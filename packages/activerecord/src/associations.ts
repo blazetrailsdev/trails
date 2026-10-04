@@ -315,7 +315,7 @@ export class Associations {
       this,
       new Module((mod) => {
         mod.defineMethod("destroyAssociations", async function (this: any): Promise<void> {
-          await this.association(middleReflection.name).deleteAll("delete_all");
+          await this.association(middleReflection.name).deleteAll("deleteAll");
           this.association(name).reset();
           await mod.superMethod(this, "destroyAssociations")!();
         });

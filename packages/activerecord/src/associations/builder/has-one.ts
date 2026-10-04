@@ -43,74 +43,41 @@ export class HasOne extends SingularAssociation {
 
   static override defineCallbacks(model: any, reflection: any): void {
     super.defineCallbacks(model, reflection);
-    const options = reflection.options ?? {};
-    if (options.touch) {
-      this.addTouchCallbacks(model, reflection);
-    }
+    if (reflection.options.touch) this.addTouchCallbacks(model, reflection);
   }
 
   static override addDestroyCallbacks(model: any, reflection: any): void {
-    const options = reflection.options ?? {};
-    if (!options.through) {
-      super.addDestroyCallbacks(model, reflection);
-    }
+    if (!reflection.options.through) super.addDestroyCallbacks(model, reflection);
   }
 
   static override defineValidations(model: any, reflection: any): void {
     super.defineValidations(model, reflection);
-    const options = reflection.options ?? {};
-    if (options.required) {
+    if (reflection.options.required) {
       model.validatesPresenceOf(reflection.name, { message: ":required" });
     }
   }
 
   static async touchRecord(record: any, name: string, touch: any): Promise<void> {
-    let instance: any;
-    if (typeof record.association === "function") {
-      const assoc = record.association(name);
-      instance = typeof assoc.loadTarget === "function" ? await assoc.loadTarget() : assoc.target;
-    } else {
-      instance = typeof record[name] === "function" ? record[name]() : record[name];
-    }
+    const instance = await record[name];
 
-    if (instance && typeof instance.isPersisted === "function" && instance.isPersisted()) {
-      if (typeof instance.touch !== "function") return;
-      if (touch === true) {
-        await instance.touch();
-      } else {
+    if (instance?.isPersisted()) {
+      if (touch !== true) {
         await instance.touch(touch);
+      } else {
+        await instance.touch();
       }
     }
   }
 
   static addTouchCallbacks(model: any, reflection: any): void {
-    const name = reflection.name ?? reflection;
-    const touch = reflection.options?.touch;
+    const name = reflection.name;
+    const touch = reflection.options.touch;
 
-    const callback = async (record: any) => {
-      await HasOne.touchRecord(record, name, touch);
-    };
-
+    const callback = (record: any) => HasOne.touchRecord(record, name, touch);
     model.afterCreate(callback, { if: ":isSavedChanges" });
-    model.afterCreateCommit(async (record: any) => {
-      record.association(name).resetNegativeCache();
-    });
+    model.afterCreateCommit((record: any) => record.association(name).resetNegativeCache());
     model.afterUpdate(callback, { if: ":isSavedChanges" });
-    model.afterDestroy(async (record: any) => {
-      if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
-        await HasOne.touchRecord(record, name, touch);
-      }
-    });
-    if (typeof model.afterTouch === "function") {
-      model.afterTouch(async (record: any) => {
-        if (record._touchingAssociations) return;
-        record._touchingAssociations = true;
-        try {
-          await HasOne.touchRecord(record, name, touch);
-        } finally {
-          record._touchingAssociations = false;
-        }
-      });
-    }
+    model.afterDestroy(callback);
+    model.afterTouch(callback);
   }
 }

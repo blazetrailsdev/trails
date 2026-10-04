@@ -1,6 +1,13 @@
-import { aryDelete, isEmpty, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
+import { aryDelete, compact, isEmpty, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
-import { underscore, compactBlank, indexBy, valuesAt } from "@blazetrails/activesupport";
+import {
+  underscore,
+  compactBlank,
+  indexBy,
+  isBlank,
+  kernelArray,
+  valuesAt,
+} from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
@@ -66,74 +73,61 @@ export abstract class CollectionAssociation extends Association {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
-  /** @missingRailsCall empty? — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck */
+  /**
+   * @missingRailsCall empty? — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
+   * @inventedArm if — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
+   */
   async idsReader(): Promise<unknown[]> {
-    const pk = this.associationPrimaryKey();
-    const keys = Array.isArray(pk) ? pk : [pk];
-    const readKey = (r: Base): unknown => {
-      const vals = keys.map((key) =>
-        typeof (r as any)._readAttribute === "function"
-          ? (r as any)._readAttribute(key)
-          : (r as any)[key],
+    const readKeys = (target: Base[], ...keys: string[]): unknown[] =>
+      target.map((record) =>
+        keys.length > 1
+          ? keys.map((key) => record.readAttribute(key))
+          : record.readAttribute(keys[0]),
       );
-      return vals.length === 1 ? vals[0] : vals;
-    };
     if (this.isLoaded()) {
-      return this.target.map(readKey);
+      return readKeys(this.target, ...kernelArray(this.reflection.associationPrimaryKey()));
+    } else if (this.target.length > 0) {
+      return readKeys(
+        await this.loadTarget(),
+        ...kernelArray(this.reflection.associationPrimaryKey()),
+      );
+    } else {
+      return (this._associationIds ??= await this.scope().pluck(
+        ...kernelArray(this.reflection.associationPrimaryKey()),
+      ));
     }
-    if (this.target.length > 0) {
-      await this.loadTarget();
-      return this.target.map(readKey);
-    }
-    if (this._associationIds) return this._associationIds;
-    const rel = this.scope();
-    if (rel && typeof rel.pluck === "function") {
-      this._associationIds = await rel.pluck(...keys);
-      return this._associationIds!;
-    }
-    return [];
-  }
-
-  protected associationPrimaryKey(): string | string[] {
-    return this.reflection.associationPrimaryKey?.() ?? (this.klass as any).primaryKey ?? "id";
   }
 
   /** @missingRailsName size — PERMANENT */
   async idsWriter(ids: unknown[]): Promise<void> {
+    const primaryKey = this.reflection.associationPrimaryKey();
     const klass = this.klass as any;
-    const primaryKey = this.associationPrimaryKey();
     const pkType = klass.typeForAttribute(primaryKey);
-    ids = compactBlank(ids == null ? [] : Array.isArray(ids) ? ids : [ids]);
+    ids = compactBlank(kernelArray(ids));
     ids = ids.map((id) => pkType.cast(id));
 
-    const indexKey = (key: unknown): string =>
-      Array.isArray(key) ? key.map(String).join(",") : String(key);
     let indexed: Record<string, Base>;
     if (klass.compositePrimaryKey) {
-      const rows: Base[] = await klass.where(new Map([[primaryKey, ids]])).toArray();
-      indexed = indexBy<Base, string>(rows, (record) =>
-        indexKey(
-          (primaryKey as string[]).map((primaryKey) => (record as any)._readAttribute(primaryKey)),
-        ),
+      indexed = indexBy<Base, string>(
+        await klass.where(new Map([[primaryKey, ids]])).toArray(),
+        (record) =>
+          String(
+            (primaryKey as string[]).map((primaryKey) =>
+              (record as any)._readAttribute(primaryKey),
+            ),
+          ),
       );
     } else {
-      const rows: Base[] = await klass.where({ [primaryKey as string]: ids }).toArray();
-      indexed = indexBy<Base, string>(rows, (record) =>
-        indexKey((record as any)._readAttribute(primaryKey as string)),
+      indexed = indexBy<Base, string>(
+        await klass.where({ [primaryKey as string]: ids }).toArray(),
+        (record) => String((record as any)._readAttribute(primaryKey)),
       );
     }
-    const records: Base[] = valuesAt(indexed, ...ids.map(indexKey)).filter(
-      (record): record is Base => record != null,
-    );
+    const records = compact(valuesAt(indexed, ...ids.map(String)));
 
     if (records.length !== ids.length) {
-      const foundIds = records.map((record) =>
-        Array.isArray(primaryKey)
-          ? primaryKey.map((primaryKey) => (record as any)._readAttribute(primaryKey))
-          : (record as any)._readAttribute(primaryKey),
-      );
-      const foundKeys = new Set(foundIds.map(indexKey));
-      const notFoundIds = ids.filter((id) => !foundKeys.has(indexKey(id)));
+      const foundIds = records.map((record) => String((record as any)._readAttribute(primaryKey)));
+      const notFoundIds = ids.filter((id) => !foundIds.includes(String(id)));
       klass
         .all()
         .raiseRecordNotFoundExceptionBang(ids, records.length, ids.length, primaryKey, notFoundIds);
@@ -152,34 +146,30 @@ export abstract class CollectionAssociation extends Association {
 
   /** @missingRailsName size — PERMANENT */
   async find(...args: unknown[]): Promise<Base | Base[] | null> {
-    const scope = this.scope();
-
-    if (this.reflection.options.inverseOf && this.isLoaded()) {
+    if (this.options.inverseOf && this.isLoaded()) {
       const argsFlatten = (args as any[]).flat(Infinity);
-      const model = scope.model;
+      const model = this.scope().model;
 
-      if (argsFlatten.length === 0) {
-        throw new RecordNotFound(
-          `Couldn't find ${model.name} without an ID`,
-          model.name,
-          String(model.primaryKey),
-          args,
-        );
+      if (isBlank(argsFlatten)) {
+        const errorMessage = `Couldn't find ${model.name} without an ID`;
+        throw new RecordNotFound(errorMessage, model.name, String(model.primaryKey), args);
       }
 
       const result = this.findByScan(args);
 
-      const resultSize = Array.isArray(result) ? result.length : result == null ? 0 : 1;
+      const resultSize = kernelArray(result).length;
       if (!result || resultSize !== argsFlatten.length) {
-        scope.raiseRecordNotFoundExceptionBang(argsFlatten, resultSize, argsFlatten.length);
+        return this.scope().raiseRecordNotFoundExceptionBang(
+          argsFlatten,
+          resultSize,
+          argsFlatten.length,
+        );
+      } else {
+        return result as Base | Base[];
       }
-      return result as Base | Base[];
+    } else {
+      return this.scope().find(...args);
     }
-
-    if (scope && typeof scope.find === "function") {
-      return await scope.find(...args);
-    }
-    return null;
   }
 
   build(attributes: Record<string, unknown>[], block?: (record: Base) => void): Base[];
@@ -195,6 +185,7 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   concat(...records: Base[]): Promise<Base[] | undefined> | Base[] | undefined {
     records = records.flat();
     if (this.owner.isNewRecord()) {
@@ -208,11 +199,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected transaction<R>(block: () => Promise<R> | R): Promise<R | undefined> {
-    const klass = (this.reflection as any).klass ?? this.klass;
-    if (klass && typeof klass.transaction === "function") {
-      return klass.transaction(() => Promise.resolve(block()));
-    }
-    return Promise.resolve(block());
+    return (this.reflection.klass as any).transaction(block);
   }
 
   /** @internal */
@@ -317,24 +304,15 @@ export abstract class CollectionAssociation extends Association {
   }
 
   async deleteAll(dependent?: string): Promise<number> {
-    if (
-      dependent &&
-      dependent !== "nullify" &&
-      dependent !== "delete_all" &&
-      dependent !== "deleteAll"
-    ) {
+    if (dependent && !["nullify", "deleteAll"].includes(dependent)) {
       throw new ArgumentError("Valid values are :nullify or :delete_all");
     }
 
-    const optionDep = this.options.dependent;
-    dependent =
-      dependent === "delete_all"
+    dependent = dependent
+      ? dependent
+      : this.options.dependent === "destroy" || this.options.dependent === "delete"
         ? "deleteAll"
-        : dependent
-          ? dependent
-          : optionDep === "destroy" || optionDep === "delete"
-            ? "deleteAll"
-            : optionDep;
+        : (this.options.dependent as string | undefined);
 
     const count = await this.deleteOrNullifyAllRecords(dependent);
 
@@ -393,6 +371,7 @@ export abstract class CollectionAssociation extends Association {
     return this.target.length === 0 && !(await this.scope().isExists());
   }
 
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   replace(otherArray: Base[]): Promise<Base[] | undefined> | Base[] {
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const replaceAgainst = (originalTarget: Base[]): Promise<Base[] | undefined> | Base[] => {
@@ -458,6 +437,7 @@ export abstract class CollectionAssociation extends Association {
     return this.target.some((r) => r.equals(record));
   }
 
+  /** @inventedArm if — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch */
   override loadTarget(): Promise<Base[]> | Base[] {
     const loaded = (): Base[] => {
       this.loadedBang();
@@ -495,13 +475,12 @@ export abstract class CollectionAssociation extends Association {
     save?: () => Promise<void> | void,
   ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace = false } = options;
-    const distinctValue = !!(this.associationScope() as { distinctValue?: boolean } | undefined)
-      ?.distinctValue;
-    const shouldReplace = replace || distinctValue;
-    if (save) {
-      return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }, save);
-    }
-    return this.replaceOnTarget(record, skipCallbacks, { replace: shouldReplace }) as Base | null;
+    return this.replaceOnTarget(
+      record,
+      skipCallbacks,
+      { replace: replace || this.associationScope().distinctValue },
+      save,
+    );
   }
 
   override scope(): any {
@@ -528,6 +507,10 @@ export abstract class CollectionAssociation extends Association {
     return true;
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch
+   * @inventedArm try — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch
+   */
   get reader(): AssociationProxy {
     this.ensureKlassExists();
 

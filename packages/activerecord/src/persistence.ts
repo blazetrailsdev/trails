@@ -451,16 +451,7 @@ export async function save<T extends SaveRecord>(
 
   try {
     return (await withTransactionReturningStatus.call(self, async () => {
-      if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
-        await self._runBelongsToDefaults();
-        self._belongsToDefaultsApplied = true;
-      }
-      let validationsPassed: boolean;
-      try {
-        validationsPassed = await performValidations.call(this, options);
-      } finally {
-        self._belongsToDefaultsApplied = false;
-      }
+      const validationsPassed = await performValidations.call(this, options);
       if (!validationsPassed) return false;
       if (this._readonly) {
         throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);

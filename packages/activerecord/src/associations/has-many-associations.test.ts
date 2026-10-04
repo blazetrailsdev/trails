@@ -2313,7 +2313,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = companies("first_firm") as any;
     const clientId = (await firm.dependentClientsOfFirm.first()).id;
     const count = await firm.dependentClientsOfFirm.count();
-    expect(await firm.dependentClientsOfFirm.deleteAll("delete_all")).toBe(count);
+    expect(await firm.dependentClientsOfFirm.deleteAll("deleteAll")).toBe(count);
     expect(await (Client as any).findById(clientId)).toBeNull();
   });
 

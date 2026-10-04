@@ -1,5 +1,5 @@
-import { Module } from "@blazetrails/ruby-compat";
-import { camelize, singularize } from "@blazetrails/activesupport";
+import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { camelize, classAttribute, kernelArray, singularize } from "@blazetrails/activesupport";
 import { Association, type AssociationInstanceHost } from "./association.js";
 
 /** @noRailsEquivalent CONVERGEABLE retire-ids-name-helper-constructor-dispatch */
@@ -23,8 +23,8 @@ export class CollectionAssociation extends Association {
 
   static override defineCallbacks(model: any, reflection: any): void {
     super.defineCallbacks(model, reflection);
-    const name = reflection.name ?? reflection;
-    const options = reflection.options ?? {};
+    const name = reflection.name;
+    const options = reflection.options;
     for (const callbackName of CALLBACKS) {
       this.defineCallback(model, callbackName, name, options);
     }
@@ -50,26 +50,22 @@ export class CollectionAssociation extends Association {
     name: string,
     options: Record<string, unknown>,
   ): void {
-    const callbackValues = Array.isArray(options[callbackName])
-      ? options[callbackName]
-      : options[callbackName] != null
-        ? [options[callbackName]]
-        : [];
-
     const fullCallbackName = `${callbackName}For${name.charAt(0).toUpperCase()}${name.slice(1)}`;
 
-    const isMethodDefined = fullCallbackName in model;
+    const callbackValues = kernelArray(options[callbackName]);
+    const methodDefined = rbObjRespondTo(model, fullCallbackName);
 
-    if (callbackValues.length === 0) {
-      if (!isMethodDefined) return;
-      if (!Object.prototype.hasOwnProperty.call(model, fullCallbackName)) {
-        model[fullCallbackName] = [];
-      }
-      return;
+    if (callbackValues.length === 0 && !methodDefined) return;
+
+    if (!methodDefined) {
+      classAttribute.call(model, fullCallbackName, {
+        instanceAccessor: false,
+        instancePredicate: false,
+      });
     }
 
-    const normalized = callbackValues.map((callback: any) => {
-      if (typeof callback === "string" || typeof callback === "symbol") {
+    const callbacks = callbackValues.map((callback: any) => {
+      if (typeof callback === "string") {
         return (_method: string, owner: any, record: any) => owner[callback](record);
       } else if (typeof callback === "function") {
         return (_method: string, owner: any, record: any) => callback(owner, record);
@@ -77,17 +73,7 @@ export class CollectionAssociation extends Association {
         return (method: string, owner: any, record: any) => callback[method](owner, record);
       }
     });
-
-    const existing = Object.prototype.hasOwnProperty.call(model, fullCallbackName)
-      ? model[fullCallbackName]
-      : undefined;
-    const prior = Array.isArray(existing) ? existing : [];
-    model[fullCallbackName] = [...prior, ...normalized];
-
-    const reflection = model._reflectOnAssociation?.(name);
-    if (reflection) {
-      reflection.options[callbackName] = model[fullCallbackName];
-    }
+    model[fullCallbackName] = callbacks;
   }
 
   static override defineReaders(mixin: Module, name: string): void {

@@ -1,5 +1,14 @@
-import { first, type Hash, hashDelete, hasKey, type Module, rtest } from "@blazetrails/ruby-compat";
-import { underscore, pluralize, isBlank, safeConstantize } from "@blazetrails/activesupport";
+import {
+  first,
+  type Hash,
+  hashDelete,
+  hasKey,
+  type Module,
+  rbObjRespondTo,
+  rtest,
+  union,
+} from "@blazetrails/ruby-compat";
+import { safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
@@ -29,290 +38,153 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static override defineCallbacks(model: any, reflection: any): void {
-    const options = reflection.options ?? {};
-    const dependent = options.dependent;
-    if (dependent) {
-      this.checkDependentOptions(dependent as string, model);
-      this.addDestroyCallbacks(model, reflection);
-      this.addAfterCommitJobsCallback(model, dependent as string);
-    }
-    for (const extension of this.extensions) {
-      if (typeof extension.build === "function") {
-        extension.build(model, reflection);
-      }
-    }
-    if (options.counterCache) {
-      this.addCounterCacheCallbacks(model, reflection);
-    }
-    if (options.touch) {
-      this.addTouchCallbacks(model, reflection);
-    }
-    if (options.default != null) {
-      this.addDefaultCallbacks(model, reflection);
-    }
+    super.defineCallbacks(model, reflection);
+    if (reflection.options.counterCache) this.addCounterCacheCallbacks(model, reflection);
+    if (reflection.options.touch) this.addTouchCallbacks(model, reflection);
+    if (reflection.options.default) this.addDefaultCallbacks(model, reflection);
   }
 
+  /** @inventedArm if — CONVERGEABLE eliminate-pending-counter-cache-deferral-via-lazy-target-resolution */
   static addCounterCacheCallbacks(model: any, reflection: any): void {
-    const name = reflection.name;
+    const cacheColumn = reflection.counterCacheColumn();
 
-    const cacheColumn = (): string =>
-      (typeof reflection.counterCacheColumn === "function"
-        ? reflection.counterCacheColumn()
-        : null) ?? `${pluralize(underscore(model.name))}_count`;
+    model.afterUpdate(async (record: any) => {
+      const association = record.association(reflection.name);
+
+      if (association.isSavedChangeToTarget()) {
+        await association.incrementCounters();
+        await association.decrementCountersBeforeLastSave();
+      }
+    });
+
     const klass = safeConstantize(reflection.className) as any;
+    if (klass && rbObjRespondTo(klass, "_counterCacheColumns")) {
+      klass._counterCacheColumns = union(klass._counterCacheColumns, [cacheColumn]);
+    }
     if (!klass) {
       const pending =
         pendingCounterCacheColumns.get(reflection.className) ?? new Set<() => string>();
-      pending.add(cacheColumn);
+      pending.add(() => cacheColumn);
       pendingCounterCacheColumns.set(reflection.className, pending);
-    } else if ("_counterCacheColumns" in klass) {
-      const column = cacheColumn();
-      if (!klass._counterCacheColumns.includes(column)) {
-        klass._counterCacheColumns = [...klass._counterCacheColumns, column];
-      }
     }
-
-    if (!model.counterCachedAssociationNames.includes(name)) {
-      model.counterCachedAssociationNames = [...model.counterCachedAssociationNames, name];
-    }
-
-    model.afterUpdate(async (record: any) => {
-      const assoc = record.association(name);
-      if (assoc.isSavedChangeToTarget()) {
-        await assoc.incrementCounters();
-        await assoc.decrementCountersBeforeLastSave();
-      }
-    });
-  }
-
-  private static async touchParent(target: any, touch: any): Promise<void> {
-    if (Array.isArray(touch) && touch.length === 0) return;
-    const touchFn = target.touchLater ?? target.touch;
-    if (typeof touchFn !== "function") return;
-    if (touch === true) {
-      await touchFn.call(target);
-    } else if (Array.isArray(touch)) {
-      await touchFn.call(target, ...touch);
-    } else {
-      await touchFn.call(target, touch);
-    }
-  }
-
-  private static buildFindConditions(
-    pk: string | string[],
-    fkValue: any,
-  ): Record<string, unknown> | null {
-    if (Array.isArray(pk)) {
-      const values = Array.isArray(fkValue) ? fkValue : [fkValue];
-      if (pk.length !== values.length) return null;
-      if (values.some((v) => v == null)) return null;
-      return Object.fromEntries(pk.map((key, i) => [key, values[i]]));
-    }
-    if (fkValue == null) return null;
-    return { [pk]: fkValue };
+    model.counterCachedAssociationNames = union(model.counterCachedAssociationNames, [
+      reflection.name,
+    ]);
   }
 
   static async touchRecord(
     o: any,
-    changes: Hash<string, unknown>,
+    changes: Hash<string | string[], unknown[]>,
     foreignKey: string | string[],
     name: string,
     touch: any,
   ): Promise<void> {
-    const fkColumns = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
+    const oldForeignId = changes.get(foreignKey) && first(changes.get(foreignKey)!);
 
-    const oldFkValues = fkColumns.map((col) => {
-      const change = changes.get(col) as [unknown, unknown] | undefined;
-      if (change) return first(change);
-      return typeof o._readAttribute === "function" ? o._readAttribute(col) : o[col];
-    });
-    const foreignTypeCol = `${underscore(name)}_type`;
-    const hasOldFk =
-      fkColumns.some((col) => changes.get(col) != null) || changes.get(foreignTypeCol) != null;
+    if (rtest(oldForeignId)) {
+      const association = o.association(name);
+      const reflection = association.reflection;
+      let klass: any;
+      if (reflection.isPolymorphic()) {
+        const foreignType = reflection.foreignType;
+        klass = (changes.get(foreignType) && first(changes.get(foreignType)!)) || o[foreignType];
+        klass = o.constructor.polymorphicClassFor(klass);
+      } else {
+        klass = association.klass;
+      }
+      const primaryKey = reflection.associationPrimaryKey(klass);
+      const oldRecord = await klass.findBy({ [primaryKey]: oldForeignId });
 
-    if (hasOldFk) {
-      const association = typeof o.association === "function" ? o.association(name) : null;
-      if (association) {
-        const reflection = association.reflection;
-        let klass: any;
-        const isPolymorphic =
-          reflection?.options?.polymorphic ??
-          (typeof reflection?.isPolymorphic === "function" && reflection.isPolymorphic());
-        if (isPolymorphic) {
-          const foreignType =
-            reflection?.foreignType ??
-            reflection?.options?.foreignType ??
-            `${underscore(name)}_type`;
-          klass = changes.get(foreignType) && first(changes.get(foreignType) as unknown[]);
-          if (!rtest(klass)) {
-            klass =
-              typeof o._readAttribute === "function"
-                ? o._readAttribute(foreignType)
-                : o[foreignType];
-          }
-          try {
-            klass = klass
-              ? (o.constructor as { polymorphicClassFor(name: string): any }).polymorphicClassFor(
-                  klass,
-                )
-              : null;
-          } catch {
-            klass = null;
-          }
+      if (oldRecord) {
+        if (touch !== true) {
+          await oldRecord.touchLater(touch);
         } else {
-          klass = association.klass;
-        }
-        if (klass) {
-          const pk = reflection.associationPrimaryKey(klass);
-          const oldFkValue = fkColumns.length === 1 ? oldFkValues[0] : oldFkValues;
-          const conditions = BelongsTo.buildFindConditions(pk, oldFkValue);
-          if (conditions && typeof klass.findBy === "function") {
-            const oldRecord = await klass.findBy(conditions);
-            if (oldRecord) await BelongsTo.touchParent(oldRecord, touch);
-          }
+          await oldRecord.touchLater();
         }
       }
     }
 
-    const association = typeof o.association === "function" ? o.association(name) : null;
-    if (association && typeof association.loadTarget === "function") {
-      const parent = await association.loadTarget();
-      if (parent && !Array.isArray(parent) && parent.isPersisted?.()) {
-        await BelongsTo.touchParent(parent, touch);
+    const record = await o[name];
+    if (record && record.isPersisted()) {
+      if (touch !== true) {
+        await record.touchLater(touch);
+      } else {
+        await record.touchLater();
       }
     }
   }
 
   static addTouchCallbacks(model: any, reflection: any): void {
-    const foreignKey =
-      reflection.foreignKey() ??
-      reflection.options?.foreignKey ??
-      reflection.options?.queryConstraints;
+    const foreignKey = reflection.foreignKey();
     const name = reflection.name;
-    const touch = reflection.options?.touch;
+    const touch = reflection.options.touch;
 
-    const makeCallback = (changesMethod: string) => async (record: any) => {
-      await BelongsTo.touchRecord(record, record[changesMethod], foreignKey, name, touch);
-    };
+    const callback = (changesMethod: string) => (record: any) =>
+      BelongsTo.touchRecord(record, record[changesMethod], foreignKey, name, touch);
 
-    const hasCounterCache =
-      typeof reflection.counterCacheColumn === "function" &&
-      reflection.counterCacheColumn() != null;
-    if (hasCounterCache) {
-      model.afterUpdate(async (record: any) => {
-        if (typeof record.isSavedChanges === "function" && !record.isSavedChanges()) return;
-        const assoc =
-          typeof record.association === "function" ? record.association(name) : undefined;
-        if (assoc && typeof assoc.isSavedChangeToTarget === "function") {
-          if (assoc.isSavedChangeToTarget()) return;
+    if (reflection.counterCacheColumn()) {
+      const touchCallback = callback("savedChanges");
+      const updateCallback = async (record: any) => {
+        if (!record.association(reflection.name).isSavedChangeToTarget()) {
+          await touchCallback(record);
         }
-        await makeCallback("savedChanges")(record);
-      });
+      };
+      model.afterUpdate(updateCallback, { if: ":isSavedChanges" });
     } else {
-      model.afterCreate(makeCallback("savedChanges"), {
-        if: (record: any) => record.isSavedChanges(),
-      });
-      model.afterUpdate(makeCallback("savedChanges"), {
-        if: (record: any) => record.isSavedChanges(),
-      });
-      model.afterDestroy(makeCallback("changesToSave"));
+      model.afterCreate(callback("savedChanges"), { if: ":isSavedChanges" });
+      model.afterUpdate(callback("savedChanges"), { if: ":isSavedChanges" });
+      model.afterDestroy(callback("changesToSave"));
     }
 
-    if (typeof model.afterTouch === "function") {
-      model.afterTouch(async (record: any) => {
-        if (record._touchingAssociations) return;
-        record._touchingAssociations = true;
-        try {
-          await makeCallback("changesToSave")(record);
-        } finally {
-          record._touchingAssociations = false;
-        }
-      });
-    }
+    model.afterTouch(callback("changesToSave"));
   }
 
   static addDefaultCallbacks(model: any, reflection: any): void {
-    model.beforeValidation((record: any) => {
-      if (record._belongsToDefaultsApplied) return;
-      if (typeof record.association !== "function") return;
-      const assoc = record.association(reflection.name);
-      if (typeof assoc.default === "function") {
-        void assoc.default(reflection.options?.default);
-      }
-    });
+    model.beforeValidation((o: any) =>
+      o.association(reflection.name).default(reflection.options.default),
+    );
   }
 
   static override addDestroyCallbacks(model: any, reflection: any): void {
-    const name = reflection.name;
-    model.afterDestroy((record: any) => {
-      return record.association(name).handleDependency();
-    });
+    model.afterDestroy((o: any) => o.association(reflection.name).handleDependency());
   }
 
+  /** @inventedArm validate — CONVERGEABLE ar-read-attribute-for-validation-is-not-send */
   static override defineValidations(model: any, reflection: any): void {
-    const options = reflection.options ?? {};
-
-    if (hasKey(options, "required")) {
-      options.optional = !hashDelete(options, "required");
+    if (hasKey(reflection.options, "required")) {
+      reflection.options.optional = !hashDelete(reflection.options, "required");
     }
 
-    let required: boolean | null | undefined;
-    if (options.optional == null) {
+    let required: boolean;
+    if (reflection.options.optional == null) {
       required = model.belongsToRequiredByDefault;
     } else {
-      required = !options.optional;
+      required = !reflection.options.optional;
     }
 
     super.defineValidations(model, reflection);
 
-    if (required && typeof model.validatesPresenceOf === "function") {
-      const name = reflection.name;
-      const polymorphic = !!reflection.options?.polymorphic;
-      const rawFk =
-        reflection.foreignKey() ?? options.foreignKey ?? `${underscore(reflection.name)}_id`;
-      const foreignKeys = Array.isArray(rawFk) ? rawFk : [rawFk];
-      const foreignTypes = polymorphic
-        ? Array.isArray(reflection.foreignType)
-          ? (reflection.foreignType as string[])
-          : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
-        : [];
+    if (required) {
+      const loadTarget = (record: any) => record.association(reflection.name).loadTarget();
+      if (belongsToRequiredValidatesForeignKey()) {
+        model.validate(loadTarget);
+        model.validatesPresenceOf(reflection.name, { message: ":required" });
+      } else {
+        const condition = (record: any) => {
+          const foreignKey = reflection.foreignKey();
+          const foreignType = reflection.foreignType;
 
-      const foreignKeyPresent = (record: any): boolean => {
-        if (foreignKeys.length === 0) return false;
-        if (!foreignKeys.every((key) => !isBlank(record._readAttribute(key)))) return false;
-        if (!polymorphic) return true;
-        return foreignTypes.every((type) => !isBlank(record._readAttribute(type)));
-      };
+          return (
+            record.readAttribute(foreignKey) == null ||
+            record.attributeChanged(foreignKey) ||
+            (reflection.isPolymorphic() &&
+              (record.readAttribute(foreignType) == null || record.attributeChanged(foreignType)))
+          );
+        };
 
-      const needsValidation = (record: any, attrs: string[]) =>
-        attrs.some(
-          (attr) =>
-            record._readAttribute(attr) == null ||
-            (typeof record.attributeChanged === "function" && record.attributeChanged(attr)),
-        );
-      const railsRuns = belongsToRequiredValidatesForeignKey()
-        ? () => true
-        : (record: any) =>
-            needsValidation(record, foreignKeys) ||
-            (polymorphic && needsValidation(record, foreignTypes));
-
-      const condition: (record: any) => boolean = (record) =>
-        railsRuns(record) && !foreignKeyPresent(record);
-
-      model.validatesPresenceOf(name, { message: ":required", if: condition });
-
-      model.validate(
-        async (record: any) => {
-          let target: unknown = null;
-          if (typeof record.association === "function") {
-            target = await record.association(name).loadTarget();
-          }
-          if (target == null) {
-            record.errors.add(name, ":blank", { message: ":required" });
-          }
-        },
-        { if: (record: any) => railsRuns(record) && foreignKeyPresent(record) },
-      );
+        model.validate(loadTarget, { if: condition });
+        model.validatesPresenceOf(reflection.name, { message: ":required", if: condition });
+      }
     }
   }
 

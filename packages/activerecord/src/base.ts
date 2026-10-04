@@ -54,7 +54,7 @@ import {
   usingSingleTableInheritance as _usingSingleTableInheritance,
   qualifiedName,
 } from "./inheritance.js";
-import { NotImplementedError } from "./errors.js";
+import { NotImplementedError, RecordNotDestroyed } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -1827,34 +1827,27 @@ export class Base extends Model {
     }
   }
 
-  /** @internal */
-  private async _runBelongsToDefaults(): Promise<void> {
-    const ctor = this.constructor as typeof Base;
-    if (typeof (this as any).association !== "function") return;
-    for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
-      const block = (ref as any).options?.default;
-      if (block == null) continue;
-      const assoc = (this as any).association(ref.name);
-      if (typeof assoc?.default === "function") {
-        await assoc.default(block);
-      }
-    }
-  }
-
   private async _destroyRow(): Promise<boolean> {
     await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
-    const destroyResult = await this.runCallbacks("destroy", async () => {
-      await (this as any).destroyAssociations();
+    let destroyResult: unknown;
+    try {
+      destroyResult = await this.runCallbacks("destroy", async () => {
+        await (this as any).destroyAssociations();
 
-      if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
+        if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
 
-      this._destroyed = true;
-      this._previouslyNewRecord = false;
-      this.freeze();
-      return true;
-    });
+        this._destroyed = true;
+        this._previouslyNewRecord = false;
+        this.freeze();
+        return true;
+      });
+    } catch (e) {
+      if (!(e instanceof RecordNotDestroyed)) throw e;
+      (this as any)._associationDestroyException = e;
+      return false;
+    }
 
     if (!destroyResult) return false;
 

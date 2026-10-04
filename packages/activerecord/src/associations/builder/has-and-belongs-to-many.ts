@@ -8,7 +8,7 @@ import {
   demodulize,
 } from "@blazetrails/activesupport";
 import { joinHabtmTableNames } from "../../associations.js";
-import { ConfigurationError } from "../../errors.js";
+import { ActiveRecord } from "../../namespaces.js";
 import { HasMany } from "./has-many.js";
 
 export class HasAndBelongsToMany {
@@ -26,15 +26,8 @@ export class HasAndBelongsToMany {
     const builder = this;
     const lhsModel = this.lhsModel;
 
-    let BaseClass: any = lhsModel;
-    let parent = Object.getPrototypeOf(BaseClass);
-    while (parent && parent !== Function.prototype && typeof parent.create === "function") {
-      BaseClass = parent;
-      parent = Object.getPrototypeOf(BaseClass);
-    }
-
     let tableName: string | null = null;
-    const joinModel: any = class extends BaseClass {
+    const joinModel: any = class extends (ActiveRecord.Base as any) {
       static leftModel: any;
       static tableNameResolver: () => string;
       static leftReflection: any;
@@ -80,11 +73,6 @@ export class HasAndBelongsToMany {
       }
     };
 
-    const ownerFk = this.options.foreignKey;
-    if (Array.isArray(ownerFk)) {
-      throw new ConfigurationError("HABTM associations do not support composite foreign keys");
-    }
-
     Object.defineProperty(joinModel, "name", {
       value: `HABTM_${camelize(this.associationName)}`,
       writable: true,
@@ -92,15 +80,13 @@ export class HasAndBelongsToMany {
     });
     joinModel.tableNameResolver = () => builder._tableName();
     joinModel.leftModel = lhsModel;
-
-    if (lhsModel.moduleName) {
-      joinModel.moduleName = lhsModel.moduleName;
-    }
+    joinModel.moduleName = lhsModel.moduleName;
 
     joinModel.addLeftAssociation("leftSide", {
       anonymousClass: lhsModel,
       foreignKey:
-        ownerFk ?? `${underscore(demodulize(lhsModel._demodulizedName ?? lhsModel.name))}_id`,
+        this.options.foreignKey ??
+        `${underscore(demodulize(lhsModel._demodulizedName ?? lhsModel.name))}_id`,
     });
     joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
     joinModel.primaryKey = [
