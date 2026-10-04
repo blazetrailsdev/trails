@@ -668,9 +668,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await freshAdapter();
     const Book = EncryptedBookWithBinary;
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
-    expect((await Book.create({ logo: allBytes })).logo).toEqual(allBytes);
+    expect(new Uint8Array((await Book.create({ logo: allBytes })).logo as Uint8Array)).toEqual(
+      allBytes,
+    );
     expect((await Book.create({ logo: null })).logo).toBeNull();
-    expect((await Book.create({ logo: new Uint8Array(0) })).logo).toEqual(new Uint8Array(0));
+    expect(
+      new Uint8Array((await Book.create({ logo: new Uint8Array(0) })).logo as Uint8Array),
+    ).toEqual(new Uint8Array(0));
   });
   it("binary data can be encrypted uncompressed", async () => {
     await freshAdapter();

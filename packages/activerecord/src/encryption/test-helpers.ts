@@ -228,8 +228,8 @@ export function makeEncryptedBookWithCustomCompressor() {
     deflate(data: string): Buffer | Uint8Array {
       return Configurable.config.compressor.deflate(data);
     },
-    inflate(data: Buffer | Uint8Array): string {
-      return "[compressed] " + Configurable.config.compressor.inflate(data);
+    inflate(data: Buffer | Uint8Array): Buffer {
+      return Buffer.from("[compressed] " + Configurable.config.compressor.inflate(data));
     },
   };
   return class EncryptedBookWithCustomCompressor extends Base {

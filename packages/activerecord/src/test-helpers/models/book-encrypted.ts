@@ -166,7 +166,7 @@ export class EncryptedBookWithCustomCompressor extends Base {
     this.encrypts("name", {
       compressor: {
         deflate: (value: string): Buffer => Buffer.from(`[compressed] ${value}`),
-        inflate: (data: Buffer | Uint8Array): string => Buffer.from(data).toString(),
+        inflate: (data: Buffer | Uint8Array): Buffer => Buffer.from(data),
       },
     });
   }

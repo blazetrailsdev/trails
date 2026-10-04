@@ -1,5 +1,12 @@
 import { isPresent } from "@blazetrails/activesupport";
-import { EncodingError, rbObjClassname, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  EncodingError,
+  OpenSSL,
+  forceEncoding,
+  rbObjClassname,
+  rbObjEncoding,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import type { Properties } from "./properties.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
@@ -16,9 +23,9 @@ export interface EncryptorOptions {
 }
 
 export interface EncryptorLike {
-  encrypt(clearText: string, options?: Record<string, unknown>): string;
-  decrypt(encryptedText: string, options?: Record<string, unknown>): string;
-  isEncrypted(text: string): boolean;
+  encrypt(clearText: string | Bytes, options?: Record<string, unknown>): string | Bytes;
+  decrypt(encryptedText: string | Bytes, options?: Record<string, unknown>): string | Bytes;
+  isEncrypted(text: string | Bytes): boolean;
   isBinary(): boolean;
 }
 
@@ -39,12 +46,12 @@ export class Encryptor {
   }
 
   encrypt(
-    clearText: string,
+    clearText: string | Bytes,
     {
       keyProvider = this.defaultKeyProvider(),
       cipherOptions = {},
     }: { keyProvider?: KeyProviderLike; cipherOptions?: { deterministic?: boolean } } = {},
-  ): string {
+  ): string | Bytes {
     if (cipherOptions.deterministic) clearText = this.forceEncodingIfNeeded(clearText);
 
     this.validatePayloadType(clearText);
@@ -54,12 +61,12 @@ export class Encryptor {
   }
 
   decrypt(
-    encryptedText: string,
+    encryptedText: string | Bytes,
     {
       keyProvider = this.defaultKeyProvider(),
       cipherOptions = {},
     }: { keyProvider?: KeyProviderLike; cipherOptions?: Record<string, unknown> } = {},
-  ): string {
+  ): string | Bytes {
     try {
       const message = this.deserializeMessage(encryptedText);
       const keys = keyProvider.decryptionKeys(message);
@@ -73,6 +80,7 @@ export class Encryptor {
         !(
           e instanceof EncodingError ||
           e instanceof Encoding ||
+          e instanceof OpenSSL.Cipher.CipherError ||
           e instanceof EncryptedContentIntegrity ||
           e instanceof Decryption
         )
@@ -83,7 +91,7 @@ export class Encryptor {
     }
   }
 
-  isEncrypted(text: string): boolean {
+  isEncrypted(text: string | Bytes): boolean {
     try {
       this.deserializeMessage(text);
       return true;
@@ -116,7 +124,7 @@ export class Encryptor {
 
   /** @internal */
   private validatePayloadType(clearText: unknown): void {
-    if (typeof clearText !== "string") {
+    if (!(typeof clearText === "string" || clearText instanceof Uint8Array)) {
       throw new ForbiddenClass(
         `The encryptor can only encrypt string values (${rbObjClassname(clearText)})`,
       );
@@ -124,12 +132,12 @@ export class Encryptor {
   }
 
   /** @internal */
-  private serializeMessage(message: Message): string {
+  private serializeMessage(message: Message): string | Bytes {
     return this.serializer().dump(message);
   }
 
   /** @internal */
-  private deserializeMessage(message: string): Message {
+  private deserializeMessage(message: string | Bytes): Message {
     try {
       return this.serializer().load(message);
     } catch (e) {
@@ -145,7 +153,7 @@ export class Encryptor {
 
   /** @internal */
   private buildEncryptedMessage(
-    clearText: string | Buffer,
+    clearText: string | Bytes,
     {
       keyProvider,
       cipherOptions,
@@ -154,7 +162,7 @@ export class Encryptor {
     const key = keyProvider.encryptionKey();
 
     let wasCompressed: boolean;
-    [clearText, wasCompressed] = this.compressIfWorthIt(clearText as string);
+    [clearText, wasCompressed] = this.compressIfWorthIt(clearText);
     const message = this.cipher().encrypt(clearText, { key: key.secret, ...cipherOptions });
     message.headers.add(key.publicTags);
     if (wasCompressed) message.headers.compressed = true;
@@ -162,42 +170,45 @@ export class Encryptor {
   }
 
   /** @internal */
-  private compressIfWorthIt(string: string): [string | Buffer, boolean] {
-    if (
-      this.isCompress() &&
-      Buffer.byteLength(string, "utf-8") > THRESHOLD_TO_JUSTIFY_COMPRESSION
-    ) {
+  private compressIfWorthIt(string: string | Bytes): [string | Bytes, boolean] {
+    if (this.isCompress() && Buffer.byteLength(string) > THRESHOLD_TO_JUSTIFY_COMPRESSION) {
       return [this.compress(string), true];
+    } else {
+      return [string, false];
     }
-    return [string, false];
   }
 
   /** @internal */
-  private compress(data: string): Buffer {
-    const result = this._compressor.deflate(data);
-    return Buffer.isBuffer(result) ? result : Buffer.from(result);
+  private compress(data: string | Bytes): string | Bytes {
+    const compressedData = this._compressor.deflate(data);
+    return forceEncoding(compressedData, rbObjEncoding(data));
   }
 
   /** @internal */
-  private uncompressIfNeeded(data: Bytes, compressed: boolean | undefined): string {
+  private uncompressIfNeeded(
+    data: string | Bytes,
+    compressed: boolean | undefined,
+  ): string | Bytes {
     if (compressed) {
       return this.uncompress(data);
+    } else {
+      return data;
     }
-    return data.toString("utf-8");
   }
 
   /** @internal */
-  private uncompress(data: Buffer | Uint8Array): string {
-    return this._compressor.inflate(data);
+  private uncompress(data: string | Bytes): string | Bytes {
+    const uncompressedData = this._compressor.inflate(data);
+    return forceEncoding(uncompressedData, rbObjEncoding(data));
   }
 
   /** @internal */
-  private forceEncodingIfNeeded(value: string): string {
+  private forceEncodingIfNeeded(value: string | Bytes): string | Bytes {
     const enc = this.forcedEncodingForDeterministicEncryption();
     if (!enc) return value;
     const normalized = normalizeEncoding(enc);
     if (!normalized || normalized === "utf8") return value;
-    return replaceUnencodable(value, normalized === "ascii" ? 0x7f : 0xff);
+    return replaceUnencodable(value as string, normalized === "ascii" ? 0x7f : 0xff);
   }
 
   /** @internal */

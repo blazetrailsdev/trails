@@ -187,22 +187,16 @@ export class EncryptedAttributeType extends ValueType {
     return first(this.previousTypes)!.serialize(value);
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE encryption-binary-clear-text-rides-as-bytes-with-encoding-header
-   */
+  /** @internal */
   private serializeWithCurrent(value: unknown): unknown {
     let castedValue = this.castType.serialize(value) as string | BinaryData | null;
     if (this.isDowncase) castedValue = (castedValue as string | null)?.toLowerCase() as string;
-    if (castedValue != null) {
-      const text = toS(castedValue);
-      return this.encrypt(typeof text === "string" ? text : Buffer.from(text).toString("latin1"));
-    }
+    if (castedValue != null) return this.encrypt(toS(castedValue));
     return null;
   }
 
   /** @internal */
-  private encryptAsText(value: string): string {
+  private encryptAsText(value: string | Uint8Array): string | Uint8Array {
     return this.scheme.withContext(() => {
       if (this.encryptor.isBinary() && !this.castType.isBinary()) {
         throw new Encoding("Binary encoded data can only be stored in binary columns");
@@ -211,7 +205,7 @@ export class EncryptedAttributeType extends ValueType {
     });
   }
 
-  private encrypt(value: string): unknown {
+  private encrypt(value: string | Uint8Array): unknown {
     return this.textToDatabaseType(this.encryptAsText(value));
   }
 
@@ -243,29 +237,22 @@ export class EncryptedAttributeType extends ValueType {
     }));
   }
 
-  /**
-   * @internal
-   * @inventedArm from — CONVERGEABLE encryption-binary-clear-text-rides-as-bytes-with-encoding-header
-   */
+  /** @internal */
   private textToDatabaseType(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
-      value = new Uint8Array(Buffer.from(value as string, "latin1"));
       return new BinaryData(value);
     } else {
       return value;
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm from — CONVERGEABLE encryption-binary-clear-text-rides-as-bytes-with-encoding-header
-   */
+  /** @internal */
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
       const binaryCastType = this.castType.isSerialized()
         ? (this.castType as Serialized).subtype!
         : this.castType;
-      return Buffer.from(binaryCastType.deserialize(value) as string, "latin1").toString("latin1");
+      return binaryCastType.deserialize(value);
     } else {
       return value;
     }

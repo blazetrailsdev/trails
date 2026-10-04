@@ -101,7 +101,8 @@ export class Cipher {
     }
     try {
       impl.setAuthTag(tag);
-    } catch {
+    } catch (e) {
+      if (e instanceof TypeError) throw e;
       throw new CipherError("unable to set AEAD tag");
     }
   }
@@ -129,6 +130,7 @@ export class Cipher {
     try {
       return (this.started() as CipherAdapter).update(data);
     } catch (e) {
+      if (e instanceof TypeError) throw e;
       throw new CipherError((e as Error).message);
     }
   }
@@ -138,6 +140,7 @@ export class Cipher {
     try {
       return (this.started() as CipherAdapter).final();
     } catch (e) {
+      if (e instanceof TypeError) throw e;
       throw new CipherError((e as Error).message);
     }
   }

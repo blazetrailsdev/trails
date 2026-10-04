@@ -28,7 +28,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   fixtures({});
 
   it("validates config options when using encrypted attributes", () => {
-    const zlib = { deflate: () => Buffer.alloc(0), inflate: () => "" };
+    const zlib = { deflate: () => Buffer.alloc(0), inflate: () => Buffer.alloc(0) };
     assertInvalidDeclaration({ deterministic: false, ignoreCase: true });
     assertInvalidDeclaration({
       key: "1234",
@@ -124,7 +124,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   it("should create a encryptor well when compressor is given", () => {
     const customCompressor = {
       deflate: (data: string) => Buffer.from(data),
-      inflate: (data: Buffer | Uint8Array) => Buffer.from(data).toString("utf-8"),
+      inflate: (data: Buffer | Uint8Array) => Buffer.from(data),
     };
     const scheme = new Scheme({ compressor: customCompressor });
     expect((scheme.toH().encryptor as Encryptor).compressor).toBe(customCompressor);

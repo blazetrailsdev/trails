@@ -6,6 +6,7 @@ import {
   OpenSSL,
   rbModAttrReader,
   rbModAttrWriter,
+  type Bytes,
   type DigestClass,
 } from "@blazetrails/ruby-compat";
 
@@ -15,16 +16,16 @@ import { KeyGenerator } from "./key-generator.js";
 import { Scheme, type SchemeOptions } from "./scheme.js";
 
 export interface Compressor {
-  deflate(data: string): Buffer | Uint8Array;
-  inflate(data: Buffer | Uint8Array): string;
+  deflate(data: string | Bytes): Bytes;
+  inflate(data: string | Bytes): Bytes;
 }
 
 const Zlib: Compressor = {
-  deflate(data: string): Buffer {
-    return deflateSync(Buffer.from(data, "utf-8"));
+  deflate(data: string | Bytes): Bytes {
+    return deflateSync(data);
   },
-  inflate(data: Buffer | Uint8Array): string {
-    return inflateSync(data).toString("utf-8");
+  inflate(data: string | Bytes): Bytes {
+    return inflateSync(data);
   },
 };
 

@@ -15,7 +15,7 @@ describe("ActiveRecord::Encryption::SchemeTest (trails)", () => {
     expect(new Scheme({ compress: false }).toH().encryptor).toBeInstanceOf(Encryptor);
     expect(
       new Scheme({
-        compressor: { deflate: (d: string) => Buffer.from(d), inflate: () => "" },
+        compressor: { deflate: (d: string) => Buffer.from(d), inflate: () => Buffer.alloc(0) },
       }).toH().encryptor,
     ).toBeInstanceOf(Encryptor);
   });

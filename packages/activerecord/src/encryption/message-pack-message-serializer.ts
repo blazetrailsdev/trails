@@ -1,24 +1,22 @@
 import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 
 export class MessagePackMessageSerializer implements MessageSerializerLike {
-  dump(message: Message): string {
+  dump(message: Message): Bytes {
     if (!(message instanceof Message)) {
       throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
     }
-    return MessagePack.dump(this.messageToHash(message)).toString("latin1");
+    return MessagePack.dump(this.messageToHash(message));
   }
 
-  load(serializedContent: string): Message {
-    if (typeof serializedContent !== "string") {
-      throw new TypeError(`Expected string, got ${typeof serializedContent}`);
-    }
+  load(serializedContent: string | Bytes): Message {
     let data: unknown;
     try {
-      data = MessagePack.load(serializedContent);
+      data = MessagePack.load(serializedContent as Buffer);
     } catch (e) {
       if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
       throw e;

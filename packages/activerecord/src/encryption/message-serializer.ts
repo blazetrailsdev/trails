@@ -1,11 +1,12 @@
 import { Encryption } from "../namespaces.js";
+import type { Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
-import { Decryption, ForbiddenClass } from "./errors.js";
+import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
 
 export interface MessageSerializerLike {
-  dump(message: Message): string;
-  load(serializedContent: string): Message;
+  dump(message: Message): string | Bytes;
+  load(serializedContent: string | Bytes): Message;
   isBinary(): boolean;
 }
 
@@ -17,15 +18,13 @@ export class MessageSerializer implements MessageSerializerLike {
     return JSON.stringify(this.messageToJson(message));
   }
 
-  load(serializedContent: string): Message {
-    if (typeof serializedContent !== "string") {
-      throw new TypeError(`Expected string, got ${typeof serializedContent}`);
-    }
+  load(serializedContent: string | Bytes): Message {
+    serializedContent = Buffer.from(serializedContent as string).toString();
     let data: unknown;
     try {
       data = JSON.parse(serializedContent);
     } catch {
-      throw new Decryption("Failed to deserialize encrypted message");
+      throw new Encoding();
     }
     return this.parseMessage(data, 1);
   }

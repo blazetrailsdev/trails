@@ -90,7 +90,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
     const spyCompressor = {
       deflate: (_data: string) => compressedRaw,
-      inflate: (_data: Buffer | Uint8Array) => originalText,
+      inflate: (_data: Buffer | Uint8Array) => Buffer.from(originalText),
     };
 
     const enc = new Encryptor({ compress: true, compressor: spyCompressor });
@@ -112,7 +112,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
         deflateCallCount++;
         return Buffer.from(data, "utf-8");
       },
-      inflate: (data: Buffer | Uint8Array) => Buffer.from(data).toString("utf-8"),
+      inflate: (data: Buffer | Uint8Array) => Buffer.from(data),
     };
     const enc = new Encryptor({ compress: true, compressor: spyCompressor });
     const key = generateKey();
@@ -199,7 +199,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("accept a custom compressor", () => {
     const compressor = {
       deflate: (data: string) => Buffer.from(`compressed ${data}`, "utf-8"),
-      inflate: (data: Buffer) => data.toString("utf-8").replace(/^compressed /, ""),
+      inflate: (data: Buffer) => Buffer.from(data.toString("utf-8").replace(/^compressed /, "")),
     };
     const enc = new Encryptor({ compress: true, compressor });
     const content = crypto.randomBytes(5 * 1024).toString("hex");

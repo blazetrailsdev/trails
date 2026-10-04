@@ -9,14 +9,14 @@ import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 
 const encryptorA: EncryptorLike = {
   encrypt: (v) => `A:${v}`,
-  decrypt: (v) => v.replace(/^A:/, ""),
-  isEncrypted: (v) => v.startsWith("A:"),
+  decrypt: (v) => (v as string).replace(/^A:/, ""),
+  isEncrypted: (v) => (v as string).startsWith("A:"),
   isBinary: () => false,
 };
 const encryptorB: EncryptorLike = {
   encrypt: (v) => `B:${v}`,
-  decrypt: (v) => v.replace(/^B:/, ""),
-  isEncrypted: (v) => v.startsWith("B:"),
+  decrypt: (v) => (v as string).replace(/^B:/, ""),
+  isEncrypted: (v) => (v as string).startsWith("B:"),
   isBinary: () => false,
 };
 

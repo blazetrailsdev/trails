@@ -1,5 +1,19 @@
 import { Encoding } from "../encoding.js";
 
+const encodings = new WeakMap<Uint8Array, Encoding>();
+
+/**
+ * `rb_obj_encoding` (`vendor/ruby/v3.3.11/encoding.c:1147`), `String#encoding`. A JS
+ * string is UTF-8. A `Uint8Array` is `ASCII-8BIT` unless {@link forceEncoding}
+ * associated it with another encoding.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_encoding` (`vendor/ruby/v3.3.11/encoding.c:1147`).
+ */
+export function rbObjEncoding(obj: string | Uint8Array): Encoding {
+  if (typeof obj === "string") return Encoding.UTF_8;
+  return encodings.get(obj) ?? Encoding.ASCII_8BIT;
+}
+
 /**
  * Ruby core `String#force_encoding` (`vendor/ruby/v3.3.11/string.c:11005`
  * `rb_str_force_encoding`), which Rails inherits rather than defines.
@@ -14,10 +28,35 @@ import { Encoding } from "../encoding.js";
  * `rb_str_force_encoding` leaves the receiver alone for it, so a `null` from
  * {@link Encoding.find} is the same no-op here.
  *
+ * A `Uint8Array` receiver is a String held as its bytes. One whose bytes are
+ * valid in `encoding` is the JS string they spell; any other keeps its bytes
+ * and is associated with the encoding (`rb_enc_associate`,
+ * `vendor/ruby/v3.3.11/encoding.c:1007`), which {@link rbObjEncoding} reads.
+ *
  * @noRailsEquivalent PERMANENT
  */
-export function forceEncoding(string: string, encoding: string | Encoding | null): string {
+export function forceEncoding(string: string, encoding: string | Encoding | null): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_force_encoding` (`vendor/ruby/v3.3.11/string.c:11005`). */
+export function forceEncoding(
+  string: string | Uint8Array,
+  encoding: string | Encoding | null,
+): string | Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_force_encoding` (`vendor/ruby/v3.3.11/string.c:11005`). */
+export function forceEncoding(
+  string: string | Uint8Array,
+  encoding: string | Encoding | null,
+): string | Uint8Array {
   const enc = encoding == null ? null : Encoding.find(encoding);
+  if (string instanceof Uint8Array) {
+    if (enc === null) return string;
+    encodings.set(string, enc);
+    if (enc.decoderLabel === null) return string;
+    try {
+      return new TextDecoder(enc.decoderLabel, { fatal: true }).decode(string);
+    } catch {
+      return string;
+    }
+  }
   if (enc === null || enc.decoderLabel === null) return string;
 
   const bytes = new Uint8Array(string.length);

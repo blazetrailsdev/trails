@@ -51,4 +51,28 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
       expect(Configurable.keyProvider).toBe(Encryption.context.keyProvider);
     });
   });
+
+  it("sends each property to its Config or Context writer", () => {
+    const previousSchemes = Configurable.config.previousSchemes;
+    const context = Encryption.defaultContext;
+    try {
+      Configurable.config.previousSchemes = [];
+      Configurable.configure({
+        primaryKey: "the primary key",
+        keyDerivationSalt: "the salt",
+        supportSha1ForNonDeterministicEncryption: true,
+        previous: [{ deterministic: true }],
+        storeKeyReferences: true,
+        frozenEncryption: true,
+      });
+
+      expect(Configurable.config.previousSchemes.length).toBe(2);
+      expect(Configurable.config.storeKeyReferences).toBe(true);
+      expect(Encryption.defaultContext.frozenEncryption).toBe(true);
+    } finally {
+      Configurable.config.previousSchemes = previousSchemes;
+      Configurable.config.storeKeyReferences = false;
+      Encryption.defaultContext = context;
+    }
+  });
 });

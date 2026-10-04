@@ -40,7 +40,7 @@ export class EnvelopeEncryptionKeyProvider {
     const key = this.primaryKeyProvider()
       .decryptionKeys(encryptedMessage)
       ?.map((k) => k.secret);
-    if (key) return Encryption.cipher.decrypt(encryptedDataKey, { key }).toString();
+    if (key) return Encryption.cipher.decrypt(encryptedDataKey, { key }) as string;
   }
 
   /** @internal */

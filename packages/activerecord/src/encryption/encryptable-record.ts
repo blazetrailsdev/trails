@@ -147,15 +147,17 @@ export function encrypts(this: any, ...names: unknown[]): void {
   }
 }
 
-export function deterministicEncryptedAttributes(this: any): Set<string> {
+export function deterministicEncryptedAttributes(this: any): Set<string> | undefined {
   return (
     Object.getOwnPropertyDescriptor(this, "_deterministicEncryptedAttributes")?.value ||
-    (this._deterministicEncryptedAttributes = new Set(
-      Array<string>(this.encryptedAttributes).filter(
-        (attributeName) =>
-          (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
-      ),
-    ))
+    (this._deterministicEncryptedAttributes =
+      this.encryptedAttributes &&
+      new Set(
+        Array<string>(this.encryptedAttributes).filter(
+          (attributeName) =>
+            (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
+        ),
+      ))
   );
 }
 
@@ -285,7 +287,10 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   Encryption.encryptedAttributeWasDeclared(this, name);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm add — CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
+ */
 export function preserveOriginalEncrypted(this: any, name: string): void {
   const modelClass = this;
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
