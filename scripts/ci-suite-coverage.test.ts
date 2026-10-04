@@ -496,14 +496,13 @@ const THOR_ONLY_CALL = "bash scripts/ci/thor-only.sh";
 /**
  * The whole-surface comparison scripts scripts/ci/thor-comparison.sh does not
  * run, each with why a thor-only diff cannot move its answer. The population
- * premises are asserted by scripts/api-compare/scope.test.ts: extra-surface's
- * GATED_PACKAGES, param-name-mark's (which the block-param ratchet gates by
- * too), and the dependency rules. The receipt-audit package and the
+ * premises are asserted by scripts/api-compare/scope.test.ts: param-name-mark's
+ * GATED_PACKAGES (which the block-param ratchet gates by too), and the
+ * dependency rules. The receipt-audit package and the
  * method-order and test-name lint paths, which ci.yml states, are asserted by
  * the test that reads this table.
  */
 const THOR_COMPARISON_SKIPS: Record<string, string> = {
-  "scripts/api-compare/lint-extra-surface-ratchet.ts": "thor is not in its GATED_PACKAGES",
   "scripts/api-compare/lint-param-names.ts": "thor is not in its GATED_PACKAGES",
   "scripts/api-compare/lint-block-params.ts": "thor is not in its GATED_PACKAGES",
   "scripts/api-compare/lint-deps.ts": "no dependency rule names thor",

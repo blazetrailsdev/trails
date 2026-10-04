@@ -42,7 +42,9 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
+import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import {
+  GATED_PACKAGES,
   MARK_PATH,
   ROWLESS_PACKAGES,
   TAGGED_ONLY_PACKAGES,
@@ -62,19 +64,31 @@ async function readManifest(name: string): Promise<ApiManifest> {
   return JSON.parse(await fs.readFile(path.join(OUTPUT_DIR, name), "utf-8")) as ApiManifest;
 }
 
-async function main(tighten: boolean): Promise<number> {
+async function main(tighten: boolean, scope: string | null): Promise<number> {
   const ruby = await readManifest("rails-api.json");
   const ts = await readManifest("ts-api.json");
+  if (scope !== null) {
+    if (!(GATED_PACKAGES as readonly string[]).includes(scope)) {
+      console.error(`\nextra-surface gate: ${scope} is not a gated package.\n`);
+      return 1;
+    }
+    const mismatch = scopeMismatch("extra-surface gate", Object.keys(ts.packages), scope);
+    if (mismatch !== null) {
+      console.error(mismatch);
+      return 1;
+    }
+  }
+  const inScope = (name: string): boolean => scope === null || name === scope;
   const report = buildReport(ruby, ts, {
-    filterPkg: null,
+    filterPkg: scope,
     excludeGlobs: [],
     novelOnly: false,
     topN: 0,
-    concernHooks: await loadConcernHooks(ruby, null),
+    concernHooks: await loadConcernHooks(ruby, scope),
   });
-  const current = measure(report.packages);
+  const current = scopedMarks(measure(report.packages), scope);
 
-  const absent = unmeasuredPackages(current);
+  const absent = unmeasuredPackages(current).filter(inScope);
   if (absent.length > 0) {
     console.error(
       `\nextra-surface gate: ${absent.length} gated package(s) not measured: ${absent.join(", ")}.\n` +
@@ -85,9 +99,9 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  const marks = await loadMarks();
+  const marks = scopedMarks(await loadMarks(), scope);
 
-  const unmarked = unmarkedPackages(marks);
+  const unmarked = unmarkedPackages(marks).filter(inScope);
   if (unmarked.length > 0) {
     console.error(
       `\nextra-surface gate: ${unmarked.length} gated package(s) carry no committed mark: ${unmarked.join(", ")}.\n` +
@@ -203,7 +217,8 @@ async function runAsScript(): Promise<void> {
   const self = fileURLToPath(import.meta.url);
   const invoked = process.argv[1] ? path.resolve(process.argv[1]) : "";
   if (path.resolve(self) !== invoked) return;
-  const code = await main(process.argv.slice(2).includes("--tighten"));
+  const argv = process.argv.slice(2);
+  const code = await main(argv.includes("--tighten"), scopeOf(argv));
   process.exit(code);
 }
 

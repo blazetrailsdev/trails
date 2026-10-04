@@ -2,5 +2,9 @@
   "ruby-compat": {
     "novel": 0,
     "total": 52
+  },
+  "thor": {
+    "novel": 0,
+    "total": 2
   }
 }

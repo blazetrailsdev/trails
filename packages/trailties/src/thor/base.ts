@@ -7,10 +7,13 @@ import {
   env,
   Errno,
   exit,
+  extend,
   File,
   Hash,
   hashDelete,
   hasKey,
+  include,
+  included,
   initialize,
   last,
   merge,
@@ -38,6 +41,7 @@ import {
   warn,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
+import { Invocation } from "./invocation.js";
 import { Error as ThorError, InvocationError, UndefinedCommandError } from "./error.js";
 import { NestedContext } from "./nested-context.js";
 import type {
@@ -48,7 +52,7 @@ import { Argument, type ArgumentOptions } from "./parser/argument.js";
 import { Arguments } from "./parser/arguments.js";
 import { Option, type OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
-import { Base as ThorBase } from "./shell.js";
+import { Base as ThorBase, Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
 import { namespaceFromThorClass } from "./util.js";
 
@@ -88,7 +92,7 @@ type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: st
 
 type RelationBlock = (this: BaseClass) => unknown;
 
-interface BaseConfig {
+export interface BaseConfig {
   commandOptions?: Record<string, Option> | null;
   currentCommand?: Command | null;
   classOptions?: HashWithIndifferentAccess | null;
@@ -181,7 +185,13 @@ export interface BaseClass {
   baseclass(): unknown;
   createCommand(meth: string): unknown;
   initializeAdded(): void;
-  dispatch(command: unknown, givenArgs: string[], givenOpts: unknown, config: BaseConfig): unknown;
+  dispatch(
+    command: unknown,
+    givenArgs: string[],
+    givenOpts: unknown,
+    config: BaseConfig,
+    block?: (instance: Base) => void,
+  ): unknown;
   registerOptionsRelationFor(target: string, relation: string, ...args: unknown[]): void;
   builtOptionNames(target: string, opt: { for?: string }, block: RelationBlock): string[];
   commandScopeMember(name: string, options?: { for?: string }): unknown;
@@ -812,5 +822,11 @@ export function fromSuperclass(
     }
   }
 }
+
+(ThorBase as unknown as Record<symbol, unknown>)[included] = function (base: object): void {
+  extend(base, ClassMethods);
+  include(base as { prototype: object }, Invocation);
+  include(base as { prototype: object }, Shell);
+};
 
 export const Base = Object.assign(ThorBase, { ClassMethods, subclasses, registerKlassFile });

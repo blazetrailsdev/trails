@@ -31,7 +31,7 @@ type IsolatedNamespace = {
   name: string;
   trailtieNamespace?: () => typeof Engine;
   tableNamePrefix?: string;
-  useRelativeModelNaming?: () => boolean;
+  isUseRelativeModelNaming?: () => boolean;
   trailtieHelpersPaths?: () => Promise<string[]>;
   trailtieRoutesUrlHelpers?: (includePathHelpers?: boolean) => unknown;
 };
@@ -105,8 +105,8 @@ export class Engine extends Trailtie {
         });
       }
 
-      if (!rbObjRespondTo(mod, "useRelativeModelNaming")) {
-        mod.useRelativeModelNaming = () => true;
+      if (!rbObjRespondTo(mod, "isUseRelativeModelNaming")) {
+        mod.isUseRelativeModelNaming = () => true;
       }
 
       if (!rbObjRespondTo(mod, "trailtieHelpersPaths")) {

@@ -84,7 +84,8 @@
  *
  * arel enrolled first, being the only package measured at `novel: 0`;
  * ruby-compat joined it once RFC 0129 burnt its 4 down to zero. arel has since
- * moved on to rowless (below).
+ * moved on to rowless (below). thor joined under RFC 0171, measured at
+ * `novel: 0` before its port grew.
  *
  * ROWLESS MODE is the end of that road. Once a package's `total` is burnt to
  * zero as well — every moved-not-novel extra receipted, deleted, or relocated
@@ -128,7 +129,7 @@ export const COUNTED_PACKAGES = [] as const;
  * a row, because `total` stays gated in both modes. Only-grow: a package joins
  * on reaching zero and never leaves.
  */
-export const TAGGED_ONLY_PACKAGES = ["ruby-compat"] as const;
+export const TAGGED_ONLY_PACKAGES = ["ruby-compat", "thor"] as const;
 
 /**
  * Gated packages pinned at the constant 0 in BOTH `novel` and `total`, which

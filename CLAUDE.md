@@ -512,7 +512,7 @@ write.
    says "known extra surface, not yet removed", and someone will come back for
    it.
 
-   **`arel`, `activemodel`, `activerecord` and `ruby-compat` are gated**, by the RFC 0117
+   **`arel`, `activemodel`, `activerecord`, `ruby-compat` and `thor` are gated**, by the RFC 0117
    extra-surface ratchet:
 
    ```bash
@@ -537,7 +537,7 @@ write.
    package's rule 1 is not enforced by this gate (see
    [its README](packages/ruby-compat/README.md#1-only-what-trails-actually-calls)).
 
-   A package that has burnt its untagged novel surface to zero (`ruby-compat` today)
+   A package that has burnt its untagged novel surface to zero (`ruby-compat` and `thor` today)
    is additionally **pinned**: its `novel` is the constant 0 regardless of what
    its row says, so widening the row cannot clear a red run. The only two
    remedies are a `@noRailsEquivalent PERMANENT|CONVERGEABLE <story-id>`
@@ -1804,6 +1804,57 @@ one reader is the unported `Thor::Runner`; it is a scoped skip in
 
 This is a genuine language shortcoming, ratified repo-wide here. A new Thor
 class is not a new decision to argue.
+
+## Thor dispatch is async
+
+Thor runs synchronously end to end: `Thor::Base.start`
+(`vendor/thor/v1.3.2/lib/thor/base.rb:582-594`) calls `dispatch`, which builds
+the instance and calls `invoke_command`
+(`vendor/thor/v1.3.2/lib/thor/invocation.rb:122-129`), which calls
+`Command#run` (`vendor/thor/v1.3.2/lib/thor/command.rb:21-38`), which sends
+the command method. Every step returns its value in line.
+
+In trails three leaves of that tree need a promise: reading a line
+(`$stdin.gets` behind `LineEditor#readline`), the file actions (the async
+`getFs()` adapter, which the website's in-memory fs needs), and shell-outs
+(`system`). A command body that awaits one returns a promise, and everything
+above it follows. **The settled cascade is:**
+
+`LineEditor#readline` → `ask` / `yes?` / `no?` / `file_collision` →
+`CreateFile#force_on_collision?` → `on_conflict_behavior` → `invoke!` →
+`action` → every `Thor::Actions` method → every command body → `Command#run` →
+`invoke_command` / `invoke_all` / `invoke` / `invoke_with_padding` →
+`dispatch` → `start`.
+
+Three rules bound it:
+
+- **`invoke_all` awaits each command in order.** Ruby's
+  `self.class.all_commands.map { |_, command| invoke_command(command) }`
+  (`invocation.rb:133-135`) is sequential, so the port is a `for` loop that
+  awaits each `invokeCommand` before the next and collects the results. A
+  `Promise.all` over the map would run a generator's steps concurrently.
+- **Block-scoped state restores when the block's promise settles.** `inside`,
+  `with_padding`, `mute`, `indent`, `with_output_buffer` and `FileUtils.cd` are
+  `set; yield; ensure restore` in Ruby. Their ports go through `rbEnsure`, which
+  defers the restore to the promise's settle, so `invoke_with_padding`
+  (`invocation.rb:138-140`) holds its padding for the whole awaited invocation.
+- **Constructors stay synchronous.** `Thor::Base#initialize`
+  (`base.rb:53-113`) and the `Invocation`, `Shell` and `Actions` initializers
+  that wrap it do no I/O, and a JS constructor cannot await.
+
+The alternatives lose:
+
+- **Keeping the synchronous `fs` path** breaks the website's generators, which
+  run over an in-memory fs reachable only through the async adapter.
+- **A synchronous stdin read** blocks the event loop under a running `run`, and
+  no browser adapter can serve one.
+- **A synchronous `invoke_all` that drops the promises** runs a generator's
+  steps interleaved, and loses each step's exception.
+
+This is a genuine language shortcoming, ratified repo-wide here: JS has no
+synchronous await. A Thor method on the cascade returning a promise where Thor
+returns a value is the designed shape, and a new command is not a new decision
+to argue.
 
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 

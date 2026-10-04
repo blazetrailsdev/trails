@@ -2,7 +2,6 @@ import {
   ArgumentError,
   aryDelete,
   eachPair,
-  extend,
   hashDelete,
   include,
   initializeIncludedModules,
@@ -17,7 +16,7 @@ import {
   STDOUT,
   union,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass, ClassMethods } from "./base.js";
+import { Base, type BaseClass } from "./base.js";
 import { Command, HiddenCommand } from "./command.js";
 import { Arguments } from "./parser/arguments.js";
 import type { Option, OptionOptions } from "./parser/option.js";
@@ -434,4 +433,3 @@ Thor.createTask = Thor.createCommand;
 Thor.subtaskHelp = Thor.subcommandHelp;
 
 include(Thor, Base);
-extend(Thor, ClassMethods);
