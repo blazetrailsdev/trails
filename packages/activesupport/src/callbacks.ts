@@ -1221,7 +1221,6 @@ function runCallbacks(
           nextSequence = nextSequence.nested!;
           const proceeding = tracker;
           const own: ProceedTracker = (tracker = { pending: undefined, observed: false });
-          const around = current;
           let cbResult: unknown;
           try {
             const [receiver, blk, method, ...args] = current.expandCallTemplate(
@@ -1245,7 +1244,7 @@ function runCallbacks(
                 try {
                   await pending.catch(() => {});
                 } finally {
-                  nextSequence = around;
+                  nextSequence = current;
                   tracker = proceeding;
                 }
                 throw err;
@@ -1279,10 +1278,10 @@ function runCallbacks(
                   else await own.pending;
                 }
               } finally {
-                nextSequence = around;
+                nextSequence = current;
                 tracker = proceeding;
               }
-              resume = { current: around, skipped, step: "after" };
+              resume = { current, skipped, step: "after" };
               return invokeSequence();
             })();
             break sequence;
@@ -1312,18 +1311,17 @@ function runCallbacks(
   };
 
   if (nextSequence.isFinal()) {
-    const current = nextSequence;
     const beforeDone = nextSequence.invokeBefore(env);
     if (isThenable(beforeDone)) {
       return Promise.resolve(beforeDone).then(() => {
-        resume = { current, skipped: null, step: "yield" };
+        resume = { current: nextSequence, skipped: null, step: "yield" };
         return invokeSequence();
       });
     }
     const yielded = assignYield(env, env.halted ? false : block ? block() : true);
     if (isThenable(yielded)) {
       return yielded.then(() => {
-        resume = { current, skipped: null, step: "after" };
+        resume = { current: nextSequence, skipped: null, step: "after" };
         return invokeSequence();
       });
     }
