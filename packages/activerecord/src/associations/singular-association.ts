@@ -23,7 +23,11 @@ export class SingularAssociation extends Association<Base> {
     return this.replace(record);
   }
 
-  /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
+  /**
+   * @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   * @inventedArm loadDisplacedForBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   * @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   */
   build(
     attributes?: Record<string, unknown>,
     block?: (record: Base) => void,
@@ -130,6 +134,7 @@ export class SingularAssociation extends Association<Base> {
     })();
   }
 
+  /** @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     raiseError = false,
