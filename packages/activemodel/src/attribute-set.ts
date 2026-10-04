@@ -3,7 +3,7 @@ import { Attribute } from "./attribute.js";
 import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import {
   FrozenError,
-  block,
+  type Block,
   eachKey,
   eachValue,
   except,
@@ -29,12 +29,8 @@ export class AttributeSet {
     eachValue(this.attributes(), fn);
   }
 
-  fetch<T = Attribute>(name: string, defaultOrBlock?: T | ((name: string) => T)): Attribute | T {
-    const attributes = this.attributes();
-    if (defaultOrBlock === undefined) return fetch<Attribute>(attributes, name);
-    return typeof defaultOrBlock === "function"
-      ? fetch(attributes, name, block(defaultOrBlock as (name: string) => Attribute))
-      : fetch(attributes, name, defaultOrBlock as Attribute);
+  fetch<T = Attribute>(name: string, ...rest: [] | [T | Block<T>]): Attribute | T {
+    return fetch<Attribute | T>(this.attributes(), name, ...rest);
   }
 
   except(...names: string[]): Record<string, Attribute> {

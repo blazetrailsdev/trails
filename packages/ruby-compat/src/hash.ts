@@ -80,6 +80,16 @@ export function fetch<T>(
   defaultValue: T,
 ): T;
 /**
+ * The arguments forwarded as received, which is how a delegated `fetch`
+ * (`delegate :fetch, to: :attributes`) reaches `Hash#fetch`.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ */
+export function fetch<T>(
+  hash: Record<string, unknown> | { fetch(key: string, ...rest: never): unknown },
+  key: string,
+  ...rest: [] | [T | Block<T>]
+): T;
+/**
  * The Map arm: a Hash keyed by objects, looked up the same way.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */

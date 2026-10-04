@@ -5,7 +5,7 @@ import { registry } from "./type.js";
 import { Builder, LazyAttributeHash } from "./attribute-set/builder.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
-import { FrozenError, KeyError, NoMethodError } from "@blazetrails/ruby-compat";
+import { FrozenError, KeyError, NoMethodError, block } from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -98,7 +98,23 @@ describe("AttributeSetTest", () => {
   it("fetch uses the given block for an unknown name", () => {
     const set = new AttributeSet({});
     const fallback = Attribute.null("wibble");
-    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+    expect(
+      set.fetch(
+        "wibble",
+        block(() => fallback),
+      ),
+    ).toBe(fallback);
+  });
+
+  it("fetch returns an explicitly passed undefined default for an unknown name", () => {
+    const set = new AttributeSet({});
+    expect(set.fetch("wibble", undefined)).toBeUndefined();
+  });
+
+  it("fetch returns a function passed as a default without calling it", () => {
+    const set = new AttributeSet({});
+    const fallback = () => Attribute.null("wibble");
+    expect(set.fetch<() => Attribute>("wibble", fallback)).toBe(fallback);
   });
 
   it("fetch returns the given default value for an unknown name", () => {
@@ -189,7 +205,12 @@ describe("AttributeSet over a LazyAttributeHash store", () => {
   it("fetch sends fetch to the LazyAttributeHash", () => {
     const set = new AttributeSet(new LazyAttributeHash(types, {}));
     const fallback = Attribute.null("wibble");
-    expect(set.fetch("wibble", () => fallback)).toBe(fallback);
+    expect(
+      set.fetch(
+        "wibble",
+        block(() => fallback),
+      ),
+    ).toBe(fallback);
     expect(set.fetch("wibble", fallback)).toBe(fallback);
     expect(() => set.fetch("wibble")).toThrow(KeyError);
     expect(set.fetch("name").isInitialized()).toBe(false);

@@ -304,6 +304,7 @@ export interface FilterEnvironment {
   target: object;
   halted: boolean;
   value: unknown;
+  syncChain?: string;
 }
 
 export class Before {
@@ -332,12 +333,8 @@ export class Before {
     this.name = name;
   }
 
-  call(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): FilterEnvironment | Promise<FilterEnvironment> {
-    const { target, value, halted } = env;
+  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+    const { target, value, halted, syncChain } = env;
     if (halted || !this.userConditions.every((c) => c(target, value))) return env;
 
     const terminatorFn = this.terminator;
@@ -346,10 +343,10 @@ export class Before {
     if (terminatorFn === false) {
       const r = resultLambda();
       if (!isThenable(r)) return env;
-      if (opts?.strict === "sync") {
+      if (syncChain !== undefined) {
         swallowRejection(r);
         throw new RuntimeError(
-          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
       }
       return Promise.resolve(r).then(() => env);
@@ -369,13 +366,13 @@ export class Before {
       }
       if (isThenable(cbResult)) {
         swallowRejection(cbResult);
-        if (opts?.strict === "sync") {
+        if (syncChain !== undefined) {
           throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — before returned a Promise`,
+            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
           );
         }
         throw new RuntimeError(
-          `Async before callback on chain "${chainName}" is unsupported with a custom terminator. ` +
+          `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
             `Custom terminators cannot evaluate Promise-returning callbacks. ` +
             `Use the default terminator (halt via throw(:abort)) or make all before callbacks synchronous.`,
         );
@@ -391,10 +388,10 @@ export class Before {
         terminate = false;
         return;
       }
-      if (opts?.strict === "sync") {
+      if (syncChain !== undefined) {
         swallowRejection(cbResult);
         throw new RuntimeError(
-          `Async callback on sync chain "${chainName}" — before returned a Promise`,
+          `Async callback on sync chain "${syncChain}" — before returned a Promise`,
         );
       }
       return Promise.resolve(cbResult).then(() => {
@@ -457,19 +454,15 @@ export class After {
     this.halting = chainConfig.skipAfterCallbacksIfTerminated ?? false;
   }
 
-  call(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): FilterEnvironment | Promise<FilterEnvironment> {
-    const { target, value, halted } = env;
+  call(env: FilterEnvironment): FilterEnvironment | Promise<FilterEnvironment> {
+    const { target, value, halted, syncChain } = env;
     if ((!halted || !this.halting) && this.userConditions.every((c) => c(target, value))) {
       const r = this.userCallback(target, value);
       if (isThenable(r)) {
-        if (opts?.strict === "sync") {
+        if (syncChain !== undefined) {
           swallowRejection(r);
           throw new RuntimeError(
-            `Async callback on sync chain "${chainName}" — after returned a Promise`,
+            `Async callback on sync chain "${syncChain}" — after returned a Promise`,
           );
         }
         return Promise.resolve(r).then(() => env);
@@ -691,34 +684,24 @@ export class CallbackSequence {
     return this.callTemplate!.expand(arg.target, arg.value, block);
   }
 
-  invokeBefore(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): void | Promise<void> {
-    return this._runFilters(this.beforeList, 0, env, opts, chainName);
+  invokeBefore(arg: FilterEnvironment): void | Promise<void> {
+    return this._runFilters(this.beforeList, 0, arg);
   }
 
-  invokeAfter(
-    env: FilterEnvironment,
-    opts?: RunCallbacksOptions,
-    chainName = "",
-  ): void | Promise<void> {
-    return this._runFilters(this.afterList, 0, env, opts, chainName);
+  invokeAfter(arg: FilterEnvironment): void | Promise<void> {
+    return this._runFilters(this.afterList, 0, arg);
   }
 
   private _runFilters(
     list: Array<Before | After> | null,
     start: number,
     env: FilterEnvironment,
-    opts: RunCallbacksOptions | undefined,
-    chainName: string,
   ): void | Promise<void> {
     if (!list) return;
     for (let i = start; i < list.length; i++) {
-      const r = list[i].call(env, opts, chainName);
+      const r = list[i].call(env);
       if (isThenable(r)) {
-        return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env, opts, chainName));
+        return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env));
       }
     }
   }
@@ -940,20 +923,15 @@ interface ProceedTracker {
   observed: boolean;
 }
 
-function assignYield(
-  env: FilterEnvironment,
-  y: unknown,
-  opts: RunCallbacksOptions | undefined,
-  chainName: string,
-): void | Promise<void> {
+function assignYield(env: FilterEnvironment, y: unknown): void | Promise<void> {
   if (!isThenable(y)) {
     env.value = y;
     return;
   }
-  if (opts?.strict === "sync") {
+  if (env.syncChain !== undefined) {
     swallowRejection(y);
     throw new RuntimeError(
-      `Async callback on sync chain "${chainName}" — block returned a Promise`,
+      `Async callback on sync chain "${env.syncChain}" — block returned a Promise`,
     );
   }
   return Promise.resolve(y).then((v) => {
@@ -1174,11 +1152,6 @@ Callbacks.moduleEval((mod) => {
   mod.haltedCallbackHook = function (_filter: unknown, _name: string): void {};
 });
 
-/**
- * @missingRailsArgs invoke_before — CONVERGEABLE activesupport-run-callbacks-invoke-before-after-take-env-only
- * @missingRailsArgs invoke_after — CONVERGEABLE activesupport-run-callbacks-invoke-before-after-take-env-only
- * @missingRailsArgs expand_call_template — CONVERGEABLE activesupport-run-callbacks-passes-invoke-sequence-to-expand-call-template
- */
 function runCallbacks(
   this: object,
   kind: string,
@@ -1197,26 +1170,34 @@ function runCallbacks(
     }
     return r;
   }
-  const chainName = callbacks.name;
-  const env: FilterEnvironment = { target: this, halted: false, value: undefined };
+  const env: FilterEnvironment = {
+    target: this,
+    halted: false,
+    value: undefined,
+    syncChain: opts?.strict === "sync" ? callbacks.name : undefined,
+  };
 
-  const nextSequence = callbacks.compile(type);
+  let nextSequence = callbacks.compile(type);
+  let resume: InvokeSequenceState | null = null;
+  let tracker: ProceedTracker | null = null;
 
-  const invokeSequence = (
-    start: CallbackSequence,
-    resume: InvokeSequenceState | null,
-    proceed: ProceedTracker | null,
-  ): unknown => {
-    let current = resume?.current ?? start;
+  const invokeSequence = (): unknown => {
+    const proceed = resume ? null : tracker;
+    let current = resume?.current ?? nextSequence;
     let skipped = resume?.skipped ?? null;
     let step = resume?.step ?? "before";
+    resume = null;
     const suspend = (r: PromiseLike<unknown>, at: InvokeSequenceState["step"]) =>
-      Promise.resolve(r).then(() => invokeSequence(start, { current, skipped, step: at }, null));
+      Promise.resolve(r).then(() => {
+        resume = { current, skipped, step: at };
+        return invokeSequence();
+      });
 
     let result: unknown;
     sequence: while (true) {
       if (step === "before") {
-        const beforeDone = current.invokeBefore(env, opts, chainName);
+        current = nextSequence;
+        const beforeDone = current.invokeBefore(env);
         step = "yield";
         if (isThenable(beforeDone)) {
           result = suspend(beforeDone, "yield");
@@ -1226,29 +1207,27 @@ function runCallbacks(
       if (step === "yield") {
         step = "after";
         if (current.isFinal()) {
-          const yielded = assignYield(
-            env,
-            env.halted ? false : block ? block() : true,
-            opts,
-            chainName,
-          );
+          const yielded = assignYield(env, env.halted ? false : block ? block() : true);
           if (isThenable(yielded)) {
             result = suspend(yielded, "after");
             break sequence;
           }
         } else if (current.isSkip(env)) {
           (skipped ??= []).push(current);
-          current = current.nested!;
+          nextSequence = nextSequence.nested!;
           step = "before";
           continue;
         } else {
-          const tracker: ProceedTracker = { pending: undefined, observed: false };
-          const [receiver, blk, method, ...args] = current.expandCallTemplate(
-            env,
-            invokeSequence.bind(null, current.nested!, null, tracker),
-          ) as [unknown, unknown, string, ...unknown[]];
+          nextSequence = nextSequence.nested!;
+          const proceeding = tracker;
+          const own: ProceedTracker = (tracker = { pending: undefined, observed: false });
+          const around = current;
           let cbResult: unknown;
           try {
+            const [receiver, blk, method, ...args] = current.expandCallTemplate(
+              env,
+              invokeSequence,
+            ) as [unknown, unknown, string, ...unknown[]];
             if (method === "instanceExec") {
               cbResult = (blk as (...a: unknown[]) => unknown).apply(receiver, args);
             } else if (method === "call") {
@@ -1260,51 +1239,67 @@ function runCallbacks(
               );
             }
           } catch (err) {
-            if (tracker.pending) {
-              const pending = tracker.pending;
+            if (own.pending) {
+              const pending = own.pending;
               result = (async () => {
-                await pending.catch(() => {});
+                try {
+                  await pending.catch(() => {});
+                } finally {
+                  nextSequence = around;
+                  tracker = proceeding;
+                }
                 throw err;
               })();
               break sequence;
             }
+            nextSequence = current;
+            tracker = proceeding;
             throw err;
           }
-          if (isThenable(cbResult) || tracker.pending) {
-            if (opts?.strict === "sync") {
+          if (isThenable(cbResult) || own.pending) {
+            if (env.syncChain !== undefined) {
+              nextSequence = current;
+              tracker = proceeding;
               swallowRejection(cbResult);
-              swallowRejection(tracker.pending);
+              swallowRejection(own.pending);
               throw new RuntimeError(
-                `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
+                `Async callback on sync chain "${env.syncChain}" — around callback or block returned a Promise`,
               );
             }
-            const around = cbResult;
             result = (async () => {
               try {
-                await around;
-              } catch (err) {
-                if (tracker.pending) await tracker.pending.catch(() => {});
-                throw err;
+                try {
+                  await cbResult;
+                } catch (err) {
+                  if (own.pending) await own.pending.catch(() => {});
+                  throw err;
+                }
+                if (own.pending) {
+                  if (own.observed) await own.pending.catch(() => {});
+                  else await own.pending;
+                }
+              } finally {
+                nextSequence = around;
+                tracker = proceeding;
               }
-              if (tracker.pending) {
-                if (tracker.observed) await tracker.pending.catch(() => {});
-                else await tracker.pending;
-              }
-              return invokeSequence(start, { current, skipped, step: "after" }, null);
+              resume = { current: around, skipped, step: "after" };
+              return invokeSequence();
             })();
             break sequence;
           }
+          nextSequence = current;
+          tracker = proceeding;
         }
       }
       if (step === "after") {
-        const afterDone = current.invokeAfter(env, opts, chainName);
+        const afterDone = current.invokeAfter(env);
         if (isThenable(afterDone)) {
           result = suspend(afterDone, "skipped");
           break sequence;
         }
       }
       while (skipped && skipped.length > 0) {
-        const afterDone = skipped.pop()!.invokeAfter(env, opts, chainName);
+        const afterDone = skipped.pop()!.invokeAfter(env);
         if (isThenable(afterDone)) {
           result = suspend(afterDone, "skipped");
           break sequence;
@@ -1317,22 +1312,25 @@ function runCallbacks(
   };
 
   if (nextSequence.isFinal()) {
-    const beforeDone = nextSequence.invokeBefore(env, opts, chainName);
+    const current = nextSequence;
+    const beforeDone = nextSequence.invokeBefore(env);
     if (isThenable(beforeDone)) {
-      return Promise.resolve(beforeDone).then(() =>
-        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "yield" }, null),
-      );
+      return Promise.resolve(beforeDone).then(() => {
+        resume = { current, skipped: null, step: "yield" };
+        return invokeSequence();
+      });
     }
-    const yielded = assignYield(env, env.halted ? false : block ? block() : true, opts, chainName);
+    const yielded = assignYield(env, env.halted ? false : block ? block() : true);
     if (isThenable(yielded)) {
-      return yielded.then(() =>
-        invokeSequence(nextSequence, { current: nextSequence, skipped: null, step: "after" }, null),
-      );
+      return yielded.then(() => {
+        resume = { current, skipped: null, step: "after" };
+        return invokeSequence();
+      });
     }
-    const afterDone = nextSequence.invokeAfter(env, opts, chainName);
+    const afterDone = nextSequence.invokeAfter(env);
     if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
     return env.value;
   } else {
-    return invokeSequence(nextSequence, null, null);
+    return invokeSequence();
   }
 }

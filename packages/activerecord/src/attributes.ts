@@ -6,6 +6,7 @@ import {
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
+import { block } from "@blazetrails/ruby-compat";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
   isSchemaLoaded,
@@ -120,7 +121,10 @@ function defineDefaultAttribute(
       name,
       value,
       type,
-      this._defaultAttributes().fetch(name, () => null),
+      this._defaultAttributes().fetch(
+        name,
+        block(() => null),
+      ),
     );
   } else {
     defaultAttribute = Attribute.fromDatabase(name, value, type);

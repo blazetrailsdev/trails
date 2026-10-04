@@ -949,6 +949,26 @@ describe("Callbacks — async propagation", () => {
     expect(t.log).toEqual(["ao", "block", "ac", "after"]);
   });
 
+  it("around callbacks that call their block after an await each run the nested sequence once", async () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "around", async (x: any, next: any) => {
+      await Promise.resolve();
+      x.log.push("outer");
+      await next();
+      x.log.push("/outer");
+    });
+    Target.setCallback("save", "around", async (x: any, next: any) => {
+      await Promise.resolve();
+      x.log.push("inner");
+      await next();
+      x.log.push("/inner");
+    });
+    await t.runCallbacks("save", () => t.log.push("block"));
+    expect(t.log).toEqual(["outer", "inner", "block", "/inner", "/outer"]);
+  });
+
   it("awaited next() resolves to the async block result", async () => {
     class Target extends Model {
       result = null as unknown;
