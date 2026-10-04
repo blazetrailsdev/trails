@@ -244,7 +244,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       } finally {
         pool.remove(connection);
         await connection.disconnectBang();
-        Sample.releaseConnection();
+        await Sample.releaseConnection();
       }
     });
   });

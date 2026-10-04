@@ -332,7 +332,7 @@ describe("ConnectionHandlerTest", () => {
     expect(handler.hasActiveConnections("all")).toBeFalsy();
     expect(await handler.retrieveConnection(connectionName)).toBeTruthy();
     expect(handler.hasActiveConnections("all")).toBeTruthy();
-    handler.clearActiveConnectionsBang("all");
+    await handler.clearActiveConnectionsBang("all");
     expect(handler.hasActiveConnections("all")).toBeFalsy();
   });
 
@@ -526,7 +526,7 @@ describe("ConnectionHandlerTest", () => {
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
     expect(pool.activeConnection).toBeTruthy();
-    handler.clearActiveConnectionsBang();
+    await handler.clearActiveConnectionsBang();
     expect(pool.activeConnection).toBeNull();
   });
 
@@ -552,7 +552,7 @@ describe("ConnectionHandlerTest", () => {
     const conn = await handler.retrieveConnection("primary");
     expect(conn).toBeTruthy();
     expect(conn.adapterName).toBeTruthy();
-    handler.retrieveConnectionPool("primary")!.releaseConnection();
+    await handler.retrieveConnectionPool("primary")!.releaseConnection();
   });
 
   it("retrieve connection strict throws for missing pool", async () => {
@@ -566,7 +566,7 @@ describe("ConnectionHandlerTest", () => {
     const pool = handler.retrieveConnectionPool("primary")!;
     await (await pool.leaseConnection()).verifyBang();
     expect(handler.isConnected("primary")).toBe(true);
-    pool.releaseConnection();
+    await pool.releaseConnection();
   });
 
   it("remove connection pool", async () => {
@@ -585,7 +585,7 @@ describe("ConnectionHandlerTest", () => {
     await handler.establishConnection(config, { ownerName: "primary" });
     const pool = handler.retrieveConnectionPool("primary")!;
     await pool.leaseConnection();
-    pool.releaseConnection();
+    await pool.releaseConnection();
     expect(pool.stat().idle).toBe(1);
     await handler.flushIdleConnectionsBang();
     expect(pool.stat().connections).toBe(0);
@@ -624,7 +624,7 @@ describe("ConnectionHandlerTest", () => {
     await pool.leaseConnection();
     expect(handler.hasActiveConnections("writing")).toBe(true);
     expect(handler.hasActiveConnections("reading")).toBe(false);
-    pool.releaseConnection();
+    await pool.releaseConnection();
   });
 
   it("retrieve connection pool strict mode with role and shard", async () => {

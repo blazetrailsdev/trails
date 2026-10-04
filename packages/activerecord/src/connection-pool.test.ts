@@ -170,7 +170,7 @@ it("with connection", async () => {
     });
 
     expect(activeConnections(pool).length).toBe(2);
-    pool.releaseConnection();
+    await pool.releaseConnection();
     expect(activeConnections(pool).length).toBe(1);
   }).join();
 
@@ -351,7 +351,7 @@ it("active connection?", async () => {
   expect(pool.isActiveConnection()).toBeFalsy();
   expect(await pool.leaseConnection()).toBeTruthy();
   expect(pool.isActiveConnection()).toBeTruthy();
-  pool.releaseConnection();
+  await pool.releaseConnection();
   expect(pool.isActiveConnection()).toBeFalsy();
 });
 
@@ -588,7 +588,7 @@ it("pin connection always returns the same connection", async () => {
 
   expect(await pool.checkout()).toBe(pinnedConnection);
 
-  pool.releaseConnection();
+  await pool.releaseConnection();
   expect(pool.isActiveConnection()).toBeFalsy();
   expect(await pool.checkout()).toBe(pinnedConnection);
 });

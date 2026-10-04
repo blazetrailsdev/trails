@@ -82,7 +82,7 @@ describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
       t.integer("update_count", { null: false, default: 0 });
       t.index("nick", { unique: true });
     });
-    pool.releaseConnection();
+    await pool.releaseConnection();
     restoreDirectSubscriber = await establishConnectionTo(DirectSubscriber, adapter);
     await DirectSubscriber.loadSchema();
   });

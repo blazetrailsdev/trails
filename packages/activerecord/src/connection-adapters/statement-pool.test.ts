@@ -153,7 +153,7 @@ describe("SQLite3 StatementPool integration", () => {
     } finally {
       prepareSpy.mockRestore();
       await adapter.execute('DROP TABLE IF EXISTS "test_pool"');
-      adapterPool.releaseConnection();
+      await adapterPool.releaseConnection();
       await adapterPool.disconnectBang();
     }
   });

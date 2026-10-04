@@ -214,18 +214,17 @@ export class LeaseRegistry {
 export class ExecutorHooks {
   static run(): void {}
 
-  static complete(): void {
-    ActiveRecord.Base.connectionHandler.eachConnectionPool((pool) => {
+  /** @inventedArm loop — PERMANENT */
+  static async complete(): Promise<void> {
+    for (const pool of ActiveRecord.Base.connectionHandler.eachConnectionPool()) {
       const connection = pool.isActiveConnection();
       if (connection) {
-        const txn =
-          (connection as any).currentTransaction?.() ??
-          (connection as any).transactionManager?.currentTransaction;
-        if (txn && (txn.closed || !txn.joinable)) {
-          pool.releaseConnection();
+        const transaction = connection.currentTransaction();
+        if (transaction.closed || !transaction.joinable) {
+          await pool.releaseConnection();
         }
       }
-    });
+    }
   }
 }
 
@@ -395,10 +394,10 @@ export class ConnectionPool implements ReapablePool {
     return this.isActiveConnection();
   }
 
-  releaseConnection(_existingLease: Lease | null = null): boolean {
+  async releaseConnection(_existingLease: Lease | null = null): Promise<boolean> {
     const conn = this.connectionLease().release();
     if (conn) {
-      void this.checkin(conn);
+      await this.checkin(conn);
       return true;
     }
     return false;
@@ -424,7 +423,7 @@ export class ConnectionPool implements ReapablePool {
         return await fn((lease.connection = await this.checkout()));
       } finally {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (!lease.sticky) this.releaseConnection(lease);
+        if (!lease.sticky) await this.releaseConnection(lease);
       }
     }
   }
@@ -751,9 +750,10 @@ export class ConnectionPool implements ReapablePool {
     const ensure = (release: boolean, result?: T): T => {
       const restore = () => {
         if (preventPermanentCheckout && !stickyWas) lease.sticky = stickyWas;
-        if (release && !lease.sticky) this.releaseConnection(lease);
+        if (release && !lease.sticky) return this.releaseConnection(lease);
       };
       if (result instanceof Promise) return result.finally(restore) as T;
+      // eslint-disable-next-line @typescript-eslint/no-floating-promises -- the synchronous lease cannot await `release_connection` (connection_pool.rb:388-393); `withConnection` does. CLAUDE.md § "Schema reflection peeks at a warm cache", scope boundary.
       restore();
       return result as T;
     };

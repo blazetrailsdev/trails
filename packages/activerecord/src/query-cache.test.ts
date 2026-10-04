@@ -609,7 +609,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache does not establish connection if unconnected", async () => {
-    Base.connectionHandler.clearActiveConnectionsBang("all");
+    await Base.connectionHandler.clearActiveConnectionsBang("all");
     assertNot(Base.connectionHandler.hasActiveConnections("all"));
 
     await middleware(() => {
@@ -626,7 +626,7 @@ describe("QueryCacheTest", () => {
   });
 
   it("query cache is enabled on connections established after middleware runs", async () => {
-    Base.connectionHandler.clearActiveConnectionsBang("all");
+    await Base.connectionHandler.clearActiveConnectionsBang("all");
     assertNot(Base.connectionHandler.hasActiveConnections("all"));
 
     await middleware(async () => {

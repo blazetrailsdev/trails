@@ -60,7 +60,7 @@ async function withWarningSuppression<T>(fn: () => Promise<T>): Promise<T> {
   try {
     return await fn();
   } finally {
-    Base.connectionHandler.clearActiveConnectionsBang("all");
+    await Base.connectionHandler.clearActiveConnectionsBang("all");
     await (await leasePgAdapter()).setClientMinMessages(logLevel);
   }
 }
@@ -97,7 +97,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(async () => {
-      Base.connectionHandler.clearActiveConnectionsBang("all");
+      await Base.connectionHandler.clearActiveConnectionsBang("all");
       const connection = await leasePgAdapter();
       await connection.dropTable("samples", "bits", { ifExists: true });
     });

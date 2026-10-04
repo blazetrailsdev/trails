@@ -41,7 +41,7 @@ describe("MigrationTest", () => {
       async down() {}
     }
     const m = new M();
-    Base.releaseConnection();
+    await Base.releaseConnection();
     try {
       expect(Base.connectionPool().activeConnection).toBeNull();
       const conn = await m.connection;
@@ -58,7 +58,7 @@ describe("MigrationTest", () => {
       async down() {}
     }
     const m = new M();
-    Base.releaseConnection();
+    await Base.releaseConnection();
     try {
       const conn = await Base.withConnection(async (connection) => {
         expect(await m.connection).toBe(connection);
@@ -98,7 +98,7 @@ describe("MigrationTest", () => {
       expect(m.connectionPool).toBe(basePool);
     } finally {
       for (const pool of [overridePool, poolOverridePool]) {
-        pool.releaseConnection();
+        await pool.releaseConnection();
         await pool.disconnectBang();
       }
     }
