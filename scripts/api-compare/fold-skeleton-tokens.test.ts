@@ -201,6 +201,13 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:scan"], "ruby", ["ref:matchAll"])).toEqual([]);
   });
 
+  it("folds a block `each_slice` onto the `for … of eachSlice` loop its port spells, and a blockless one onto nothing", () => {
+    expect(
+      foldSkeletonTokens(["ref:each_slice", "ref:enqueue"], "ruby", ["loop", "ref:eachSlice"]),
+    ).toEqual(["loop", "ref:enqueue"]);
+    expect(foldSkeletonTokens(["ref:each_slice"], "ruby", ["ref:eachSlice"])).toEqual([]);
+  });
+
   it("spends a single-lowering idiom once, leaving the loops later idioms are owed", () => {
     expect(
       foldSkeletonTokens(["ref:each_with_index", "ref:save", "ref:scan", "ref:scan"], "ruby", [

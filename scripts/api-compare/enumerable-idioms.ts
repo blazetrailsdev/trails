@@ -379,6 +379,11 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // unbounded array. Part of audit row 31.
   ["concat", [[], ["loop"]]],
   ["scan", [[], ["loop"]]],
+  // `ids.each_slice(batch_size) do |ids_batch| … end`
+  // (activerecord/lib/active_record/associations/has_many_association.rb:46) —
+  // `eachSlice` answers the batches and the port walks them with `for … of`.
+  // A blockless `each_slice` chained into `map` is the bare call.
+  ["each_slice", [[], ["loop"]]],
   // `value.dig("session_id", "public_id")`
   // (actionpack/lib/action_controller/metal/request_forgery_protection.rb:343) —
   // an optional-chain `a?.b?.c`, which emits nothing, or a spelled-out guard

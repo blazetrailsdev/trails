@@ -175,6 +175,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return new Ctor(targetModel, association) as CollectionProxy<T>;
   }
 
+  /**
+   * @inventedArm loop — CONVERGEABLE collection-proxy-extensions-function-form
+   * @inventedArm if — CONVERGEABLE collection-proxy-extensions-function-form
+   */
   constructor(klass: typeof Base, association: CollectionAssociation) {
     super(klass, klass.arelTable);
     this._association = association;
@@ -202,11 +206,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    return (
-      Array.isArray(attributes)
-        ? this._association.build(attributes, block as (record: Base) => void)
-        : this._association.build(attributes, block as (record: Base) => void)
-    ) as T | T[];
+    return this._association.build(attributes, block as (record: Base) => void) as T | T[];
   }
 
   new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
@@ -343,11 +343,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   override async pluck(
     ...columnNames: Array<string | Arel.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
-    if (this.isNullScope()) return this.scope().pluck(...columnNames);
-    if (this.reflection.options.disableJoins) {
-      return this.scope().pluck(...columnNames);
-    }
-    return super.pluck(...columnNames);
+    return this.isNullScope() ? this.scope().pluck(...columnNames) : super.pluck(...columnNames);
   }
 
   async reload(): Promise<Omit<this, "then">> {
@@ -382,28 +378,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return this._association.isFindFromTarget();
   }
 
-  async inspect(): Promise<string> {
+  override async inspect(): Promise<string> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any).limitValue as number | null;
-    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
-    const subject = this._targetLoaded
-      ? this._target
-      : await this.annotate("loading for inspect").limit(take);
-    const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
-    if (entries.length === 11) entries[10] = "...";
-    return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
+    return super.inspect();
   }
 
-  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+  override async prettyPrint(pp: PrettyPrinter): Promise<void> {
     if (this.isFindFromTarget()) await this.loadTarget();
-    const limitValue = (this as any).limitValue as number | null;
-    const take = limitValue != null ? Math.min(limitValue, 11) : 11;
-    const subject = this._targetLoaded
-      ? this._target
-      : await this.annotate("loading for pp").limit(take);
-    const entries = subject.slice(0, take) as (T | string)[];
-    if (entries.length === 11) entries[10] = "...";
-    await pp.pp(entries);
+    return super.prettyPrint(pp);
   }
 
   async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
@@ -440,11 +422,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     operation: string,
     columnName?: string | ArelNode | number | null,
   ): Promise<unknown> {
-    if (this.isNullScope()) return this.scope().calculate(operation, columnName);
-    if (this.reflection.options.disableJoins) {
-      return this.scope().calculate(operation, columnName);
-    }
-    return super.calculate(operation, columnName);
+    return this.isNullScope()
+      ? this.scope().calculate(operation, columnName)
+      : super.calculate(operation, columnName);
   }
 
   get proxyAssociation(): CollectionAssociation {

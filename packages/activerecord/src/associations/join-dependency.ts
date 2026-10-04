@@ -187,6 +187,7 @@ export class JoinDependency {
     return this._joinType;
   }
 
+  /** @inventedArm if — CONVERGEABLE join-dependency-optional-alias-tracker-and-row-hash-parent-key */
   joinConstraints(
     joinsToAdd: JoinDependency[],
     aliasTracker?: AliasTracker,
@@ -314,6 +315,7 @@ export class JoinDependency {
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
 
+  /** @inventedArm if — CONVERGEABLE join-dependency-optional-alias-tracker-and-row-hash-parent-key */
   instantiate(
     resultSet: Result,
     strictLoadingValue?: boolean | null,
@@ -537,8 +539,8 @@ export class JoinDependency {
       [...this.joinRoot].map((joinPart, i) => {
         let columnNames: string[];
         if (joinPart === this.joinRoot && !this._joinRootAlias) {
-          const primaryKey = this.joinRoot.baseKlass.primaryKey;
-          columnNames = primaryKey ? (Array.isArray(primaryKey) ? primaryKey : [primaryKey]) : [];
+          const primaryKey = this.joinRoot.primaryKey;
+          columnNames = primaryKey != null ? [primaryKey] : [];
         } else {
           columnNames = joinPart.columnNames();
         }

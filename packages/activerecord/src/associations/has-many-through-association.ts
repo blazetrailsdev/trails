@@ -4,7 +4,7 @@ import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import { aryCount, Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
-import { underscore, singularize, isBlank } from "@blazetrails/activesupport";
+import { underscore, isBlank } from "@blazetrails/activesupport";
 import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
@@ -88,7 +88,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return sourceReflection(this) as AssociationReflection;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected override concatRecords(records: Base[]): Promise<Base[]> | Base[] {
     this.ensureNotNested();
     const concatenated = super.concatRecords(records, true);
@@ -162,7 +165,10 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return false;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected override removeRecords(
     existingRecords: Base[],
     records: Base[],
@@ -182,66 +188,44 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   protected override async deleteRecords(records: Base[], method: string): Promise<number> {
     this.ensureNotNested();
-    const throughName = this.reflection.options.through;
-    const owner = this.owner as unknown as { association?: (n: string) => any };
-    const throughAssoc = throughName ? (owner.association?.(throughName) ?? null) : null;
-    if (!throughAssoc) return 0;
 
-    let scope: any = throughAssoc.scope();
-    scope = scope.where(this.constructJoinAttributes(...records));
-    const extra = this.throughScopeAttributes();
-    if (Object.keys(extra).length > 0) scope = scope.where(extra);
+    let scope = (this.throughAssociation() as any).scope();
+    scope.whereBang(this.constructJoinAttributes(...records));
+    scope = scope.where(this.throughScopeAttributes());
 
-    const ctor = this.owner.constructor as {
-      _reflectOnAssociation?: (n: string) => RichCounterReflection | undefined;
-    };
-    const ownRefl = ctor._reflectOnAssociation?.(this.reflection.name);
-    const sourceRefl = (ownRefl as { sourceReflection?: SourceCounterReflection } | undefined)
-      ?.sourceReflection;
-
-    let count = 0;
-    if (method === "destroy") {
-      if ((scope.model as typeof Base | undefined)?.primaryKey) {
-        count = aryCount((await scope.destroyAll()) as Base[], (r) => r.isDestroyed());
-      } else {
-        const recs = (await scope.toArray()) as Base[];
-        for (const r of recs) {
-          await r.runCallbacks("destroy");
+    let count: number;
+    switch (method) {
+      case "destroy":
+        if (scope.model.primaryKey != null) {
+          count = aryCount((await scope.destroyAll()) as Base[], (r) => r.isDestroyed());
+        } else {
+          for (const r of (await scope.toArray()) as Base[]) await r.runCallbacks("destroy");
+          count = await scope.deleteAll();
         }
+        break;
+      case "nullify":
+        count = await scope.updateAll({ [this.sourceReflection().foreignKey() as string]: null });
+        break;
+      default:
         count = await scope.deleteAll();
-      }
-    } else if (method === "nullify") {
-      count = await scope.updateAll({
-        [sourceRefl?.foreignKey?.() ?? `${underscore(singularize(this.reflection.name))}_id`]: null,
-      });
-    } else {
-      count = await scope.deleteAll();
     }
 
     await this.deleteThroughRecords(records);
 
-    if (method !== "destroy" && sourceRefl?.options?.counterCache) {
-      const counter = sourceRefl.counterCacheColumn?.();
-      const klass = this.klass as {
-        decrementCounter?: (col: string, ids: unknown) => Promise<unknown>;
-      };
-      if (typeof counter === "string" && klass.decrementCounter) {
-        await klass.decrementCounter(
-          counter,
-          records.map((record) => (record as any).id),
-        );
-      }
+    if (this.sourceReflection().options.counterCache && method !== "destroy") {
+      const counter = this.sourceReflection().counterCacheColumn();
+      await (this.klass as any).decrementCounter(
+        counter,
+        records.map((record) => record.id),
+      );
     }
 
-    if (count > 0) {
-      const throughReflection = this.throughReflection() as
-        | (AssociationDefinition & RichCounterReflection)
-        | null;
-      if (throughReflection?.isCollection?.() && updateThroughCounter.call(this, method)) {
-        await this.updateCounter(-count, throughReflection);
-      } else {
-        await this.updateCounter(-count);
-      }
+    const throughReflection = this.throughReflection() as AssociationDefinition &
+      RichCounterReflection;
+    if (throughReflection.isCollection() && updateThroughCounter.call(this, method)) {
+      await this.updateCounter(-count, throughReflection);
+    } else {
+      await this.updateCounter(-count);
     }
 
     return count;

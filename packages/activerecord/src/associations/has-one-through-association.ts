@@ -49,6 +49,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     return sourceReflection(this);
   }
 
+  /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     const created = this.createThroughRecord(record, save);
     if (created instanceof Promise) {
