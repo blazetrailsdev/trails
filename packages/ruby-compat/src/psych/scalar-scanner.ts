@@ -49,9 +49,15 @@ export class ScalarScanner {
       }
     } else if (/^:./.test(string)) {
       const match = /^:(["'])(.*)\1/.exec(string);
-      const sym = this.classLoader.symbolize((match ? match[2] : string).replace(/^:/, ""));
-      this.symbolCache.set(string, sym);
-      return sym;
+      if (match) {
+        const sym = this.classLoader.symbolize(match[2].replace(/^:/, ""));
+        this.symbolCache.set(string, sym);
+        return sym;
+      } else {
+        const sym = this.classLoader.symbolize(string.replace(/^:/, ""));
+        this.symbolCache.set(string, sym);
+        return sym;
+      }
     } else {
       return string;
     }
