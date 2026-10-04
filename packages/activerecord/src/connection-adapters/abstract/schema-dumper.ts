@@ -3,7 +3,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js"
 import type { SchemaSource } from "../../schema-dumper.js";
 import type { Column } from "../column.js";
 import { compact, isPresent } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect, rtest } from "@blazetrails/ruby-compat";
 
 export class SchemaDumper extends BaseSchemaDumper {
   static readonly DEFAULT_DATETIME_PRECISION = 6;
@@ -80,7 +80,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected schemaLimit(column: Column): string | undefined {
     const limit = this.isBigint(column) ? undefined : column.limit;
     if (
-      limit != null &&
+      rtest(limit) &&
       limit !== this._adapter().nativeDatabaseTypes()[column.type as string].limit
     ) {
       return rbInspect(limit);
