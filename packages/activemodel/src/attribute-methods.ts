@@ -629,11 +629,11 @@ export function defineMethodAttribute(
       sources.push((mod) => {
         Object.defineProperty(mod, tempMethodName, {
           get(
-            this: ReadWriteHost & {
-              attribute(n: string): unknown;
-              _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-              missingAttribute(n: string, stack: string[]): never;
-            },
+            this: ReadWriteHost &
+              Pick<InstanceMethodsHost, "missingAttribute"> & {
+                attribute(n: string): unknown;
+                _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+              },
           ) {
             if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
               this.missingAttribute(canonicalName, rbFCaller());
