@@ -39,10 +39,33 @@ class ENOTTY extends SystemCallError {
 }
 
 /**
+ * `Errno::EPIPE`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. A write to a closed pipe reaches JS as the host's own
+ * error carrying `code: "EPIPE"`, which is this class to `rescue Errno::EPIPE`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EPIPE`, which Thor rescues
+ * without defining.
+ */
+class EPIPE extends SystemCallError {
+  static readonly Errno = 32;
+  readonly code = "EPIPE";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Broken pipe" : `Broken pipe - ${mesg}`);
+    this.name = "Errno::EPIPE";
+    this.errno = EPIPE.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EPIPE";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { ENOTTY };
+export const Errno = { ENOTTY, EPIPE };
