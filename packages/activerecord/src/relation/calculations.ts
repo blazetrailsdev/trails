@@ -10,9 +10,28 @@ import {
   star,
   type ArelNode,
 } from "@blazetrails/arel";
-import { ArgumentError, BigIntegerType } from "@blazetrails/activemodel";
-import { any, BigDecimal, isPresent, many, tryCall } from "@blazetrails/activesupport";
-import { block, fetch, first, isEmpty, isModuleIncluded, uniq } from "@blazetrails/ruby-compat";
+import { ArgumentError } from "@blazetrails/activemodel";
+import {
+  any,
+  isPresent,
+  kernelArray,
+  many,
+  pick as enumerablePick,
+  tryCall,
+} from "@blazetrails/activesupport";
+import {
+  block,
+  fetch,
+  first,
+  isEmpty,
+  isModuleIncluded,
+  rbFPublicSend,
+  rbObjRespondTo,
+  rtest,
+  toD,
+  toI,
+  uniq,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { Result, type ColumnType, type ColumnTypes } from "../result.js";
@@ -101,6 +120,7 @@ interface CalculationRelation {
     ensureSchemaLoaded(): Promise<void>;
     disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
     attributeNames(): string[];
+    attributeAliases: Record<string, string>;
   };
   withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
   limitValue: number | string | null;
@@ -208,10 +228,9 @@ export async function count(
   this: CalculationRelation,
   columnName?: string | ArelNode | null | CountBlock,
   block?: CountBlock,
-  ...rest: unknown[]
 ): Promise<number | Map<unknown, number>> {
-  if (rest.length > 0 || (block !== undefined && typeof block !== "function")) {
-    throw new ArgumentError(`wrong number of arguments (given ${rest.length + 2}, expected 0..1)`);
+  if (arguments.length > 2) {
+    throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 0..1)`);
   }
   if (typeof columnName === "function") {
     block = columnName;
@@ -329,9 +348,9 @@ export async function sum(
       | number
       | bigint;
   }
-  const sum = await this.calculate("sum", initialValueOrColumn as string);
-  if (this.groupValues.length > 0) return sum as Map<unknown, number | bigint>;
-  return (sum as number | bigint) ?? 0;
+  return this.calculate("sum", initialValueOrColumn as string) as Promise<
+    number | bigint | Map<unknown, number | bigint>
+  >;
 }
 
 export function asyncSum(
@@ -386,6 +405,7 @@ export async function calculate(
   }
 }
 
+/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -439,6 +459,7 @@ export function asyncPluck(
   return this.async().pluck(...columnNames);
 }
 
+/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
 export async function pick(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -450,12 +471,7 @@ export async function pick(
   >
 ): Promise<unknown> {
   if (this.loaded && isAllAttributes(this, columnNames as unknown as string[])) {
-    const records = await this.records();
-    if (records.length === 0) return null;
-    const first = records[0] as unknown as { get(attrName: string): unknown };
-    return columnNames.length > 1
-      ? columnNames.map((columnName) => first.get(String(columnName)))
-      : first.get(String(columnNames[0]));
+    return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
   }
 
   const values = await this.limit(1).pluck(...columnNames);
@@ -477,11 +493,7 @@ export function asyncPick(
 
 export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
   const primaryKey = this.model.primaryKey as string | string[] | null;
-  const primaryKeyArray = Array.isArray(primaryKey)
-    ? primaryKey
-    : primaryKey == null
-      ? []
-      : [primaryKey];
+  const primaryKeyArray = kernelArray<string>(primaryKey);
 
   if (this.loaded) {
     const toId = (record: { _readAttribute(name: string): unknown }): unknown => {
@@ -657,12 +669,14 @@ export function aggregateColumn(
 
 /** @internal */
 export function isAllAttributes(rel: CalculationRelation, columnNames: string[]): boolean {
-  const model = rel.model as any;
-  const known = new Set<string>([
-    ...(typeof model.attributeNames === "function" ? (model.attributeNames() as string[]) : []),
-    ...Object.keys(model.attributeAliases ?? {}),
-  ]);
-  return isEmpty(columnNames.map(String).filter((c) => !known.has(c)));
+  const attributeNames: string[] = rel.model.attributeNames();
+  const attributeAliases = Object.keys(rel.model.attributeAliases);
+  return isEmpty(
+    columnNames
+      .map(String)
+      .filter((name) => !attributeNames.includes(name))
+      .filter((name) => !attributeAliases.includes(name)),
+  );
 }
 
 /** @internal */
@@ -726,8 +740,7 @@ export function operationOverAggregateColumn(
   operation: string,
   distinct: boolean,
 ): unknown {
-  if (operation === "count") return column.count(distinct);
-  return typeof column[operation] === "function" ? column[operation]() : column;
+  return operation === "count" ? column.count(distinct) : rbFPublicSend(column, operation);
 }
 
 /** @internal */
@@ -840,11 +853,7 @@ export async function executeGroupedCalculation(
   if (groupFields.length === 1 && typeof groupFields[0] === "string") {
     association = (rel.model as any)._reflectOnAssociation?.(groupFields[0]) ?? null;
     associated = association != null && association.belongsTo?.() === true;
-    if (associated) {
-      groupFields = Array.isArray(association.foreignKey())
-        ? [...(association.foreignKey() as string[])]
-        : [association.foreignKey() as string];
-    }
+    if (associated) groupFields = kernelArray(association.foreignKey());
   }
   const relation = rel.except("group").distinctBang(false) as CalculationRelation;
   const groupNodes = arelColumns.call(relation as never, groupFields) as ArelNode[];
@@ -871,10 +880,14 @@ export async function executeGroupedCalculation(
       );
     }
     selectValues.push(
-      ...groupColumns.map(
-        ([aliaz, field]) =>
-          new Nodes.As(field, new Nodes.SqlLiteral(connection.quoteColumnName(aliaz))),
-      ),
+      ...groupColumns.map(([aliaz, field]) => {
+        aliaz = connection.quoteColumnName(aliaz);
+        if (rbObjRespondTo(field, "as")) {
+          return (field as unknown as { as(aliaz: string): ArelNode }).as(aliaz);
+        } else {
+          return `${field} AS ${aliaz}` as unknown as ArelNode;
+        }
+      }),
     );
 
     relation.groupValues = groupNodes;
@@ -891,9 +904,7 @@ export async function executeGroupedCalculation(
     let keyRecords: Map<string, unknown> | null = null;
     if (association) {
       const klass = association.klass.baseClass ?? association.klass;
-      const primaryKey = (
-        Array.isArray(klass.primaryKey) ? klass.primaryKey : [klass.primaryKey]
-      ) as string[];
+      const primaryKey = kernelArray<string>(klass.primaryKey);
       const keyIds = calculatedData
         .toArray()
         .map((row) => groupAliases.map((aliaz) => row[aliaz]))
@@ -968,9 +979,8 @@ export function lookupCastTypeFromJoinDependencies(
 ): unknown {
   let found: unknown = null;
   eachJoinDependencies.call(rel as any, joinDependencies, (join: any) => {
-    if (found != null) return;
     const type = fetch(join.baseKlass.attributeTypes(), name, null);
-    if (type) found = type;
+    if (rtest(type)) found ??= type;
   });
   return found;
 }
@@ -1010,36 +1020,22 @@ export async function typeCastPluckValues(
 }
 
 /** @internal */
-export function typeCastCalculatedValue(value: unknown, operation: string, type: unknown): unknown {
+export function typeCastCalculatedValue(value: unknown, operation: string, type: any): unknown {
   switch (operation) {
     case "count":
-      return Number(value ?? 0);
+      return toI(value);
     case "sum":
-      if (type instanceof BigIntegerType) return type.deserialize(value ?? 0) ?? 0n;
-      return Number(value ?? 0);
-    case "average": {
-      switch ((type as { type?(): string } | null)?.type?.()) {
+      return type.deserialize(rtest(value) ? value : 0);
+    case "average":
+      switch (type.type()) {
         case "integer":
         case "decimal":
-          return value == null
-            ? null
-            : value instanceof BigDecimal
-              ? value
-              : new BigDecimal(value as string | number | bigint);
-        default: {
-          if (value === null || value === undefined) return null;
-          const ct = type as { deserialize?(v: unknown): unknown } | null;
-          if (typeof ct?.deserialize === "function") return ct.deserialize(value);
-          return value;
-        }
+          return value == null ? null : toD(String(value));
+        default:
+          return type.deserialize(value);
       }
-    }
-    default: {
-      if (value === null || value === undefined) return null;
-      const ct = type as { deserialize?(v: unknown): unknown } | null;
-      if (typeof ct?.deserialize === "function") return ct.deserialize(value);
-      return value;
-    }
+    default:
+      return type.deserialize(value);
   }
 }
 

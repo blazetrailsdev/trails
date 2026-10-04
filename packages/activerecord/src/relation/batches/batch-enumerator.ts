@@ -7,7 +7,7 @@ interface BatchRelation {
   deleteAll(): Promise<number>;
   updateAll(updates: Record<string, unknown>): Promise<number>;
   destroyAll(): Promise<any[]>;
-  touchAll?(...args: TouchAllArgs): Promise<number>;
+  touchAll(...args: TouchAllArgs): Promise<number>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -82,7 +82,10 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
+  /**
+   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   */
   async deleteAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -91,7 +94,10 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
+  /**
+   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   */
   async updateAll(updates: Record<string, unknown>): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
@@ -100,18 +106,22 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
+  /**
+   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   */
   async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
-      if (typeof batchRelation.touchAll === "function") {
-        total += await batchRelation.touchAll(...args);
-      }
+      total += await batchRelation.touchAll(...args);
     }
     return total;
   }
 
-  /** @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
+  /**
+   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
+   */
   async destroyAll(): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {

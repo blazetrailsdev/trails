@@ -287,6 +287,30 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#build"]).toEqual(["ref:cached", "or", "new:Thing"]);
   });
 
+  it("tokens an `||` whose right side exits as an arm", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def merge
+            reflection = lookup || return
+            preload(reflection)
+          end
+
+          def each_option
+            items.each { |item| option = pick(item) || next }
+          end
+
+          def fallback
+            lookup || default
+          end
+        end
+      `,
+    });
+    expect(s["Foo#merge"]).toEqual(["ref:lookup", "if", "ref:preload"]);
+    expect(s["Foo#each_option"]).toEqual(["ref:items", "ref:each", "ref:pick", "if"]);
+    expect(s["Foo#fallback"]).toEqual(["ref:lookup", "or", "ref:default"]);
+  });
+
   it("carries the raised class on the throw token, however the raise is spelled", () => {
     const s = rubySkeletons({
       "foo.rb": `

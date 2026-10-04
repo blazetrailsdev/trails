@@ -3192,6 +3192,17 @@ class ApiExtractor
   # non-logical op-assign (`+=`) is not a branch and emits nothing.
   SKELETON_LOGICAL_OP_ASSIGNS = { "||=" => "or", "&&=" => "and" }.freeze
 
+  # `x = find { … } || return`
+  # (`activerecord/lib/active_record/relation/merger.rb:103-105`): an `||` whose
+  # right side leaves the method, block or loop is `return unless x`, an arm and
+  # not a value fallback. Its port is `if (!x) return;`, a JS `||` having no
+  # statement for a right side, so it tokens as the `if` that port emits.
+  SKELETON_EXIT_NODES = %i[return return0 next break].freeze
+
+  def skeleton_or_exit?(node)
+    SKELETON_LOGICAL_OPS[node[2]] == "or" && node[3].is_a?(Array) && SKELETON_EXIT_NODES.include?(node[3][0])
+  end
+
   # The body's ordered control + call skeleton — `if` / `loop` / `try` /
   # `rescue` / `throw`, the `or` / `and` short-circuits,
   # `new:Const` and `ref:<name>` reaches, in source order
@@ -3259,7 +3270,11 @@ class ApiExtractor
       return
     elsif kind == :binary && SKELETON_LOGICAL_OPS.key?(node[2])
       walk_for_skeleton(node[1], tokens)
-      tokens << (skeleton_string_or_symbol?(node) ? "or:string-symbol" : SKELETON_LOGICAL_OPS[node[2]])
+      tokens << if skeleton_or_exit?(node)
+        "if"
+      else
+        skeleton_string_or_symbol?(node) ? "or:string-symbol" : SKELETON_LOGICAL_OPS[node[2]]
+      end
       walk_for_skeleton(node[3], tokens)
       return
     elsif kind == :opassign && SKELETON_LOGICAL_OP_ASSIGNS.key?(op_assign_op(node[2]).to_s)

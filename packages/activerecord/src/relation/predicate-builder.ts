@@ -4,6 +4,7 @@ import {
   rbFPublicSend,
   rbObjAsString as toS,
   rbObjRespondTo,
+  rtest,
   Range,
   toH,
   zip,
@@ -19,7 +20,6 @@ import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js"
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { DeferredPluck } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
-import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import type { TableMetadata } from "../table-metadata.js";
 
@@ -154,59 +154,24 @@ export class PredicateBuilder {
 
   /** @missingRailsName name — PERMANENT */
   build(attribute: Arel.Attribute, value: unknown, operator: string | null = null): Nodes.Node {
-    if (respondsToId(value)) {
-      value = (value as { id: unknown }).id;
-    }
+    if (respondsToId(value)) value = value.id;
     if (
-      (operator ??=
-        this.table.type(toS(attribute.name)).isForceEquality?.(value) === true ? "eq" : null) !=
-      null
+      rtest(
+        (operator ||= (rtest(this.table.type(toS(attribute.name)).isForceEquality(value)) &&
+          "eq") as string | null),
+      )
     ) {
       const bind = this.buildBindAttribute(toS(attribute.name), value);
-      return (attribute as unknown as Record<string, (b: unknown) => Nodes.Node>)[operator](bind);
+      return rbFPublicSend(attribute, operator, bind) as Nodes.Node;
+    } else {
+      return this.handlerFor(value).call(attribute, value);
     }
-    if (this.isScalarQueryValue(value)) {
-      const normalized = this.normalizeQueryValue(toS(attribute.name), value);
-      if (normalized === null || normalized === undefined) {
-        return attribute.eq(null);
-      }
-    }
-    if (value === null || value === undefined) {
-      return attribute.eq(null);
-    }
-    return this.handlerFor(value).call(attribute, value);
-  }
-
-  private isScalarQueryValue(value: unknown): boolean {
-    return !(
-      value === null ||
-      value === undefined ||
-      Array.isArray(value) ||
-      value instanceof Set ||
-      value instanceof Range ||
-      value instanceof Substitute ||
-      this.isRelation(value)
-    );
-  }
-
-  private normalizeQueryValue(columnName: string, value: unknown): unknown {
-    const klass = this.table.klass as { normalizedAttributes?: Set<string> } | null;
-    const normalizedAttributes = klass?.normalizedAttributes;
-    if (!normalizedAttributes || !normalizedAttributes.has(columnName)) return value;
-    return this.table.type(columnName).cast(value);
   }
 
   registerHandler(
     klass: any,
     handler: { call(attr: Arel.Attribute, value: any): Nodes.Node },
   ): void {
-    if (
-      typeof klass !== "function" ||
-      typeof klass.prototype !== "object" ||
-      klass.prototype === null
-    ) {
-      throw new TypeError("registerHandler requires a constructor function as the first argument");
-    }
     this.handlers.unshift([klass, handler]);
   }
 
