@@ -842,9 +842,12 @@ export class Hash<K, V> extends Map<K, V> {
    * `Map` keys an object by identity, so two equal Arrays would otherwise be
    * two entries. A primitive's identity is already its `eql?`. An identity
    * hash's table type is `identhash` (`vendor/ruby/v3.3.11/hash.c:375`), whose
-   * `rb_ident_cmp` is the `Map`'s own comparison.
+   * `rb_ident_cmp` is the `Map`'s own comparison. Ruby has one Integer for
+   * every magnitude (`rb_int_equal`, `vendor/ruby/v3.3.11/numeric.c:4634`), so a
+   * `bigint` that fits a `number` is looked up as that `number`.
    */
   private hashStlikeLookup(key: K): K {
+    if (typeof key === "bigint" && Number.isSafeInteger(Number(key))) return Number(key) as K;
     if (this.#identhash || !isObjectKey(key)) return key;
     return this.#eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
   }

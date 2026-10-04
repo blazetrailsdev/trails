@@ -3,8 +3,9 @@ import * as Arel from "@blazetrails/arel";
 import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
-import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
-import { first, isEmpty, union } from "@blazetrails/ruby-compat";
+import type { AliasTracker } from "../alias-tracker.js";
+import { extractBang } from "@blazetrails/activesupport";
+import { first, isEmpty, rtest, union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -49,49 +50,30 @@ export class JoinAssociation extends JoinPart {
     foreignTable: Table | Nodes.TableAlias,
     foreignKlass: typeof Base,
     joinType: JoinType,
-    aliasTracker?: AliasTracker,
-    resolveTable?: TableResolver,
+    aliasTracker: AliasTracker,
+    block: TableResolver,
   ): Nodes.Node[] {
     const joins: Nodes.Node[] = [];
     const chain: [AbstractReflection, Table | Nodes.TableAlias][] = [];
 
     const reflectionChain = this.reflection.chain;
+    for (const [index, reflection] of reflectionChain.entries()) {
+      const [table, terminated] = block(reflection, reflectionChain.slice(index));
+      this._table ||= table;
 
-    for (let index = 0; index < reflectionChain.length; index++) {
-      const refl = reflectionChain[index];
-      let table: Table | Nodes.TableAlias;
-      let terminated = false;
-
-      if (resolveTable) {
-        [table, terminated] = resolveTable(refl, reflectionChain.slice(index));
-      } else {
-        table = aliasedArelTableForReflection(refl, refl.tableName!);
-      }
-
-      if (!this._table) this._table = table;
-      if (
-        !this.tables.some(
-          (t) => String(t.tableAlias ?? t.name) === String(table.tableAlias ?? table.name),
-        )
-      ) {
-        this.tables.push(table);
-      }
-
-      if (terminated) {
+      if (rtest(terminated)) {
         foreignTable = table;
-        foreignKlass = refl.klass;
+        foreignKlass = reflection.klass;
         break;
       }
 
-      chain.push([refl, table]);
+      chain.push([reflection, table]);
     }
 
-    chain.reverse();
+    for (const [reflection, table] of chain.reverse()) {
+      const klass = reflection.klass;
 
-    for (const [refl, table] of chain) {
-      const klass = refl.klass;
-
-      const scope = refl.joinScope(table, foreignTable, foreignKlass);
+      const scope = reflection.joinScope(table, foreignTable, foreignKlass);
 
       if (!isEmpty(scope.referencesValues)) {
         const associations = union(scope.eagerLoadValues, scope.includesValues);
@@ -102,27 +84,25 @@ export class JoinAssociation extends JoinPart {
       }
 
       const arel = scope.arel(aliasTracker);
-      let nodes: Nodes.And["children"][number] = first(arel.constraints)!;
+      const nodes: Nodes.And["children"][number] = first(arel.constraints)!;
 
-      const others: Nodes.And["children"] = [];
+      let others: Nodes.And["children"] | undefined;
       if (nodes instanceof Nodes.And) {
-        const remaining: Nodes.And["children"] = [];
-        for (const child of nodes.children) {
-          if (!nodeReferencesTable(child, String(table.tableAlias ?? table.name))) {
-            others.push(child);
-          } else {
-            remaining.push(child);
-          }
-        }
-        if (others.length > 0) {
-          if (remaining.length === 0) nodes = new Nodes.True();
-          else nodes = remaining.length === 1 ? remaining[0] : new Nodes.And(remaining);
-        }
+        others = extractBang(
+          nodes.children,
+          (node) =>
+            !fetchAttribute(
+              node,
+              (attr) =>
+                String(attr.relation.tableAlias ?? attr.relation.name) ===
+                String(table.tableAlias ?? table.name),
+            ),
+        );
       }
 
       joins.push(new joinType(table, new Nodes.On(nodes)));
 
-      if (!isEmpty(others)) {
+      if (others != null && !isEmpty(others)) {
         const sources: Nodes.Node[] = [...arel.joinSources()] as Nodes.Node[];
         joins.push(...sources);
         const lastIdx = joins.length - 1;
@@ -161,21 +141,6 @@ export class JoinAssociation extends JoinPart {
       return null;
     }
   }
-}
-
-function nodeReferencesTable(node: unknown, tableName: string): boolean {
-  let found = false;
-  fetchAttribute(node, (attr: Arel.Attribute): boolean => {
-    if (attr instanceof Arel.Attribute) {
-      const rel = attr.relation;
-      if (String(rel.tableAlias ?? rel.name) === tableName) {
-        found = true;
-        return false;
-      }
-    }
-    return !found;
-  });
-  return found;
 }
 
 /** @internal */

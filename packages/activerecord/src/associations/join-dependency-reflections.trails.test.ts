@@ -10,7 +10,7 @@ describe("JoinDependency#reflections", () => {
   fixtures(["authors", "posts", "comments"]);
 
   it("drops the join root and reads each node's own reflection", () => {
-    const jd = new JoinDependency(Author, null, "posts.comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, null, { posts: "comments" }, Nodes.OuterJoin);
 
     expect(jd.reflections).toEqual([
       Author.reflectOnAssociation("posts"),

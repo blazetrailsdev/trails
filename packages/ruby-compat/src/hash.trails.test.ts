@@ -710,6 +710,19 @@ describe("Array#values_at", () => {
 });
 
 describe("Hash keys by eql?", () => {
+  it("finds an Integer key through either of its JS seats", () => {
+    const h = new Hash<unknown, string>();
+    h.set(1n, "one");
+    expect(h.get(1)).toBe("one");
+    expect(h.has(1n)).toBe(true);
+    h.set(1, "uno");
+    expect(h.size).toBe(1);
+    h.set([2, 3], "pair");
+    expect(h.get([2n, 3])).toBe("pair");
+    expect(h.delete(1n)).toBe("uno");
+    expect(h.has(1)).toBe(false);
+  });
+
   it("collapses equal Array keys into one entry and keeps the first key", () => {
     const first = ["a", 1];
     const h = new Hash<unknown[], string>();

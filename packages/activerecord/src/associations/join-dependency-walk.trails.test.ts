@@ -63,9 +63,9 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("deduplicates shared subtree when merging two JoinDependencies", () => {
-    const jd1 = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd1 = new JoinDependency(Post, null, { comments: "author" }, Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post, null, "comments.likes", Nodes.OuterJoin);
+    const jd2 = new JoinDependency(Post, null, { comments: "likes" }, Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
 
@@ -102,9 +102,9 @@ describe("JoinDependency walk() deduplication", () => {
   });
 
   it("does not duplicate shared intermediate join on second merge", () => {
-    const jd1 = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd1 = new JoinDependency(Post, null, { comments: "author" }, Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post, null, "comments.likes", Nodes.OuterJoin);
+    const jd2 = new JoinDependency(Post, null, { comments: "likes" }, Nodes.OuterJoin);
 
     const jd3 = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
@@ -126,7 +126,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const jd1 = new JoinDependency(Post, null, ["comments", "reviews"], Nodes.OuterJoin);
 
-    const jd2 = new JoinDependency(Post, null, "reviews.likes", Nodes.OuterJoin);
+    const jd2 = new JoinDependency(Post, null, { reviews: "likes" }, Nodes.OuterJoin);
 
     const joins = jd1.joinConstraints([jd2]);
 

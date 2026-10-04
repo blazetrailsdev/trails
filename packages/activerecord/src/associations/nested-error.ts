@@ -1,11 +1,12 @@
 import { underscore } from "@blazetrails/activesupport";
 import { NestedError as ActiveModelNestedError } from "@blazetrails/activemodel";
+import { rtest } from "@blazetrails/ruby-compat";
 import { indexNestedAttributeErrors } from "../active-record.js";
 
 interface AssociationLike {
   owner: object | null;
   reflection: { name: string; options?: Record<string, unknown> };
-  isCollection?(): boolean;
+  isCollection(): boolean;
   target?: unknown[];
   nestedAttributesTarget?: unknown[];
   options?: Record<string, unknown>;
@@ -42,18 +43,17 @@ export class NestedError extends ActiveModelNestedError {
       _association: association,
       innerError,
     });
-    const name = underscore(association.reflection.name);
-    const isCollection =
-      typeof association.isCollection === "function"
-        ? association.isCollection()
-        : Array.isArray(association.target);
-    if (isCollection && indexErrorsSetting.call(self)) {
-      const idx = index.call(self);
-      if (idx != null) {
-        return `${name}[${idx}].${innerError.attribute}`;
-      }
+    const associationName = underscore(association.reflection.name);
+
+    if (
+      association.isCollection() &&
+      rtest(indexErrorsSetting.call(self)) &&
+      index.call(self) != null
+    ) {
+      return `${associationName}[${index.call(self)}].${innerError.attribute}`;
+    } else {
+      return `${associationName}.${innerError.attribute}`;
     }
-    return `${name}.${innerError.attribute}`;
   }
 }
 

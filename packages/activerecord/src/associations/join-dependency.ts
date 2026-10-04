@@ -1,5 +1,21 @@
-import { Autoload, extend, Notifications, type Extended } from "@blazetrails/activesupport";
-import { first, Hash, isEmpty, partition, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  Autoload,
+  extend,
+  isPlainObject,
+  Notifications,
+  type Extended,
+} from "@blazetrails/activesupport";
+import {
+  first,
+  Hash,
+  isEmpty,
+  partition,
+  rbEqual,
+  rbInspect,
+  rtest,
+  symbolToS,
+  toSym,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
@@ -12,28 +28,9 @@ import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
-import {
-  AliasTracker,
-  aliasedArelTableFor,
-  aliasedArelTableForReflection,
-} from "./alias-tracker.js";
+import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
 
 const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
-
-let _reflectionIdCounter = 0;
-const _reflectionIds = new WeakMap<object, number>();
-function reflectionChainKey(chain: readonly object[]): string {
-  let key = "";
-  for (const refl of chain) {
-    let id = _reflectionIds.get(refl);
-    if (id === undefined) {
-      id = ++_reflectionIdCounter;
-      _reflectionIds.set(refl, id);
-    }
-    key += key ? `,${id}` : `${id}`;
-  }
-  return key;
-}
 
 export class Aliases {
   private _tables: Aliases.Table[];
@@ -103,10 +100,8 @@ export class JoinDependency {
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _references: Map<string, string> = new Map();
   /** @internal */
-  private _joinedTables: Map<
-    string,
-    { aliased: ArelTable | Nodes.TableAlias; effectiveName: string; terminated: boolean }
-  > = new Map();
+  private _joinedTables: Hash<readonly object[], [ArelTable | Nodes.TableAlias, boolean]> =
+    new Hash();
   constructor(
     base: typeof Base,
     table: ArelTable | Nodes.TableAlias | null,
@@ -144,30 +139,18 @@ export class JoinDependency {
   }
 
   /** @internal */
-  private addAssociation(reflection: any): JoinAssociation {
-    const targetModel: typeof Base = reflection.klass;
-    const targetTable: string = (targetModel as any).tableName;
-
-    const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable);
-
-    const treePart = new JoinAssociation(reflection);
-    treePart.table = targetArelTable;
-    return treePart;
-  }
-
-  /** @internal */
   private build(associations: Record<string, any>, baseKlass: typeof Base): JoinAssociation[] {
     return Object.keys(associations).flatMap((name) => {
       const right = associations[name];
       const reflection = this.findReflection(baseKlass, name);
-      reflection.checkValidityBang?.();
-      reflection.checkEagerLoadableBang?.();
-      if (reflection.isPolymorphic?.()) {
+      reflection.checkValidityBang();
+      reflection.checkEagerLoadableBang();
+
+      if (reflection.isPolymorphic()) {
         throw new EagerLoadPolymorphicError(name);
       }
-      const node = this.addAssociation(reflection);
-      if (right != null) node.children.push(...this.build(right, reflection.klass));
-      return [node];
+
+      return [new JoinAssociation(reflection, this.build(right, reflection.klass))];
     });
   }
 
@@ -199,7 +182,7 @@ export class JoinDependency {
       this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
     }
     this._references = new Map();
-    this._joinedTables = new Map();
+    this._joinedTables = new Hash();
     if (references) {
       for (const tableName of references) {
         if (tableName instanceof Nodes.SqlLiteral)
@@ -250,67 +233,49 @@ export class JoinDependency {
   /** @internal */
   private makeConstraints(
     parent: JoinPart,
-    child: JoinPart,
+    child: JoinAssociation,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    const foreignTable =
-      parent.table ?? aliasedArelTableFor(parent.baseKlass as never, parent.tableName!);
+    const foreignTable = parent.table!;
     const foreignKlass = parent.baseKlass;
-    const joins: Nodes.Join[] = [];
+    const joins = child.joinConstraints(
+      foreignTable,
+      foreignKlass,
+      joinType,
+      this.aliasTracker,
+      (reflection, remainingReflectionChain) => {
+        const [memo, terminated] = this._joinedTables.get(remainingReflectionChain) ?? [];
+        let table = memo;
+        const root = reflection === child.reflection;
 
-    if (child instanceof JoinAssociation) {
-      let resolvedRoot:
-        | { aliased: ArelTable | Nodes.TableAlias; effectiveName: string }
-        | undefined;
-      const built = child.joinConstraints(
-        foreignTable,
-        foreignKlass,
-        joinType,
-        this.aliasTracker,
-        (reflection, remainingReflectionChain) => {
-          const chainKey = reflectionChainKey(remainingReflectionChain);
-          const memo = this._joinedTables.get(chainKey);
-          const root = reflection === child.reflection;
+        if (table != null && (!root || !rtest(terminated))) {
+          if (root) this._joinedTables.set(remainingReflectionChain, [table, root]);
+          return [table, true];
+        }
 
-          if (memo && (!root || !memo.terminated)) {
-            if (root) {
-              memo.terminated = true;
-              resolvedRoot = memo;
-            }
-            return [memo.aliased, true];
-          }
+        const tableName = this._references.get((reflection as any).name);
 
-          const tableName = this._references.get((reflection as any).name);
+        table = this.aliasTracker.aliasedTableFor(
+          aliasedArelTableForReflection(reflection, (reflection as any).tableName),
+          tableName ?? null,
+          () => {
+            const name = (reflection as any).aliasCandidate(parent.tableName);
+            return root ? name : `${name}_join`;
+          },
+        );
+        table = aliasedArelTableForReflection(
+          reflection,
+          (reflection as any).tableName,
+          String(table!.tableAlias ?? table!.name),
+        );
 
-          const table = this.aliasTracker.aliasedTableFor(
-            aliasedArelTableForReflection(reflection, (reflection as any).tableName),
-            tableName ?? null,
-            () => {
-              const name = (reflection as any).aliasCandidate(parent.tableName);
-              return root ? name : `${name}_join`;
-            },
-          );
-          const effectiveName = String(table.tableAlias ?? table.name);
-          const aliased = aliasedArelTableForReflection(
-            reflection,
-            (reflection as any).tableName,
-            effectiveName,
-          );
-          if (root) resolvedRoot = { aliased, effectiveName };
-
-          if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
-            this._joinedTables.set(chainKey, { aliased, effectiveName, terminated: root });
-          }
-          return [aliased, false];
-        },
-      );
-
-      if (resolvedRoot) {
-        child.table = resolvedRoot.aliased;
-      }
-      joins.push(...(built as Nodes.Join[]));
-      this._aliasesCache = undefined;
-    }
+        if (joinType === Nodes.OuterJoin && !this._joinedTables.has(remainingReflectionChain)) {
+          this._joinedTables.set(remainingReflectionChain, [table, root]);
+        }
+        return [table, false];
+      },
+    ) as Nodes.Join[];
+    this._aliasesCache = undefined;
 
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
@@ -407,30 +372,18 @@ export class JoinDependency {
 
   static walkTree(associations: any, hash: Record<string, any>): void {
     if (typeof associations === "string") {
-      const name = associations.startsWith(":") ? associations.slice(1) : associations;
-      let cur = hash;
-      for (const part of name.split(".")) {
-        cur = cur[part] ??= Object.create(null);
-      }
+      hash[symbolToS(toSym(associations))] ||= Object.create(null);
     } else if (Array.isArray(associations)) {
       for (const assoc of associations) {
         JoinDependency.walkTree(assoc, hash);
       }
-    } else if (associations && typeof associations === "object") {
-      for (const key of Reflect.ownKeys(associations)) {
-        const value = associations[key];
-        const k = typeof key === "string" && key.startsWith(":") ? key.slice(1) : String(key);
-        if (!hash[k]) hash[k] = Object.create(null);
-        if (value != null) JoinDependency.walkTree(value, hash[k]);
+    } else if (isPlainObject(associations)) {
+      for (const [k, v] of Object.entries(associations)) {
+        const cache = (hash[symbolToS(toSym(k))] ||= Object.create(null));
+        if (rtest(v)) JoinDependency.walkTree(v, cache);
       }
     } else {
-      let desc: string;
-      try {
-        desc = JSON.stringify(associations) ?? String(associations);
-      } catch {
-        desc = `${typeof associations}`;
-      }
-      throw new ConfigurationError(`Invalid association spec: ${desc}`);
+      throw new ConfigurationError(rbInspect(associations));
     }
   }
 
@@ -525,7 +478,7 @@ export class JoinDependency {
   /** @internal */
   private findReflection(klass: typeof Base, name: string): any {
     const reflection = _reflectOnAssociation(klass as any, name);
-    if (!reflection) {
+    if (!rtest(reflection)) {
       throw new ConfigurationError(
         `Can't join '${(klass as any).name}' to association named '${name}'; perhaps you misspelled it?`,
       );

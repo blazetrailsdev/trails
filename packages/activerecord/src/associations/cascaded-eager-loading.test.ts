@@ -127,7 +127,7 @@ describe("CascadedEagerLoadingTest", () => {
   it("eager association loading dedups a manual join coinciding with a dotted eager root", async () => {
     const loaded = await Author.all()
       .joins(":posts")
-      .eagerLoad("posts.comments")
+      .eagerLoad({ posts: "comments" })
       .order("authors.id");
     expect(loaded).toHaveLength(3);
     expect(targetArr(loaded[0], "posts")).toHaveLength(5);

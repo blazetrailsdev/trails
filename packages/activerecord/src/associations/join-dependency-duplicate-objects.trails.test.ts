@@ -110,7 +110,7 @@ describe("JoinDependency dedupes duplicate join rows", () => {
   });
 
   it("shares one child instance across distinct parents joined to the same record", () => {
-    const jd = new JoinDependency(Reader, null, "post.comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Reader, null, { post: "comments" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {

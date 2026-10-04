@@ -56,10 +56,6 @@ describe("JoinDependency#build", () => {
     expect(paths(buildEager({ comments: "author" }))).toEqual(["comments", "comments.author"]);
   });
 
-  it("joins a dotted-string spec", () => {
-    expect(paths(buildEager("comments.author"))).toEqual(["comments", "comments.author"]);
-  });
-
   it("deduplicates shared prefixes across hash array values", () => {
     expect(paths(buildEager({ comments: ["author", "tags"] }))).toEqual([
       "comments",
@@ -69,7 +65,7 @@ describe("JoinDependency#build", () => {
   });
 
   it("deduplicates shared prefixes across separate spec calls", () => {
-    expect(paths(buildEager(["comments.author", "comments.tags"]))).toEqual([
+    expect(paths(buildEager([{ comments: "author" }, { comments: "tags" }]))).toEqual([
       "comments",
       "comments.author",
       "comments.tags",

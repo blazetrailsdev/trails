@@ -36,7 +36,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("eager association loading grafts stashed associations to correct parent", () => {
-    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, null, { comments: "author" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {
@@ -74,7 +74,7 @@ describe("JoinDependency nested hydration", () => {
   });
 
   it("eager association loading with cascaded two levels and one level", () => {
-    const jd = new JoinDependency(Post, null, "comments.author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, null, { comments: "author" }, Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {

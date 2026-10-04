@@ -9,6 +9,7 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
+import type { Relation } from "../../relation.js";
 import type { AbstractReflection } from "../../reflection.js";
 import { Association } from "./association.js";
 import { ThroughAssociation } from "./through-association.js";
@@ -28,7 +29,7 @@ export class Branch {
   readonly scope: any;
   readonly associateByDefault: boolean;
 
-  private _preloadedRecords: Base[] | undefined;
+  private _preloadedRecords: Base[] | Relation<Base> | undefined;
   private _loaders: Association[] | null;
   private _polymorphic: boolean | undefined;
 
@@ -55,20 +56,18 @@ export class Branch {
     this._loaders = null;
   }
 
-  setPreloadedRecords(records: Base[]): void {
+  setPreloadedRecords(records: Base[] | Relation<Base>): void {
     this._preloadedRecords = records;
   }
 
   async preloadedRecords(): Promise<Base[]> {
-    if (this._preloadedRecords !== undefined) return this._preloadedRecords;
-    if (this.parent == null) {
-      throw new Error("Root preloader branch requires preloadedRecords to be set before access");
-    }
-    const records: Base[] = [];
-    for (const loader of await this.loaders()) {
-      records.push(...(await loader.preloadedRecords()));
-    }
-    this._preloadedRecords = records;
+    this._preloadedRecords ??= await (async () => {
+      const preloadedRecords: Base[][] = [];
+      for (const loader of await this.loaders()) {
+        preloadedRecords.push(await loader.preloadedRecords());
+      }
+      return preloadedRecords.flat();
+    })();
     return this._preloadedRecords;
   }
 
@@ -88,11 +87,9 @@ export class Branch {
 
   async immediateFutureClasses(): Promise<(typeof Base)[]> {
     if (this.parent!.isDone()) {
-      const futureClasses: (typeof Base)[] = [];
-      for (const loader of await this.loaders()) {
-        futureClasses.push(...(await loader.futureClasses()));
-      }
-      return uniq(futureClasses);
+      const futureClasses: (typeof Base)[][] = [];
+      for (const loader of await this.loaders()) futureClasses.push(await loader.futureClasses());
+      return uniq(futureClasses.flat());
     } else {
       return uniq(
         (await this.likelyReflections())
@@ -151,7 +148,6 @@ export class Branch {
   }
 
   async sourceRecords(): Promise<Base[]> {
-    if (this.isRoot()) return [];
     return this.parent!.preloadedRecords();
   }
 
@@ -160,12 +156,9 @@ export class Branch {
   }
 
   async runnableLoaders(): Promise<Association[]> {
-    if (this.isRoot()) return [];
-    const runnable: Association[] = [];
-    for (const loader of await this.loaders()) {
-      runnable.push(...(await loader.runnableLoaders()));
-    }
-    return runnable.filter((l) => !l.isRun());
+    const runnableLoaders: Association[][] = [];
+    for (const loader of await this.loaders()) runnableLoaders.push(await loader.runnableLoaders());
+    return runnableLoaders.flat().filter((l) => !l.isRun());
   }
 
   async groupedRecords(): Promise<Map<AbstractReflection, Base[]>> {
@@ -184,12 +177,7 @@ export class Branch {
         continue;
       }
 
-      const existing = h.get(reflection!);
-      if (existing) {
-        existing.push(record);
-      } else {
-        h.set(reflection!, [record]);
-      }
+      (h.get(reflection!) ?? h.set(reflection!, []).get(reflection!)!).push(record);
     }
     return h;
   }

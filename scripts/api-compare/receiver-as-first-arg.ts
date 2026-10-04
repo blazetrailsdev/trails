@@ -108,6 +108,10 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // active_support/core_ext/enumerable.rb:184-186 — `values.compact_blank`,
   // exported by @blazetrails/activesupport as `compactBlank(collection)`.
   "compact_blank",
+  // active_support/core_ext/array/extract.rb:10-17 — `nodes.children.extract! { … }`
+  // (activerecord/lib/active_record/associations/join_dependency/join_association.rb:60),
+  // exported by @blazetrails/activesupport as `extractBang(array, block)`.
+  "extract!",
   // Ruby core `Enumerable#filter_map` — `schemes.filter_map { … }`
   // (activerecord/lib/active_record/encryption/encryptable_record.rb:79). No
   // JS method both filters and maps, so @blazetrails/activesupport exports it
