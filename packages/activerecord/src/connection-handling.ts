@@ -145,7 +145,7 @@ export function connectedToMany<T>(this: typeof Base, ...classes: unknown[]): T 
 
 export async function connectedToAllShards<T>(
   this: typeof Base,
-  { role, preventWrites = false }: { role?: string; preventWrites?: boolean },
+  { role, preventWrites }: { role?: string; preventWrites?: boolean },
   blk: () => T,
 ): Promise<Awaited<T>[]> {
   const results: Awaited<T>[] = [];

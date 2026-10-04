@@ -95,6 +95,15 @@ describe("ShardsKeysTest", () => {
     expect(results).toEqual(["shard_one_reading", "shard_two_reading"]);
   });
 
+  it("connected to all shards runs an async block against one shard at a time", async () => {
+    const results = await ShardedBase.connectedToAllShards({}, async () => {
+      await Promise.resolve();
+      return ShardedBase.connectionPool().dbConfig.name;
+    });
+
+    expect(results).toEqual(["shard_one", "shard_two"]);
+  });
+
   it("connected to all shards respects preventing writes", async () => {
     expect(ShardedBase.currentPreventingWrites()).toBeFalsy();
 
