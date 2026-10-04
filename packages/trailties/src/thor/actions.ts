@@ -213,6 +213,8 @@ export function inRoot<T>(this: ActionsHost, block: () => T | Promise<T>): Promi
   return this.inside(this._destinationStack[0], {}, () => block());
 }
 
+let applied = 0;
+
 export async function apply(
   this: Pick<ActionsHost, "findInSourcePaths" | "sayStatus" | "shell">,
   path: string,
@@ -233,7 +235,7 @@ export async function apply(
     const contents = await response.text();
     url = `data:text/javascript,${encodeURIComponent(contents)}`;
   } else {
-    url = `${getPath().pathToFileURL!(path).href}?${Date.now()}`;
+    url = `${getPath().pathToFileURL!(path).href}?${(applied += 1)}`;
   }
 
   await (await import(url)).default.call(this, this);

@@ -51,7 +51,6 @@ describe("Thor::Actions#apply (trails)", () => {
       File.write(file, 'export default function () { this.foo = "FOO"; }');
       await capture(":stdout", () => r.apply(file));
       File.write(file, 'export default function () { this.foo = "BAR"; }');
-      await new Promise((resolve) => setTimeout(resolve, 2));
       await capture(":stdout", () => r.apply(file));
       expect(r.foo).toBe("BAR");
     } finally {
