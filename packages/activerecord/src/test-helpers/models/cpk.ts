@@ -10,7 +10,11 @@ export class CpkAuthor extends Base {
   static _demodulizedName = "Author";
 
   static {
-    this.hasMany("books", { className: "CpkBook", foreignKey: "author_id", dependent: "delete" });
+    this.hasMany("books", {
+      className: "CpkBook",
+      foreignKey: "author_id",
+      dependent: "deleteAll",
+    });
   }
 }
 

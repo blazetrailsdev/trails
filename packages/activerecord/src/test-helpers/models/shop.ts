@@ -36,7 +36,7 @@ export class ShopProduct extends Base {
     this.hasMany("variants", {
       className: "ShopVariant",
       foreignKey: "product_id",
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.belongsTo("type", { className: "ShopProductType" });
   }

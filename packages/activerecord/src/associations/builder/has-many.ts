@@ -23,7 +23,6 @@ export class HasMany extends CollectionAssociation {
   static override validDependentOptions(): string[] {
     return [
       "destroy",
-      "delete",
       "deleteAll",
       "nullify",
       "restrictWithError",

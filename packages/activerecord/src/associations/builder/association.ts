@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError, kernelThrow, type Module } from "@blazetrails/ruby-compat";
+import { NotImplementedError, type Module } from "@blazetrails/ruby-compat";
 import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
-import { ConfigurationError, RecordNotDestroyed } from "../../errors.js";
+import { ConfigurationError } from "../../errors.js";
 import { _Reflection } from "../../reflection-slot.js";
 
 /** @internal */
@@ -213,18 +213,8 @@ export class Association {
   }
 
   static addDestroyCallbacks(model: any, reflection: any): void {
-    const name = reflection.name ?? reflection;
-    model.beforeDestroy(async (record: any) => {
-      try {
-        await record.association(name).handleDependency();
-      } catch (e) {
-        if (e instanceof RecordNotDestroyed) {
-          record._associationDestroyException = e;
-          kernelThrow(":abort");
-        }
-        throw e;
-      }
-    });
+    const name = reflection.name;
+    model.beforeDestroy((o: any) => o.association(name).handleDependency());
   }
 
   static addAfterCommitJobsCallback(_model: any, _dependent: string): void {}
