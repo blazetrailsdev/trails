@@ -90,7 +90,17 @@ export namespace Psych {
    *
    * @noRailsEquivalent PERMANENT
    */
-  export const Visitors = { ToRuby, NoAliasRuby, YAMLTree };
+  export const Visitors = {
+    get ToRuby() {
+      return ToRuby;
+    },
+    get NoAliasRuby() {
+      return NoAliasRuby;
+    },
+    get YAMLTree() {
+      return YAMLTree;
+    },
+  };
 
   /**
    * `Psych.load_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:741`).
