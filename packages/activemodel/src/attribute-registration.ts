@@ -142,6 +142,7 @@ export const ClassMethods = {
     this.resetDefaultAttributes();
   },
 
+  /** @inventedArm registerSubclass — PERMANENT */
   _defaultAttributes(this: AttributeHostInternals): AttributeSet {
     return (this._cachedDefaultAttributes ||= (() => {
       const attributeSet = new AttributeSet({});
