@@ -243,6 +243,7 @@ class TestExtractor
 
     walk(sexp)
 
+    collect_lib_modules(filepath)
     flush_collected_modules
 
     return if @test_cases.empty?
@@ -433,6 +434,35 @@ class TestExtractor
     name = const_name_from_args(args)
     return unless name
     @module_includes[name] ||= @gate_stack.dup
+  end
+
+  LIB_TEST_MODULES = %w[ActiveModel::Lint::Tests].freeze
+
+  def collect_lib_modules(filepath)
+    @module_includes.keys.each do |name|
+      next if @modules.key?(name) || !LIB_TEST_MODULES.include?(name)
+      path = lib_module_path(name, filepath)
+      sexp = path && Ripper.sexp(File.read(path))
+      next unless sexp
+      own = @modules
+      @modules = {}
+      walk(sexp)
+      tests = @modules[name.split("::").last]
+      @modules = own
+      @modules[name] = tests if tests
+    end
+  end
+
+  def lib_module_path(name, filepath)
+    segments = name.split("::").map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase }
+    gem = File.dirname(filepath)
+    gem = File.dirname(gem) until File.directory?(File.join(gem, "lib")) || gem == File.dirname(gem)
+    until segments.empty?
+      found = Dir.glob("#{File.join(File.dirname(gem), "*", "lib", *segments)}.rb").first
+      return found if found
+      segments.pop
+    end
+    nil
   end
 
   # Emit every collected mixin module's tests once (bare — no class ancestor, as

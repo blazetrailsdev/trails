@@ -2,7 +2,12 @@ import * as path from "path";
 import * as fs from "fs";
 import { globSync } from "tinyglobby";
 import type { TestManifest, TestPackageInfo } from "./types.js";
-import { extractTestsFromSource } from "./extract-ts-core.js";
+import {
+  LIB_TEST_MODULES,
+  collectLibTests,
+  extractTestsFromSource,
+  type HelperMap,
+} from "./extract-ts-core.js";
 import { PKG_SRC_DIRS } from "./compare.js";
 import { PACKAGE_DIR_OVERRIDES } from "../api-compare/config.js";
 import { scopeOf } from "../api-compare/scope.js";
@@ -83,7 +88,7 @@ function getPackageTestFiles(): Record<string, string[]> {
 }
 
 /** `only` narrows the extraction to one package (CI's thor-only comparison). */
-export function main(only: string | null = null) {
+export async function main(only: string | null = null) {
   const manifest: TestManifest = {
     source: "typescript",
     generatedAt: new Date().toISOString(),
@@ -92,10 +97,16 @@ export function main(only: string | null = null) {
 
   const packageTestFiles = getPackageTestFiles();
 
+  const libTests: HelperMap = new Map();
+  for (const [namespace, file] of Object.entries(LIB_TEST_MODULES)) {
+    const content = await fs.promises.readFile(path.join(ROOT_DIR, file), "utf-8");
+    for (const [name, defs] of collectLibTests(content, file, namespace)) libTests.set(name, defs);
+  }
+
   for (const [pkg, files] of Object.entries(packageTestFiles)) {
     if (only !== null && pkg !== only) continue;
     const absoluteFiles = files.map((f) => path.join(ROOT_DIR, f));
-    manifest.packages[pkg] = extractPackageTests(absoluteFiles);
+    manifest.packages[pkg] = extractPackageTests(absoluteFiles, libTests);
   }
 
   // Print summary
@@ -115,7 +126,7 @@ export function main(only: string | null = null) {
   console.log(`\nWritten to ${outputPath}`);
 }
 
-function extractPackageTests(files: string[]): TestPackageInfo {
+function extractPackageTests(files: string[], libTests: HelperMap): TestPackageInfo {
   const pkgInfo: TestPackageInfo = {
     files: [],
     totalTests: 0,
@@ -123,11 +134,11 @@ function extractPackageTests(files: string[]): TestPackageInfo {
 
   for (const file of files) {
     const content = fs.readFileSync(file, "utf-8");
-    pkgInfo.files.push(extractTestsFromSource(content, path.relative(ROOT_DIR, file)));
+    pkgInfo.files.push(extractTestsFromSource(content, path.relative(ROOT_DIR, file), libTests));
   }
 
   pkgInfo.totalTests = pkgInfo.files.reduce((sum, f) => sum + f.testCases.length, 0);
   return pkgInfo;
 }
 
-if (require.main === module) main(scopeOf(process.argv.slice(2)));
+if (require.main === module) void main(scopeOf(process.argv.slice(2)));

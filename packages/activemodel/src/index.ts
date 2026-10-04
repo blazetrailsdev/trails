@@ -1,5 +1,6 @@
 export { Access } from "./access.js";
 export { ActiveModel } from "./namespaces.js";
+export * as Lint from "./lint.js";
 export { Model } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";

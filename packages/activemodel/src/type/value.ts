@@ -1,4 +1,5 @@
 import {
+  type Included,
   include,
   initializeIncludedModules,
   rbDeclareIvar,
@@ -9,9 +10,8 @@ import {
 import { NoMethodError } from "../attribute-assignment.js";
 import { SerializeCastValue } from "./serialize-cast-value.js";
 
-export interface ValueType<T = unknown> {
+export interface ValueType<T = unknown> extends Included<typeof SerializeCastValue> {
   serializeCastValue(value: T | null): unknown;
-  itselfIfSerializeCastValueCompatible(): this | null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

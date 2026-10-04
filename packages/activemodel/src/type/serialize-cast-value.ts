@@ -14,7 +14,9 @@ interface SerializeCastValueType {
   serialize(value: unknown): unknown;
 }
 
-export const SerializeCastValue = new Module() as Module & {
+export const SerializeCastValue = new Module() as Module<{
+  itselfIfSerializeCastValueCompatible: typeof itselfIfSerializeCastValueCompatible;
+}> & {
   ClassMethods: typeof ClassMethods;
   DefaultImplementation: Module;
   [included](klass: { prototype: object }): void;

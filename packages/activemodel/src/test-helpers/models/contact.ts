@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (contact.rb:3-7); the class/interface merge is how `include()` surfaces those members on the type side. */
 import { InstanceVariablesObject, exceptBang, extend, include } from "@blazetrails/activesupport";
-import { Conversion, ClassMethods as ConversionClassMethods } from "../../conversion.js";
+import { Conversion } from "../../conversion.js";
 import { Naming } from "../../naming.js";
 import type { ModelName } from "../../naming.js";
 import { NoMethodError } from "../../attribute-assignment.js";
@@ -17,7 +17,6 @@ export class Contact {
   static {
     extend(this, Naming);
     include(this, Conversion);
-    extend(this, ConversionClassMethods);
     include(this, Validations);
 
     include(this, SerializersJSON);

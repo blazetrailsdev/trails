@@ -56,6 +56,7 @@ interface HelperDef {
   lambda: boolean;
   scopeStart: number;
   scopeEnd: number;
+  sourceFile?: ts.SourceFile;
 }
 
 /**
@@ -75,7 +76,53 @@ interface HelperDef {
  * Still static: receiver calls (`obj.foo()`) and runtime-dispatched helpers are
  * out of scope, which is fine for a report-only count.
  */
-type HelperMap = Map<string, HelperDef[]>;
+export type HelperMap = Map<string, HelperDef[]>;
+
+/**
+ * The TS twin of extract-ruby-tests.rb's `LIB_TEST_MODULES`: a namespace of
+ * `test*` functions a package's LIB exports, which a test case mounts by
+ * calling them (`Tests.testToKey(model)`) where Rails `include`s the module
+ * (activemodel/test/cases/lint_test.rb:6). Only-grow, like its twin.
+ */
+export const LIB_TEST_MODULES: Record<string, string> = {
+  Tests: "packages/activemodel/src/lint.ts",
+};
+
+/**
+ * The functions of `namespace` in a lib file, keyed `Namespace.fn`, the name a
+ * call site reaches one by (`Tests.testToKey`, `Lint.Tests.testToKey`). A
+ * body's own helper calls are not folded, as the Ruby walk of the lib file
+ * folds none.
+ */
+export function collectLibTests(content: string, file: string, namespace: string): HelperMap {
+  const sourceFile = ts.createSourceFile(file, content, ts.ScriptTarget.ESNext, false);
+  const tests: HelperMap = new Map();
+  const walk = (n: ts.Node, inside: boolean) => {
+    if (inside && ts.isFunctionDeclaration(n) && n.name && n.body) {
+      tests.set(`${namespace}.${n.name.text}`, [
+        { body: n.body, lambda: false, scopeStart: 0, scopeEnd: Infinity, sourceFile },
+      ]);
+      return;
+    }
+    const enters = ts.isModuleDeclaration(n) && n.name.text === namespace;
+    ts.forEachChild(n, (c) => walk(c, inside || enters));
+  };
+  walk(sourceFile, false);
+  return tests;
+}
+
+function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (!ts.isPropertyAccessExpression(expression)) return null;
+  const owner = expression.expression;
+  const namespace = ts.isIdentifier(owner)
+    ? owner.text
+    : ts.isPropertyAccessExpression(owner)
+      ? owner.name.text
+      : null;
+  const key = `${namespace}.${expression.name.text}`;
+  return namespace !== null && helpers.has(key) ? key : null;
+}
 
 function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
   const helpers: HelperMap = new Map();
@@ -159,15 +206,16 @@ function countAssertions(
 ): number {
   let count = 0;
   const walk = (n: ts.Node) => {
-    if (ts.isCallExpression(n) && ts.isIdentifier(n.expression)) {
-      const name = n.expression.text;
+    const name = ts.isCallExpression(n) ? helperCalleeName(n.expression, helpers) : null;
+    if (name !== null) {
       const def = resolveHelper(helpers, name, n.pos);
       if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
         if (isAssertionCallee(name)) {
           count++;
         } else if (def && depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
           visiting.add(name);
-          count += countAssertions(def.body, helpers, depth + 1, visiting, rootStart, rootEnd);
+          const inner = def.sourceFile ? new Map() : helpers;
+          count += countAssertions(def.body, inner, depth + 1, visiting, rootStart, rootEnd);
           visiting.delete(name);
         }
       }
@@ -299,14 +347,14 @@ function collectAssertionKinds(
   const values: (string | null)[] = [];
   const walk = (n: ts.Node) => {
     if (ts.isCallExpression(n)) {
-      if (ts.isPropertyAccessExpression(n.expression)) {
-        const matcher = expectChainMatcher(n);
+      const name = helperCalleeName(n.expression, helpers);
+      if (name === null) {
+        const matcher = ts.isPropertyAccessExpression(n.expression) && expectChainMatcher(n);
         if (matcher) {
           kinds.push(matcher);
           values.push(literalToken(n.arguments[0], sourceFile));
         }
-      } else if (ts.isIdentifier(n.expression)) {
-        const name = n.expression.text;
+      } else {
         const def = resolveHelper(helpers, name, n.pos);
         if (def === null || !isInlineDef(def, rootStart, rootEnd)) {
           if (isAssertionCallee(name)) {
@@ -320,8 +368,8 @@ function collectAssertionKinds(
             visiting.add(name);
             const sub = collectAssertionKinds(
               def.body,
-              helpers,
-              sourceFile,
+              def.sourceFile ? new Map() : helpers,
+              def.sourceFile ?? sourceFile,
               depth + 1,
               visiting,
               rootStart,
@@ -363,9 +411,14 @@ function calleeRootName(expression: ts.Expression): string | null {
  * every contained test; inline `it.skipIf`/`runIf` add a per-test gate.
  * `pending` (it.skip/todo) stays a separate TODO signal, never a gate.
  */
-export function extractTestsFromSource(content: string, relativePath: string): TestFileInfo {
+export function extractTestsFromSource(
+  content: string,
+  relativePath: string,
+  libTests: HelperMap = new Map(),
+): TestFileInfo {
   const sourceFile = ts.createSourceFile(relativePath, content, ts.ScriptTarget.ESNext, false);
   const helpers = collectHelpers(sourceFile);
+  for (const [name, defs] of libTests) helpers.set(name, defs);
   const constDecls = collectConstDeclarations(sourceFile);
   const bindings = new Map<string, BoundValue>();
 

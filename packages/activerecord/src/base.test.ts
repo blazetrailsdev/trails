@@ -1,4 +1,4 @@
-import { describe, it, expect, afterAll, afterEach, vi } from "vitest";
+import { describe, it, expect, afterAll, afterEach, beforeEach, vi } from "vitest";
 import { Base, NotImplementedError, ReadonlyAttributeError, Relation } from "./index.js";
 import {
   TableNotSpecified,
@@ -29,7 +29,7 @@ import {
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { fixtures } from "./test-fixtures.js";
 import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
-import { IntegerType, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { IntegerType, ValueType, ArgumentError, Lint } from "@blazetrails/activemodel";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { Company, Client, AbstractCompany } from "./test-helpers/models/company.js";
 import { Post, PostRecord } from "./test-helpers/models/post.js";
@@ -164,6 +164,40 @@ function timeToA(time: any): unknown[] {
     time.zone,
   ];
 }
+
+describe("LintTest", () => {
+  class LintModel extends Base {}
+
+  let model: LintModel;
+
+  beforeEach(() => {
+    model = new LintModel();
+  });
+
+  it("to key", () => {
+    Lint.Tests.testToKey(model);
+  });
+
+  it("to param", () => {
+    Lint.Tests.testToParam(model);
+  });
+
+  it("to partial path", () => {
+    Lint.Tests.testToPartialPath(model);
+  });
+
+  it("persisted?", () => {
+    Lint.Tests.testPersisted(model);
+  });
+
+  it("model naming", () => {
+    Lint.Tests.testModelNaming(model);
+  });
+
+  it("errors aref", () => {
+    Lint.Tests.testErrorsAref(model);
+  });
+});
 
 describe("BasicsTest", async () => {
   const { topics, posts, authors, developers, cpkBooks } = fixtures([

@@ -32,6 +32,8 @@ export interface SkeletonRow extends CallSkeleton {
 export interface SkeletonArtifact {
   packages: string[];
   skeletons: SkeletonRow[];
+  /** `@inventedArm` tags on a declaration no skeleton row was written for. */
+  uncomparedArmTags?: { package: string; tsFile: string; tsName: string; call: string }[];
 }
 
 /**
@@ -287,6 +289,14 @@ function armVerdict(
  * body's OWN, for the same reason: the helper's divergence is the helper row's.
  */
 export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
+  const verdict = unreceiptedArms(row);
+  if (verdict?.kind !== "count" || row.inventedArms === undefined) return verdict;
+  const invented = verdict.invented.filter((token) => !row.inventedArms!.includes(token));
+  if (verdict.missing.length === 0 && invented.length === 0) return undefined;
+  return { ...verdict, invented };
+}
+
+function unreceiptedArms(row: SkeletonRow): ArmMismatch | undefined {
   const plain = armVerdict(row, row.ruby, row.ts);
   if (plain === undefined) return undefined;
   const spliced = armVerdict(
@@ -295,6 +305,22 @@ export function compareArms(row: SkeletonRow): ArmMismatch | undefined {
     spliceHelperSkeletons(row.ts, row.tsHelpers),
   );
   return spliced === undefined ? undefined : plain;
+}
+
+/**
+ * The `@inventedArm` receipts on `row` that receipt nothing: a control token
+ * the pair does not file as invented, or a call name the TS body does not
+ * reach or the Ruby body reaches too. A receipt is debt the gate must be able
+ * to retire, so one that outlives its arm is an error rather than a no-op.
+ */
+export function staleArmReceipts(row: SkeletonRow): string[] {
+  if (row.inventedArms === undefined) return [];
+  const invented = unreceiptedArms(row)?.invented ?? [];
+  return row.inventedArms.filter((token) =>
+    CONTROL_TOKENS.has(token)
+      ? !invented.includes(token)
+      : !row.ts.includes(`ref:${token}`) || row.ruby.includes(`ref:${token}`),
+  );
 }
 
 /** The RFC 0113 cluster a `count` row belongs to; an `order` row is `arm-order`. */

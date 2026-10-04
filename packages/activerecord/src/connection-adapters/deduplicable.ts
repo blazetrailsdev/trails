@@ -3,7 +3,11 @@ import { Module, extend, rbEqual } from "@blazetrails/ruby-compat";
 
 type DeduplicableClass = { registry(): Map<number, WeakRef<object>[]> };
 
-export const Deduplicable = new Module() as Module & { ClassMethods: typeof ClassMethods };
+export const Deduplicable = new Module() as Module<{
+  deduplicate: typeof deduplicate;
+  negate: typeof negate;
+  deduplicated: typeof deduplicated;
+}> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 
 const registries = new WeakMap<object, Map<number, WeakRef<object>[]>>();

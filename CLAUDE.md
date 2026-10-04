@@ -461,6 +461,22 @@ write.
    claiming neither is an error, not an assumed PERMANENT, and a bare
    `CONVERGEABLE` with no story id is only half a receipt.
 
+   **An arm or call your body ADDS to Rails'** — a branch Rails' method does
+   not take, or a call it does not make — is invisible to both call gates, which
+   flag only what Rails does and the port omits. Converge it away; where a
+   ratified language shortcoming forces it, receipt it on the declaration with
+   `@inventedArm <token> — PERMANENT|CONVERGEABLE <story-id>`, one tag per
+   token: a control token the arms report files as invented for the pair (`if`,
+   `loop`, `try`, `rescue`, `throw`), or the name of the call only the TS body
+   makes. A receipt is per TOKEN, not per occurrence: one `if` receipt
+   speaks for every invented `if` on the pair, so `report-arms.ts` drops them
+   all, and the receipt goes stale only when the pair invents no `if` at all
+   (equal arm counts, an `order` verdict included). A call-name receipt
+   discharges nothing, since no gate flags an extra call; it records the
+   deviation at the declaration and goes stale when the body stops making the
+   call. `pnpm parity:api:arms:throws` reds on a stale receipt and on one
+   sitting on a declaration no skeleton row was written for.
+
 3. **Did you touch a signature?** Parameter NAMES are gated too (RFC 0126) —
    `parity:api` prints a `params N/M` figure beside `arity`, `--params` lists
    every differing position, and
