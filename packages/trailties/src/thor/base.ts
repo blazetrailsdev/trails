@@ -3,7 +3,6 @@ import {
   argv,
   aryDeleteIf,
   compact,
-  dup,
   eachPair,
   env,
   Errno,
@@ -35,6 +34,7 @@ import {
   RuntimeError,
   stringSplit,
   toI,
+  TypeError,
   warn,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
@@ -137,7 +137,7 @@ export interface BaseClass {
   attrAccessor(...names: string[]): void;
   checkUnknownOptionsBang(): void;
   checkUnknownOptions(): unknown;
-  "checkUnknownOptions?"(config: BaseConfig): boolean;
+  isCheckUnknownOptions(config: BaseConfig): boolean;
   checkDefaultTypeBang(): void;
   allowIncompatibleDefaultTypeBang(): void;
   checkDefaultType(): boolean | null;
@@ -235,7 +235,7 @@ export interface BaseClass {
     this.options = config.classOptions!.merge(this.options) as typeof this.options;
   }
 
-  if (klass["checkUnknownOptions?"](config)) opts.checkUnknownBang();
+  if (klass.isCheckUnknownOptions(config)) opts.checkUnknownBang();
 
   let toParse = args;
   if (!klass["strictArgsPosition?"](config)) toParse = toParse.concat(opts.remaining());
@@ -366,7 +366,7 @@ export const ClassMethods = {
     return this._checkUnknownOptions;
   },
 
-  "checkUnknownOptions?"(this: BaseClass, config: BaseConfig): boolean {
+  isCheckUnknownOptions(this: BaseClass, config: BaseConfig): boolean {
     return rtest(this.checkUnknownOptions());
   },
 
@@ -804,16 +804,12 @@ export function fromSuperclass(
   } else {
     const value = superclass[method]();
 
-    if (Array.isArray(value)) return [...value];
-    if (value instanceof Hash) return dup(value);
-    if (
-      value !== null &&
-      typeof value === "object" &&
-      Object.getPrototypeOf(value) === Object.prototype
-    ) {
-      return dup(value as Record<string, unknown>);
+    try {
+      return rbObjDup(value);
+    } catch (e) {
+      if (e instanceof TypeError) return value;
+      throw e;
     }
-    return value;
   }
 }
 

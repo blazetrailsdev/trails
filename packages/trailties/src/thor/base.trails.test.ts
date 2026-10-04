@@ -103,7 +103,7 @@ describe("Thor::Base", () => {
       expect(new klass([], ["--nope"]).args).toEqual(["--nope"]);
       klass.checkUnknownOptionsBang();
       expect(() => new klass([], ["--nope"])).toThrow(UnknownArgumentError);
-      expect(subclass(klass)["checkUnknownOptions?"]({})).toBe(true);
+      expect(subclass(klass).isCheckUnknownOptions({})).toBe(true);
     });
 
     it("leaves the parser's remaining arguments out under strict_args_position!", () => {
@@ -283,6 +283,17 @@ describe("Thor::Base", () => {
       expect(parent.group()).toBe("standard");
       expect(parent.group("rails")).toBe("rails");
       expect(subclass(parent).group()).toBe("rails");
+    });
+  });
+
+  describe(".from_superclass", () => {
+    it("dups the inherited value at every level of the hierarchy", () => {
+      const parent = subclass(baseclass());
+      parent.classOption("force", { type: "boolean" });
+      const child = subclass(parent);
+      child.classOption("quiet", { type: "boolean" });
+      expect(Object.keys(child.classOptions())).toEqual(["force", "quiet"]);
+      expect(Object.keys(parent.classOptions())).toEqual(["force"]);
     });
   });
 
