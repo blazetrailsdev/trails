@@ -8,8 +8,14 @@ describe("SystemCallError", () => {
     expect(error instanceof Errno.ENOTTY).toBe(false);
   });
 
-  it("is not the class of an error with no code", () => {
+  it("is not the class of a value that is not an fs error", () => {
     expect(new Error("boom") instanceof SystemCallError).toBe(false);
+    expect(({ code: "EACCES" } as unknown) instanceof SystemCallError).toBe(false);
+    const coded = Object.assign(new Error("boom"), { code: "ERR_INVALID_ARG_TYPE" });
+    expect(coded instanceof SystemCallError).toBe(false);
+    expect(Object.assign(new Error("boom"), { code: "23505" }) instanceof SystemCallError).toBe(
+      false,
+    );
     expect((null as unknown) instanceof SystemCallError).toBe(false);
   });
 

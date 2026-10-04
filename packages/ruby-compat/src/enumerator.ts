@@ -25,6 +25,25 @@ export class Enumerator<T = unknown> {
   }
 
   /**
+   * `Enumerable#all?` (`vendor/ruby/v3.3.11/enum.c:1799` `enum_all`), which
+   * stops iterating at the first element the block rejects.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isAll(block: (value: T) => unknown): boolean {
+    const stop = {};
+    try {
+      this.each((value: T) => {
+        if (!block(value)) throw stop;
+      });
+    } catch (error) {
+      if (error !== stop) throw error;
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * `enumerator_each` (`vendor/ruby/v3.3.11/enumerator.c:613`) run to completion
    * into a snapshot, which a `for…of` then walks.
    *
