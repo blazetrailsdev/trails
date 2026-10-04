@@ -35,4 +35,10 @@ describe("StringScanner", () => {
     expect(s.isEos()).toBe(true);
     expect(s.string).toBe("test string");
   });
+
+  it("scan anchors ^ at the scan pointer", () => {
+    const s = new StringScanner("ab");
+    expect(s.scan(/^a/)).toBe("a");
+    expect(s.scan(/^b/)).toBe("b");
+  });
 });

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 import { Bit, Data as BitData } from "./bit.js";
 import { Hstore } from "./hstore.js";
 import { Interval } from "./interval.js";
 import { Macaddr } from "./macaddr.js";
 import { Money } from "./money.js";
+import { Point } from "./point.js";
 import { Xml } from "./xml.js";
 
 describe("PostgreSQL OID types take Rails' control flow", () => {
@@ -52,5 +54,14 @@ describe("PostgreSQL OID types take Rails' control flow", () => {
     expect(type.serialize(new Parameters())).toBe('"a"=>"1"');
     expect(type.serialize(12)).toBe(12);
     expect(type.isChangedInPlace('"a"=>"1", "b"=>NULL', { b: null, a: "1" })).toBe(false);
+    expect(type.isChangedInPlace('"a"=>"1"', { a: "2" })).toBe(true);
+    expect(type.isChangedInPlace(null, { a: "1" })).toBe(true);
+    expect(type.isChangedInPlace('"a"=>"1"', null)).toBe(true);
+    expect(type.isChangedInPlace(null, null)).toBe(false);
+  });
+
+  it("Point#build_point raises ArgumentError for a one-element array", () => {
+    expect(() => new Point().cast([1])).toThrow("wrong number of arguments (given 1, expected 2)");
+    expect(() => new Point().serialize([1])).toThrow(ArgumentError);
   });
 });

@@ -28,7 +28,9 @@ export class StringScanner {
   }
 
   /**
-   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:681` `strscan_scan`.
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:681` `strscan_scan`. The match
+   * runs over the rest of the string (`strscan_do_scan`, `:605`), so `^` and
+   * `\A` anchor at the scan pointer.
    *
    * @noRailsEquivalent PERMANENT
    */
@@ -39,8 +41,8 @@ export class StringScanner {
       re = new RegExp(pattern.source, `${pattern.flags.replace(/[gy]/g, "")}y`);
       HEADONLY.set(pattern, re);
     }
-    re.lastIndex = this.#curr;
-    const m = re.exec(this.#str);
+    re.lastIndex = 0;
+    const m = re.exec(this.#str.slice(this.#curr));
     if (m === null) return null;
     this.#curr += m[0].length;
     return m[0];

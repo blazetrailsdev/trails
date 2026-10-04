@@ -1,5 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { format, toI, registerConstant } from "@blazetrails/ruby-compat";
+import { format, rbStrSend, toI, registerConstant } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
 import { pgDatetimeConfig } from "../pg-datetime-config.js";
 import {
@@ -19,7 +19,7 @@ export class DateTime extends ArDateTime {
       return DateNegativeInfinity;
     } else if (typeof value === "string" && / BC$/.test(value)) {
       value = value.replace(/^\d+/, (year) => format("%04d", -(toI(year) as number) + 1));
-      return super.castValue((value as string).replace(/ BC$/, ""));
+      return super.castValue(rbStrSend(value as string, "deleteSuffixBang", " BC")[0]);
     } else {
       return super.castValue(value);
     }

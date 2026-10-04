@@ -1111,7 +1111,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
-  async serialSequence(table: string, column: string): Promise<string | null> {
+  async serialSequence(table: string, column: string | null): Promise<string | null> {
     return ((await this.queryValue(
       `SELECT pg_get_serial_sequence(${this.quote(table)}, ${this.quote(column)})`,
       "SCHEMA",
@@ -1120,7 +1120,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async defaultSequenceName(
     tableName: string,
-    pk: string | string[] = "id",
+    pk: string | string[] | null = "id",
   ): Promise<string | null> {
     if (Array.isArray(pk)) return null;
     try {

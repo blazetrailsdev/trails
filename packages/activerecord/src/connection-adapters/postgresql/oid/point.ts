@@ -1,7 +1,9 @@
 import {
+  ArgumentError,
   kernelFloat,
   rbEqual,
   rbObjAsString,
+  rbStrSend,
   registerConstant,
   Struct,
 } from "@blazetrails/ruby-compat";
@@ -73,11 +75,14 @@ export class Point extends ValueType {
   }
 
   private numberForPoint(number: unknown): string {
-    return rbObjAsString(number).replace(/\.0$/, "");
+    return rbStrSend(rbObjAsString(number), "deleteSuffix", ".0")[0] as string;
   }
 
   /** @missingRailsName float — PERMANENT */
   private buildPoint(x: unknown, y: unknown): InstanceType<typeof ActiveRecord.Point> {
+    if (y === undefined) {
+      throw new ArgumentError("wrong number of arguments (given 1, expected 2)");
+    }
     return new ActiveRecord.Point(kernelFloat(x), kernelFloat(y));
   }
 }

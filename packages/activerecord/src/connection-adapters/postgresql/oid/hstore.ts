@@ -28,7 +28,7 @@ export class Hstore extends ValueType<Record<string, string | null>> {
         throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
 
-      let key = scanner.scan(/(\\[\\"]|[^\\"])*?(?=")/);
+      let key = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
       if (key === null) {
         throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
       }
@@ -44,7 +44,7 @@ export class Hstore extends ValueType<Record<string, string | null>> {
           throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
 
-        value = scanner.scan(/(\\[\\"]|[^\\"])*?(?=")/);
+        value = scanner.scan(/^(\\[\\"]|[^\\"])*?(?=")/);
         if (value === null) {
           throw new ArgumentError(ERROR.replace("%s", stringInspect(scanner.string)));
         }
