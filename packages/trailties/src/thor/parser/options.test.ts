@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import { Range, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import {
   AtLeastOneRequiredArgumentError,
   Correctable,
@@ -367,6 +368,335 @@ describe("Thor::Options", () => {
 
       it("does not raise an error if exclusive argumets are not given", async () => {
         await assertNothingRaised(() => parse(["--foo", "--baz"]));
+      });
+    });
+
+    describe("when at_least_ones is given", () => {
+      beforeEach(() => {
+        create(
+          { foo: ":string", bar: ":boolean", baz: ":boolean", qux: ":boolean" },
+          {},
+          false,
+          [],
+          [
+            ["foo", "bar"],
+            ["baz", "qux"],
+          ],
+        );
+      });
+
+      it("raises an error if at least one of required argumet is not given", async () => {
+        await assertRaises(
+          [AtLeastOneRequiredArgumentError],
+          { match: /^Not found at least one of required options '--foo', '--bar'$/ },
+          () => parse(["--baz"]),
+        );
+      });
+
+      it("does not raise an error if at least one of required argument is given", async () => {
+        await assertNothingRaised(() => parse(["--foo", "--baz"]));
+      });
+    });
+
+    describe("with :string type", () => {
+      beforeEach(() => {
+        create(new Map([[["--foo", "-f"], ":required"]]));
+      });
+
+      it("accepts a switch <value> assignment", () => {
+        expect(parse("--foo", "12")["foo"]).toEqual("12");
+      });
+
+      it("accepts a switch=<value> assignment", () => {
+        expect(parse("-f=12")["foo"]).toEqual("12");
+        expect(parse("--foo=12")["foo"]).toEqual("12");
+        expect(parse("--foo=bar=baz")["foo"]).toEqual("bar=baz");
+        expect(parse("--foo=-bar")["foo"]).toEqual("-bar");
+        expect(parse("--foo=-bar -baz")["foo"]).toEqual("-bar -baz");
+      });
+
+      it("must accept underscores switch=value assignment", () => {
+        create({ foo_bar: ":required" });
+        expect(parse("--foo_bar=http://example.com/under_score/")["foo_bar"]).toEqual(
+          "http://example.com/under_score/",
+        );
+      });
+
+      it("accepts a --no-switch format", () => {
+        create({ "--foo": "bar" });
+        expect(parse("--no-foo")["foo"]).toBeNull();
+      });
+
+      it("does not consume an argument for --no-switch format", () => {
+        create({ "--cheese": ":string" });
+        expect(parse("burger", "--no-cheese", "fries")["cheese"]).toBeNull();
+      });
+
+      it("accepts a --switch format on non required types", () => {
+        create({ "--foo": ":string" });
+        expect(parse("--foo")["foo"]).toEqual("foo");
+      });
+
+      it("accepts a --switch format on non required types with default values", () => {
+        create({ "--baz": ":string", "--foo": "bar" });
+        expect(parse("--baz", "bang", "--foo")["foo"]).toEqual("bar");
+      });
+
+      it("overwrites earlier values with later values", () => {
+        expect(parse("--foo=bar", "--foo", "12")["foo"]).toEqual("12");
+        expect(parse("--foo", "12", "--foo", "13")["foo"]).toEqual("13");
+      });
+
+      it("raises error when value isn't in enum", async () => {
+        const enum_ = ["apple", "banana"];
+        create({ fruit: new Option("fruit", { type: "string", enum: enum_ }) });
+        await assertRaises(
+          [MalformattedArgumentError],
+          {
+            match: new RegExp(`^Expected '--fruit' to be one of ${enum_.join(", ")}; got orange$`),
+          },
+          () => parse("--fruit", "orange"),
+        );
+      });
+
+      it("does not erroneously mutate defaults", () => {
+        create({
+          foo: new Option("foo", {
+            type: "string",
+            repeatable: true,
+            required: false,
+            default: [],
+          }),
+        });
+        expect(parse("--foo=bar", "--foo", "12")["foo"]).toEqual(["bar", "12"]);
+        expect((rbObjIvarGet(opt, "@switches") as Record<string, Option>)["--foo"].default).toEqual(
+          [],
+        );
+      });
+    });
+
+    describe("with :boolean type", () => {
+      beforeEach(() => {
+        create({ "--foo": false });
+      });
+
+      it("accepts --opt assignment", () => {
+        expect(parse("--foo")["foo"]).toEqual(true);
+        expect(parse("--foo", "--bar")["foo"]).toEqual(true);
+      });
+
+      it("uses the default value if no switch is given", () => {
+        expect(parse("")["foo"]).toEqual(false);
+      });
+
+      it("accepts --opt=value assignment", () => {
+        expect(parse("--foo=true")["foo"]).toEqual(true);
+        expect(parse("--foo=false")["foo"]).toEqual(false);
+      });
+
+      it("accepts --[no-]opt variant, setting false for value", () => {
+        expect(parse("--no-foo")["foo"]).toEqual(false);
+      });
+
+      it("accepts --[skip-]opt variant, setting false for value", () => {
+        expect(parse("--skip-foo")["foo"]).toEqual(false);
+      });
+
+      it("accepts --[skip-]opt variant, setting false for value, even if there's a trailing non-switch", () => {
+        expect(parse("--skip-foo", "asdf")["foo"]).toEqual(false);
+      });
+
+      it("will prefer 'no-opt' variant over inverting 'opt' if explicitly set", () => {
+        create({ "--no-foo": true });
+        expect(parse("--no-foo")["no-foo"]).toEqual(true);
+      });
+
+      it("will prefer 'skip-opt' variant over inverting 'opt' if explicitly set", () => {
+        create({ "--skip-foo": true });
+        expect(parse("--skip-foo")["skip-foo"]).toEqual(true);
+      });
+
+      it("will prefer 'skip-opt' variant over inverting 'opt' if explicitly set, even if there's a trailing non-switch", () => {
+        create({ "--skip-foo": true });
+        expect(parse("--skip-foo", "asdf")["skip-foo"]).toEqual(true);
+      });
+
+      it("will prefer 'skip-opt' variant over inverting 'opt' if explicitly set, and given a value", () => {
+        create({ "--skip-foo": true });
+        expect(parse("--skip-foo=f")["skip-foo"]).toEqual(false);
+        expect(parse("--skip-foo=false")["skip-foo"]).toEqual(false);
+        expect(parse("--skip-foo=t")["skip-foo"]).toEqual(true);
+        expect(parse("--skip-foo=true")["skip-foo"]).toEqual(true);
+      });
+
+      it("accepts inputs in the human name format", () => {
+        create({ foo_bar: ":boolean" });
+        expect(parse("--foo-bar")["foo_bar"]).toEqual(true);
+        expect(parse("--no-foo-bar")["foo_bar"]).toEqual(false);
+        expect(parse("--skip-foo-bar")["foo_bar"]).toEqual(false);
+      });
+
+      it("doesn't eat the next part of the param", () => {
+        expect(Object.fromEntries(parse("--foo", "bar"))).toEqual({ foo: true });
+        expect(opt.remaining()).toEqual(["bar"]);
+      });
+
+      it("doesn't eat the next part of the param with 'no-opt' variant", () => {
+        expect(Object.fromEntries(parse("--no-foo", "bar"))).toEqual({ foo: false });
+        expect(opt.remaining()).toEqual(["bar"]);
+      });
+
+      it("doesn't eat the next part of the param with 'skip-opt' variant", () => {
+        expect(Object.fromEntries(parse("--skip-foo", "bar"))).toEqual({ foo: false });
+        expect(opt.remaining()).toEqual(["bar"]);
+      });
+
+      it("allows multiple values if repeatable is specified", () => {
+        create({
+          verbose: new Option("verbose", { type: "boolean", aliases: "-v", repeatable: true }),
+        });
+        expect((parse("-v", "-v", "-v")["verbose"] as unknown[]).length).toEqual(3);
+      });
+    });
+
+    describe("with :hash type", () => {
+      beforeEach(() => {
+        create({ "--attributes": ":hash" });
+      });
+
+      it("accepts a switch=<value> assignment", () => {
+        expect(parse("--attributes=name:string", "age:integer")["attributes"]).toEqual({
+          name: "string",
+          age: "integer",
+        });
+        expect(
+          parse("--attributes=-name:string", "age:integer", "--gender:string")["attributes"],
+        ).toEqual({ "-name": "string", age: "integer" });
+      });
+
+      it("accepts a switch <value> assignment", () => {
+        expect(parse("--attributes", "name:string", "age:integer")["attributes"]).toEqual({
+          name: "string",
+          age: "integer",
+        });
+      });
+
+      it("must not mix values with other switches", () => {
+        expect(
+          parse("--attributes", "name:string", "age:integer", "--baz", "cool")["attributes"],
+        ).toEqual({ name: "string", age: "integer" });
+      });
+
+      it("must not allow the same hash key to be specified multiple times", async () => {
+        await assertRaises(
+          [MalformattedArgumentError],
+          {
+            match:
+              /^You can't specify 'name' more than once in option '--attributes'; got name:string and name:integer$/,
+          },
+          () => parse("--attributes", "name:string", "name:integer"),
+        );
+      });
+
+      it("allows multiple values if repeatable is specified", () => {
+        create({ attributes: new Option("attributes", { type: "hash", repeatable: true }) });
+        expect(
+          parse("--attributes", "name:one", "foo:1", "--attributes", "name:two", "bar:2")[
+            "attributes"
+          ],
+        ).toEqual({ name: "two", foo: "1", bar: "2" });
+      });
+    });
+
+    describe("with :array type", () => {
+      beforeEach(() => {
+        create({ "--attributes": ":array" });
+      });
+
+      it("accepts a switch=<value> assignment", () => {
+        expect(parse("--attributes=a", "b", "c")["attributes"]).toEqual(["a", "b", "c"]);
+        expect(parse("--attributes=-a", "b", "-c")["attributes"]).toEqual(["-a", "b"]);
+      });
+
+      it("accepts a switch <value> assignment", () => {
+        expect(parse("--attributes", "a", "b", "c")["attributes"]).toEqual(["a", "b", "c"]);
+      });
+
+      it("must not mix values with other switches", () => {
+        expect(parse("--attributes", "a", "b", "c", "--baz", "cool")["attributes"]).toEqual([
+          "a",
+          "b",
+          "c",
+        ]);
+      });
+
+      it("allows multiple values if repeatable is specified", () => {
+        create({ attributes: new Option("attributes", { type: "array", repeatable: true }) });
+        expect(parse("--attributes", "1", "2", "--attributes", "3", "4")["attributes"]).toEqual([
+          ["1", "2"],
+          ["3", "4"],
+        ]);
+      });
+
+      it("raises error when value isn't in enum", async () => {
+        const enum_ = ["apple", "banana"];
+        create({ fruit: new Option("fruits", { type: "array", enum: enum_ }) });
+        await assertRaises(
+          [MalformattedArgumentError],
+          {
+            match: new RegExp(
+              `^Expected all values of '--fruits' to be one of ${enum_.join(", ")}; got strawberry$`,
+            ),
+          },
+          () => parse("--fruits=", "apple", "banana", "strawberry"),
+        );
+      });
+    });
+
+    describe("with :numeric type", () => {
+      beforeEach(() => {
+        create({ n: ":numeric", m: 5 });
+      });
+
+      it("accepts a -nXY assignment", () => {
+        expect(parse("-n12")["n"]).toEqual(12);
+      });
+
+      it("converts values to numeric types", () => {
+        expect(Object.fromEntries(parse("-n", "3", "-m", ".5"))).toEqual({ n: 3, m: 0.5 });
+      });
+
+      it("raises error when value isn't numeric", async () => {
+        await assertRaises(
+          [MalformattedArgumentError],
+          { match: /^Expected numeric value for '-n'; got "foo"$/ },
+          () => parse("-n", "foo"),
+        );
+      });
+
+      it("raises error when value isn't in Array enum", async () => {
+        const enum_ = [1, 2];
+        create({ limit: new Option("limit", { type: "numeric", enum: enum_ }) });
+        await assertRaises(
+          [MalformattedArgumentError],
+          { match: /^Expected '--limit' to be one of 1, 2; got 3$/ },
+          () => parse("--limit", "3"),
+        );
+      });
+
+      it("raises error when value isn't in Range enum", async () => {
+        const enum_ = new Range(1, 2);
+        create({ limit: new Option("limit", { type: "numeric", enum: enum_ }) });
+        await assertRaises(
+          [MalformattedArgumentError],
+          { match: /^Expected '--limit' to be one of 1\.\.2; got 3$/ },
+          () => parse("--limit", "3"),
+        );
+      });
+
+      it("allows multiple values if repeatable is specified", () => {
+        create({ run: new Option("run", { type: "numeric", repeatable: true }) });
+        expect(parse("--run", "1", "--run", "2")["run"]).toEqual([1, 2]);
       });
     });
   });
