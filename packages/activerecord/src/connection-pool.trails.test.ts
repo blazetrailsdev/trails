@@ -3,7 +3,7 @@ import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
-import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { Result } from "./result.js";
 import { NoMethodError } from "@blazetrails/activemodel";
 import { Reaper } from "./connection-adapters/abstract/connection-pool/reaper.js";

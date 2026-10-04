@@ -10,7 +10,7 @@ import { Application } from "../application.js";
 import { Trails } from "../rails.js";
 import "../trailties/active-record.js";
 import "../test-unit/trailtie.js";
-import { parse as yamlLoad } from "@blazetrails/activesupport/yaml";
+import { parse as yamlLoad } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "@blazetrails/activerecord";
 
 class ModelGeneratorTestApp extends Application {}

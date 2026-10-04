@@ -1,6 +1,6 @@
 import { readFile } from "fs/promises";
 import { describe, it, expect } from "vitest";
-import * as YAML from "@blazetrails/activesupport/yaml";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { DateTime } from "@blazetrails/date";
 import { assertRaises } from "@blazetrails/activesupport";
 import { RuntimeError } from "@blazetrails/ruby-compat";

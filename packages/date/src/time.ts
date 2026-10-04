@@ -23,6 +23,7 @@ import {
   rbDefineAllocFunc,
   rbObjDup,
   rbObjRespondTo,
+  registerConstant,
   stringInspect,
 } from "@blazetrails/ruby-compat";
 
@@ -1695,3 +1696,5 @@ rbDefineAllocFunc(Time, (klass) => {
   };
   return new klass(0);
 });
+
+registerConstant("Time", Time);

@@ -1,6 +1,9 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import {
+  stringify as yamlStringify,
+  parse as yamlParse,
+} from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "../base.js";
 import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
 import { pp } from "../pretty-print.js";

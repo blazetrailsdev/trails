@@ -187,7 +187,6 @@ const alias = {
     __dirname,
     "packages/activesupport/src/message-pack/index.ts",
   ),
-  "@blazetrails/activesupport/yaml": path.resolve(__dirname, "packages/activesupport/src/yaml.ts"),
   "@blazetrails/activesupport/test-case": path.resolve(
     __dirname,
     "packages/activesupport/src/test-case.ts",

@@ -1,4 +1,9 @@
-import { FloatDomainError, FrozenError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  FloatDomainError,
+  FrozenError,
+  NoMethodError,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   ArgumentError,
@@ -6757,3 +6762,6 @@ export class DateTime extends DateWithoutParseStatics {
     );
   }
 }
+
+registerConstant("Date", Date);
+registerConstant("DateTime", DateTime);

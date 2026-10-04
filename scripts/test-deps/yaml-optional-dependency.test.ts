@@ -1,4 +1,4 @@
-// Guard: `yaml` is an optional dependency of `@blazetrails/activesupport`, so
+// Guard: `yaml` is an optional dependency of `@blazetrails/ruby-compat`, so
 // nothing reachable from a package's `index.ts` may statically import it.
 //
 // Rails has no counterpart to this — Psych is stdlib, `require "yaml"` never
@@ -13,11 +13,11 @@
 // root imports of `@blazetrails/activerecord` (via `base.ts` →
 // `coders/yaml-column.ts`) and `@blazetrails/actionview` (via
 // `helpers/index.ts` → `debug-helper.ts`) did not. Both reach
-// `@blazetrails/activesupport/yaml`, which is why that specifier is followed
-// into `activesupport/src/yaml.ts` rather than treated as an offender: that
-// module resolves `yaml` dynamically, so naming the YAML coders costs nothing
-// at load time and the miss surfaces where Ruby would raise it, from the
-// dump/load call.
+// `@blazetrails/ruby-compat/psych-adapter`, which is why the ruby-compat Psych
+// specifiers are followed into their source files rather than treated as
+// offenders: `psych-adapter.ts` resolves `yaml` dynamically, so naming the YAML
+// coders costs nothing at load time and the miss surfaces where Ruby would
+// raise it, from the dump/load call.
 import { readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -32,7 +32,9 @@ const YAML_PACKAGE = "yaml";
 
 /** Cross-package specifier followed as a graph edge into its source file. */
 const CROSS_PACKAGE_EDGES = new Map([
-  ["@blazetrails/activesupport/yaml", { pkg: "activesupport", file: "yaml.ts" }],
+  ["@blazetrails/ruby-compat/psych", { pkg: "ruby-compat", file: "psych.ts" }],
+  ["@blazetrails/ruby-compat/psych-adapter", { pkg: "ruby-compat", file: "psych-adapter.ts" }],
+  ["@blazetrails/ruby-compat/yaml", { pkg: "ruby-compat", file: "yaml.ts" }],
 ]);
 
 async function tsFiles(dir: string, root = dir): Promise<string[]> {
@@ -99,6 +101,10 @@ async function yamlImportersReachableFromIndex(pkg: string): Promise<string[]> {
 }
 
 describe("yaml optional dependency", () => {
+  it("is not reachable from the ruby-compat root import", async () => {
+    expect(await yamlImportersReachableFromIndex("ruby-compat")).toEqual([]);
+  });
+
   it("is not reachable from the activesupport root import", async () => {
     expect(await yamlImportersReachableFromIndex("activesupport")).toEqual([]);
   });

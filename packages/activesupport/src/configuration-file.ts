@@ -1,5 +1,5 @@
 import { File } from "@blazetrails/ruby-compat";
-import { parse as yamlParse } from "yaml";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 
 export class FormatError extends Error {
@@ -26,10 +26,7 @@ export class ConfigurationFile {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
-  /**
-   * @missingRailsCall load — PERMANENT
-   * @missingRailsCall unsafe_load — CONVERGEABLE configuration-file-parse-through-psych-unsafe-load
-   */
+  /** @missingRailsCall load — PERMANENT */
   parse({
     context,
     ...options

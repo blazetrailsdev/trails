@@ -17,7 +17,7 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
+import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { kernelInteger, rbInspect } from "@blazetrails/ruby-compat";
 import {

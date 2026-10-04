@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { dump, unsafeLoad } from "@blazetrails/activesupport/yaml";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import * as Types from "../index.js";
 
 const type = new Types.IntegerType();
@@ -115,9 +115,9 @@ describe("IntegerType", () => {
   });
 
   it("dumps and loads its @range through YAML", () => {
-    const yaml = dump(new Types.IntegerType());
+    const yaml = Psych.dump(new Types.IntegerType());
     expect(yaml).toContain("range: !ruby/range");
-    const loaded = unsafeLoad(yaml) as InstanceType<typeof Types.IntegerType>;
+    const loaded = Psych.unsafeLoad(yaml) as InstanceType<typeof Types.IntegerType>;
     expect(loaded.serialize(2147483647)).toBe(2147483647);
     expect(() => loaded.serialize(2147483648)).toThrow("out of range");
   });

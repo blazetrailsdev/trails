@@ -26,7 +26,7 @@ import {
 } from "@blazetrails/activerecord";
 import { DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
 import { Trails, _resetTrailsEnv } from "../rails.js";
-import { parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 
 function discoverMigrations(migrationsPath: string): MigrationProxy[] {
   return new MigrationContext(

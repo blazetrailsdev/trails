@@ -1,7 +1,10 @@
 import { File, FileUtils, Zlib, isModuleIncluded, sort } from "@blazetrails/ruby-compat";
 import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
-import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
-import type { CollectionTag, YAMLMap } from "@blazetrails/activesupport/yaml";
+import {
+  parse as yamlParse,
+  stringify as yamlStringify,
+} from "@blazetrails/ruby-compat/psych-adapter";
+import type { CollectionTag, YAMLMap } from "@blazetrails/ruby-compat/psych-adapter";
 import { Column, NullColumn } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
 import type { ColumnCoder } from "./column.js";

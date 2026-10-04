@@ -14,6 +14,9 @@
         "../../ruby-compat/src/method-missing-proxy.ts"
       ],
       "@blazetrails/ruby-compat/name-error": ["../../ruby-compat/src/name-error.ts"],
+      "@blazetrails/ruby-compat/psych": ["../../ruby-compat/src/psych.ts"],
+      "@blazetrails/ruby-compat/psych-adapter": ["../../ruby-compat/src/psych-adapter.ts"],
+      "@blazetrails/ruby-compat/yaml": ["../../ruby-compat/src/yaml.ts"],
       "@blazetrails/ruby-compat/range": ["../../ruby-compat/src/range.ts"],
       "@blazetrails/ruby-compat": ["../../ruby-compat/src/index.ts"],
       "@blazetrails/html-sanitizer": ["../../html-sanitizer/src/index.ts"],
@@ -39,7 +42,6 @@
         "../../activesupport/src/core-ext/string/inflections.ts"
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
-      "@blazetrails/activesupport/yaml": ["../../activesupport/src/yaml.ts"],
       "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]
     }
   },
