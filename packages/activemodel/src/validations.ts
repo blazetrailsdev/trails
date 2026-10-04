@@ -9,6 +9,7 @@ import {
 
 import {
   block as rbBlock,
+  Hash,
   Module,
   rbBlockGivenP,
   rbFPublicSend,
@@ -27,6 +28,7 @@ import { HelperMethods } from "./validations/helper-methods.js";
 import {
   ClassMethods as WithClassMethods,
   validatesWith as withValidatesWith,
+  inheritedValidators,
 } from "./validations/with.js";
 import * as Validates from "./validations/validates.js";
 import { AbsenceValidator } from "./validations/absence.js";
@@ -92,7 +94,14 @@ export class Validations {
     (base as IncludingClass & ValidationsClassHost).defineCallbacks("validate", {
       scope: ["name"],
     });
-    classAttribute.call(base, "_validators", { instanceWriter: false, default: new Map() });
+    classAttribute.call(base, "_validators", {
+      instanceWriter: false,
+      default: new Hash<string | null, ValidatorLike[]>((h, k) => {
+        const v: ValidatorLike[] = [];
+        h.set(k, v);
+        return v;
+      }),
+    });
   }
 
   /** @internal */
@@ -190,7 +199,7 @@ export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
   | Array<ValidateFilter<T>>;
 
 export interface ValidationsClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
   validatesWith(...args: unknown[]): void;
   validate(...args: ValidateArgs<ValidatableRecord>): void;
@@ -290,11 +299,12 @@ export const ClassMethods = {
 
   clearValidatorsBang(this: ValidationsClassHost): void {
     this.resetCallbacks("validate");
-    this._validators = new Map();
+    inheritedValidators.call(this);
+    this._validators.clear();
   },
 
   validatorsOn(this: ValidationsClassHost, ...attributes: string[]): ValidatorLike[] {
-    return attributes.flatMap((attribute) => this._validators.get(attribute) ?? []);
+    return attributes.flatMap((attribute) => this._validators.get(attribute)!);
   },
 
   /** @internal */

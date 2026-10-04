@@ -1,5 +1,6 @@
 import { extractOptionsBang } from "@blazetrails/activesupport";
-import { rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
+import type { Hash } from "@blazetrails/ruby-compat";
+import { dup as hashDup, rbBlockGivenP, rbFSend, rbObjMethod } from "@blazetrails/ruby-compat";
 
 import { EachValidator } from "../validator.js";
 import type { ValidatableRecord } from "../validator.js";
@@ -26,7 +27,7 @@ type ValidatorClass = new (
 ) => ValidatorLike;
 
 export interface ValidatesWithClassHost {
-  _validators: Map<string | null, ValidatorLike[]>;
+  _validators: Hash<string | null, ValidatorLike[]>;
   validate(
     filter: ValidatorLike | ((record: ValidatableRecord) => unknown),
     options?: Record<string, unknown>,
@@ -47,6 +48,17 @@ export async function validatesWith(
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE validators-inherited-dup-runs-at-two-deferred-write-sites */
+export function inheritedValidators(this: {
+  _validators: Hash<string | null, ValidatorLike[]>;
+}): void {
+  if (!Object.prototype.hasOwnProperty.call(this, "__class_attr__validators")) {
+    const dup = hashDup(this._validators);
+    dup.forEach((v, k) => dup.set(k, [...v]));
+    this._validators = dup;
+  }
+}
+
 export const ClassMethods = {
   validatesWith(
     this: ValidatesWithClassHost,
@@ -59,17 +71,16 @@ export const ClassMethods = {
     for (const klass of args as ValidatorClass[]) {
       const validator = new klass({ ...options }, block);
 
-      const _validators = new Map(this._validators);
+      inheritedValidators.call(this);
+
       const attributes = (validator as { attributes?: readonly string[] }).attributes;
       if (Array.isArray(attributes) && attributes.length > 0) {
         for (const attribute of attributes) {
-          const key = String(attribute);
-          _validators.set(key, [...(_validators.get(key) ?? []), validator]);
+          this._validators.get(String(attribute))!.push(validator);
         }
       } else {
-        _validators.set(null, [...(_validators.get(null) ?? []), validator]);
+        this._validators.get(null)!.push(validator);
       }
-      this._validators = _validators;
 
       this.validate(validator, options);
     }

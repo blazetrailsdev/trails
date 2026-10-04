@@ -425,10 +425,40 @@ export const ClassMethods = {
     const reader =
       this.attributeAliases[name] === targetName &&
       rbObjRespondTo(this, "defineMethodAttribute", true);
-    if (reader) namespace = `${namespace}_reader`;
+    type Body = (self: ReadWriteHost, args: unknown[]) => unknown;
+    let descriptor: (body: Body) => PropertyDescriptor;
+    let cachedName = mangledName;
+    if (reader) {
+      cachedName = `${mangledName}__reader`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        set(this: ReadWriteHost, value: unknown) {
+          rbFSend(this, `${targetName}=`, value);
+        },
+        configurable: true,
+      });
+    } else if (parameters === false) {
+      cachedName = `${mangledName}__getter`;
+      descriptor = (body) => ({
+        get(this: ReadWriteHost) {
+          return body(this, []);
+        },
+        configurable: true,
+      });
+    } else {
+      descriptor = (body) => ({
+        value: function (this: ReadWriteHost, ...args: unknown[]) {
+          return body(this, args);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
 
-    codeGenerator.defineCachedMethod(mangledName, { namespace, as }, (batch) => {
-      let body: (self: ReadWriteHost, args: unknown[]) => unknown;
+    codeGenerator.defineCachedMethod(cachedName, { namespace, as }, (batch) => {
+      let body: Body;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
         body = (self, args) => rbFSend(self, targetName, ...callArgs, ...args);
       } else {
@@ -437,34 +467,7 @@ export const ClassMethods = {
       }
 
       batch.push((mod) => {
-        if (reader) {
-          Object.defineProperty(mod, mangledName, {
-            get(this: ReadWriteHost) {
-              return body(this, []);
-            },
-            set(this: ReadWriteHost, value: unknown) {
-              rbFSend(this, `${targetName}=`, value);
-            },
-            configurable: true,
-          });
-          return;
-        }
-        if (parameters === false) {
-          Object.defineProperty(mod, mangledName, {
-            get(this: ReadWriteHost) {
-              return body(this, []);
-            },
-            configurable: true,
-          });
-          return;
-        }
-        Object.defineProperty(mod, mangledName, {
-          value: function (this: ReadWriteHost, ...args: unknown[]) {
-            return body(this, args);
-          },
-          writable: true,
-          configurable: true,
-        });
+        Object.defineProperty(mod, cachedName, descriptor(body));
       });
     });
   },
