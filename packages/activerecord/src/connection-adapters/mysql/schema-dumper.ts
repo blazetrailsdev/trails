@@ -25,29 +25,19 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override async prepareColumnOptions(
     column: MysqlColumn,
   ): Promise<Record<string, unknown>> {
-    const spec = await super.prepareColumnOptions(column);
+    let spec = await super.prepareColumnOptions(column);
     if (column.isUnsigned()) spec["unsigned"] = "true";
     if (column.isAutoIncrement()) spec["autoIncrement"] = "true";
 
-    const sizeMatch = /^(?<size>tiny|medium|long)(?:text|blob)/i.exec(column.sqlType ?? "");
-    if (sizeMatch?.groups) {
-      const size = sizeMatch.groups["size"].toLowerCase();
-      const rest = { ...spec };
-      Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(spec, { size: JSON.stringify(size) }, rest);
+    const size = /^(?<size>tiny|medium|long)(?:text|blob)/.exec(column.sqlType ?? "")?.groups?.size;
+    if (size != null) {
+      spec = { size: JSON.stringify(size), ...spec };
     }
 
-    if (column.isVirtual()) {
-      const as = await this.extractExpressionForVirtualColumn(column);
-      if (as !== undefined) spec["as"] = as;
-      if (/\b(?:STORED|PERSISTENT)\b/i.test(column.extra ?? "")) spec["stored"] = "true";
-      const rest = { ...spec };
-      Object.keys(spec).forEach((k) => delete spec[k]);
-      Object.assign(
-        spec,
-        { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")) },
-        rest,
-      );
+    if (this.supportsVirtualColumns && column.isVirtual()) {
+      spec["as"] = await this.extractExpressionForVirtualColumn(column);
+      if (/\b(?:STORED|PERSISTENT)\b/.test(column.extra ?? "")) spec["stored"] = "true";
+      spec = { type: JSON.stringify(this.schemaType(column).replace(/^:/, "")), ...spec };
     }
 
     return spec;
@@ -75,33 +65,32 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override schemaType(column: MysqlColumn): string {
-    const sqlType = (column.sqlType ?? "").toLowerCase();
-    if (/^timestamp\b/.test(sqlType)) return ":timestamp";
-    if (/^(?:enum|set)\b/.test(sqlType)) return column.sqlType ?? sqlType;
-    if (/^bigint\b/.test(sqlType)) return ":bigint";
-    return super.schemaType(column);
+    if (/^timestamp\b/.test(column.sqlType ?? "")) {
+      return ":timestamp";
+    } else if (/^(?:enum|set)\b/.test(column.sqlType ?? "")) {
+      return column.sqlType!;
+    } else {
+      return super.schemaType(column);
+    }
   }
 
   /** @internal */
   protected override schemaLimit(column: MysqlColumn): string | undefined {
-    if (/^(?:tiny|medium|long)?(?:text|blob)\b/i.test(column.sqlType ?? "")) return undefined;
-    if (/^(?:enum|set)\b/i.test(column.sqlType ?? "")) return undefined;
-    if (/^bigint\b/i.test(column.sqlType ?? "")) return undefined;
-    if (column.type === "integer" && column.limit === 4) return undefined;
-    if (column.type === "string" && column.limit === 255) return undefined;
-    if (column.type === "float" && column.limit === 24) return undefined;
-    if (column.type === "boolean") return undefined;
-    return super.schemaLimit(column);
+    if (!/^(?:tiny|medium|long)?(?:text|blob)\b/.test(column.sqlType ?? "")) {
+      return super.schemaLimit(column);
+    }
+    return undefined;
   }
 
   /** @internal */
   protected override schemaPrecision(column: MysqlColumn): string | undefined {
-    const sqlType = (column.sqlType ?? "").toLowerCase();
-    if (/^time(?:stamp)?\b/.test(sqlType) && column.precision === 0) return undefined;
-    if (column.type === "datetime")
+    if (/^time(?:stamp)?\b/.test(column.sqlType ?? "") && column.precision === 0) {
+      return undefined;
+    } else if (column.type === "datetime") {
       return column.precision === 0 ? "null" : super.schemaPrecision(column);
-    if (column.type === "decimal" || /^time\b/.test(sqlType)) return super.schemaPrecision(column);
-    return undefined;
+    } else {
+      return super.schemaPrecision(column);
+    }
   }
 
   /** @internal */

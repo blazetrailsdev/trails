@@ -1,3 +1,4 @@
+import { extractOptionsBang } from "@blazetrails/activesupport";
 import {
   TableDefinition as AbstractTableDefinition,
   ColumnDefinition,
@@ -12,13 +13,8 @@ export class TableDefinition extends AbstractTableDefinition {
   }
 
   override references(...args: unknown[]): this {
-    const rest = [...args];
-    const last = rest[rest.length - 1];
-    const options = (typeof last === "object" && last !== null ? rest.pop() : {}) as Record<
-      string,
-      unknown
-    >;
-    return (super.references as (...a: unknown[]) => this)(...rest, {
+    const options = extractOptionsBang(args);
+    return (super.references as (...a: unknown[]) => this)(...args, {
       type: "integer",
       ...options,
     });

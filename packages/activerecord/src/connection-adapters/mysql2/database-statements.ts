@@ -2,6 +2,7 @@ import type mysql from "mysql2/promise";
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
+import { anybits } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
@@ -48,7 +49,7 @@ interface MultiStatementsHost {
   _config?: { flags?: string[] | number };
 }
 
-const MULTI_STATEMENTS_BIT = 0x10000;
+const MULTI_STATEMENTS = 0x10000;
 
 /** @internal */
 interface SelectAllHost {
@@ -92,15 +93,7 @@ export async function executeBatch(
     materializeTransactions = true,
   }: { allowRetry?: boolean; materializeTransactions?: boolean } = {},
 ): Promise<void> {
-  const host = this as unknown as MultiStatementsHost;
-  const flags = host._config?.flags;
-  const multiStatements =
-    isMultiStatementsEnabled.call(host) ||
-    (Array.isArray(flags) ? !flags.includes("-MULTI_STATEMENTS") : flags == null);
-  const totalSql = multiStatements
-    ? await combineMultiStatements.call(this, statements)
-    : statements;
-  for (const statement of totalSql) {
+  for (const statement of await combineMultiStatements.call(this, statements)) {
     await this.rawExecute(
       statement,
       name,
@@ -125,9 +118,12 @@ export async function lastInsertedId(this: LastInsertedIdHost, result: Result): 
 /** @internal */
 export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
   const flags = this._config?.flags;
-  if (Array.isArray(flags)) return flags.includes("MULTI_STATEMENTS");
-  if (typeof flags === "number") return (flags & MULTI_STATEMENTS_BIT) !== 0;
-  return false;
+
+  if (Array.isArray(flags)) {
+    return flags.includes("MULTI_STATEMENTS");
+  } else {
+    return anybits(flags as number, MULTI_STATEMENTS);
+  }
 }
 
 /** @internal */
