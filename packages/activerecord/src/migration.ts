@@ -14,6 +14,7 @@ import {
   Benchmark,
   extend,
   type Extended,
+  wrap,
 } from "@blazetrails/activesupport";
 import { format, stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
@@ -1403,11 +1404,11 @@ export class MigrationContext<
   S extends SchemaMigration | NullSchemaMigration = SchemaMigration,
   I extends InternalMetadata | NullInternalMetadata = InternalMetadata,
 > {
-  readonly migrationsPaths: string[];
+  readonly migrationsPaths: string | string[];
   readonly schemaMigration: S;
   readonly internalMetadata: I;
 
-  constructor(migrationsPaths: string[], ...seated: SeatedCollaborators<S, I>) {
+  constructor(migrationsPaths: string | string[], ...seated: SeatedCollaborators<S, I>) {
     const [schemaMigration, internalMetadata] = seated;
     this.migrationsPaths = migrationsPaths;
     this.schemaMigration = schemaMigration ?? (new SchemaMigration(this.connectionPool()) as S);
@@ -1590,7 +1591,7 @@ export class MigrationContext<
 
   /** @internal */
   protected migrationFiles(): string[] {
-    const paths = this.migrationsPaths;
+    const paths = wrap(this.migrationsPaths);
     const files = paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
 
     const isTs = (file: string): boolean => file.endsWith(".ts");

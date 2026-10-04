@@ -336,7 +336,7 @@ it("a nested execution context shares the pool's single pinned connection", asyn
         await pool.pinConnectionBang();
         expect(await pool.checkout()).toBe(ctx1Conn);
         await pool.unpinConnectionBang();
-      });
+      }).value();
 
       expect(await pool.checkout()).toBe(ctx1Conn);
       await pool.unpinConnectionBang();

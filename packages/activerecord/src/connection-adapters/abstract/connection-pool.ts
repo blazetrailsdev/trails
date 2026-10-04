@@ -5,6 +5,8 @@ import {
   Fiber,
   isMonOwned,
   Mutex,
+  rbObjDup,
+  rtest,
   RuntimeError,
   synchronize,
   Thread,
@@ -38,17 +40,10 @@ import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
-import type { TransactionManager } from "./transaction.js";
-import { ConnectionPoolConfiguration, QueryCache, type QueryCacheHost } from "./query-cache.js";
+import { ConnectionPoolConfiguration } from "./query-cache.js";
 import { SchemaMigration } from "../../schema-migration.js";
 import { InternalMetadata } from "../../internal-metadata.js";
 import { MigrationContext, Migrator } from "../../migration.js";
-
-type TransactionAwareConnection = AbstractAdapter & {
-  transactionManager: TransactionManager;
-  verifyBang(): void;
-  resetBang(): Promise<void>;
-};
 
 interface PoolManagedConnection {
   lease?(): void;
@@ -309,19 +304,18 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get schemaCache(): BoundSchemaReflection {
-    if (!this._boundSchemaCache) {
-      this._boundSchemaCache = new BoundSchemaReflection(this.schemaReflection, this);
-    }
-    return this._boundSchemaCache;
+    return (this._boundSchemaCache ||= new BoundSchemaReflection(this.schemaReflection, this));
   }
 
   get migrationContext(): MigrationContext {
     return new MigrationContext(this.migrationsPaths, this.schemaMigration, this.internalMetadata);
   }
 
-  get migrationsPaths(): string[] {
-    const paths = (this.dbConfig as any).migrationsPaths ?? Migrator.migrationsPaths;
-    return Array.isArray(paths) ? paths : [paths];
+  get migrationsPaths(): string | string[] {
+    const migrationsPaths = this.dbConfig.migrationsPaths;
+    return (rtest(migrationsPaths) ? migrationsPaths : Migrator.migrationsPaths) as
+      | string
+      | string[];
   }
 
   get schemaMigration(): SchemaMigration {
@@ -335,37 +329,30 @@ export class ConnectionPool implements ReapablePool {
   async leaseConnection(): Promise<DatabaseAdapter> {
     const lease = this.connectionLease();
     lease.sticky = true;
-    if (!lease.connection) {
-      lease.connection = await this.checkout();
-    }
-    return lease.connection;
+    return (lease.connection ||= await this.checkout());
   }
 
   isPermanentLease(): boolean {
     return this.connectionLease().sticky === null;
   }
 
+  /** @inventedArm if — PERMANENT */
   async pinConnectionBang(lockThread = false): Promise<void> {
-    if (!this._pinnedConnection) {
-      const acquired = this.connectionLease().connection ?? (await this.checkout());
-      if (this._pinnedConnection) {
-        this.checkin(acquired);
-      } else {
-        this._pinnedConnection = acquired;
-      }
+    const connection =
+      this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
+    if (this._pinnedConnection != null && this._pinnedConnection !== connection) {
+      this.checkin(connection);
     }
+    this._pinnedConnection ||= connection;
     this._pinnedConnectionsDepth += 1;
 
-    if (this._connections && !this._connections.includes(this._pinnedConnection)) {
-      this._connections.push(this._pinnedConnection);
+    if (!this._connections!.includes(this._pinnedConnection)) {
+      this._connections!.push(this._pinnedConnection);
     }
 
     if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
-    const pinned = this._pinnedConnection;
-    if (isTransactionAware(pinned)) {
-      await pinned.verifyBang();
-      await pinned.transactionManager.beginTransaction({ joinable: false, _lazy: false });
-    }
+    await this._pinnedConnection.verifyBang();
+    await this._pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
   }
 
   async unpinConnectionBang(): Promise<boolean> {
@@ -374,32 +361,24 @@ export class ConnectionPool implements ReapablePool {
     }
 
     let clean = true;
-    const block = async () => {
+    await this._pinnedConnection.lock.synchronize(async () => {
       this._pinnedConnectionsDepth -= 1;
       const connection = this._pinnedConnection!;
       if (this._pinnedConnectionsDepth === 0) this._pinnedConnection = null;
 
-      if (isTransactionAware(connection)) {
-        if (connection.transactionManager.currentTransaction.open) {
-          await connection.transactionManager.rollbackTransaction();
-        } else {
-          clean = false;
-          await connection.resetBang();
-        }
+      if (connection.isTransactionOpen()) {
+        await connection.rollbackTransaction();
+      } else {
+        clean = false;
+        await connection.resetBang();
       }
 
-      if (this._pinnedConnection === null) {
+      if (this._pinnedConnection == null) {
         connection.stealBang();
         connection.setLockThread(null);
         this.checkin(connection);
       }
-    };
-
-    if (isTransactionAware(this._pinnedConnection)) {
-      await this._pinnedConnection.lock.synchronize(block);
-    } else {
-      await block();
-    }
+    });
 
     return clean;
   }
@@ -455,24 +434,22 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get connections(): DatabaseAdapter[] {
-    return this._connections ? [...this._connections] : [];
+    return rbObjDup(this._connections)!;
   }
 
   async disconnect(raiseOnAcquisitionTimeout: boolean = true): Promise<void> {
     await this.withExclusivelyAcquiredAllConnections(raiseOnAcquisitionTimeout, () =>
       synchronize.call(this, async () => {
-        for (const conn of this._connections ?? []) {
+        for (const conn of this._connections!) {
           if (conn.isInUse()) {
             conn.stealBang();
             this.checkin(conn);
           }
-          await (
-            conn as unknown as { disconnectBang?: () => void | Promise<void> }
-          ).disconnectBang?.();
+          await conn.disconnectBang();
         }
-        if (this._connections) this._connections.length = 0;
-        this._leases?.clear();
-        this._available?.clear();
+        this._connections = [];
+        this._leases!.clear();
+        this._available!.clear();
         this._checkedOut.clear();
       }),
     );
@@ -542,44 +519,30 @@ export class ConnectionPool implements ReapablePool {
   }
 
   checkin(conn: DatabaseAdapter): void {
-    if (this._isConnectionPinned(conn)) return;
+    if (this._pinnedConnection === conn) return;
+
     this.connectionLease().clear(conn);
-    if (this._checkedOut.has(conn)) {
-      this._checkedOut.delete(conn);
-      const c = conn as unknown as PoolManagedConnection & {
-        _runCheckinCallbacks?: (block: () => void) => void;
-      };
-      const expireBlock = () => c.expire?.();
-      if (typeof c._runCheckinCallbacks === "function") c._runCheckinCallbacks(expireBlock);
-      else {
-        expireBlock();
-        QueryCache.unsetQueryCacheBang.call(conn as unknown as QueryCacheHost);
-      }
-      this._available?.add(conn);
-    }
+    this._checkedOut.delete(conn);
+
+    conn._runCheckinCallbacks(() => {
+      conn.expire();
+    });
+
+    this._available!.add(conn);
   }
 
   remove(conn: DatabaseAdapter): void {
-    this.connectionLease().clear(conn);
+    let needsNewConnection = false;
+
+    removeConnectionFromThreadCache(this, conn);
     this._checkedOut.delete(conn);
-    this._available?.delete(conn);
 
-    if (this._connections) {
-      const connIdx = this._connections.indexOf(conn);
-      if (connIdx >= 0) this._connections.splice(connIdx, 1);
-    }
+    aryDelete(this._connections!, conn);
+    this._available!.delete(conn);
 
-    const needsNewConnection = this._available?.isAnyWaiting() ?? false;
-    if (
-      needsNewConnection &&
-      this.automaticReconnect &&
-      this._connections &&
-      this._connections.length < this.size
-    ) {
-      const newConn = this.newConnection();
-      this._connections.push(newConn);
-      this._available?.add(newConn);
-    }
+    needsNewConnection = this._available!.isAnyWaiting();
+
+    if (needsNewConnection) this.bulkMakeNewConnections(1);
   }
 
   async reap(): Promise<void> {
@@ -714,10 +677,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   private connectionLease(): Lease {
-    if (!this._leases) {
-      this._leases = new LeaseRegistry();
-    }
-    return this._leases.get(IsolatedExecutionState.context());
+    return this._leases!.get(IsolatedExecutionState.context());
   }
 
   private buildAsyncExecutor(): ThreadPoolExecutor | null {
@@ -863,10 +823,6 @@ export class ConnectionPool implements ReapablePool {
   private tryToCheckoutNewConnection = tryToCheckoutNewConnection;
   private adoptConnection = adoptConnection;
   private checkoutNewConnection = checkoutNewConnection;
-
-  private _isConnectionPinned(conn: DatabaseAdapter): boolean {
-    return this._pinnedConnection === conn;
-  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
@@ -879,16 +835,6 @@ prepend(ConnectionPool.prototype, {
   checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,
 });
 ConnectionAdapters.ConnectionPool = ConnectionPool;
-
-function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
-  const c = conn as Partial<TransactionAwareConnection>;
-  return (
-    typeof c.verifyBang === "function" &&
-    typeof c.resetBang === "function" &&
-    typeof c.transactionManager === "object" &&
-    c.transactionManager !== null
-  );
-}
 
 // @internal
 type Pool = any;

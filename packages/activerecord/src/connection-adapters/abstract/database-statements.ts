@@ -19,7 +19,7 @@ import {
 } from "@blazetrails/arel";
 import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { kernelInteger, rbInspect } from "@blazetrails/ruby-compat";
+import { kernelInteger, rbInspect, rtest } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -41,7 +41,7 @@ import {
   TransactionManager,
 } from "./transaction.js";
 import { Transaction as UserTransaction } from "../../transaction.js";
-import { IsolatedExecutionState, wrap } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { Result } from "../../result.js";
 import {
   FutureResult,
@@ -250,23 +250,20 @@ export function cacheableQuery(
   const host = this as unknown as DatabaseStatementsHost;
   const visitor = (host as any).visitor as Visitors.ToSql;
 
-  let ast = arel;
-  if (ast && (ast as any).ast != null && typeof (ast as any).ast === "object") {
-    ast = (ast as any).ast;
-  }
+  const ast = (arel as { ast: Nodes.Node }).ast;
 
   let query: unknown;
   let binds: unknown[];
   if (host.preparedStatements) {
     const [sql, compiledBinds] = visitor.compile(
-      ast as Nodes.Node,
+      ast,
       host.collector!() as Collectors.Composite,
     ) as unknown as [string, unknown[]];
     binds = compiledBinds;
     query = klass.query(sql);
   } else {
     const collector = klass.partialQueryCollector() as Collectors.Composite;
-    const [parts, compiledBinds] = visitor.compile(ast as Nodes.Node, collector) as unknown as [
+    const [parts, compiledBinds] = visitor.compile(ast, collector) as unknown as [
       unknown,
       unknown[],
     ];
@@ -349,11 +346,9 @@ export async function insert(
   let sql: string;
   [sql, binds] = toSqlAndBinds.call(this, arel, binds);
   const value = await this.execInsert(sql, name, binds, pk, sequenceName, opts?.returning ?? null);
-  if (opts?.returning != null) {
-    return this.returningColumnValues(value);
-  }
-  if (idValue != null && idValue !== false) return idValue;
-  return this.lastInsertedId(value);
+  if (opts?.returning != null) return this.returningColumnValues(value);
+
+  return rtest(idValue) ? idValue : this.lastInsertedId(value);
 }
 
 /** @missingRailsName buildTruncateStatement — PERMANENT */
@@ -509,10 +504,6 @@ export function isTransactionOpen(this: DatabaseStatementsHost): boolean {
 export function resetTransaction(this: DatabaseStatementsHost): void;
 export function resetTransaction(
   this: DatabaseStatementsHost,
-  options: { restore: true },
-): Promise<void>;
-export function resetTransaction(
-  this: DatabaseStatementsHost,
   options: { restore?: boolean },
   callback: () => Promise<unknown>,
 ): Promise<unknown>;
@@ -522,29 +513,23 @@ export function resetTransaction(
   callback?: () => Promise<unknown>,
 ): void | Promise<unknown> {
   const self = this as any;
+  const oldState =
+    options?.restore && self._transactionManager?.isRestorable() ? self._transactionManager : null;
+
+  self._transactionManager = new TransactionManager(self);
+
   if (callback) {
-    const oldState =
-      options?.restore && self._transactionManager?.isRestorable?.()
-        ? self._transactionManager
-        : null;
-    self._transactionManager = new TransactionManager(self);
     return (async () => {
       const result = await callback();
+
       if (oldState) {
         self._transactionManager = oldState;
         await self._transactionManager.restoreTransactions();
       }
+
       return result;
     })();
   }
-  if (options?.restore) {
-    if (self._transactionManager?.isRestorable?.()) {
-      return self._transactionManager.restoreTransactions().then(() => {});
-    }
-    self._transactionManager = new TransactionManager(self);
-    return Promise.resolve();
-  }
-  self._transactionManager = new TransactionManager(self);
 }
 
 export function addTransactionRecord(
@@ -558,18 +543,14 @@ export function addTransactionRecord(
 export async function beginDbTransaction(): Promise<void> {}
 
 export async function beginDeferredTransaction(
-  this: DatabaseStatementsHost | void,
-  isolationLevel?: string,
+  this: DatabaseStatementsHost,
+  isolationLevel: string | null = null,
 ): Promise<void> {
-  const host = this as unknown as DatabaseStatementsHost;
-  if (isolationLevel) {
-    return host?.beginIsolatedDbTransaction
-      ? host.beginIsolatedDbTransaction.call(host, isolationLevel)
-      : beginIsolatedDbTransaction.call(this, isolationLevel);
+  if (isolationLevel != null) {
+    await this.beginIsolatedDbTransaction!(isolationLevel);
+  } else {
+    await this.beginDbTransaction!();
   }
-  return host?.beginDbTransaction
-    ? host.beginDbTransaction.call(host)
-    : beginDbTransaction.call(this);
 }
 
 export function transactionIsolationLevels(): Record<string, string> {
@@ -592,36 +573,28 @@ export function resetIsolationLevel(): void {}
 
 export async function commitDbTransaction(): Promise<void> {}
 
-export async function rollbackDbTransaction(this: DatabaseStatementsHost | void): Promise<void> {
-  const host = this as unknown as DatabaseStatementsHost;
+export async function rollbackDbTransaction(this: DatabaseStatementsHost): Promise<void> {
   try {
-    await (host?.execRollbackDbTransaction
-      ? host.execRollbackDbTransaction.call(host)
-      : execRollbackDbTransaction.call(this));
+    await this.execRollbackDbTransaction!();
   } catch (e) {
-    if (!(e instanceof ConnectionNotEstablished) && !(e instanceof ConnectionFailed)) throw e;
+    if (e instanceof ConnectionNotEstablished || e instanceof ConnectionFailed) return;
+    throw e;
   }
 }
 
 export async function execRollbackDbTransaction(): Promise<void> {}
 
-export async function restartDbTransaction(this: DatabaseStatementsHost | void): Promise<void> {
-  const host = this as unknown as DatabaseStatementsHost;
-  await (host?.execRestartDbTransaction
-    ? host.execRestartDbTransaction.call(host)
-    : execRestartDbTransaction.call(this));
+export async function restartDbTransaction(this: DatabaseStatementsHost): Promise<void> {
+  await this.execRestartDbTransaction!();
 }
 
 export async function execRestartDbTransaction(): Promise<void> {}
 
 export async function rollbackToSavepoint(
-  this: DatabaseStatementsHost | void,
-  name?: string,
+  this: DatabaseStatementsHost & { execRollbackToSavepoint(name: string | null): Promise<void> },
+  name: string | null = null,
 ): Promise<void> {
-  const host = this as any;
-  if (host?.execRollbackToSavepoint) {
-    await host.execRollbackToSavepoint(name);
-  }
+  await this.execRollbackToSavepoint(name);
 }
 
 export function defaultSequenceName(_table: string, _column: string): string | null {
@@ -676,14 +649,11 @@ export function sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral {
 }
 
 export function withYamlFallback(value: unknown): unknown {
-  if (Array.isArray(value)) return yamlStringify(value, { directives: true });
-  if (value !== null && typeof value === "object") {
-    const proto = Object.getPrototypeOf(value);
-    if (proto === Object.prototype || proto === null) {
-      return yamlStringify(value, { directives: true });
-    }
+  if (isPlainObject(value) || Array.isArray(value)) {
+    return yamlStringify(value, { directives: true });
+  } else {
+    return value;
   }
-  return value;
 }
 
 export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
@@ -1269,7 +1239,7 @@ export function select(
       );
     }
 
-    sql = (this.preprocessQuery ? this.preprocessQuery(sql) : sql) as string;
+    sql = this.preprocessQuery!(sql) as string;
     const futureResult = new (async as FutureResultClass)(
       this.pool as unknown as FutureResultPool,
       [sql, name, binds],
@@ -1303,20 +1273,20 @@ export async function sqlForInsert(
   binds: unknown[],
   returning: string[] | null | undefined,
 ): Promise<[string, unknown[]]> {
-  if (await this.supportsInsertReturning?.()) {
-    let resolvedPk: string | null | undefined = pk === false ? null : pk;
-    if (pk !== false && resolvedPk == null) {
+  if (await this.supportsInsertReturning!()) {
+    if (pk == null) {
       const tableRef = extractTableRefFromInsertSql.call(this, sql);
-      if (tableRef) resolvedPk = (await this.primaryKey?.(tableRef)) ?? null;
+      if (tableRef) pk = await this.primaryKey!(tableRef);
     }
-    const returningColumns = returning ?? (resolvedPk != null ? [resolvedPk] : []);
-    if (returningColumns.length > 0) {
-      const cols = returningColumns
-        .map((c) => (this.quoteColumnName ? this.quoteColumnName(c) : `"${c}"`))
-        .join(", ");
-      sql = `${sql} RETURNING ${cols}`;
-    }
+
+    const returningColumns = returning || wrap(pk as string | null);
+
+    const returningColumnsStatement = returningColumns
+      .map((c) => this.quoteColumnName!(c))
+      .join(", ");
+    if (returningColumns.some(rtest)) sql = `${sql} RETURNING ${returningColumnsStatement}`;
   }
+
   return [sql, binds];
 }
 

@@ -484,10 +484,15 @@ export type SkeletonSide = "ruby" | "ts";
  * `try` / `throw`. Folding the pair onto the construct the port is forced to
  * use is what lets a line-for-line body read as one — the residual `if` the TS
  * tag test contributes is a real extra arm and is left flagged (RFC 0113).
+ *
+ * `Kernel#loop` is the same kind of call: `loop do … end`
+ * (`activerecord/lib/active_record/connection_adapters/abstract/connection_pool/queue.rb:116`)
+ * emits `ref:loop`, and its port is a `for (;;)`, which emits `loop`.
  */
 const CONSTRUCT_SKELETON_NAMES = new Map([
   ["catch", "try"],
   ["throw", "throw"],
+  ["loop", "loop"],
 ]);
 
 /**

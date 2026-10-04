@@ -163,6 +163,7 @@ describe("DatabaseStatements#select", () => {
     setAsyncQueryExecutor("global_thread_pool");
     const host = {
       asyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       currentTransaction: () => ({ open: true, joinable: true }),
     };
 
@@ -190,6 +191,7 @@ describe("DatabaseStatements#select", () => {
     const host = {
       pool,
       asyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
     };
@@ -214,6 +216,7 @@ describe("DatabaseStatements#select", () => {
     const host = {
       pool,
       asyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
       internalExecQuery: async () => {
@@ -234,6 +237,7 @@ describe("DatabaseStatements#select", () => {
     const host = {
       pool,
       asyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => true,
       currentTransaction: () => ({ open: false, joinable: false }),
     };
@@ -257,6 +261,7 @@ describe("DatabaseStatements#select", () => {
     const host = {
       pool: {},
       asyncEnabled: () => true,
+      preprocessQuery: (sql: string) => sql,
       supportsConcurrentConnections: () => false,
       currentTransaction: () => ({ open: false, joinable: false }),
       rawExecQuery: async () => {
