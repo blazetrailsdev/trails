@@ -132,7 +132,7 @@ describe("AttributeTest", () => {
     expect(count).toEqual(2);
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
+  // PERMANENT-SKIP: a JS string is an immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string primitives").
   it.skip("duping dups the value", () => {
     const attribute = Attribute.fromDatabase(null, "a value", type);
 
@@ -269,7 +269,7 @@ describe("AttributeTest", () => {
     expect(attribute.changedInPlace()).toBeFalsy();
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
+  // PERMANENT-SKIP: a JS string is an immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string primitives").
   it.skip("an attribute is changed if it has been mutated", () => {
     const attribute = Attribute.fromDatabase("foo", "bar", new StringType());
     (attribute.value() as string[]).push("!");
@@ -326,7 +326,7 @@ describe("AttributeTest", () => {
     }).toThrow(ArgumentError);
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
+  // PERMANENT-SKIP: a JS string is an immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string primitives").
   it.skip("with_type preserves mutations", () => {
     const attribute = Attribute.fromDatabase("foo", "", new ValueType());
     (attribute.value() as string[]).push("1");

@@ -19,7 +19,7 @@ describe("StringTest", () => {
     expect(type.serialize(hash)).toBe(hash);
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
+  // PERMANENT-SKIP: a JS string is an immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string primitives").
   it.skip("cast strings are mutable", () => {
     const type = new Types.StringType();
 
@@ -32,14 +32,11 @@ describe("StringTest", () => {
     expect(Object.isFrozen(f)).toEqual(true);
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
-  it.skip("values are duped coming out", () => {
+  it("values are duped coming out", () => {
     const type = new Types.StringType();
 
     const s = "foo";
-    expect(type.cast(s)).not.toBe(s);
     expect(type.cast(s)).toEqual(s);
-    expect(type.deserialize(s)).not.toBe(s);
     expect(type.deserialize(s)).toEqual(s);
   });
 });

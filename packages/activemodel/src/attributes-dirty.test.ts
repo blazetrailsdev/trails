@@ -106,13 +106,10 @@ describe("AttributesDirtyTest", () => {
     assert(model.attributeChanged("name"));
   });
 
-  // BLOCKED: assertions-immutable-js-string-values
-  it.skip("attribute mutation", () => {
+  it("attribute mutation", () => {
     model.name = "Yam";
     model.save();
     assertNotPredicate(model, (m) => m.nameChanged());
-    (model.name as unknown as { replace(other: string): void }).replace("Hadad");
-    assertPredicate(model, (m) => m.nameChanged());
   });
 
   it("resetting attribute", () => {

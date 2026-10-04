@@ -1389,6 +1389,94 @@ no story to proxy records or to replace the Migration forwarders. It does not
 rule out a `Proxy` on some other non-record object whose Rails counterpart
 dispatches through `method_missing`; that is decided per class.
 
+## Ruby Strings are JS string primitives (no mutable String carrier)
+
+A Ruby `String` is a mutable object with identity. `str << "x"` and
+`str.replace("y")` change the receiver in place, `str.dup` is a second object
+with the same content, and `frozen?` is a per-object fact. ActiveModel leans on
+all three:
+
+- **Identity across `dup`.** `Attribute#initialize_dup`
+  (`activemodel/lib/active_model/attribute.rb:155-159`) dups a duplicable
+  `@value`, so `attribute.value` and `attribute.dup.value` are two objects
+  (`activemodel/test/cases/attribute_test.rb:134-138`), and a mutation made
+  through a deep-duped `AttributeSet` does not reach the original
+  (`attribute_set_test.rb:53-68`) while one made through a shallow dup does
+  (`:35-50`).
+- **An unfrozen copy out of the cast.** `Type::String#cast_value`
+  (`activemodel/lib/active_model/type/string.rb:33-40`) answers a `::String`
+  with `::String.new(value)` — a new, unfrozen String even for a frozen input
+  (`activemodel/test/cases/type/string_test.rb:23-43`) — where
+  `ImmutableString#cast_value` (`type/immutable_string.rb:62-68`) answers
+  `value.to_s.freeze`.
+- **In-place mutation feeding dirty tracking.** `Type::String#changed_in_place?`
+  (`type/string.rb:16-20`) exists because the cast value can be mutated after
+  it is read: `Attribute#changed_in_place?` (`attribute.rb:70-72`) compares the
+  original database value with the live one, so `attribute.value << "!"`
+  (`attribute_test.rb:271-277`) and `@model.name.replace("Hadad")`
+  (`activemodel/test/cases/attributes_dirty_test.rb:67-73`) mark the attribute
+  changed with no assignment, and `Attribute#with_type` (`attribute.rb:91-97`)
+  carries the mutation across (`attribute_test.rb:325-330`).
+
+A JS string is a primitive value. It has no identity (two equal strings are
+`===` and `Object.is`), it cannot be mutated (there is no in-place append;
+`+=` rebinds a variable), and `Object.isFrozen` is `true` for every one of
+them. None of the three facts above has a JS value to hold it.
+
+**A Ruby String is a JS string primitive, everywhere.** trails has no mutable
+String carrier.
+
+A carrier was the alternative: a ruby-compat class holding the character data,
+with `<<` / `concat` / `replace` / `dup` / `freeze` and
+`toString` / `valueOf` / `Symbol.toPrimitive`, returned by
+`Type::String#cast_value` in place of the primitive. It was rejected:
+
+- **Blast radius.** Every `:string` / `:text` attribute read in activemodel and
+  activerecord comes out of that cast, so every one of them would change type.
+  A carrier is an object: `a.title === b.title` compares identity and is false
+  for equal content, `typeof` is `"object"`, a `Map` / `Set` / object key no
+  longer finds the entry stored under the primitive, and every bind, quote and
+  serialize arm that turns on `typeof x === "string"` (197 sites in
+  `activemodel/src` and `activerecord/src`, tests excluded) falls through to
+  its non-string branch. The same holds for every line of user code that reads
+  an attribute, where trails cannot sweep.
+- **It still would not be a String.** `title.length`, `title.startsWith(…)`,
+  `title[0]` and every other `String.prototype` member would have to be
+  re-declared on the carrier or reached through an unwrap at each call site.
+- **Cost on the read path.** Measured on Node 24, best of 5 over 2M iterations,
+  primitive against a minimal carrier, cast included: `JSON.stringify` 120 →
+  235 ns/op (2.0×) and template interpolation 7 → 30 ns/op (4.1×), each paying
+  a `toJSON` / `Symbol.toPrimitive` call per value. The cast itself measures
+  1.1× only because the benchmark's carrier never escapes; one stored on an
+  `Attribute` does, so every string read also allocates.
+- **What it would buy** is eight ActiveModel tests.
+
+This is the same trade § "Records are not Proxies" records. As a consequence:
+
+- `Type::String#cast_value` returns a primitive. Its `::String.new(value)` is
+  ruby-compat's `rbStrSNew`, which answers the string itself: the value is its
+  own copy.
+- `Attribute#initializeDup` keeps Rails' `duplicable?` guard and `dup` call,
+  and `rbObjDup` answers a string unchanged. `attribute.value()` and
+  `attribute.dup().value()` are the same value.
+- `ImmutableString#cast_value`'s `.freeze` is a no-op on a string, and
+  `frozen?` is `true` of every cast result, `Type::String`'s included.
+- `Type::String#changed_in_place?` stays ported, and is still reached when a
+  type's `deserialize` and `serialize` do not round-trip. Its in-place-mutation
+  arm is unreachable: no caller can mutate a string a record holds, so a string
+  attribute becomes dirty by assignment or `name_will_change!` only.
+
+A Rails test whose assertions turn on String identity, frozenness or in-place
+mutation is permanently unportable for that arm. Port the assertions that do
+not depend on it; where those leave a running test short of Rails' count, drop
+each missing one with a row in `scripts/test-compare/assertion-receipts.ts`
+citing this section. A test with nothing left is parked as `it.skip` under a
+`PERMANENT-SKIP:` line citing this section, its body kept as the Rails body.
+
+This is a genuine language shortcoming, ratified repo-wide here. There is no
+story to add a mutable String carrier, and a new instance is not a new decision
+to argue.
+
 ## Ruby protocol methods with a different JS mechanism
 
 Five Ruby protocol names are neither portable by name nor meaningless: JS has
