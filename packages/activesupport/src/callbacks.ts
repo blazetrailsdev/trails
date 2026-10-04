@@ -304,6 +304,7 @@ export interface FilterEnvironment {
   target: object;
   halted: boolean;
   value: unknown;
+  /** @noRailsEquivalent PERMANENT */
   syncChain?: string;
 }
 
@@ -1251,14 +1252,15 @@ function runCallbacks(
               })();
               break sequence;
             }
-            nextSequence = current;
-            tracker = proceeding;
             throw err;
+          } finally {
+            if (env.syncChain !== undefined || !(isThenable(cbResult) || own.pending)) {
+              nextSequence = current;
+              tracker = proceeding;
+            }
           }
           if (isThenable(cbResult) || own.pending) {
             if (env.syncChain !== undefined) {
-              nextSequence = current;
-              tracker = proceeding;
               swallowRejection(cbResult);
               swallowRejection(own.pending);
               throw new RuntimeError(
@@ -1286,8 +1288,6 @@ function runCallbacks(
             })();
             break sequence;
           }
-          nextSequence = current;
-          tracker = proceeding;
         }
       }
       if (step === "after") {
