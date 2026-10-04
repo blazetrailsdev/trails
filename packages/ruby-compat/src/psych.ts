@@ -3,8 +3,16 @@
 import type { Node } from "yaml";
 import { yaml } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
-import { DisallowedClass as PsychDisallowedClass } from "./psych/exception.js";
-import { ToRuby } from "./psych/visitors/to-ruby.js";
+import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
+import {
+  AliasesNotEnabled as PsychAliasesNotEnabled,
+  AnchorNotDefined as PsychAnchorNotDefined,
+  BadAlias as PsychBadAlias,
+  DisallowedClass as PsychDisallowedClass,
+  Exception as PsychException,
+} from "./psych/exception.js";
+import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
+import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { YAMLTree } from "./psych/visitors/yaml-tree.js";
 
 /**
@@ -13,6 +21,38 @@ import { YAMLTree } from "./psych/visitors/yaml-tree.js";
  * @noRailsEquivalent PERMANENT
  */
 export namespace Psych {
+  /**
+   * `Psych::Exception` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/exception.rb:3`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const Exception = PsychException;
+  export type Exception = PsychException;
+
+  /**
+   * `Psych::BadAlias` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/exception.rb:6`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const BadAlias = PsychBadAlias;
+  export type BadAlias = PsychBadAlias;
+
+  /**
+   * `Psych::AliasesNotEnabled` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/exception.rb:10`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const AliasesNotEnabled = PsychAliasesNotEnabled;
+  export type AliasesNotEnabled = PsychAliasesNotEnabled;
+
+  /**
+   * `Psych::AnchorNotDefined` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/exception.rb:17`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const AnchorNotDefined = PsychAnchorNotDefined;
+  export type AnchorNotDefined = PsychAnchorNotDefined;
+
   /**
    * `Psych::DisallowedClass` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/exception.rb:23`).
    *
@@ -28,6 +68,29 @@ export namespace Psych {
    */
   export const Coder = PsychCoder;
   export type Coder = PsychCoder;
+
+  /**
+   * `Psych::ClassLoader` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/class_loader.rb:6`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const ClassLoader = PsychClassLoader;
+  export type ClassLoader = PsychClassLoader;
+
+  /**
+   * `Psych::ScalarScanner` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/scalar_scanner.rb:7`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const ScalarScanner = PsychScalarScanner;
+  export type ScalarScanner = PsychScalarScanner;
+
+  /**
+   * `Psych::Visitors` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/to_ruby.rb:11`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export const Visitors = { ToRuby, NoAliasRuby, YAMLTree };
 
   /**
    * `Psych.load_tags` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:741`).
@@ -49,7 +112,7 @@ export namespace Psych {
    * @noRailsEquivalent PERMANENT
    */
   export function dump(o: unknown): string {
-    const visitor = new YAMLTree();
+    const visitor = YAMLTree.create();
     visitor.push(o);
     return visitor.tree.toString({ directives: true });
   }
@@ -61,6 +124,6 @@ export namespace Psych {
    */
   export function unsafeLoad(yamlString: string): unknown {
     const doc = yaml.parseDocument(yamlString);
-    return new ToRuby().accept(doc.contents as Node | null);
+    return ToRuby.create().accept(doc.contents as Node | null);
   }
 }
