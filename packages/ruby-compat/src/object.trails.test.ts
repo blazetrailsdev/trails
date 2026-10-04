@@ -399,6 +399,19 @@ describe("rbFSend", () => {
     expect(rbFSend(req, "field")).toBe("f");
   });
 
+  it("sends an undefined method entry to method_missing, and an own undefined field as a value", () => {
+    class Undefined {
+      field: undefined = undefined;
+      methodMissing(mid: string): string {
+        return `missing ${mid}`;
+      }
+    }
+    Object.defineProperty(Undefined.prototype, "title", { value: undefined, configurable: true });
+    const host = new Undefined();
+    expect(rbFSend(host, "title")).toBe("missing title");
+    expect(rbFSend(host, "field")).toBeUndefined();
+  });
+
   it("sends a String a method String is reopened with, and one JS String lacks", () => {
     expect(rbFSend("abc", "upcase")).toBe("ABC");
     expect(rbFSend("abc", "toUpperCase")).toBe("ABC");
