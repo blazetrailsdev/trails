@@ -789,12 +789,12 @@ describe("Callbacks", () => {
   });
 
   describe("error handling", () => {
-    it("runs block when no chain is defined", () => {
+    it("runCallbacks on a chain that was never defined raises as Rails' nil chain does", () => {
       class Target extends Model {}
       const target = new Target();
       const log: string[] = [];
-      target.runCallbacks("nonexistent", () => log.push("ran"));
-      expect(log).toEqual(["ran"]);
+      expect(() => target.runCallbacks("nonexistent", () => log.push("ran"))).toThrow(TypeError);
+      expect(log).toEqual([]);
     });
   });
 
@@ -1143,15 +1143,15 @@ describe("CallbackObject dispatch", () => {
     expect(() => Record.setCallback("save", "before", () => {})).toThrow(TypeError);
   });
 
-  it("a class attribute on a singleton class keeps the reader on its attached object", () => {
+  it("a class attribute on a singleton class seats the delegators on its attached object", () => {
     const object = {} as { settings?: unknown };
     const singleton = rbObjSingletonClass(object) as any;
     classAttribute.call(singleton, "settings", { instanceWriter: false, default: 1 });
-    expect(object.settings).toBe(1);
+    expect(singleton.settings).toBe(1);
+    expect(object.settings).toBeUndefined();
     singleton.settings = 2;
-    expect(object.settings).toBe(2);
-    classAttribute.call(singleton, "writable", { default: 1 });
-    expect((object as any).writable).toBe(1);
+    expect(singleton.settings).toBe(2);
+    expect(object.settings).toBeUndefined();
   });
 
   it("a callback set on a parent after a child wrote its own chain reaches the child", () => {

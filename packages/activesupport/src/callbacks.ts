@@ -1,13 +1,11 @@
 import {
   extend,
-  include,
   kernelCatch,
   Module,
   NoMethodError,
   rbBlockGivenP,
   rbClassSuperclass,
   rbModSingletonP,
-  rbObjSingletonClass,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 
@@ -998,48 +996,6 @@ function observeProceed(
   };
 }
 
-function callbacksClass(target: object): CallbacksClass {
-  const klass =
-    Object.prototype.hasOwnProperty.call(target, "constructor") &&
-    (target.constructor as { prototype?: unknown }).prototype === target
-      ? target.constructor
-      : rbObjSingletonClass(target);
-  include(klass as AnyClass, Callbacks);
-  return klass as unknown as CallbacksClass;
-}
-
-export function defineCallbacks<T extends object>(
-  target: T,
-  name: string,
-  options: DefineCallbacksOptions<T> = {},
-): void {
-  Callbacks.ClassMethods.defineCallbacks.call(callbacksClass(target), name, options);
-}
-
-/**
- * @missingRailsCall normalize_callback_params — CONVERGEABLE activesupport-callbacks-run-callbacks-is-the-instance-method-only
- * @missingRailsCall build — CONVERGEABLE activesupport-callbacks-run-callbacks-is-the-instance-method-only
- */
-export function setCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.ClassMethods.setCallback.call(callbacksClass(target), name, ...filterList);
-}
-
-export function skipCallback<T extends object>(
-  target: T,
-  name: string,
-  ...filterList: FilterListEntry<T>[]
-): void {
-  Callbacks.ClassMethods.skipCallback.call(callbacksClass(target), name, ...filterList);
-}
-
-export function resetCallbacks(target: object, name: string): void {
-  Callbacks.ClassMethods.resetCallbacks.call(callbacksClass(target), name);
-}
-
 export const ClassMethods = {
   __updateCallbacks(
     this: CallbacksClass,
@@ -1218,6 +1174,11 @@ Callbacks.moduleEval((mod) => {
   mod.haltedCallbackHook = function (_filter: unknown, _name: string): void {};
 });
 
+/**
+ * @missingRailsArgs invoke_before — CONVERGEABLE activesupport-run-callbacks-invoke-before-after-take-env-only
+ * @missingRailsArgs invoke_after — CONVERGEABLE activesupport-run-callbacks-invoke-before-after-take-env-only
+ * @missingRailsArgs expand_call_template — CONVERGEABLE activesupport-run-callbacks-passes-invoke-sequence-to-expand-call-template
+ */
 function runCallbacks(
   this: object,
   kind: string,
@@ -1225,9 +1186,9 @@ function runCallbacks(
   opts?: RunCallbacksOptions,
   type?: CallbackKind,
 ): unknown {
-  const callbacks = (this as { __callbacks?: Record<string, CallbackChain> }).__callbacks?.[kind];
+  const callbacks = (this as { __callbacks: Record<string, CallbackChain> }).__callbacks[kind];
 
-  if (!callbacks || callbacks.isEmpty) {
+  if (callbacks.isEmpty) {
     const r = block?.();
     if (!isThenable(r)) return r;
     if (opts?.strict === "sync") {
@@ -1374,83 +1335,4 @@ function runCallbacks(
   } else {
     return invokeSequence(nextSequence, null, null);
   }
-}
-
-function runCallbacksOn(
-  target: object,
-  name: string,
-  block?: () => unknown,
-  opts?: RunCallbacksOptions,
-  type?: CallbackKind,
-): unknown {
-  return runCallbacks.call(target, name, block, opts, type);
-}
-
-export { runCallbacksOn as runCallbacks };
-
-export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Base?: TBase) {
-  const ActualBase = (Base ?? class {}) as TBase;
-
-  class WithCallbacks extends ActualBase {
-    static defineCallbacks<T extends object>(
-      this: { prototype: T },
-      name: string,
-      options: DefineCallbacksOptions<T> = {},
-    ): void {
-      defineCallbacks(this.prototype, name, options);
-    }
-
-    static beforeCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: BeforeCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "before", callback, options);
-    }
-
-    static afterCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: AfterCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "after", callback, options);
-    }
-
-    static aroundCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      callback: AroundCallback<T> | CallbackObject,
-      options: CallbackOptions<T> = {},
-    ): void {
-      setCallback(this.prototype, name, "around", callback, options);
-    }
-
-    static skipCallback<T extends object>(
-      this: { prototype: T },
-      name: string,
-      ...filterList: FilterListEntry<T>[]
-    ): void {
-      skipCallback(this.prototype, name, ...filterList);
-    }
-
-    static resetCallbacks(name: string): void {
-      resetCallbacks(this.prototype, name);
-    }
-
-    runCallbacks(
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-      type?: CallbackKind,
-    ): unknown {
-      return runCallbacks.call(this, name, block, opts, type);
-    }
-
-    /** @internal */
-    haltedCallbackHook(_filter: unknown, _name: string): void {}
-  }
-
-  return WithCallbacks;
 }

@@ -1553,6 +1553,24 @@ This is a genuine language shortcoming, ratified repo-wide here. An own-property
 memo guard in `model-schema.ts` is the port of `inherited`, not a deviation to
 retire, and there is no story to port `inherited` as a hook.
 
+### `Class#subclasses` is seated on a class's first own write (`Callbacks::ClassMethods#set_callbacks`)
+
+Rails' `DescendantsTracker#descendants`
+(`activesupport/lib/active_support/descendants_tracker.rb:107-110`) is
+`subclasses.concat(subclasses.flat_map(&:descendants))` over Ruby's native
+`Class#subclasses`, so `__update_callbacks`
+(`activesupport/lib/active_support/callbacks.rb:686-691`) reaches every subclass with
+no registration step. JS keeps no subclass list, and the same missing
+`inherited` hook means nothing can build one at definition time.
+
+A subclass that has never written its own `__callbacks` reads its parent's
+through the prototype chain, so it needs no edge. The first own write is where
+it starts to diverge, and so `setCallbacks` (`activesupport/src/callbacks.ts`)
+registers the class and its superclass chain with
+`DescendantsTracker.registerSubclass` there, a call `set_callbacks` does not
+make. Without it Rails' `ResetCallbackTest` "reset impacts subclasses" is red.
+An extra call has no JSDoc receipt shape, so this section is its receipt.
+
 ## `singleton_class` is a per-object subclass (`rbObjSingletonClass`)
 
 Ruby's `obj.singleton_class` (`vendor/ruby/v3.3.11/object.c:288`, `class.c:2215`) is a
