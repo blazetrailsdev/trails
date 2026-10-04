@@ -1,3 +1,4 @@
+import { Enumerator } from "./enumerator.js";
 import { describe, expect, it } from "vitest";
 import {
   Hash,
@@ -647,8 +648,9 @@ describe("eachValue", () => {
   });
 
   it("enumerates the values when no block is given", () => {
-    expect(eachValue({ a: 1, b: null }).every((v) => v == null)).toBe(false);
-    expect(eachValue({ a: null, b: null }).every((v) => v == null)).toBe(true);
+    const enumerator = eachValue({ a: 1, b: null });
+    expect(enumerator).toBeInstanceOf(Enumerator);
+    expect([...enumerator]).toEqual([1, null]);
   });
 });
 

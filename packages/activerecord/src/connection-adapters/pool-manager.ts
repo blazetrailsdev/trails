@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { eachValue, hashDelete, toEnum } from "@blazetrails/ruby-compat";
+import { eachValue, hashDelete } from "@blazetrails/ruby-compat";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {
@@ -32,11 +32,7 @@ export class PoolManager {
     return Object.values(this._roleToShardMapping).flatMap((shardMap) => Object.values(shardMap));
   }
 
-  /**
-   * @missingRailsName roleToShardMapping — PERMANENT
-   * @inventedArm if — CONVERGEABLE each-value-blockless-arm-answers-an-enumerator
-   * @inventedArm toEnum — CONVERGEABLE each-value-blockless-arm-answers-an-enumerator
-   */
+  /** @missingRailsName roleToShardMapping — PERMANENT */
   eachPoolConfig(
     role: string | null | undefined,
     block?: (poolConfig: PoolConfig) => void,
@@ -52,7 +48,6 @@ export class PoolManager {
     }
 
     if (role != null) {
-      if (!block) return toEnum<PoolConfig>(this, "eachPoolConfig", role);
       return eachValue(this._roleToShardMapping[role], block);
     } else {
       return eachValue(this._roleToShardMapping, (shardMap) => {

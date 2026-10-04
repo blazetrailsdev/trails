@@ -96,7 +96,7 @@ export function executeCallstackForMultiparameterAttributes(
   for (const [name, valuesWithEmptyParameters] of Object.entries(callstack)) {
     let values: Record<number, unknown> | null;
     try {
-      if (eachValue(valuesWithEmptyParameters).every((v) => v == null)) {
+      if ([...eachValue(valuesWithEmptyParameters)].every((v) => v == null)) {
         values = null;
       } else {
         values = valuesWithEmptyParameters;
