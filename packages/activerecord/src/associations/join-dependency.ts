@@ -28,7 +28,7 @@ import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
-import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
+import { AliasTracker } from "./alias-tracker.js";
 
 const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
 
@@ -147,7 +147,7 @@ export class JoinDependency {
       reflection.checkEagerLoadableBang();
 
       if (reflection.isPolymorphic()) {
-        throw new EagerLoadPolymorphicError(name);
+        throw new EagerLoadPolymorphicError(reflection);
       }
 
       return [new JoinAssociation(reflection, this.build(right, reflection.klass))];
@@ -256,26 +256,20 @@ export class JoinDependency {
         const tableName = this._references.get((reflection as any).name);
 
         table = this.aliasTracker.aliasedTableFor(
-          aliasedArelTableForReflection(reflection, (reflection as any).tableName),
+          (reflection.klass as any).arelTable,
           tableName ?? null,
           () => {
             const name = (reflection as any).aliasCandidate(parent.tableName);
             return root ? name : `${name}_join`;
           },
         );
-        table = aliasedArelTableForReflection(
-          reflection,
-          (reflection as any).tableName,
-          String(table!.tableAlias ?? table!.name),
-        );
 
         if (joinType === Nodes.OuterJoin && !this._joinedTables.has(remainingReflectionChain)) {
-          this._joinedTables.set(remainingReflectionChain, [table, root]);
+          this._joinedTables.set(remainingReflectionChain, [table!, root]);
         }
-        return [table, false];
+        return [table!, false];
       },
     ) as Nodes.Join[];
-    this._aliasesCache = undefined;
 
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }

@@ -42,7 +42,7 @@ describe("eager_load with an unresolvable association", () => {
 
   it("raises EagerLoadPolymorphicError on the exists? path", async () => {
     await expect(Tagging.all().eagerLoad(":taggable").isExists()).rejects.toThrow(
-      /Cannot eagerly load the polymorphic association :taggable\./,
+      /Cannot eagerly load the polymorphic association :taggable$/,
     );
   });
 

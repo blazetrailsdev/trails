@@ -5,7 +5,7 @@ import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
 import { extractBang } from "@blazetrails/activesupport";
-import { first, isEmpty, rtest, union } from "@blazetrails/ruby-compat";
+import { first, isEmpty, rbEqual, rtest, union } from "@blazetrails/ruby-compat";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -16,7 +16,7 @@ type TableResolver = (
 export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | Nodes.TableAlias | null = null;
-  readonly tables: (Table | Nodes.TableAlias)[] = [];
+  readonly tables: (Table | Nodes.TableAlias)[] | null = null;
   private _readonly?: boolean;
   private _strictLoading?: boolean;
 
@@ -90,13 +90,7 @@ export class JoinAssociation extends JoinPart {
       if (nodes instanceof Nodes.And) {
         others = extractBang(
           nodes.children,
-          (node) =>
-            !fetchAttribute(
-              node,
-              (attr) =>
-                String(attr.relation.tableAlias ?? attr.relation.name) ===
-                String(table.tableAlias ?? table.name),
-            ),
+          (node) => !fetchAttribute(node, (attr) => rbEqual(attr.relation.name, table.name)),
         );
       }
 
