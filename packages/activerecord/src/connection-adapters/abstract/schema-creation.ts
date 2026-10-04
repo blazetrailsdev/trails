@@ -45,9 +45,8 @@ export class SchemaCreation {
 
   async accept(o: object): Promise<string> {
     const klass = o.constructor as abstract new (...args: never[]) => object;
-    const m =
-      this.cache.get(klass) ||
-      this.cache.set(klass, `visit${klass.name.split("::").at(-1)}`).get(klass)!;
+    const m = this.cache.get(klass) || `visit${klass.name.split("::").at(-1)}`;
+    this.cache.set(klass, m);
     return (this as unknown as Record<string, (o: object) => Promise<string> | string>)[m](o);
   }
 

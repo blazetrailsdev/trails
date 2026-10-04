@@ -94,6 +94,6 @@ export interface SchemaStatementsLike {
     expressionOrOptions?: string | Record<string, unknown>,
     options?: Record<string, unknown>,
   ): Promise<void>;
-  checkConstraintExists(tableName: string, options?: Record<string, unknown>): Promise<boolean>;
+  checkConstraintExists(tableName: string, ...args: object[]): Promise<boolean>;
   primaryKey?(tableName: string): Promise<string | string[] | null>;
 }

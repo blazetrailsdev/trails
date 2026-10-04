@@ -104,7 +104,7 @@ describe("CheckConstraintDefinition#defined_for?", () => {
 describe("TableDefinition#remove_column", () => {
   const td = (): TableDefinition => {
     const t = new TableDefinition(conn, "astronauts");
-    t.setPrimaryKey("astronauts", true);
+    t.setPrimaryKey("astronauts", "primary_key");
     t.string("name");
     t.integer("rocket_id");
     return t;
@@ -655,7 +655,7 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 
   it("raises with pk-specific message for primary key columns", () => {
     const td = new TableDefinition(conn, "t");
-    td.setPrimaryKey("t", true);
+    td.setPrimaryKey("t", "primary_key");
     expect(() => td.column("id", "integer", { primaryKey: true })).toThrow(
       "redefine the primary key",
     );
@@ -665,7 +665,7 @@ describe("TableDefinition#raise_on_duplicate_column", () => {
 describe("TableDefinition#primary_key option", () => {
   it("treats primaryKey: 'uuid' as a custom PK column name", () => {
     const td = new TableDefinition(conn, "t");
-    td.setPrimaryKey("t", true, "uuid");
+    td.setPrimaryKey("t", "primary_key", "uuid");
     const pk = td.columns.find((c) => c.options.primaryKey);
     expect(pk?.name).toBe("uuid");
   });

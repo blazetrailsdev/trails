@@ -197,7 +197,7 @@ export interface AbstractAdapter {
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;

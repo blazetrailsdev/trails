@@ -2,7 +2,7 @@ import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import type { Column } from "../column.js";
-import { isPresent } from "@blazetrails/activesupport";
+import { compact, isPresent } from "@blazetrails/activesupport";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 export class SchemaDumper extends BaseSchemaDumper {
@@ -51,10 +51,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     if (!column.null) spec["null"] = "false";
     spec["collation"] = await this.schemaCollation(column);
     if (isPresent(column.comment)) spec["comment"] = rbInspect(column.comment);
-    for (const key of Object.keys(spec)) {
-      if (spec[key] == null) delete spec[key];
-    }
-    return spec;
+    return compact(spec);
   }
 
   /** @internal */
@@ -82,12 +79,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
     const limit = this.isBigint(column) ? undefined : column.limit;
-    const nativeLimit = (
-      this._adapter()?.nativeDatabaseTypes?.()?.[column.type ?? ""] as
-        | { limit?: unknown }
-        | undefined
-    )?.limit;
-    if (limit != null && limit !== nativeLimit) return String(limit);
+    if (
+      limit != null &&
+      limit !== this._adapter().nativeDatabaseTypes()[column.type as string].limit
+    ) {
+      return rbInspect(limit);
+    }
     return undefined;
   }
 

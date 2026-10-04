@@ -158,6 +158,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
       ],
       indexes: (_t: string) => [],
       isValidType: (type: string | null | undefined) => type === "integer" || type === "string",
+      nativeDatabaseTypes: () => ({ integer: { name: "integer" }, string: { name: "varchar" } }),
       primaryKey: async () => "id",
     };
     const output = (await SchemaDumper.dump(validSource as any, new StringIO())).string();

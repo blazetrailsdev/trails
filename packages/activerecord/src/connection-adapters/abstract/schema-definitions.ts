@@ -778,7 +778,7 @@ export class TableDefinition {
 
   setPrimaryKey(
     tableName: string,
-    id: boolean | ColumnType | IdHashOptions,
+    id: false | ColumnType | IdHashOptions,
     primaryKey?: string | string[] | false,
     options: Record<string, unknown> = {},
   ): void {
@@ -1154,10 +1154,12 @@ export class Table {
     return this.removeReferences(...(args as string[]));
   }
 
-  async foreignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): Promise<void> {
-    this.raiseOnIfExistOptions(options as Record<string, unknown>);
-    return this._schema.addForeignKey(this.name, toTable, ...keywordSplat(options));
+  async foreignKey(...args: Array<string | Partial<AddForeignKeyOptions>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    this.raiseOnIfExistOptions(options);
+    return this._schema.addForeignKey(this.name, ...(args as [string]), ...keywordSplat(options));
   }
+
   async removeForeignKey(
     ...args: Array<string | { column?: string; name?: string }>
   ): Promise<void> {
@@ -1179,8 +1181,13 @@ export class Table {
     );
   }
 
-  async checkConstraint(expression: string, options: Record<string, unknown> = {}): Promise<void> {
-    return this._schema.addCheckConstraint(this.name, expression, ...keywordSplat(options));
+  async checkConstraint(...args: Array<string | Record<string, unknown>>): Promise<void> {
+    const options = extractOptionsBang(args);
+    return this._schema.addCheckConstraint(
+      this.name,
+      ...(args as [string]),
+      ...keywordSplat(options),
+    );
   }
 
   async removeCheckConstraint(...args: Array<string | { name?: string }>): Promise<void> {
@@ -1193,10 +1200,10 @@ export class Table {
   }
 
   async checkConstraintExists(
-    ...args: Array<string | { name?: string; expression?: string }>
+    ...args: Array<{ name?: string; expression?: string }>
   ): Promise<boolean> {
     const options = extractOptionsBang(args);
-    return this._schema.checkConstraintExists(this.name, ...(args as []), ...keywordSplat(options));
+    return this._schema.checkConstraintExists(this.name, ...args, ...keywordSplat(options));
   }
 
   /** @internal */

@@ -195,7 +195,7 @@ export class SchemaStatements {
     tableName: string,
     options?:
       | {
-          id?: boolean | ColumnType | IdHashOptions;
+          id?: false | ColumnType | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -939,7 +939,7 @@ export class SchemaStatements {
   async buildCreateTableDefinition(
     tableName: string,
     kwargs: {
-      id?: boolean | ColumnType | IdHashOptions;
+      id?: false | ColumnType | IdHashOptions;
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       [key: string]: unknown;
