@@ -125,7 +125,7 @@ describe("PoolManager", () => {
     it("answers the role's pool configs when no block is given", () => {
       const c1 = makePoolConfig("primary");
       manager.setPoolConfig("writing", "default", c1);
-      expect(manager.eachPoolConfig("writing")).toEqual([c1]);
+      expect(Array.from(manager.eachPoolConfig("writing") as Iterable<PoolConfig>)).toEqual([c1]);
     });
   });
 

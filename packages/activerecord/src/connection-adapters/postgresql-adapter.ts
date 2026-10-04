@@ -238,7 +238,6 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
-  /** @inventedArm end — CONVERGEABLE pg-driver-errors-carry-a-result-at-the-raw-connection-boundary */
   static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
     const client = new pg.Client(connParams);
     const { database, user, host } = client;
@@ -247,7 +246,6 @@ export class PostgreSQLAdapter
       return client;
     } catch (error) {
       if (!(error instanceof Error)) throw error;
-      client.end(() => {});
       if (database === "postgres") {
         throw new ConnectionNotEstablished(error.message);
       } else if (database && error.message.includes(database)) {
@@ -1230,7 +1228,10 @@ export class PostgreSQLAdapter
       return castType;
     });
   }
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm _captureRegtypeOids — CONVERGEABLE pg-load-additional-types-runs-an-extra-regtype-query
+   */
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
     await this.loadTypesQueries(initializer, oids, async (query) => {
@@ -1242,6 +1243,7 @@ export class PostgreSQLAdapter
       initializer.run(records);
     });
   }
+  /** @inventedArm nativeTypeNamesQuery — CONVERGEABLE pg-load-additional-types-runs-an-extra-regtype-query */
   private async loadTypesQueries(
     initializer: TypeMapInitializer,
     oids: number[] | null | undefined,
