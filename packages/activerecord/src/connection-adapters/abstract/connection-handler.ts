@@ -70,7 +70,7 @@ export class ConnectionHandler {
     if (!block) return toEnum<ConnectionPool>(this, "eachConnectionPool", role);
 
     for (const manager of this._connectionNameToPoolManager.values()) {
-      manager.eachPoolConfig(role ?? undefined, (poolConfig) => {
+      manager.eachPoolConfig(role, (poolConfig) => {
         block(poolConfig.pool);
       });
     }

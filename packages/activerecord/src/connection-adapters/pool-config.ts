@@ -3,7 +3,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
-import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { synchronize } from "@blazetrails/activesupport";
 
 const INSTANCES = new Set<WeakRef<PoolConfig>>();
@@ -38,11 +37,7 @@ export class PoolConfig {
   }
 
   get schemaReflection(): SchemaReflection {
-    if (!this._schemaReflection) {
-      const lazySchemaCachePath = this._lazySchemaCachePath();
-      this._schemaReflection = new SchemaReflection(lazySchemaCachePath);
-    }
-    return this._schemaReflection;
+    return (this._schemaReflection ??= new SchemaReflection(this.dbConfig.lazySchemaCachePath()));
   }
 
   set schemaReflection(value: SchemaReflection) {
@@ -130,10 +125,7 @@ export class PoolConfig {
   }
 
   get pool(): ConnectionPool {
-    if (!this._pool) {
-      this._pool = new ConnectionPool(this);
-    }
-    return this._pool;
+    return (this._pool ??= new ConnectionPool(this));
   }
 
   async discardPoolBang(): Promise<void> {
@@ -145,30 +137,6 @@ export class PoolConfig {
       await this._pool.discardBang();
       this._pool = null;
     });
-  }
-
-  private _lazySchemaCachePath(): string | null {
-    const cfg = this.dbConfig as unknown as {
-      defaultSchemaCachePath?: (dbDir?: string) => string | null | undefined;
-      schemaCachePath?: string | null;
-    };
-    const dbDir = this._resolveDbDir();
-    let raw: string | null | undefined;
-    if (cfg && "schemaCachePath" in cfg && cfg.schemaCachePath != null) {
-      raw = cfg.schemaCachePath;
-    } else if (typeof cfg?.defaultSchemaCachePath === "function") {
-      raw = cfg.defaultSchemaCachePath(dbDir);
-    }
-    const trimmed = typeof raw === "string" ? raw.trim() : "";
-    return trimmed.length > 0 ? trimmed : null;
-  }
-
-  private _resolveDbDir(): string {
-    try {
-      return DatabaseTasks.dbDir ?? "db";
-    } catch {
-      return "db";
-    }
   }
 }
 

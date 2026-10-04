@@ -167,30 +167,16 @@ export class SchemaReflection {
   }
 
   private async cache(pool: Pool): Promise<SchemaCache> {
-    if (this._cache) return this._cache;
-
-    if (!this._cachePromise) {
-      const promise = this.loadCache(pool).then((loaded) => {
-        if (this._cachePromise === promise) {
-          this._cache = loaded ?? this.emptyCache();
-          this._cachePromise = null;
-        }
-        return this._cache ?? this.emptyCache();
-      });
-      this._cachePromise = promise;
-    }
-    return this._cachePromise;
+    return (this._cache ||= await (this._cachePromise ||= this.loadCache(pool).then(
+      (newCache) => newCache || this.emptyCache(),
+    )));
   }
 
   /** @missingRailsName cachePath — PERMANENT */
   private possibleCacheAvailable(): boolean {
-    if (!SchemaReflection.useSchemaCacheDump) return false;
-    if (!this._cachePath) return false;
-    try {
-      return File.isFile(this._cachePath);
-    } catch {
-      return false;
-    }
+    return (
+      SchemaReflection.useSchemaCacheDump && this._cachePath != null && File.isFile(this._cachePath)
+    );
   }
 
   private async loadCache(pool: Pool | null): Promise<SchemaCache | null> {
@@ -201,18 +187,17 @@ export class SchemaReflection {
 
     if (SchemaReflection.checkSchemaCacheDumpVersion) {
       try {
-        const expired = await pool!.withConnection(async (connection) => {
+        return await pool!.withConnection(async (connection) => {
           const currentVersion = await connection.schemaVersion();
 
           if ((await newCache.version(connection)) !== currentVersion) {
             console.warn(
               `Ignoring ${this._cachePath} because it has expired. The current schema version is ${currentVersion}, but the one in the schema cache file is ${newCache.schemaVersion}.`,
             );
-            return true;
+            return null;
           }
-          return false;
+          return newCache;
         });
-        if (expired) return null;
       } catch (error) {
         if (!(error instanceof ActiveRecordError)) throw error;
         console.warn(

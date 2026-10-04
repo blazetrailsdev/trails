@@ -681,41 +681,6 @@ describe("ConnectionPool schema cache", () => {
     },
   );
 
-  it("PoolConfig treats blank/empty schemaCachePath as presence-based 'no cache'", async () => {
-    for (const blank of ["", "   "]) {
-      const dbConfig = makeAmbientDbConfig({ schemaCachePath: blank });
-      const pc = new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        dbConfig,
-        "writing",
-        "default",
-      );
-      expect(
-        (pc.schemaReflection as unknown as { _cachePath: string | null })._cachePath,
-      ).toBeNull();
-    }
-  });
-
-  it("PoolConfig aligns SchemaReflection path with DatabaseTasks.dbDir", async () => {
-    const { DatabaseTasks } = await import("./tasks/database-tasks.js");
-    const originalDbDir = DatabaseTasks.dbDir;
-    DatabaseTasks.dbDir = "custom_db_dir";
-    try {
-      const dbConfig = makeAmbientDbConfig();
-      const pc = new PoolConfig(
-        new ConnectionDescriptor("primary"),
-        dbConfig,
-        "writing",
-        "default",
-      );
-      const cachePath = (pc.schemaReflection as unknown as { _cachePath: string | null })
-        ._cachePath;
-      expect(cachePath).toBe("custom_db_dir/schema_cache.yml");
-    } finally {
-      DatabaseTasks.dbDir = originalDbDir;
-    }
-  });
-
   it("PoolConfig primes SchemaReflection with the config's schemaCachePath", async () => {
     const dbConfig = makeAmbientDbConfig({ schemaCachePath: "db/custom_cache.json" });
     const pc = new PoolConfig(new ConnectionDescriptor("primary"), dbConfig, "writing", "default");

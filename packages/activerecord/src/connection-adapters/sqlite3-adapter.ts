@@ -23,7 +23,7 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { Concurrent, rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, groupBy, rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -509,7 +509,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
-    if ((columnName as string | undefined) === undefined) {
+    if (columnName === undefined) {
       throw new ArgumentError("wrong number of arguments (given 1, expected 2..3)");
     }
     await this.alterTable(tableName, undefined, undefined, undefined, (definition) => {
@@ -605,62 +605,47 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    const rows = (
-      await this.internalExecQuery(`PRAGMA foreign_key_list(${this.quote(tableName)})`, "SCHEMA")
-    ).toArray();
-    const fkStrings = (await this.tableStructureSql(tableName)).filter(
-      (columnString) =>
-        columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+    const fkInfo = await this.internalExecQuery(
+      `PRAGMA foreign_key_list(${this.quote(tableName)})`,
+      "SCHEMA",
     );
-    const fkDefs: Record<string, "immediate" | "deferred" | false> = {};
-    for (const fkString of fkStrings) {
-      const fk = SQLite3Adapter.FK_REGEX.exec(fkString);
-      if (!fk) continue;
-      const [, from, table, to] = fk;
-      const mode = SQLite3Adapter.DEFERRABLE_REGEX.exec(fkString)?.[1];
-      fkDefs[`${table},${from},${to}`] =
-        mode === undefined ? false : mode.toLowerCase() === "deferred" ? "deferred" : "immediate";
-    }
-    const groupedFk: Array<Array<Record<string, unknown>>> = [];
-    const groupsById: Record<string, Array<Record<string, unknown>>> = {};
-    for (const row of rows) {
-      const id = String(row.id);
-      let group = groupsById[id];
-      if (!group) {
-        group = groupsById[id] = [];
-        groupedFk.push(group);
-      }
-      group.push(row);
-    }
+    const fkDefs: Record<string, "immediate" | "deferred" | false> = Object.fromEntries(
+      (await this.tableStructureSql(tableName))
+        .filter(
+          (columnString) =>
+            columnString.startsWith("CONSTRAINT") && columnString.includes("FOREIGN KEY"),
+        )
+        .map((fkString) => {
+          const [, from, table, to] = [...(fkString.match(SQLite3Adapter.FK_REGEX) ?? [])];
+          const [, mode] = [...(fkString.match(SQLite3Adapter.DEFERRABLE_REGEX) ?? [])];
+          const deferred = (mode?.toLowerCase() as "immediate" | "deferred" | undefined) || false;
+          return [[table, from, to].join(), deferred];
+        }),
+    );
 
-    const results: ForeignKeyDefinition[] = [];
+    const groupedFk: Array<Array<Record<string, unknown>>> = [
+      ...groupBy(fkInfo.toArray(), (row) => row["id"]).values(),
+    ];
     for (const group of groupedFk) {
-      group.sort((a, b) => (a.seq as number) - (b.seq as number));
-      const first = group[0];
-      const toTable = first.table as string;
-      const onDelete = this.extractForeignKeyAction(first.on_delete as string);
-      const onUpdate = this.extractForeignKeyAction(first.on_update as string);
-      const fromCols = group.map((r) => r.from as string);
-      const toCols = group.map((r) => r.to as string);
-      const columnKey = fromCols.join(",");
-      const primaryKeyKey = toCols.join(",");
+      group.sort((a, b) => (a["seq"] as number) - (b["seq"] as number));
+    }
+    return groupedFk.map((group) => {
+      const row = group[0];
       const options: Partial<AddForeignKeyOptions> = {
-        onDelete,
-        onUpdate,
-        deferrable: fkDefs[`${toTable},${columnKey},${primaryKeyKey}`],
+        onDelete: this.extractForeignKeyAction(row["on_delete"] as string),
+        onUpdate: this.extractForeignKeyAction(row["on_update"] as string),
+        deferrable: fkDefs[[row["table"], row["from"], row["to"]].join()],
       };
 
       if (group.length === 1) {
-        options.column = fromCols[0];
-        options.primaryKey = toCols[0];
+        options.column = row["from"] as string;
+        options.primaryKey = row["to"] as string;
       } else {
-        options.column = fromCols;
-        options.primaryKey = toCols;
+        options.column = group.map((row) => row["from"] as string);
+        options.primaryKey = group.map((row) => row["to"] as string);
       }
-
-      results.push(new ForeignKeyDefinition(tableName, toTable, options));
-    }
-    return results;
+      return new ForeignKeyDefinition(tableName, row["table"] as string, options);
+    });
   }
 
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
@@ -735,9 +720,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   /** @internal */
   extractValueFromDefault(default_: string | null): unknown {
-    if (default_ === null) return null;
     let m: RegExpExecArray | null;
-    if (/^null$/im.test(default_)) {
+    if (default_ == null || /^null$/im.test(default_)) {
       return null;
     } else if ((m = /^'([^|]*)'$/m.exec(default_))) {
       return m[1].replace(/''/g, "'");
@@ -930,7 +914,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
+    const exceptionMessage = (exception as Error).message;
     if (
       /(column(s)? .* (is|are) not unique|UNIQUE constraint failed: .*)/i.test(exceptionMessage)
     ) {

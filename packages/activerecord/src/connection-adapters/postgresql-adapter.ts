@@ -245,18 +245,18 @@ export class PostgreSQLAdapter
       await client.connect();
       return client;
     } catch (error) {
-      await client.end().catch(() => {});
-      const message = error instanceof Error ? error.message : String(error);
+      if (!(error instanceof Error)) throw error;
+      client.end(() => {});
       if (database === "postgres") {
-        throw new ConnectionNotEstablished(message);
-      } else if (database && message.includes(database)) {
+        throw new ConnectionNotEstablished(error.message);
+      } else if (database && error.message.includes(database)) {
         throw NoDatabaseError.dbError(database);
-      } else if (user && message.includes(user)) {
+      } else if (user && error.message.includes(user)) {
         throw DatabaseConnectionError.usernameError(user);
-      } else if (host && message.includes(host)) {
+      } else if (host && error.message.includes(host)) {
         throw DatabaseConnectionError.hostnameError(host);
       } else {
-        throw new ConnectionNotEstablished(message);
+        throw new ConnectionNotEstablished(error.message);
       }
     }
   }
@@ -908,14 +908,23 @@ export class PostgreSQLAdapter
     await this.internalExecQuery(query);
     await this.reloadTypeMap();
   }
-  async renameEnum(name: string, newName?: string | { to: string }): Promise<void> {
-    const options: { to?: string } = typeof newName === "object" && newName !== null ? newName : {};
-    if (typeof newName !== "string") {
-      if (options.to == null) {
-        throw new ArgumentError("rename_enum requires two from/to name positional arguments.");
-      }
-      newName = options.to;
+  async renameEnum(
+    name: string,
+    newName: string | { to?: string } | null = null,
+    options: { to?: string } = {},
+  ): Promise<void> {
+    if (typeof newName === "object" && newName !== null) {
+      options = newName;
+      newName = null;
     }
+    newName ??= fetch<string>(
+      options,
+      "to",
+      block(() => {
+        throw new ArgumentError("rename_enum requires two from/to name positional arguments.");
+      }),
+    );
+
     await this.execQuery(
       `ALTER TYPE ${this.quoteTableName(name)} RENAME TO ${this.quoteTableName(newName)}`,
     );
@@ -950,10 +959,20 @@ export class PostgreSQLAdapter
       throw new ArgumentError("Renaming enum values is only supported in PostgreSQL 10 or later");
     }
 
-    const from = options.from;
-    if (from == null) throw new ArgumentError(":from is required");
-    const to = options.to;
-    if (to == null) throw new ArgumentError(":to is required");
+    const from = fetch<string>(
+      options,
+      "from",
+      block(() => {
+        throw new ArgumentError(":from is required");
+      }),
+    );
+    const to = fetch<string>(
+      options,
+      "to",
+      block(() => {
+        throw new ArgumentError(":to is required");
+      }),
+    );
 
     await this.execute(
       `ALTER TYPE ${this.quoteTableName(typeName)} RENAME VALUE ${this.quote(from)} TO ${this.quote(to)}`,
@@ -966,8 +985,7 @@ export class PostgreSQLAdapter
   }
   async sessionAuth(user: string): Promise<void> {
     await this.clearCacheBang();
-    const quoted = user.toUpperCase() === "DEFAULT" ? "DEFAULT" : pgQuoteColumnName(user);
-    await this.internalExecute(`SET SESSION AUTHORIZATION ${quoted}`, undefined, [], {
+    await this.internalExecute(`SET SESSION AUTHORIZATION ${user}`, undefined, [], {
       materializeTransactions: true,
     });
   }
@@ -1100,18 +1118,23 @@ export class PostgreSQLAdapter
     await this.loadAdditionalTypes();
   }
   /** @internal */
-  extractValueFromDefault(defaultExpr: string | null): unknown {
-    if (defaultExpr == null) return null;
-    const quoted = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(defaultExpr);
-    if (quoted) {
-      if (quoted[1] === "now" && quoted[2] === "date") return null;
-      return quoted[1].replace(/''/g, "'");
+  extractValueFromDefault(default_: string | null): unknown {
+    let m: RegExpExecArray | null;
+    if ((m = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(default_!))) {
+      if (m[1] === "now" && m[2] === "date") {
+        return null;
+      } else {
+        return m[1].replace(/''/g, "'");
+      }
+    } else if (default_ === "true" || default_ === "false") {
+      return default_;
+    } else if ((m = /^\(?(-?\d+(\.\d*)?)\)?(::bigint)?$/.exec(default_!))) {
+      return m[1];
+    } else if ((m = /^-?\d+$/.exec(default_!))) {
+      return m[1];
+    } else {
+      return null;
     }
-    if (defaultExpr === "true" || defaultExpr === "false") return defaultExpr;
-    const num = /^\(?(-?\d+(?:\.\d*)?)\)?(?:::bigint)?$/.exec(defaultExpr);
-    if (num) return num[1];
-    if (/^-?\d+$/.test(defaultExpr)) return defaultExpr;
-    return null;
   }
   /** @internal */
   extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null {
@@ -1209,20 +1232,21 @@ export class PostgreSQLAdapter
   /** @internal */
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
-    for await (const query of this.loadTypesQueries(initializer, oids)) {
+    await this.loadTypesQueries(initializer, oids, async (query) => {
       const records = (await this.internalExecute(query, "SCHEMA", [], {
         allowRetry: true,
         materializeTransactions: false,
       })) as PgTypeRow[];
       this._captureRegtypeOids(records);
       initializer.run(records);
-    }
+    });
   }
-  private async *loadTypesQueries(
+  private async loadTypesQueries(
     initializer: TypeMapInitializer,
-    oids?: number[],
-  ): AsyncGenerator<string, void, void> {
-    const baseQuery = [
+    oids: number[] | null | undefined,
+    block: (query: string) => Promise<void>,
+  ): Promise<void> {
+    const query = [
       "SELECT t.oid, t.typname, t.typelem, t.typdelim, t.typinput,",
       '       format_type(t.oid, NULL) AS "formatType",',
       "       r.rngsubtype, t.typtype, t.typbasetype",
@@ -1230,28 +1254,25 @@ export class PostgreSQLAdapter
       "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
     ].join("\n");
 
-    if (oids && oids.length > 0) {
-      const safe = oids.map((oid) => {
-        const n = Number(oid);
-        if (!Number.isInteger(n) || n < 0) {
-          throw new Error(`loadAdditionalTypes: invalid OID ${String(oid)}`);
-        }
-        return n;
-      });
-      yield `${baseQuery}\nWHERE t.oid IN (${safe.join(", ")})`;
-      return;
+    if (oids != null) {
+      await block(`${query}\nWHERE t.oid IN (${oids.join(", ")})`);
+    } else {
+      await block(`${query}\n${initializer.queryConditionsForKnownTypeNames()}`);
+      await block(`${query}\n${initializer.queryConditionsForKnownTypeTypes()}`);
+      await block(`${query}\n${initializer.queryConditionsForArrayTypes()}`);
+      await block(this.nativeTypeNamesQuery());
     }
-    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeNames()}`;
-    yield `${baseQuery}\n${initializer.queryConditionsForKnownTypeTypes()}`;
-    yield `${baseQuery}\n${initializer.queryConditionsForArrayTypes()}`;
-    yield this.nativeTypeNamesQuery();
   }
   /** @internal */
   isCachedPlanFailure(pgerror: unknown): boolean {
-    if (!(pgerror instanceof Error)) return false;
-    const err = pgerror as { code?: string; message?: string };
-    if (err.code !== FEATURE_NOT_SUPPORTED) return false;
-    return typeof err.message === "string" && err.message.includes("cached plan");
+    try {
+      return (
+        (pgerror as pg.DatabaseError).code === FEATURE_NOT_SUPPORTED &&
+        (pgerror as pg.DatabaseError).routine === "RevalidateCachedQuery"
+      );
+    } catch {
+      return false;
+    }
   }
 
   /** @internal */
@@ -1999,13 +2020,16 @@ export class PostgreSQLAdapter
     columnName: string | string[],
     options: Parameters<AbstractAdapter["addIndexOptions"]>[2] = {},
   ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
-    const opts = { ...options };
-    if (typeof opts.where === "string") {
-      if ((await this.tableExists(tableName)) && (await this.columnExists(tableName, opts.where))) {
-        opts.where = this.quoteColumnName(opts.where);
-      }
+    options = { ...options };
+    const where = options.where;
+    if (
+      typeof where === "string" &&
+      (await this.tableExists(tableName)) &&
+      (await this.columnExists(tableName, where))
+    ) {
+      options.where = this.quoteColumnName(where);
     }
-    return super.addIndexOptions(tableName, columnName, opts);
+    return super.addIndexOptions(tableName, columnName, options);
   }
 
   get schemaCreation(): PgSchemaCreation {
