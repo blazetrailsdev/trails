@@ -282,6 +282,21 @@ export class TableDefinition extends AbstractTableDefinition {
       return "serial";
     }
   }
+
+  override primaryKey(
+    name: string,
+    type: ColumnType = "primary_key",
+    options: ColumnOptions = {},
+  ): this {
+    if (type === "uuid") {
+      options = {
+        ...options,
+        default: "default" in options ? options.default : "gen_random_uuid()",
+      };
+    }
+
+    return super.primaryKey(name, type, options);
+  }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:246`); the class/interface merge is how a mixin surfaces on the type side. */

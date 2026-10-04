@@ -1,6 +1,6 @@
 import { ValueType } from "@blazetrails/activemodel";
 import { Duration } from "@blazetrails/activesupport";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbInspect, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Interval extends ValueType<Duration> {
   override type(): string {
@@ -8,38 +8,32 @@ export class Interval extends ValueType<Duration> {
   }
 
   castValue(value: unknown): Duration | null {
-    if (value == null) return null;
-    if (value instanceof Duration) return value;
-    if (typeof value === "string") {
+    if (value instanceof Duration) {
+      return value;
+    } else if (typeof value === "string") {
       try {
         return Duration.parse(value);
       } catch (error) {
         if (error instanceof Duration.ISO8601Parser.ParsingError) return null;
         throw error;
       }
+    } else {
+      return super.castValue(value);
     }
-    if (typeof value === "number") {
-      return Duration.build(value);
-    }
-    return null;
   }
 
-  override serialize(value: unknown): string | null {
-    if (value == null) return null;
+  override serialize(value: unknown): unknown {
     if (value instanceof Duration) {
-      return value.iso8601({ precision: this.precision ?? null });
+      return value.iso8601({ precision: this.precision });
+    } else if (typeof value === "number") {
+      return Duration.build(value).iso8601({ precision: this.precision });
+    } else {
+      return super.serialize(value);
     }
-    if (typeof value === "number") {
-      return Duration.build(value).iso8601({ precision: this.precision ?? null });
-    }
-    if (typeof value === "string") return value;
-    return null;
   }
 
   override typeCastForSchema(value: unknown): string {
-    const serialized = this.serialize(value);
-    if (serialized == null) return "nil";
-    return `"${serialized.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+    return rbInspect(this.serialize(value));
   }
 }
 

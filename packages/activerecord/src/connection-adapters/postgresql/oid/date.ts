@@ -6,22 +6,22 @@ import {
   type DateInfinityType,
   type DateNegativeInfinityType,
 } from "@blazetrails/activemodel";
-import { format, registerConstant } from "@blazetrails/ruby-compat";
+import { format, toI, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Date extends DateType {
   override castValue(
     value: unknown,
   ): Temporal.PlainDate | DateInfinityType | DateNegativeInfinityType | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "string") {
-      if (value === "infinity") return DateInfinity;
-      if (value === "-infinity") return DateNegativeInfinity;
-      if (/ BC$/.test(value)) {
-        const rewritten = value.replace(/^\d+/, (year) => format("%04d", -Number(year) + 1));
-        return super.castValue(rewritten.replace(/ BC$/, ""));
-      }
+    if (value === "infinity") {
+      return DateInfinity;
+    } else if (value === "-infinity") {
+      return DateNegativeInfinity;
+    } else if (typeof value === "string" && / BC$/.test(value)) {
+      value = value.replace(/^\d+/, (year) => format("%04d", -(toI(year) as number) + 1));
+      return super.castValue((value as string).replace(/ BC$/, ""));
+    } else {
+      return super.castValue(value);
     }
-    return super.castValue(value);
   }
 
   override typeCastForSchema(value: unknown): unknown {

@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { rbEqual, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFPublicSend, rbObjAsString, registerConstant } from "@blazetrails/ruby-compat";
 
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
 const NULL_LITERAL = /^null$/i;
@@ -170,7 +170,6 @@ export class Array extends ValueType<unknown> {
       return this.typeCastArray(this.pgDecoder.decode(value), "deserialize");
     }
     if (value instanceof Data) return this.typeCastArray(value.values, "deserialize");
-    if (globalThis.Array.isArray(value)) return this.typeCastArray(value, "deserialize");
     return super.deserialize(value);
   }
 
@@ -227,10 +226,7 @@ export class Array extends ValueType<unknown> {
       return value.map((item) => this.typeCastArray(item, method));
     }
 
-    if (method === "deserialize")
-      return this.subtype.deserialize?.(value) ?? this.subtype.cast(value);
-    if (method === "cast") return this.subtype.cast(value);
-    return this.subtype.serialize(value);
+    return rbFPublicSend(this.subtype, method, value);
   }
 
   override isMutable(): boolean {

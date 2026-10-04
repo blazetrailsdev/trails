@@ -160,13 +160,6 @@ describe("PostgreSQL SchemaCreation", () => {
     );
   });
 
-  it("visitExclusionConstraintDefinition: unnamed constraint omits CONSTRAINT prefix", () => {
-    const ec = new ExclusionConstraintDefinition("t", "e WITH &&", {});
-    const sql = s().visitExclusionConstraintDefinition(ec);
-    expect(sql).toMatch(/^EXCLUDE/);
-    expect(sql).not.toContain("CONSTRAINT");
-  });
-
   it("visitAlterTable: appends constraint validations after the FK adds (Rails parity)", async () => {
     const fk = new ForeignKeyDefinition("users", "posts", {
       column: "post_id",

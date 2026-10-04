@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { StringType } from "@blazetrails/activemodel";
 
 export class Xml extends StringType {
@@ -7,10 +7,8 @@ export class Xml extends StringType {
   }
 
   override serialize(value: unknown): Data | null {
-    if (value == null) return null;
-    if (value instanceof Data) return value;
-    const cast = this.cast(value);
-    return cast == null ? null : new Data(cast);
+    if (!rtest(value)) return null;
+    return new Data(super.serialize(value) as string);
   }
 }
 

@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbStrHex, registerConstant, rtest } from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 export class Bit extends ValueType<string> {
@@ -6,22 +6,21 @@ export class Bit extends ValueType<string> {
     return "bit";
   }
 
-  castValue(value: unknown): string | null {
-    if (value == null) return null;
+  castValue(value: unknown): string {
     if (typeof value === "string") {
       if (/^0x/i.test(value)) {
-        const leadingHex = value.slice(2).match(/^[0-9a-f]+/i)?.[0] ?? "0";
-        return BigInt(`0x${leadingHex}`).toString(2);
+        return rbStrHex(value.slice(2)).toString(2);
+      } else {
+        return value;
       }
-      return value;
+    } else {
+      return rbObjAsString(value);
     }
-    return String(value);
   }
 
   override serialize(value: unknown): Data | null {
-    if (value == null) return null;
-    if (value instanceof Data) return value;
-    return new Data(typeof value === "string" ? value : String(value));
+    if (rtest(value)) return new Data(super.serialize(value) as string);
+    return null;
   }
 }
 

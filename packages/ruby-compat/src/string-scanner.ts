@@ -19,6 +19,15 @@ export class StringScanner {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:357` `strscan_get_string`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get string(): string {
+    return this.#str;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:681` `strscan_scan`.
    *
    * @noRailsEquivalent PERMANENT
@@ -35,5 +44,24 @@ export class StringScanner {
     if (m === null) return null;
     this.#curr += m[0].length;
     return m[0];
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:723` `strscan_skip`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  skip(pattern: RegExp): number | null {
+    const matched = this.scan(pattern);
+    return matched === null ? null : matched.length;
+  }
+
+  /**
+   * `vendor/ruby/v3.3.11/ext/strscan/strscan.c:1046` `strscan_eos_p`.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  isEos(): boolean {
+    return this.#curr >= this.#str.length;
   }
 }

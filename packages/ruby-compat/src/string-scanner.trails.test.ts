@@ -23,4 +23,16 @@ describe("StringScanner", () => {
       null,
     ]);
   });
+
+  // vendor/ruby/v3.3.11/ext/strscan/strscan.c:709-722, the `skip` call-seq.
+  it("skip answers the matched length and eos? the end of the string", () => {
+    const s = new StringScanner("test string");
+    expect(s.skip(/\w+/)).toBe(4);
+    expect(s.skip(/\w+/)).toBeNull();
+    expect(s.isEos()).toBe(false);
+    expect(s.skip(/\s+/)).toBe(1);
+    expect(s.skip(/\w+/)).toBe(6);
+    expect(s.isEos()).toBe(true);
+    expect(s.string).toBe("test string");
+  });
 });

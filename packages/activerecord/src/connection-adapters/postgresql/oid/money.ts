@@ -12,18 +12,17 @@ export class Money extends DecimalType {
   }
 
   override castValue(value: unknown): BigDecimal | null {
-    if (value === null || value === undefined) return null;
-    if (typeof value !== "string") return super.castValue(value);
+    if (typeof value !== "string") return value as BigDecimal | null;
 
-    let str = value.replace(/^\((.+)\)$/, "-$1");
-
-    if (/^-?[^0-9,.]*[\d,]+\.\d{2}$/.test(str)) {
-      str = str.replace(/[^\-0-9.]/g, "");
-    } else if (/^-?[^0-9,.]*[\d.]+,\d{2}$/.test(str)) {
-      str = str.replace(/[^\-0-9,]/g, "").replace(/,/g, ".");
+    value = value.replace(/^\((.+)\)$/, "-$1");
+    if (/^-?[^0-9,.]*[\d,]+\.\d{2}$/.test(value as string)) {
+      value = (value as string).replace(/[^\-0-9.]/g, "");
+    } else if (/^-?[^0-9,.]*[\d.]+,\d{2}$/.test(value as string)) {
+      value = (value as string).replace(/[^\-0-9,]/g, "");
+      value = (value as string).replace(/,/g, ".");
     }
 
-    return super.castValue(str);
+    return super.castValue(value);
   }
 }
 

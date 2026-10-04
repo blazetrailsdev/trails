@@ -163,8 +163,8 @@ export async function execInsert(
       const tableRef = extractTableRefFromInsertSql.call(this as never, sql);
       if (tableRef) {
         if (pk == null) pk = (await this.primaryKey(tableRef)) as string | null;
-        pk = suppressCompositePrimaryKey(typeof pk === "string" ? pk : undefined) ?? null;
-        sequenceName = pk ? await this.defaultSequenceName(tableRef, pk) : null;
+        pk = suppressCompositePrimaryKey(pk as string | string[] | undefined);
+        sequenceName = await this.defaultSequenceName(tableRef, pk as string);
       }
       if (!sequenceName) return result;
     }
@@ -252,7 +252,7 @@ interface SetConstraintsHost {
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
   return `EXPLAIN (${options
-    .map((option) => (option.startsWith(":") ? option.slice(1) : option))
+    .map((option) => option.replace(/^:/, ""))
     .join(", ")
     .toUpperCase()})`;
 }

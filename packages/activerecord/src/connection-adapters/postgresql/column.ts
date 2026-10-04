@@ -73,9 +73,8 @@ export class Column extends BaseColumn {
     return this.sqlTypeMetadata?.type === "enum";
   }
 
-  override get sqlType(): string | null {
-    const raw = super.sqlType;
-    return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
+  override get sqlType(): string {
+    return super.sqlType!.replace(/\[\]$/, "");
   }
 
   override equals(other: unknown): boolean {

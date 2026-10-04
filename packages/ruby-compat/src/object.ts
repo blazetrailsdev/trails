@@ -345,9 +345,9 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
  * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
- * (`array.c:8619`), whose prototype carries no such member. `isInfinite` is
- * bound for a JS number and bigint, which spell Float (`numeric.c:6376`) and
- * Integer (`numeric.rb:48`). A Temporal seat answers for the methods
+ * (`array.c:8619`), whose prototype carries no such member. `isInfinite` and
+ * `isFinite` are bound for a JS number and bigint, which spell Float
+ * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
  * {@link TEMPORAL_METHOD_TABLE} binds on it.
  *
  * A class receiver (a non-writable `prototype`, which a plain function, the
@@ -375,7 +375,12 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
 export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true): boolean {
   if (typeof obj === "string" && (mid === "toStr" || mid === "toSym")) return true;
   if (Array.isArray(obj) && mid === "toAry") return true;
-  if ((typeof obj === "number" || typeof obj === "bigint") && mid === "isInfinite") return true;
+  if (
+    (typeof obj === "number" || typeof obj === "bigint") &&
+    (mid === "isInfinite" || mid === "isFinite")
+  ) {
+    return true;
+  }
   if (temporalMethod(obj, mid) !== undefined) return true;
   if (
     mid === "get" &&
@@ -709,6 +714,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isInfinite") {
     return recv === Infinity ? 1 : recv === -Infinity ? -1 : null;
+  }
+  if ((typeof recv === "number" || typeof recv === "bigint") && mid === "isFinite") {
+    return typeof recv === "bigint" || Number.isFinite(recv);
   }
   if (
     (typeof recv === "bigint" || Number.isInteger(recv)) &&
