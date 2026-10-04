@@ -1769,7 +1769,7 @@ Three consequences follow, and they are ratified here:
   `class_eval "def ..."` fires `method_added`.
 - **`no_commands` is ported verbatim** over `NestedContext`
   (`base.rb:530-542`), and a helper is declared the way Ruby declares one. The
-  `thor-command-registration-lint-rule` story enforces the public half: every
+  `blazetrails/thor-command-registration` lint rule enforces the public half: every
   public method of a Thor class is either passed to `methodAdded` or declared
   inside `noCommands`, so a forgotten command cannot pass as a helper.
 - **`inherited` is deferred.** Its `@no_commands = 0` is the own-property memo

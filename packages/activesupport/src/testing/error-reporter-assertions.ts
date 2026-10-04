@@ -87,6 +87,7 @@ function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
   }
 }
 
+/** @missingRailsArgs assert_predicate — CONVERGEABLE assert-predicate-takes-the-predicate-name-and-builds-minitests-message */
 export async function assertNoErrorReported(block: () => unknown): Promise<void> {
   const reports = await ErrorCollector.record(() =>
     _assertNothingRaisedOrWarn("assert_no_error_reported", block),
