@@ -98,12 +98,12 @@ export class Arguments {
 
   /** @internal */
   protected peek(): unknown {
-    return first(this.pile);
+    return first(this.pile) ?? null;
   }
 
   /** @internal */
   protected shift(): unknown {
-    return this.pile.shift();
+    return this.pile.shift() ?? null;
   }
 
   /** @internal */

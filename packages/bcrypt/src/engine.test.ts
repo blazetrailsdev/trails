@@ -4,8 +4,10 @@ import { Engine, Errors, Password } from "./index.js";
 
 describe("BCrypt::Engine", () => {
   describe(".calibrate(upper_time_limit_in_ms)", () => {
-    it("returns a minimum cost supported by the algorithm", () => {
-      expect(Engine.calibrate(0.001)).toBe(4);
+    describe("a tiny upper time limit provided", () => {
+      it("returns a minimum cost supported by the algorithm", () => {
+        expect(Engine.calibrate(0.001)).toBe(4);
+      });
     });
   });
 });
