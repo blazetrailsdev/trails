@@ -81,6 +81,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
 
   declare static sourcePaths: typeof ThorActions.ClassMethods.sourcePaths;
   declare static sourcePathsForSearch: typeof ThorActions.ClassMethods.sourcePathsForSearch;
+  declare static addRuntimeOptionsBang: typeof ThorActions.ClassMethods.addRuntimeOptionsBang;
 
   static {
     include(this as unknown as new (...args: unknown[]) => unknown, ThorActions.Actions);
@@ -96,30 +97,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       desc: "Skip collision check",
     });
 
-    this.classOption("force", {
-      type: "boolean",
-      aliases: "-f",
-      group: "runtime",
-      desc: "Overwrite files that already exist",
-    });
-    this.classOption("pretend", {
-      type: "boolean",
-      aliases: "-p",
-      group: "runtime",
-      desc: "Run but do not make any changes",
-    });
-    this.classOption("quiet", {
-      type: "boolean",
-      aliases: "-q",
-      group: "runtime",
-      desc: "Suppress status output",
-    });
-    this.classOption("skip", {
-      type: "boolean",
-      aliases: "-s",
-      group: "runtime",
-      desc: "Skip files that already exist",
-    });
+    this.addRuntimeOptionsBang();
   }
 
   static async sourceRoot(path: string | null = null): Promise<string | null | undefined> {
@@ -143,7 +121,9 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   cwd: string;
-  destinationRoot: string;
+  /** @internal */
+  declare _destinationStack: string[];
+  declare destinationRoot: string;
   output: (msg: string) => void;
   options: GeneratorOptions;
   behavior: "invoke" | "revoke";
@@ -164,6 +144,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
+  /** @internal */
+  declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
   log = Actions.log;
   generate = Actions.generate;
@@ -201,12 +183,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         this.behavior = "invoke";
     }
     this.options = opts as unknown as GeneratorOptions;
-  }
-
-  /** @internal */
-  private _cleanupOptionsAndSet(options: Record<string, unknown>, key: string): void {
-    for (const i of ["force", "skip"]) delete options[i];
-    options[key] = true;
   }
 
   /** @noRailsEquivalent PERMANENT */

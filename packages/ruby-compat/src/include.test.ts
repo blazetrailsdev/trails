@@ -31,6 +31,75 @@ type DynProps = Record<string, unknown>;
 type DynSymbols = Record<symbol, unknown>;
 
 describe("initializeIncludedModules", () => {
+  it("runs a generator initializer's code before its yield ahead of the initializers beneath it", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      calls.push("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* (name: string) {
+      calls.push(`before ${name}`);
+      yield;
+      calls.push(`after ${name}`);
+    };
+    class Root {
+      constructor(...args: unknown[]) {
+        initializeIncludedModules(this, ...args);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    new Sub("x");
+    expect(calls).toEqual(["before x", "inner", "after x"]);
+  });
+
+  it("closes a generator initializer when an initializer beneath it raises", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      throw new TypeError("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      try {
+        yield;
+        calls.push("after");
+      } finally {
+        calls.push("ensure");
+      }
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    expect(() => new Sub()).toThrow(TypeError);
+    expect(calls).toEqual(["ensure"]);
+  });
+
+  it("raises for a generator initializer that yields a second time", () => {
+    const Twice = new Module();
+    (Twice as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      yield;
+      yield;
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Twice);
+
+    expect(() => new Root()).toThrow(/yields once/);
+  });
+
   it("seats a module's per-instance state as an own property at construction", () => {
     class Controller {
       constructor() {

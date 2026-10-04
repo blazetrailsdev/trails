@@ -54,7 +54,7 @@ type AnyFunction = (...args: never) => unknown;
 type ModuleHooks = {
   [included]?: (klass: unknown) => void;
   [extended]?: (klass: unknown) => void;
-  [initialize]?: (this: object, ...args: never[]) => void;
+  [initialize]?: (this: object, ...args: never[]) => void | Generator;
 };
 
 /**
@@ -701,6 +701,15 @@ const prependedInstanceInitializers = Symbol.for(
  * `Thor::Shell#initialize(args, options, config)` (thor/shell.rb:44-48) reads
  * `config[:shell]`.
  *
+ * An `initialize` that runs code before its `super`, as
+ * `Thor::Actions#initialize` does (thor/actions.rb:72-85), is a generator
+ * function whose `yield` stands where Ruby's `super` does: the code before the
+ * `yield` runs before every initializer beneath it, the code after it once
+ * they have completed. One that raises closes the generators above it, so an
+ * `ensure` around `super` (a `finally` around the `yield`) runs and the code
+ * after the `yield` does not. Only a synchronous generator function is read
+ * this way: a constructor cannot await, so an async one is never resumed.
+ *
  * Mirrors: the `super` call in a class whose ancestry carries module
  * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
  *
@@ -726,10 +735,32 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
     if (level.length !== 0) chain.unshift(level);
     if (Object.prototype.hasOwnProperty.call(proto, delegateClass)) break;
   }
-  for (const initializers of chain) {
-    for (const initializer of initializers) initializer.call(instance, ...args);
-  }
+  const initializers = chain.flat();
+  const unwind = (index: number): void => {
+    if (index < 0) return;
+    const initializer = initializers[index];
+    if (Object.getPrototypeOf(initializer) === GeneratorFunction) {
+      const body = initializer.call(instance, ...args) as unknown as Generator;
+      body.next();
+      try {
+        unwind(index - 1);
+      } catch (error) {
+        body.return(undefined);
+        throw error;
+      }
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
+    } else {
+      unwind(index - 1);
+      initializer.call(instance, ...args);
+    }
+  };
+  unwind(initializers.length - 1);
 }
+
+const GeneratorFunction = Object.getPrototypeOf(function* () {}) as object;
 
 function trackInstanceInitializer(
   proto: object,
