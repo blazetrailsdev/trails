@@ -145,7 +145,7 @@ export class Encryptor {
 
   /** @internal */
   private buildEncryptedMessage(
-    clearText: string,
+    clearText: string | Buffer,
     {
       keyProvider,
       cipherOptions,
@@ -153,8 +153,9 @@ export class Encryptor {
   ): Message {
     const key = keyProvider.encryptionKey();
 
-    const [text, wasCompressed] = this.compressIfWorthIt(clearText);
-    const message = this.cipher().encrypt(text, { key: key.secret, ...cipherOptions });
+    let wasCompressed: boolean;
+    [clearText, wasCompressed] = this.compressIfWorthIt(clearText as string);
+    const message = this.cipher().encrypt(clearText, { key: key.secret, ...cipherOptions });
     message.headers.add(key.publicTags);
     if (wasCompressed) message.headers.compressed = true;
     return message;

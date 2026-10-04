@@ -33,20 +33,23 @@ export class Config {
   private _deterministicKey?: string;
   private _keyDerivationSalt?: string;
   declare storeKeyReferences: boolean;
+  declare hashDigestClass: DigestClass;
   declare supportUnencryptedData: boolean;
   declare encryptFixtures: boolean;
   declare validateColumnSize: boolean;
   declare addToFilterParameters: boolean;
   declare excludedFromFilterParameters: string[];
-  declare previousSchemes: Scheme[];
   declare extendQueries: boolean;
-  declare hashDigestClass: DigestClass;
-  declare compressor: Compressor;
+  declare previousSchemes: Scheme[];
   declare forcedEncodingForDeterministicEncryption: string;
+  declare compressor: Compressor;
 
   static {
     const attrs = [
+      "primaryKey",
+      "deterministicKey",
       "storeKeyReferences",
+      "keyDerivationSalt",
       "hashDigestClass",
       "supportUnencryptedData",
       "encryptFixtures",
@@ -58,7 +61,7 @@ export class Config {
       "forcedEncodingForDeterministicEncryption",
       "compressor",
     ];
-    rbModAttrReader(this, ...attrs);
+    rbModAttrReader(this, ...attrs.filter((id) => !Object.hasOwn(this.prototype, id)));
     rbModAttrWriter(this, ...attrs);
   }
 

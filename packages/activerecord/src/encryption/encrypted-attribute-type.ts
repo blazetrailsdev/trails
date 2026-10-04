@@ -265,7 +265,7 @@ export class EncryptedAttributeType extends ValueType {
       const binaryCastType = this.castType.isSerialized()
         ? (this.castType as Serialized).subtype!
         : this.castType;
-      return Buffer.from(binaryCastType.deserialize(value) as Uint8Array).toString("latin1");
+      return Buffer.from(binaryCastType.deserialize(value) as string, "latin1").toString("latin1");
     } else {
       return value;
     }
