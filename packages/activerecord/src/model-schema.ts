@@ -10,10 +10,9 @@ import {
   type AttributeSet,
   type ValueType,
 } from "@blazetrails/activemodel";
-import { classAttribute, included, moduleParents } from "@blazetrails/activesupport";
-import { isBaseClass, baseClass, qualifiedName } from "./inheritance.js";
+import { classAttribute, included, moduleParent, moduleParents } from "@blazetrails/activesupport";
+import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
-import { modelRegistry } from "./associations.js";
 import { TableNotSpecified } from "./errors.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
@@ -53,10 +52,9 @@ function undecoratedTableName(modelName: string, pluralizes = true): string {
 }
 
 function containedTableNamePrefix(this: typeof Base): string {
-  const moduleName = (this as any).moduleName as string | undefined;
-  if (!moduleName) return "";
-  const parent = modelRegistry.get(moduleName);
-  if (!parent || (parent as any).abstractClass) return "";
+  const parent = moduleParent(this) as typeof Base;
+  if (!(typeof parent === "function" && parent.prototype instanceof ActiveRecord.Base)) return "";
+  if (parent.abstractClass) return "";
   const contained =
     ((parent as any).pluralizeTableNames ?? true)
       ? singularize(parent.tableName!)
@@ -281,21 +279,19 @@ export function resetTableName(this: SchemaHost): string | null {
   return this._tableName;
 }
 
-/** @missingRailsArgs module_parents — CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
 export function fullTableNamePrefix(this: SchemaHost): string {
   return (
-    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
-      rbObjRespondTo(p, "tableNamePrefix"),
-    ) as SchemaHost | undefined) ?? this
+    (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNamePrefix")) as
+      | SchemaHost
+      | undefined) ?? this
   ).tableNamePrefix;
 }
 
-/** @missingRailsArgs module_parents — CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
 export function fullTableNameSuffix(this: SchemaHost): string {
   return (
-    (moduleParents({ name: qualifiedName(this as typeof Base) }).find((p) =>
-      rbObjRespondTo(p, "tableNameSuffix"),
-    ) as SchemaHost | undefined) ?? this
+    (moduleParents(this).find((p) => rbObjRespondTo(p, "tableNameSuffix")) as
+      | SchemaHost
+      | undefined) ?? this
   ).tableNameSuffix;
 }
 

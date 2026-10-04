@@ -1,4 +1,4 @@
-import { type Hash, isEmpty } from "@blazetrails/ruby-compat";
+import { type Hash, isEmpty, rbModConstSet, rbModName } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -52,7 +52,6 @@ import {
   findStiClass as _findStiClass,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
-  qualifiedName,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotDestroyed } from "./errors.js";
 import {
@@ -637,7 +636,7 @@ export class Base extends Model {
     if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
       // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
       throw new NotImplementedError(
-        `${qualifiedName(this)} is an abstract class and cannot be instantiated.`,
+        `${rbModName(this)} is an abstract class and cannot be instantiated.`,
       );
     }
   }
@@ -2284,7 +2283,7 @@ export class Base extends Model {
   }
 }
 
-ActiveRecord.Base = Base;
+rbModConstSet(ActiveRecord, "Base", Base);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {

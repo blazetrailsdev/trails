@@ -1,4 +1,5 @@
-import { Hash, kernelThrow } from "@blazetrails/ruby-compat";
+import { Namespaced } from "./namespaces.js";
+import { Hash, kernelThrow, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Account } from "./account.js";
@@ -92,15 +93,17 @@ export interface Company {
 export class SpecialCo extends Company {}
 
 export class NamespacedCompany extends Company {
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(Namespaced, "Company", this);
+  }
 }
 
 export class NamespacedFirm extends Company {
   declare clients: AssociationProxy<NamespacedClient>;
 
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(Namespaced, "Firm", this);
+  }
 
   static {
     this.hasMany("clients", { className: "Namespaced::Client", foreignKey: "firm_id" });
@@ -108,8 +111,9 @@ export class NamespacedFirm extends Company {
 }
 
 export class NamespacedClient extends Company {
-  static moduleName = "Namespaced";
-  static _demodulizedName = "Client";
+  static {
+    rbModConstSet(Namespaced, "Client", this);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

@@ -1,3 +1,5 @@
+import { Admin } from "../namespaces.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import {
   ActiveSupportJSON,
   isPresent,
@@ -30,8 +32,9 @@ export class AdminUser extends Base {
   declare settings: HashWithIndifferentAccess<unknown>;
   declare spouse: HashWithIndifferentAccess<unknown>;
   static _tableName = "admin_users";
-  static moduleName = "Admin";
-  static _demodulizedName = "User";
+  static {
+    rbModConstSet(Admin, "User", this);
+  }
 
   static {
     this.belongsTo("account", { className: "AdminAccount" });

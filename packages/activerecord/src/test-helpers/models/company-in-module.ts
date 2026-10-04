@@ -1,26 +1,28 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
-import { Module, Range, registerConstant } from "@blazetrails/ruby-compat";
+import { Module, Range, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 
 registerConstant("MyApplication", new Module());
-registerConstant("MyApplication::Business", new Module());
-registerConstant(
-  "MyApplication::Business::Prefixed",
-  Object.assign(new Module(), { tableNamePrefix: "prefixed_" }),
-);
-registerConstant("MyApplication::Business::Prefixed::Nested", new Module());
-registerConstant(
-  "MyApplication::Business::Suffixed",
-  Object.assign(new Module(), { tableNameSuffix: "_suffixed" }),
-);
-registerConstant("MyApplication::Business::Suffixed::Nested", new Module());
-registerConstant("MyApplication::Billing", new Module());
-registerConstant("MyApplication::Billing::Nested", new Module());
+const Business = new Module();
+registerConstant("MyApplication::Business", Business);
+const Prefixed = Object.assign(new Module(), { tableNamePrefix: "prefixed_" });
+registerConstant("MyApplication::Business::Prefixed", Prefixed);
+const PrefixedNested = new Module();
+registerConstant("MyApplication::Business::Prefixed::Nested", PrefixedNested);
+const Suffixed = Object.assign(new Module(), { tableNameSuffix: "_suffixed" });
+registerConstant("MyApplication::Business::Suffixed", Suffixed);
+const SuffixedNested = new Module();
+registerConstant("MyApplication::Business::Suffixed::Nested", SuffixedNested);
+const Billing = new Module();
+registerConstant("MyApplication::Billing", Billing);
+const BillingNested = new Module();
+registerConstant("MyApplication::Billing::Nested", BillingNested);
 
 export class MyAppBusinessCompany extends Base {
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(Business, "Company", this);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -30,8 +32,9 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   declare clientsOfFirm: AssociationProxy<MyAppBusinessClient>;
   declare clientsLikeMs: AssociationProxy<MyAppBusinessClient>;
 
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(Business, "Firm", this);
+  }
 
   static {
     this.hasMany(
@@ -76,8 +79,9 @@ export interface MyAppBusinessFirm {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessClient extends MyAppBusinessCompany {
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Client";
+  static {
+    rbModConstSet(Business, "Client", this);
+  }
 
   static {
     this.belongsTo("firm", { foreignKey: "client_of" });
@@ -93,16 +97,18 @@ export interface MyAppBusinessClient {
 }
 
 export class MyAppBusinessClientContact extends Base {
-  static moduleName = "MyApplication::Business::Client";
-  static _demodulizedName = "Contact";
+  static {
+    rbModConstSet(MyAppBusinessClient, "Contact", this);
+  }
 }
 
 export class MyAppBusinessDeveloper extends Base {
   declare projects: AssociationProxy<MyAppBusinessProject>;
   declare name: string;
 
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Developer";
+  static {
+    rbModConstSet(Business, "Developer", this);
+  }
 
   static {
     this.hasAndBelongsToMany("projects");
@@ -113,8 +119,9 @@ export class MyAppBusinessDeveloper extends Base {
 export class MyAppBusinessProject extends Base {
   declare developers: AssociationProxy<MyAppBusinessDeveloper>;
 
-  static moduleName = "MyApplication::Business";
-  static _demodulizedName = "Project";
+  static {
+    rbModConstSet(Business, "Project", this);
+  }
 
   static {
     this.hasAndBelongsToMany("developers");
@@ -122,13 +129,15 @@ export class MyAppBusinessProject extends Base {
 }
 
 export class MyAppBusinessPrefixedCompany extends Base {
-  static moduleName = "MyApplication::Business::Prefixed";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(Prefixed, "Company", this);
+  }
 }
 
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
-  static moduleName = "MyApplication::Business::Prefixed";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(Prefixed, "Firm", this);
+  }
 
   static {
     this._tableName = "companies";
@@ -136,18 +145,21 @@ export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
 }
 
 export class MyAppBusinessPrefixedNestedCompany extends Base {
-  static moduleName = "MyApplication::Business::Prefixed::Nested";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(PrefixedNested, "Company", this);
+  }
 }
 
 export class MyAppBusinessSuffixedCompany extends Base {
-  static moduleName = "MyApplication::Business::Suffixed";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(Suffixed, "Company", this);
+  }
 }
 
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
-  static moduleName = "MyApplication::Business::Suffixed";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(Suffixed, "Firm", this);
+  }
 
   static {
     this._tableName = "companies";
@@ -155,13 +167,15 @@ export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
 }
 
 export class MyAppBusinessSuffixedNestedCompany extends Base {
-  static moduleName = "MyApplication::Business::Suffixed::Nested";
-  static _demodulizedName = "Company";
+  static {
+    rbModConstSet(SuffixedNested, "Company", this);
+  }
 }
 
 export class MyAppBillingFirm extends Base {
-  static moduleName = "MyApplication::Billing";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(Billing, "Firm", this);
+  }
 
   static {
     this._tableName = "companies";
@@ -169,8 +183,9 @@ export class MyAppBillingFirm extends Base {
 }
 
 export class MyAppBillingNestedFirm extends Base {
-  static moduleName = "MyApplication::Billing::Nested";
-  static _demodulizedName = "Firm";
+  static {
+    rbModConstSet(BillingNested, "Firm", this);
+  }
 
   static {
     this._tableName = "companies";
@@ -179,8 +194,9 @@ export class MyAppBillingNestedFirm extends Base {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBillingAccount extends Base {
-  static moduleName = "MyApplication::Billing";
-  static _demodulizedName = "Account";
+  static {
+    rbModConstSet(Billing, "Account", this);
+  }
 
   static {
     const opts = { foreignKey: "firm_id" };

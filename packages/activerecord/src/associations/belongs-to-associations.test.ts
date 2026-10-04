@@ -1,4 +1,5 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Admin } from "../test-helpers/models/namespaces.js";
+import { kernelThrow, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
@@ -213,13 +214,15 @@ for (const m of [
 
 class AdminRegion extends Base {
   static _tableName = "admin_regions";
-  static moduleName = "Admin";
-  static _demodulizedName = "Region";
+  static {
+    rbModConstSet(Admin, "Region", this);
+  }
 }
 
 class AdminRegionalUser extends AdminUser {
-  static moduleName = "Admin";
-  static _demodulizedName = "RegionalUser";
+  static {
+    rbModConstSet(Admin, "RegionalUser", this);
+  }
 
   static {
     this.belongsTo("region");

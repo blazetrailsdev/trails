@@ -57,7 +57,13 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { LoosePerson, LooseDescendant } from "./test-helpers/models/person.js";
 import "./support/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
-import { Hash, Range as ArRange, RuntimeError, sort } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  Range as ArRange,
+  RuntimeError,
+  sort,
+  rbModConstSet,
+} from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -96,14 +102,24 @@ class Photo extends SecondAbstractClass {}
 class Smarts extends Base {}
 class CreditCard extends Base {}
 class PinNumber extends Base {
-  static moduleName = "CreditCard";
+  static {
+    rbModConstSet(CreditCard, "PinNumber", this);
+  }
 }
 class CvvCode extends Base {
-  static moduleName = "CreditCard::PinNumber";
+  static {
+    rbModConstSet(PinNumber, "CvvCode", this);
+  }
 }
-class SubPinNumber extends PinNumber {}
+class SubPinNumber extends PinNumber {
+  static {
+    rbModConstSet(CreditCard, "SubPinNumber", this);
+  }
+}
 class Brand extends Category {
-  static moduleName = "CreditCard";
+  static {
+    rbModConstSet(CreditCard, "Brand", this);
+  }
 }
 class MasterCreditCard extends Base {}
 registerModel(CreditCard);

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { stiName, polymorphicName, qualifiedName, namespaceSegments } from "./inheritance.js";
+import { rbModName } from "@blazetrails/ruby-compat";
+import { stiName, polymorphicName } from "./inheritance.js";
 import { fixtures } from "./test-fixtures.js";
 import {
   ClothingItem,
@@ -35,13 +36,8 @@ describe("InheritanceTest (module-namespaced sti_name)", () => {
 
 describe("module-namespaced qualifiedName / polymorphic_name", () => {
   it("qualifiedName prepends the module path to the demodulized name", () => {
-    expect(qualifiedName(ClothingItemUsed)).toBe("ClothingItem::Used");
-    expect(qualifiedName(AdminUser)).toBe("Admin::User");
-  });
-
-  it("namespaceSegments splits moduleName, or [] when absent", () => {
-    expect(namespaceSegments(AdminUser)).toEqual(["Admin"]);
-    expect(namespaceSegments(ClothingItem)).toEqual([]);
+    expect(rbModName(ClothingItemUsed)).toBe("ClothingItem::Used");
+    expect(rbModName(AdminUser)).toBe("Admin::User");
   });
 
   it("polymorphic_name returns the full base_class name", () => {
