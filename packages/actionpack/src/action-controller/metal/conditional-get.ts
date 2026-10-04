@@ -8,6 +8,7 @@
  *   strings via JS `Date.parse` semantics for the freshness comparison.
  */
 
+import { Concern, Module, classAttribute, extend } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
 
 import { includeContent as _includeContent } from "./head.js";
@@ -113,9 +114,23 @@ export function noStore(this: ConditionalGetHost): void {
 
 export type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
 
-export function etag(this: { etaggers: Etagger[] }, etagger: Etagger): void {
-  this.etaggers = [...this.etaggers, etagger];
-}
+export const ClassMethods = {
+  etag(this: { etaggers: Etagger[] }, etagger: Etagger): void {
+    this.etaggers = [...this.etaggers, etagger];
+  },
+};
+
+export const ConditionalGet = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "etaggers", { default: [] });
+    },
+  );
+}) as Module & { ClassMethods: typeof ClassMethods };
+ConditionalGet.ClassMethods = ClassMethods;
 
 /** @internal */
 export function combineEtags(

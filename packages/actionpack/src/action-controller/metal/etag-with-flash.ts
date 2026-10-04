@@ -1,4 +1,8 @@
+import { Concern, Module, extend, include } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
 import {
+  ConditionalGet,
   combineEtags as _combineEtags,
   httpCacheForever as _httpCacheForever,
   includeContent as _includeContent,
@@ -43,3 +47,23 @@ export function flashEtagger(request: {
   if (!flash || flash.isEmpty()) return undefined;
   return flash.toHash ? flash.toHash() : flash;
 }
+
+export const EtagWithFlash = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, ConditionalGet);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
+        this: unknown,
+      ) {
+        const controller = this as { request: object; flash: FlashHash };
+        if (rbObjRespondTo(controller.request, "flash") && !controller.flash.isEmpty()) {
+          return controller.flash;
+        }
+      });
+    },
+  );
+});

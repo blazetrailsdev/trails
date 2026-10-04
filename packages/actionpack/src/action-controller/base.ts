@@ -23,7 +23,13 @@ import {
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
-import { etag, type Etagger } from "./metal/conditional-get.js";
+import {
+  ConditionalGet,
+  type ClassMethods as ConditionalGetClassMethods,
+  type Etagger,
+} from "./metal/conditional-get.js";
+import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
+import { EtagWithFlash } from "./metal/etag-with-flash.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import {
   type addFlashTypes,
@@ -87,7 +93,10 @@ import type {
   ViewContextHost,
   ViewContextRoutes,
 } from "@blazetrails/actionview";
-import { AllowBrowser, type allowBrowser } from "./metal/allow-browser.js";
+import {
+  AllowBrowser,
+  type ClassMethods as AllowBrowserClassMethods,
+} from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
@@ -363,10 +372,12 @@ export class Base extends Metal {
   declare static etaggers: Etagger[];
   declare static isEtaggers: boolean;
   declare etaggers: Etagger[];
+  declare isEtaggers: boolean;
   declare static etagWithTemplateDigest: boolean;
   declare static isEtagWithTemplateDigest: boolean;
   declare etagWithTemplateDigest: boolean;
-  static etag = etag;
+  declare isEtagWithTemplateDigest: boolean;
+  declare static etag: OmitThisParameter<(typeof ConditionalGetClassMethods)["etag"]>;
 
   declare static helpersPath: string[];
   declare static isHelpersPath: boolean;
@@ -540,7 +551,7 @@ export class Base extends Metal {
   static protectFromForgery = protectFromForgery;
   static skipForgeryProtection = skipForgeryProtection;
 
-  declare static allowBrowser: OmitThisParameter<typeof allowBrowser>;
+  declare static allowBrowser: OmitThisParameter<(typeof AllowBrowserClassMethods)["allowBrowser"]>;
 
   static permissionsPolicy = permissionsPolicy;
 
@@ -904,6 +915,9 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+include(Base, ConditionalGet);
+include(Base, EtagWithTemplateDigest);
+include(Base, EtagWithFlash);
 include(Base, Flash);
 include(Base, AllowBrowser);
 Base.prototype.redirectTo = _instrumentRedirectTo;
@@ -953,9 +967,6 @@ include(Base, Instrumentation);
 include(Base, RequestForgeryProtection);
 
 mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
-
-classAttribute.call(Base, "etaggers", { default: [] });
-classAttribute.call(Base, "etagWithTemplateDigest", { default: true });
 
 classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });

@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { classAttribute } from "@blazetrails/activesupport";
-import { combineEtags as _combineEtags, etag as _etag, type Etagger } from "./conditional-get.js";
+import { ClassMethods, combineEtags as _combineEtags, type Etagger } from "./conditional-get.js";
 
 class Host {
   declare static etaggers: Etagger[];
   declare etaggers: Etagger[];
-  static etag = _etag;
+  static etag = ClassMethods.etag;
   combineEtags = _combineEtags;
 }
 

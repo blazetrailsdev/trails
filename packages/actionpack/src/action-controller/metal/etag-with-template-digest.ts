@@ -1,5 +1,7 @@
+import { Concern, Module, classAttribute, extend, include } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
 import {
+  ConditionalGet,
   combineEtags as _combineEtags,
   httpCacheForever as _httpCacheForever,
   includeContent as _includeContent,
@@ -81,3 +83,26 @@ export function templateEtagger(
   if (!lookupContext) return undefined;
   return determineTemplateEtag.call({ ...controller, lookupContext }, options);
 }
+
+export const EtagWithTemplateDigest = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, ConditionalGet);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "etagWithTemplateDigest", { default: true });
+
+      (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
+        this: unknown,
+        options,
+      ) {
+        const controller = this as EtagWithTemplateDigestHost & { etagWithTemplateDigest: boolean };
+        if (controller.etagWithTemplateDigest) {
+          return determineTemplateEtag.call(controller, options);
+        }
+      });
+    },
+  );
+});

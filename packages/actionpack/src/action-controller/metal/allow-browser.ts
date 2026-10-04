@@ -1,5 +1,12 @@
 import { UAParser } from "ua-parser-js";
-import { Notifications, TopLevel, extend, included } from "@blazetrails/activesupport";
+import {
+  Concern,
+  Module,
+  Notifications,
+  TopLevel,
+  extend,
+  type Included,
+} from "@blazetrails/activesupport";
 import { File, rbFSend } from "@blazetrails/ruby-compat";
 
 import type { Request } from "../../action-dispatch/http/request.js";
@@ -19,53 +26,54 @@ interface AllowBrowserHost {
   render(options: Record<string, unknown>): unknown;
 }
 
-export class AllowBrowser {
-  static ClassMethods = { allowBrowser };
+export const ClassMethods = {
+  allowBrowser(
+    this: AllowBrowserClassHost,
+    {
+      versions,
+      block = function (this: AllowBrowserHost) {
+        return this.render({
+          file: File.join(TopLevel.Trails!.root()!, "public/406-unsupported-browser.html"),
+          layout: false,
+          status: "not_acceptable",
+        });
+      },
+      ...options
+    }: { versions: BrowserVersions; block?: Block } & CallbackOptions,
+  ): void {
+    this.beforeAction(
+      (controller) =>
+        (controller as unknown as Included<typeof AllowBrowser>).allowBrowser({
+          versions: versions,
+          block: block,
+        }),
+      options,
+    );
+  },
+};
 
-  static [included](base: AllowBrowserClassHost): void {
-    extend(base, AllowBrowser.ClassMethods);
+export const AllowBrowser = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod("allowBrowser", allowBrowser);
+}) as Module<{ allowBrowser: typeof allowBrowser }> & { ClassMethods: typeof ClassMethods };
+AllowBrowser.ClassMethods = ClassMethods;
+
+/**
+ * @missingRailsCall require — PERMANENT
+ * @internal
+ */
+export async function allowBrowser(
+  this: AllowBrowserHost,
+  { versions, block }: { versions: BrowserVersions; block: Block },
+): Promise<void> {
+  if (new BrowserBlocker(this.request, { versions: versions }).blocked) {
+    await Notifications.instrument(
+      "browser_block.action_controller",
+      { request: this.request, versions: versions },
+      () => (typeof block === "string" ? rbFSend(this, block) : block.call(this)),
+    );
   }
-
-  /**
-   * @missingRailsCall require — PERMANENT
-   * @internal
-   */
-  async allowBrowser(
-    this: AllowBrowserHost,
-    { versions, block }: { versions: BrowserVersions; block: Block },
-  ): Promise<void> {
-    if (new BrowserBlocker(this.request, { versions: versions }).blocked) {
-      await Notifications.instrument(
-        "browser_block.action_controller",
-        { request: this.request, versions: versions },
-        () => (typeof block === "string" ? rbFSend(this, block) : block.call(this)),
-      );
-    }
-  }
-}
-
-export function allowBrowser(
-  this: AllowBrowserClassHost,
-  {
-    versions,
-    block = function (this: AllowBrowserHost) {
-      return this.render({
-        file: File.join(TopLevel.Trails!.root()!, "public/406-unsupported-browser.html"),
-        layout: false,
-        status: "not_acceptable",
-      });
-    },
-    ...options
-  }: { versions: BrowserVersions; block?: Block } & CallbackOptions,
-): void {
-  this.beforeAction(
-    (controller) =>
-      (controller as unknown as AllowBrowser).allowBrowser.call(controller as never, {
-        versions: versions,
-        block: block,
-      }),
-    options,
-  );
 }
 
 const SETS: Record<string, Record<string, string | false>> = {

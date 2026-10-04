@@ -128,3 +128,18 @@ describe("Parameters.alwaysPermittedParameters", () => {
     }
   });
 });
+
+describe("Base etag seats", () => {
+  it("etaggers and etag_with_template_digest are declared by their modules", async () => {
+    const { Base } = await import("../base.js");
+    class PostsController extends Base {}
+    PostsController.etag(() => "mine");
+
+    expect(Base.etaggers.length).toBe(2);
+    expect(PostsController.etaggers.length).toBe(3);
+    expect(Base.etagWithTemplateDigest).toBe(true);
+    PostsController.etagWithTemplateDigest = false;
+    expect(Base.etagWithTemplateDigest).toBe(true);
+    expect(new PostsController().etagWithTemplateDigest).toBe(false);
+  });
+});
