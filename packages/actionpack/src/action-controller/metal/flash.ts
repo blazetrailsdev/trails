@@ -34,8 +34,8 @@ export class Flash {
     (base as FlashClassHost & typeof Flash.ClassMethods).addFlashTypes("alert", "notice");
   }
 
-  get flash(): FlashHash {
-    return (this as unknown as { request: { flash: FlashHash | null } }).request.flash!;
+  get flash(): FlashHash | null {
+    return (this as unknown as { request: { flash: FlashHash | null } }).request.flash;
   }
 
   redirectTo<FlashType extends string = never>(

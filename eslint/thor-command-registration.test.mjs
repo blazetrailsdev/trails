@@ -204,6 +204,22 @@ class MyScript extends Thor {
     },
     {
       code: `
+class Child extends Parent {
+  animal() {}
+}
+class Parent extends Thor {}`,
+      output: `
+class Child extends Parent {
+  static {
+    this.methodAdded("animal");
+  }
+  animal() {}
+}
+class Parent extends Thor {}`,
+      errors: [unregistered("animal")],
+    },
+    {
+      code: `
 const Child = class extends Parent {
   animal() {}
 };
