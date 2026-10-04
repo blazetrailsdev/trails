@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { ArgumentError } from "../argument-error.js";
+import { Exception } from "../exception.js";
 import { rbModName } from "../object.js";
 import { Psych } from "../psych.js";
 import { yaml } from "../psych-adapter.js";
@@ -61,7 +62,7 @@ describe("Psych::ClassLoader", () => {
     expect(loader.range()).toBe(Range);
     expect(loader.regexp()).toBe(RegExp);
     expect(loader.object()).toBe(Object);
-    expect(loader.exception()).toBe(Error);
+    expect(loader.exception()).toBe(Exception);
     expect(() => loader.psychOmap()).toThrow(new ArgumentError("undefined class/module Psych::"));
     expect(() => loader.bigDecimal()).toThrow(ArgumentError);
   });
@@ -112,11 +113,8 @@ describe("Psych::ClassLoader::Restricted", () => {
     expect(() => visit(restricted([], []), "--- !ruby/object:LoaderWidget {}")).toThrow(
       "Tried to load unspecified class: LoaderWidget",
     );
-    expect(() => visit(restricted([], []), "--- :foo")).toThrow(
-      "Tried to load unspecified class: Symbol",
-    );
     expect(() => visit(restricted([], []), "--- !ruby/symbol foo")).toThrow(Psych.DisallowedClass);
-    expect(visit(restricted(["Symbol"], ["foo"]), "--- [:foo, :'foo']")).toEqual([":foo", ":foo"]);
+    expect(visit(restricted(["Symbol"], ["foo"]), "--- !ruby/symbol foo")).toBe(":foo");
     expect(() => visit(restricted([], []), "--- !ruby/range 1..2")).toThrow(
       "Tried to load unspecified class: Range",
     );

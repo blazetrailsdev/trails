@@ -1,7 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
+import { Exception } from "./exception.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import { classpaths } from "./object.js";
+import { classpaths, rbCSymbol } from "./object.js";
+import { Range } from "./range.js";
 import { TypeError } from "./type-error.js";
 
 const _constants = new Map<string, unknown>();
@@ -247,3 +249,9 @@ export function rbModConstGet(mod: object, name: string): unknown {
   }
   return c;
 }
+
+registerConstant("Object", Object);
+registerConstant("Exception", Exception);
+registerConstant("Range", Range);
+registerConstant("Regexp", RegExp);
+registerConstant("Symbol", rbCSymbol);

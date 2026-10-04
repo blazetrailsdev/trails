@@ -216,6 +216,12 @@ export const rbCNumeric = rbDefineClass("Numeric");
 export const rbCString = rbDefineClass("String");
 
 /**
+ * `rb_cSymbol` (`vendor/ruby/v3.3.11/string.c:12290`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCSymbol = rbDefineClass("Symbol");
+
+/**
  * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
  * @noRailsEquivalent PERMANENT
  */

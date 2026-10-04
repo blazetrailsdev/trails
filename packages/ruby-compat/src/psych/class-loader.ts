@@ -1,23 +1,14 @@
 import { ArgumentError } from "../argument-error.js";
 import { NameError } from "../name-error.js";
-import { Range } from "../range.js";
 import { rbPathToClass } from "../variable.js";
 import { DisallowedClass } from "./exception.js";
 
-const core: Record<string, unknown> = {
-  Exception: globalThis.Error,
-  Object,
-  Range,
-  Regexp: RegExp,
-  Symbol: String,
-};
-
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * `Psych::ClassLoader` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/class_loader.rb:6`).
  *
  * @noRailsEquivalent PERMANENT
  */
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ClassLoader {
   /** @noRailsEquivalent PERMANENT */
   static readonly BIG_DECIMAL = "BigDecimal";
@@ -100,7 +91,6 @@ export class ClassLoader {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ClassLoader {
   /** @noRailsEquivalent PERMANENT */
   bigDecimal(): unknown;
@@ -129,6 +119,7 @@ export interface ClassLoader {
   /** @noRailsEquivalent PERMANENT */
   symbol(): unknown;
 }
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 const constants = Object.entries(ClassLoader) as [string, string][];
 
@@ -147,7 +138,7 @@ const CACHE: Readonly<Record<string, unknown>> = Object.freeze(
   Object.fromEntries(
     constants.flatMap(([, val]) => {
       try {
-        return [[val, val in core ? core[val] : rbPathToClass(val)]];
+        return [[val, rbPathToClass(val)]];
       } catch {
         return [];
       }

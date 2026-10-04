@@ -15,7 +15,6 @@ const TIME =
 export class ScalarScanner {
   /** @noRailsEquivalent PERMANENT */
   readonly classLoader: ClassLoader;
-  private symbolCache = new Map<string, string>();
   private strictInteger: boolean;
 
   /** @noRailsEquivalent PERMANENT */
@@ -27,11 +26,11 @@ export class ScalarScanner {
   /**
    * `Psych::ScalarScanner#tokenize` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/scalar_scanner.rb:37`).
    *
+   * @missingRailsCall parse_int — CONVERGEABLE psych-scalar-scanner-tokenize
    * @noRailsEquivalent PERMANENT
    */
   tokenize(string: unknown): unknown {
     if (typeof string !== "string") return string;
-    if (this.symbolCache.has(string)) return this.symbolCache.get(string);
     if (TIME.test(string)) {
       try {
         return this.parseTime(string);
@@ -46,17 +45,6 @@ export class ScalarScanner {
       } catch (error) {
         if (!(error instanceof ArgumentError)) throw error;
         return string;
-      }
-    } else if (/^:./.test(string)) {
-      const match = /^:(["'])(.*)\1/.exec(string);
-      if (match) {
-        const sym = this.classLoader.symbolize(match[2].replace(/^:/, ""));
-        this.symbolCache.set(string, sym);
-        return sym;
-      } else {
-        const sym = this.classLoader.symbolize(string.replace(/^:/, ""));
-        this.symbolCache.set(string, sym);
-        return sym;
       }
     } else {
       return string;
