@@ -212,14 +212,6 @@ export type ValidateArgs<T extends ValidatableRecord = ValidatableRecord> =
   | [...filters: Array<ValidateFilter<T>>, options: ConditionalOptions]
   | Array<ValidateFilter<T>>;
 
-export function initializeDup<TBase extends object>(
-  this: ValidationsInternalsHost<TBase>,
-  other: unknown,
-): void {
-  this._errors = undefined;
-  SuperMethods.superMethod(this, "initializeDup")!(other);
-}
-
 export interface ValidationsClassHost {
   _validators: Hash<string | null, ValidatorLike[]>;
   _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
@@ -386,18 +378,19 @@ const _predicatesForValidationContexts = new Map<
   (model: ValidationsContextHost) => boolean
 >();
 
+export function initializeDup<TBase extends object>(
+  this: ValidationsInternalsHost<TBase>,
+  other: unknown,
+): void {
+  this._errors = undefined;
+  SuperMethods.superMethod(this, "initializeDup")!(other);
+}
+
 export function freeze<T extends Validations>(this: T): T {
   void this.errors;
   void this.contextForValidation();
 
   return SuperMethods.superMethod(this, "freeze")!() as T;
-}
-
-/** @internal */
-export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
-  SuperMethods.superMethod(this, "initInternals")!();
-  this._errors = undefined;
-  this._contextForValidation = undefined;
 }
 
 export const VALID_OPTIONS_FOR_VALIDATE = ["on", "if", "unless", "prepend", "exceptOn"] as const;
@@ -408,6 +401,13 @@ export interface ValidationsContextHost {
 
 export interface ReadAttributeForValidationHost {
   [key: string]: unknown;
+}
+
+/** @internal */
+export function initInternals<TBase extends object>(this: ValidationsInternalsHost<TBase>): void {
+  SuperMethods.superMethod(this, "initInternals")!();
+  this._errors = undefined;
+  this._contextForValidation = undefined;
 }
 
 function inherited(this: ValidationsClassHost, base: ValidationsClassHost): void {

@@ -842,6 +842,17 @@ describe("ValidationsTest (trails)", () => {
       expect(Grandchild.validatorsOn("name")).toHaveLength(1);
     });
 
+    it("a subclass's first _validators read copies parent validators added since it was defined", () => {
+      class Base extends Model {}
+      class Child extends Base {}
+      Base.validates("name", { presence: true });
+      expect(Child.validatorsOn("name")).toHaveLength(1);
+      expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr__validators")).toBe(true);
+      const copy = Child._validators;
+      expect(Child._validators).toBe(copy);
+      expect(copy).not.toBe(Base._validators);
+    });
+
     it("a validatorsOn miss on a subclass stores nothing in the parent's hash", () => {
       class Base extends Model {}
       class Child extends Base {}
