@@ -144,6 +144,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   declare relativeToOriginalDestinationRoot: typeof ThorActions.relativeToOriginalDestinationRoot;
   declare sourcePaths: typeof ThorActions.sourcePaths;
   declare findInSourcePaths: typeof ThorActions.findInSourcePaths;
+  /** @internal */
+  declare protected _cleanupOptionsAndSet: ThorActions.ActionsHost["_cleanupOptionsAndSet"];
 
   log = Actions.log;
   generate = Actions.generate;
@@ -181,12 +183,6 @@ export abstract class GeneratorBase implements GeneratorActionsState {
         this.behavior = "invoke";
     }
     this.options = opts as unknown as GeneratorOptions;
-  }
-
-  /** @internal */
-  private _cleanupOptionsAndSet(options: Record<string, unknown>, key: string): void {
-    for (const i of ["force", "skip"]) delete options[i];
-    options[key] = true;
   }
 
   /** @noRailsEquivalent PERMANENT */

@@ -56,6 +56,34 @@ describe("initializeIncludedModules", () => {
     expect(calls).toEqual(["before x", "inner", "after x"]);
   });
 
+  it("closes a generator initializer when an initializer beneath it raises", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      throw new TypeError("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* () {
+      try {
+        yield;
+        calls.push("after");
+      } finally {
+        calls.push("ensure");
+      }
+    };
+    class Root {
+      constructor() {
+        initializeIncludedModules(this);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    expect(() => new Sub()).toThrow(TypeError);
+    expect(calls).toEqual(["ensure"]);
+  });
+
   it("seats a module's per-instance state as an own property at construction", () => {
     class Controller {
       constructor() {

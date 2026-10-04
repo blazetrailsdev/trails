@@ -702,7 +702,10 @@ const prependedInstanceInitializers = Symbol.for(
  * `Thor::Actions#initialize` does (thor/actions.rb:72-85), is a generator
  * function whose `yield` stands where Ruby's `super` does: the code before the
  * `yield` runs before every initializer beneath it, the code after it once
- * they have completed.
+ * they have completed. One that raises closes the generators above it, so an
+ * `ensure` around `super` (a `finally` around the `yield`) runs and the code
+ * after the `yield` does not. Only a synchronous generator function is read
+ * this way: a constructor cannot await, so an async one is never resumed.
  *
  * Mirrors: the `super` call in a class whose ancestry carries module
  * `initialize` definitions — vendor/ruby/v3.3.11/class.c:1179 `rb_include_module`.
@@ -736,7 +739,12 @@ export function initializeIncludedModules(instance: object, ...args: unknown[]):
     if (Object.getPrototypeOf(initializer) === GeneratorFunction) {
       const body = initializer.call(instance, ...args) as unknown as Generator;
       body.next();
-      unwind(index - 1);
+      try {
+        unwind(index - 1);
+      } catch (error) {
+        body.return(undefined);
+        throw error;
+      }
       body.next();
     } else {
       unwind(index - 1);
