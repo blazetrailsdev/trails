@@ -19,6 +19,7 @@ import {
 } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
+import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
 import { rbPathToClass } from "./variable.js";
@@ -560,7 +561,8 @@ function longToobig(size: number): never {
 /**
  * `r_long` (`vendor/ruby/v3.3.11/marshal.c:1405`). JS's bitwise operators are
  * 32-bit, so the bytes are summed; the negative arm's mask-and-or over `-1` is
- * the same value less `256 ** c`.
+ * the same value less `256 ** c`. `w_long` writes four bytes at most; a wider
+ * payload is exact up to `2 ** 53`, where a C `long` is to `2 ** 63`.
  */
 function rLong(arg: LoadArg): number {
   let x: number;
@@ -615,9 +617,12 @@ function rBytes0(len: number, arg: LoadArg): string {
  */
 function sym2encidx(sym: string, val: unknown): Encoding | null {
   if (!isAsciiString(sym)) return null;
+  if (sym.length <= 0) return null;
   if (sym === "encoding") {
+    const name = stringValue(val);
+    if (name.includes("\0")) throw new ArgumentError("string contains null byte");
     try {
-      return Encoding.find(rbObjAsString(val));
+      return Encoding.find(name);
     } catch (e) {
       if (!(e instanceof ArgumentError)) throw e;
       return null;
@@ -641,7 +646,10 @@ function rSymlink(arg: LoadArg): string {
   return sym;
 }
 
-/** `r_symreal` (`vendor/ruby/v3.3.11/marshal.c:1592`). */
+/**
+ * `r_symreal` (`vendor/ruby/v3.3.11/marshal.c:1592`). Its US-ASCII tag for an
+ * ascii-only symbol (`marshal.c:1598`) has no JS string to sit on.
+ */
 function rSymreal(arg: LoadArg, ivar: boolean): string {
   let s = rBytes(arg);
   let idx: Encoding | null = null;
@@ -655,7 +663,7 @@ function rSymreal(arg: LoadArg, ivar: boolean): string {
       idx = sym2encidx(sym, rObject(arg));
     }
   }
-  if (idx !== null) {
+  if (idx !== null && idx !== Encoding.ASCII_8BIT) {
     if (!isValidEncoding(s, idx)) {
       throw new ArgumentError(`invalid byte sequence in ${idx.name}: ${rbInspect(s)}`);
     }
@@ -727,15 +735,17 @@ function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): s
 }
 
 /**
- * `r_encname` (`vendor/ruby/v3.3.11/marshal.c:1750`). Its callers re-read the
- * class path as UTF-8, the one encoding `w_encivar` tags a path with.
+ * `r_encname` (`vendor/ruby/v3.3.11/marshal.c:1750`). `obj` holds the String
+ * `rb_enc_associate_index` retags in place, and is left holding the re-read one.
  */
-function rEncname(obj: unknown, arg: LoadArg): number {
+function rEncname(obj: { value: string }, arg: LoadArg): number {
   let len = rLong(arg);
   if (len > 0) {
     const sym = rSymbol(arg);
     const val = rObject(arg);
-    len -= rIvarEncoding(obj, arg, sym, val) !== undefined ? 1 : 0;
+    const str = rIvarEncoding(obj.value, arg, sym, val);
+    if (str !== undefined) obj.value = str;
+    len -= str !== undefined ? 1 : 0;
   }
   return len;
 }
@@ -817,9 +827,15 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
  * for `goto type_hash`. `Marshal.load`'s `proc` and `freeze:` are not ported,
  * which leaves `r_leave` (`marshal.c:1693`) nothing to do. `load_mantissa`
  * (`marshal.c:386`) reads the mantissa bytes format 4.8 no longer writes, and
- * `rb_integer_unpack` and `ULONG2NUM` are the BigInt shifts. The arms
+ * `rb_integer_unpack` and `ULONG2NUM` are the BigInt shifts. `TYPE_IVAR`
+ * re-enters at its `arg->data` index the String `r_ivar` re-read, where
+ * `rb_enc_associate_index` retags a Ruby String in place; a linked String has
+ * no entry of its own to re-enter. `TYPE_UCLASS` reaches a String, an Array,
+ * a Hash or a Module, and `TYPE(v) != TYPE(tmp)` compares those. The arms
  * {@link wObject} does not write are not read either, and take the `default:`
  * arm.
+ *
+ * @inventedArm rEntry0 — PERMANENT
  */
 function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number): unknown {
   let v: unknown;
@@ -842,7 +858,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         v = rObject0(arg, ivar);
         if (ivar.value) {
           const obj = rIvar(v, null, arg);
-          if (obj !== v) v = rEntry0(obj, idx, arg);
+          if (obj !== v && arg.data.get(idx) === v) v = rEntry0(obj, idx, arg);
         }
         break;
       }
@@ -859,7 +875,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
           continue;
         }
         v = rObjectFor(arg, null, type);
-        if (v === null || typeof v !== "object" || tObjectP(v as unknown)) {
+        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
           throw new ArgumentError("dump format error (user class)");
         }
         const klass = rbObjClass(v) as AnyClass;
@@ -868,6 +884,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
           const tmp = objAllocByKlass(c);
 
           if (
+            v instanceof Module ||
             Array.isArray(v) !== tmp instanceof Array ||
             v instanceof Map !== tmp instanceof Map
           ) {
@@ -983,21 +1000,21 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
       }
 
       case TYPE_CLASS: {
-        const str = rBytes(arg);
+        const str = { value: rBytes(arg) };
 
         if (ivp && ivp.value) ivp.value = rEncname(str, arg) > 0;
-        v = path2class(forceEncoding(str, Encoding.UTF_8));
-        prohibitIvar("class", str, ivp);
+        v = path2class(str.value);
+        prohibitIvar("class", str.value, ivp);
         v = rEntry(v, arg);
         break;
       }
 
       case TYPE_MODULE: {
-        const str = rBytes(arg);
+        const str = { value: rBytes(arg) };
 
         if (ivp && ivp.value) ivp.value = rEncname(str, arg) > 0;
-        v = mustBeModule(rbPathToClass(forceEncoding(str, Encoding.UTF_8)), str);
-        prohibitIvar("module", str, ivp);
+        v = mustBeModule(rbPathToClass(str.value), str.value);
+        prohibitIvar("module", str.value, ivp);
         v = rEntry(v, arg);
         break;
       }
@@ -1036,10 +1053,11 @@ function rObject(arg: LoadArg): unknown {
 
 /** `rb_marshal_load_with_proc` (`vendor/ruby/v3.3.11/marshal.c:2378`), for a String `port`. */
 function rbMarshalLoadWithProc(port: unknown): unknown {
-  if (typeof port !== "string") {
+  const v = rbCheckStringType(port);
+  if (v === null) {
     throw new TypeError("instance of IO needed");
   }
-  const arg: LoadArg = { src: port, offset: 0, symbols: [], data: new Map() };
+  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map() };
 
   const major = rByte(arg);
   const minor = rByte(arg);
