@@ -669,9 +669,10 @@ export class AssociationReflection extends MacroReflection {
     return !!this.options.polymorphic;
   }
 
-  get validate(): boolean {
-    if (this.options.validate !== undefined) return !!this.options.validate;
-    return !!(this.options.autosave === true || this.isCollection());
+  isValidate(): boolean {
+    return this.options.validate != null
+      ? !!this.options.validate
+      : this.options.autosave === true || this.isCollection();
   }
 
   hasInverse(): string | false | null {
@@ -1272,8 +1273,8 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.hasOne();
   }
 
-  get validate(): boolean {
-    return this._delegate.validate;
+  isValidate(): boolean {
+    return this._delegate.isValidate();
   }
 
   get strictLoading(): boolean {

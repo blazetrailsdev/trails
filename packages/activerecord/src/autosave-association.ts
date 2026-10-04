@@ -537,7 +537,7 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
 /** @internal */
 export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
   const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
-  if (reflection.validate && !rbModMethodDefined(this, validationMethod.slice(1))) {
+  if (reflection.isValidate() && !rbModMethodDefined(this, validationMethod.slice(1))) {
     let method: string;
     if (reflection.isCollection()) {
       method = "validateCollectionAssociation";

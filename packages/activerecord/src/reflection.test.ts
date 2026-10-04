@@ -393,45 +393,60 @@ describe("ReflectionTest", () => {
     expect(normalRef!.foreignType).toBeNull();
   });
   it("default association validation", () => {
-    expect(createReflection("hasMany", "clients", null, {}, Firm).validate).toBeTruthy();
+    expect(createReflection("hasMany", "clients", null, {}, Firm).isValidate()).toBeTruthy();
 
-    expect(createReflection("hasOne", "client", null, {}, Firm).validate).toBeFalsy();
-    expect(createReflection("belongsTo", "client", null, {}, Firm).validate).toBeFalsy();
+    expect(createReflection("hasOne", "client", null, {}, Firm).isValidate()).toBeFalsy();
+    expect(createReflection("belongsTo", "client", null, {}, Firm).isValidate()).toBeFalsy();
   });
   it("always validate association if explicit", () => {
     expect(
-      createReflection("hasOne", "client", null, { validate: true }, Firm).validate,
+      createReflection("hasOne", "client", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("belongsTo", "client", null, { validate: true }, Firm).validate,
+      createReflection("belongsTo", "client", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("hasMany", "clients", null, { validate: true }, Firm).validate,
+      createReflection("hasMany", "clients", null, { validate: true }, Firm).isValidate(),
     ).toBeTruthy();
   });
   it("validate association if autosave", () => {
     expect(
-      createReflection("hasOne", "client", null, { autosave: true }, Firm).validate,
+      createReflection("hasOne", "client", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("belongsTo", "client", null, { autosave: true }, Firm).validate,
+      createReflection("belongsTo", "client", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
     expect(
-      createReflection("hasMany", "clients", null, { autosave: true }, Firm).validate,
+      createReflection("hasMany", "clients", null, { autosave: true }, Firm).isValidate(),
     ).toBeTruthy();
   });
   it("never validate association if explicit", () => {
     expect(
-      createReflection("hasOne", "client", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "hasOne",
+        "client",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
     expect(
-      createReflection("belongsTo", "client", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "belongsTo",
+        "client",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
     expect(
-      createReflection("hasMany", "clients", null, { autosave: true, validate: false }, Firm)
-        .validate,
+      createReflection(
+        "hasMany",
+        "clients",
+        null,
+        { autosave: true, validate: false },
+        Firm,
+      ).isValidate(),
     ).toBeFalsy();
   });
   it.skip("symbol for class name", () => {});

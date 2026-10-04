@@ -448,7 +448,7 @@ describe("AutosaveAssociation::AssociationBuilderExtension.build", () => {
     const reflection = Prisoner.reflectOnAssociation("ship")!;
 
     expect("validate" in reflection.options).toBe(false);
-    expect(reflection.validate).toBe(true);
+    expect(reflection.isValidate()).toBe(true);
   });
 
   it("adds the autosave callbacks to the model", () => {

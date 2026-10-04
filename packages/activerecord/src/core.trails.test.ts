@@ -365,6 +365,21 @@ describe("configurations is a single process-global registry", () => {
   });
 });
 
+describe("inspection_filter", () => {
+  it("a subclass assigning filter_attributes gets its own filter, reset on reassignment", () => {
+    class FilteredTopic extends Topic {}
+    expect(FilteredTopic.inspectionFilter()).toBe(Topic.inspectionFilter());
+
+    FilteredTopic.filterAttributes = ["title"];
+    const filter = FilteredTopic.inspectionFilter();
+    expect(filter).not.toBe(Topic.inspectionFilter());
+    expect(FilteredTopic.inspectionFilter()).toBe(filter);
+
+    FilteredTopic.filterAttributes = ["content"];
+    expect(FilteredTopic.inspectionFilter()).not.toBe(filter);
+  });
+});
+
 describe("compare", () => {
   fixtures(["topics"]);
 
