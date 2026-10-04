@@ -510,18 +510,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidForum", this);
         this.tableName = "pg_uuid_forums";
-        this.hasMany(
-          "uuidPosts",
-          function (this: any) {
-            return this.order("title DESC");
-          },
-          {
-            className: "UuidPostDj",
-          },
-        );
-        this.hasMany("uuidComments", { className: "UuidCommentDj", through: "uuidPosts" });
+        this.hasMany("uuidPosts", function (this: any) {
+          return this.order("title DESC");
+        });
+        this.hasMany("uuidComments", { through: "uuidPosts" });
         this.hasMany("uuidCommentsWithoutJoins", {
-          className: "UuidCommentDj",
           through: "uuidPosts",
           source: "uuidComments",
           disableJoins: true,
@@ -532,27 +525,23 @@ describeIfPg("PostgreSQLAdapter", () => {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidPost", this);
         this.tableName = "pg_uuid_posts";
-        this.belongsTo("uuidForum", { className: "UuidForumDj" });
-        this.hasMany("uuidComments", { className: "UuidCommentDj" });
+        this.belongsTo("uuidForum");
+        this.hasMany("uuidComments");
       }
     }
     class UuidComment extends Base {
       static {
         rbModConstSet(PostgresqlUUIDHasManyThroughDisableJoinsTest, "UuidComment", this);
         this.tableName = "pg_uuid_comments";
-        this.belongsTo("uuidPost", { className: "UuidPostDj" });
-        this.hasOne("uuidForum", { className: "UuidForumDj", through: "uuidPost" });
+        this.belongsTo("uuidPost");
+        this.hasOne("uuidForum", { through: "uuidPost" });
         this.hasOne("uuidForumWithoutJoins", {
-          className: "UuidForumDj",
           through: "uuidPost",
           source: "uuidForum",
           disableJoins: true,
         });
       }
     }
-    registerModel("UuidForumDj", UuidForum);
-    registerModel("UuidPostDj", UuidPost);
-    registerModel("UuidCommentDj", UuidComment);
 
     beforeEach(async () => {
       await adapter.transaction(async () => {
