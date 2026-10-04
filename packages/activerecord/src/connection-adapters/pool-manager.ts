@@ -33,20 +33,7 @@ export class PoolManager {
   }
 
   /** @missingRailsName roleToShardMapping — PERMANENT */
-  eachPoolConfig(
-    role: string | null | undefined,
-    block?: (poolConfig: PoolConfig) => void,
-  ): unknown;
-  eachPoolConfig(block: (poolConfig: PoolConfig) => void): unknown;
-  eachPoolConfig(
-    role: string | null | undefined | ((poolConfig: PoolConfig) => void) = null,
-    block?: (poolConfig: PoolConfig) => void,
-  ): unknown {
-    if (typeof role === "function") {
-      block = role;
-      role = null;
-    }
-
+  eachPoolConfig(role: string | null = null, block?: (poolConfig: PoolConfig) => void): unknown {
     if (role != null) {
       return eachValue(this._roleToShardMapping[role], block);
     } else {

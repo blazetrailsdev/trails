@@ -102,7 +102,7 @@ describe("PoolManager", () => {
       manager.setPoolConfig("writing", "default", c1);
       manager.setPoolConfig("reading", "default", c2);
       const collected: PoolConfig[] = [];
-      manager.eachPoolConfig((pc) => collected.push(pc));
+      manager.eachPoolConfig(null, (pc) => collected.push(pc));
       expect(collected).toEqual(expect.arrayContaining([c1, c2]));
       expect(collected).toHaveLength(2);
     });
