@@ -5201,8 +5201,11 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
  * that: no `else`, ahead of anything but other binding guards, a test that reads
  * no parameter but the positional and no `this`, and a body that assigns a LATER
  * parameter from the positional and then, at most, clears the positional to
- * `null` / `undefined`. That binds parameters, as {@link isArgumentBindingGuard}'s
- * raise does, and is not an arm.
+ * `null` / `undefined` or back to its declared default: a block handed in the
+ * slot of a defaulted positional (`def sum(initial_value_or_column = 0, &block)`,
+ * `activerecord/lib/active_record/relation/calculations.rb:172`) leaves Ruby's
+ * positional at that default. That binds parameters, as
+ * {@link isArgumentBindingGuard}'s raise does, and is not an arm.
  */
 function isParameterRebinding(statement: ts.IfStatement): boolean {
   const body = statement.parent;
@@ -5231,7 +5234,12 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
   if (moves.length === 2) {
     if (!clear || clear.left.getText() !== positional) return false;
     const cleared = clear.right;
-    if (cleared.kind !== ts.SyntaxKind.NullKeyword && cleared.getText() !== "undefined")
+    const declared = body.parent.parameters[at].initializer?.getText();
+    if (
+      cleared.kind !== ts.SyntaxKind.NullKeyword &&
+      cleared.getText() !== "undefined" &&
+      cleared.getText() !== declared
+    )
       return false;
   }
   let onlyPositional = true;

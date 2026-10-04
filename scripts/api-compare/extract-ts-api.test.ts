@@ -861,6 +861,19 @@ describe("body call capture", () => {
           }
           return this.create(name, scope, options);
         }
+        sum(initial: number | Function = 0, block?: Function) {
+          if (typeof initial === "function") {
+            block = initial;
+            initial = 0;
+          }
+          return this.calculate(initial, block);
+        }
+        clearedToAnotherValue(initial: number | Function = 0, block?: Function) {
+          if (typeof initial === "function") {
+            block = initial;
+            initial = 1;
+          }
+        }
         afterSideEffect(name: string, scope: object | null, options: object = {}) {
           this.log(name);
           if (typeof scope === "object") {
@@ -891,6 +904,8 @@ describe("body call capture", () => {
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("build")).toEqual(["ref:create"]);
+    expect(skeleton("sum")).toEqual(["ref:calculate"]);
+    expect(skeleton("clearedToAnotherValue")).toEqual(["if"]);
     expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
     expect(skeleton("notABinding")).toEqual(["if", "ref:merge"]);
     expect(skeleton("otherTest")).toEqual(["if"]);

@@ -12,6 +12,7 @@ import {
   toSentence,
   toFsArray,
   toXmlArray,
+  without,
   type XmlBuilder,
 } from "@blazetrails/activesupport";
 import { NotImplementedError } from "../errors.js";
@@ -45,12 +46,11 @@ let _uncacheableMethods: Set<string> | undefined;
 
 /** @missingRailsArgs public_instance_methods — PERMANENT */
 export function uncacheableMethods(): Set<string> {
-  if (_uncacheableMethods) return _uncacheableMethods;
-  const relationMethods = new Set(publicInstanceMethods(ActiveRecord.Relation));
-  return (_uncacheableMethods = new Set(
-    delegatedClasses()
-      .flatMap((klass) => publicInstanceMethods(klass))
-      .filter((n) => !relationMethods.has(n)),
+  return (_uncacheableMethods ??= new Set(
+    without(
+      delegatedClasses().flatMap((klass) => publicInstanceMethods(klass)),
+      ...publicInstanceMethods(ActiveRecord.Relation),
+    ),
   ));
 }
 
@@ -60,6 +60,7 @@ const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelat
 export class DelegateCache {
   static delegateBaseMethods = true;
 
+  /** @inventedArm if — PERMANENT */
   static relationDelegateClass(this: typeof Base, klass: FamilyCtor): FamilyCtor {
     if (!_relationDelegateCache.get(this)?.has(klass)) {
       DelegateCache.initializeRelationDelegateCache.call(this);
@@ -94,7 +95,10 @@ export class DelegateCache {
     include(delegate, this.generatedRelationMethods());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue
+   */
   static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
     let methods = _generatedRelationMethodsByModel.get(this);
     if (!methods) {
@@ -153,6 +157,7 @@ export class ClassSpecificRelation {
   }
 }
 
+/** @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue */
 export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
   const [kwargs] = args;
   if (isPlainObject(kwargs)) args = [kwargs.table, kwargs.predicateBuilder];
