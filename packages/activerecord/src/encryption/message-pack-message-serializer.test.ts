@@ -66,7 +66,7 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
 
   it("dumps bytes identical to real Rails MessagePack", () => {
     const dumped = serializer.dump(fixtureMessage());
-    expect([...Buffer.from(dumped, "latin1")]).toEqual(MRI_FIXTURE);
+    expect([...dumped]).toEqual(MRI_FIXTURE);
   });
 
   it("round-trips values that span the str8/bin16/map16 length-prefix boundaries", () => {

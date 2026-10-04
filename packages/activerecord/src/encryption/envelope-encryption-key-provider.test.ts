@@ -39,9 +39,9 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
     const key = provider.encryptionKey();
     const encryptedSecret = key.publicTags.encryptedDataKey;
     expect(
-      Configurable.cipher
-        .decrypt(encryptedSecret as Message, { key: provider.activePrimaryKey.secret })
-        .toString(),
+      Configurable.cipher.decrypt(encryptedSecret as Message, {
+        key: provider.activePrimaryKey.secret,
+      }),
     ).toBe(key.secret);
   });
 

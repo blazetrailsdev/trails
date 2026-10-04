@@ -58,9 +58,7 @@ export class AutoFilteredParameters {
   }
 
   private collectForLater(klass: any, attribute: string): void {
-    if (!this._attributesByClass.has(klass)) {
-      this._attributesByClass.set(klass, []);
-    }
+    this._attributesByClass.set(klass, this._attributesByClass.get(klass) || []);
     this._attributesByClass.get(klass)!.push(attribute);
   }
 

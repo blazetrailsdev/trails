@@ -2,8 +2,17 @@ import { getCrypto, type CipherAdapter, type DecipherAdapter } from "./crypto-ad
 import type { Bytes } from "./fs-adapter.js";
 import { DigestClass, type DigestInstance } from "./digest.js";
 import { SecureRandom } from "./secure-random.js";
+import { ArgumentError } from "./argument-error.js";
+import { StandardError } from "./standard-error.js";
 
 const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
+
+/**
+ * `OpenSSL::Cipher::CipherError` (`vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:1047`).
+ *
+ * @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:1047
+ */
+export class CipherError extends StandardError {}
 
 /**
  * `OpenSSL::Cipher` (`vendor/ruby/v3.3.11/ext/openssl/lib/openssl/cipher.rb:16`), the
@@ -14,6 +23,9 @@ const AEAD_MODES = ["gcm", "ccm", "ocb", "chacha20-poly1305", "siv"];
  * without defining.
  */
 export class Cipher {
+  /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:1047 */
+  static readonly CipherError = CipherError;
+
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:355 */
   readonly name: string;
 
@@ -62,11 +74,15 @@ export class Cipher {
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:840 */
   set key(key: Uint8Array) {
+    const keyLen = this.keyLen;
+    if (key.length !== keyLen) throw new ArgumentError(`key must be ${keyLen} bytes`);
     this.currentKey = key;
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:884 */
   set iv(iv: Uint8Array) {
+    const ivLen = this.ivLen;
+    if (iv.length !== ivLen) throw new ArgumentError(`iv must be ${ivLen} bytes`);
     this.currentIv = iv;
   }
 
@@ -83,7 +99,12 @@ export class Cipher {
     if (!impl.setAuthTag) {
       throw new Error("Crypto adapter does not support GCM auth tags (setAuthTag)");
     }
-    impl.setAuthTag(tag);
+    try {
+      impl.setAuthTag(tag);
+    } catch (e) {
+      if (e instanceof TypeError) throw e;
+      throw new CipherError("unable to set AEAD tag");
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:898 */
@@ -106,12 +127,22 @@ export class Cipher {
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:504 */
   update(data: Uint8Array): Bytes {
-    return (this.started() as CipherAdapter).update(data);
+    try {
+      return (this.started() as CipherAdapter).update(data);
+    } catch (e) {
+      if (e instanceof TypeError) throw e;
+      throw new CipherError((e as Error).message);
+    }
   }
 
   /** @noRailsEquivalent PERMANENT — vendor/ruby/v3.3.11/ext/openssl/ossl_cipher.c:568 */
   final(): Bytes {
-    return (this.started() as CipherAdapter).final();
+    try {
+      return (this.started() as CipherAdapter).final();
+    } catch (e) {
+      if (e instanceof TypeError) throw e;
+      throw new CipherError((e as Error).message);
+    }
   }
 
   private cipherInfo(): { keyLength: number; ivLength: number; mode: string } {

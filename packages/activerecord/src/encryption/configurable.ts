@@ -1,4 +1,5 @@
 import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
@@ -44,63 +45,51 @@ export class Configurable {
     return Encryption.context.frozenEncryption;
   }
 
-  static configure(options: {
+  static configure({
+    primaryKey,
+    deterministicKey,
+    keyDerivationSalt,
+    ...properties
+  }: {
     primaryKey?: string | string[];
     deterministicKey?: string;
     keyDerivationSalt?: string;
     previous?: SchemeOptions[];
     [key: string]: unknown;
   }): void {
-    const config = this.config;
-    config.primaryKey = options.primaryKey;
-    config.deterministicKey = options.deterministicKey;
-    config.keyDerivationSalt = options.keyDerivationSalt;
+    this.config.primaryKey = primaryKey;
+    this.config.deterministicKey = deterministicKey;
+    this.config.keyDerivationSalt = keyDerivationSalt;
 
-    const properties: Record<string, unknown> = { ...options };
-    properties.supportSha1ForNonDeterministicEncryption ??= true;
+    if (properties.supportSha1ForNonDeterministicEncryption == null) {
+      properties.supportSha1ForNonDeterministicEncryption = true;
+    }
 
-    for (const [key, value] of Object.entries(properties)) {
-      if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
-        continue;
-      }
-      if (value === undefined) continue;
-      const writer = `set${key[0].toUpperCase()}${key.slice(1)}`;
-      if (typeof (config as unknown as Record<string, unknown>)[writer] === "function") {
-        (config as unknown as Record<string, (v: unknown) => void>)[writer](value);
-        continue;
-      }
-      if (key in config) {
-        (config as any)[key] = value;
+    for (const [name, value] of Object.entries(properties)) {
+      if (rbObjRespondTo(Encryption.config, `${name}=`)) {
+        rbFSend(Encryption.config, `${name}=`, value);
       }
     }
 
     Encryption.resetDefaultContext();
 
-    for (const [key, value] of Object.entries(properties)) {
-      if (key === "primaryKey" || key === "deterministicKey" || key === "keyDerivationSalt") {
-        continue;
+    for (const [name, value] of Object.entries(properties)) {
+      if (rbObjRespondTo(Encryption.context, `${name}=`)) {
+        rbFSend(Encryption.context, `${name}=`, value);
       }
-      if (value === undefined) continue;
-      if (!(Context.PROPERTIES as readonly string[]).includes(key)) continue;
-      (Encryption.context as unknown as Record<string, unknown>)[key] = value;
     }
   }
 
-  static onEncryptedAttributeDeclared(callback: (klass: any, name: string) => void): () => void {
-    const listeners = (this.encryptedAttributeDeclarationListeners ??= []);
-    listeners.push(callback);
-    return () => {
-      const idx = listeners.indexOf(callback);
-      if (idx !== -1) listeners.splice(idx, 1);
-    };
+  static onEncryptedAttributeDeclared(block: DeclarationListener): DeclarationListener[] {
+    this.encryptedAttributeDeclarationListeners ||= [];
+    this.encryptedAttributeDeclarationListeners.push(block);
+    return this.encryptedAttributeDeclarationListeners;
   }
 
   static encryptedAttributeWasDeclared(klass: any, name: string): void {
-    const listeners = this.encryptedAttributeDeclarationListeners;
-    if (!listeners) return;
-    for (const listener of [...listeners]) {
-      listener(klass, name);
-    }
+    this.encryptedAttributeDeclarationListeners?.forEach((block) => {
+      block(klass, name);
+    });
   }
 }
 

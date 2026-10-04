@@ -1,5 +1,5 @@
 import { mattrAccessor, threadMattrAccessor } from "@blazetrails/activesupport";
-import { included, last, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
+import { included, last, rbEnsure, rbFSend, rbObjDup } from "@blazetrails/ruby-compat";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
@@ -17,33 +17,20 @@ export class Contexts {
   }
 
   static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
-    let result: T;
-    try {
-      this.customContexts ||= [];
-      this.customContexts.push(rbObjDup(this.defaultContext));
-      for (const [key, value] of Object.entries(properties)) {
-        rbFSend(this.currentCustomContext, `${key}=`, value);
-      }
+    return rbEnsure(
+      () => {
+        this.customContexts ||= [];
+        this.customContexts.push(rbObjDup(this.defaultContext));
+        for (const [key, value] of Object.entries(properties)) {
+          rbFSend(this.currentCustomContext, `${key}=`, value);
+        }
 
-      result = block();
-    } catch (e) {
-      this.customContexts!.pop();
-      throw e;
-    }
-    if (result && typeof (result as { then?: unknown }).then === "function") {
-      return (result as unknown as Promise<unknown>).then(
-        (val) => {
-          this.customContexts!.pop();
-          return val;
-        },
-        (err) => {
-          this.customContexts!.pop();
-          throw err;
-        },
-      ) as unknown as T;
-    }
-    this.customContexts.pop();
-    return result;
+        return block();
+      },
+      () => {
+        this.customContexts!.pop();
+      },
+    );
   }
 
   static withoutEncryption<T>(block: () => T): T {

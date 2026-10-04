@@ -4,7 +4,7 @@ import { Scheme } from "./scheme.js";
 
 const compressor: Compressor = {
   deflate: (data) => Buffer.from(data),
-  inflate: (data) => Buffer.from(data).toString(),
+  inflate: (data) => Buffer.from(data),
 };
 
 describe("ActiveRecord::Encryption::ConfigTest", () => {

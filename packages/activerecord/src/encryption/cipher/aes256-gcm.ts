@@ -1,15 +1,17 @@
-import { Cipher, OpenSSL, rbObjId, sprintf, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Cipher,
+  OpenSSL,
+  rbObjId,
+  sprintf,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
 import { Encryption } from "../../namespaces.js";
-import { Configuration, Decryption, EncryptedContentIntegrity } from "../errors.js";
+import { Decryption, EncryptedContentIntegrity } from "../errors.js";
 import { Message } from "../message.js";
 
 const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
-const AUTH_TAG_LENGTH = 16;
-
-function isBytes(value: unknown): value is string | Bytes {
-  return typeof value === "string" || value instanceof Uint8Array;
-}
 
 function toBytes(value: string | Bytes): Bytes {
   return typeof value === "string" ? Buffer.from(value, "latin1") : value;
@@ -42,8 +44,7 @@ export class Aes256Gcm {
   }
 
   encrypt(clearText: string | Bytes): Message {
-    this._validateKeyLength(this.secret);
-    if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
+    clearText = Buffer.from(clearText as Bytes);
 
     const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
     cipher.encrypt();
@@ -62,42 +63,39 @@ export class Aes256Gcm {
   }
 
   decrypt(encryptedMessage: Message): Bytes {
-    const iv = encryptedMessage.headers.get("iv");
-    const authTag = encryptedMessage.headers.get("at");
-    if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
-
-    const authTagBuf = toBytes(authTag);
-    if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
-
     try {
+      const encryptedData = toBytes(encryptedMessage.payload);
+      const iv = encryptedMessage.headers.iv;
+      const authTag = encryptedMessage.headers.authTag;
+
+      if (authTag == null || toBytes(authTag).length !== 16) {
+        throw new EncryptedContentIntegrity();
+      }
+
       const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
 
       cipher.decrypt();
       cipher.key = this.secret;
-      cipher.iv = toBytes(iv);
+      cipher.iv = toBytes(iv!);
 
-      cipher.authTag = authTagBuf;
+      cipher.authTag = toBytes(authTag);
       cipher.authData = "";
 
-      const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
         encryptedData.length === 0 ? encryptedData : cipher.update(encryptedData);
       return Buffer.concat([decryptedData, cipher.final()]);
-    } catch {
-      throw new Decryption("The provided key could not decrypt the data");
+    } catch (e) {
+      if (
+        !(e instanceof Cipher.CipherError || e instanceof TypeError || e instanceof ArgumentError)
+      ) {
+        throw e;
+      }
+      throw new Decryption();
     }
   }
 
   inspect(): string {
     return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
-  }
-
-  private _validateKeyLength(key: Bytes): void {
-    if (key.length < KEY_LENGTH) {
-      throw new Configuration(
-        `The provided key has length ${key.length} but must be at least ${KEY_LENGTH} bytes`,
-      );
-    }
   }
 
   /** @internal */

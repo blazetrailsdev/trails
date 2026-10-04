@@ -1,16 +1,20 @@
+import { kernelArray as Array } from "@blazetrails/activesupport";
 import { Encryption } from "../namespaces.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
-import { KeyGenerator } from "./key-generator.js";
+import type { KeyGenerator } from "./key-generator.js";
 
 export class DerivedSecretKeyProvider extends KeyProvider {
   private _keyGenerator: KeyGenerator;
 
-  constructor(passwords: string | string[], options?: { keyGenerator?: KeyGenerator }) {
-    const passwordList = Array.isArray(passwords) ? passwords : [passwords];
-    const keyGenerator = options?.keyGenerator ?? new KeyGenerator();
+  constructor(
+    passwords: string | string[],
+    {
+      keyGenerator = Encryption.keyGenerator as KeyGenerator,
+    }: { keyGenerator?: KeyGenerator } = {},
+  ) {
     super(
-      passwordList.map((password) =>
+      Array(passwords).map((password) =>
         DerivedSecretKeyProvider.prototype.deriveKeyFrom.call(
           {} as DerivedSecretKeyProvider,
           password,

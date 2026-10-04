@@ -2,7 +2,13 @@ import { Encryption } from "../namespaces.js";
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
-import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
+import {
+  OpenSSL,
+  rbModAttrReader,
+  rbModAttrWriter,
+  type Bytes,
+  type DigestClass,
+} from "@blazetrails/ruby-compat";
 
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -10,16 +16,16 @@ import { KeyGenerator } from "./key-generator.js";
 import { Scheme, type SchemeOptions } from "./scheme.js";
 
 export interface Compressor {
-  deflate(data: string): Buffer | Uint8Array;
-  inflate(data: Buffer | Uint8Array): string;
+  deflate(data: string | Bytes): Bytes;
+  inflate(data: string | Bytes): Bytes;
 }
 
 const Zlib: Compressor = {
-  deflate(data: string): Buffer {
-    return deflateSync(Buffer.from(data, "utf-8"));
+  deflate(data: string | Bytes): Bytes {
+    return deflateSync(data);
   },
-  inflate(data: Buffer | Uint8Array): string {
-    return inflateSync(data).toString("utf-8");
+  inflate(data: string | Bytes): Bytes {
+    return inflateSync(data);
   },
 };
 
@@ -27,17 +33,38 @@ export class Config {
   private _primaryKey?: string | string[];
   private _deterministicKey?: string;
   private _keyDerivationSalt?: string;
-  storeKeyReferences: boolean = false;
-  supportUnencryptedData: boolean = false;
-  encryptFixtures: boolean = false;
-  validateColumnSize: boolean = true;
-  addToFilterParameters: boolean = true;
-  excludedFromFilterParameters: string[] = [];
-  previousSchemes: Scheme[] = [];
-  extendQueries: boolean = false;
-  hashDigestClass: DigestClass = OpenSSL.Digest.SHA1;
-  compressor: Compressor = Zlib;
-  forcedEncodingForDeterministicEncryption: string = "UTF-8";
+  declare storeKeyReferences: boolean;
+  declare hashDigestClass: DigestClass;
+  declare supportUnencryptedData: boolean;
+  declare encryptFixtures: boolean;
+  declare validateColumnSize: boolean;
+  declare addToFilterParameters: boolean;
+  declare excludedFromFilterParameters: string[];
+  declare extendQueries: boolean;
+  declare previousSchemes: Scheme[];
+  declare forcedEncodingForDeterministicEncryption: string;
+  declare compressor: Compressor;
+
+  static {
+    const attrs = [
+      "primaryKey",
+      "deterministicKey",
+      "storeKeyReferences",
+      "keyDerivationSalt",
+      "hashDigestClass",
+      "supportUnencryptedData",
+      "encryptFixtures",
+      "validateColumnSize",
+      "addToFilterParameters",
+      "excludedFromFilterParameters",
+      "extendQueries",
+      "previousSchemes",
+      "forcedEncodingForDeterministicEncryption",
+      "compressor",
+    ];
+    rbModAttrReader(this, ...attrs.filter((id) => !Object.hasOwn(this.prototype, id)));
+    rbModAttrWriter(this, ...attrs);
+  }
 
   constructor() {
     this.setDefaults();

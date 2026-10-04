@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 import { Encryptor } from "./encryptor.js";
+import { Key } from "./key.js";
+import { KeyProvider } from "./key-provider.js";
 import * as crypto from "crypto";
 
 function generateKey(): string {
@@ -16,10 +18,10 @@ describe("ActiveRecord::Encryption::EncryptingOnlyEncryptorTest", () => {
   it("encrypt encrypts the passed data", () => {
     const enc = new EncryptingOnlyEncryptor();
     const key = generateKey();
-    const encrypted = enc.encrypt("Some data", { key });
+    const encrypted = enc.encrypt("Some data", { keyProvider: new KeyProvider(new Key(key)) });
     expect(encrypted).not.toBe("Some data");
     const realEnc = new Encryptor();
-    const decrypted = realEnc.decrypt(encrypted, { key });
+    const decrypted = realEnc.decrypt(encrypted, { keyProvider: new KeyProvider(new Key(key)) });
     expect(decrypted).toBe("Some data");
   });
 

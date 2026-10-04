@@ -1,22 +1,19 @@
 import { ValueType, StringType, BinaryData } from "@blazetrails/activemodel";
-import { Serialized } from "../type/serialized.js";
+import { isBlank } from "@blazetrails/activesupport";
+import type { Serialized } from "../type/serialized.js";
 import { Scheme } from "./scheme.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { Encryption } from "../encryption.js";
 import { Encoding, Decryption, Base } from "./errors.js";
-import { first, rtest, registerConstant } from "@blazetrails/ruby-compat";
+import { first, rbObjAsString as toS, rtest, registerConstant } from "@blazetrails/ruby-compat";
 import { NullEncryptor } from "./null-encryptor.js";
-import {
-  normalizeEncoding as _normalizeEncoding,
-  replaceUnencodable as _replaceUnencodable,
-} from "./encoding-helpers.js";
 
 export class EncryptedAttributeType extends ValueType {
   readonly scheme: Scheme;
   readonly castType: ValueType;
   private _previousType: boolean;
   private _default?: unknown;
-  private _previousTypes?: Map<boolean, EncryptedAttributeType[]>;
+  private _previousTypes?: Record<string, EncryptedAttributeType[]>;
   private _previousTypesWithoutCleanText?: EncryptedAttributeType[];
   private _cleanTextScheme?: Scheme;
   private _serializeWithOldest = false;
@@ -39,14 +36,15 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   deserialize(value: unknown): unknown {
-    if (value === null || value === undefined) return value;
     return this.castType.deserialize(this.decrypt(value));
   }
 
   serialize(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (this.isSerializeWithOldest()) return this.serializeWithOldest(value);
-    return this.serializeWithCurrent(value);
+    if (this.isSerializeWithOldest()) {
+      return this.serializeWithOldest(value);
+    } else {
+      return this.serializeWithCurrent(value);
+    }
   }
 
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
@@ -55,8 +53,7 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   isEncrypted(value: unknown): boolean {
-    if (typeof value !== "string") return false;
-    return this.scheme.withContext(() => this.encryptor.isEncrypted(value));
+    return this.withContext(() => this.encryptor.isEncrypted(value as string));
   }
 
   accessor(): unknown {
@@ -94,14 +91,10 @@ export class EncryptedAttributeType extends ValueType {
   }
 
   get previousTypes(): EncryptedAttributeType[] {
-    this._previousTypes ??= new Map();
-    const supportUnencryptedData = this.supportUnencryptedData;
-    let types = this._previousTypes.get(supportUnencryptedData);
-    if (types === undefined) {
-      types = this.buildPreviousTypesFor(this.previousSchemesIncludingCleanText());
-      this._previousTypes.set(supportUnencryptedData, types);
-    }
-    return types;
+    this._previousTypes ||= {};
+    return (this._previousTypes[`${this.supportUnencryptedData}`] ||= this.buildPreviousTypesFor(
+      this.previousSchemesIncludingCleanText(),
+    ));
   }
 
   get supportUnencryptedData(): boolean {
@@ -139,28 +132,23 @@ export class EncryptedAttributeType extends ValueType {
   /** @internal */
   private decryptAsText(value: unknown): unknown {
     try {
-      return this.scheme.withContext(() => {
-        if (value === null || value === undefined) return value;
-        if (rtest(this._default) && this._default === value) return value;
-
-        let ciphertext: string;
-        if (typeof value === "string") {
-          ciphertext = value;
-        } else {
-          try {
-            ciphertext = JSON.stringify(value) ?? String(value);
-          } catch {
-            ciphertext = String(value);
+      return this.withContext(() => {
+        if (value != null) {
+          if (rtest(this._default) && this._default === value) {
+            return value;
+          } else {
+            return this.encryptor.decrypt(value as string, this.decryptionOptions());
           }
         }
-
-        return this.encryptor.decrypt(ciphertext, this.decryptionOptions());
+        return null;
       });
     } catch (error) {
       if (!(error instanceof Base)) throw error;
-      if (this.previousTypesWithoutCleanText().length === 0)
+      if (isBlank(this.previousTypesWithoutCleanText())) {
         return this.handleDeserializeError(error, value);
-      return this.tryToDeserializeWithPreviousEncryptedTypes(value);
+      } else {
+        return this.tryToDeserializeWithPreviousEncryptedTypes(value);
+      }
     }
   }
 
@@ -201,27 +189,14 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private serializeWithCurrent(value: unknown): unknown {
-    const casted = this.castType.serialize?.(value) ?? value;
-    if (casted === null || casted === undefined) return null;
-    const bytes =
-      casted instanceof BinaryData
-        ? casted.toString()
-        : casted instanceof Uint8Array
-          ? casted
-          : null;
-    const str = bytes
-      ? Buffer.from(bytes).toString("latin1")
-      : typeof casted === "string"
-        ? casted
-        : String(casted);
-    const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
-    const toEncrypt =
-      this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
-    return this.encrypt(toEncrypt);
+    let castedValue = this.castType.serialize(value) as string | BinaryData | null;
+    if (this.isDowncase) castedValue = (castedValue as string | null)?.toLowerCase() as string;
+    if (castedValue != null) return this.encrypt(toS(castedValue));
+    return null;
   }
 
   /** @internal */
-  private encryptAsText(value: string): string {
+  private encryptAsText(value: string | Uint8Array): string | Uint8Array {
     return this.scheme.withContext(() => {
       if (this.encryptor.isBinary() && !this.castType.isBinary()) {
         throw new Encoding("Binary encoded data can only be stored in binary columns");
@@ -230,7 +205,7 @@ export class EncryptedAttributeType extends ValueType {
     });
   }
 
-  private encrypt(value: string): unknown {
+  private encrypt(value: string | Uint8Array): unknown {
     return this.textToDatabaseType(this.encryptAsText(value));
   }
 
@@ -241,7 +216,7 @@ export class EncryptedAttributeType extends ValueType {
 
   /** @internal */
   private encryptionOptions(): Record<string, unknown> {
-    const opts: Record<string, unknown> = { deterministic: this.deterministic };
+    const opts: Record<string, unknown> = { cipherOptions: { deterministic: this.deterministic } };
     const kp = this.scheme.keyProvider;
     if (kp != null) opts.keyProvider = kp;
     return opts;
@@ -265,35 +240,22 @@ export class EncryptedAttributeType extends ValueType {
   /** @internal */
   private textToDatabaseType(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
-      if (typeof value === "string") {
-        return new BinaryData(new Uint8Array(Buffer.from(value, "latin1")));
-      }
-      if (value instanceof Uint8Array) return new BinaryData(value);
-      if (value instanceof BinaryData) return value;
-      return new BinaryData(String(value));
+      return new BinaryData(value);
+    } else {
+      return value;
     }
-    return value;
   }
 
   /** @internal */
   private databaseTypeToText(value: unknown): unknown {
     if (value != null && this.castType.isBinary()) {
-      const binaryCastType: ValueType =
-        this.castType.isSerialized() && this.castType instanceof Serialized
-          ? this.castType.subtype!
-          : this.castType;
-      const raw = binaryCastType.deserialize?.(value) ?? value;
-      return raw instanceof Uint8Array ? Buffer.from(raw).toString("latin1") : raw;
+      const binaryCastType = this.castType.isSerialized()
+        ? (this.castType as Serialized).subtype!
+        : this.castType;
+      return binaryCastType.deserialize(value);
+    } else {
+      return value;
     }
-    return value;
-  }
-
-  private _applyForcedEncoding(value: string): string {
-    const forced = Encryption.config.forcedEncodingForDeterministicEncryption;
-    if (!forced) return value;
-    const enc = _normalizeEncoding(forced);
-    if (enc === null || enc === "utf8") return value;
-    return _replaceUnencodable(value, enc === "ascii" ? 0x7f : 0xff);
   }
 }
 

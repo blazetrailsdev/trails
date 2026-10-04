@@ -1,4 +1,4 @@
-import type { Bytes } from "@blazetrails/ruby-compat";
+import { Encoding, forceEncoding, rbObjEncoding, type Bytes } from "@blazetrails/ruby-compat";
 import { Autoload, extend, kernelArray as Array, type Extended } from "@blazetrails/activesupport";
 
 import { Aes256Gcm as AesGcmCipher } from "./cipher/aes256-gcm.js";
@@ -7,15 +7,28 @@ import { Decryption } from "./errors.js";
 import { Message } from "./message.js";
 
 export class Cipher {
-  encrypt(cleanText: string | Bytes, options: { key: string; deterministic?: boolean }): Message {
-    return this.cipherFor(options.key, options.deterministic ?? false).encrypt(cleanText);
+  static readonly DEFAULT_ENCODING = Encoding.UTF_8;
+
+  encrypt(
+    cleanText: string | Bytes,
+    { key, deterministic = false }: { key: string; deterministic?: boolean },
+  ): Message {
+    const message = this.cipherFor(key, { deterministic }).encrypt(cleanText);
+    if (rbObjEncoding(cleanText) !== Cipher.DEFAULT_ENCODING) {
+      message.headers.encoding = rbObjEncoding(cleanText).name;
+    }
+    return message;
   }
 
   decrypt(
     encryptedMessage: Message,
-    options: { key: string | string[]; [k: string]: unknown },
-  ): Bytes {
-    return this.tryToDecryptWithEach(encryptedMessage, { keys: Array(options.key) });
+    { key }: { key: string | string[]; [k: string]: unknown },
+  ): string | Bytes {
+    const decryptedText = this.tryToDecryptWithEach(encryptedMessage, { keys: Array(key) });
+    return forceEncoding(
+      decryptedText as Bytes,
+      encryptedMessage.headers.encoding || Cipher.DEFAULT_ENCODING,
+    );
   }
 
   keyLength(): number {
@@ -27,23 +40,26 @@ export class Cipher {
   }
 
   /** @internal */
-  private tryToDecryptWithEach(encryptedText: Message, { keys }: { keys: string[] }): Bytes {
-    if (keys.length === 0) throw new Decryption("No decryption keys provided");
-    let lastError: unknown;
-    for (let i = 0; i < keys.length; i++) {
+  private tryToDecryptWithEach(
+    encryptedText: Message,
+    { keys }: { keys: string[] },
+  ): Bytes | string[] {
+    for (const [index, key] of keys.entries()) {
       try {
-        return this.cipherFor(keys[i]).decrypt(encryptedText);
+        return this.cipherFor(key).decrypt(encryptedText);
       } catch (e) {
         if (!(e instanceof Decryption)) throw e;
-        lastError = e;
+        if (index === keys.length - 1) throw e;
       }
     }
-    const msg = lastError instanceof Error ? lastError.message : String(lastError);
-    throw new Decryption(msg);
+    return keys;
   }
 
   /** @internal */
-  private cipherFor(secret: string, deterministic: boolean = false): AesGcmCipher {
+  private cipherFor(
+    secret: string,
+    { deterministic = false }: { deterministic?: boolean } = {},
+  ): AesGcmCipher {
     return new AesGcmCipher(secret, { deterministic });
   }
 }

@@ -35,13 +35,12 @@ export class EnvelopeEncryptionKeyProvider {
   }
 
   /** @internal */
-  private decryptDataKey(encryptedMessage: Message): string | null {
+  private decryptDataKey(encryptedMessage: Message): string | undefined {
     const encryptedDataKey = encryptedMessage.headers.encryptedDataKey as Message;
     const key = this.primaryKeyProvider()
       .decryptionKeys(encryptedMessage)
       ?.map((k) => k.secret);
-    if (key) return Encryption.cipher.decrypt(encryptedDataKey, { key }).toString();
-    return null;
+    if (key) return Encryption.cipher.decrypt(encryptedDataKey, { key }) as string;
   }
 
   /** @internal */

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Configurable } from "./configurable.js";
 import { Context } from "./context.js";
+import { KeyGenerator } from "./key-generator.js";
 import { Encryption } from "../encryption.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {
@@ -40,13 +41,38 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
     for (const name of Context.PROPERTIES) {
       expect(name in Configurable).toBe(true);
     }
-    Encryption.withEncryptionContext({ frozenEncryption: true, keyGenerator: "kg" }, () => {
+    const keyGenerator = new KeyGenerator();
+    Encryption.withEncryptionContext({ frozenEncryption: true, keyGenerator }, () => {
       expect(Configurable.frozenEncryption).toBe(true);
-      expect(Configurable.keyGenerator).toBe("kg");
+      expect(Configurable.keyGenerator).toBe(keyGenerator);
       expect(Configurable.cipher).toBe(Encryption.context.cipher);
       expect(Configurable.messageSerializer).toBe(Encryption.context.messageSerializer);
       expect(Configurable.encryptor).toBe(Encryption.context.encryptor);
       expect(Configurable.keyProvider).toBe(Encryption.context.keyProvider);
     });
+  });
+
+  it("sends each property to its Config or Context writer", () => {
+    const previousSchemes = Configurable.config.previousSchemes;
+    const context = Encryption.defaultContext;
+    try {
+      Configurable.config.previousSchemes = [];
+      Configurable.configure({
+        primaryKey: "the primary key",
+        keyDerivationSalt: "the salt",
+        supportSha1ForNonDeterministicEncryption: true,
+        previous: [{ deterministic: true }],
+        storeKeyReferences: true,
+        frozenEncryption: true,
+      });
+
+      expect(Configurable.config.previousSchemes.length).toBe(2);
+      expect(Configurable.config.storeKeyReferences).toBe(true);
+      expect(Encryption.defaultContext.frozenEncryption).toBe(true);
+    } finally {
+      Configurable.config.previousSchemes = previousSchemes;
+      Configurable.config.storeKeyReferences = false;
+      Encryption.defaultContext = context;
+    }
   });
 });

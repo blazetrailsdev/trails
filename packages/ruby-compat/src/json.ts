@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `JSON` module is a
    namespace of module functions; ESM syntax cannot spell `JSON.dump`. */
 import { ArgumentError } from "./argument-error.js";
+import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
 
@@ -38,6 +39,30 @@ export namespace JSON {
       constant = (constant as Record<string, unknown>)[name];
     }
     return constant;
+  }
+
+  /**
+   * `JSON.parse` (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`). The parser
+   * takes the source through `StringValue` and `convert_encoding`
+   * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:673-687,805`), which reads an
+   * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
+   * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
+   * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
+   */
+  export function parse(source: string | Uint8Array): unknown {
+    if (source instanceof Uint8Array) {
+      try {
+        source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(source);
+      } catch {
+        throw new SyntaxError("source sequence is illegal/malformed utf-8");
+      }
+    }
+    if (typeof source !== "string") {
+      throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
+    }
+    return globalJSON.parse(source);
   }
 
   export function dump(value: unknown): string {

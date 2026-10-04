@@ -33,11 +33,19 @@ export function headerString(value: unknown): string | undefined {
  * @internal
  * @noRailsEquivalent CONVERGEABLE encryption-encoding-helpers-fold-into-string-encode-and-header-reads
  */
-export function replaceUnencodable(value: string, maxCodePoint: number): string {
+export function encode(value: string | Uint8Array, encoding: string): string | Uint8Array {
+  const normalized = normalizeEncoding(encoding);
+  if (normalized === null) return value;
+  const replacement = normalized === "utf8" ? "\uFFFD" : "?";
+  const max = normalized === "utf8" ? 0x10ffff : normalized === "ascii" ? 0x7f : 0xff;
   const out: string[] = [];
-  for (const char of value) {
-    const cp = char.codePointAt(0)!;
-    out.push(cp > maxCodePoint || (cp >= 0xd800 && cp <= 0xdfff) ? "?" : char);
+  if (value instanceof Uint8Array) {
+    for (const byte of value) out.push(byte > 0x7f ? replacement : String.fromCharCode(byte));
+  } else {
+    for (const char of value) {
+      const cp = char.codePointAt(0)!;
+      out.push(cp > max || (cp >= 0xd800 && cp <= 0xdfff) ? replacement : char);
+    }
   }
   return out.join("");
 }
