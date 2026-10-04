@@ -1,3 +1,4 @@
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "../attribute-assignment.js";
 import { ValueType } from "./value.js";
 
@@ -19,6 +20,9 @@ export class TypeRegistry {
   register(typeName: string, klass: TypeClass | null = null, block?: TypeFactory): void {
     if (block === undefined) {
       block = (_: string, ...args: unknown[]) => new klass!(...(args as never[]));
+      if (rbObjRespondTo(block, "ruby2Keywords")) {
+        (block as unknown as { ruby2Keywords(): void }).ruby2Keywords();
+      }
     }
     this.registrations.set(typeName, block);
   }

@@ -62,15 +62,18 @@ SerializeCastValue[included] = function (klass: { prototype: object }): void {
 };
 
 export function serialize(type: SerializeCastValueType, value: unknown): unknown {
-  let compatible: unknown;
-  try {
-    compatible = (
-      type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
-    ).itselfIfSerializeCastValueCompatible();
-  } catch {
-    compatible = null;
-  }
-  if (type === compatible) {
+  if (
+    type ===
+    (() => {
+      try {
+        return (
+          type as unknown as { itselfIfSerializeCastValueCompatible(): unknown }
+        ).itselfIfSerializeCastValueCompatible();
+      } catch {
+        return null;
+      }
+    })()
+  ) {
     return type.serializeCastValue(value);
   } else {
     return type.serialize(value);

@@ -106,41 +106,26 @@ export interface AttributeRegistrationHost extends AttributeHostInternals {
 type HostAsClass = new (...args: unknown[]) => unknown;
 
 export const ClassMethods = {
+  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   attribute(
     this: AttributeRegistrationHost,
     name: string,
-    type?: string | ValueType | AttributeOptions,
-    options?: AttributeOptions,
+    type: string | ValueType | AttributeOptions | null = null,
+    options: AttributeOptions = {},
   ): void {
+    if (type != null && typeof type !== "string" && !(type instanceof ValueType)) {
+      [type, options] = [null, type];
+    }
+    const { default: default_, ...opts } = options;
+    const noDefault = default_ === undefined;
     name = this.resolveAttributeName(name);
-    if (type !== undefined && typeof type !== "string" && !(type instanceof ValueType)) {
-      options = type;
-      type = undefined;
-    }
-    const typeProvided = type !== undefined;
-    const { default: _default, ...typeOptions } = options ?? {};
-    if (typeProvided) {
-      type =
-        type instanceof ValueType
-          ? type
-          : this.resolveTypeName(
-              type as string,
-              Object.keys(typeOptions).length > 0
-                ? (typeOptions as Record<string, unknown>)
-                : undefined,
-            );
-      type = this.hookAttributeType(name, type as ValueType);
-    }
+    if (typeof type === "string") type = this.resolveTypeName(type, opts);
+    if (type != null) type = this.hookAttributeType(name, type as ValueType);
 
-    const noDefault = options?.default === undefined;
     if (type != null || noDefault) {
-      this.pendingAttributeModifications().push(
-        new PendingType(name, typeProvided ? (type as ValueType) : null),
-      );
+      this.pendingAttributeModifications().push(new PendingType(name, type as ValueType | null));
     }
-    if (!noDefault) {
-      this.pendingAttributeModifications().push(new PendingDefault(name, options?.default));
-    }
+    if (!noDefault) this.pendingAttributeModifications().push(new PendingDefault(name, default_));
 
     this.resetDefaultAttributes();
   },
@@ -158,15 +143,15 @@ export const ClassMethods = {
   },
 
   _defaultAttributes(this: AttributeHostInternals): AttributeSet {
-    if (!this._cachedDefaultAttributes) {
-      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
+    return (this._cachedDefaultAttributes ||= (() => {
       const attributeSet = new AttributeSet({});
+      registerSubclass(Object.getPrototypeOf(this) as HostAsClass, this as unknown as HostAsClass);
       this.applyPendingAttributeModifications(attributeSet);
-      this._cachedDefaultAttributes = attributeSet;
-    }
-    return this._cachedDefaultAttributes;
+      return attributeSet;
+    })());
   },
 
+  /** @inventedArm if — PERMANENT */
   attributeTypes(this: AttributeHostInternals): Record<string, ValueType | null> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
@@ -199,7 +184,10 @@ export const ClassMethods = {
     }
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
     if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
       this._pendingAttributeModifications = [];
