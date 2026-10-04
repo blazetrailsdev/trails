@@ -130,7 +130,7 @@ export class Person extends Base {
     this.hasMany("jobsWithDependentDeleteAll", {
       source: "job",
       through: "references",
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.hasMany("jobsWithDependentNullify", {
       source: "job",
@@ -188,7 +188,7 @@ export class PersonWithDependentDeleteAllJobs extends Base {
   static {
     this._tableName = "people";
     this.hasMany("references", { foreignKey: "person_id" });
-    this.hasMany("jobs", { source: "job", through: "references", dependent: "delete" });
+    this.hasMany("jobs", { source: "job", through: "references", dependent: "deleteAll" });
   }
 }
 

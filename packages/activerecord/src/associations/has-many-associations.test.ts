@@ -486,7 +486,7 @@ describe("HasManyAssociationsTest", () => {
         this.hasMany("del_all_posts", {
           className: "DelAllPost",
           foreignKey: "author_id",
-          dependent: "delete",
+          dependent: "deleteAll",
         });
       }
     }

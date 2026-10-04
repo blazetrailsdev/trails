@@ -44,7 +44,7 @@ import { CpkOrder } from "../test-helpers/models/cpk.js";
 class PostWithHasManyDeleteAll extends Base {
   static {
     this._tableName = "posts";
-    this.hasMany("taggings", { as: "taggable", dependent: "delete" });
+    this.hasMany("taggings", { as: "taggable", dependent: "deleteAll" });
   }
 }
 class PostWithHasManyDestroy extends Base {

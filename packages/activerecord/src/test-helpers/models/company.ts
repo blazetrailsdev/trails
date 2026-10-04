@@ -204,7 +204,7 @@ export class Firm extends Company {
       {
         foreignKey: "client_of",
         className: "Client",
-        dependent: "delete",
+        dependent: "deleteAll",
       },
     );
     this.hasMany(
@@ -247,7 +247,7 @@ export class Firm extends Company {
       className: "Client",
       primaryKey: "name",
       foreignKey: "firm_name",
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.hasMany(
       "clientsGroupedByFirmId",
@@ -664,21 +664,21 @@ export class ExclusivelyDependentFirm extends Company {
       function (this: any) {
         return this.order("id").where("name = 'BigShot Inc.'");
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentHashConditionalClientsOfFirm",
       function (this: any) {
         return this.order("id").where({ name: "BigShot Inc." });
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
     this.hasMany(
       "dependentConditionalClientsOfFirm",
       function (this: any) {
         return this.order("id").where("name = ?", "BigShot Inc.");
       },
-      { foreignKey: "client_of", className: "Client", dependent: "delete" },
+      { foreignKey: "client_of", className: "Client", dependent: "deleteAll" },
     );
   }
 }

@@ -462,7 +462,7 @@ export class Post extends Base {
     this.hasMany("taggingsWithDeleteAll", {
       className: "Tagging",
       as: "taggable",
-      dependent: "delete",
+      dependent: "deleteAll",
       counterCache: "taggings_with_delete_all_count",
     });
     this.hasMany("taggingsWithDestroy", {

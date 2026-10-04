@@ -1,4 +1,11 @@
-import { aryDelete, compact, isEmpty, kernelCatch, rbEqual } from "@blazetrails/ruby-compat";
+import {
+  aryDelete,
+  compact,
+  isEmpty,
+  kernelCatch,
+  rbEqual,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import {
   underscore,
@@ -76,6 +83,7 @@ export abstract class CollectionAssociation extends Association {
   /**
    * @missingRailsCall empty? — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
    * @inventedArm if — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
+   * @inventedArm readKeys — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
    */
   async idsReader(): Promise<unknown[]> {
     const readKeys = (target: Base[], ...keys: string[]): unknown[] =>
@@ -310,7 +318,7 @@ export abstract class CollectionAssociation extends Association {
 
     dependent = dependent
       ? dependent
-      : this.options.dependent === "destroy" || this.options.dependent === "delete"
+      : this.options.dependent === "destroy"
         ? "deleteAll"
         : (this.options.dependent as string | undefined);
 
@@ -863,13 +871,12 @@ export function callback(this: CallbackHost, method: string, record: Base): void
 
 /** @internal */
 export function callbacksFor(this: CallbackHost, callbackName: string): unknown[] {
-  const fullName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
-  const owner = this.owner.constructor as any;
-  const stored = owner[fullName];
-  if (typeof stored === "function") return stored();
-  if (Array.isArray(stored)) return stored;
-  const fromOptions = (this.reflection.options as Record<string, unknown>)[callbackName];
-  return Array.isArray(fromOptions) ? fromOptions : fromOptions != null ? [fromOptions] : [];
+  const fullCallbackName = `${callbackName}For${this.reflection.name.charAt(0).toUpperCase()}${this.reflection.name.slice(1)}`;
+  if (rbObjRespondTo(this.owner.constructor, fullCallbackName)) {
+    return (this.owner.constructor as any)[fullCallbackName];
+  } else {
+    return [];
+  }
 }
 
 function arraysEqual(a: Base[], b: Base[]): boolean {

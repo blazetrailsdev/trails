@@ -48,7 +48,7 @@ export class ShardedBlogPost extends Base {
     this.hasMany("deleteComments", {
       className: "ShardedComment",
       foreignKey: ["blog_id", "blog_post_id"],
-      dependent: "delete",
+      dependent: "deleteAll",
     });
     this.hasMany("children", { className: "ShardedBlogPost", as: "parent" });
 

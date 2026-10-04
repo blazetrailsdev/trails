@@ -395,7 +395,7 @@ export class Author extends Base {
         return this.where({ title: "So I was thinking" });
       },
       {
-        dependent: "delete",
+        dependent: "deleteAll",
         className: "Post",
       },
     );
