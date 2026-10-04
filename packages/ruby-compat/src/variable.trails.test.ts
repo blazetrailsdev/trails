@@ -246,6 +246,16 @@ describe("rb_mod_constants", () => {
     );
   });
 
+  it("keeps inspect on the aliased to_s when to_s is redefined", () => {
+    class Quiet extends Module {
+      override toS(): string {
+        return "quiet";
+      }
+    }
+    const mod = rbModConstSet({ name: "ConstSpace" }, "Quiet", new Quiet());
+    expect(mod.inspect()).toBe("ConstSpace::Quiet");
+  });
+
   it("renders a seated Module through to_s", () => {
     const mod = rbModConstSet({ name: "ConstSpace" }, "Seated", new Module());
     expect(mod.toS()).toBe("ConstSpace::Seated");
