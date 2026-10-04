@@ -31,7 +31,7 @@ function ensureType(type: CastType | null): ValueType | null {
 
 export class QueryAttribute extends Attribute {
   /** @internal */
-  private _unboundable?: 1 | -1 | false;
+  declare private _unboundable?: 1 | -1 | null;
 
   constructor(name: string | null, value: unknown, type: CastType | null) {
     super(name, value, ensureType(type));
@@ -60,14 +60,15 @@ export class QueryAttribute extends Attribute {
     return this.__valueForDatabase;
   }
 
-  isNil(): boolean {
-    if (this.valueBeforeTypeCast instanceof Substitute) return false;
-    if (this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined) return true;
-    const type = this.type as { subtype?: unknown; normalizer?: unknown };
-    const hasSubtypeOrNormalizer = type.subtype !== undefined || type.normalizer !== undefined;
-    if (!hasSubtypeOrNormalizer || !this.isSerializable()) return false;
-    const forDatabase = this.valueForDatabase;
-    return forDatabase === null || forDatabase === undefined;
+  isNil(): boolean | undefined {
+    if (!(this.valueBeforeTypeCast instanceof Substitute)) {
+      return (
+        this.valueBeforeTypeCast == null ||
+        ((rbObjRespondTo(this.type, "subtype") || rbObjRespondTo(this.type, "normalizer")) &&
+          this.isSerializable() &&
+          this.valueForDatabase == null)
+      );
+    }
   }
 
   isInfinite(): 1 | -1 | null | false {
@@ -77,13 +78,13 @@ export class QueryAttribute extends Attribute {
     );
   }
 
-  isUnboundable(): 1 | -1 | false {
-    if (this._unboundable === undefined) {
-      let unboundable: 1 | -1 | false = false;
-      const serializable = this.isSerializable((castValue) => {
-        unboundable = compareToZero(castValue);
-      });
-      this._unboundable = serializable ? false : unboundable;
+  isUnboundable(): 1 | -1 | null | undefined {
+    if (!Object.hasOwn(this, "_unboundable")) {
+      void (
+        this.isSerializable((value) => {
+          this._unboundable = compareToZero(value);
+        }) && (this._unboundable = null)
+      );
     }
     return this._unboundable;
   }

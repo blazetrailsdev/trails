@@ -1,11 +1,16 @@
 import type * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
+import { extractBang } from "@blazetrails/activesupport";
 import type { PredicateBuilder } from "../predicate-builder.js";
 
 import { ActiveRecord } from "../../namespaces.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { compactBang, isEmpty, Range } from "@blazetrails/ruby-compat";
 
-export class NullPredicate {}
+export const NullPredicate = {
+  or(other: Nodes.Node): Nodes.Node {
+    return other;
+  },
+};
 
 export class ArrayHandler {
   private predicateBuilder: PredicateBuilder;
@@ -15,59 +20,36 @@ export class ArrayHandler {
   }
 
   call(attribute: Arel.Attribute, value: unknown[] | Set<unknown>): Nodes.Node {
-    if ((Array.isArray(value) ? value.length : value.size) === 0) {
-      return attribute.in([]);
-    }
+    if (isEmpty(value)) return attribute.in([]);
 
-    const values: unknown[] = [];
-    let hasNull = false;
-    const ranges: Range<unknown>[] = [];
-
-    for (const item of value) {
-      if (item === null || item === undefined) {
-        hasNull = true;
-      } else if (item instanceof Range) {
-        ranges.push(item);
-      } else if (item instanceof ActiveRecord.Base) {
-        values.push((item as { id: unknown }).id);
-      } else {
-        values.push(item);
-      }
-    }
+    const values = Array.from(value, (x) => (x instanceof ActiveRecord.Base ? x.id : x));
+    const nils = compactBang(values);
+    const ranges = extractBang(values, (v) => v instanceof Range);
 
     let valuesPredicate: Nodes.Node | typeof NullPredicate;
-    if (values.length === 0) {
-      valuesPredicate = NullPredicate;
-    } else if (values.length === 1) {
-      valuesPredicate = this.predicateBuilder.build(attribute, values[0]);
+    switch (values.length) {
+      case 0:
+        valuesPredicate = NullPredicate;
+        break;
+      case 1:
+        valuesPredicate = this.predicateBuilder.build(attribute, values[0]);
+        break;
+      default:
+        valuesPredicate = new Nodes.HomogeneousIn(values, attribute, "in");
+    }
+
+    if (nils) {
+      valuesPredicate = valuesPredicate.or(attribute.eq(null));
+    }
+
+    if (isEmpty(ranges)) {
+      return valuesPredicate as Nodes.Node;
     } else {
-      valuesPredicate = new Nodes.HomogeneousIn(values, attribute, "in");
+      const arrayPredicates = ranges.map((range) => this.predicateBuilder.build(attribute, range));
+      return arrayPredicates.reduce(
+        (memo, predicate) => memo.or(predicate),
+        valuesPredicate,
+      ) as Nodes.Node;
     }
-
-    if (hasNull) {
-      valuesPredicate =
-        valuesPredicate === NullPredicate
-          ? attribute.eq(null)
-          : groupedOr(valuesPredicate as Nodes.Node, attribute.eq(null));
-    }
-
-    if (ranges.length === 0) {
-      return valuesPredicate === NullPredicate ? attribute.in([]) : (valuesPredicate as Nodes.Node);
-    }
-
-    const arrayPredicates = ranges.map((range) => this.predicateBuilder.build(attribute, range));
-    let result: Nodes.Node | typeof NullPredicate = valuesPredicate;
-    for (const rp of arrayPredicates) {
-      result = result === NullPredicate ? rp : groupedOr(result as Nodes.Node, rp);
-    }
-    return result as Nodes.Node;
   }
-
-  or(left: Nodes.Node, right: Nodes.Node): Nodes.Node {
-    return groupedOr(left, right);
-  }
-}
-
-function groupedOr(left: Nodes.Node, right: Nodes.Node): Nodes.Grouping {
-  return new Nodes.Grouping(new Nodes.Or([left, right]));
 }

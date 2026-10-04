@@ -689,6 +689,23 @@ export function compact<T>(ary: readonly T[]): Array<NonNullable<T>> {
 }
 
 /**
+ * Ruby `Array#compact!` (`vendor/ruby/v3.3.11/array.c:6207` `rb_ary_compact_bang`):
+ * removes every `nil` element in place, answering the array, or `nil` when
+ * none was removed.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function compactBang<T>(ary: T[]): T[] | null {
+  let p = 0;
+  for (let t = 0; t < ary.length; t++) {
+    if (ary[t] != null) ary[p++] = ary[t];
+  }
+  if (ary.length === p) return null;
+  ary.length = p;
+  return ary;
+}
+
+/**
  * `rb_check_array_type` (`vendor/ruby/v3.3.11/array.c:975`, over
  * `rb_check_convert_type_with_id`, `vendor/ruby/v3.3.11/object.c:3184`): an
  * Array, its `to_ary`, or nil. A `to_ary` answering anything else raises.

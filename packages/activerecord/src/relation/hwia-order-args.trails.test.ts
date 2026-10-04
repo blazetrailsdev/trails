@@ -21,6 +21,12 @@ describe("HashWithIndifferentAccess order arguments", () => {
     ).toThrow(/Direction "sideways" is invalid/);
   });
 
+  it("rejects a direction outside Rails' eight spellings", () => {
+    expect(() => validateOrderArgs.call({} as never, [{ id: "Asc" }])).toThrow(
+      'Direction "Asc" is invalid. Valid directions are: [:asc, :desc, :ASC, :DESC, "asc", "desc", "ASC", "DESC"]',
+    );
+  });
+
   it("orders by the same SQL as the plain hash", () => {
     const hash: Map<string, "desc"> = new HashWithIndifferentAccess<"desc">({ id: "desc" });
     expect(Topic.order(hash).toSql()).toEqual(Topic.order({ id: "desc" }).toSql());

@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { AssociationQueryValue } from "./association-query-value.js";
+import { fixtures } from "../../test-fixtures.js";
+import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
+
+const queriesOf = (av: AssociationQueryValue) =>
+  av.queries().map((query) => Object.fromEntries(query as Map<string, unknown>));
 
 describe("AssociationQueryValue", () => {
   describe("scalar primary key", () => {
@@ -41,7 +46,7 @@ describe("AssociationQueryValue", () => {
         },
         comment,
       );
-      expect(av.queries()).toEqual([{ blog_id: 11, id: 22 }]);
+      expect(queriesOf(av)).toEqual([{ blog_id: 11, id: 22 }]);
     });
 
     it("extracts tuples from an array of records", () => {
@@ -54,7 +59,7 @@ describe("AssociationQueryValue", () => {
         },
         [c1, c2],
       );
-      expect(av.queries()).toEqual([
+      expect(queriesOf(av)).toEqual([
         { blog_id: 11, id: 22 },
         { blog_id: 12, id: 33 },
       ]);
@@ -64,9 +69,7 @@ describe("AssociationQueryValue", () => {
       const record = {
         blog_id: 5,
         id: [5, 99],
-        readAttribute(name: string) {
-          return name === "id" ? 99 : (this as any)[name];
-        },
+        id_value: 99,
       };
       const av = new AssociationQueryValue(
         {
@@ -75,37 +78,7 @@ describe("AssociationQueryValue", () => {
         },
         record,
       );
-      expect(av.queries()).toEqual([{ blog_id: 5, blog_post_id: 99 }]);
-    });
-
-    it("emits per-column subqueries for a Relation value (Batch 71 deviation)", () => {
-      const reselected: string[] = [];
-      const fakeRelation = {
-        _model: {},
-        arel() {
-          return null;
-        },
-        selectValues: [],
-        reselect(col: string) {
-          reselected.push(col);
-          return { tag: `reselect(${col})` };
-        },
-        whereValuesHash() {
-          return {};
-        },
-      };
-      const av = new AssociationQueryValue(
-        {
-          joinForeignKey: ["blog_id", "id"],
-          joinPrimaryKey: () => ["blog_id", "blog_post_id"],
-        },
-        fakeRelation,
-      );
-      const result = av.queries();
-      expect(result).toEqual([
-        { blog_id: { tag: "reselect(blog_id)" }, id: { tag: "reselect(blog_post_id)" } },
-      ]);
-      expect(reselected).toEqual(["blog_id", "blog_post_id"]);
+      expect(queriesOf(av)).toEqual([{ blog_id: 5, blog_post_id: 99 }]);
     });
 
     it("returns null tuple entries when value is null", () => {
@@ -116,7 +89,22 @@ describe("AssociationQueryValue", () => {
         },
         [null],
       );
-      expect(av.queries()).toEqual([{ blog_id: null, id: null }]);
+      expect(queriesOf(av)).toEqual([{ blog_id: null, id: null }]);
+    });
+  });
+
+  describe("composite foreign key with a Relation value", () => {
+    fixtures(["cpkOrders", "cpkBooks"]);
+
+    it("matches the relation's primary key tuples, not each column on its own", async () => {
+      const first = await CpkOrder.create({ id: [1, 2] });
+      const second = await CpkOrder.create({ id: [5, 6] });
+      const book = await (first as any).books.create({ id: [3, 4] });
+      const stray = await (second as any).books.create({ id: [7, 8] });
+      await stray.updateColumn("shop_id", 1);
+
+      const books = await CpkBook.where({ order: CpkOrder.all() });
+      expect(books.map((b) => b.id)).toEqual([book.id]);
     });
   });
 });

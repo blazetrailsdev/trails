@@ -1,4 +1,9 @@
-import { hasKey, isEmpty } from "@blazetrails/ruby-compat";
+import { hasKey, isEmpty, rbFPublicSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
+import type { Base } from "../../base.js";
+import { ActiveRecord } from "../../namespaces.js";
+import type { Relation } from "../../relation.js";
+import { DeferredPluck } from "./deferred-distinct-pk-in.js";
+
 export interface AssocTableMeta {
   joinForeignKey: string | string[];
   joinPrimaryKey(klass?: unknown): string | string[] | null;
@@ -25,63 +30,37 @@ export class AssociationQueryValue {
     return this._value;
   }
 
-  queries(): Record<string, unknown>[] {
-    const fk = this.associatedTable.joinForeignKey;
-    if (Array.isArray(fk)) {
-      const ids = this.ids();
-      if (this.isRelation(ids)) {
-        const pks = this.primaryKey() as string[];
-        const fkCols = fk;
-        const baseRelation = ids as any;
+  queries(): (Record<string, unknown> | Map<unknown, unknown>)[] {
+    const joinForeignKey = this.associatedTable.joinForeignKey;
+    if (Array.isArray(joinForeignKey)) {
+      const idList = this.ids();
+      if (idList instanceof ActiveRecord.Relation) {
         return [
-          fkCols.reduce<Record<string, unknown>>((acc, fkCol, i) => {
-            acc[fkCol] = baseRelation.reselect(pks[i]);
-            return acc;
-          }, {}),
+          new Map([[joinForeignKey, new DeferredPluck(idList, this.primaryKey() as string[])]]),
         ];
       }
-      const idList = Array.isArray(ids) ? ids : [ids];
-      return idList.map((idsSet: any) => {
-        if (!Array.isArray(idsSet)) {
-          throw new Error(
-            `Composite foreign key association requires tuple values matching [${fk.join(", ")}]. ` +
-              "Pass an array of [value1, value2, ...] tuples (Slot B).",
-          );
-        }
-        if (idsSet.length !== fk.length) {
-          throw new Error(
-            `Composite FK tuple arity mismatch: expected ${fk.length} values ` +
-              `([${fk.join(", ")}]) but got ${idsSet.length}.`,
-          );
-        }
-        return fk.reduce((acc: Record<string, unknown>, k: string, i: number) => {
-          acc[k] = idsSet[i];
-          return acc;
-        }, {});
-      });
+
+      return idList.map((idsSet) => toH(zip(joinForeignKey, idsSet as unknown[])));
+    } else {
+      return [{ [joinForeignKey]: this.ids() }];
     }
-    return [{ [fk]: this.ids() }];
   }
 
   /** @internal */
-  private ids(): unknown {
+  private ids(): Relation<Base, boolean> | unknown[] {
     const value = this.value;
-    if (this.isRelation(value)) {
-      const pk = this.primaryKey();
-      let relation = value as any;
-      if (!Array.isArray(pk) && this.isSelectClause()) {
-        const arelTable = relation._model?.arelTable;
-        relation = relation.select(arelTable ? arelTable.get(pk) : pk);
-      }
+    if (value instanceof ActiveRecord.Relation) {
+      let relation = value as Relation<Base, boolean>;
+      if (this.isSelectClause()) relation = relation.select(this.primaryKey() as string);
       if (this.isPolymorphicClause()) {
         relation = relation.where({ [this.primaryType()!]: this.polymorphicName() });
       }
       return relation;
-    }
-    if (Array.isArray(value)) {
+    } else if (Array.isArray(value)) {
       return value.map((v) => this.convertToId(v));
+    } else {
+      return [this.convertToId(value)];
     }
-    return [this.convertToId(value)];
   }
 
   /** @internal */
@@ -101,38 +80,33 @@ export class AssociationQueryValue {
 
   /** @internal */
   private isPolymorphicClause(): boolean {
-    const value = this.value as { whereValuesHash?: () => Record<string, unknown> };
-    const type = this.primaryType();
-    if (!type) return false;
-    const hash = typeof value.whereValuesHash === "function" ? value.whereValuesHash() : undefined;
-    if (!hash) return true;
-    return !hasKey(hash, type);
+    return (
+      this.primaryType() != null &&
+      !hasKey((this.value as Relation<Base, boolean>).whereValuesHash(), this.primaryType()!)
+    );
   }
 
   /** @internal */
   private isSelectClause(): boolean {
-    return isEmpty((this.value as any).selectValues);
+    return isEmpty((this.value as Relation<Base, boolean>).selectValues);
   }
 
   private convertToId(value: unknown): unknown {
-    const pk = this.primaryKey();
-    if (Array.isArray(pk)) {
-      return pk.map((attr) => {
-        if (value === null || value === undefined) return null;
-        if (attr === "id" && typeof (value as any).readAttribute === "function") {
-          return (value as any).readAttribute("id");
-        }
-        return (value as any)[attr];
-      });
-    }
-    if (typeof pk === "string" && typeof value === "object" && value !== null) {
-      if (pk in value) return (value as any)[pk];
-      if ("id" in value) return (value as any).id;
-    }
-    return value;
-  }
+    const primaryKey = this.primaryKey();
+    if (Array.isArray(primaryKey)) {
+      return primaryKey.map((attribute) => {
+        if (value == null) return null;
 
-  private isRelation(value: unknown): boolean {
-    return typeof value === "object" && value !== null && "_model" in value && "arel" in value;
+        if (attribute === "id") {
+          return (value as Base & { id_value: unknown }).id_value;
+        } else {
+          return rbFPublicSend(value, attribute);
+        }
+      });
+    } else if (rbObjRespondTo(value, primaryKey)) {
+      return rbFPublicSend(value, primaryKey);
+    } else {
+      return value;
+    }
   }
 }

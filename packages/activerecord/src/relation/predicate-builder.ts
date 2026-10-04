@@ -20,6 +20,7 @@ import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js"
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { DeferredPluck } from "./predicate-builder/deferred-distinct-pk-in.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
+import { ActiveRecord } from "../namespaces.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import type { TableMetadata } from "../table-metadata.js";
 
@@ -41,7 +42,7 @@ export class PredicateBuilder {
 
     this.registerHandler(BasicObject, new BasicObjectHandler(this));
     this.registerHandler(Range, new RangeHandler(this));
-    this.registerHandler(Relation, new RelationHandler());
+    this.registerHandler(ActiveRecord.Relation, new RelationHandler());
     this.registerHandler(Array, new ArrayHandler(this));
     this.registerHandler(Set, new ArrayHandler(this));
   }
@@ -54,6 +55,7 @@ export class PredicateBuilder {
     return this.expandFromHash(attributes, block);
   }
 
+  /** @inventedArm if — PERMANENT */
   protected expandFromHash(
     attributes: Attributes,
     block?: (tableName: string) => unknown,
@@ -196,88 +198,68 @@ export class PredicateBuilder {
   }
 
   static references(attributes: string[] | Attributes): Nodes.SqlLiteral[] {
-    const refs: Nodes.SqlLiteral[] = [];
-    const entries: Array<[string | string[], unknown]> = Array.isArray(attributes)
-      ? attributes.map((k) => [k, undefined] as [string, unknown])
-      : entriesOf(attributes);
-    for (const [key, value] of entries) {
-      if (Array.isArray(key)) {
-        continue;
-      }
+    const result: Nodes.SqlLiteral[] = [];
+    let idx: number;
+    for (const [key, value] of entriesOf(attributes)) {
       if (isPlainObject(value)) {
-        refs.push(sql(key, { retryable: true }));
-      } else {
-        const dot = key.lastIndexOf(".");
-        if (dot !== -1) {
-          refs.push(sql(key.slice(0, dot), { retryable: true }));
-        }
+        result.push(sql(key as string, { retryable: true }));
+      } else if ((idx = key.lastIndexOf(".")) !== -1) {
+        result.push(sql((key as string).slice(0, idx), { retryable: true }));
       }
     }
-    return refs;
+    return result;
   }
 
   references(): string[] {
     return [];
   }
 
-  private isRelation(value: unknown): boolean {
-    return typeof value === "object" && value !== null && "_model" in value && "arel" in value;
-  }
-
   private convertDotNotationToHash(attributes: Attributes): Attributes {
     const converted = new Map<string | string[], unknown>();
-    let arrayKeyed = false;
+    let existing: Record<string, unknown> | undefined;
+    let idx: number;
     for (const [key, value] of entriesOf(attributes)) {
-      if (Array.isArray(key)) {
-        arrayKeyed = true;
-        converted.set(key, value);
-      } else if (isPlainObject(value)) {
-        const existing = converted.get(key);
-        if (existing && isPlainObject(existing)) {
+      if (isPlainObject(value)) {
+        if ((existing = converted.get(key) as Record<string, unknown> | undefined)) {
           Object.assign(existing, value);
         } else {
           converted.set(key, { ...value });
         }
-      } else {
-        const dot = key.lastIndexOf(".");
-        if (dot !== -1) {
-          const tableName = key.slice(0, dot);
-          const colName = key.slice(dot + 1);
-          const existing = converted.get(tableName);
-          if (existing && isPlainObject(existing)) {
-            existing[colName] = value;
-          } else {
-            converted.set(tableName, { [colName]: value });
-          }
+      } else if ((idx = key.lastIndexOf(".")) !== -1) {
+        const [tableName, columnName] = [
+          (key as string).slice(0, idx),
+          (key as string).slice(idx + 1),
+        ];
+
+        if ((existing = converted.get(tableName) as Record<string, unknown> | undefined)) {
+          existing[columnName] = value;
         } else {
-          converted.set(key, value);
+          converted.set(tableName, { [columnName]: value });
         }
+      } else {
+        converted.set(key, value);
       }
     }
-    if (arrayKeyed) return converted as Map<unknown, unknown>;
-    return Object.fromEntries(converted as Map<string, unknown>);
+    return converted as Map<unknown, unknown>;
   }
 
   private handlerFor(object: unknown): { call(attr: Arel.Attribute, value: any): Nodes.Node } {
-    return last(
-      this.handlers.find(([klass]) =>
-        klass === BasicObject
-          ? true
-          : klass === Relation
-            ? this.isRelation(object)
-            : object instanceof klass,
-      )!,
-    ) as { call(attr: Arel.Attribute, value: any): Nodes.Node };
+    return last(this.handlers.find(([klass]) => object instanceof klass)!) as {
+      call(attr: Arel.Attribute, value: any): Nodes.Node;
+    };
   }
 }
 
-class BasicObject {}
-
-class Relation {}
+class BasicObject {
+  static [Symbol.hasInstance](): boolean {
+    return true;
+  }
+}
 
 type Attributes = Record<string, unknown> | Map<unknown, unknown>;
 
-function entriesOf(attributes: Attributes): [string | string[], unknown][] {
+function entriesOf(attributes: string[] | Attributes): [string | string[], unknown][] {
+  if (Array.isArray(attributes)) return attributes.map((key) => [key, undefined]);
   return attributes instanceof Map
     ? ([...attributes] as [string | string[], unknown][])
     : Object.entries(attributes);

@@ -157,6 +157,7 @@ export {
   aryPop,
   arySlice,
   compact,
+  compactBang,
   drop,
   each,
   first,
