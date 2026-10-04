@@ -51,22 +51,34 @@ describe("Thor", () => {
       expect(klass.commands().zoo).toBeInstanceOf(HiddenCommand);
     });
 
-    it("amends an existing command through for:, cloning an inherited one", () => {
-      const parent = thor((k) => {
+    const zooParent = () =>
+      thor((k) => {
         k.desc("zoo", "zoo around");
         k.methodAdded("zoo");
       });
-      const child = thor((k) => {
-        k.desc("zoo NAME", null, { for: "zoo" });
-        k.longDesc("longer", { for: "zoo" });
-        k.methodOption("cage", { for: "zoo", type: "string" });
-      }, parent);
+
+    it("desc for: amends an existing command, cloning an inherited one", () => {
+      const parent = zooParent();
+      const child = thor((k) => k.desc("zoo NAME", null, { for: "zoo" }), parent);
       expect(child.commands().zoo.usage).toBe("zoo NAME");
       expect(child.commands().zoo.description).toBe("zoo around");
-      expect(child.commands().zoo.longDescription).toBe("longer");
-      expect(Object.keys(child.commands().zoo.options)).toEqual(["cage"]);
       expect(parent.commands().zoo.usage).toBe("zoo");
+    });
+
+    it("long_desc for: sets the long description of an existing command", () => {
+      const parent = zooParent();
+      const child = thor((k) => k.longDesc("longer", { for: "zoo", wrap: false }), parent);
+      expect(child.commands().zoo.longDescription).toBe("longer");
+      expect(parent.commands().zoo.longDescription).toBeNull();
+      expect(Object.hasOwn(child, "_longDesc")).toBe(false);
+    });
+
+    it("method_option for: adds the option to an existing command", () => {
+      const parent = zooParent();
+      const child = thor((k) => k.methodOption("cage", { for: "zoo", type: "string" }), parent);
+      expect(Object.keys(child.commands().zoo.options)).toEqual(["cage"]);
       expect(parent.commands().zoo.options).toEqual({});
+      expect(child.methodOptions()).toEqual({});
     });
 
     it("warns and registers nothing for a method with no usage or description", () => {
