@@ -4,6 +4,7 @@ import {
   type Concurrent,
   isEmpty,
   rbClassSuperclass,
+  rbFCaller,
   rbInspect as inspect,
   rbModConstSet,
 } from "@blazetrails/ruby-compat";
@@ -658,6 +659,7 @@ export function get(this: InstanceMethodHost, attrName: string): unknown {
     AttributeMethods.AttributeMethods.missingAttribute.call(
       this as unknown as AttributeMethodsInstanceHost,
       n,
+      rbFCaller().join("\n"),
     ),
   );
 }

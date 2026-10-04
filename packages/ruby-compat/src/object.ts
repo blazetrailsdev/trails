@@ -757,6 +757,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
+    if (o !== obj && desc && "value" in desc && desc.value === undefined) break;
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);

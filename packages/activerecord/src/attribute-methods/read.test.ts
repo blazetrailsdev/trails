@@ -20,7 +20,6 @@ describe("ReadTest", () => {
       static _schemaLoaded = true;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
       static attributeAliases = {};
-      static _aliasesByAttributeName = new Map<string, string[]>();
       static defineAttributeMethods = defineAttributeMethods;
       static defineMethodAttribute = defineMethodAttribute;
       static setDefineMethodAttribute = setDefineMethodAttribute;
