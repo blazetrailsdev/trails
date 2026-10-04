@@ -22,6 +22,7 @@ interface ComposedOfOptions {
   allowNil?: boolean;
 }
 
+/** @inventedArm if — CONVERGEABLE composed-of-class-name-is-a-string-not-a-constructor */
 export function composedOf(this: typeof Base, partId: string, options: ComposedOfOptions): void {
   assertValidKeys(options as unknown as Record<string, unknown>, [
     "className",

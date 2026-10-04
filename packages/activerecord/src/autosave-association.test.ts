@@ -3541,6 +3541,7 @@ describe("computePrimaryKey", () => {
     return {
       constructor: {
         primaryKey: opts.primaryKey ?? "id",
+        _primaryKey: opts.primaryKey ?? "id",
         _queryConstraintsList: opts.queryConstraintsList ?? null,
         _hasQueryConstraints: opts.hasQueryConstraints ?? false,
       },

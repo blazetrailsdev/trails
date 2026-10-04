@@ -18,6 +18,9 @@ describe("ReadTest", () => {
       static _primaryKey = null;
       static _attributeMethodsGenerated = false;
       static _schemaLoaded = true;
+      static isBaseClass = () => true;
+      static abstractClass = false;
+      static generateAliasAttributes = Base.generateAliasAttributes;
       static attributeMethodPatterns = Base.attributeMethodPatterns;
       static attributeAliases = {};
       static defineAttributeMethods = defineAttributeMethods;
@@ -41,6 +44,7 @@ describe("ReadTest", () => {
       static buildMangledName = Base.buildMangledName;
       static defineCall = Base.defineCall;
     }
+    Object.setPrototypeOf(Klass, Base);
     return Klass;
   }
 

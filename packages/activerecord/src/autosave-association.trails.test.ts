@@ -11,7 +11,12 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { fixtures } from "./test-fixtures.js";
-import { build } from "./autosave-association.js";
+import {
+  aroundSaveCollectionAssociation,
+  build,
+  is_recordChanged,
+} from "./autosave-association.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 import { Prisoner } from "./test-helpers/models/ship.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
@@ -248,8 +253,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(author.isNewRecord()).toBe(true);
     expect(post.errors.size).toBe(0);
   });
-
-  it("belongs_to autosave with PK longer than FK skips trailing PK positions", async () => {
+  it("belongs_to autosave with PK longer than FK raises on the unpaired PK position", async () => {
     class Parent extends Base {
       declare name: string | null;
 
@@ -280,9 +284,43 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     const parent = new Parent({ name: "P" });
     const child = new Child({ name: "c" });
     cacheAssoc(child, "parent", parent);
-    await child.save();
-    expect(parent.isNewRecord()).toBe(false);
-    expect(child.author_id).toBe(parent.id);
+    await expect(child.save()).rejects.toThrow(MissingAttributeError);
+  });
+
+  it("around_save_collection_association restores new_record_before_save once the block settles", async () => {
+    const host = { _newRecordBeforeSave: false, isNewRecord: () => true } as any;
+    let during: boolean | undefined;
+    await aroundSaveCollectionAssociation.call(host, async () => {
+      await Promise.resolve();
+      during = host._newRecordBeforeSave;
+    });
+    expect(during).toBe(true);
+    expect(host._newRecordBeforeSave).toBe(false);
+
+    await expect(
+      aroundSaveCollectionAssociation.call(host, async () => {
+        await Promise.resolve();
+        throw new Error("boom");
+      }),
+    ).rejects.toThrow("boom");
+    expect(host._newRecordBeforeSave).toBe(false);
+  });
+
+  it("_record_changed? sees a composite foreign key change through association_foreign_key_changed?", () => {
+    const reflection = {
+      isThroughReflection: () => false,
+      foreignKey: () => ["shop_id", "order_id"],
+      inverseOf: () => null,
+    };
+    const values: Record<string, unknown> = { shop_id: 1, order_id: 2 };
+    const record = {
+      isNewRecord: () => false,
+      _hasAttribute: (key: string) => key in values,
+      _readAttribute: (key: string) => values[key],
+      isWillSaveChangeToAttribute: () => false,
+    };
+    expect(is_recordChanged(reflection, record, [1, 2])).toBe(false);
+    expect(is_recordChanged(reflection, record, [1, 3])).toBe(true);
   });
 });
 

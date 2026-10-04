@@ -309,7 +309,7 @@ export { byteslice } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";
-export { rbStrDump, rbStrHex } from "./string/convert.js";
+export { rbStrDump, rbStrHex, rbStrToF, rbStrToI } from "./string/convert.js";
 export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export { strCount } from "./string/tr.js";
