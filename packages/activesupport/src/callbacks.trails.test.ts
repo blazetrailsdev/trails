@@ -1024,6 +1024,39 @@ describe("Callbacks — async propagation", () => {
     Target.setCallback("v", "before", async () => {});
     expect(() => t.runCallbacks("v", undefined, { strict: "sync" })).toThrow(/sync chain/);
   });
+
+  it("strict:sync throws on a promise-returning custom terminator", async () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("v", {
+      terminator: async (_t: object, fn: () => unknown) => {
+        fn();
+        throw new Error("rejected halt");
+      },
+    });
+    Target.setCallback("v", "before", (x: any) => x.log.push("first"));
+    Target.setCallback("v", "before", (x: any) => x.log.push("second"));
+    expect(() => t.runCallbacks("v", undefined, { strict: "sync" })).toThrow(
+      'Async callback on sync chain "v" — before returned a Promise',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(t.log).toEqual(["first"]);
+  });
+
+  it("a promise-returning custom terminator is awaited without strict:sync", async () => {
+    class Target extends Model {}
+    const t = new Target();
+    Target.defineCallbacks("v", {
+      terminator: async (_t: object, fn: () => unknown) => fn() === false,
+    });
+    Target.setCallback("v", "before", (x: any) => {
+      x.log.push("first");
+      return false;
+    });
+    Target.setCallback("v", "before", (x: any) => x.log.push("second"));
+    await t.runCallbacks("v");
+    expect(t.log).toEqual(["first"]);
+  });
 });
 
 describe("CallbackObject dispatch", () => {

@@ -28,8 +28,10 @@ export interface Naming {
 function modelName(this: NamingHost): ModelName {
   if (!Object.hasOwn(this, "_modelName") || !this._modelName) {
     const namespace = moduleParents(this).find((n) => {
-      if (!rbObjRespondTo(n, "useRelativeModelNaming")) return false;
-      const relative = (n as { useRelativeModelNaming: () => unknown }).useRelativeModelNaming();
+      if (!rbObjRespondTo(n, "isUseRelativeModelNaming")) return false;
+      const relative = (
+        n as { isUseRelativeModelNaming: () => unknown }
+      ).isUseRelativeModelNaming();
       return relative != null && relative !== false;
     });
     this._modelName = new ModelName(this as unknown as ModelLike, namespace ?? null);

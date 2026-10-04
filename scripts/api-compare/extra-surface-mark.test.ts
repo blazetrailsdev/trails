@@ -34,8 +34,8 @@ describe("extra-surface mark", () => {
   });
 
   it("names a gated package the mark file never seeded", () => {
-    expect(unmarkedPackages({})).toEqual(["ruby-compat"]);
-    expect(unmarkedPackages({ "ruby-compat": { novel: 0, total: 0 } })).toEqual([]);
+    expect(unmarkedPackages({})).toEqual(["ruby-compat", "thor"]);
+    expect(unmarkedPackages({ "ruby-compat": { novel: 0, total: 0 } })).toEqual(["thor"]);
   });
 
   it("demands a mark from a tagged-only package too, because total stays gated", () => {

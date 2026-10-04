@@ -360,6 +360,12 @@ export class Before {
         return cbResult;
       });
       if (isThenable(halt)) {
+        if (syncChain !== undefined) {
+          swallowRejection(halt);
+          throw new RuntimeError(
+            `Async callback on sync chain "${syncChain}" — before returned a Promise`,
+          );
+        }
         return Promise.resolve(halt).then((h) => {
           if (h) this.halt(env);
           return env;

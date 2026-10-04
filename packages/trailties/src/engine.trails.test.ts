@@ -80,7 +80,7 @@ describe("Engine.isolate_namespace", () => {
     expect(routes.defaultScope).toEqual({ module: "blog/admin" });
     expect(mod.trailtieNamespace!()).toBe(IsolatedEngine);
     expect(mod.tableNamePrefix).toBe("blog_admin_");
-    expect(mod.useRelativeModelNaming!()).toBe(true);
+    expect(mod.isUseRelativeModelNaming!()).toBe(true);
     expect(mod.trailtieRoutesUrlHelpers!()).toBe(routes.urlHelpers());
   });
 });

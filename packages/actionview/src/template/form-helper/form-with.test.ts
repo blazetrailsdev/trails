@@ -190,7 +190,7 @@ class Post {
   }
 }
 
-const Blog = { name: "Blog", useRelativeModelNaming: () => true };
+const Blog = { name: "Blog", isUseRelativeModelNaming: () => true };
 registerConstant("Blog", Blog);
 
 class BlogPost {

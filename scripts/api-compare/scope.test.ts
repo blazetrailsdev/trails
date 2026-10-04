@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { GATE_ENFORCED_PACKAGES } from "../test-compare/compare.js";
-import { GATED_PACKAGES as EXTRA_SURFACE_GATED } from "./extra-surface-mark.js";
 import { RULES as DEP_RULES } from "./lint-deps.js";
 import { GATED_PACKAGES as PARAM_NAME_GATED } from "./param-name-mark.js";
 import { inScope, scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
@@ -58,7 +57,6 @@ describe("scopedMarks", () => {
 
 describe("the gates scripts/ci/thor-comparison.sh skips", () => {
   it("judge populations thor is outside of", () => {
-    expect(EXTRA_SURFACE_GATED).not.toContain("thor");
     expect(PARAM_NAME_GATED).not.toContain("thor");
     expect([...GATE_ENFORCED_PACKAGES]).not.toContain("thor");
     expect(DEP_RULES.map((rule) => rule.package)).not.toContain("thor");
