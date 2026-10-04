@@ -129,6 +129,29 @@ describe("Thor", () => {
     });
   });
 
+  describe(".map with mappings and keywords", () => {
+    it("merges an Array-keyed mapping into the keywords", () => {
+      const klass = thor((k) => k.map(new Map([[["-a", "-b"], "zoo"]]), { "-v": "version" }));
+      expect(klass.map()).toEqual({ "-a": "zoo", "-b": "zoo", "-v": "version" });
+    });
+  });
+
+  describe(".command_exists?", () => {
+    it("looks the normalized name up in the class's own commands", () => {
+      const parent = thor((k) => {
+        k.desc("animal TYPE", "horse around");
+        k.methodAdded("animal");
+      });
+      const klass = thor((k) => {
+        k.desc("zoo", "zoo around");
+        k.methodAdded("zoo");
+      }, parent);
+      klass.normalizeCommandName = (meth) => String(meth).replaceAll("-", "_");
+      expect(klass.isCommandExists("zoo")).toBe(true);
+      expect(klass.isCommandExists("animal")).toBe(false);
+    });
+  });
+
   describe(".package_name and .default_command", () => {
     it("stores a package name and clears it for an empty one", () => {
       expect(thor((k) => k.packageName("Trails"))._packageName).toBe("Trails");
@@ -138,7 +161,7 @@ describe("Thor", () => {
     it("defaults to help, maps none to help, and inherits", () => {
       const parent = thor((k) => k.defaultCommand("zoo"));
       expect(thor(() => {}).defaultCommand()).toBe("help");
-      expect(thor((k) => k.defaultTask("none")).defaultCommand()).toBe("help");
+      expect(thor((k) => k.defaultTask(":none")).defaultCommand()).toBe("help");
       expect(thor(() => {}, parent).defaultCommand()).toBe("zoo");
     });
   });
@@ -234,11 +257,11 @@ describe("Thor", () => {
         k.stopOnUnknownOptionBang("zoo", "animal");
         k.disableRequiredCheckBang("zoo");
       });
-      expect(klass.stopOnUnknownOption()).toEqual(["zoo", "animal"]);
+      expect(klass._stopOnUnknownOption).toEqual(["zoo", "animal"]);
       expect(klass.isStopOnUnknownOption(command("zoo"))).toBe(true);
       expect(klass.isStopOnUnknownOption(command("help"))).toBe(false);
       expect(klass.isStopOnUnknownOption(null)).toBe(false);
-      expect(klass.disableRequiredCheck()).toEqual(["help", "zoo"]);
+      expect(klass._disableRequiredCheck).toEqual(["help", "zoo"]);
       expect(klass.isDisableRequiredCheck(command("help"))).toBe(true);
       expect(klass.isDisableRequiredCheck(null)).toBe(false);
     });

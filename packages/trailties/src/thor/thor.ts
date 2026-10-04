@@ -8,13 +8,12 @@ import {
   initializeIncludedModules,
   isEmpty,
   mergeBang,
-  NoMethodError,
   puts,
   rbFCaller,
   rbInspect,
-  rbModToS,
   rbObjAsString,
   rtest,
+  toS,
   STDOUT,
   union,
 } from "@blazetrails/ruby-compat";
@@ -38,7 +37,8 @@ type Instance = {
   invoke(...args: unknown[]): unknown;
 };
 
-export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
+export type ThorClass = typeof Thor &
+  Omit<BaseClass, keyof typeof Thor> & { normalizeCommandName(meth: string | null): string };
 
 export class Thor {
   declare static Group: abstract new (...args: never[]) => object;
@@ -80,7 +80,7 @@ export class Thor {
 
   static defaultCommand(this: ThorClass, meth: string | null = null): string {
     if (rtest(meth)) {
-      return (this._defaultCommand = meth === "none" ? "help" : rbObjAsString(meth));
+      return (this._defaultCommand = meth === ":none" ? "help" : toS(meth));
     } else {
       if (!Object.hasOwn(this, "_defaultCommand") || !rtest(this._defaultCommand)) {
         this._defaultCommand = this.fromSuperclass("defaultCommand", "help") as string;
@@ -155,7 +155,7 @@ export class Thor {
     }
 
     if (rtest(mappings) && !isEmpty(kw)) {
-      mappings = mergeBang(kw, mappings as Record<string, string>);
+      mappings = mergeBang(new Map(Object.entries(kw)), mappings as Map<string, string>);
     } else {
       mappings ||= kw;
     }
@@ -307,11 +307,7 @@ export class Thor {
   }
 
   static isCommandExists(this: ThorClass, commandName: string): boolean {
-    return Object.keys(this.commands()).includes(
-      (this as unknown as { normalizeCommandName(meth: string): string }).normalizeCommandName(
-        commandName,
-      ),
-    );
+    return Object.keys(this.commands()).includes(this.normalizeCommandName(commandName));
   }
 
   /** @internal */
@@ -336,14 +332,16 @@ export class Thor {
     return this._methodAtLeastOneOptionNames!;
   }
 
-  static stopOnUnknownOption(this: ThorClass): string[] {
+  /** @internal */
+  protected static stopOnUnknownOption(this: ThorClass): string[] {
     if (!Object.hasOwn(this, "_stopOnUnknownOption") || !rtest(this._stopOnUnknownOption)) {
       this._stopOnUnknownOption = [];
     }
     return this._stopOnUnknownOption!;
   }
 
-  static disableRequiredCheck(this: ThorClass): string[] {
+  /** @internal */
+  protected static disableRequiredCheck(this: ThorClass): string[] {
     if (!Object.hasOwn(this, "_disableRequiredCheck") || !rtest(this._disableRequiredCheck)) {
       this._disableRequiredCheck = ["help"];
     }
@@ -406,14 +404,11 @@ export class Thor {
     const prototype = this.prototype;
     Object.defineProperty(prototype, "help", {
       value: function (this: object, command: string | null = null, subcommand: unknown = true) {
-        const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>).help;
-        if (typeof superMethod !== "function") {
-          throw new NoMethodError(
-            `super: no superclass method 'help' for an instance of ${rbModToS(prototype.constructor as never)}`,
-            "help",
-          );
-        }
-        return superMethod.call(this, command, subcommand);
+        return (
+          Object.getPrototypeOf(prototype) as {
+            help(command: unknown, subcommand: unknown): unknown;
+          }
+        ).help.call(this, command, subcommand);
       },
       writable: true,
       configurable: true,
