@@ -84,6 +84,11 @@ describe("modulesForHelpers (when Module)", () => {
     expect(modulesForHelpers([mod])).toEqual([mod]);
   });
 
+  it("passes a helpers module derived from another through", () => {
+    const derived = Object.create(FooHelper) as HelperMethodsModule;
+    expect(modulesForHelpers([derived])).toEqual([derived]);
+  });
+
   it("raises ArgumentError for an object that is not a module", () => {
     class NotAModule {}
     for (const value of [new NotAModule(), new Map(), 42]) {

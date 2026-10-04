@@ -9,8 +9,10 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  Hash,
   isSymbol,
   Module,
+  rbObjClass,
   rbObjIsKindOf,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -86,19 +88,15 @@ export function defineHelpersModule(
   return mod;
 }
 
-/** @internal */
-function isModuleObject(value: unknown): value is HelperMethodsModule {
-  if (value === null || typeof value !== "object") return false;
-  const proto = Object.getPrototypeOf(value) as object | null;
-  return proto === Object.prototype || proto === null;
-}
-
 export const Resolution = {
   modulesForHelpers(modulesOrHelperPrefixes: readonly HelperArgument[]): HelperMethodsModule[] {
     return (modulesOrHelperPrefixes as readonly unknown[])
       .flat(Infinity)
       .map((moduleOrHelperPrefix) => {
-        if (rbObjIsKindOf(moduleOrHelperPrefix, Module) || isModuleObject(moduleOrHelperPrefix)) {
+        if (
+          rbObjIsKindOf(moduleOrHelperPrefix, Module) ||
+          rbObjClass(moduleOrHelperPrefix) === Hash
+        ) {
           return moduleOrHelperPrefix as HelperMethodsModule;
         } else if (typeof moduleOrHelperPrefix === "string") {
           let helperPrefix = isSymbol(moduleOrHelperPrefix)
