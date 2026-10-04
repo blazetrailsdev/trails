@@ -19,7 +19,7 @@ import {
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import { rbObjAsString as toS } from "@blazetrails/ruby-compat";
+import { toS } from "@blazetrails/ruby-compat";
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || value instanceof BigDecimal) {

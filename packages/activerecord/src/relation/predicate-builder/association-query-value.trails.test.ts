@@ -69,9 +69,7 @@ describe("AssociationQueryValue", () => {
       const record = {
         blog_id: 5,
         id: [5, 99],
-        readAttribute(name: string) {
-          return name === "id" ? 99 : (this as any)[name];
-        },
+        id_value: 99,
       };
       const av = new AssociationQueryValue(
         {

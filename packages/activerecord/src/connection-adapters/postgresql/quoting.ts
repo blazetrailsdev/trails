@@ -20,14 +20,7 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import {
-  format,
-  rbFSend,
-  rbObjAsString as toS,
-  rbObjRespondTo,
-  Range,
-  Rational,
-} from "@blazetrails/ruby-compat";
+import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 import { ConnectionNotEstablished } from "../../errors.js";
 

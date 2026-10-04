@@ -639,7 +639,7 @@ export function buildWhereClause(
   } else if (opts instanceof Nodes.Node) {
     parts = [opts];
   } else {
-    throw new ArgumentError(`Unsupported argument type: ${String(opts)} (${typeof opts})`);
+    throw new ArgumentError(`Unsupported argument type: ${String(opts)} (${rbObjClassname(opts)})`);
   }
 
   return new WhereClause(parts);
@@ -1902,9 +1902,12 @@ export function buildWithExpressionFromValue(
     if (value.length === 1) return buildWithExpressionFromValue.call(this, value[0], false);
 
     const parts = value.map((query) => buildWithExpressionFromValue.call(this, query, true));
-    return parts.reduce(
-      (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
-    );
+    return parts
+      .slice(1)
+      .reduce(
+        (result: unknown, value: unknown) => new Nodes.UnionAll(result as any, value as any),
+        parts[0],
+      );
   }
   throw new ArgumentError(
     `Unsupported argument type: \`${String(value)}\` ${rubyClassNameOf(value)}`,

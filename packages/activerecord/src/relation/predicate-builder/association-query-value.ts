@@ -98,7 +98,7 @@ export class AssociationQueryValue {
         if (value == null) return null;
 
         if (attribute === "id") {
-          return (value as Base).readAttribute("id");
+          return (value as Base & { id_value: unknown }).id_value;
         } else {
           return rbFPublicSend(value, attribute);
         }
