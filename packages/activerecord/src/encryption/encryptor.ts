@@ -217,7 +217,10 @@ export class Encryptor {
     return this._compressor.inflate(data);
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE encryption-encoding-helpers-fold-into-string-encode-and-header-reads
+   */
   private forceEncodingIfNeeded(value: string): string {
     if (
       this.forcedEncodingForDeterministicEncryption() != null &&

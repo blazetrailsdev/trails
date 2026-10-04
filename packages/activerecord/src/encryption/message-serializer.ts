@@ -19,6 +19,10 @@ export class MessageSerializer implements MessageSerializerLike {
     return JSON.stringify(this.messageToJson(message));
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   * @inventedArm throw — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   */
   load(serializedContent: string): Message {
     if (typeof serializedContent !== "string") {
       throw new TypeError(`Expected string, got ${typeof serializedContent}`);
@@ -101,7 +105,11 @@ export class MessageSerializer implements MessageSerializerLike {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   * @inventedArm throw — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   */
   private decodeIfNeeded(value: unknown): unknown {
     if (typeof value === "string") {
       try {

@@ -14,6 +14,10 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
     return MessagePack.dump(this.messageToHash(message)).toString("latin1");
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   * @inventedArm throw — CONVERGEABLE encryption-serializer-load-and-decode-arms-need-stdlib-raises
+   */
   load(serializedContent: string): Message {
     if (typeof serializedContent !== "string") {
       throw new TypeError(`Expected string, got ${typeof serializedContent}`);
