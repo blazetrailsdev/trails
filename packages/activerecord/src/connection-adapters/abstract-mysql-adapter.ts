@@ -1365,6 +1365,7 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   override async removeForeignKey(
     fromTable: string,
     toTable?: string | RemoveForeignKeyOptions,

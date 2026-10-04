@@ -1814,7 +1814,10 @@ export class AbstractAdapter implements Quoting {
     return m;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-connection-adapters-root-part-1-residue
+   */
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): unknown {
     if (nativeError instanceof ActiveRecordError) return nativeError;
 
