@@ -17,6 +17,7 @@ import {
   merge,
   max,
   mergeBang,
+  NoMethodError,
   NotImplementedError,
   rbFSend,
   rbInspect,
@@ -24,8 +25,10 @@ import {
   rbModAttrWriter,
   rbModName,
   rbModPublicMethodDefined,
+  rbModToS,
   rbObjAsString,
   rbObjClone,
+  rbObjDup,
   rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
@@ -271,7 +274,7 @@ function removeCommand(this: BaseClass, ...names: unknown[]): void {
     hashDelete(this.commands(), rbObjAsString(name));
     hashDelete(this.allCommands(), rbObjAsString(name));
     if (rtest(options.undefine)) {
-      Object.defineProperty(this.prototype, name as string, {
+      Object.defineProperty(this.prototype, rbObjAsString(name), {
         value: undefined,
         writable: true,
         configurable: true,
@@ -286,13 +289,17 @@ function noCommands<T>(this: BaseClass, block: () => T): T {
 
 function publicCommand(this: BaseClass, ...names: string[]): void {
   names.forEach((name) => {
-    const superclass = Object.getPrototypeOf(this.prototype) as Record<
-      string,
-      (...args: unknown[]) => unknown
-    >;
+    const prototype = this.prototype;
     Object.defineProperty(this.prototype, name, {
       value: function (this: object, ...args: unknown[]) {
-        return superclass[name].apply(this, args);
+        const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>)[name];
+        if (typeof superMethod !== "function") {
+          throw new NoMethodError(
+            `super: no superclass method '${name}' for an instance of ${rbModToS(prototype.constructor as never)}`,
+            name,
+          );
+        }
+        return superMethod.apply(this, args);
       },
       writable: true,
       configurable: true,
@@ -563,7 +570,7 @@ export const ClassMethods = {
   ): Promise<unknown> {
     try {
       config.shell ||= new ThorBase.shell!();
-      return await this.dispatch(null, [...givenArgs], null, config);
+      return await this.dispatch(null, rbObjDup(givenArgs), null, config);
     } catch (e) {
       if (e instanceof ThorError) {
         if (rtest(config.debug) || env["THOR_DEBUG"] === "1") {
@@ -594,7 +601,7 @@ export const ClassMethods = {
     arity: unknown,
   ): never {
     const name = compact([command.ancestorName, command.name]).join(" ");
-    let msg = `ERROR: "${this.basename()} ${name}" was called with `;
+    let msg = `ERROR: "${this.basename() ?? ""} ${name}" was called with `;
     if (args.length === 0) msg += "no arguments";
     if (!(args.length === 0)) msg += "arguments " + rbInspect(args);
     msg += `\nUsage: "${stringSplit(this.banner(command), "\n").join('"\n       "')}"`;
@@ -712,7 +719,7 @@ export const ClassMethods = {
 
   /** @internal */
   basename(this: BaseClass): string | null {
-    return stringSplit(File.basename(argv[1]), " ")[0] ?? null;
+    return stringSplit(File.basename(argv[1] ?? ""), " ")[0] ?? null;
   },
 
   /** @internal */

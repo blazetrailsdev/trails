@@ -374,6 +374,13 @@ describe("Thor::Base", () => {
         "built app",
       );
       expect(Object.keys(child.commands())).toEqual(["build"]);
+
+      parent.prototype.build = (name: string) => `rebuilt ${name}`;
+      expect((new child() as Instance & { build(name: string): string }).build("app")).toBe(
+        "rebuilt app",
+      );
+      child.publicCommand("nope");
+      expect(() => (new child() as Instance & { nope(): void }).nope()).toThrow(NoMethodError);
     });
   });
 
@@ -381,6 +388,8 @@ describe("Thor::Base", () => {
     it("derives from the class name, and registers the class when set explicitly", () => {
       const klass = baseclass();
       Object.defineProperty(klass, "name", { value: "Scripts::MyScript" });
+      expect(baseclass().namespace()).toBe("root");
+      expect(subclass(baseclass()).namespace()).toMatch(/^#<class:0x[0-9a-f]+>$/);
       expect(klass.namespace()).toBe("scripts:my_script");
       expect(Base.subclasses()).not.toContain(klass);
       expect(klass.namespace("my_scripts")).toBe("my_scripts");

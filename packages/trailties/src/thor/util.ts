@@ -1,7 +1,9 @@
-import { rbModName } from "@blazetrails/ruby-compat";
+import { rbModToS, rbObjAsString } from "@blazetrails/ruby-compat";
 
-export function namespaceFromThorClass(constant: object): string {
-  let name = (rbModName(constant) ?? "").replace(/^Thor::Sandbox::/gm, "");
+export function namespaceFromThorClass(constant: unknown): string {
+  let name = (
+    typeof constant === "function" ? rbModToS(constant as never) : rbObjAsString(constant)
+  ).replace(/^Thor::Sandbox::/gm, "");
   name = snakeCase(name).replace(/:+/g, ":");
   return name;
 }
