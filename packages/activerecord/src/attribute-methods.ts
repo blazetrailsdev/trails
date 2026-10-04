@@ -729,7 +729,7 @@ export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return _isSavedChangeToAttribute(this as any, attrName, options);
 }
 export function savedChangeToAttribute(
@@ -748,7 +748,7 @@ export function isWillSaveChangeToAttribute(
   this: InstanceMethodHost,
   attrName: string,
   options?: DirtyOptions,
-): boolean {
+): boolean | undefined {
   return _isWillSaveChangeToAttribute(this as any, attrName, options);
 }
 export function attributeChangeToBeSaved(

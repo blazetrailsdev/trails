@@ -13,9 +13,9 @@ describe("StringType", () => {
   describe("isChangedInPlace", () => {
     it("non-string new value returns false", () => {
       const type = new Types.StringType();
-      expect(type.isChangedInPlace("42", 42)).toBe(false);
-      expect(type.isChangedInPlace("hello", null)).toBe(false);
-      expect(type.isChangedInPlace("", true)).toBe(false);
+      expect(type.isChangedInPlace("42", 42)).toBeUndefined();
+      expect(type.isChangedInPlace("hello", null)).toBeUndefined();
+      expect(type.isChangedInPlace("", true)).toBeUndefined();
     });
 
     it("same string returns false", () => {
@@ -40,7 +40,7 @@ describe("StringType", () => {
 
     it("null rawOldValue with non-string newValue returns false", () => {
       const type = new Types.StringType();
-      expect(type.isChangedInPlace(null, 42)).toBe(false);
+      expect(type.isChangedInPlace(null, 42)).toBeUndefined();
     });
 
     it("empty string newValue is still a string", () => {

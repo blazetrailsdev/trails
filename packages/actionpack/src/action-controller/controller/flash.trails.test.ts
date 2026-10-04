@@ -1,7 +1,10 @@
 import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect } from "vitest";
+import { include } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
+import { Metal } from "../metal.js";
+import { Flash } from "../metal/flash.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { CookieStore } from "../../action-dispatch/middleware/session/cookie-store.js";
 import { ShowExceptions } from "../../action-dispatch/middleware/show-exceptions.js";
@@ -63,5 +66,23 @@ describe("add_flash_types readers", () => {
     expect(WarningsController.actionMethods()).toContain("warning");
     WarningsController.addFlashTypes("warning");
     expect(WarningsController.actionMethods()).not.toContain("warning");
+  });
+
+  it("extends add_flash_types and action_methods onto a Metal includer", () => {
+    class MetalFlashController extends Metal {
+      async show(): Promise<void> {}
+    }
+    include(MetalFlashController, Flash);
+    const klass = MetalFlashController as unknown as {
+      prototype: object;
+      addFlashTypes(...types: string[]): void;
+      actionMethods(): string[];
+    };
+    expect(Object.hasOwn(klass, "addFlashTypes")).toBe(true);
+    expect(klass.actionMethods()).toContain("show");
+    expect(klass.actionMethods()).not.toContain("alert");
+    klass.addFlashTypes("warning");
+    expect("warning" in klass.prototype).toBe(true);
+    expect("warning" in Metal.prototype).toBe(false);
   });
 });

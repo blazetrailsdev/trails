@@ -1,11 +1,16 @@
-import { rbStrSNew, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  rbEqual,
+  rbObjAsString as toS,
+  rbStrSNew,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { ImmutableStringType } from "./immutable-string.js";
 
 export class StringType extends ImmutableStringType {
-  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
-    if (typeof newValue !== "string") return false;
-    if (rawOldValue === null || rawOldValue === undefined) return true;
-    return rawOldValue !== newValue;
+  isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean | undefined {
+    if (typeof newValue === "string") {
+      return !rbEqual(rawOldValue, newValue);
+    }
   }
 
   toImmutableString(): ImmutableStringType {
@@ -23,7 +28,7 @@ export class StringType extends ImmutableStringType {
     if (typeof value === "string") return rbStrSNew(value);
     else if (value === true) return this.true;
     else if (value === false) return this.false;
-    else return String(value);
+    else return toS(value);
   }
 }
 

@@ -1,7 +1,7 @@
 import { ActiveSupport } from "../index.js";
 import { IsolatedExecutionState } from "../isolated-execution-state.js";
 import type { ErrorContext, ErrorSeverity } from "../error-reporter.js";
-import { assert, Assertion, _assertNothingRaisedOrWarn } from "./assertions.js";
+import { assert, assertPredicate, Assertion, _assertNothingRaisedOrWarn } from "./assertions.js";
 
 const RECORDERS = "active_support_error_reporter_assertions";
 
@@ -37,7 +37,7 @@ export const ErrorCollector = {
   subscribed: false,
 
   async record(block: () => unknown): Promise<Report[]> {
-    subscribe();
+    this.subscribe();
     const recorders =
       IsolatedExecutionState.get<Report[][]>(RECORDERS) ??
       IsolatedExecutionState.set(RECORDERS, [] as Report[][]);
@@ -66,6 +66,18 @@ export const ErrorCollector = {
     });
     return true;
   },
+
+  /** @internal */
+  subscribe(): void {
+    if (this.subscribed) return;
+
+    if (ActiveSupport.errorReporter) {
+      ActiveSupport.errorReporter.subscribe(this);
+      this.subscribed = true;
+    } else {
+      throw new Assertion("No error reporter is configured");
+    }
+  },
 };
 
 /** @internal */
@@ -75,26 +87,12 @@ function deleteIf<T>(array: T[], predicate: (element: T) => boolean): void {
   }
 }
 
-/** @internal */
-function subscribe(): void {
-  if (ErrorCollector.subscribed) return;
-
-  if (ActiveSupport.errorReporter) {
-    ActiveSupport.errorReporter.subscribe(ErrorCollector);
-    ErrorCollector.subscribed = true;
-  } else {
-    throw new Assertion("No error reporter is configured");
-  }
-}
-
+/** @missingRailsArgs assert_predicate — CONVERGEABLE assert-predicate-takes-the-predicate-name-and-builds-minitests-message */
 export async function assertNoErrorReported(block: () => unknown): Promise<void> {
   const reports = await ErrorCollector.record(() =>
     _assertNothingRaisedOrWarn("assert_no_error_reported", block),
   );
-  assert(
-    reports.length === 0,
-    () => `Expected [${reports.map((r) => r.error.constructor.name).join(", ")}] to be empty?`,
-  );
+  assertPredicate(reports, (r) => r.length === 0);
 }
 
 export async function assertErrorReported(
@@ -122,3 +120,5 @@ export async function assertErrorReported(
   }
   return undefined;
 }
+
+export const ErrorReporterAssertions = { assertNoErrorReported, assertErrorReported };

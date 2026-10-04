@@ -72,7 +72,7 @@ export class AttributeMutationTracker {
     return this.attrNames().some((attr) => this.isChanged(attr));
   }
 
-  isChanged(attrName: string, options: { from?: unknown; to?: unknown } = {}): boolean {
+  isChanged(attrName: string, options: { from?: unknown; to?: unknown } = {}): boolean | undefined {
     const { OPTION_NOT_GIVEN } = AttributeMutationTracker;
     const { from, to } = { from: OPTION_NOT_GIVEN, to: OPTION_NOT_GIVEN, ...options };
     return (
@@ -83,7 +83,7 @@ export class AttributeMutationTracker {
     );
   }
 
-  changedInPlace(attrName: string): boolean {
+  changedInPlace(attrName: string): boolean | undefined {
     return this.attributes.getAttribute(attrName).changedInPlace();
   }
 
@@ -106,7 +106,7 @@ export class AttributeMutationTracker {
     return this.attributes.keys();
   }
 
-  protected attributeChanged(attrName: string): boolean {
+  protected attributeChanged(attrName: string): boolean | undefined {
     return this.forcedChanges.has(attrName) || this.attributes.getAttribute(attrName).isChanged();
   }
 
