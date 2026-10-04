@@ -6,7 +6,7 @@ import {
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
-import { block } from "@blazetrails/ruby-compat";
+import { block, transformValues } from "@blazetrails/ruby-compat";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
   isSchemaLoaded,
@@ -51,50 +51,40 @@ export function isReplayingOverColdSchema(): boolean {
   return replayingOverColdSchema;
 }
 
+/** @inventedArm try — CONVERGEABLE enum-undeclared-type-raise-reads-no-cold-schema-replay-flag */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
-  const cacheHost = this;
+  return (
+    Object.getOwnPropertyDescriptor(this, "_cachedDefaultAttributes")?.value ||
+    (this._cachedDefaultAttributes = (() => {
+      registerSubclass(Object.getPrototypeOf(this), this);
 
-  if (
-    !Object.prototype.hasOwnProperty.call(cacheHost, "_cachedDefaultAttributes") ||
-    !cacheHost._cachedDefaultAttributes
-  ) {
-    registerSubclass(Object.getPrototypeOf(cacheHost), cacheHost);
-
-    const attributesHash = cacheHost.connectionPool().withConnectionSync((connection: unknown) => {
-      const attributesHash: Record<string, Attribute> = Object.create(null) as Record<
-        string,
-        Attribute
-      >;
-      for (const [name, column] of Object.entries(
-        cacheHost.columnsHash() as Record<string, { name: string; default?: unknown }>,
-      )) {
-        attributesHash[name] = Attribute.fromDatabase(
-          column.name,
-          column.default ?? null,
-          typeForColumn.call(cacheHost, connection, column),
-        );
-      }
-      return attributesHash;
-    });
-
-    const attributeSet = new AttributeSet(attributesHash);
-    const cold =
-      !isSchemaLoaded.call(cacheHost) && !cacheHost.abstractClass && !!cacheHost.tableName;
-    const wasCold = replayingOverColdSchema;
-    replayingOverColdSchema = cold;
-    try {
-      AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
-        cacheHost,
-        attributeSet,
+      const attributesHash = this.connectionPool().withConnectionSync((connection: unknown) =>
+        transformValues(
+          this.columnsHash() as Record<string, { name: string; default?: unknown }>,
+          (column) =>
+            Attribute.fromDatabase(
+              column.name,
+              column.default ?? null,
+              typeForColumn.call(this, connection, column),
+            ),
+        ),
       );
-    } finally {
-      replayingOverColdSchema = wasCold;
-    }
 
-    cacheHost._cachedDefaultAttributes = attributeSet;
-  }
-
-  return cacheHost._cachedDefaultAttributes;
+      const attributeSet = new AttributeSet(attributesHash);
+      const cold = !isSchemaLoaded.call(this) && !this.abstractClass && !!this.tableName;
+      const wasCold = replayingOverColdSchema;
+      replayingOverColdSchema = cold;
+      try {
+        AttributeRegistration.ClassMethods.applyPendingAttributeModifications.call(
+          this,
+          attributeSet,
+        );
+      } finally {
+        replayingOverColdSchema = wasCold;
+      }
+      return attributeSet;
+    })())
+  );
 }
 
 /** @internal */

@@ -77,7 +77,7 @@ class DeveloperWithSymbolsForKeys extends Base {
 class DeveloperWithSymbolClassName extends Developer {
   static {
     this.hasAndBelongsToMany("projects", {
-      className: Symbol("ProjectWithSymbolsForKeys") as unknown as string,
+      className: "ProjectWithSymbolsForKeys",
     });
   }
 }

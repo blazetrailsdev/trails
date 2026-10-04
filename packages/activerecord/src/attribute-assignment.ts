@@ -1,5 +1,5 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { eachValue, isEmpty, rbInspect } from "@blazetrails/ruby-compat";
+import { eachValue, isEmpty, rbInspect, rbStrToF, rbStrToI } from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -19,7 +19,10 @@ function isNestedParameterHash(value: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE assign-attributes-pending-promise-chain-arms
+ */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
   attributes: Record<string, unknown>,
@@ -59,7 +62,10 @@ export function _assignAttributes(
   return pending ? pending.then(assignDeferred) : assignDeferred();
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE assign-attributes-pending-promise-chain-arms
+ */
 export function assignNestedParameterAttributes(
   this: AttributeAssignmentHost,
   pairs: Record<string, unknown>,
@@ -142,24 +148,13 @@ export function extractCallstackForMultiparameterAttributes(
 
 /** @internal */
 export function typeCastAttributeValue(multiparameterName: string, value: string): unknown {
-  const match = multiparameterName.match(/\(\d*([if])\)/);
-  if (!match) return value;
-  const flag = match[1];
-  if (flag === "i") {
-    const n = parseInt(value, 10);
-    return isNaN(n) ? 0 : n;
-  }
-  if (flag === "f") {
-    const n = parseFloat(value);
-    return isNaN(n) ? 0.0 : n;
-  }
-  return value;
+  const md = /\([0-9]*([if])\)/.exec(multiparameterName);
+  return md ? { i: rbStrToI, f: rbStrToF }[md[1] as "i" | "f"](value) : value;
 }
 
 /** @internal */
 export function findParameterPosition(multiparameterName: string): number {
-  const match = multiparameterName.match(/\((\d+)/);
-  return match ? parseInt(match[1], 10) : 0;
+  return rbStrToI([...multiparameterName.matchAll(/\(([0-9]*).*\)/g)][0][1]) as number;
 }
 
 export const AttributeAssignment = {

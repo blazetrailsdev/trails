@@ -288,10 +288,6 @@ export class Associations {
       options = scope;
       scope = null;
     }
-    const rawClassName = (options as { className?: unknown }).className;
-    if (typeof rawClassName === "symbol") {
-      options = { ...options, className: rawClassName.description ?? "" };
-    }
     const self = this as any;
     const habtmReflection = new Reflection.HasAndBelongsToManyReflection(
       name,

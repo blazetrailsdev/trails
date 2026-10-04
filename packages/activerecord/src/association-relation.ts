@@ -5,6 +5,7 @@ import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbEqual } from "@blazetrails/ruby-compat";
 
 export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
@@ -101,17 +102,7 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   }
 
   override async equals(other: unknown): Promise<boolean | undefined> {
-    const records = await this.records();
-    if (Array.isArray(other)) {
-      return (
-        other.length === records.length && other.every((record: T, i) => record.equals(records[i]))
-      );
-    }
-    const otherEquals = (other as { equals?: (o: unknown) => unknown } | null)?.equals;
-    if (typeof otherEquals === "function") {
-      return (await otherEquals.call(other, records)) as boolean | undefined;
-    }
-    return false;
+    return rbEqual(other, await this.records());
   }
 
   protected override async execQueries(block?: (record: T) => void): Promise<T[]> {
