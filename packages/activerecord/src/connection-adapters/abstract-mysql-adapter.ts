@@ -20,7 +20,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, rtest } from "@blazetrails/ruby-compat";
 import { transactionIsolationLevels } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
@@ -94,6 +94,7 @@ import {
 } from "./mysql/schema-statements.js";
 import {
   compactBlank,
+  extractOptionsBang,
   groupBy,
   include,
   isPresent,
@@ -479,10 +480,6 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.renameTableIndexes(tableName, newName, options);
   }
 
-  /**
-   * @inventedArm loop — CONVERGEABLE activerecord-converge-invented-control-flow-arms-abstract-quoting-and-table-ddl
-   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-abstract-quoting-and-table-ddl
-   */
   override async dropTable(
     ...args:
       | string[]
@@ -497,30 +494,20 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
           ((t: MysqlTableDefinition) => void) | undefined,
         ]
   ): Promise<unknown> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as {
+    const tableNames = args.filter(
+      (arg) => arg !== undefined && typeof arg !== "function",
+    ) as string[];
+    const options = extractOptionsBang(tableNames) as {
       ifExists?: boolean;
       force?: boolean | "cascade";
       temporary?: boolean;
     };
     for (const tableName of tableNames) {
-      await this.schemaCache.clearDataSourceCacheBang(tableName);
+      await this.schemaCache.clearDataSourceCacheBang(toS(tableName));
     }
-    const temporary = options.temporary ? " TEMPORARY" : "";
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
-    const cascade = options.force === "cascade" ? " CASCADE" : "";
-    const names = tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ");
-    return this.execute(`DROP${temporary} TABLE${ifExists} ${names}${cascade}`);
+    return this.execute(
+      `DROP${options.temporary ? " TEMPORARY" : ""} TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
+    );
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1256,7 +1243,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     return result.toArray();
   }
 
-  static override readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+  static override readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   /** @internal */
   async createTableInfo(tableName: string): Promise<string | null> {

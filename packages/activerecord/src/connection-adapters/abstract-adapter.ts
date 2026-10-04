@@ -35,6 +35,7 @@ import {
   abort,
   block,
   cmp,
+  Concurrent,
   env,
   excSetupMessage,
   fetch,
@@ -1801,19 +1802,15 @@ export class AbstractAdapter implements Quoting {
     return null;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall compute_if_absent — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
-   * @inventedArm if — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
-   */
+  /** @internal */
   get typeMap(): unknown {
-    const ctor = this.constructor as typeof AbstractAdapter;
+    const klass = this.constructor as typeof AbstractAdapter;
     const key = this.extendedTypeMapKey();
-    if (!key) return ctor.TYPE_MAP;
-    const cacheKey = JSON.stringify(key);
-    let m = ctor.EXTENDED_TYPE_MAPS.get(cacheKey);
-    if (!m) ctor.EXTENDED_TYPE_MAPS.set(cacheKey, (m = ctor.extendedTypeMap(key)));
-    return m;
+    if (key != null) {
+      return klass.EXTENDED_TYPE_MAPS.computeIfAbsent(key, () => klass.extendedTypeMap(key));
+    } else {
+      return klass.TYPE_MAP;
+    }
   }
 
   /** @internal */
@@ -2009,7 +2006,9 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  static readonly EXTENDED_TYPE_MAPS = new Map<string, unknown>();
+  static readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   quoteDefaultExpression(value: unknown, column: unknown): string {
     return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });

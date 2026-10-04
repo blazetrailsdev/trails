@@ -1,3 +1,4 @@
+import { Hash } from "../hash.js";
 import { rbModConstSet } from "../include.js";
 
 /**
@@ -19,7 +20,7 @@ export const Concurrent = { name: "Concurrent" } as { readonly name: string; Map
  * @noRailsEquivalent PERMANENT
  */
 export class Map<K, V> {
-  private readonly backend = new globalThis.Map<K, V>();
+  private readonly backend = new Hash<K, V>();
 
   /**
    * `initial_capacity:` is a sizing hint the MRI backend never reads
