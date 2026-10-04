@@ -161,17 +161,17 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /** @internal */
-  protected override async deleteRecords(records: Base[], method: string): Promise<number | void> {
+  protected override async deleteRecords(records: Base[], method: string): Promise<unknown> {
     if (method === "destroy") {
       for (const record of records) await record.destroyBang();
       if (!this.reflection.isInverseUpdatesCounterCache()) {
-        await this.updateCounter(-records.length);
+        return this.updateCounter(-records.length);
       }
     } else {
       const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
       const values = records.map((r) => queryConstraints.map((col) => r._readAttribute(col)));
       const scope = this.scope().where(new Map([[queryConstraints, values]]));
-      await this.updateCounter(-(await this.deleteCount(method, scope)));
+      return this.updateCounter(-(await this.deleteCount(method, scope)));
     }
   }
 

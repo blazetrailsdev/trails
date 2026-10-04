@@ -206,9 +206,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     attributes: Record<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
-    return this._association.build(attributes as Record<string, unknown>, block as never) as
-      | T
-      | T[];
+    return this._association.build(attributes, block as (record: Base) => void) as T | T[];
   }
 
   new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
@@ -426,7 +424,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   ): Promise<unknown> {
     return this.isNullScope()
       ? this.scope().calculate(operation, columnName)
-      : super.calculate(operation as never, columnName as never);
+      : super.calculate(operation, columnName);
   }
 
   get proxyAssociation(): CollectionAssociation {

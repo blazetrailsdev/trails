@@ -4,7 +4,6 @@ import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { kernelArray, underscore } from "@blazetrails/activesupport";
-import { reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
   foreignKeyPresent,
@@ -48,7 +47,7 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   async delete(
-    method: string | undefined = this.reflection.options.dependent as string | undefined,
+    method: string | undefined = this.options.dependent as string | undefined,
   ): Promise<void> {
     if (await this.loadTarget()) {
       const target = this.target as any;
@@ -58,7 +57,6 @@ export class HasOneAssociation extends SingularAssociation {
           break;
         case "destroy":
           target.destroyedByAssociation = this.reflection;
-          await preloadDestroyInverseBelongsTo(this);
           await target.destroy();
           if (!target.isDestroyed()) kernelThrow(":abort");
           break;
@@ -242,7 +240,6 @@ export class HasOneAssociation extends SingularAssociation {
         break;
       case "destroy":
         target.destroyedByAssociation = this.reflection;
-        await preloadDestroyInverseBelongsTo(this, target);
         if (target.isPersisted()) {
           await target.destroy();
         }
@@ -268,39 +265,6 @@ export class HasOneAssociation extends SingularAssociation {
         record.writeAttribute(foreignKeyColumn, null);
       }
     }
-  }
-}
-
-/** @internal */
-async function preloadDestroyInverseBelongsTo(
-  assoc: HasOneAssociation,
-  target: Base | null = assoc.target,
-): Promise<void> {
-  if (!target) return;
-  const owner = assoc.owner;
-  const targetCtor = (target as any).constructor as typeof Base;
-  if (typeof (target as any).association !== "function") return;
-  const ownFk = JSON.stringify((assoc as any).foreignKeyColumns());
-
-  for (const ref of reflectOnAllAssociations(targetCtor, "belongsTo")) {
-    const concrete = ref as unknown as {
-      name: string;
-      foreignKey: () => unknown;
-      klass?: typeof Base;
-    };
-    let fk: unknown;
-    let klass: typeof Base | undefined;
-    try {
-      fk = concrete.foreignKey();
-      klass = concrete.klass;
-    } catch {
-      continue;
-    }
-    if (JSON.stringify(Array.isArray(fk) ? fk : [fk]) !== ownFk) continue;
-    if (klass && !(owner instanceof (klass as any))) continue;
-    try {
-      await (target as any).association(ref.name).loadTarget();
-    } catch {}
   }
 }
 
