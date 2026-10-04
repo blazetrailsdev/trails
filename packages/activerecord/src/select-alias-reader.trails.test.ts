@@ -33,4 +33,11 @@ describe("select alias dynamic reader (trails)", () => {
     expect(record.bumped_id).toEqual(record.readAttribute("bumped_id"));
     expect(record.bumped_id).not.toBeUndefined();
   });
+
+  it("loads a record without materializing its attribute set", async () => {
+    const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
+    const attributes = (record as unknown as { _attributes: { _attributes: object } })._attributes;
+    expect(Object.keys(attributes._attributes)).toEqual([]);
+    expect((record as Comment & { bumped_id: unknown }).bumped_id).not.toBeUndefined();
+  });
 });

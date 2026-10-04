@@ -371,6 +371,13 @@ export function initWith(
 ): void {
   coder = LegacyYamlAdapter.convert(coder);
   const attributes = (this.constructor as unknown as YamlHost).yamlEncoder().decode(coder);
+  for (const name of attributes.keys()) {
+    if (!basicObjRespondTo(this, name, false)) {
+      (
+        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
+      ).defineAttributeMethod(name);
+    }
+  }
   this.initWithAttributes(attributes, coder["new_record"] as boolean, block);
 }
 
@@ -388,13 +395,6 @@ export function initWithAttributes<T extends CoreRecord>(
   this._newRecord = newRecord;
   this._attributes = attributes;
   this.initInternals();
-  for (const name of attributes.keys() as Iterable<string>) {
-    if (!basicObjRespondTo(this, name, false)) {
-      (
-        rbObjSingletonClass(this) as unknown as { defineAttributeMethod(name: string): void }
-      ).defineAttributeMethod(name);
-    }
-  }
 
   block?.(this);
 
