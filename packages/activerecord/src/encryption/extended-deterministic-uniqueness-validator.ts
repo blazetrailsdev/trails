@@ -1,31 +1,12 @@
 import { Encryption } from "../namespaces.js";
 import { prepend } from "@blazetrails/ruby-compat";
+import { UniquenessValidator } from "../validations/uniqueness.js";
 
 export class ExtendedDeterministicUniquenessValidator {
-  private static _installed = false;
-
-  static installSupport({
-    UniquenessValidator,
-    EncryptedUniquenessValidator,
-  }: {
-    UniquenessValidator: { prototype: { validateEach: (...args: any[]) => unknown } };
-    EncryptedUniquenessValidator: EncryptedUniquenessValidatorModule;
-  }): void {
-    if (this._installed) return;
-
-    if (typeof UniquenessValidator.prototype.validateEach !== "function") {
-      throw new Error(
-        "ExtendedDeterministicUniquenessValidator: UniquenessValidator.prototype.validateEach is not callable",
-      );
-    }
-
-    this._installed = true;
-
+  static installSupport(): void {
     prepend(UniquenessValidator.prototype, EncryptedUniquenessValidator);
   }
 }
-
-type EncryptedUniquenessValidatorModule = typeof EncryptedUniquenessValidator;
 
 export const EncryptedUniquenessValidator = {
   async validateEach(

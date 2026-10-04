@@ -22,10 +22,8 @@ import {
   ControllerRuntime,
   LogSubscriber,
   QueryCache,
-  Relation,
   SchemaReflection,
   Migration,
-  UniquenessValidator,
   deprecator,
   QueryLogs,
   type AutoFilteredParametersApp,
@@ -34,9 +32,7 @@ import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapte
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import {
   Encryption,
-  EncryptedAttributeType,
   EncryptedFixtures,
-  EncryptedUniquenessValidator,
   ExtendedDeterministicQueries,
   ExtendedDeterministicUniquenessValidator,
 } from "@blazetrails/activerecord/encryption";
@@ -101,11 +97,8 @@ const onPostgresqlAdapterLoadedPushTimestamptz = (): void => {
 
 const installEncryptionExtendedQueries = (): void => {
   if (Encryption.config.extendQueries) {
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
-    ExtendedDeterministicUniquenessValidator.installSupport({
-      UniquenessValidator,
-      EncryptedUniquenessValidator,
-    });
+    ExtendedDeterministicQueries.installSupport();
+    ExtendedDeterministicUniquenessValidator.installSupport();
   }
 };
 

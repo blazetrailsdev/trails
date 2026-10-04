@@ -39,7 +39,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
     Configurable.config.extendQueries = true;
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicQueries.installSupport();
   });
 
   afterEach(() => {
@@ -49,7 +49,6 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     (Base as any).findBy = savedMethods.findBy;
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
-    (ExtendedDeterministicQueries as any)._installed = false;
 
     restoreEncryptionConfig(configSnapshot);
     Configurable.config.extendQueries = savedExtendQueries;

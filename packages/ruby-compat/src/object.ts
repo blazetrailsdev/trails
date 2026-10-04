@@ -232,11 +232,35 @@ export const rbCDate = rbDefineClass("Date");
  */
 export const rbCDateTime = rbDefineClass("DateTime", rbCDate);
 
-const rbCNilClass = rbDefineClass("NilClass");
-const rbCTrueClass = rbDefineClass("TrueClass");
-const rbCFalseClass = rbDefineClass("FalseClass");
-const rbCInteger = rbDefineClass("Integer", rbCNumeric);
-const rbCFloat = rbDefineClass("Float", rbCNumeric);
+/**
+ * `rb_cNilClass` (`vendor/ruby/v3.3.11/object.c:4412`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNilClass = rbDefineClass("NilClass");
+
+/**
+ * `rb_cTrueClass` (`vendor/ruby/v3.3.11/object.c:4498`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTrueClass = rbDefineClass("TrueClass");
+
+/**
+ * `rb_cFalseClass` (`vendor/ruby/v3.3.11/object.c:4510`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFalseClass = rbDefineClass("FalseClass");
+
+/**
+ * `rb_cInteger` (`vendor/ruby/v3.3.11/numeric.c:6190`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+
+/**
+ * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6296`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFloat = rbDefineClass("Float", rbCNumeric);
 const rbCProc = rbDefineClass("Proc");
 
 /**

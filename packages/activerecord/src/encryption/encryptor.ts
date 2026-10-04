@@ -201,8 +201,7 @@ export class Encryptor {
 
   /** @internal */
   private compress(data: string): Buffer {
-    const result = this._compressor.deflate(data);
-    return Buffer.isBuffer(result) ? result : Buffer.from(result);
+    return Buffer.from(this._compressor.deflate(data));
   }
 
   /** @internal */
@@ -220,11 +219,20 @@ export class Encryptor {
 
   /** @internal */
   private forceEncodingIfNeeded(value: string): string {
-    const enc = this.forcedEncodingForDeterministicEncryption();
-    if (!enc) return value;
-    const normalized = normalizeEncoding(enc);
-    if (!normalized || normalized === "utf8") return value;
-    return replaceUnencodable(value, normalized === "ascii" ? 0x7f : 0xff);
+    if (
+      this.forcedEncodingForDeterministicEncryption() != null &&
+      value != null &&
+      !["utf8", null].includes(normalizeEncoding(this.forcedEncodingForDeterministicEncryption()))
+    ) {
+      return replaceUnencodable(
+        value,
+        normalizeEncoding(this.forcedEncodingForDeterministicEncryption()) === "ascii"
+          ? 0x7f
+          : 0xff,
+      );
+    } else {
+      return value;
+    }
   }
 
   /** @internal */

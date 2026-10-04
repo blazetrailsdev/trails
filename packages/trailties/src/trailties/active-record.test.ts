@@ -16,7 +16,6 @@ import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sq
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
 import {
   Configurable as EncryptionConfigurable,
-  EncryptedUniquenessValidator,
   Encryption,
 } from "@blazetrails/activerecord/encryption";
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
@@ -107,10 +106,7 @@ describe("RailtieTest", () => {
     Fixture.prototype.initialize = savedFixtureInitialize;
     setVerifyForeignKeysForFixtures(false);
     if (savedExtendQueries) {
-      ExtendedDeterministicUniquenessValidator.installSupport({
-        UniquenessValidator,
-        EncryptedUniquenessValidator,
-      });
+      ExtendedDeterministicUniquenessValidator.installSupport();
     }
   });
 
