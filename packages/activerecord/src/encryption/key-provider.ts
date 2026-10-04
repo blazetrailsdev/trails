@@ -1,4 +1,4 @@
-import { groupBy, kernelArray as Array } from "@blazetrails/activesupport";
+import { groupBy, kernelArray } from "@blazetrails/activesupport";
 import { last } from "@blazetrails/ruby-compat";
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
@@ -11,7 +11,7 @@ export class KeyProvider {
   private _keysGroupedById: Map<string, Key[]> | undefined;
 
   constructor(keys: Key | Key[]) {
-    this._keys = Array(keys);
+    this._keys = kernelArray(keys);
   }
 
   /** @missingRailsName keys — PERMANENT */

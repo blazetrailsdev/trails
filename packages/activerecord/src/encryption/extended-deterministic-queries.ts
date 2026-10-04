@@ -40,8 +40,11 @@ export class EncryptedQuery {
 
     if (owner.deterministicEncryptedAttributes()?.size === 0) return args;
 
-    let options: any;
-    if (Array.isArray(args) && (isPlainObject((options = args[0])) || options instanceof Map)) {
+    let options: Map<string, unknown> | Record<string, unknown>;
+    if (
+      Array.isArray(args) &&
+      (isPlainObject((options = args[0] as typeof options)) || options instanceof Map)
+    ) {
       options = transformKeys(
         options as Map<string, unknown>,
         ((key: unknown) => {

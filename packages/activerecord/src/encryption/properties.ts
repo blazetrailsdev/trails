@@ -16,13 +16,13 @@ import {
   type Bytes,
 } from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
+import type { Message } from "./message.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Properties {
   static get ALLOWED_VALUE_CLASSES(): unknown[] {
     return [
       rbCString,
-      Buffer,
       Encryption.Message,
       rbCNumeric,
       rbCInteger,
@@ -117,8 +117,8 @@ export class Properties {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Properties {
-  get encryptedDataKey(): string | undefined;
-  set encryptedDataKey(value: string | undefined);
+  get encryptedDataKey(): string | Message | undefined;
+  set encryptedDataKey(value: string | Message | undefined);
   get encryptedDataKeyId(): string | undefined;
   set encryptedDataKeyId(value: string | undefined);
   get compressed(): boolean | undefined;

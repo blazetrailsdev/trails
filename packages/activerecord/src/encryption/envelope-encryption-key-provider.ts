@@ -1,10 +1,8 @@
 import { Key } from "./key.js";
-import { Encryptor } from "./encryptor.js";
 import { KeyProvider } from "./key-provider.js";
 import type { KeyGenerator } from "./key-generator.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryption } from "../encryption.js";
-import { headerString } from "./encoding-helpers.js";
 import type { Message } from "./message.js";
 
 export class EnvelopeEncryptionKeyProvider {
@@ -32,19 +30,17 @@ export class EnvelopeEncryptionKeyProvider {
   }
 
   /** @internal */
-  private encryptDataKey(randomSecret: string): string {
-    return new Encryptor({ compress: false }).encrypt(randomSecret, {
-      key: this.activePrimaryKey.secret,
-    });
+  private encryptDataKey(randomSecret: string): Message {
+    return Encryption.cipher.encrypt(randomSecret, { key: this.activePrimaryKey.secret });
   }
 
   /** @internal */
   private decryptDataKey(encryptedMessage: Message): string | null {
-    const encryptedDataKey = headerString(encryptedMessage.headers.encryptedDataKey)!;
+    const encryptedDataKey = encryptedMessage.headers.encryptedDataKey as Message;
     const key = this.primaryKeyProvider()
       .decryptionKeys(encryptedMessage)
       ?.map((k) => k.secret);
-    if (key) return new Encryptor({ compress: false }).decrypt(encryptedDataKey, { key });
+    if (key) return Encryption.cipher.decrypt(encryptedDataKey, { key }).toString();
     return null;
   }
 

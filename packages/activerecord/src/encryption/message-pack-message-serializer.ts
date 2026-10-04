@@ -26,7 +26,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
       const data = MessagePack.load(serializedContent);
       return this.hashToMessage(data, 1);
     } catch (e) {
-      if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
+      if (e instanceof MessagePackError) throw new Decryption();
       throw e;
     }
   }
