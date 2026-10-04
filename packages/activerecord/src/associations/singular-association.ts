@@ -8,7 +8,7 @@ import {
 } from "../associations.js";
 import { Association } from "./association.js";
 import { AssociationNotFoundError } from "./errors.js";
-import { underscore } from "@blazetrails/activesupport";
+import { exceptBang, kernelArray, underscore } from "@blazetrails/activesupport";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
@@ -23,6 +23,11 @@ export class SingularAssociation extends Association<Base> {
     return this.replace(record);
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   * @inventedArm loadDisplacedForBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   * @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   */
   build(
     attributes?: Record<string, unknown>,
     block?: (record: Base) => void,
@@ -60,6 +65,7 @@ export class SingularAssociation extends Association<Base> {
     return this.target;
   }
 
+  /** @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies */
   get reader(): Base | null | Promise<Base | null> {
     this.ensureKlassExistsBang();
     if (!this.isLoaded() || this.isStaleTarget()) {
@@ -71,13 +77,14 @@ export class SingularAssociation extends Association<Base> {
 
   /** @internal */
   override scopeForCreate(): Record<string, unknown> {
-    const attrs = super.scopeForCreate();
-    const pk = (this.klass as typeof Base | undefined)?.primaryKey;
-    if (pk == null) return attrs;
-    for (const key of Array.isArray(pk) ? pk : [pk]) delete attrs[key];
-    return attrs;
+    return exceptBang(super.scopeForCreate(), ...kernelArray(this.klass.primaryKey));
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
+   * @inventedArm loop — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
+   * @inventedArm throw — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
+   */
   protected override findTarget(): Promise<Base | null> {
     if (!this.disableJoins && this.isViolatesStrictLoading()) {
       strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
@@ -127,6 +134,7 @@ export class SingularAssociation extends Association<Base> {
     })();
   }
 
+  /** @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     raiseError = false,
@@ -140,15 +148,10 @@ export class SingularAssociation extends Association<Base> {
         ((record: Base) => {
           yielded = block(record);
         }),
-    );
-    if (!record) return null;
+    )!;
     await yielded;
-    let saved = true;
-    if (typeof (record as any).save === "function") {
-      saved = await (record as any).save();
-    }
-    const removal = this.detachDisplacedOnBuild(record);
-    if (removal) await removal;
+    const saved = await record.save();
+    await this.detachDisplacedOnBuild(record);
     await this.setNewRecord(record);
     if (!saved && raiseError) {
       throw new RecordInvalid(record);
@@ -164,9 +167,4 @@ export class SingularAssociation extends Association<Base> {
   protected setNewRecord(record: Base): Base | null | Promise<Base | null> {
     return this.replace(record);
   }
-}
-
-/** @internal */
-function scopeForCreate(assoc: SingularAssociation): Record<string, unknown> {
-  return (assoc as any).scope?.()?.scopeForCreate?.() ?? {};
 }

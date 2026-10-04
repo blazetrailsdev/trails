@@ -6,13 +6,26 @@ import {
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { drop, isNil, Module, zip } from "@blazetrails/ruby-compat";
+import {
+  drop,
+  first,
+  isNil,
+  Module,
+  rbEqual,
+  transformValues,
+  zip,
+} from "@blazetrails/ruby-compat";
 import { filterMap, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface ThroughAssociationHost {
   owner: Base;
   reflection: any;
+  options: any;
+  /** @internal */
+  _throughReflection?: any;
+  /** @internal */
+  _throughAssociation?: any;
   /** @internal */
   throughReflection(): any;
   /** @internal */
@@ -20,10 +33,7 @@ export interface ThroughAssociationHost {
   /** @internal */
   ensureMutable(): void;
   /** @internal */
-  sourceReflection(): {
-    isCollection(): boolean;
-    inverseOf(): { foreignKey(): string | string[] } | null | undefined;
-  };
+  sourceReflection(): any;
 }
 
 /** @internal */
@@ -42,30 +52,21 @@ export function sourceReflection(assoc: { owner: Base; reflection: { name: strin
 }
 
 /** @internal */
-export function throughReflection(this: ThroughAssociationHost): unknown {
-  type Refl = {
-    throughReflection?: Refl | null;
-    isThroughReflection?: () => boolean;
-  };
-  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => Refl | null };
-  let refl: Refl | null =
-    (ctor._reflectOnAssociation?.(this.reflection.name) as Refl | null)?.throughReflection ?? null;
-  if (!refl) {
-    const throughName = this.reflection.options.through;
-    if (!throughName) return null;
-    refl = ctor._reflectOnAssociation?.(throughName) ?? null;
-  }
-  while (refl?.isThroughReflection?.() && refl.throughReflection) {
-    refl = refl.throughReflection;
-  }
-  return refl;
+export function throughReflection(this: ThroughAssociationHost): any {
+  return (this._throughReflection ??= (() => {
+    let refl = this.reflection.throughReflection;
+
+    while (refl.isThroughReflection()) {
+      refl = refl.throughReflection;
+    }
+
+    return refl;
+  })());
 }
 
 /** @internal */
 export function throughAssociation(this: ThroughAssociationHost): any {
-  const tr = this.throughReflection() as { name?: string } | null;
-  if (!tr?.name) return null;
-  return (this.owner as unknown as { association?: (n: string) => any }).association?.(tr.name);
+  return (this._throughAssociation ??= this.owner.association(this.throughReflection().name));
 }
 
 /** @internal */
@@ -94,36 +95,36 @@ export function constructJoinAttributes(
   ...records: Base[]
 ): Record<string, unknown> {
   this.ensureMutable();
-  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-  const sourceRefl = refl?.sourceReflection;
-  if (!sourceRefl) return {};
-  const assocPk = sourceRefl.associationPrimaryKey?.(refl.klass) ?? sourceRefl.primaryKey ?? "id";
-  const pkArr: string[] = Array(assocPk);
-  const compositeConstraints: string[] = compositeQueryConstraintsList.call(refl.klass);
+
+  const associationPrimaryKey = this.sourceReflection().associationPrimaryKey(
+    this.reflection.klass,
+  );
 
   let joinAttributes: Record<string, unknown>;
   if (
-    pkArr.length === compositeConstraints.length &&
-    pkArr.every((k: string, i: number) => k === compositeConstraints[i]) &&
-    !refl.options?.sourceType
+    rbEqual(
+      Array(associationPrimaryKey),
+      compositeQueryConstraintsList.call(this.reflection.klass),
+    ) &&
+    this.options.sourceType == null
   ) {
-    joinAttributes = { [sourceRefl.name]: records.length === 1 ? records[0] : records };
+    joinAttributes = { [this.sourceReflection().name]: records };
   } else {
-    const fk: string = sourceRefl.foreignKey() ?? `${sourceRefl.name}_id`;
-    const read = (r: any, k: string) => r._readAttribute?.(k) ?? r.readAttribute?.(k);
-    const values = records.map((r: any) =>
-      pkArr.length === 1 ? (read(r, pkArr[0]) ?? r.id) : pkArr.map((k: string) => read(r, k)),
+    const assocPkValues = records.map((record) =>
+      record._readAttribute(associationPrimaryKey as string),
     );
-    joinAttributes = { [fk]: records.length === 1 ? values[0] : values };
+    joinAttributes = { [this.sourceReflection().foreignKey() as string]: assocPkValues };
   }
 
-  if (refl.options?.sourceType) {
-    const foreignType: string = sourceRefl.foreignType ?? `${sourceRefl.name}_type`;
-    joinAttributes[foreignType] =
-      records.length === 1 ? refl.options.sourceType : [refl.options.sourceType];
+  if (this.options.sourceType != null) {
+    joinAttributes[this.sourceReflection().foreignType] = [this.options.sourceType];
   }
-  return joinAttributes;
+
+  if (records.length === 1) {
+    return transformValues(joinAttributes, (value) => first(value as unknown[]));
+  } else {
+    return joinAttributes;
+  }
 }
 
 /** @internal */

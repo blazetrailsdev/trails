@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { wrap } from "@blazetrails/activesupport";
 import {
+  groupBy,
   NoMethodError,
   rbObjClassname,
   rtest,
@@ -186,51 +187,30 @@ export class Branch {
     reflection: AbstractReflection,
     reflectionRecords: Base[],
   ): Association[] {
-    const groups: {
-      key: string;
-      klass: typeof Base;
-      reflectionScope: any;
-      records: Base[];
-    }[] = [];
+    return [
+      ...groupBy(reflectionRecords, (record) => {
+        const klass: typeof Base = (record as any).association(this.association!).klass;
 
-    for (const record of reflectionRecords) {
-      const klass: typeof Base = (record as any).association(this.association!).klass;
-
-      let reflectionScope: any = undefined;
-      if (reflection.scope && reflection.scope.length !== 0) {
-        const scopes = (reflection as any).joinScopes(
-          klass.arelTable,
-          (klass as any).predicateBuilder,
-          klass,
-          record,
-        );
-        if (scopes && scopes.length > 0) {
-          reflectionScope = scopes.reduce((acc: any, s: any) => acc.merge(s));
+        let reflectionScope: any;
+        if (reflection.scope != null && reflection.scope.length !== 0) {
+          reflectionScope = (reflection as any)
+            .joinScopes(klass.arelTable, (klass as any).predicateBuilder, klass, record)
+            .reduce((memo: any, scope: any) => memo.mergeBang(scope));
         }
-      }
 
-      const scopeKey =
-        reflectionScope?.toSql?.() ?? (reflectionScope == null ? "" : String(reflectionScope));
-      const key = `${klass.name}::${scopeKey}`;
-      const existing = groups.find((g) => g.key === key);
-      if (existing) {
-        existing.records.push(record);
-      } else {
-        groups.push({ key, klass, reflectionScope, records: [record] });
-      }
-    }
-
-    return groups.map(({ klass: rhsKlass, reflectionScope, records: rs }) => {
-      const preloaderClass = this.preloaderFor(reflection);
-      return new preloaderClass(
-        rhsKlass,
-        rs,
-        reflection as any,
-        this.scope,
-        reflectionScope,
-        this.associateByDefault,
-      );
-    });
+        return [klass, reflectionScope] as const;
+      }),
+    ].map(
+      ([[rhsKlass, reflectionScope], rs]) =>
+        new (this.preloaderFor(reflection))(
+          rhsKlass,
+          rs,
+          reflection as any,
+          this.scope,
+          reflectionScope,
+          this.associateByDefault,
+        ),
+    );
   }
 
   async isPolymorphic(): Promise<boolean> {
@@ -247,11 +227,10 @@ export class Branch {
   }
 
   async loaders(): Promise<Association[]> {
-    if (this._loaders !== null) return this._loaders;
-    this._loaders = [...(await this.groupedRecords())].flatMap(([reflection, reflectionRecords]) =>
-      this.preloadersForReflection(reflection, reflectionRecords),
-    );
-    return this._loaders;
+    return (this._loaders ??= [...(await this.groupedRecords())].flatMap(
+      ([reflection, reflectionRecords]) =>
+        this.preloadersForReflection(reflection, reflectionRecords),
+    ));
   }
 
   private buildChildren(children: any): Branch[] {
@@ -290,9 +269,10 @@ export class Branch {
   private preloaderFor(
     reflection: AbstractReflection,
   ): typeof Association | typeof ThroughAssociation {
-    if ((reflection as any).options?.through) {
+    if ((reflection as any).options.through != null) {
       return ThroughAssociation;
+    } else {
+      return Association;
     }
-    return Association;
   }
 }
