@@ -1256,6 +1256,10 @@ export class ThroughReflection extends AbstractReflection {
     return this._delegate.isCollection();
   }
 
+  checkEagerLoadableBang(): void {
+    return this._delegate.checkEagerLoadableBang();
+  }
+
   isPolymorphic(): boolean {
     return this._delegate.isPolymorphic();
   }

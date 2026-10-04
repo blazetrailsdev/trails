@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../../index.js";
+import { groupBy } from "@blazetrails/ruby-compat";
 import { fixtures } from "../../test-fixtures.js";
 import { Preloader } from "../preloader.js";
 import { Author } from "../../test-helpers/models/author.js";
@@ -45,6 +46,16 @@ describe("Preloader::Association::LoaderQuery", () => {
       const [a, b] = [await loaderFor(), await loaderFor()];
       expect(a.loaderQuery().eql(b.loaderQuery())).toBe(true);
       expect(a.loaderQuery().hash()).toBe(b.loaderQuery().hash());
+    });
+
+    it("groups loaders whose scopes carry equal where clauses, and separates unequal ones", async () => {
+      const loaders = await new Preloader({
+        records: [authors("david")],
+        associations: ["thinkingPosts", "thinkingPosts", "welcomePosts"],
+        associateByDefault: false,
+      }).loaders();
+      const grouped = groupBy(loaders, (loader) => loader.loaderQuery());
+      expect([...grouped.values()].map((similar) => similar.length)).toEqual([2, 1]);
     });
   });
 });

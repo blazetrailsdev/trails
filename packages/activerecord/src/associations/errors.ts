@@ -361,12 +361,13 @@ export class HasOneThroughNestedAssociationsAreReadonly extends ThroughNestedAss
 }
 
 export class EagerLoadPolymorphicError extends ActiveRecordError {
-  readonly reflection: string;
-
-  constructor(reflection: string) {
-    super(`Cannot eagerly load the polymorphic association :${reflection}.`);
+  constructor(reflection: { name: string } | null = null) {
+    if (reflection != null) {
+      super(`Cannot eagerly load the polymorphic association :${reflection.name}`);
+    } else {
+      super("Eager load polymorphic error.");
+    }
     this.name = "ActiveRecord::EagerLoadPolymorphicError";
-    this.reflection = reflection;
   }
 }
 

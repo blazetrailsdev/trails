@@ -1,16 +1,9 @@
-import { wrap } from "@blazetrails/activesupport";
-import { Hash, rbEqual } from "@blazetrails/ruby-compat";
+import { isPresent, wrap } from "@blazetrails/activesupport";
+import { first, Hash, rbEqual, rbHash, toS, zip } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
-
-const MAX_SAFE_BIGINT = BigInt(Number.MAX_SAFE_INTEGER);
-const MIN_SAFE_BIGINT = BigInt(Number.MIN_SAFE_INTEGER);
-const bigintNumber = (_key: string, value: unknown): unknown =>
-  typeof value === "bigint"
-    ? (JSON as JSON & { rawJSON(text: string): unknown }).rawJSON(value.toString())
-    : value;
 
 export class Association {
   readonly klass: typeof Base;
@@ -27,7 +20,7 @@ export class Association {
   /** @internal */
   protected _recordsByOwner: Map<Base, Base[]> | undefined;
   private _preloadedRecords: Base[] | undefined;
-  private _ownersByKey: Map<unknown, Base[]> | undefined;
+  private _ownersByKey: Hash<unknown, Base[]> | undefined;
   private _scope: any;
   private _keyConversionRequired: boolean | undefined;
 
@@ -103,53 +96,36 @@ export class Association {
     return new LoaderQuery(this.scope, this.associationKeyName);
   }
 
-  get ownersByKey(): Map<unknown, Base[]> {
-    if (this._ownersByKey !== undefined) return this._ownersByKey;
-
-    this._ownersByKey = new Map();
-    for (const owner of this.owners) {
-      const key = this.deriveKey(owner, this.ownerKeyName);
-      if (key == null) continue;
-      const existing = this._ownersByKey.get(key);
-      if (existing) {
-        existing.push(owner);
-      } else {
-        this._ownersByKey.set(key, [owner]);
+  get ownersByKey(): Hash<unknown, Base[]> {
+    this._ownersByKey ??= (() => {
+      const result = new Hash<unknown, Base[]>();
+      for (const owner of this.owners) {
+        const key = this.deriveKey(owner, this.ownerKeyName);
+        if (key != null) (result.get(key) ?? result.set(key, []).get(key)!).push(owner);
       }
-    }
+      return result;
+    })();
     return this._ownersByKey;
   }
 
   isLoaded(owner: Base): boolean {
-    try {
-      return (owner as any).association(this.reflection.name).loaded;
-    } catch {
-      return false;
-    }
+    return (owner as any).association(this.reflection.name).isLoaded();
   }
 
   targetFor(owner: Base): Base[] {
-    try {
-      return wrap((owner as any).association(this.reflection.name).target);
-    } catch {
-      return [];
-    }
+    return wrap((owner as any).association(this.reflection.name).target);
   }
 
   get scope(): any {
-    if (this._scope !== undefined) return this._scope;
-    this._scope = this.buildScope();
+    this._scope ??= this.buildScope();
     return this._scope;
   }
 
   setInverse(record: Base): void {
-    const key = this.deriveKey(record, this.associationKeyName);
-    const owners = this.ownersByKey.get(key);
-    if (owners && owners.length > 0) {
-      try {
-        const association = (owners[0] as any).association(this.reflection.name);
-        association.setInverseInstance(record);
-      } catch {}
+    const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
+    if (owners != null) {
+      const association = (first(owners) as any).association(this.reflection.name);
+      association.setInverseInstance(record);
     }
   }
 
@@ -187,23 +163,19 @@ export class Association {
     if (this.preloadScope && !this.preloadScope.isEmptyScope) return;
     if ((this.reflection as any).isCollection?.()) return;
 
-    for (const record of unscopedRecords) {
-      const key = this.deriveKey(record, this.associationKeyName);
-      if (key == null) continue;
+    const associationKeyName = this.associationKeyName as string;
+    for (const record of unscopedRecords.filter((r) =>
+      isPresent((r as any).readAttribute(associationKeyName)),
+    )) {
+      const owners = this.ownersByKey.get(this.deriveKey(record, this.associationKeyName));
+      owners?.forEach((owner, i) => {
+        const association = (owner as any).association(this.reflection.name);
+        association.target = record;
 
-      const owners = this.ownersByKey.get(key);
-      if (!owners) continue;
-
-      for (let i = 0; i < owners.length; i++) {
-        const owner = owners[i];
-        try {
-          const association = (owner as any).association(this.reflection.name);
-          association.target = record;
-          if (i === 0) {
-            association.setInverseInstance(record);
-          }
-        } catch {}
-      }
+        if (i === 0) {
+          association.setInverseInstance(record);
+        }
+      });
     }
   }
 
@@ -219,11 +191,9 @@ export class Association {
     if (this.isLoaded(owner)) return;
 
     const association = (owner as any).association(this.reflection.name);
-    const isCollection = (this.reflection as any).isCollection?.() ?? false;
-    if (isCollection) {
-      const currentTarget: Base[] = Array.isArray(association.target) ? association.target : [];
-      const notPersistedRecords = currentTarget.filter((r) => !(r as any).isPersisted());
-      association.target = [...records, ...notPersistedRecords];
+    if (this.reflection.isCollection()) {
+      const notPersistedRecords = (association.target as Base[]).filter((r) => !r.isPersisted());
+      association.target = records.concat(notPersistedRecords);
     } else {
       association.target = records[0] ?? null;
     }
@@ -231,18 +201,18 @@ export class Association {
 
   private deriveKey(owner: Base, key: string | string[]): unknown {
     if (Array.isArray(key)) {
-      return JSON.stringify(key.map((k) => this.convertKey((owner as any)._readAttribute(k))));
+      return key.map((k) => this.convertKey((owner as any)._readAttribute(k)));
+    } else {
+      return this.convertKey((owner as any)._readAttribute(key));
     }
-    return this.convertKey((owner as any)._readAttribute(key));
   }
 
   private convertKey(key: unknown): unknown {
-    if (this.isKeyConversionRequired()) return key == null ? "" : String(key);
-    if (key == null) return key;
-    if (typeof key === "bigint") {
-      return key >= MIN_SAFE_BIGINT && key <= MAX_SAFE_BIGINT ? Number(key) : key.toString();
+    if (this.isKeyConversionRequired()) {
+      return toS(key);
+    } else {
+      return key;
     }
-    return key;
   }
 
   private isKeyConversionRequired(): boolean {
@@ -254,15 +224,11 @@ export class Association {
   }
 
   private associationKeyType(): string | undefined {
-    const associationKeyName = this.associationKeyName;
-    if (Array.isArray(associationKeyName)) return undefined;
-    return this.klass.typeForAttribute(associationKeyName)!.type();
+    return this.klass.typeForAttribute(this.associationKeyName as string)!.type();
   }
 
   private ownerKeyType(): string | undefined {
-    const ownerKeyName = this.ownerKeyName;
-    if (this.model == null || Array.isArray(ownerKeyName)) return undefined;
-    return this.model.typeForAttribute(ownerKeyName)!.type();
+    return this.model!.typeForAttribute(this.ownerKeyName as string)!.type();
   }
 
   /** @internal */
@@ -328,39 +294,33 @@ export class LoaderQuery {
     );
   }
 
-  hash(): string {
-    const keyName = Array.isArray(this.associationKeyName)
-      ? this.associationKeyName.join(",")
-      : this.associationKeyName;
-    return `${keyName}::${this.scope.model.tableName}::${this.scope.model.connectionSpecificationName}::${JSON.stringify(this.scope.valuesForQueries(), bigintNumber)}`;
+  hash(): number {
+    return rbHash([
+      this.associationKeyName,
+      this.scope.model.tableName,
+      this.scope.model.connectionSpecificationName,
+      this.scope.valuesForQueries(),
+    ]);
   }
 
-  async loadRecordsForKeys(
-    keys: unknown[],
-    instantiateBlock?: (record: Base) => void,
-  ): Promise<Base[]> {
-    if (keys.length === 0) return [];
+  async loadRecordsForKeys(keys: Set<unknown>, block?: (record: Base) => void): Promise<Base[]> {
+    if (keys.size === 0) return [];
 
     if (Array.isArray(this.associationKeyName)) {
-      const conditions: Record<string, Set<unknown>> = {};
-      for (const values of keys) {
-        const valArr = (typeof values === "string" ? JSON.parse(values) : values) as unknown[];
-        for (let i = 0; i < this.associationKeyName.length; i++) {
-          const keyName = this.associationKeyName[i];
-          if (!conditions[keyName]) conditions[keyName] = new Set();
-          conditions[keyName].add(valArr[i]);
+      const queryConstraints = new Hash<string, Set<unknown>>(
+        (hsh, key) => hsh.set(key, new Set()).get(key)!,
+      );
+
+      for (const valuesSet of keys) {
+        for (const [keyName, value] of zip(this.associationKeyName, valuesSet as unknown[])) {
+          queryConstraints.get(keyName as string)!.add(value);
         }
       }
-      const whereObj: Record<string, unknown[]> = {};
-      for (const [k, v] of Object.entries(conditions)) {
-        whereObj[k] = [...v];
-      }
-      return (await this.scope.where(whereObj).load(instantiateBlock)).toArray();
-    }
 
-    return (
-      await this.scope.where({ [this.associationKeyName]: keys }).load(instantiateBlock)
-    ).toArray();
+      return (await this.scope.where(Object.fromEntries(queryConstraints)).load(block)).toArray();
+    } else {
+      return (await this.scope.where({ [this.associationKeyName]: keys }).load(block)).toArray();
+    }
   }
 
   recordsFor(loaders: Association[]): Promise<Base[]> {
@@ -384,13 +344,13 @@ export class LoaderRecords {
   /** @internal */
   readonly keysToLoad: Set<unknown>;
   /** @internal */
-  readonly alreadyLoadedRecordsByKey: Map<unknown, Base[]>;
+  readonly alreadyLoadedRecordsByKey: Hash<unknown, Base[]>;
 
   constructor(loaders: Association[], loaderQuery: LoaderQuery) {
     this.loaderQuery = loaderQuery;
     this.loaders = loaders;
     this.keysToLoad = new Set();
-    this.alreadyLoadedRecordsByKey = new Map();
+    this.alreadyLoadedRecordsByKey = new Hash();
 
     this.populateKeysToLoadAndAlreadyLoadedRecords();
   }
@@ -404,7 +364,7 @@ export class LoaderRecords {
     for (const loader of this.loaders) {
       for (const [key, owners] of loader.ownersByKey) {
         const loadedOwner = owners.find((owner) => loader.isLoaded(owner));
-        if (loadedOwner) {
+        if (loadedOwner != null) {
           this.alreadyLoadedRecordsByKey.set(key, loader.targetFor(loadedOwner));
         } else {
           this.keysToLoad.add(key);
@@ -419,7 +379,7 @@ export class LoaderRecords {
 
   /** @internal */
   loadRecords(): Promise<Base[]> {
-    return this.loaderQuery.loadRecordsForKeys([...this.keysToLoad], (record) => {
+    return this.loaderQuery.loadRecordsForKeys(this.keysToLoad, (record) => {
       for (const l of this.loaders) l.setInverse(record);
     });
   }

@@ -105,7 +105,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   it("aliases a referenced through-target table to the reference name when free", () => {
     const jd = new JoinDependency(Author, null, "commentsWithForeignKey", Nodes.OuterJoin);
     const target = nodeAt(jd, "commentsWithForeignKey");
-    expect(sqlNameOf(target)).toBe("comments");
+    expect(target.table).toBeNull();
 
     jd.joinConstraints([], (jd as any)._aliasTracker, [
       new Nodes.SqlLiteral("commentsWithForeignKey"),

@@ -7,34 +7,6 @@ import { Associations } from "../namespaces.js";
 
 const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-4
- */
-export function aliasedArelTableFor(
-  klass: { arelTable?: Table; tableName?: string } | null | undefined,
-  tableName: string,
-  effectiveName?: string,
-): Table | Nodes.TableAlias {
-  const sqlName = effectiveName ?? tableName;
-  const base = klass?.arelTable ?? new Table(tableName);
-  if (sqlName === base.name) return base;
-  return base.alias(sqlName);
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-4
- */
-export function aliasedArelTableForReflection(
-  reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,
-  tableName: string,
-  effectiveName?: string,
-): Table | Nodes.TableAlias {
-  const klass = reflection?.isPolymorphic?.() ? null : (reflection?.klass as never);
-  return aliasedArelTableFor(klass, tableName, effectiveName);
-}
-
 export class AliasTracker {
   readonly aliases: Hash<string, number>;
   private _tableAliasLength: number;

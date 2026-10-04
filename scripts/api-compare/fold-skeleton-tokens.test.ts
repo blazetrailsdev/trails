@@ -201,6 +201,14 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:scan"], "ruby", ["ref:matchAll"])).toEqual([]);
   });
 
+  it("folds `Set#subtract` onto the `delete` loop its port spells, and onto nothing without one", () => {
+    expect(
+      foldSkeletonTokens(["ref:subtract", "ref:keys"], "ruby", ["loop", "ref:keys", "ref:delete"]),
+    ).toEqual(["loop", "ref:keys"]);
+    expect(foldSkeletonTokens(["ref:subtract"], "ruby", ["ref:difference"])).toEqual([]);
+    expect(foldSkeletonTokens(["ref:subtract"], "ts")).toEqual(["ref:subtract"]);
+  });
+
   it("folds a block `each_slice` onto the `for … of eachSlice` loop its port spells, and a blockless one onto nothing", () => {
     expect(
       foldSkeletonTokens(["ref:each_slice", "ref:enqueue"], "ruby", ["loop", "ref:eachSlice"]),

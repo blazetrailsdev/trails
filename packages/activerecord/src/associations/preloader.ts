@@ -15,11 +15,6 @@ export interface PreloaderOptions {
   associateByDefault?: boolean;
 }
 
-/** @internal */
-function isRelation(records: Base[] | Relation<Base>): records is Relation<Base> {
-  return !Array.isArray(records) && typeof (records as any).toArray === "function";
-}
-
 export class Preloader {
   readonly records: Base[] | Relation<Base>;
   readonly associations: any;
@@ -28,7 +23,6 @@ export class Preloader {
 
   private _tree: Branch;
   private _availableRecords: (Base | Base[])[];
-  private _materialized: boolean;
 
   /** @noRailsEquivalent CONVERGEABLE preloader-new-stub-seam-onto-a-ruby-compat-class-new */
   static new(options: PreloaderOptions): Preloader {
@@ -49,22 +43,11 @@ export class Preloader {
       associateByDefault: this.associateByDefault,
       scope: this.scope,
     });
-    this._materialized = !isRelation(this.records);
-    if (this._materialized) {
-      this._tree.setPreloadedRecords(this.records as Base[]);
-    }
+    this._tree.setPreloadedRecords(this.records);
   }
 
   async isEmpty(): Promise<boolean> {
-    if (this.associations == null) return true;
-    await this.materialize();
-    return (await this._tree.preloadedRecords()).length === 0;
-  }
-
-  private async materialize(): Promise<void> {
-    if (this._materialized) return;
-    this._tree.setPreloadedRecords(await (this.records as Relation<Base>));
-    this._materialized = true;
+    return this.associations == null || (await this.records).length === 0;
   }
 
   async call(): Promise<Association[]> {
@@ -78,11 +61,9 @@ export class Preloader {
   }
 
   async loaders(): Promise<Association[]> {
-    const loaders: Association[] = [];
-    for (const branch of this.branches) {
-      loaders.push(...(await branch.loaders()));
-    }
-    return loaders;
+    const loaders: Association[][] = [];
+    for (const branch of this.branches) loaders.push(await branch.loaders());
+    return loaders.flat();
   }
 }
 

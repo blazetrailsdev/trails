@@ -379,6 +379,11 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // unbounded array. Part of audit row 31.
   ["concat", [[], ["loop"]]],
   ["scan", [[], ["loop"]]],
+  // `@keys_to_load.subtract(already_loaded_records_by_key.keys)`
+  // (activerecord/lib/active_record/associations/preloader/association.rb:88) —
+  // `Set#subtract` deletes each element in place, and a JS `Set` has no
+  // mutating difference, so the port is a `delete` loop.
+  ["subtract", [[], ["loop"]]],
   // `ids.each_slice(batch_size) do |ids_batch| … end`
   // (activerecord/lib/active_record/associations/has_many_association.rb:46) —
   // `eachSlice` answers the batches and the port walks them with `for … of`.

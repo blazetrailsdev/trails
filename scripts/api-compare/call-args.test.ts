@@ -293,6 +293,16 @@ describe("compareCallArgs built-in receiver as argument 1", () => {
       "mismatch",
     );
   });
+
+  it("strips the chained receiver of Array#extract!", () => {
+    // join_association.rb:60 `nodes.children.extract! { |node| … }`, ported as
+    // `extractBang(nodes.children, (node) => …)`.
+    const ruby = { ...site("extract!", [], ["block"]), recv: "call:children" };
+    expect(compareCallArgs(ruby, site("extractBang", ["call:children"])).verdict).toBe("match");
+    expect(compareCallArgs(ruby, site("extractBang", ["call:children", "id:extra"])).verdict).toBe(
+      "mismatch",
+    );
+  });
 });
 
 describe("compareCallArgs Regexp flag argument", () => {

@@ -23,7 +23,7 @@ export function rbHash(value: unknown): number {
       return stringHash(value);
     case "number":
     case "bigint":
-      return stringHash(String(value));
+      return stringHash(`\0${String(value)}`);
     case "boolean":
       return value ? 0x5bf03635 : 0x27d4eb2f;
     case "symbol":

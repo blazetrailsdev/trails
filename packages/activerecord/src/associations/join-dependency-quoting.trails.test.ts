@@ -199,7 +199,7 @@ describe("JoinDependency Arel node construction", () => {
     Associations.hasMany.call(Owner, "assets", { className: "Asset", foreignKey: "owner_id" });
     Associations.hasMany.call(Asset, "comments", { className: "Comment", foreignKey: "asset_id" });
 
-    const jd = new JoinDependency(Owner, null, "assets.comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Owner, null, { assets: "comments" }, Nodes.OuterJoin);
     jd.joinConstraints([]);
 
     expect(jd.joinRoot.children).toHaveLength(1);
@@ -217,11 +217,10 @@ describe("JoinDependency Arel node construction", () => {
 
     const jd = new JoinDependency(Asset, null, { owner: "assets" }, Nodes.OuterJoin);
     const node1 = nodeAt(jd, "owner");
-    expect(sqlNameOf(node1)).toBe("owners");
-
     const node2 = nodeAt(jd, "owner.assets");
 
     const joins = jd.joinConstraints([]);
+    expect(sqlNameOf(node1)).toBe("owners");
 
     const table1 = (joinFor(joins, node1) as Nodes.OuterJoin).left;
     expect((table1 as any).tableAlias).toBeNull();
