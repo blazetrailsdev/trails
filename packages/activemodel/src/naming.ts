@@ -252,7 +252,6 @@ export class ModelName {
 
 include(ModelName, ToJsonWithActiveSupportEncoder);
 
-/** @noRailsEquivalent CONVERGEABLE unify-ruby-class-name-message-helpers */
 function builtinClassName(value: unknown): string {
   if (value === null || value === undefined) return "nil";
   if (typeof value === "boolean") return String(value);

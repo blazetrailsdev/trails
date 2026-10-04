@@ -237,7 +237,6 @@ function isIncludeHash(value: unknown): value is Record<string, SerializeOptions
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** @noRailsEquivalent PERMANENT */
 async function preloadIncludes(
   record: SerializationRecord,
   options: SerializeOptions,

@@ -283,6 +283,10 @@ export const ClassMethods = {
     });
   },
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm answersWithAMethod — PERMANENT
+   */
   defineAttributeMethodPattern(
     this: ClassMethodsHost,
     pattern: AttributeMethodPattern,
@@ -569,7 +573,6 @@ export const AttributeMethods = {
   },
 };
 
-/** @noRailsEquivalent PERMANENT */
 function answersWithAMethod(klass: unknown, name: string): boolean {
   const start = (klass as { prototype?: object }).prototype;
   for (

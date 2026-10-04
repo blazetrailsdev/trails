@@ -754,8 +754,8 @@ uniform Promise.
 
 This is a genuine language shortcoming — JS has no synchronous await and no
 lazily-loading collection read — and it is ratified repo-wide here.
-`thenableHash`, `asJsonThenable` and `preloadIncludes` carry
-`@noRailsEquivalent PERMANENT` receipts against this section, and the
+`thenableHash` and `asJsonThenable` carry `@noRailsEquivalent PERMANENT`
+receipts against this section, and the module-private `preloadIncludes`, the
 `SerializableHash` type and the `sync` re-entry parameter exist to serve them.
 Do not re-derive the decision per call site, and do not file a story to make
 them `Promise`.
