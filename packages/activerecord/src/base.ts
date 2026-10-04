@@ -162,7 +162,6 @@ import {
   runLoadHooks,
   type PrependMethod,
   type Included,
-  type ParameterFilter,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
@@ -589,9 +588,7 @@ export class Base extends Model {
 
   declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 
-  static inspectionFilter(): ParameterFilter {
-    return _Core.inspectionFilter.call(this);
-  }
+  declare static inspectionFilter: typeof _Core.ClassMethods.inspectionFilter;
 
   static _abstractClass = false;
   declare static automaticScopeInversing: boolean;
@@ -1201,7 +1198,7 @@ export class Base extends Model {
 
   declare static initializeFindByCache: typeof _Core.initializeFindByCache;
   declare static cachedFindByStatement: typeof _Core.cachedFindByStatement;
-  declare static _findByStatementCache?: Map<boolean, Map<unknown, unknown>>;
+  declare static _findByStatementCache?: ReturnType<typeof _Core.initializeFindByCache>;
 
   declare static configurations: typeof _Core.configurations;
 
@@ -2735,6 +2732,7 @@ include(Base, {
   fullInspect: _Core.fullInspect,
   initializeInternalsCallback: _Core.initializeInternalsCallback,
   isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
+  inspectionFilter: _Core.inspectionFilter,
   inspectWithAttributes: _Core.inspectWithAttributes,
   attributesForInspect: _Core.attributesForInspect,
   allAttributesForInspect: _Core.allAttributesForInspect,

@@ -377,12 +377,12 @@ describe("compare", () => {
     expect(first.compare(first)).toBe(0);
 
     expect(new Topic({ title: "a" }).compare(new Topic({ title: "b" }))).toBe(0);
-    expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
-    expect(first.compare("not a topic")).toBeUndefined();
+    expect(first.compare(new Topic({ title: "a" }))).toBeNull();
+    expect(first.compare("not a topic")).toBeNull();
 
     const reply = await Reply.find(2);
     expect(first.compare(reply)).toBe(-1);
-    expect(reply.compare(first)).toBeUndefined();
+    expect(reply.compare(first)).toBeNull();
   });
 });
 

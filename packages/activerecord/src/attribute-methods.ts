@@ -558,9 +558,7 @@ export function formatForInspect(this: InstanceMethodHost, name: string, value: 
       inspectedValue = inspect(value);
     }
 
-    const filtered = _coreInspectionFilter
-      .call(this.constructor as never)
-      .filterParam(name, inspectedValue);
+    const filtered = _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue);
     return filtered instanceof InspectionMask ? String(filtered.__getobj__()) : String(filtered);
   }
 }

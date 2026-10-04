@@ -1076,6 +1076,33 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
   });
 
+  it("reads an own-property conditional as a class-level ivar read, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        static memo() {
+          return (
+            (Object.hasOwn(this, "_memo") ? this._memo : undefined) || (this._memo = this.build())
+          );
+        }
+        static cast() {
+          const name = Object.prototype.hasOwnProperty.call(this, "_name")
+            ? (this as any)._name
+            : null;
+          return this.build(name);
+        }
+        static other(klass: typeof Foo) {
+          const a = Object.hasOwn(this, "_memo") ? this._other : undefined;
+          const b = Object.hasOwn(this, "_memo") ? klass._memo : undefined;
+          return Object.hasOwn(this, "_memo") ? this._memo : this.build(a, b);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.classMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("memo")).toEqual(["or", "ref:build"]);
+    expect(skeleton("cast")).toEqual(["ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if", "if"]);
+  });
+
   it("emits or, not an arm, for a write guarded by the Ruby-falsiness of its own target", () => {
     const cls = extractFromSource(
       `class Foo {

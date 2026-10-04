@@ -1,4 +1,11 @@
-import { kernelThrow, rbEqual, zip } from "@blazetrails/ruby-compat";
+import {
+  kernelThrow,
+  rbEnsure,
+  rbEqual,
+  rbFSend,
+  rbModMethodDefined,
+  zip,
+} from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { RecordInvalid } from "./validations.js";
 import { Rollback } from "./errors.js";
@@ -477,76 +484,49 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
  * @internal
  * @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat
  */
-export function defineNonCyclicMethod(this: any, name: string, fn: (this: any) => any): void {
-  const klass = this;
-  if (name.startsWith(":")) name = name.slice(1);
-  if (!klass.prototype) return;
-  if (Object.prototype.hasOwnProperty.call(klass.prototype, name)) return;
-  if (klass.prototype) {
-    klass.prototype[name] = function (this: any) {
-      this._alreadyCalled ??= Object.create(null);
-      if (this._alreadyCalled[name]) return true;
-      this._alreadyCalled[name] = true;
-      const clear = () => {
-        this._alreadyCalled[name] = false;
-      };
-      let result: any;
-      try {
-        result = fn.call(this);
-      } catch (e) {
-        clear();
-        throw e;
-      }
-      if (result != null && typeof result.then === "function") {
-        return result.then(
-          (v: any) => {
-            clear();
-            return v;
-          },
-          (e: any) => {
-            clear();
-            throw e;
-          },
-        );
-      }
-      clear();
-      return result;
-    };
-  }
+export function defineNonCyclicMethod(this: any, name: string, block: (this: any) => any): void {
+  if (Object.prototype.hasOwnProperty.call(this.prototype, name)) return;
+
+  this.prototype[name] = function (this: any) {
+    let result: any = true;
+    this._alreadyCalled ||= {};
+    if (!this._alreadyCalled[name]) {
+      result = rbEnsure(
+        () => {
+          this._alreadyCalled[name] = true;
+          return block.call(this);
+        },
+        () => {
+          this._alreadyCalled[name] = false;
+        },
+      );
+    }
+
+    return result;
+  };
 }
 
 /** @internal */
 export function addAutosaveAssociationCallbacks(this: any, reflection: any): void {
   const saveMethod = `:autosaveAssociatedRecordsFor_${reflection.name}`;
-  const isCollection: boolean =
-    typeof reflection.isCollection === "function"
-      ? reflection.isCollection()
-      : reflection.collection === true ||
-        reflection.macro === "hasMany" ||
-        reflection.macro === "hasAndBelongsToMany";
-  const isHasOne: boolean =
-    typeof reflection.hasOne === "function"
-      ? reflection.hasOne()
-      : reflection.hasOne === true || reflection.macro === "hasOne";
 
-  if (isCollection) {
+  if (reflection.isCollection()) {
     this.aroundSave(":aroundSaveCollectionAssociation");
-    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
+
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
       return this.saveCollectionAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
-  } else if (isHasOne) {
-    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
+  } else if (reflection.isHasOne()) {
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
       return this.saveHasOneAssociation(reflection);
     });
     this.afterCreate(saveMethod);
     this.afterUpdate(saveMethod);
   } else {
-    defineNonCyclicMethod.call(this, saveMethod, async function (this: any) {
-      if ((await this.saveBelongsToAssociation(reflection)) === false) {
-        kernelThrow(":abort");
-      }
+    defineNonCyclicMethod.call(this, saveMethod.slice(1), async function (this: any) {
+      if ((await this.saveBelongsToAssociation(reflection)) === false) kernelThrow(":abort");
     });
     this.beforeSave(saveMethod);
   }
@@ -556,31 +536,21 @@ export function addAutosaveAssociationCallbacks(this: any, reflection: any): voi
 
 /** @internal */
 export function defineAutosaveValidationCallbacks(this: any, reflection: any): void {
-  if (!reflection.validate) return;
   const validationMethod = `:validateAssociatedRecordsFor_${reflection.name}`;
-  if (!this.prototype) return;
-  if (Object.prototype.hasOwnProperty.call(this.prototype, validationMethod.slice(1))) return;
-  const isCol =
-    typeof reflection.isCollection === "function"
-      ? reflection.isCollection()
-      : !!reflection.collection;
-  const isHasOne =
-    typeof reflection.hasOne === "function" ? reflection.hasOne() : !!reflection.hasOne;
-  if (isCol) {
+  if (reflection.validate && !rbModMethodDefined(this, validationMethod.slice(1))) {
+    let method: string;
+    if (reflection.isCollection()) {
+      method = "validateCollectionAssociation";
+    } else if (reflection.isHasOne()) {
+      method = "validateHasOneAssociation";
+    } else {
+      method = "validateBelongsToAssociation";
+    }
+
     defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
-      return validateCollectionAssociation.call(this, reflection);
+      return rbFSend(this, method, reflection);
     });
-  } else if (isHasOne) {
-    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
-      return validateHasOneAssociation.call(this, reflection);
-    });
-  } else {
-    defineNonCyclicMethod.call(this, validationMethod.slice(1), function (this: any) {
-      return validateBelongsToAssociation.call(this, reflection);
-    });
-  }
-  if (typeof this.validate === "function") {
     this.validate(validationMethod);
+    this.afterValidation(":_ensureNoDuplicateErrors");
   }
-  this.afterValidation(":_ensureNoDuplicateErrors");
 }

@@ -74,12 +74,12 @@ describe("ShardsKeysTest", () => {
     expect(ShardedModel.isSharded()).toBeTruthy();
   });
 
-  it("connected to all shards", () => {
-    const unshardedResults = UnshardedBase.connectedToAllShards({}, () => {
+  it("connected to all shards", async () => {
+    const unshardedResults = await UnshardedBase.connectedToAllShards({}, () => {
       return UnshardedBase.connectionPool().dbConfig.name;
     });
 
-    const shardedResults = ShardedBase.connectedToAllShards({}, () => {
+    const shardedResults = await ShardedBase.connectedToAllShards({}, () => {
       return ShardedBase.connectionPool().dbConfig.name;
     });
 
@@ -87,18 +87,18 @@ describe("ShardsKeysTest", () => {
     expect(shardedResults).toEqual(["shard_one", "shard_two"]);
   });
 
-  it("connected to all shards can switch each to reading role", () => {
-    const results = ShardedBase.connectedToAllShards({ role: "reading" }, () => {
+  it("connected to all shards can switch each to reading role", async () => {
+    const results = await ShardedBase.connectedToAllShards({ role: "reading" }, () => {
       return ShardedBase.connectionPool().dbConfig.name;
     });
 
     expect(results).toEqual(["shard_one_reading", "shard_two_reading"]);
   });
 
-  it("connected to all shards respects preventing writes", () => {
+  it("connected to all shards respects preventing writes", async () => {
     expect(ShardedBase.currentPreventingWrites()).toBeFalsy();
 
-    const results = ShardedBase.connectedToAllShards(
+    const results = await ShardedBase.connectedToAllShards(
       { role: "writing", preventWrites: true },
       () => {
         return ShardedBase.currentPreventingWrites();
