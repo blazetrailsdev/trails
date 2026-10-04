@@ -10,6 +10,7 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
+import { fetch } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -291,7 +292,7 @@ export class TableDefinition extends AbstractTableDefinition {
     if (type === "uuid") {
       options = {
         ...options,
-        default: "default" in options ? options.default : "gen_random_uuid()",
+        default: fetch(options as Record<string, unknown>, "default", "gen_random_uuid()"),
       };
     }
 
