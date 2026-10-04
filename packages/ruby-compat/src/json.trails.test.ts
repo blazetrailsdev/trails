@@ -17,4 +17,8 @@ describe("JSON.parse", () => {
   it("raises SyntaxError for a malformed source", () => {
     expect(() => JSON.parse("not json")).toThrow(SyntaxError);
   });
+
+  it("raises SyntaxError for a byte source that is not valid UTF-8", () => {
+    expect(() => JSON.parse(Uint8Array.of(0x22, 0xff, 0x22))).toThrow(SyntaxError);
+  });
 });

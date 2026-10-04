@@ -52,7 +52,13 @@ export namespace JSON {
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
    */
   export function parse(source: string | Uint8Array): unknown {
-    if (source instanceof Uint8Array) return globalJSON.parse(new TextDecoder().decode(source));
+    if (source instanceof Uint8Array) {
+      try {
+        source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(source);
+      } catch {
+        throw new SyntaxError("source sequence is illegal/malformed utf-8");
+      }
+    }
     if (typeof source !== "string") {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
     }
