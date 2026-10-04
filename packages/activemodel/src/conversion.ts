@@ -16,21 +16,29 @@ interface ConversionRecord {
   toKey(): unknown[] | null;
 }
 
-export const Conversion = new Module() as Module<{
+export const Conversion = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+    },
+  );
+
+  mod.defineMethod("toModel", toModel);
+  mod.defineMethod("toKey", toKey);
+  mod.defineMethod("toParam", toParam);
+  mod.defineMethod("toPartialPath", toPartialPath);
+}) as Module<{
   toModel: typeof toModel;
   toKey: typeof toKey;
   toParam: typeof toParam;
   toPartialPath: typeof toPartialPath;
 }> & {
   ClassMethods: typeof ClassMethods;
-  included(base: null, block: (this: object) => void): void;
 };
 export type Conversion = Included<typeof Conversion>;
-extend(Conversion, Concern);
-
-Conversion.included(null, function (this: object) {
-  classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
-});
 
 export function toModel<T>(this: T): T {
   return this;
@@ -70,11 +78,6 @@ export function _toPartialPath(this: ConversionHost): string {
 
 export const ClassMethods = { _toPartialPath };
 Conversion.ClassMethods = ClassMethods;
-
-Conversion.defineMethod("toModel", toModel);
-Conversion.defineMethod("toKey", toKey);
-Conversion.defineMethod("toParam", toParam);
-Conversion.defineMethod("toPartialPath", toPartialPath);
 
 interface ConversionHost {
   name: string;
