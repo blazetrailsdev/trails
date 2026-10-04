@@ -80,8 +80,8 @@ export class Point extends ValueType {
 
   /** @missingRailsName float — PERMANENT */
   private buildPoint(x: unknown, y: unknown): InstanceType<typeof ActiveRecord.Point> {
-    if (y === undefined) {
-      throw new ArgumentError("wrong number of arguments (given 1, expected 2)");
+    if (arguments.length !== 2) {
+      throw new ArgumentError(`wrong number of arguments (given ${arguments.length}, expected 2)`);
     }
     return new ActiveRecord.Point(kernelFloat(x), kernelFloat(y));
   }

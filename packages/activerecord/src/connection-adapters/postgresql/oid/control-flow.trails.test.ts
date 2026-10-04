@@ -60,8 +60,14 @@ describe("PostgreSQL OID types take Rails' control flow", () => {
     expect(type.isChangedInPlace(null, null)).toBe(false);
   });
 
-  it("Point#build_point raises ArgumentError for a one-element array", () => {
+  it("Point#build_point raises ArgumentError for any element count but two", () => {
     expect(() => new Point().cast([1])).toThrow("wrong number of arguments (given 1, expected 2)");
+    expect(() => new Point().cast([])).toThrow("wrong number of arguments (given 0, expected 2)");
+    expect(() => new Point().cast([1, 2, 3])).toThrow(
+      "wrong number of arguments (given 3, expected 2)",
+    );
     expect(() => new Point().serialize([1])).toThrow(ArgumentError);
+    expect(() => new Point().cast([1, null])).toThrow(TypeError);
+    expect(() => new Point().cast([1, null])).not.toThrow(ArgumentError);
   });
 });

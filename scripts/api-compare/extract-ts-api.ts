@@ -5153,6 +5153,22 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
   }
   let test = statement.expression;
   let message: RegExp;
+  if (ts.isBinaryExpression(test) && test.left.getText() === "arguments.length") {
+    let raise = statement.thenStatement;
+    if (ts.isBlock(raise) && raise.statements.length === 1) raise = raise.statements[0];
+    if (statement.elseStatement || !ts.isThrowStatement(raise)) return false;
+    const thrown = raise.expression;
+    if (!ts.isNewExpression(thrown) || thrown.expression.getText() !== "ArgumentError") {
+      return false;
+    }
+    const [text] = thrown.arguments ?? [];
+    return (
+      text !== undefined &&
+      /^[`"]wrong number of arguments \(given (\d+|\$\{arguments\.length\}), expected [\d.+]+\)[`"]$/.test(
+        text.getText(),
+      )
+    );
+  }
   if (ts.isPrefixUnaryExpression(test) && test.operator === ts.SyntaxKind.ExclamationToken) {
     test = test.operand;
     while (ts.isParenthesizedExpression(test)) test = test.expression;
