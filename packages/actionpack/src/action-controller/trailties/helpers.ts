@@ -1,9 +1,10 @@
-import { helper, type HelpersClassMethods } from "../../abstract-controller/helpers.js";
-import { helpersPath, modulesForHelpers } from "../metal/helpers.js";
+import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
+import { helpersPath } from "../metal/helpers.js";
 
 export interface HelpersPathControllerClass extends HelpersClassMethods {
   helpersPath?: string[];
   includeAllHelpers?: boolean;
+  helper?: HelpersClass["helper"];
 }
 
 const fired = new WeakSet<object>();
@@ -39,6 +40,6 @@ export function inherited(
   klass.helpersPath = helpersPath();
 
   if (Object.getPrototypeOf(klass) === base && base.includeAllHelpers) {
-    helper(klass, ...modulesForHelpers(["all"]));
+    (klass as HelpersClass).helper("all");
   }
 }

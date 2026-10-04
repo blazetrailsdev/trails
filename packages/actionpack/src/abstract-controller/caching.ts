@@ -1,6 +1,8 @@
 /** @internal */
 
 import { expandCacheKey, lookupStore } from "@blazetrails/activesupport/cache";
+import { classAttribute, extend, included } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activesupport";
 
 export type ViewCacheDependency = (this: CachingHost) => unknown;
@@ -38,6 +40,29 @@ export const ConfigMethods = {
   /** @internal */
   isCacheConfigured(this: Omit<CachingHost, "constructor" | "isCacheConfigured">) {
     return this.performCaching && this.cacheStore;
+  },
+};
+
+export const Caching = {
+  [included](
+    base: CachingClassMethods & {
+      configAccessor(...names: string[]): void;
+      helperMethod?(...methods: string[]): void;
+    },
+  ): void {
+    extend(base, ConfigMethods);
+
+    base.configAccessor("defaultStaticExtension");
+    base.defaultStaticExtension ??= ".html";
+
+    base.configAccessor("performCaching");
+    if (base.performCaching == null) base.performCaching = true;
+
+    base.configAccessor("enableFragmentCacheLogging");
+    base.enableFragmentCacheLogging = false;
+
+    classAttribute.call(base, "_viewCacheDependencies", { default: [] });
+    if (rbObjRespondTo(base, "helperMethod")) base.helperMethod!("viewCacheDependencies");
   },
 };
 

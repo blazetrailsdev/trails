@@ -1,7 +1,7 @@
 /** @internal */
 
-import { NoMethodError } from "@blazetrails/ruby-compat";
-import { Notifications } from "@blazetrails/activesupport";
+import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { classAttribute, included, mattrWriter, Notifications } from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
 export type FragmentCacheKeyBlock = (this: FragmentsHost) => unknown;
@@ -21,6 +21,22 @@ export interface FragmentsHost {
   instrumentName(): string;
   instrumentPayload(key: unknown): Record<string, unknown>;
 }
+
+export const Fragments = {
+  [included](base: FragmentsClassMethods & { helperMethod?(...methods: string[]): void }): void {
+    if (typeof base === "function") {
+      classAttribute.call(base, "fragmentCacheKeys");
+    } else {
+      mattrWriter.call(base, "fragmentCacheKeys");
+    }
+
+    base.fragmentCacheKeys = [];
+
+    if (rbObjRespondTo(base, "helperMethod")) {
+      base.helperMethod!("combinedFragmentCacheKey");
+    }
+  },
+};
 
 export function fragmentCacheKey(
   this: FragmentsClassMethods,

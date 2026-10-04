@@ -1,4 +1,13 @@
-import { camelize, demodulize, NameError } from "@blazetrails/activesupport";
+import {
+  camelize,
+  classAttribute,
+  constantize,
+  extend,
+  included,
+  isAnonymous,
+  NameError,
+} from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/ruby-compat";
 
 /** @internal */
 
@@ -9,6 +18,19 @@ export interface HelpersClassMethods {
   _helperMethods?: string[];
   name?: string;
 }
+
+export interface HelpersClass extends HelpersClassMethods {
+  _helperMethods: string[];
+  name: string;
+  helperMethod: typeof helperMethod;
+  helper: typeof helper;
+  clearHelpers: typeof clearHelpers;
+  _helpersForModification: typeof _helpersForModification;
+  defaultHelperModuleBang: typeof defaultHelperModuleBang;
+  modulesForHelpers: (typeof Resolution)["modulesForHelpers"];
+}
+
+type HelperArgument = HelperMethodsModule | string | HelperArgument[];
 
 export type HelperMethodNameList = string | HelperMethodNameList[];
 
@@ -58,31 +80,72 @@ export function defineHelpersModule(
   return mod;
 }
 
-export function helperMethod(this: HelpersClassMethods, ...names: HelperMethodNameList[]): void {
-  const flat = (names as readonly unknown[]).flat(Infinity) as string[];
-  if (flat.length === 0) return;
-  this._helperMethods = [...(this._helperMethods ?? []), ...flat];
-  const mod = _helpersForModification(this);
-  for (const name of flat) {
+export const Resolution = {
+  modulesForHelpers(modulesOrHelperPrefixes: readonly HelperArgument[]): HelperMethodsModule[] {
+    return (modulesOrHelperPrefixes as readonly unknown[])
+      .flat(Infinity)
+      .map((moduleOrHelperPrefix) => {
+        if (moduleOrHelperPrefix !== null && typeof moduleOrHelperPrefix === "object") {
+          return moduleOrHelperPrefix as HelperMethodsModule;
+        } else if (typeof moduleOrHelperPrefix === "string") {
+          let helperPrefix = String(moduleOrHelperPrefix);
+          if (!/^[A-Z]/.test(helperPrefix)) helperPrefix = camelize(helperPrefix);
+          return constantize(`${helperPrefix}Helper`) as HelperMethodsModule;
+        } else {
+          throw new ArgumentError("helper must be a String, Symbol, or Module");
+        }
+      });
+  },
+
+  async allHelpersFromPath(path: string | readonly string[]): Promise<string[]> {
+    const modName = ["@blazetrails", "activesupport", "glob"].join("/");
+    const { glob } = (await import(modName)) as typeof import("@blazetrails/activesupport/glob");
+    const helpers: string[] = [];
+    for (const _path of typeof path === "string" ? [path] : path) {
+      const names = (await glob("**/*{-,_}helper.{ts,js,rb}", { cwd: _path })).map((file) =>
+        file.replace(/[-_]helper\.(ts|js|rb)$/, ""),
+      );
+      helpers.push(...names.sort());
+    }
+    return [...new Set(helpers)];
+  },
+
+  async helperModulesFromPaths(
+    this: {
+      modulesForHelpers(modulesOrHelperPrefixes: readonly HelperArgument[]): HelperMethodsModule[];
+      allHelpersFromPath(path: string | readonly string[]): Promise<string[]>;
+    },
+    paths: string | readonly string[],
+  ): Promise<HelperMethodsModule[]> {
+    return this.modulesForHelpers(await this.allHelpersFromPath(paths));
+  },
+};
+
+export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameList[]): void {
+  const flat = (methods as readonly unknown[]).flat(Infinity) as string[];
+  this._helperMethods = [...this._helperMethods, ...flat];
+
+  for (const method of flat) {
+    const mod = this._helpersForModification();
     let proto = (this as { prototype?: object }).prototype ?? null;
     let descriptor: PropertyDescriptor | undefined;
-    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, name))) {
+    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, method))) {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
     if (descriptor?.get) {
-      Object.defineProperty(mod, name, {
+      Object.defineProperty(mod, method, {
         get(this: { controller: Record<string, unknown> }) {
-          return this.controller[name];
+          return this.controller[method];
         },
         configurable: true,
         enumerable: true,
       });
       continue;
     }
-    mod[name] = function (this: { controller: Record<string, unknown> }, ...args: unknown[]) {
-      const fn = this.controller[name];
+    mod[method] = function (this: { controller: Record<string, unknown> }, ...args: unknown[]) {
+      const fn = this.controller[method];
       if (typeof fn !== "function") {
-        throw new TypeError(`helper_method: controller does not respond to '${name}'`);
+        throw new TypeError(`helper_method: controller does not respond to '${method}'`);
       }
       return (fn as (...a: unknown[]) => unknown).apply(this.controller, args);
     };
@@ -90,21 +153,19 @@ export function helperMethod(this: HelpersClassMethods, ...names: HelperMethodNa
 }
 
 export function helper(
-  cls: HelpersClassMethods,
-  ...args: Array<HelperMethodsModule | ((mod: HelperMethodsModule) => void)>
+  this: HelpersClass,
+  ...args: Array<HelperArgument | ((mod: HelperMethodsModule) => void)>
 ): void {
-  for (const arg of args) {
-    if (typeof arg === "function") {
-      arg(_helpersForModification(cls));
-    } else if (arg && typeof arg === "object") {
-      if (isHelperIncluded(cls._helpers, arg)) continue;
-      const head = _helpersForModification(cls);
-      const currentTail = Object.getPrototypeOf(head) as object | null;
-      const link = makeIncludeLink(arg, currentTail);
-      Object.setPrototypeOf(head, link);
-      recordHelperIncluded(head, arg);
-    }
+  const block =
+    typeof args.at(-1) === "function" ? (args.pop() as (mod: HelperMethodsModule) => void) : null;
+  for (const mod of this.modulesForHelpers(args as HelperArgument[])) {
+    if (isHelperIncluded(this._helpers, mod)) continue;
+    const head = this._helpersForModification();
+    Object.setPrototypeOf(head, makeIncludeLink(mod, Object.getPrototypeOf(head) as object | null));
+    recordHelperIncluded(head, mod);
   }
+
+  if (block) block(this._helpersForModification());
 }
 
 function isHelperIncluded(helpers: HelperMethodsModule | undefined, mod: object): boolean {
@@ -153,101 +214,53 @@ function recordHelperIncluded(helpers: HelperMethodsModule, mod: object): void {
   set.add(mod);
 }
 
-export function clearHelpers(cls: HelpersClassMethods): void {
-  const inherited = [...(cls._helperMethods ?? [])];
-  cls._helpers = Object.create(null) as HelperMethodsModule;
-  cls._helperMethods = [];
-  helperMethod.call(cls, ...inherited);
+export function clearHelpers(this: HelpersClass): void {
+  const inheritedHelperMethods = this._helperMethods;
+  this._helpers = Object.create(null) as HelperMethodsModule;
+  this._helperMethods = [];
+
+  inheritedHelperMethods.forEach((meth) => this.helperMethod(meth));
+  if (!isAnonymous(this)) this.defaultHelperModuleBang();
 }
 
-export function _helpersForModification(cls: HelpersClassMethods): HelperMethodsModule {
-  if (Object.prototype.hasOwnProperty.call(cls, "_helpers") && cls._helpers) {
-    return cls._helpers;
+export function _helpersForModification(this: HelpersClass): HelperMethodsModule {
+  if (!(Object.prototype.hasOwnProperty.call(this, "_helpers") && this._helpers)) {
+    this._helpers = defineHelpersModule(
+      this,
+      (Object.getPrototypeOf(this) as HelpersClassMethods)._helpers,
+    );
   }
-  const inherited = cls._helpers ?? null;
-  const child = Object.create(inherited) as HelperMethodsModule;
-  cls._helpers = child;
-  return child;
-}
-
-export type HelperResolver = (name: string) => HelperMethodsModule | undefined;
-
-export interface ResolutionOptions {
-  resolve: HelperResolver;
-}
-
-export function modulesForHelpers(
-  args: ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
-  options: ResolutionOptions,
-): HelperMethodsModule[] {
-  const flat = (args as readonly unknown[]).flat(Infinity);
-  return flat.map((arg) => {
-    if (arg && typeof arg === "object") {
-      for (const v of Object.values(arg)) {
-        if (typeof v !== "function") {
-          throw new TypeError("helper must be a String, Symbol, or Module");
-        }
-      }
-      return arg as HelperMethodsModule;
-    }
-    if (typeof arg === "string" || typeof arg === "symbol") {
-      const raw = typeof arg === "symbol" ? (arg.description ?? "") : arg;
-      const name = `${/^[A-Z]/.test(raw) ? raw : camelizeHelperPrefix(raw)}Helper`;
-      const mod = options.resolve(name);
-      if (!mod) throw new NameError(`uninitialized constant ${name}`, demodulize(name));
-      return mod;
-    }
-    throw new TypeError("helper must be a String, Symbol, or Module");
-  });
-}
-
-export async function allHelpersFromPath(path: string | readonly string[]): Promise<string[]> {
-  const modName = ["@blazetrails", "activesupport", "glob"].join("/");
-  const { glob } = (await import(modName)) as typeof import("@blazetrails/activesupport/glob");
-  const roots = typeof path === "string" ? [path] : path;
-  const out: string[] = [];
-  const seen = new Set<string>();
-  for (const root of roots) {
-    const matches = await glob("**/*{-,_}helper.{ts,js,rb}", { cwd: root });
-    const names = matches
-      .map((f) => f.replace(/\.(ts|js|rb)$/, "").replace(/[-_]helper$/, ""))
-      .sort();
-    for (const name of names) {
-      if (!seen.has(name)) {
-        seen.add(name);
-        out.push(name);
-      }
-    }
-  }
-  return out;
-}
-
-export async function helperModulesFromPaths(
-  paths: string | readonly string[],
-  options: ResolutionOptions,
-): Promise<HelperMethodsModule[]> {
-  const names = await allHelpersFromPath(paths);
-  return modulesForHelpers(names, options);
+  return this._helpers;
 }
 
 /** @internal */
-export function defaultHelperModuleBang(
-  cls: HelpersClassMethods,
-  options: ResolutionOptions,
-): void {
-  const className = cls.name;
-  if (!className) return;
-  const helperPrefix = className.replace(/Controller$/, "");
-  const expectedName = `${/^[A-Z]/.test(helperPrefix) ? helperPrefix : camelize(helperPrefix)}Helper`;
+export function defaultHelperModuleBang(this: HelpersClass): void {
+  const helperPrefix = this.name.replace(/Controller$/, "");
   try {
-    const [mod] = modulesForHelpers([helperPrefix], options);
-    helper(cls, mod);
-  } catch (err) {
-    if (err instanceof NameError && err.isMissingName(expectedName)) return;
-    throw err;
+    this.helper(helperPrefix);
+  } catch (e) {
+    if (!(e instanceof NameError)) throw e;
+    if (!e.isMissingName(`${helperPrefix}Helper`)) throw e;
   }
 }
 
-function camelizeHelperPrefix(raw: string): string {
-  return camelize(raw);
+export class Helpers {
+  static modulesForHelpers = Resolution.modulesForHelpers;
+  static allHelpersFromPath = Resolution.allHelpersFromPath;
+  static helperModulesFromPaths = Resolution.helperModulesFromPaths;
+
+  static ClassMethods = {
+    ...Resolution,
+    helperMethod,
+    helper,
+    clearHelpers,
+    _helpersForModification,
+    defaultHelperModuleBang,
+  };
+
+  static [included](base: HelpersClass): void {
+    extend(base, Helpers.ClassMethods);
+    classAttribute.call(base, "_helperMethods", { default: [] });
+    base._helpers = defineHelpersModule(base);
+  }
 }

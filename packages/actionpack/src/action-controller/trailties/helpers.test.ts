@@ -1,13 +1,21 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { helpersPath, setApplicationHelpers, setHelpersPath } from "../metal/helpers.js";
+import { include } from "@blazetrails/ruby-compat";
+import {
+  helpersPath,
+  modulesForHelpers,
+  setApplicationHelpers,
+  setHelpersPath,
+} from "../metal/helpers.js";
 import { inherited, type HelpersPathControllerClass } from "./helpers.js";
-import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
+import { Helpers, type HelperMethodsModule } from "../../abstract-controller/helpers.js";
 
 const AbcHelper: HelperMethodsModule = { bareA: () => "a" };
 
 function base(): HelpersPathControllerClass {
-  return { name: "Base", helpersPath: [], includeAllHelpers: true };
+  const Base = class Base {};
+  include(Base, Helpers);
+  return Object.assign(Base, { helpersPath: [], includeAllHelpers: true, modulesForHelpers });
 }
 
 function subclassOf(parent: HelpersPathControllerClass): HelpersPathControllerClass {

@@ -295,6 +295,10 @@ export function skipAroundAction(
   });
 }
 
+export const appendBeforeAction = beforeAction;
+export const appendAfterAction = afterAction;
+export const appendAroundAction = aroundAction;
+
 /** @internal */
 export async function processAction(
   controller: AbstractController,
