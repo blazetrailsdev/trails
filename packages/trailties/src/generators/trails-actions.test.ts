@@ -27,6 +27,7 @@ let previousAdapter: string | null;
 
 function install(): void {
   const fs = {
+    cwd: () => "/",
     exists: async (p: string) => files.has(p) || dirs.has(p),
     readFile: async (p: string) => {
       const v = files.get(p);
