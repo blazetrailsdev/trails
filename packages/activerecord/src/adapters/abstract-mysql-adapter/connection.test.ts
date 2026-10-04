@@ -246,10 +246,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("passing flags by array to adapter", async () => {
       const testAdapter = new Mysql2Adapter({
         uri: MYSQL_TEST_URL,
-        flags: ["FOUND_ROWS", "COMPRESS"],
+        flags: ["COMPRESS"],
       });
       try {
-        expect(testAdapter._testOnlyPoolFlags()).toEqual(["FOUND_ROWS", "COMPRESS"]);
+        expect(testAdapter._testOnlyPoolFlags()).toEqual(["COMPRESS", "FOUND_ROWS"]);
       } finally {
         await testAdapter.disconnectBang();
       }
