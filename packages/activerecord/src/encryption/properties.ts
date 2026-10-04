@@ -1,11 +1,39 @@
 import { Encryption } from "../namespaces.js";
-import type { Bytes } from "@blazetrails/ruby-compat";
+import {
+  BigDecimal,
+  eachPair,
+  rbCFalseClass,
+  rbCFloat,
+  rbCInteger,
+  rbCNilClass,
+  rbCNumeric,
+  rbCString,
+  rbCTrueClass,
+  rbInspect,
+  rbObjClass,
+  rbObjClassname,
+  rbObjIsKindOf,
+  type Bytes,
+} from "@blazetrails/ruby-compat";
 import { EncryptedContentIntegrity, ForbiddenClass } from "./errors.js";
-
-const ALLOWED_TYPES = new Set(["string", "number", "boolean"]);
+import type { Message } from "./message.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Properties {
+  static get ALLOWED_VALUE_CLASSES(): unknown[] {
+    return [
+      rbCString,
+      Encryption.Message,
+      rbCNumeric,
+      rbCInteger,
+      rbCFloat,
+      BigDecimal,
+      rbCTrueClass,
+      rbCFalseClass,
+      rbCNilClass,
+    ];
+  }
+
   static readonly DEFAULT_PROPERTIES = {
     encryptedDataKey: "k",
     encryptedDataKeyId: "i",
@@ -55,13 +83,9 @@ export class Properties {
   }
 
   add(otherProperties: Record<string, unknown> | Properties): void {
-    if (otherProperties instanceof Properties) {
-      otherProperties.each((key, value) => this.set(key, value));
-      return;
-    }
-    for (const [key, value] of Object.entries(otherProperties)) {
+    eachPair(otherProperties as Record<string, unknown>, (key, value) => {
       this.set(key, value);
-    }
+    });
   }
 
   toH(): Map<string, unknown> {
@@ -69,15 +93,14 @@ export class Properties {
   }
 
   validateValueType(value: unknown): void {
-    if (value === null) return;
-    if (Buffer.isBuffer(value)) return;
-    if (typeof value === "object" && value !== null && "payload" in value && "headers" in value)
-      return;
-    const t = typeof value;
-    if (!ALLOWED_TYPES.has(t)) {
-      const typeName = _typeNameFor(value);
+    if (
+      !(
+        Properties.ALLOWED_VALUE_CLASSES.includes(rbObjClass(value)) ||
+        Properties.ALLOWED_VALUE_CLASSES.some((klass) => rbObjIsKindOf(value, klass))
+      )
+    ) {
       throw new ForbiddenClass(
-        `Can't store a ${typeName}, only properties of type string, number, boolean, null are allowed`,
+        `Can't store a ${rbObjClassname(value)}, only properties of type ${rbInspect(Properties.ALLOWED_VALUE_CLASSES)} are allowed`,
       );
     }
   }
@@ -94,8 +117,8 @@ export class Properties {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Properties {
-  get encryptedDataKey(): string | undefined;
-  set encryptedDataKey(value: string | undefined);
+  get encryptedDataKey(): string | Message | undefined;
+  set encryptedDataKey(value: string | Message | undefined);
   get encryptedDataKeyId(): string | undefined;
   set encryptedDataKeyId(value: string | undefined);
   get compressed(): boolean | undefined;
@@ -154,15 +177,6 @@ interface Equatable {
 /** @internal */
 function isBinaryish(value: unknown): boolean {
   return typeof value === "string" || Buffer.isBuffer(value);
-}
-
-function _typeNameFor(value: unknown): string {
-  const t = typeof value;
-  if ((t === "object" || t === "function") && value !== null) {
-    const name = (value as { constructor?: { name?: string } }).constructor?.name;
-    if (name) return name;
-  }
-  return t;
 }
 
 Encryption.Properties = Properties;

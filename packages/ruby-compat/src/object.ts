@@ -23,7 +23,8 @@ type Klass = abstract new (...args: never) => unknown;
  * the constructor, which a singleton class leaves naming the real class.
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
- *  which one it is is read off the value; a Temporal value carrying an instant
+ *  which one it is is read off the value; a `Uint8Array` is the binary
+ *  `String` seat; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
@@ -38,7 +39,7 @@ export function rbObjClass(obj: unknown): Klass {
   if (typeof obj === "bigint") return rbCInteger;
   if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
   if (obj instanceof Number) return rbCFloat;
-  if (typeof obj === "string") return rbCString;
+  if (typeof obj === "string" || obj instanceof Uint8Array) return rbCString;
   if (typeof obj === "function") {
     return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
       ? rbCClass
@@ -232,11 +233,35 @@ export const rbCDate = rbDefineClass("Date");
  */
 export const rbCDateTime = rbDefineClass("DateTime", rbCDate);
 
-const rbCNilClass = rbDefineClass("NilClass");
-const rbCTrueClass = rbDefineClass("TrueClass");
-const rbCFalseClass = rbDefineClass("FalseClass");
-const rbCInteger = rbDefineClass("Integer", rbCNumeric);
-const rbCFloat = rbDefineClass("Float", rbCNumeric);
+/**
+ * `rb_cNilClass` (`vendor/ruby/v3.3.11/object.c:4412`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCNilClass = rbDefineClass("NilClass");
+
+/**
+ * `rb_cTrueClass` (`vendor/ruby/v3.3.11/object.c:4498`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCTrueClass = rbDefineClass("TrueClass");
+
+/**
+ * `rb_cFalseClass` (`vendor/ruby/v3.3.11/object.c:4510`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFalseClass = rbDefineClass("FalseClass");
+
+/**
+ * `rb_cInteger` (`vendor/ruby/v3.3.11/numeric.c:6190`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+
+/**
+ * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6259`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const rbCFloat = rbDefineClass("Float", rbCNumeric);
 const rbCProc = rbDefineClass("Proc");
 
 /**

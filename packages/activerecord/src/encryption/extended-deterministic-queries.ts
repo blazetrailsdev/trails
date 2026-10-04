@@ -1,6 +1,20 @@
-import { Encryption } from "../namespaces.js";
-import { Concern, any, isPlainObject, transformKeys } from "@blazetrails/activesupport";
-import { Module, extend, include, isEmpty, prepend } from "@blazetrails/ruby-compat";
+import { ActiveRecord, Encryption } from "../namespaces.js";
+import {
+  Concern,
+  any,
+  isPlainObject,
+  kernelArray,
+  transformKeys,
+} from "@blazetrails/activesupport";
+import {
+  Module,
+  extend,
+  hashAref,
+  hashAset,
+  include,
+  isEmpty,
+  prepend,
+} from "@blazetrails/ruby-compat";
 import { Relation } from "../relation.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 
@@ -9,61 +23,10 @@ export interface SerializableType {
 }
 
 export class ExtendedDeterministicQueries {
-  private static _installed = false;
-
-  static installSupport(targets: {
-    Relation: {
-      prototype: {
-        where: (...args: any[]) => unknown;
-        isExists: (...args: any[]) => unknown;
-        scopeForCreate: (...args: any[]) => unknown;
-      };
-    };
-    Base: new (...args: any[]) => unknown;
-    EncryptedAttributeType: { prototype: { serialize: (...args: any[]) => unknown } };
-  }): void {
-    if (this._installed) return;
-
-    const relProto = targets.Relation.prototype as unknown as Record<
-      string,
-      (...args: any[]) => unknown
-    >;
-    const eatProto = targets.EncryptedAttributeType.prototype as unknown as Record<
-      string,
-      (...args: any[]) => unknown
-    >;
-    const missing: string[] = [];
-    if (typeof relProto.where !== "function") missing.push("Relation.prototype.where");
-    if (typeof relProto.isExists !== "function") missing.push("Relation.prototype.isExists");
-    if (typeof relProto.scopeForCreate !== "function")
-      missing.push("Relation.prototype.scopeForCreate");
-    if (typeof eatProto.serialize !== "function")
-      missing.push("EncryptedAttributeType.prototype.serialize");
-    if (missing.length > 0) {
-      throw new Error(
-        `ExtendedDeterministicQueries.installSupport: missing target method(s): ${missing.join(", ")}`,
-      );
-    }
-
-    prepend(relProto, {
-      where(super_, ...args) {
-        return RelationQueries.where.call(this, super_ as (...args: any[]) => unknown, args);
-      },
-      isExists(super_, ...args) {
-        return RelationQueries.isExists.call(this, super_ as (...args: any[]) => unknown, args);
-      },
-      scopeForCreate(super_) {
-        return RelationQueries.scopeForCreate.call(this, super_ as (...args: any[]) => unknown);
-      },
-    });
-    include(targets.Base, CoreQueries);
-    prepend(eatProto, {
-      serialize(super_, data) {
-        return ExtendedEncryptableType.serialize((v: unknown) => super_.call(this, v), data);
-      },
-    });
-
-    this._installed = true;
+  static installSupport(): void {
+    prepend(Relation.prototype, RelationQueries);
+    include(ActiveRecord.Base, CoreQueries);
+    prepend(EncryptedAttributeType.prototype, ExtendedEncryptableType);
   }
 }
 
@@ -77,9 +40,12 @@ export class EncryptedQuery {
 
     if (owner.deterministicEncryptedAttributes()?.size === 0) return args;
 
-    let options: unknown;
-    if (Array.isArray(args) && (isPlainObject((options = args[0])) || options instanceof Map)) {
-      const hash = transformKeys(
+    let options: Map<string, unknown> | Record<string, unknown>;
+    if (
+      Array.isArray(args) &&
+      (isPlainObject((options = args[0] as typeof options)) || options instanceof Map)
+    ) {
+      options = transformKeys(
         options as Map<string, unknown>,
         ((key: unknown) => {
           if (Array.isArray(key)) {
@@ -88,8 +54,8 @@ export class EncryptedQuery {
             return String(key);
           }
         }) as (key: string) => string,
-      ) as Map<string, unknown> | Record<string, unknown>;
-      args[0] = hash;
+      );
+      args[0] = options;
 
       for (let attributeName of owner.deterministicEncryptedAttributes() ?? []) {
         attributeName = String(attributeName);
@@ -97,12 +63,14 @@ export class EncryptedQuery {
         let value: unknown;
         if (
           !isEmpty(type.previousTypes) &&
-          (value = hash instanceof Map ? hash.get(attributeName) : hash[attributeName]) != null &&
+          (value = hashAref(options, attributeName)) != null &&
           value !== false
         ) {
-          value = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
-          if (hash instanceof Map) hash.set(attributeName, value);
-          else hash[attributeName] = value;
+          hashAset(
+            options,
+            attributeName,
+            this.processEncryptedQueryArgument(value, checkForAdditionalValues, type),
+          );
         }
       }
     }
@@ -125,7 +93,7 @@ export class EncryptedQuery {
     }
 
     if (typeof value === "string" || Array.isArray(value)) {
-      const list = Array.isArray(value) ? value : [value];
+      const list = kernelArray(value);
       return [
         ...list,
         ...list.flatMap((eachValue) => {
@@ -146,27 +114,20 @@ export class EncryptedQuery {
   }
 }
 
-export class RelationQueries {
-  static where(this: any, originalWhere: (...args: any[]) => unknown, args: unknown[]): unknown {
-    return originalWhere.call(this, ...EncryptedQuery.processArguments(this, args, true));
-  }
+export const RelationQueries = {
+  where(this: any, super_: (...args: any[]) => unknown, ...args: unknown[]): unknown {
+    return super_(...EncryptedQuery.processArguments(this, args, true));
+  },
 
-  static isExists(
-    this: any,
-    originalExists: (...args: any[]) => unknown,
-    args: unknown[],
-  ): unknown {
-    return originalExists.call(this, ...EncryptedQuery.processArguments(this, args, true));
-  }
+  isExists(this: any, super_: (...args: any[]) => unknown, ...args: unknown[]): unknown {
+    return super_(...EncryptedQuery.processArguments(this, args, true));
+  },
 
-  static scopeForCreate(
-    this: any,
-    originalScopeForCreate: (...args: any[]) => unknown,
-  ): Record<string, unknown> {
+  scopeForCreate(this: any, super_: (...args: any[]) => unknown): Record<string, unknown> {
     if (!any([...(this.model.deterministicEncryptedAttributes() ?? [])]))
-      return originalScopeForCreate.call(this) as Record<string, unknown>;
+      return super_() as Record<string, unknown>;
 
-    const scopeAttributes = originalScopeForCreate.call(this) as Record<string, unknown>;
+    const scopeAttributes = super_() as Record<string, unknown>;
     const wheres = this.whereValuesHash();
 
     for (let attributeName of this.model.deterministicEncryptedAttributes()) {
@@ -178,8 +139,8 @@ export class RelationQueries {
     }
 
     return scopeAttributes;
-  }
-}
+  },
+};
 
 export const CoreQueries = new Module() as Module & { ClassMethods: Module };
 extend(CoreQueries, Concern);
@@ -206,13 +167,14 @@ export class AdditionalValue {
   }
 }
 
-export class ExtendedEncryptableType {
-  static serialize(originalSerialize: (data: unknown) => unknown, data: unknown): unknown {
+export const ExtendedEncryptableType = {
+  serialize(super_: (data: unknown) => unknown, data: unknown): unknown {
     if (data instanceof AdditionalValue) {
       return data.value;
+    } else {
+      return super_(data);
     }
-    return originalSerialize(data);
-  }
-}
+  },
+};
 
 Encryption.ExtendedDeterministicQueries = ExtendedDeterministicQueries;

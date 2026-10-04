@@ -67,7 +67,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     savedMethods.findBy = baseStatics.findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
-    ExtendedDeterministicQueries.installSupport({ Relation, Base, EncryptedAttributeType });
+    ExtendedDeterministicQueries.installSupport();
 
     EncryptedSerializedBook = buildSerializedBook();
     PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
@@ -84,7 +84,6 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     baseStatics.findBy = savedMethods.findBy;
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
-    (ExtendedDeterministicQueries as unknown as Record<string, unknown>)._installed = false;
 
     Configurable.config.extendQueries = savedConfig.extendQueries;
     Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
