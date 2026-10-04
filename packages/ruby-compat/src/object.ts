@@ -716,6 +716,16 @@ function isComparable(recv: unknown): boolean {
   return typeof compareTo === "function" || typeof cmp === "function";
 }
 
+/**
+ * The method tables `Module#undef_method` writes its entries into: a data
+ * property holding `undefined` on one of them is `VM_METHOD_TYPE_UNDEF`
+ * (`vendor/ruby/v3.3.11/vm_method.c:1973` `rb_mod_undef_method`), where the
+ * lookup stops and `send` goes to `method_missing`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const UNDEF_METHOD_TABLES = new WeakSet<object>();
+
 function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown): unknown {
   const [vid, ...args] = argv;
   const name = rbCheckStringType(vid);
@@ -757,7 +767,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   for (let o: object | null = obj; o; o = Object.getPrototypeOf(o) as object | null) {
     const desc = Object.getOwnPropertyDescriptor(o, mid);
     if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
-    if (o !== obj && desc && "value" in desc && desc.value === undefined) break;
+    if (UNDEF_METHOD_TABLES.has(o) && desc && "value" in desc && desc.value === undefined) break;
     if (desc && argc === 0) return desc.get ? desc.get.call(recv) : desc.value;
     const setter = attr === undefined ? undefined : Object.getOwnPropertyDescriptor(o, attr)?.set;
     if (setter) return setter.call(recv, args[0]);

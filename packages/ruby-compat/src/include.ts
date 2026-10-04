@@ -45,6 +45,7 @@ import {
   rbModAttrWriter,
   rbModName,
   rbModToS,
+  UNDEF_METHOD_TABLES,
 } from "./object.js";
 
 type AnyClass = new (...args: never[]) => unknown;
@@ -396,6 +397,7 @@ export class Module<I extends object = Record<never, never>> {
     let links = includerCarriers.get(this);
     if (!links) includerCarriers.set(this, (links = []));
     links.push(link);
+    UNDEF_METHOD_TABLES.add(link);
     Object.defineProperty(link, T_ICLASS, { value: this });
     Object.setPrototypeOf(proto, link);
   }
@@ -456,6 +458,7 @@ export class Module<I extends object = Record<never, never>> {
     if (!links) singletonCarriers.set(this, (links = { members: new WeakSet(), refs: new Set() }));
     const ref = new WeakRef(link);
     links.members.add(link);
+    UNDEF_METHOD_TABLES.add(link);
     links.refs.add(ref);
     singletonReaper.register(link, { mod: this, ref });
     Object.defineProperty(link, T_ICLASS, { value: this });
