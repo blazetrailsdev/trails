@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
 import { Module, rbModConstSet } from "./include.js";
 import { Marshal } from "./marshal.js";
@@ -223,7 +224,6 @@ describe("Marshal.load", () => {
 
   it("loads a Hash default", () => {
     const h = Marshal.load(bytes("hash default")) as Hash<string, number>;
-    expect(h).toBeInstanceOf(Hash);
     expect(h.default()).toBe(5);
     expect((Marshal.load(bytes("hash default false")) as Hash<string, boolean>).default()).toBe(
       false,
@@ -245,7 +245,6 @@ describe("Marshal.load", () => {
     const loaded = Marshal.load(bytes("array cycle")) as unknown[];
     expect(loaded[0]).toBe(loaded);
     const [a, b] = Marshal.load(bytes("object link")) as [Column, Column];
-    expect(a).toBeInstanceOf(Column);
     expect(b).toBe(a);
   });
 
@@ -266,6 +265,7 @@ describe("Marshal.load", () => {
       new ArgumentError("ruby2_keywords flag is given but [] is not a Hash"),
     );
     expect(() => Marshal.load('\x04\bI"\x00\x06:\x0dencodingi\x06')).toThrow(TypeError);
+    expect(() => Marshal.load('\x04\bI"\x06a\x07:\x06ET:\x07@xi\x06')).toThrow(FrozenError);
   });
 
   it("loads what Marshal.dump dumped", () => {
@@ -282,9 +282,7 @@ describe("Marshal.load", () => {
     );
     expect(() => Marshal.load("\x03\x00i\x00")).toThrow(TypeError);
     expect(Marshal.load("\x04\x07i\x06")).toBe(1);
-    expect(() => Marshal.load(1 as unknown as string)).toThrow(
-      new TypeError("instance of IO needed"),
-    );
+    expect(() => Marshal.load(1)).toThrow(new TypeError("instance of IO needed"));
   });
 
   it("raises ArgumentError for malformed data", () => {

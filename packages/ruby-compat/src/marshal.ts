@@ -613,7 +613,8 @@ function rBytes0(len: number, arg: LoadArg): string {
 
 /**
  * `sym2encidx` (`vendor/ruby/v3.3.11/marshal.c:1543`); `null` is its `-1`, which
- * `rb_enc_find_index` also answers for a name that is not registered.
+ * `rb_enc_find_index` also answers for a name that is not registered. Like
+ * `Encoding.find`, it resolves the `external` and `locale` aliases.
  */
 function sym2encidx(sym: string, val: unknown): Encoding | null {
   if (!isAsciiString(sym)) return null;
@@ -941,9 +942,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
             num |= BigInt(rByte(arg)) << BigInt(i * 16);
             num |= BigInt(rByte(arg)) << BigInt(i * 16 + 8);
           }
-          if (sign === 0x2d) {
-            num = -num;
-          }
+          if (sign === 0x2d) num = -num;
         } else {
           const data = rBytes0(len * 2, arg);
           for (let i = data.length - 1; i >= 0; i--) {
@@ -1131,9 +1130,11 @@ export const Marshal = {
    *  Float loads boxed (`rbDbl2num`), and a Bignum goes through `rbBigNorm`.
    *  `rb_obj_alloc` is `Object.create(klass.prototype)`, so no constructor
    *  runs. `TYPE_UCLASS` re-classes an Array or Hash with `Object.setPrototypeOf`;
-   *  a JS string has no class to set, so a String subclass is a format error.
-   *  A class path resolves through `rbPathToClass`, whose table holds no core
-   *  class, so a `compare_by_identity` Hash loads only once `Hash` is seated.
+   *  a JS string has no class to set, so a String subclass is a format error,
+   *  and no ivar table, so a String, Float or Bignum dumped with an ivar of its
+   *  own raises `FrozenError`. A class path resolves through `rbPathToClass`,
+   *  whose table holds no core class, so a `compare_by_identity` Hash loads
+   *  only once `Hash` is seated.
    *
    * Not ported: the `proc` and `freeze:` arguments and an IO source; and the
    * `TYPE_USRMARSHAL` arm, which is
@@ -1143,7 +1144,7 @@ export const Marshal = {
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.load` (`vendor/ruby/v3.3.11/marshal.c:2434`).
    */
-  load(source: string): unknown {
+  load(source: unknown): unknown {
     return rbMarshalLoadWithProc(source);
   },
 };
