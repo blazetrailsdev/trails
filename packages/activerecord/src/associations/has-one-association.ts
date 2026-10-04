@@ -3,8 +3,8 @@ import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { underscore } from "@blazetrails/activesupport";
-import { _reflectOnAssociation, reflectOnAllAssociations } from "../reflection.js";
+import { kernelArray, underscore } from "@blazetrails/activesupport";
+import { reflectOnAllAssociations } from "../reflection.js";
 import {
   ForeignAssociation,
   foreignKeyPresent,
@@ -50,60 +50,43 @@ export class HasOneAssociation extends SingularAssociation {
   async delete(
     method: string | undefined = this.reflection.options.dependent as string | undefined,
   ): Promise<void> {
-    if (!(await this.loadTarget())) return;
-    const target = this.target!;
+    if (await this.loadTarget()) {
+      const target = this.target as any;
+      switch (method) {
+        case "delete":
+          await target.delete();
+          break;
+        case "destroy":
+          target.destroyedByAssociation = this.reflection;
+          await preloadDestroyInverseBelongsTo(this);
+          await target.destroy();
+          if (!target.isDestroyed()) kernelThrow(":abort");
+          break;
+        case "destroyAsync": {
+          let primaryKeyColumn: string | string[];
+          let id: unknown;
+          if (queryConstraintsList.call(target.constructor)) {
+            primaryKeyColumn = queryConstraintsList.call(target.constructor)!;
+            id = primaryKeyColumn.map((col) => target[col]);
+          } else {
+            primaryKeyColumn = target.constructor.primaryKey as string;
+            id = target[primaryKeyColumn];
+          }
 
-    switch (method) {
-      case "delete":
-        if (typeof (target as any).delete === "function") {
-          await (target as any).delete();
+          this.enqueueDestroyAssociation({
+            ownerModelName: this.owner.constructor.name,
+            ownerId: (this.owner as any).id,
+            associationClass: String(this.reflection.klass.name),
+            associationIds: [id],
+            associationPrimaryKeyColumn: primaryKeyColumn,
+            ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
+          });
+          break;
         }
-        break;
-
-      case "destroy":
-        (target as any).destroyedByAssociation = this.reflection;
-        await preloadDestroyInverseBelongsTo(this);
-        if (typeof (target as any).destroy === "function") {
-          await (target as any).destroy();
-        }
-        if (typeof (target as any).isDestroyed === "function" && !(target as any).isDestroyed()) {
-          kernelThrow(":abort");
-        }
-        break;
-
-      case "destroyAsync": {
-        let primaryKeyColumn: string | string[];
-        let id: unknown;
-        const targetClass = target.constructor as typeof Base;
-        if (queryConstraintsList.call(targetClass as any)) {
-          primaryKeyColumn = queryConstraintsList.call(targetClass as any)!;
-          id = primaryKeyColumn.map((col) => (target as any)[col]);
-        } else {
-          primaryKeyColumn = targetClass.primaryKey as string;
-          id = (target as any)[primaryKeyColumn];
-        }
-
-        this.enqueueDestroyAssociation({
-          ownerModelName: this.owner.constructor.name,
-          ownerId: (this.owner as any).id,
-          associationClass: String(this.reflection.klass.name),
-          associationIds: [id],
-          associationPrimaryKeyColumn: primaryKeyColumn,
-          ensuringOwnerWasMethod: fetch(this.reflection.options, "ensuringOwnerWas", null),
-        });
-        break;
+        case "nullify":
+          if (target.isPersisted()) await target.updateColumns(nullifiedOwnerAttributes(this));
+          break;
       }
-
-      case "nullify":
-        if (target.isPersisted()) {
-          await (target as any).updateColumns(nullifiedOwnerAttributes(this));
-        }
-        break;
-
-      default:
-        if (typeof (target as any).destroy === "function") {
-          await (target as any).destroy();
-        }
     }
   }
 
@@ -137,18 +120,18 @@ export class HasOneAssociation extends SingularAssociation {
     record: Base | null,
     save?: boolean,
   ): Base | null | Promise<Base | null>;
+  /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override replace(record: Base | null, save = true): Base | null | Promise<Base | null> {
     if (save) {
       return (async () => {
         if (record) (this as any).raiseOnTypeMismatchBang(record);
-        if (!this.loaded) await this.loadTarget();
-        if (!this.target && !record) return this.target;
+        if (!((await this.loadTarget()) || record)) return this.target;
         const assigningAnotherRecord = !rbEqual(this.target, record);
-        if (assigningAnotherRecord || record?.hasChangesToSave === true) {
-          save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
+        if (assigningAnotherRecord || record!.hasChangesToSave) {
+          save &&= this.owner.isPersisted();
           await transactionIf(this, save, async () => {
-            if (this.target && !(this.target as any).isDestroyed?.() && assigningAnotherRecord) {
-              await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
+            if (this.target && !this.target.isDestroyed() && assigningAnotherRecord) {
+              await this.removeTargetBang(this.options.dependent as string | undefined);
             }
             if (record) {
               this.setOwnerAttributes(record);
@@ -191,12 +174,16 @@ export class HasOneAssociation extends SingularAssociation {
     }
   }
 
+  /**
+   * @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   * @inventedArm throw — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
+   */
   protected override async _createRecord(
     attributes?: Record<string, unknown>,
     raiseError = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {
-    if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+    if (!this.owner.isPersisted()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
     }
     const loadError = await this.loadDisplacedTargetForCreate();
@@ -220,7 +207,7 @@ export class HasOneAssociation extends SingularAssociation {
   protected async detachDisplacedTarget(): Promise<void> {
     if (!this.target) return;
     if ((this.target as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
-    await this.removeTargetBang((this.reflection.options.dependent as string) ?? "");
+    await this.removeTargetBang(this.options.dependent as string | undefined);
   }
 
   /** @internal */
@@ -247,49 +234,39 @@ export class HasOneAssociation extends SingularAssociation {
     return this.replace(record, false);
   }
 
-  private async removeTargetBang(method: string): Promise<void> {
-    const target = this.target;
-    if (!target) return;
-    if (method === "delete") {
-      await ((target as any).delete?.() ?? Promise.resolve());
-      return;
-    }
-    if (method === "destroy") {
-      (target as any).destroyedByAssociation = this.reflection;
-      await preloadDestroyInverseBelongsTo(this, target);
-      if (target.isPersisted()) await ((target as any).destroy?.() ?? Promise.resolve());
-      return;
-    }
-    this.nullifyOwnerAttributes(target);
-    this.removeInverseInstance(target);
-    if (target.isPersisted() && (this.owner as any).isPersisted?.()) {
-      const saved = await ((target as any).save?.() ?? Promise.resolve(true));
-      if (saved === false) {
-        this.setOwnerAttributes(target);
-        throw new RecordNotSaved(
-          `Failed to remove the existing associated ${this.reflection.name}. ` +
-            `The record failed to save after its foreign key was set to nil.`,
-          target,
-        );
-      }
+  private async removeTargetBang(method: string | undefined): Promise<void> {
+    const target = this.target as any;
+    switch (method) {
+      case "delete":
+        await target.delete();
+        break;
+      case "destroy":
+        target.destroyedByAssociation = this.reflection;
+        await preloadDestroyInverseBelongsTo(this, target);
+        if (target.isPersisted()) {
+          await target.destroy();
+        }
+        break;
+      default:
+        this.nullifyOwnerAttributes(target);
+        this.removeInverseInstance(target);
+
+        if (target.isPersisted() && this.owner.isPersisted() && !(await target.save())) {
+          this.setOwnerAttributes(target);
+          throw new RecordNotSaved(
+            `Failed to remove the existing associated ${this.reflection.name}. ` +
+              `The record failed to save after its foreign key was set to nil.`,
+            target,
+          );
+        }
     }
   }
 
   private nullifyOwnerAttributes(record: Base): void {
-    const reflection = _reflectOnAssociation(
-      this.owner.constructor as typeof Base,
-      this.reflection.name,
-    );
-    const foreignKey = reflection?.foreignKey();
-    const primaryKey = (record.constructor as typeof Base).primaryKey;
-    const primaryKeys =
-      primaryKey == null ? [] : Array.isArray(primaryKey) ? primaryKey : [primaryKey];
-    for (const foreignKeyColumn of foreignKey == null
-      ? []
-      : Array.isArray(foreignKey)
-        ? foreignKey
-        : [foreignKey]) {
-      if (!primaryKeys.includes(foreignKeyColumn)) record.writeAttribute(foreignKeyColumn, null);
+    for (const foreignKeyColumn of kernelArray(this.reflection.foreignKey())) {
+      if (!kernelArray((record.constructor as typeof Base).primaryKey).includes(foreignKeyColumn)) {
+        record.writeAttribute(foreignKeyColumn, null);
+      }
     }
   }
 }
@@ -334,12 +311,10 @@ function transactionIf(
   block: () => Promise<void>,
 ): Promise<void> {
   if (value) {
-    const klass = assoc.klass;
-    if (klass && typeof (klass as any).transaction === "function") {
-      return (klass as any).transaction(block);
-    }
+    return (assoc.reflection.klass as any).transaction(block);
+  } else {
+    return block();
   }
-  return block();
 }
 
 /** @internal */

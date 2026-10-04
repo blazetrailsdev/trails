@@ -230,7 +230,10 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
+   */
   protected override async _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
@@ -256,8 +259,7 @@ export abstract class CollectionAssociation extends Association {
         ((record: Base) => {
           yielded = block(record);
         }),
-    );
-    if (!record) return null;
+    )!;
     await yielded;
     await this.transaction(async () => {
       let result: boolean | undefined = undefined;
@@ -271,7 +273,12 @@ export abstract class CollectionAssociation extends Association {
     return record;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   * @inventedArm loop — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   * @inventedArm throw — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
     let result = true;
 
@@ -418,6 +425,10 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
+  /**
+   * @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
+   * @inventedArm if — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
+   */
   private async isIncludeInMemory(record: Base): Promise<boolean> {
     const reflection = this.reflection as unknown as {
       isThroughReflection?: () => boolean;
@@ -560,6 +571,7 @@ export abstract class CollectionAssociation extends Association {
     return opts.foreignType ?? `${underscore(opts.as)}_type`;
   }
 
+  /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   protected deleteOrDestroy(
     records: Array<Base | number | string | bigint>,
     method?: string,
@@ -597,7 +609,10 @@ export abstract class CollectionAssociation extends Association {
     return this.find(...ids).then((found) => (Array.isArray(found) ? found : found ? [found] : []));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected removeRecords(
     existingRecords: Base[],
     records: Base[],
@@ -627,7 +642,7 @@ export abstract class CollectionAssociation extends Association {
   }
 
   /** @internal */
-  protected deleteRecords(_records: Base[], _method: string): Promise<number> | number {
+  protected deleteRecords(_records: Base[], _method: string): Promise<unknown> | unknown {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:415
     throw new NotImplementedError();
   }
@@ -726,7 +741,10 @@ export abstract class CollectionAssociation extends Association {
     return this.target.filter((r) => ids.includes(String((r as any).id)));
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   replaceOnTarget(
     record: Base,
     skipCallbacks: boolean,

@@ -54,10 +54,7 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   async handleDependency(): Promise<void> {
-    const dependent = this.reflection.options.dependent;
-    if (!dependent) return;
-
-    switch (dependent) {
+    switch (this.options.dependent) {
       case "restrictWithException": {
         if (!(await this.isEmpty())) {
           throw new DeleteRestrictionError(this.reflection.name);
@@ -109,11 +106,10 @@ export class HasManyAssociation extends CollectionAssociation {
             ids = this.target.map((assoc) => (assoc as any)[primaryKeyColumn as string]);
           }
 
-          const idsBatches = eachSlice(
+          for (const idsBatch of eachSlice(
             ids,
             (this.owner.constructor as typeof Base).destroyAssociationAsyncBatchSize ?? ids.length,
-          );
-          for (const idsBatch of idsBatches) {
+          )) {
             this.enqueueDestroyAssociation({
               ownerModelName: this.owner.constructor.name,
               ownerId: (this.owner as any).id,
@@ -165,30 +161,24 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   /** @internal */
-  protected override async deleteRecords(records: Base[], method: string): Promise<number> {
+  protected override async deleteRecords(records: Base[], method: string): Promise<number | void> {
     if (method === "destroy") {
-      for (const record of records) await (record as any).destroyBang();
-      if (!this.reflection.isInverseUpdatesCounterCache?.()) {
+      for (const record of records) await record.destroyBang();
+      if (!this.reflection.isInverseUpdatesCounterCache()) {
         await this.updateCounter(-records.length);
       }
-      return records.length;
+    } else {
+      const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
+      const values = records.map((r) => queryConstraints.map((col) => r._readAttribute(col)));
+      const scope = this.scope().where(new Map([[queryConstraints, values]]));
+      await this.updateCounter(-(await this.deleteCount(method, scope)));
     }
-    const queryConstraints = compositeQueryConstraintsList.call(this.reflection.klass as any);
-    const values = records.map((r) =>
-      queryConstraints.map((col) => (r as any)._readAttribute(col)),
-    );
-    const baseScope = (this as any).scope?.();
-    if (!baseScope) return 0;
-    const scope =
-      queryConstraints.length === 1
-        ? baseScope.where({ [queryConstraints[0]]: values.map((tuple) => tuple[0]) })
-        : baseScope.where(new Map([[queryConstraints, values]]));
-    const count = await this.deleteCount(method, scope);
-    if (count > 0) await this.updateCounter(-count);
-    return count;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns
+   */
   protected override concatRecords(records: Base[], raise = false): Promise<Base[]> | Base[] {
     const concatenated = super.concatRecords(records, raise);
     return isThenable(concatenated)
