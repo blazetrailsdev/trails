@@ -302,7 +302,7 @@ class TestExtractor
     if inner.is_a?(Array) && inner[0] == :command
       cmd_name = ident_name(inner[1])
       case cmd_name
-      when "describe"
+      when "describe", "context"
         desc = extract_first_string(inner[2])
         return if desc.nil? && collect_shared_example(inner[2], node)
         desc ||= const_name_from_args(inner[2]) unless @describe_stack.empty?
@@ -330,7 +330,7 @@ class TestExtractor
       if inner[1].is_a?(Array) && inner[1][0] == :fcall
         cmd_name = ident_name(inner[1][1])
         case cmd_name
-        when "describe"
+        when "describe", "context"
           desc = extract_string_from_arg_paren(inner[2])
           if desc
             @describe_stack.push(desc)
@@ -578,7 +578,7 @@ class TestExtractor
     args = node[2]
 
     case cmd_name
-    when "describe"
+    when "describe", "context"
       process_describe(args, node)
     when "it_behaves_like", "it_should_behave_like", "include_examples"
       materialize_shared_example(args, node)
@@ -596,7 +596,7 @@ class TestExtractor
     if node[1].is_a?(Array) && node[1][0] == :fcall
       cmd_name = ident_name(node[1][1])
       case cmd_name
-      when "describe"
+      when "describe", "context"
         process_describe_paren(node)
       when "it", "specify"
         process_it_paren(node)

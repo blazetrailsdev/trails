@@ -103,7 +103,7 @@ export class Arguments {
 
   /** @internal */
   protected shift(): unknown {
-    return this.pile.shift();
+    return this.pile.shift() ?? null;
   }
 
   /** @internal */
