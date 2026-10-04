@@ -1,6 +1,5 @@
 import {
   Callbacks as ASCallbacks,
-  defineCallbacks,
   include,
   Notifications,
   onLoad,
@@ -38,6 +37,7 @@ type IsolatedNamespace = {
 };
 
 export class Engine extends Trailtie {
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
   declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
   declare runCallbacks: Included<typeof ASCallbacks>["runCallbacks"];
 
@@ -415,4 +415,4 @@ async function realpathOr(fs: Fs, p: string): Promise<string> {
 Object.defineProperty(Engine, "name", { value: "Rails::Engine" });
 
 include(Engine, ASCallbacks);
-defineCallbacks(Engine.prototype, "load_seed");
+Engine.defineCallbacks("load_seed");

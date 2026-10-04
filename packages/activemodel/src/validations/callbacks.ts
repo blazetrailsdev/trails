@@ -1,10 +1,10 @@
 import {
   Callbacks as ASCallbacks,
-  defineCallbacks,
   extend,
   include,
   included,
   kernelArray as array,
+  type Extended,
 } from "@blazetrails/activesupport";
 import { hasKey, isIntersect, Module } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
@@ -60,7 +60,7 @@ export const Callbacks = {
     extend(base, ClassMethods);
 
     include(base, ASCallbacks);
-    defineCallbacks(base.prototype, "validation", {
+    (base as AnyClass & Extended<typeof ASCallbacks.ClassMethods>).defineCallbacks("validation", {
       skipAfterCallbacksIfTerminated: true,
       scope: ["kind", "name"],
     });

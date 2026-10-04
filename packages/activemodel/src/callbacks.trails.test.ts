@@ -4,7 +4,7 @@ import { kernelThrow } from "@blazetrails/ruby-compat";
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { extend, runCallbacks, withOptions, include } from "@blazetrails/activesupport";
+import { extend, withOptions, include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Callbacks as ValidationsCallbacks } from "./validations/callbacks.js";
 import { Callbacks, type CallbackConditions, defineModelCallbacks } from "./callbacks.js";
@@ -213,7 +213,7 @@ describe("CallbackChain.run", () => {
     Klass.afterSave(() => {
       log.push("after");
     });
-    await runCallbacks(new Klass(), "save", () => {
+    await new Klass().runCallbacks("save", () => {
       log.push("block:start");
       log.push("block:end");
     });
@@ -231,7 +231,7 @@ describe("CallbackChain.run", () => {
     Klass.afterSave(() => {
       log.push("after");
     });
-    await runCallbacks(new Klass(), "save", () => {
+    await new Klass().runCallbacks("save", () => {
       log.push("block");
     });
     expect(log).toEqual(["around:before", "block", "around:after", "after"]);
@@ -246,7 +246,7 @@ describe("CallbackChain.run", () => {
     Klass.afterSave(() => {
       log.push("after2");
     });
-    await runCallbacks(new Klass(), "save", () => {
+    await new Klass().runCallbacks("save", () => {
       log.push("block");
     });
     expect(log).toEqual(["block", "after1", "after2"]);
@@ -457,7 +457,7 @@ describe("unified sync/async runner", () => {
     Klass.afterSave(() => {
       log.push("after");
     });
-    const result = runCallbacks(new Klass(), "save", () => {
+    const result = new Klass().runCallbacks("save", () => {
       log.push("block");
       return true;
     });
@@ -475,7 +475,7 @@ describe("unified sync/async runner", () => {
     Klass.afterSave(() => {
       log.push("after");
     });
-    const result = runCallbacks(new Klass(), "save", () => {
+    const result = new Klass().runCallbacks("save", () => {
       log.push("block");
       return true;
     });
@@ -489,7 +489,7 @@ describe("unified sync/async runner", () => {
     const log: string[] = [];
     Klass.beforeSave(() => log.push("before"));
     Klass.afterSave(() => log.push("after"));
-    const result = runCallbacks(new Klass(), "save", async () => {
+    const result = new Klass().runCallbacks("save", async () => {
       await Promise.resolve();
       log.push("block");
       return true;
@@ -513,14 +513,14 @@ describe("unified sync/async runner", () => {
       await Promise.resolve();
       log.push("a1");
     });
-    await runCallbacks(new Klass(), "save", () => log.push("block"));
+    await new Klass().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["b1", "b2", "block", "a1"]);
   });
 
   it("strict: 'sync' throws when an after callback returns a Promise", () => {
     const Klass = modelWith("initialize");
     Klass.afterInitialize(async () => {});
-    expect(() => runCallbacks(new Klass(), "initialize", undefined, { strict: "sync" })).toThrow(
+    expect(() => new Klass().runCallbacks("initialize", undefined, { strict: "sync" })).toThrow(
       /Async callback on sync chain "initialize"/,
     );
   });
@@ -629,8 +629,7 @@ describe("unified sync/async runner", () => {
     const log: string[] = [];
     Klass.beforeValidation(() => log.push("before"));
     Klass.afterValidation(() => log.push("after"));
-    const result = runCallbacks(
-      new Klass(),
+    const result = new Klass().runCallbacks(
       "validation",
       () => {
         log.push("block");
@@ -928,7 +927,7 @@ describe("defineModelCallbacks()", () => {
     });
 
     const p = new Payment({ amount: 100 });
-    await runCallbacks(p, "process");
+    await p.runCallbacks("process");
     expect(log).toEqual(["before_process", "after_process"]);
   });
 
@@ -973,7 +972,7 @@ describe("callbacks with prepend option", () => {
     );
 
     const u = new User({ name: "Alice" });
-    await runCallbacks(u, "save");
+    await u.runCallbacks("save");
     expect(order).toEqual(["prepended", "first"]);
   });
 });
@@ -1017,7 +1016,7 @@ describe("skipCallback with CallbackObject (mixin-level)", () => {
     Klass.beforeSave(obj);
     Klass.beforeSave(() => log.push("fn"));
     Klass.skipCallback("save", "before", obj);
-    await runCallbacks(new Klass(), "save");
+    await new Klass().runCallbacks("save");
     expect(log).toEqual(["fn"]);
   });
 });

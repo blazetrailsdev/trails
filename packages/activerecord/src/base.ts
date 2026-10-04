@@ -167,7 +167,6 @@ import {
   type PrependMethod,
   type Included,
   type ParameterFilter,
-  runCallbacks,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
@@ -1715,7 +1714,7 @@ export class Base extends Model {
         assocPending = null;
       }
       initBlock?.(this as unknown as Base);
-      void runCallbacks(this, "initialize", undefined, { strict: "sync" });
+      void this.runCallbacks("initialize", undefined, { strict: "sync" });
     }
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
@@ -1769,7 +1768,7 @@ export class Base extends Model {
     let saved = false;
     let wasNewRecord = false;
 
-    const saveOk = await runCallbacks(this, "save", async () => {
+    const saveOk = await this.runCallbacks("save", async () => {
       wasNewRecord = this._newRecord;
       if (wasNewRecord) {
         const result = await this._createRecord(undefined, block);
@@ -1846,7 +1845,7 @@ export class Base extends Model {
     await this._preloadBelongsToForDestroyCallbacks();
 
     let didDelete = false;
-    const destroyResult = await runCallbacks(this, "destroy", async () => {
+    const destroyResult = await this.runCallbacks("destroy", async () => {
       await (this as any).destroyAssociations();
 
       if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;

@@ -1,4 +1,10 @@
-import { Configurable, include, mattrAccessor, underscore } from "@blazetrails/activesupport";
+import {
+  type Callbacks as ASCallbacks,
+  Configurable,
+  include,
+  underscore,
+  type Extended,
+} from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
@@ -32,7 +38,7 @@ import {
   skipAfterAction,
   skipAroundAction,
   skipBeforeAction,
-  _defineActionCallbacks,
+  Callbacks,
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
@@ -77,6 +83,10 @@ export class ActionNotFound extends Error {
 }
 
 export class AbstractController {
+  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
+  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
+
   _actionName: string = "";
 
   get actionName(): string {
@@ -335,6 +345,5 @@ export class AbstractController {
 }
 
 include(AbstractController, Configurable);
-mattrAccessor.call(AbstractController, "raiseOnMissingCallbackActions", { default: false });
 
-_defineActionCallbacks(AbstractController.prototype);
+include(AbstractController, Callbacks);
