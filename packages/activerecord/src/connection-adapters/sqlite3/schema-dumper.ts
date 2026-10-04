@@ -7,23 +7,23 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected override async virtualTables(
     stream: IO | StringIO,
   ): Promise<Array<[string, [string, string]]> | undefined> {
-    const connection = this._adapter();
-    if (!connection || typeof connection.virtualTables !== "function") return;
-    const virtualTables: Array<[string, [string, string]]> = await connection.virtualTables();
-    if (virtualTables.length === 0) return;
-    stream.puts("");
-    stream.puts("  // Virtual tables defined in this database.");
-    stream.puts(
-      "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
-    );
-    const sorted = [...virtualTables].sort();
-    for (const [tableName, options] of sorted) {
-      const [moduleName, argumentsStr] = options;
+    const virtualTables: Array<[string, [string, string]]> = await this._adapter().virtualTables();
+    if (virtualTables.length > 0) {
+      stream.puts("");
+      stream.puts("  // Virtual tables defined in this database.");
       stream.puts(
-        `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(argumentsStr.split(", "))});`,
+        "  // Note that virtual tables may not work with other database engines. Be careful if changing database.",
       );
+      const sorted = [...virtualTables].sort();
+      for (const [tableName, options] of sorted) {
+        const [moduleName, argumentsStr] = options;
+        stream.puts(
+          `  await ctx.createVirtualTable(${JSON.stringify(tableName)}, ${JSON.stringify(moduleName)}, ${JSON.stringify(argumentsStr.split(", "))});`,
+        );
+      }
+      return sorted;
     }
-    return sorted;
+    return undefined;
   }
 
   /** @internal */

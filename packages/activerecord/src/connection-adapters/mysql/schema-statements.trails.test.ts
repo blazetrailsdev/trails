@@ -385,7 +385,7 @@ describe("MySQL::SchemaStatements", () => {
 
   it("extractSchemaQualifiedName splits schema.table", () => {
     expect(extractSchemaQualifiedName("mydb.users")).toEqual(["mydb", "users"]);
-    expect(extractSchemaQualifiedName("`mydb`.`users`")).toEqual(["mydb", "users"]);
+    expect(extractSchemaQualifiedName("`mydb`.`users`")).toEqual(["`mydb`", "`users`"]);
     expect(extractSchemaQualifiedName("users")).toEqual([null, "users"]);
     expect(extractSchemaQualifiedName(null)).toEqual([null, null]);
   });

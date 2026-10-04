@@ -22,8 +22,7 @@ import { Value as TimeValue } from "../../type/time.js";
 
 export function castBoundValue(value: unknown): unknown {
   if (value instanceof Rational) {
-    const f = value.toF();
-    return Number.isInteger(f) ? `${f}.0` : String(f);
+    return toS(new Number(value.toF()));
   }
   if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
     return toS(value);
@@ -119,19 +118,17 @@ export function columnNameWithOrderMatcher(): RegExp {
 }
 
 export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `\`${toS(name).replace(/`/g, "``")}\``;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (
+    QUOTED_COLUMN_NAMES.get(name) ??
+    QUOTED_COLUMN_NAMES.set(name, `\`${toS(name).replace(/`/g, "``")}\``).get(name)!
+  );
 }
 
 export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `\`${toS(name).replace(/`/g, "``").replace(/\./g, "`.`")}\``;
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (
+    QUOTED_TABLE_NAMES.get(name) ??
+    QUOTED_TABLE_NAMES.set(name, `\`${toS(name).replace(/`/g, "``").replace(/\./g, "`.`")}\``).get(
+      name,
+    )!
+  );
 }

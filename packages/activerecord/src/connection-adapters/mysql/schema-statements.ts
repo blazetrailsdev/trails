@@ -1,5 +1,6 @@
 import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { toS } from "@blazetrails/ruby-compat";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Version } from "../abstract-adapter.js";
 import { TypeMetadata } from "./type-metadata.js";
@@ -182,15 +183,21 @@ export class SchemaStatements extends BaseSchemaStatements {
     options?: CreateTableOptions | ((t: TableDefinitionOf<this>) => void | Promise<void>),
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<unknown> {
-    const definer = typeof options === "function" ? options : fn;
-    const kwargs: CreateTableOptions = typeof options === "function" || !options ? {} : options;
-    if (kwargs.options === undefined) {
-      const rowFormat = await defaultRowFormat.call(this as unknown as RowFormatHost);
-      if (rowFormat != null) {
-        return super.createTable(tableName, { ...kwargs, options: rowFormat }, definer);
-      }
+    if (typeof options === "function") {
+      fn = options;
+      options = undefined;
     }
-    return super.createTable(tableName, kwargs, definer);
+    return super.createTable(
+      tableName,
+      {
+        ...options,
+        options:
+          options?.options ??
+          (await defaultRowFormat.call(this as unknown as RowFormatHost)) ??
+          undefined,
+      },
+      fn,
+    );
   }
 
   override async removeColumn(
@@ -396,14 +403,9 @@ export function quotedScope(
 export function extractSchemaQualifiedName(
   string: string | null | undefined,
 ): [string | null, string | null] {
-  const parts = (string ?? "").match(/[^`.\s]+|`[^`]*`/g) ?? [];
-  if (parts.length >= 2) {
-    return [parts[0]!.replace(/^`|`$/g, ""), parts[1].replace(/^`|`$/g, "")];
-  }
-  if (parts.length === 1) {
-    return [null, parts[0].replace(/^`|`$/g, "")];
-  }
-  return [null, null];
+  let [schema, name]: Array<string | null> = toS(string).match(/[^`.\s]+|`[^`]*`/g) ?? [];
+  if (name == null) [schema, name] = [null, schema ?? null];
+  return [schema, name];
 }
 
 /** @internal */

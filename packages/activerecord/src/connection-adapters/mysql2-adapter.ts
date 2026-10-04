@@ -37,6 +37,8 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { defaultTimezone } from "../active-record.js";
 
+const FOUND_ROWS = 2;
+
 let mysql2TypeMap: TypeMap | null = null;
 
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
@@ -48,6 +50,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static readonly ER_CONN_HOST_ERROR = 2003;
   static readonly ER_UNKNOWN_HOST_ERROR = 2005;
 
+  /** @inventedArm filter — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection */
   static async newClient(
     config: mysql.PoolOptions & MysqlAdapterOptions,
   ): Promise<mysql.Connection> {
@@ -83,7 +86,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(connOptions.flags),
+        flags: withoutDefaultIgnoreSpace(connOptions.flags).filter(
+          (flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS",
+        ),
         multipleStatements: true,
         typeCast: composedTypeCast,
       });
@@ -134,7 +139,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
   /** @deprecated */
   constructor(rawConnection: mysql.Connection, deprecatedConfig?: Record<string, unknown> | null);
-  /** @missingRailsCall push — CONVERGEABLE mysql2-adapter-initialize-sets-found-rows-on-config-flags */
   constructor(
     config: string | (mysql.PoolOptions & MysqlAdapterOptions) | mysql.Connection,
     deprecatedConfig?: Record<string, unknown> | null,
@@ -152,6 +156,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           ? { ...(config as Record<string, unknown>) }
           : {},
     );
+    this._config.flags ||= 0;
+
+    if (Array.isArray(this._config.flags)) {
+      this._config.flags.push("FOUND_ROWS");
+    } else {
+      this._config.flags = (this._config.flags as number) | FOUND_ROWS;
+    }
+
     if (deprecatedRawConnection) {
       deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
       this._acceptDeprecatedRawConnection(config);
@@ -204,11 +216,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           return undefined;
         }
       })();
-    const inputFlags = mysqlConfig.flags;
-    const resolvedFlags: string[] = Array.isArray(inputFlags)
-      ? inputFlags.includes("FOUND_ROWS")
-        ? inputFlags
-        : [...inputFlags, "FOUND_ROWS"]
+    const resolvedFlags: string[] = Array.isArray(this._config.flags)
+      ? this._config.flags
       : ["FOUND_ROWS"];
     const {
       username: railsUsername,
