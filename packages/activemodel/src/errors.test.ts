@@ -16,15 +16,20 @@ import {
   assertNil,
   extend,
 } from "@blazetrails/activesupport";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FrozenError, Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
 import { resetI18n } from "./test-helpers/i18n.js";
 
+const ErrorsTest = new Module();
+registerConstant("ErrorsTest", ErrorsTest);
+
 class Person {
-  static moduleName = "ErrorsTest";
+  static {
+    rbModConstSet(ErrorsTest, "Person", this);
+  }
   declare modelName: ModelName;
   errors: Errors<Person>;
   name: string | null = null;

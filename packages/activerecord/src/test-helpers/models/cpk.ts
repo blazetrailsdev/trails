@@ -1,13 +1,18 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbModConstSet, Module, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
+
+export const Cpk = new Module();
+registerConstant("Cpk", Cpk);
 
 export class CpkAuthor extends Base {
   declare books: AssociationProxy<CpkBook>;
   declare name: string;
 
   static _tableName = "cpk_authors";
-  static _demodulizedName = "Author";
+  static {
+    rbModConstSet(Cpk, "Author", this);
+  }
 
   static {
     this.hasMany("books", {
@@ -28,7 +33,9 @@ export class CpkBook extends Base {
   declare title: string;
 
   static _tableName = "cpk_books";
-  static _demodulizedName = "Book";
+  static {
+    rbModConstSet(Cpk, "Book", this);
+  }
 
   declare failDestroy: boolean | undefined;
 
@@ -66,12 +73,16 @@ export interface CpkBook {
 CpkBook.generatesTokenFor("test");
 
 export class CpkBestSeller extends CpkBook {
-  static _demodulizedName = "BestSeller";
+  static {
+    rbModConstSet(Cpk, "BestSeller", this);
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBook extends CpkBook {
-  static _demodulizedName = "BrokenBook";
+  static {
+    rbModConstSet(Cpk, "BrokenBook", this);
+  }
   static {
     this.belongsTo("order", { className: "CpkOrderWithSpecialPrimaryKey" });
   }
@@ -84,7 +95,9 @@ export interface CpkBrokenBook {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenBookWithNonCpkOrder extends CpkBook {
-  static _demodulizedName = "BrokenBookWithNonCpkOrder";
+  static {
+    rbModConstSet(Cpk, "BrokenBookWithNonCpkOrder", this);
+  }
   static {
     this.belongsTo("order", {
       className: "CpkNonCpkOrder",
@@ -100,7 +113,9 @@ export interface CpkBrokenBookWithNonCpkOrder {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNonCpkBook extends CpkBook {
-  static _demodulizedName = "NonCpkBook";
+  static {
+    rbModConstSet(Cpk, "NonCpkBook", this);
+  }
   static {
     this._primaryKey = "id";
     this.belongsTo("nonCpkOrder", { className: "CpkNonCpkOrder", foreignKey: ["order_id"] });
@@ -114,7 +129,9 @@ export interface CpkNonCpkBook {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkNullifiedBook extends CpkBook {
-  static _demodulizedName = "NullifiedBook";
+  static {
+    rbModConstSet(Cpk, "NullifiedBook", this);
+  }
   static {
     this.hasOne("chapter", {
       className: "CpkChapter",
@@ -133,7 +150,9 @@ export interface CpkNullifiedBook {
 export class CpkBookWithOrderAgreements extends CpkBook {
   declare orderAgreements: AssociationProxy<CpkOrderAgreement>;
 
-  static _demodulizedName = "BookWithOrderAgreements";
+  static {
+    rbModConstSet(Cpk, "BookWithOrderAgreements", this);
+  }
   static {
     this.hasMany("orderAgreements", { through: "order" });
     this.hasOne("orderAgreement", { through: "order", source: "orderAgreements" });
@@ -148,7 +167,9 @@ export interface CpkBookWithOrderAgreements {
 export class CpkBookDestroyAsync extends Base {
   declare chapters: AssociationProxy<CpkChapterDestroyAsync>;
 
-  static _demodulizedName = "BookDestroyAsync";
+  static {
+    rbModConstSet(Cpk, "BookDestroyAsync", this);
+  }
   static _tableName = "cpk_books";
 
   static {
@@ -166,7 +187,9 @@ export class CpkChapter extends Base {
   declare book_id: number;
   declare title: string;
 
-  static _demodulizedName = "Chapter";
+  static {
+    rbModConstSet(Cpk, "Chapter", this);
+  }
   static _tableName = "cpk_chapters";
 
   static {
@@ -182,7 +205,9 @@ export interface CpkChapter {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkChapterDestroyAsync extends Base {
-  static _demodulizedName = "ChapterDestroyAsync";
+  static {
+    rbModConstSet(Cpk, "ChapterDestroyAsync", this);
+  }
   static _tableName = "cpk_chapters";
 
   static {
@@ -210,7 +235,9 @@ export class CpkOrder extends Base {
   declare status: string;
 
   static _tableName = "cpk_orders";
-  static _demodulizedName = "Order";
+  static {
+    rbModConstSet(Cpk, "Order", this);
+  }
 
   static {
     this._primaryKey = ["shop_id", "id"];
@@ -236,7 +263,9 @@ export interface CpkOrder {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrder extends CpkOrder {
-  static _demodulizedName = "BrokenOrder";
+  static {
+    rbModConstSet(Cpk, "BrokenOrder", this);
+  }
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkBook" });
@@ -251,7 +280,9 @@ export interface CpkBrokenOrder {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
-  static _demodulizedName = "OrderWithSpecialPrimaryKey";
+  static {
+    rbModConstSet(Cpk, "OrderWithSpecialPrimaryKey", this);
+  }
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "status"] });
@@ -266,7 +297,9 @@ export interface CpkOrderWithSpecialPrimaryKey {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
-  static _demodulizedName = "BrokenOrderWithNonCpkBooks";
+  static {
+    rbModConstSet(Cpk, "BrokenOrderWithNonCpkBooks", this);
+  }
   static {
     this._primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "CpkNonCpkBook" });
@@ -280,7 +313,9 @@ export interface CpkBrokenOrderWithNonCpkBooks {
 }
 
 export class CpkNonCpkOrder extends CpkOrder {
-  static _demodulizedName = "NonCpkOrder";
+  static {
+    rbModConstSet(Cpk, "NonCpkOrder", this);
+  }
   static {
     this._primaryKey = "id";
   }
@@ -288,7 +323,9 @@ export class CpkNonCpkOrder extends CpkOrder {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
-  static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
+  static {
+    rbModConstSet(Cpk, "OrderWithPrimaryKeyAssociatedBook", this);
+  }
   static {
     this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
   }
@@ -301,7 +338,9 @@ export interface CpkOrderWithPrimaryKeyAssociatedBook {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CpkOrderWithNullifiedBook extends CpkOrder {
-  static _demodulizedName = "OrderWithNullifiedBook";
+  static {
+    rbModConstSet(Cpk, "OrderWithNullifiedBook", this);
+  }
   static {
     this.hasOne("book", {
       className: "CpkBook",
@@ -319,7 +358,9 @@ export interface CpkOrderWithNullifiedBook {
 export class CpkOrderWithSingularBookChapters extends CpkOrder {
   declare chapters: AssociationProxy<CpkChapter>;
 
-  static _demodulizedName = "OrderWithSingularBookChapters";
+  static {
+    rbModConstSet(Cpk, "OrderWithSingularBookChapters", this);
+  }
   static {
     this.hasMany("chapters", { className: "CpkChapter", through: "book" });
   }
@@ -330,7 +371,9 @@ export class CpkOrderAgreement extends Base {
   declare order_id: number;
   declare signature: string;
 
-  static _demodulizedName = "OrderAgreement";
+  static {
+    rbModConstSet(Cpk, "OrderAgreement", this);
+  }
   static _tableName = "cpk_order_agreements";
 
   static {
@@ -350,7 +393,9 @@ export class CpkOrderTag extends Base {
   declare order_id: number;
   declare tag_id: number;
 
-  static _demodulizedName = "OrderTag";
+  static {
+    rbModConstSet(Cpk, "OrderTag", this);
+  }
   static _tableName = "cpk_order_tags";
   static _primaryKey = ["order_id", "tag_id"];
 
@@ -372,7 +417,9 @@ export class CpkTag extends Base {
   declare orders: AssociationProxy<CpkOrder>;
   declare name: string;
 
-  static _demodulizedName = "Tag";
+  static {
+    rbModConstSet(Cpk, "Tag", this);
+  }
   static _tableName = "cpk_tags";
 
   static {
@@ -386,7 +433,9 @@ export class CpkPost extends Base {
   declare author: string;
   declare title: string;
 
-  static _demodulizedName = "Post";
+  static {
+    rbModConstSet(Cpk, "Post", this);
+  }
   static _tableName = "cpk_posts";
 
   static {
@@ -405,7 +454,9 @@ export class CpkComment extends Base {
   declare commentable_type: string;
   declare text: string;
 
-  static _demodulizedName = "Comment";
+  static {
+    rbModConstSet(Cpk, "Comment", this);
+  }
   static _tableName = "cpk_comments";
 
   static {
@@ -435,7 +486,9 @@ export class CpkReview extends Base {
   declare "number": number;
   declare rating: number;
 
-  static _demodulizedName = "Review";
+  static {
+    rbModConstSet(Cpk, "Review", this);
+  }
   static _tableName = "cpk_reviews";
 
   static {
@@ -457,7 +510,9 @@ export class CpkCar extends Base {
   declare model: string;
 
   static _tableName = "cpk_cars";
-  static _demodulizedName = "Car";
+  static {
+    rbModConstSet(Cpk, "Car", this);
+  }
 
   static {
     this.hasMany("carReviews", {
@@ -475,7 +530,9 @@ export class CpkCarReview extends Base {
   declare rating: number;
 
   static _tableName = "cpk_car_reviews";
-  static _demodulizedName = "CarReview";
+  static {
+    rbModConstSet(Cpk, "CarReview", this);
+  }
 
   static {
     this.belongsTo("car", { className: "CpkCar", foreignKey: ["car_make", "car_model"] });

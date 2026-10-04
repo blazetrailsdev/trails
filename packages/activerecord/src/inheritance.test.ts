@@ -9,7 +9,13 @@ import {
   assertRaise,
   assertRaises,
 } from "@blazetrails/activesupport";
-import { include, regexpEscape } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  rbModConstSet,
+  regexpEscape,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Nodes } from "@blazetrails/arel";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 import { classify, underscore } from "@blazetrails/activesupport";
@@ -594,23 +600,28 @@ describe("InheritanceComputeTypeTest", () => {
 });
 
 describe("InheritanceAttributeTest", () => {
+  const InheritanceAttributeTest = new Module();
+  registerConstant("InheritanceAttributeTest", InheritanceAttributeTest);
   fixtures(["companies"]);
 
   class AttrTestCompany extends Base {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Company";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Company", this);
+    }
     static {
       this.tableName = "companies";
       this.attribute("type", "string", { default: "InheritanceAttributeTest::Startup" });
     }
   }
   class AttrTestStartup extends AttrTestCompany {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Startup";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Startup", this);
+    }
   }
   class AttrTestEmpire extends AttrTestCompany {
-    static moduleName = "InheritanceAttributeTest";
-    static _demodulizedName = "Empire";
+    static {
+      rbModConstSet(InheritanceAttributeTest, "Empire", this);
+    }
   }
 
   registerModel([AttrTestCompany, AttrTestStartup, AttrTestEmpire]);
@@ -629,6 +640,8 @@ describe("InheritanceAttributeTest", () => {
 });
 
 describe("InheritanceAttributeMappingTest", () => {
+  const InheritanceAttributeMappingTest = new Module();
+  registerConstant("InheritanceAttributeMappingTest", InheritanceAttributeMappingTest);
   fixtures(["companies", "sponsors"]);
 
   class OmgStiType extends StringType {
@@ -650,20 +663,23 @@ describe("InheritanceAttributeMappingTest", () => {
   Type.register("omg_sti", OmgStiType);
 
   class IamtCompany extends Base {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Company";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Company", this);
+    }
     static {
       this.tableName = "companies";
       this.attribute("type", "omg_sti");
     }
   }
   class IamtStartup extends IamtCompany {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Startup";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Startup", this);
+    }
   }
   class IamtEmpire extends IamtCompany {
-    static moduleName = "InheritanceAttributeMappingTest";
-    static _demodulizedName = "Empire";
+    static {
+      rbModConstSet(InheritanceAttributeMappingTest, "Empire", this);
+    }
   }
 
   registerModel([IamtCompany, IamtStartup, IamtEmpire]);

@@ -1,2 +1,4 @@
-export * from "./publisher/article.js";
-export * from "./publisher/magazine.js";
+import { Module, registerConstant } from "@blazetrails/ruby-compat";
+
+export const Publisher = new Module();
+registerConstant("Publisher", Publisher);

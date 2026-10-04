@@ -1,3 +1,4 @@
+import { rbModName } from "@blazetrails/ruby-compat";
 import "./support/canonical-model-index.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, registerSubclass } from "./index.js";
@@ -91,7 +92,10 @@ describe("registerModel canonical-name shadow guard", () => {
     const saved = [...modelRegistry.entries()];
     try {
       modelRegistry.clear();
-      for (const [name, model] of saved) expect(safeConstantize(name)).not.toBe(model);
+      for (const [name, model] of saved) {
+        if (name.includes("::") && rbModName(model) === name) continue;
+        expect(safeConstantize(name)).not.toBe(model);
+      }
     } finally {
       for (const [name, model] of saved) {
         if (model._registryKeys?.includes(name)) registerModel(name, model);

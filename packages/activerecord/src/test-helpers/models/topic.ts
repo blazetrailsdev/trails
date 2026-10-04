@@ -6,6 +6,7 @@ import type { UniqueReply } from "./reply.js";
 import type { WebReply } from "./reply.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
@@ -274,12 +275,16 @@ export class TitlePrimaryKeyTopic extends Topic {
   }
 }
 
+export const Web = new Module();
+registerConstant("Web", Web);
+
 export class WebTopic extends Base {
   declare replies: AssociationProxy<WebReply>;
 
   static _tableName = "topics";
 
   static {
+    rbModConstSet(Web, "Topic", this);
     this.hasMany("replies", {
       dependent: "destroy",
       foreignKey: "parent_id",

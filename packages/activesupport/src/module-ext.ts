@@ -1,4 +1,4 @@
-import { NameError } from "@blazetrails/ruby-compat";
+import { NameError, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
 import { constantize } from "./inflector.js";
 import { Delegation, type DelegateOptions } from "./delegation.js";
@@ -209,18 +209,19 @@ export function isAnonymous(klass: { name: string }): boolean {
   return !klass.name || klass.name === "";
 }
 
-export function moduleParentName(klass: { name: string }): string | null {
-  const name = klass.name ?? "";
+export function moduleParentName(klass: object): string | null {
+  const name = rbModName(klass);
+  if (name == null) return null;
   const parts = name.split("::");
   if (parts.length <= 1) return null;
   return parts.slice(0, -1).join("::");
 }
 
-export function moduleParent(klass: { name: string }): unknown {
+export function moduleParent(klass: object): unknown {
   return moduleParentName(klass) != null ? constantize(moduleParentName(klass)!) : Object;
 }
 
-export function moduleParents(klass: { name: string }): unknown[] {
+export function moduleParents(klass: object): unknown[] {
   const parents: unknown[] = [];
   const parentName = moduleParentName(klass);
   if (parentName != null) {

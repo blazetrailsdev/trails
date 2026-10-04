@@ -1,4 +1,5 @@
-import { Topic, WebTopic } from "./topic.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Topic, Web, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -110,7 +111,9 @@ export class WrongReply extends Reply {
 }
 
 export class WebReply extends WebTopic {
-  static _demodulizedName = "Reply";
+  static {
+    rbModConstSet(Web, "Reply", this);
+  }
   static {
     this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
   }

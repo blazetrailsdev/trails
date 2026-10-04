@@ -1,4 +1,4 @@
-import { block, fetch, rbInspect } from "@blazetrails/ruby-compat";
+import { block, fetch, rbInspect, rbModName } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
@@ -598,7 +598,7 @@ export class AssociationReflection extends MacroReflection {
       const inv = this.inverseOf();
       if (inv) return String(inv.foreignKey({ inferFromInverseOf: false }));
     }
-    const baseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
+    const baseName = rbModName(this.activeRecord)!;
     return `${underscore(demodulize(baseName))}_id`;
   }
 
@@ -703,7 +703,7 @@ export class AssociationReflection extends MacroReflection {
   private automaticInverseOf(): string | null {
     if (!this.canFindInverseOfAutomatically(this)) return null;
 
-    const modelBaseName = (this.activeRecord as any)._demodulizedName ?? this.activeRecord.name;
+    const modelBaseName = rbModName(this.activeRecord)!;
     const snakeInverseName = this.options.as
       ? underscore(this.options.as as string)
       : underscore(demodulize(modelBaseName));
@@ -974,9 +974,9 @@ export class AssociationReflection extends MacroReflection {
 
     if (!isAbsolute) {
       const arName = this.activeRecordRegistryName();
-      const moduleName = (this.activeRecord as { moduleName?: string }).moduleName;
-      const nestingSource = arName.includes("::") ? arName : moduleName;
-      if (nestingSource) {
+      const name = rbModName(this.activeRecord)!;
+      const nestingSource = arName.includes("::") ? arName : name;
+      if (nestingSource.includes("::")) {
         const segments = nestingSource.split("::");
         for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");

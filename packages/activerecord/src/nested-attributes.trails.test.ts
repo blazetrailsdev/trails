@@ -1,8 +1,16 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import type { Base } from "./index.js";
 import { describe, it, expect } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { CpkBook, CpkChapter, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
+import {
+  Cpk,
+  CpkBook,
+  CpkChapter,
+  CpkOrder,
+  CpkCar,
+  CpkCarReview,
+} from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
@@ -92,7 +100,9 @@ describe("nested attributes (trails-only)", () => {
 
   it("builds nested children on a bare CPK subclass with the declaring model's composite foreign key", async () => {
     class CpkSportsCar extends CpkCar {
-      static _demodulizedName = "SportsCar";
+      static {
+        rbModConstSet(Cpk, "SportsCar", this);
+      }
     }
     registerModel(CpkSportsCar);
     CpkSportsCar.acceptsNestedAttributesFor("carReviews");

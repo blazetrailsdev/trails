@@ -13,7 +13,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbClassSuperclass } from "@blazetrails/ruby-compat";
+import { rbClassSuperclass, rbModName } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -62,7 +62,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
     }
 
     const candidates: string[] = [];
-    const name = qualifiedName(baseClass);
+    const name = rbModName(baseClass)!;
     for (const match of name.matchAll(/::|$/g)) {
       candidates.unshift(`${name.slice(0, match.index)}::${typeName}`);
     }
@@ -70,7 +70,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
 
     for (const candidate of candidates) {
       const constant = safeConstantize(candidate) as typeof Base | null | undefined;
-      if (constant != null && candidate === qualifiedName(constant)) {
+      if (constant != null && candidate === rbModName(constant)) {
         klass._typeCandidatesCache.set(typeName, candidate);
         return constant;
       }
@@ -118,25 +118,8 @@ export function setBaseClass(modelClass: typeof Base): void {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static */
-export function qualifiedName(modelClass: typeof Base): string {
-  const klass = modelClass as typeof Base & { moduleName?: string; _demodulizedName?: string };
-  if (modelClass === ActiveRecord.Base) return "ActiveRecord::Base";
-  if (!klass.moduleName) return modelClass.name;
-  return `${klass.moduleName}::${klass._demodulizedName ?? modelClass.name}`;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE model-namespace-reads-the-constant-path-not-a-module-name-static
- */
-export function namespaceSegments(modelClass: typeof Base): string[] {
-  const moduleName = (modelClass as typeof Base & { moduleName?: string }).moduleName;
-  return moduleName ? moduleName.split("::") : [];
-}
-
 export function stiName(modelClass: typeof Base): string | null {
-  const name = modelClass.name === "" ? null : qualifiedName(modelClass);
+  const name = rbModName(modelClass);
   const klass = modelClass as typeof Base & {
     storeFullStiClass?: boolean;
     storeFullClassName?: boolean;
@@ -146,7 +129,7 @@ export function stiName(modelClass: typeof Base): string | null {
 
 export function polymorphicName(modelClass: typeof Base): string {
   const base = baseClass.call(modelClass);
-  const name = qualifiedName(base);
+  const name = rbModName(base)!;
   const klass = modelClass as typeof Base & { storeFullClassName?: boolean };
   return klass.storeFullClassName ? name : demodulize(name);
 }
@@ -239,7 +222,7 @@ export function findStiClass(this: typeof Base, typeName: string): typeof Base {
 
   if (!(subclass === this || this.descendants.includes(subclass))) {
     throw new SubclassNotFound(
-      `Invalid single-table inheritance type: ${qualifiedName(subclass)} is not a subclass of ${qualifiedName(this)}`,
+      `Invalid single-table inheritance type: ${rbModName(subclass)} is not a subclass of ${rbModName(this)}`,
     );
   }
 
