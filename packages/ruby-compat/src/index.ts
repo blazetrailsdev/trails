@@ -332,6 +332,7 @@ export { isSymbol, rbMethodName, stringToSym, symbolToS } from "./symbol.js";
 export { Monitor, isMonOwned, synchronize } from "./monitor.js";
 export { Mutex } from "./mutex.js";
 export { rbEnsure } from "./ensure.js";
+export { keywordSplat } from "./keyword-splat.js";
 export { Queue, SizedQueue } from "./queue.js";
 export { Fiber } from "./fiber.js";
 export { FiberError } from "./fiber-error.js";
