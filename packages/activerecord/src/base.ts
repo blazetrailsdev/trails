@@ -1,11 +1,4 @@
-import {
-  type Hash,
-  basicObjRespondTo,
-  hasKey,
-  isEmpty,
-  keys,
-  rbObjSingletonClass,
-} from "@blazetrails/ruby-compat";
+import { type Hash, isEmpty } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -1657,15 +1650,7 @@ export class Base extends Model {
 
     (ModelSchema.loadSchema as any).call(this);
 
-    const attributes = (this as any).attributesBuilder().buildFromDatabase(row, columnTypes ?? {});
-    const record = this.allocate();
-    const attributeTypes = this.attributeTypes();
-    for (const name of keys(row)) {
-      if (!hasKey(attributeTypes, name) && !basicObjRespondTo(record, name, false)) {
-        (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);
-      }
-    }
-    return (record as any).initWithAttributes(attributes, false, block);
+    return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
   _newRecord = true;

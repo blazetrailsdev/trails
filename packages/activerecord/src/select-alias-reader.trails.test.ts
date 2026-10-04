@@ -40,4 +40,15 @@ describe("select alias dynamic reader (trails)", () => {
     expect(Object.keys(attributes._attributes)).toEqual([]);
     expect((record as Comment & { bumped_id: unknown }).bumped_id).not.toBeUndefined();
   });
+
+  it("keeps the alias reader on a record loaded through marshal_load", async () => {
+    const record = (await Comment.select("comments.*, (id + 1000) AS bumped_id").order("id"))[0];
+    const loaded = Comment.allocate() as Comment & { bumped_id: unknown };
+    loaded.marshalLoad([
+      (record as unknown as { attributesForDatabase(): object }).attributesForDatabase(),
+      false,
+    ]);
+    expect(loaded.bumped_id).toEqual(record.readAttribute("bumped_id"));
+    expect(loaded.bumped_id).not.toBeUndefined();
+  });
 });
