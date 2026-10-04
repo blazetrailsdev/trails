@@ -1,18 +1,29 @@
 import { ArgumentError } from "./argument-error.js";
+import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
 import { Module } from "./include.js";
-import { rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
+import { warn } from "./kernel-warn.js";
+import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import {
+  rbInspect,
   rbModName,
   rbModSingletonP,
   rbModToS,
+  rbObjAsString,
+  rbObjClass,
   rbObjClassname,
   rbObjInstanceVariables,
   rbObjIvarGet,
+  rbObjIvarSet,
+  rtest,
 } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
+import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
+import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
+import { rbPathToClass } from "./variable.js";
+import { verbose } from "./verbose.js";
 
 const MARSHAL_MAJOR = 4;
 const MARSHAL_MINOR = 8;
@@ -56,6 +67,14 @@ interface DumpArg {
   numEntries: number;
 }
 
+/** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
+interface LoadArg {
+  src: string;
+  offset: number;
+  symbols: string[];
+  data: Map<number, unknown>;
+}
+
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
 function tObjectP(obj: unknown): obj is object {
   return (
@@ -71,11 +90,17 @@ function mustNotBeAnonymous(type: string, path: string): string {
   return path;
 }
 
-/** `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). */
+/**
+ * `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). Every caller hands it
+ * a class that is not a singleton, which `rb_class_real` answers unchanged.
+ */
 function class2path(klass: AnyClass | Module): string {
   const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);
+  if (rbPathToClass(path) !== klass) {
+    throw new TypeError(`${path} can't be referred to`);
+  }
   return path;
 }
 
@@ -503,6 +528,552 @@ function rbMarshalDumpLimited(obj: unknown, limit: number): string {
   return port;
 }
 
+/** `too_short` (`vendor/ruby/v3.3.11/marshal.c:1337`). */
+function tooShort(): never {
+  throw new ArgumentError("marshal data too short");
+}
+
+/** `r_prepare` (`vendor/ruby/v3.3.11/marshal.c:1343`); `undefined` is `Qundef`. */
+function rPrepare(arg: LoadArg): number {
+  const idx = arg.data.size;
+
+  arg.data.set(idx, undefined);
+  return idx;
+}
+
+/** `r_byte` (`vendor/ruby/v3.3.11/marshal.c:1370`), the String-source arm. */
+function rByte(arg: LoadArg): number {
+  let c: number;
+
+  if (arg.src.length > arg.offset) {
+    c = arg.src.charCodeAt(arg.offset++) & 0xff;
+  } else {
+    tooShort();
+  }
+  return c;
+}
+
+/** `long_toobig` (`vendor/ruby/v3.3.11/marshal.c:1398`). */
+function longToobig(size: number): never {
+  throw new TypeError(`long too big for this architecture (size 8, given ${size})`);
+}
+
+/**
+ * `r_long` (`vendor/ruby/v3.3.11/marshal.c:1405`). JS's bitwise operators are
+ * 32-bit, so the bytes are summed; the negative arm's mask-and-or over `-1` is
+ * the same value less `256 ** c`. `w_long` writes four bytes at most; a wider
+ * payload is exact up to `2 ** 53`, where a C `long` is to `2 ** 63`.
+ */
+function rLong(arg: LoadArg): number {
+  let x: number;
+  let c = (rByte(arg) << 24) >> 24;
+
+  if (c === 0) return 0;
+  if (c > 0) {
+    if (4 < c && c < 128) {
+      return c - 5;
+    }
+    if (c > 8) longToobig(c);
+    x = 0;
+    for (let i = 0; i < c; i++) {
+      x += rByte(arg) * 256 ** i;
+    }
+  } else {
+    if (-129 < c && c < -4) {
+      return c + 5;
+    }
+    c = -c;
+    if (c > 8) longToobig(c);
+    x = -(256 ** c);
+    for (let i = 0; i < c; i++) {
+      x += rByte(arg) * 256 ** i;
+    }
+  }
+  return x;
+}
+
+/** `r_bytes` (`vendor/ruby/v3.3.11/marshal.c:1507`). */
+function rBytes(arg: LoadArg): string {
+  return rBytes0(rLong(arg), arg);
+}
+
+/** `r_bytes0` (`vendor/ruby/v3.3.11/marshal.c:1510`), the String-source arm: an ASCII-8BIT String. */
+function rBytes0(len: number, arg: LoadArg): string {
+  let str: string;
+
+  if (len === 0) return "";
+  if (arg.src.length - arg.offset >= len) {
+    str = arg.src.slice(arg.offset, arg.offset + len);
+    arg.offset += len;
+  } else {
+    tooShort();
+  }
+  return str;
+}
+
+/**
+ * `sym2encidx` (`vendor/ruby/v3.3.11/marshal.c:1543`); `null` is its `-1`, which
+ * `rb_enc_find_index` also answers for a name that is not registered. Like
+ * `Encoding.find`, it resolves the `external` and `locale` aliases.
+ */
+function sym2encidx(sym: string, val: unknown): Encoding | null {
+  if (!isAsciiString(sym)) return null;
+  if (sym.length <= 0) return null;
+  if (sym === "encoding") {
+    const name = stringValue(val);
+    if (name.includes("\0")) throw new ArgumentError("string contains null byte");
+    try {
+      return Encoding.find(name);
+    } catch (e) {
+      if (!(e instanceof ArgumentError)) throw e;
+      return null;
+    }
+  }
+  if (sym === "E") {
+    if (val === false) return Encoding.US_ASCII;
+    else if (val === true) return Encoding.UTF_8;
+  }
+  return null;
+}
+
+/** `r_symlink` (`vendor/ruby/v3.3.11/marshal.c:1580`). */
+function rSymlink(arg: LoadArg): string {
+  const num = rLong(arg);
+  const sym = arg.symbols[num];
+
+  if (sym === undefined) {
+    throw new ArgumentError("bad symbol");
+  }
+  return sym;
+}
+
+/**
+ * `r_symreal` (`vendor/ruby/v3.3.11/marshal.c:1592`). Its US-ASCII tag for an
+ * ascii-only symbol (`marshal.c:1598`) has no JS string to sit on.
+ */
+function rSymreal(arg: LoadArg, ivar: boolean): string {
+  let s = rBytes(arg);
+  let idx: Encoding | null = null;
+  const n = arg.symbols.length;
+
+  arg.symbols[n] = s;
+  if (ivar) {
+    let num = rLong(arg);
+    while (num-- > 0) {
+      const sym = rSymbol(arg);
+      idx = sym2encidx(sym, rObject(arg));
+    }
+  }
+  if (idx !== null && idx !== Encoding.ASCII_8BIT) {
+    if (!isValidEncoding(s, idx)) {
+      throw new ArgumentError(`invalid byte sequence in ${idx.name}: ${rbInspect(s)}`);
+    }
+    arg.symbols[n] = s = forceEncoding(s, idx);
+  }
+
+  return s;
+}
+
+/** `r_symbol` (`vendor/ruby/v3.3.11/marshal.c:1620`). */
+function rSymbol(arg: LoadArg): string {
+  let type: number;
+  let ivar = false;
+
+  for (;;) {
+    switch ((type = rByte(arg))) {
+      default:
+        throw new ArgumentError(`dump format error for symbol(0x${type.toString(16)})`);
+      case TYPE_IVAR:
+        ivar = true;
+        continue;
+      case TYPE_SYMBOL:
+        return rSymreal(arg, ivar);
+      case TYPE_SYMLINK:
+        if (ivar) {
+          throw new ArgumentError("dump format error (symlink with encoding)");
+        }
+        return rSymlink(arg);
+    }
+  }
+}
+
+/** `r_unique` (`vendor/ruby/v3.3.11/marshal.c:1642`). */
+function rUnique(arg: LoadArg): string {
+  return rSymbol(arg);
+}
+
+/** `r_string` (`vendor/ruby/v3.3.11/marshal.c:1648`). */
+function rString(arg: LoadArg): string {
+  return rBytes(arg);
+}
+
+/** `r_entry0` (`vendor/ruby/v3.3.11/marshal.c:1654`). */
+function rEntry0<T>(v: T, num: number, arg: LoadArg): T {
+  arg.data.set(num, v);
+  return v;
+}
+
+/** `r_entry` (`vendor/ruby/v3.3.11/marshal.c:1331`). */
+function rEntry<T>(v: T, arg: LoadArg): T {
+  return rEntry0(v, arg.data.size, arg);
+}
+
+/**
+ * `r_ivar_encoding` (`vendor/ruby/v3.3.11/marshal.c:1734`). `rb_enc_associate_index`
+ * retags a Ruby String in place; a JS string is immutable, so the re-read
+ * string is answered, and `undefined` is the C `FALSE`.
+ */
+function rIvarEncoding(obj: unknown, arg: LoadArg, sym: string, val: unknown): string | undefined {
+  const idx = sym2encidx(sym, val);
+  if (idx !== null) {
+    if (typeof obj === "string") {
+      return forceEncoding(obj, idx);
+    } else {
+      throw new ArgumentError(`${rbObjAsString(obj)} is not enc_capable`);
+    }
+  }
+  return undefined;
+}
+
+/**
+ * `r_encname` (`vendor/ruby/v3.3.11/marshal.c:1750`). `obj` holds the String
+ * `rb_enc_associate_index` retags in place, and is left holding the re-read one.
+ */
+function rEncname(obj: { value: string }, arg: LoadArg): number {
+  let len = rLong(arg);
+  if (len > 0) {
+    const sym = rSymbol(arg);
+    const val = rObject(arg);
+    const str = rIvarEncoding(obj.value, arg, sym, val);
+    if (str !== undefined) obj.value = str;
+    len -= str !== undefined ? 1 : 0;
+  }
+  return len;
+}
+
+/**
+ * `r_ivar` (`vendor/ruby/v3.3.11/marshal.c:1762`), answering `obj` as
+ * {@link rIvarEncoding} left it. `rb_hash_ruby2_keywords` flags a Hash as
+ * keyword arguments, which a JS call has no slot for.
+ */
+function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadArg): unknown {
+  let len = rLong(arg);
+  if (len > 0) {
+    do {
+      const sym = rSymbol(arg);
+      const val = rObject(arg);
+      const str = rIvarEncoding(obj, arg, sym, val);
+      if (str !== undefined) {
+        if (hasEncoding) hasEncoding.value = true;
+        obj = str;
+      } else if (sym === "K") {
+        if (!(obj instanceof Map)) {
+          throw new ArgumentError(
+            `ruby2_keywords flag is given but ${rbObjAsString(obj)} is not a Hash`,
+          );
+        }
+      } else {
+        rbObjIvarSet(obj as object, sym, val);
+      }
+    } while (--len > 0);
+  }
+  return obj;
+}
+
+/** `path2class` (`vendor/ruby/v3.3.11/marshal.c:1790`). */
+function path2class(path: string): AnyClass {
+  const v = rbPathToClass(path);
+
+  if (!(typeof v === "function" && rbObjClassname(v) === "Class")) {
+    throw new ArgumentError(`${path} does not refer to class`);
+  }
+  return v as AnyClass;
+}
+
+/** `must_be_module` (`vendor/ruby/v3.3.11/marshal.c:1803`), under `path2module` (`marshal.c:1800`). */
+function mustBeModule(v: unknown, path: string): Module {
+  if (!(v instanceof Module)) {
+    throw new ArgumentError(`${path} does not refer to module`);
+  }
+  return v;
+}
+
+/**
+ * `obj_alloc_by_klass` (`vendor/ruby/v3.3.11/marshal.c:1812`). `rb_obj_alloc`
+ * runs the class's allocator and never `initialize`.
+ */
+function objAllocByKlass(klass: AnyClass): object {
+  return Object.create(klass.prototype as object) as object;
+}
+
+/** `obj_alloc_by_path` (`vendor/ruby/v3.3.11/marshal.c:1835`). */
+function objAllocByPath(path: string): object {
+  return objAllocByKlass(path2class(path));
+}
+
+/** `prohibit_ivar` (`vendor/ruby/v3.3.11/marshal.c:1852`). */
+function prohibitIvar(type: string, str: string, ivp: { value: boolean } | null): void {
+  if (!ivp || !ivp.value) return;
+  throw new TypeError(`can't override instance variable of ${type} \`${str}'`);
+}
+
+/** `r_object0` (`vendor/ruby/v3.3.11/marshal.c:1861`). */
+function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
+  const type = rByte(arg);
+  return rObjectFor(arg, ivp, type);
+}
+
+/**
+ * `r_object_for` (`vendor/ruby/v3.3.11/marshal.c:1868`). The loop stands in
+ * for `goto type_hash`. `Marshal.load`'s `proc` and `freeze:` are not ported,
+ * which leaves `r_leave` (`marshal.c:1693`) nothing to do. `load_mantissa`
+ * (`marshal.c:386`) reads the mantissa bytes format 4.8 no longer writes, and
+ * `rb_integer_unpack` and `ULONG2NUM` are the BigInt shifts. `TYPE_IVAR`
+ * re-enters at its `arg->data` index the String `r_ivar` re-read, where
+ * `rb_enc_associate_index` retags a Ruby String in place; a linked String has
+ * no entry of its own to re-enter. `TYPE_UCLASS` reaches a String, an Array,
+ * a Hash or a Module, and `TYPE(v) != TYPE(tmp)` compares those. The arms
+ * {@link wObject} does not write are not read either, and take the `default:`
+ * arm.
+ *
+ * @inventedArm rEntry0 — PERMANENT
+ */
+function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number): unknown {
+  let v: unknown;
+  let hashNewWithSize = (): Hash<unknown, unknown> => new Hash();
+
+  for (;;) {
+    switch (type) {
+      case TYPE_LINK: {
+        const id = rLong(arg);
+        if (!arg.data.has(id)) {
+          throw new ArgumentError("dump format error (unlinked)");
+        }
+        v = arg.data.get(id);
+        break;
+      }
+
+      case TYPE_IVAR: {
+        const ivar = { value: true };
+        const idx = arg.data.size;
+        v = rObject0(arg, ivar);
+        if (ivar.value) {
+          const obj = rIvar(v, null, arg);
+          if (obj !== v && arg.data.get(idx) === v) v = rEntry0(obj, idx, arg);
+        }
+        break;
+      }
+
+      case TYPE_UCLASS: {
+        const c = path2class(rUnique(arg));
+
+        if (rbModSingletonP(c)) {
+          throw new TypeError("singleton can't be loaded");
+        }
+        type = rByte(arg);
+        if (c === Hash && (type === TYPE_HASH || type === TYPE_HASH_DEF)) {
+          hashNewWithSize = () => new Hash().compareByIdentity();
+          continue;
+        }
+        v = rObjectFor(arg, null, type);
+        if (v === null || typeof v !== "object" || rbFloatTypeP(v) || tObjectP(v as unknown)) {
+          throw new ArgumentError("dump format error (user class)");
+        }
+        const klass = rbObjClass(v) as AnyClass;
+        const proto = c.prototype as object;
+        if (v instanceof Module || !(c === klass || proto instanceof klass)) {
+          const tmp = objAllocByKlass(c);
+
+          if (
+            v instanceof Module ||
+            Array.isArray(v) !== tmp instanceof Array ||
+            v instanceof Map !== tmp instanceof Map
+          ) {
+            throw new ArgumentError("dump format error (user class)");
+          }
+        }
+        Object.setPrototypeOf(v, proto);
+        break;
+      }
+
+      case TYPE_NIL:
+        v = null;
+        break;
+
+      case TYPE_TRUE:
+        v = true;
+        break;
+
+      case TYPE_FALSE:
+        v = false;
+        break;
+
+      case TYPE_FIXNUM: {
+        const i = rLong(arg);
+        v = i;
+        break;
+      }
+
+      case TYPE_FLOAT: {
+        let d: number;
+        const ptr = rBytes(arg);
+
+        if (ptr === "nan") {
+          d = NaN;
+        } else if (ptr === "inf") {
+          d = Infinity;
+        } else if (ptr === "-inf") {
+          d = -Infinity;
+        } else {
+          d = Number.parseFloat(ptr);
+        }
+        v = rbDbl2num(d);
+        v = rEntry(v, arg);
+        break;
+      }
+
+      case TYPE_BIGNUM: {
+        const sign = rByte(arg);
+        const len = rLong(arg);
+        let num = 0n;
+
+        if (len <= 4) {
+          for (let i = 0; i < len; i++) {
+            num |= BigInt(rByte(arg)) << BigInt(i * 16);
+            num |= BigInt(rByte(arg)) << BigInt(i * 16 + 8);
+          }
+          if (sign === 0x2d) num = -num;
+        } else {
+          const data = rBytes0(len * 2, arg);
+          for (let i = data.length - 1; i >= 0; i--) {
+            num = (num << 8n) | BigInt(data.charCodeAt(i));
+          }
+          if (sign === 0x2d) num = -num;
+        }
+        v = rbBigNorm(num);
+        v = rEntry(v, arg);
+        break;
+      }
+
+      case TYPE_STRING:
+        v = rEntry(rString(arg), arg);
+        break;
+
+      case TYPE_ARRAY: {
+        let len = rLong(arg);
+        const ary: unknown[] = [];
+
+        v = rEntry(ary, arg);
+        while (len--) {
+          ary.push(rObject(arg));
+        }
+        break;
+      }
+
+      case TYPE_HASH:
+      case TYPE_HASH_DEF: {
+        let len = rLong(arg);
+        const hash = hashNewWithSize();
+
+        v = rEntry(hash, arg);
+        while (len--) {
+          const key = rObject(arg);
+          const value = rObject(arg);
+          hash.set(key, value);
+        }
+        if (type === TYPE_HASH_DEF) {
+          hash.setDefault(rObject(arg));
+        }
+        break;
+      }
+
+      case TYPE_OBJECT: {
+        const idx = rPrepare(arg);
+        v = objAllocByPath(rUnique(arg));
+        if (!tObjectP(v)) {
+          throw new ArgumentError("dump format error");
+        }
+        v = rEntry0(v, idx, arg);
+        rIvar(v, null, arg);
+        break;
+      }
+
+      case TYPE_CLASS: {
+        const str = { value: rBytes(arg) };
+
+        if (ivp && ivp.value) ivp.value = rEncname(str, arg) > 0;
+        v = path2class(str.value);
+        prohibitIvar("class", str.value, ivp);
+        v = rEntry(v, arg);
+        break;
+      }
+
+      case TYPE_MODULE: {
+        const str = { value: rBytes(arg) };
+
+        if (ivp && ivp.value) ivp.value = rEncname(str, arg) > 0;
+        v = mustBeModule(rbPathToClass(str.value), str.value);
+        prohibitIvar("module", str.value, ivp);
+        v = rEntry(v, arg);
+        break;
+      }
+
+      case TYPE_SYMBOL:
+        if (ivp) {
+          v = rSymreal(arg, ivp.value);
+          ivp.value = false;
+        } else {
+          v = rSymreal(arg, false);
+        }
+        v = `:${v as string}`;
+        break;
+
+      case TYPE_SYMLINK:
+        v = `:${rSymlink(arg)}`;
+        break;
+
+      default:
+        throw new ArgumentError(`dump format error(0x${type.toString(16)})`);
+    }
+    break;
+  }
+
+  if (v === undefined) {
+    throw new ArgumentError("dump format error (bad link)");
+  }
+
+  return v;
+}
+
+/** `r_object` (`vendor/ruby/v3.3.11/marshal.c:2349`). */
+function rObject(arg: LoadArg): unknown {
+  return rObject0(arg, null);
+}
+
+/** `rb_marshal_load_with_proc` (`vendor/ruby/v3.3.11/marshal.c:2378`), for a String `port`. */
+function rbMarshalLoadWithProc(port: unknown): unknown {
+  const v = rbCheckStringType(port);
+  if (v === null) {
+    throw new TypeError("instance of IO needed");
+  }
+  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map() };
+
+  const major = rByte(arg);
+  const minor = rByte(arg);
+  if (major !== MARSHAL_MAJOR || minor > MARSHAL_MINOR) {
+    throw new TypeError(
+      `incompatible marshal file format (can't be read)\n\tformat version ${MARSHAL_MAJOR}.${MARSHAL_MINOR} required; ${major}.${minor} given`,
+    );
+  }
+  if (rtest(verbose()) && minor !== MARSHAL_MINOR) {
+    warn(
+      `incompatible marshal file format (can be read)\n\tformat version ${MARSHAL_MAJOR}.${MARSHAL_MINOR} required; ${major}.${minor} given`,
+    );
+  }
+
+  return rObject(arg);
+}
+
 /**
  * Ruby's `Marshal` (`vendor/ruby/v3.3.11/marshal.c:2555`), format 4.8. The
  * marshalled data is an ASCII-8BIT String, one character per byte.
@@ -539,14 +1110,41 @@ export const Marshal = {
    *
    * Not ported: the `anIO` argument; `w_extended` (`marshal.c:550`) and the
    * `marshal_dump` arm (`marshal.c:910`), which are
-   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`; `class2path`'s
-   * `rb_path_to_class` check (`marshal.c:279`), which is
-   * `ruby-compat-marshal-load-core-types`; and the `_dump`, Regexp and Struct
-   * arms, which nothing calls.
+   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`; and the `_dump`,
+   * Regexp and Struct arms, which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
   dump(obj: unknown, limit: number = -1): string {
     return rbMarshalDumpLimited(obj, limit);
+  },
+
+  /**
+   * `Marshal.load(source)` (`marshal_load`, `vendor/ruby/v3.3.11/marshal.c:2434`,
+   * over `r_object_for`, `marshal.c:1868`), for a String source holding what
+   * {@link Marshal.dump} writes.
+   *
+   * @boundary: a String with no `E` / `encoding` ivar loads as its bytes, one
+   *  character per byte, and one with the ivar is re-read through
+   *  `forceEncoding`. A Hash loads as ruby-compat's `Hash`, a whole-valued
+   *  Float loads boxed (`rbDbl2num`), and a Bignum goes through `rbBigNorm`.
+   *  `rb_obj_alloc` is `Object.create(klass.prototype)`, so no constructor
+   *  runs. `TYPE_UCLASS` re-classes an Array or Hash with `Object.setPrototypeOf`;
+   *  a JS string has no class to set, so a String subclass is a format error,
+   *  and no ivar table, so a String, Float or Bignum dumped with an ivar of its
+   *  own raises `FrozenError`. A class path resolves through `rbPathToClass`,
+   *  whose table holds no core class, so a `compare_by_identity` Hash loads
+   *  only once `Hash` is seated.
+   *
+   * Not ported: the `proc` and `freeze:` arguments and an IO source; and the
+   * `TYPE_USRMARSHAL` arm, which is
+   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`, with
+   * `TYPE_USERDEF`, `TYPE_DATA`, `TYPE_EXTENDED`, Regexp and Struct, which
+   * nothing calls.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Marshal.load` (`vendor/ruby/v3.3.11/marshal.c:2434`).
+   */
+  load(source: unknown): unknown {
+    return rbMarshalLoadWithProc(source);
   },
 };

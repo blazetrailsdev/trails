@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
 import { Module, rbModConstSet } from "./include.js";
 import { Marshal } from "./marshal.js";
 import { rbSetClassPathString } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
+import { registerConstant, unregisterConstant } from "./variable.js";
 
 const fixtures = JSON.parse(
   readFileSync(new URL("./marshal.fixtures.json", import.meta.url), "utf8"),
@@ -32,6 +34,19 @@ const Kind = rbModConstSet(Geo, "Kind", new Module());
 function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: H): H {
   for (const [key, value] of pairs) h.set(key, value);
   return h;
+}
+
+const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Geo, Hash };
+
+beforeAll(() => {
+  for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);
+});
+afterAll(() => {
+  for (const [name, value] of Object.entries(CONSTANTS)) unregisterConstant(name, value);
+});
+
+function bytes(name: string): string {
+  return fixtures[name].replace(/../g, (byte) => String.fromCharCode(Number.parseInt(byte, 16)));
 }
 
 function hex(str: string): string {
@@ -90,9 +105,40 @@ const VALUES: Record<string, unknown> = {
   ],
 };
 
+const LOADED: Record<string, unknown> = {
+  floats: [...(VALUES.floats as unknown[]).slice(0, 8), 1.5],
+  "string binary": "Ã©ÿ",
+  "string us-ascii": "abc",
+  "string shift_jis": "あ",
+  array: [1, "a", null, [], new Hash()],
+  hash: hash(
+    [
+      ["a", 1],
+      [":b", [2]],
+      [3, new Hash()],
+    ],
+    new Hash(),
+  ),
+  "hash string keys": hash(
+    [
+      ["a", 1],
+      ["b", null],
+    ],
+    new Hash(),
+  ),
+  "schema cache": [
+    20240101000000,
+    hash([["posts", [new Column("id", ":integer")]]], new Hash()),
+    new Hash(),
+    hash([["posts", "id"]], new Hash()),
+    hash([["posts", true]], new Hash()),
+    new Hash(),
+  ],
+};
+
 describe("Marshal.dump", () => {
   it("has a value for every fixture ruby dumped", () => {
-    expect(Object.keys(VALUES)).toEqual(Object.keys(fixtures));
+    expect(Object.keys({ ...VALUES, ...LOADED }).sort()).toEqual(Object.keys(fixtures).sort());
   });
 
   it.each(Object.entries(VALUES))("dumps the bytes ruby dumped: %s", (name, value) => {
@@ -129,6 +175,22 @@ describe("Marshal.dump", () => {
     }
   });
 
+  it("raises for an instance of a class its path does not reach", () => {
+    class Unreachable {}
+    expect(() => Marshal.dump(new Unreachable())).toThrow(
+      new ArgumentError("undefined class/module Unreachable"),
+    );
+    const other = class {};
+    registerConstant("Unreachable", other);
+    try {
+      expect(() => Marshal.dump(new Unreachable())).toThrow(
+        new TypeError("Unreachable can't be referred to"),
+      );
+    } finally {
+      unregisterConstant("Unreachable", other);
+    }
+  });
+
   it("raises ArgumentError past the depth limit", () => {
     expect(Marshal.dump([[1]], 3)).toBe(Marshal.dump([[1]]));
     expect(() => Marshal.dump([[1]], 2)).toThrow(new ArgumentError("exceed depth limit"));
@@ -145,5 +207,121 @@ describe("Marshal.dump", () => {
   it("raises TypeError for a length past 32 bits", () => {
     const ary = new Proxy([], { get: (t, k) => (k === "length" ? 2 ** 32 : Reflect.get(t, k)) });
     expect(() => Marshal.dump(ary)).toThrow(new TypeError("long too big to dump"));
+  });
+});
+
+describe("Marshal.load", () => {
+  it.each(Object.keys(fixtures))("loads the bytes ruby dumped: %s", (name) => {
+    const expected = name in LOADED ? LOADED[name] : VALUES[name];
+    expect(Marshal.load(bytes(name))).toEqual(expected);
+  });
+
+  it("loads a Float boxed when it is whole, and -0.0 apart from 0.0", () => {
+    const floats = Marshal.load(bytes("floats")) as unknown[];
+    expect(floats[0]).toBeInstanceOf(Number);
+    expect(Object.is((floats[6] as number).valueOf(), -0)).toBe(true);
+  });
+
+  it("loads a Hash default", () => {
+    const h = Marshal.load(bytes("hash default")) as Hash<string, number>;
+    expect(h.default()).toBe(5);
+    expect((Marshal.load(bytes("hash default false")) as Hash<string, boolean>).default()).toBe(
+      false,
+    );
+  });
+
+  it("loads TYPE_UCLASS as the subclass, and a compare_by_identity Hash", () => {
+    const ary = Marshal.load(bytes("array subclass"));
+    expect(ary).toBeInstanceOf(Ary);
+    const hsh = Marshal.load(bytes("hash subclass")) as Hsh;
+    expect(hsh).toBeInstanceOf(Hsh);
+    expect(hsh.get("a")).toBe(1);
+    const ident = Marshal.load(bytes("hash compare_by_identity")) as Hash<number, number>;
+    expect(ident.constructor).toBe(Hash);
+    expect(ident.isCompareByIdentity()).toBe(true);
+  });
+
+  it("loads an Array that holds itself, and a linked object as the same object", () => {
+    const loaded = Marshal.load(bytes("array cycle")) as unknown[];
+    expect(loaded[0]).toBe(loaded);
+    const [a, b] = Marshal.load(bytes("object link")) as [Column, Column];
+    expect(b).toBe(a);
+  });
+
+  it("loads a Class and a Module as the constants their paths name", () => {
+    const [column, shape, kind] = Marshal.load(bytes("class and module")) as unknown[];
+    expect([column === Column, shape === Shape, kind === Kind]).toEqual([true, true, true]);
+    expect(() => Marshal.load("\x04\bIc\x0bColumn\x06:\x08foo0")).toThrow(
+      new TypeError("can't override instance variable of class `Column'"),
+    );
+  });
+
+  it("leaves a linked String's entry alone under TYPE_IVAR, and reads the K ivar of a Hash only", () => {
+    expect(() => Marshal.load('\x04\b[\x08"\x07\xc3\xa9I@\x06\x06:\x06ET@\x07')).toThrow(
+      new ArgumentError("dump format error (unlinked)"),
+    );
+    expect(Marshal.load("\x04\bI{\x00\x06:\x06KT")).toEqual(new Hash());
+    expect(() => Marshal.load("\x04\bI[\x00\x06:\x06KT")).toThrow(
+      new ArgumentError("ruby2_keywords flag is given but [] is not a Hash"),
+    );
+    expect(() => Marshal.load('\x04\bI"\x00\x06:\x0dencodingi\x06')).toThrow(TypeError);
+    expect(() => Marshal.load('\x04\bI"\x06a\x07:\x06ET:\x07@xi\x06')).toThrow(FrozenError);
+  });
+
+  it("loads what Marshal.dump dumped", () => {
+    for (const [name, value] of Object.entries(VALUES)) {
+      expect(Marshal.load(Marshal.dump(value))).toEqual(name in LOADED ? LOADED[name] : value);
+    }
+  });
+
+  it("raises TypeError for an incompatible format version and for a source that is not a String", () => {
+    expect(() => Marshal.load("\x04\x09i\x00")).toThrow(
+      new TypeError(
+        "incompatible marshal file format (can't be read)\n\tformat version 4.8 required; 4.9 given",
+      ),
+    );
+    expect(() => Marshal.load("\x03\x00i\x00")).toThrow(TypeError);
+    expect(Marshal.load("\x04\x07i\x06")).toBe(1);
+    expect(() => Marshal.load(1)).toThrow(new TypeError("instance of IO needed"));
+  });
+
+  it("raises ArgumentError for malformed data", () => {
+    expect(() => Marshal.load("\x04\b")).toThrow(new ArgumentError("marshal data too short"));
+    expect(() => Marshal.load('\x04\b"\x0aabc')).toThrow(
+      new ArgumentError("marshal data too short"),
+    );
+    expect(() => Marshal.load("\x04\b@\x00")).toThrow(
+      new ArgumentError("dump format error (unlinked)"),
+    );
+    expect(() => Marshal.load("\x04\b;\x00")).toThrow(new ArgumentError("bad symbol"));
+    expect(() => Marshal.load("\x04\bZ")).toThrow(new ArgumentError("dump format error(0x5a)"));
+    expect(() => Marshal.load('\x04\bo"\x00\x00')).toThrow(
+      new ArgumentError("dump format error for symbol(0x22)"),
+    );
+    expect(() => Marshal.load("\x04\bI;\x00")).toThrow(new ArgumentError("bad symbol"));
+    expect(() => Marshal.load("\x04\bo:\x09Hash\x00")).toThrow(
+      new ArgumentError("dump format error"),
+    );
+  });
+
+  it("raises ArgumentError for a path that does not resolve to a class or a module", () => {
+    expect(() => Marshal.load("\x04\bo:\x0dFoo::Bar\x00")).toThrow(
+      new ArgumentError("undefined class/module Foo::"),
+    );
+    expect(() => Marshal.load("\x04\bo:\x08Geo\x00")).toThrow(
+      new ArgumentError("Geo does not refer to class"),
+    );
+    expect(() => Marshal.load("\x04\bc\x0eGeo::Kind")).toThrow(
+      new ArgumentError("Geo::Kind does not refer to class"),
+    );
+    expect(() => Marshal.load("\x04\bm\x0bColumn")).toThrow(
+      new ArgumentError("Column does not refer to module"),
+    );
+  });
+
+  it("raises ArgumentError for a TYPE_UCLASS over a value of another type", () => {
+    for (const data of ["\x04\bC:\x08Ary{\x00", "\x04\bC:\x08Aryi\x06", "\x04\bC:\x08Aryf\x061"]) {
+      expect(() => Marshal.load(data)).toThrow(new ArgumentError("dump format error (user class)"));
+    }
   });
 });
