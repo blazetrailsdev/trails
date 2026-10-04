@@ -871,7 +871,7 @@ export class Base extends Model {
   declare static isInstanceMethodAlreadyImplemented: AttributeMethodsClassHalf["isInstanceMethodAlreadyImplemented"];
   declare static isDangerousAttributeMethod: (methodName: string) => boolean;
   /** @internal */
-  declare static _aliasesByAttributeName: Map<string, string[]>;
+  declare static _aliasesByAttributeName: Hash<string, string[]>;
   /** @internal */
   declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
   /** @internal */

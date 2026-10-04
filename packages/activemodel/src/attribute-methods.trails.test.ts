@@ -346,13 +346,13 @@ describe("AttributeMethodsTest (trails)", () => {
     interface Person extends Attributes {}
 
     const p = new Person({ name: "test" });
-    const stack = "custom backtrace line";
+    const stack = ["at custom (backtrace.ts:1:1)"];
     const call = () =>
       (
         AttributeMethods.missingAttribute as (
           this: unknown,
           attrName: string,
-          stack?: string,
+          stack: string[],
         ) => never
       ).call(p, "title", stack);
     let caught: Error | undefined;
@@ -362,7 +362,39 @@ describe("AttributeMethodsTest (trails)", () => {
       caught = err as Error;
     }
     expect(caught?.message).toContain("missing attribute 'title'");
-    expect(caught?.stack).toBe(stack);
+    expect(caught?.stack).toBe(
+      "MissingAttributeError: missing attribute 'title' for Person\n    at custom (backtrace.ts:1:1)",
+    );
+  });
+
+  it("forwards a named parameter through a proxy call and through its alias", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+      declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
+      declare static attributeAliases: AttributesClassHalf["attributeAliases"];
+      declare static attributeMethodPatterns: AttributesClassHalf["attributeMethodPatterns"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+      declare static aliasesByAttributeName: AttributesClassHalf["aliasesByAttributeName"];
+      declare nameJoined: (other: string) => string;
+      declare nicknameJoined: (other: string) => string;
+
+      static {
+        include(this, Attributes);
+        this.attributeMethodSuffix("Joined", { parameters: "other" });
+        this.attribute("name", "string");
+        this.aliasAttribute("nickname", "name");
+      }
+      attributeJoined(attrName: string, other: string): string {
+        return `${attrName} ${other}`;
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person({ name: "Alexander" });
+    expect(person.nameJoined("x")).toBe("name x");
+    expect(person.nicknameJoined("x")).toBe("name x");
+    expect(Person.aliasesByAttributeName().get("name")).toEqual(["nickname"]);
+    expect(Person.aliasesByAttributeName().get("age")).toEqual([]);
   });
 });
 

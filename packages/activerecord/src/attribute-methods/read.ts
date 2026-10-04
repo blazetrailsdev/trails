@@ -84,14 +84,12 @@ export function defineMethodAttribute(
 interface ReadRecord {
   _attributes: AttributeSet;
   _readAttribute(n: string, block: (n: string) => unknown): unknown;
-  missingAttribute(n: string, stack: string): never;
+  missingAttribute(n: string, stack: string[]): never;
 }
 
 /** @internal */
 function readGeneratedAttribute(record: ReadRecord, canonicalName: string): unknown {
-  return record._readAttribute(canonicalName, (n) =>
-    record.missingAttribute(n, rbFCaller().join("\n")),
-  );
+  return record._readAttribute(canonicalName, (n) => record.missingAttribute(n, rbFCaller()));
 }
 
 AttributeMethodsNamespace.Read = Read;

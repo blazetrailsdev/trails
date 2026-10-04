@@ -6,7 +6,7 @@ import {
   type Included,
   included,
 } from "@blazetrails/activesupport";
-import { Module, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, Module, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -197,7 +197,7 @@ export type AttributesClassHalf = AttributeRegistrationClassHalf &
     attributeMethodPatterns: AttributeMethodPattern[];
     isAttributeMethodPatterns: boolean;
     /** @internal */
-    _aliasesByAttributeName: Map<string, string[]>;
+    _aliasesByAttributeName: Hash<string, string[]>;
   };
 
 export type AttributeRegistrationClassHalf = Extended<typeof AttributeRegistrationClassMethods>;

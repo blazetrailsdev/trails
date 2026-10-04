@@ -143,10 +143,10 @@ export class BelongsToAssociation extends SingularAssociation {
   protected override staleState(): unknown {
     const owner = this.owner as unknown as {
       _readAttribute(n: string, block: (n: string) => unknown): unknown;
-      missingAttribute(n: string, stack: string): never;
+      missingAttribute(n: string, stack: string[]): never;
     };
     return owner._readAttribute(this.reflection.foreignKey() as string, (n) =>
-      owner.missingAttribute(n, rbFCaller().join("\n")),
+      owner.missingAttribute(n, rbFCaller()),
     );
   }
 

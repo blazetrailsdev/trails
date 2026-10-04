@@ -3,6 +3,7 @@ import {
   basicObjRespondTo,
   block,
   Concurrent,
+  excSetBacktrace,
   fetch,
   Hash,
   hasKey,
@@ -134,7 +135,7 @@ export interface AttributeMethodHost {
   attributeNames(): string[];
   attributeMethodPatterns: AttributeMethodPattern[];
   attributeAliases: Record<string, string>;
-  _aliasesByAttributeName: Map<string, string[]>;
+  _aliasesByAttributeName: Hash<string, string[]>;
   _generatedAttributeMethods?: Module;
 }
 
@@ -328,7 +329,7 @@ export const ClassMethods = {
   },
 
   /** @inventedArm if — PERMANENT */
-  aliasesByAttributeName(this: ClassMethodsHost): Map<string, string[]> {
+  aliasesByAttributeName(this: ClassMethodsHost): Hash<string, string[]> {
     if (!Object.prototype.hasOwnProperty.call(this, "_aliasesByAttributeName")) {
       this._aliasesByAttributeName = new Hash<string, string[]>((h, k) => {
         const v: string[] = [];
@@ -427,7 +428,7 @@ export const ClassMethods = {
    * @internal
    * @inventedArm if — PERMANENT
    * @inventedArm rbObjRespondTo — PERMANENT
-   * @inventedArm pop — PERMANENT
+   * @inventedArm slice — PERMANENT
    */
   defineCall(
     this: ClassMethodsHost,
@@ -475,14 +476,14 @@ export const ClassMethods = {
     }
 
     codeGenerator.defineCachedMethod(cachedName, { namespace, as }, (batch) => {
-      if (parameters) callArgs.pop();
       let body: Body;
       if (CALL_COMPILABLE_REGEXP.test(targetName)) {
-        body = (self, args) => rbFSend(self, targetName, ...callArgs, ...args);
+        body = (self, args) => rbFSend(self, targetName, ...sent, ...args);
       } else {
         callArgs.unshift(targetName);
-        body = (self, args) => rbFSend(self, ...(callArgs as [string, ...string[]]), ...args);
+        body = (self, args) => rbFSend(self, ...(sent as [string, ...string[]]), ...args);
       }
+      const sent = parameters ? callArgs.slice(0, -1) : callArgs;
 
       batch.push((mod) => {
         Object.defineProperty(mod, cachedName, descriptor(body));
@@ -560,11 +561,11 @@ export const AttributeMethods = {
   },
 
   /** @internal */
-  missingAttribute(this: InstanceHost, attrName: string, stack: string): never {
+  missingAttribute(this: InstanceHost, attrName: string, stack: string[]): never {
     const err = new MissingAttributeError(
       `missing attribute '${attrName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
     );
-    err.stack = stack;
+    excSetBacktrace(err, stack);
     throw err;
   },
 

@@ -659,7 +659,7 @@ export function get(this: InstanceMethodHost, attrName: string): unknown {
     AttributeMethods.AttributeMethods.missingAttribute.call(
       this as unknown as AttributeMethodsInstanceHost,
       n,
-      rbFCaller().join("\n"),
+      rbFCaller(),
     ),
   );
 }
