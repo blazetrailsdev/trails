@@ -23,7 +23,7 @@ describe("HotCompatibilityTest", () => {
     try {
       await body(ddlConnection);
     } finally {
-      await pool.checkin(ddlConnection);
+      pool.checkin(ddlConnection);
       await pool.disconnectBang();
     }
   }

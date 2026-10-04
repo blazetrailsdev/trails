@@ -420,7 +420,7 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE reload_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS reload_t", "SCHEMA");
-    await pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn as unknown as DatabaseAdapter);
 
     const draining = pool.clearReloadableConnections();
     expect(isClosed()).toBe(false);
@@ -439,7 +439,7 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE flush_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS flush_t", "SCHEMA");
-    await pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn as unknown as DatabaseAdapter);
 
     const draining = pool.flushBang();
     expect(isClosed()).toBe(false);
@@ -489,7 +489,7 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE swap_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS swap_t", "SCHEMA");
-    await pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn as unknown as DatabaseAdapter);
 
     failCheckout = true;
     await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
@@ -511,7 +511,7 @@ describe("SQLite adapter driver binding", () => {
     const conn = (await pool.checkout()) as unknown as SQLite3Adapter;
     await conn.internalExecute("CREATE TABLE sync_seam_t (id INTEGER PRIMARY KEY)", "SCHEMA");
     await conn.internalExecute("DROP TABLE IF EXISTS sync_seam_t", "SCHEMA");
-    await pool.checkin(conn as unknown as DatabaseAdapter);
+    pool.checkin(conn as unknown as DatabaseAdapter);
     await expect(pool.flushBang()).resolves.toBeUndefined();
     await expect(pool.clearReloadableConnections()).resolves.toBeUndefined();
     await expect(pool.discardBang()).resolves.toBeUndefined();

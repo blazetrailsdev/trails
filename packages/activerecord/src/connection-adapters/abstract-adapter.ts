@@ -1544,7 +1544,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   close(): void | Promise<void> {
-    return this.pool.checkin(this);
+    this.pool.checkin(this);
   }
 
   isDefaultIndexType(_index: unknown): boolean {

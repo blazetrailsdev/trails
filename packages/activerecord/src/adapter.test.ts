@@ -162,7 +162,7 @@ async function killConnectionFromServer(
       await killer.execute(`SELECT pg_cancel_backend(${connectionId})`);
     }
   } finally {
-    await pool.checkin(killer);
+    pool.checkin(killer);
   }
 }
 
