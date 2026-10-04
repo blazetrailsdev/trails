@@ -341,7 +341,7 @@ export class ConnectionPool implements ReapablePool {
     const connection =
       this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
     if (this._pinnedConnection != null && this._pinnedConnection !== connection) {
-      this.checkin(connection);
+      await this.checkin(connection);
     }
     this._pinnedConnection ||= connection;
     this._pinnedConnectionsDepth += 1;
@@ -376,7 +376,7 @@ export class ConnectionPool implements ReapablePool {
       if (this._pinnedConnection == null) {
         connection.stealBang();
         connection.setLockThread(null);
-        this.checkin(connection);
+        await this.checkin(connection);
       }
     });
 
@@ -398,7 +398,7 @@ export class ConnectionPool implements ReapablePool {
   releaseConnection(_existingLease: Lease | null = null): boolean {
     const conn = this.connectionLease().release();
     if (conn) {
-      this.checkin(conn);
+      void this.checkin(conn);
       return true;
     }
     return false;
@@ -443,7 +443,7 @@ export class ConnectionPool implements ReapablePool {
         for (const conn of this._connections!) {
           if (conn.isInUse()) {
             conn.stealBang();
-            this.checkin(conn);
+            await this.checkin(conn);
           }
           await conn.disconnectBang();
         }
@@ -483,7 +483,7 @@ export class ConnectionPool implements ReapablePool {
         for (const conn of this._connections!) {
           if (conn.isInUse()) {
             conn.stealBang();
-            this.checkin(conn);
+            await this.checkin(conn);
           }
           if (conn.requiresReloading()) await conn.disconnectBang();
         }
@@ -518,17 +518,19 @@ export class ConnectionPool implements ReapablePool {
     );
   }
 
-  checkin(conn: DatabaseAdapter): void {
+  checkin(conn: DatabaseAdapter): void | Promise<void> {
     if (this._pinnedConnection === conn) return;
 
-    this.connectionLease().clear(conn);
-    this._checkedOut.delete(conn);
+    return conn.lock.synchronize(() => {
+      this.connectionLease().clear(conn);
+      this._checkedOut.delete(conn);
 
-    conn._runCheckinCallbacks(() => {
-      conn.expire();
+      conn._runCheckinCallbacks(() => {
+        conn.expire();
+      });
+
+      this._available!.add(conn);
     });
-
-    this._available!.add(conn);
   }
 
   remove(conn: DatabaseAdapter): void {
@@ -558,7 +560,7 @@ export class ConnectionPool implements ReapablePool {
     for (const conn of staleConnections) {
       if (await conn.active()) {
         await conn.resetBang();
-        this.checkin(conn);
+        await this.checkin(conn);
       } else {
         this.remove(conn);
       }
@@ -912,7 +914,7 @@ async function attemptToCheckoutAllExistingConnections(
     throw err;
   } finally {
     if (releaseNewlyCheckedOut) {
-      for (const conn of newlyCheckedOut) this.checkin(conn);
+      for (const conn of newlyCheckedOut) await this.checkin(conn);
     }
   }
 }

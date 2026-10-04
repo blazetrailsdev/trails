@@ -870,7 +870,7 @@ describe("sqlForInsert", () => {
         throw new Error("primaryKey() must not be called when pk=false");
       },
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], []);
+    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 

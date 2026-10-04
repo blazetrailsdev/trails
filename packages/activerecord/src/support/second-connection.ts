@@ -26,7 +26,7 @@ export async function withSecondAdapter<T>(
     try {
       return await fn(adapter);
     } finally {
-      pool.checkin(adapter as unknown as DatabaseAdapter);
+      await pool.checkin(adapter as unknown as DatabaseAdapter);
     }
   } finally {
     await pool.disconnect(false).catch(() => {});

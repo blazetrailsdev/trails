@@ -7,7 +7,12 @@ import { Result } from "./result.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import * as Types from "@blazetrails/activemodel";
 import { Attribute } from "@blazetrails/activemodel";
-import { Store } from "./connection-adapters/abstract/query-cache.js";
+import {
+  Store,
+  selectAll,
+  type QueryCacheHost,
+} from "./connection-adapters/abstract/query-cache.js";
+import { FutureResult, type FutureResultPool } from "./future-result.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
 registerModel(Task as never);
@@ -204,5 +209,19 @@ describe("schema reflection does not dirty the query cache (trails)", () => {
       conn.execute = original;
     }
     expect(executeCalls).toBe(0);
+  });
+});
+
+describe("select_all async arm on a cache miss (trails)", () => {
+  it("returns the FutureResult super answers, not a promise of it", () => {
+    const future = new FutureResult({} as FutureResultPool, ["SELECT 1", null, []]);
+    const host = {
+      _queryCache: { enabled: true },
+      lookupSqlCache: () => undefined,
+    } as unknown as QueryCacheHost;
+
+    const result = selectAll.call(host, () => future, "SELECT 1", null, [], { async: true });
+
+    expect(result).toBe(future);
   });
 });

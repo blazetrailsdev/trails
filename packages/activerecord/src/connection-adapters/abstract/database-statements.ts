@@ -1284,7 +1284,7 @@ export async function sqlForInsert(
     const returningColumnsStatement = returningColumns
       .map((c) => this.quoteColumnName!(c))
       .join(", ");
-    if (returningColumns.length > 0) sql = `${sql} RETURNING ${returningColumnsStatement}`;
+    if (returningColumns.some(rtest)) sql = `${sql} RETURNING ${returningColumnsStatement}`;
   }
 
   return [sql, binds];

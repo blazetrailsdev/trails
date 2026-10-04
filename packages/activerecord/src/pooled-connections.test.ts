@@ -28,7 +28,7 @@ describe("PooledConnectionsTest", () => {
     for (let i = 0; i < iterations; i++) {
       try {
         const conn = await pool.checkout();
-        pool.checkin(conn);
+        await pool.checkin(conn);
         connectionCount += 1;
       } catch (err) {
         if (err instanceof ConnectionTimeoutError) timedOut += 1;
@@ -48,7 +48,7 @@ describe("PooledConnectionsTest", () => {
     for (let i = 0; i < loops; i++) {
       try {
         const conn = await pool.checkout();
-        pool.checkin(conn);
+        await pool.checkin(conn);
         connectionCount += 1;
         await pool.leaseConnection();
       } catch (err) {

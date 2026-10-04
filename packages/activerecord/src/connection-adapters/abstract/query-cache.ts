@@ -298,6 +298,7 @@ export function clearQueryCache(this: QueryCacheHost): void {
   this.pool.clearQueryCache();
 }
 
+/** @inventedArm if — PERMANENT */
 export function selectAll(
   this: QueryCacheHost,
   super_: BaseSelectAll,
@@ -323,7 +324,9 @@ export function selectAll(
       const result =
         this.lookupSqlCache(sql, name, binds ?? []) ??
         super_.call(this, sql, name, binds, forwardOpts);
-      return Promise.resolve(result).then((result) => FutureResult.wrap(result));
+      return result instanceof Promise
+        ? result.then((result) => FutureResult.wrap(result))
+        : FutureResult.wrap(result);
     }
     return this.cacheSql(
       sql,

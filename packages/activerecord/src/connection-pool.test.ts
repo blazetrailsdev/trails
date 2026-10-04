@@ -217,10 +217,10 @@ it("full pool blocks", async () => {
   const pool = makePool(1);
   const conn = await pool.checkout();
   const promise = pool.checkout(1);
-  pool.checkin(conn);
+  await pool.checkin(conn);
   const conn2 = await promise;
   expect(conn2).toBe(conn);
-  pool.checkin(conn2);
+  await pool.checkin(conn2);
 });
 
 it("removing releases latch", async () => {
@@ -261,7 +261,7 @@ it("reap inactive", async () => {
   await pool.reap();
 
   expect(activeConnections(pool).length).toBe(1);
-  pool.checkin(conn);
+  await pool.checkin(conn);
   await pool.disconnect();
 });
 
@@ -271,7 +271,7 @@ it("idle timeout configuration", async () => {
 
   pool = makeAmbientPool({ idleTimeout: 0.02 });
   const idleConn = await pool.checkout();
-  pool.checkin(idleConn);
+  await pool.checkin(idleConn);
 
   (idleConn as unknown as { _idleSince: number })._idleSince =
     Process.clockGettime(Process.CLOCK_MONOTONIC) - 0.01;
@@ -289,7 +289,7 @@ it("idle timeout configuration", async () => {
 it("disable flush", async () => {
   const pool = makeAmbientPool({ idleTimeout: null });
   const conn = await pool.checkout();
-  pool.checkin(conn);
+  await pool.checkin(conn);
   await pool.flush();
   expect(pool.stat().connections).toBe(1);
 });
@@ -301,8 +301,8 @@ it("flush", async () => {
   const activeConn = await pool.checkout();
 
   try {
-    pool.checkin(idleConn);
-    pool.checkin(recentConn);
+    await pool.checkin(idleConn);
+    await pool.checkin(recentConn);
 
     expect(pool.connections.length).toBe(3);
 
@@ -315,7 +315,7 @@ it("flush", async () => {
 
     expect(new Set(pool.connections)).toEqual(new Set([recentConn, activeConn]));
   } finally {
-    pool.checkin(activeConn);
+    await pool.checkin(activeConn);
   }
 });
 
@@ -323,8 +323,8 @@ it("flush bang", async () => {
   const pool = makePool(5);
   const c1 = await pool.checkout();
   const c2 = await pool.checkout();
-  pool.checkin(c1);
-  pool.checkin(c2);
+  await pool.checkin(c1);
+  await pool.checkin(c2);
   expect(pool.stat().idle).toBe(2);
   await pool.flushBang();
   expect(pool.stat().connections).toBe(0);
@@ -382,8 +382,8 @@ it("checkout order is lifo", async () => {
   const pool = makePool(2);
   const c1 = await pool.checkout();
   const c2 = await pool.checkout();
-  pool.checkin(c1);
-  pool.checkin(c2);
+  await pool.checkin(c1);
+  await pool.checkin(c2);
   const c3 = await pool.checkout();
   expect(c3).toBe(c2);
 });
@@ -491,7 +491,7 @@ it("pool sets connection schema cache", async () => {
     );
   });
 
-  pool.checkin(connection);
+  await pool.checkin(connection);
 });
 
 it("connection pool stat", async () => {
@@ -612,7 +612,7 @@ it("isConnected probes each pooled connection's connected state", async () => {
   const conn = await pool.checkout();
   await conn.verifyBang();
   expect(pool.isConnected()).toBe(true);
-  pool.checkin(conn);
+  await pool.checkin(conn);
   await conn.disconnectBang();
   expect(pool.connections.length).toBe(1);
   expect(pool.isConnected()).toBe(false);

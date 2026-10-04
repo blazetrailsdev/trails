@@ -62,7 +62,26 @@ it("verifyBang on a checked-out adapter establishes the raw connection on every 
     expect(conn.isConnected()).toBe(true);
     expect(pool.isConnected()).toBe(true);
   } finally {
-    pool.checkin(conn);
+    await pool.checkin(conn);
+    await closePoolConnections(pool);
+  }
+});
+
+it("checkin waits for the holder of the connection's lock before expiring it", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  try {
+    let release!: () => void;
+    const held = conn.lock.synchronize(() => new Promise<void>((resolve) => (release = resolve)));
+
+    const checkin = pool.checkin(conn);
+    expect(conn.isInUse()).toBeTruthy();
+
+    release();
+    await held;
+    await checkin;
+    expect(conn.isInUse()).toBeNull();
+  } finally {
     await closePoolConnections(pool);
   }
 });
@@ -133,7 +152,7 @@ it("withConnection waits for a released connection when pool is saturated", asyn
   const waiter = pool.withConnection((conn) => {
     connSeen = conn;
   });
-  pool.checkin(held);
+  await pool.checkin(held);
   await waiter;
   expect(connSeen).toBe(held);
   expect(pool.stat().busy).toBe(0);
@@ -164,7 +183,7 @@ it("withConnection waits using pool default timeout without explicit checkoutTim
   const waiter = pool.withConnection((conn) => {
     connSeen = conn;
   });
-  pool.checkin(held);
+  await pool.checkin(held);
   await waiter;
   expect(connSeen).toBe(held);
   expect(pool.stat().busy).toBe(0);
@@ -181,7 +200,7 @@ it("reaper flushes idle connections after idle_timeout", async () => {
     vi.useFakeTimers();
     const pool = makeAmbientPool({ idleTimeout: 1, reapingFrequency: 10 });
     const conn = await pool.checkout();
-    pool.checkin(conn);
+    await pool.checkin(conn);
     expect(pool.stat().connections).toBe(1);
 
     await vi.advanceTimersByTimeAsync(2000);
@@ -201,8 +220,8 @@ it("disconnect calls disconnectBang on each pooled connection", async () => {
   const pool = makePool(3);
   const c1 = await pool.checkout();
   const c2 = await pool.checkout();
-  pool.checkin(c1);
-  pool.checkin(c2);
+  await pool.checkin(c1);
+  await pool.checkin(c2);
   const spy1 = vi.fn();
   const spy2 = vi.fn();
   (c1 as unknown as { disconnectBang: () => void }).disconnectBang = spy1;
@@ -218,7 +237,7 @@ it("disconnect calls disconnectBang on each pooled connection", async () => {
 it("disconnect under exclusive acquisition checks out idle connections during the block", async () => {
   const pool = makePool(2);
   const c1 = await pool.checkout();
-  pool.checkin(c1);
+  await pool.checkin(c1);
   const stat = pool.stat();
   expect(stat.busy).toBe(0);
   expect(stat.idle).toBe(1);
@@ -244,7 +263,7 @@ it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and
 
 it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
   const pool = makePool(2) as any;
-  pool.checkin(await pool.checkout());
+  await pool.checkin(await pool.checkout());
   pool._nowConnecting = 1;
   await expect(pool.withExclusivelyAcquiredAllConnections(true, () => "done")).rejects.toThrow(
     /could not obtain ownership of all database connections/,
@@ -257,8 +276,8 @@ it("clearReloadableConnections only disconnects reloadable adapters", async () =
   const pool = makePool(3);
   const c1 = await pool.checkout();
   const c2 = await pool.checkout();
-  pool.checkin(c1);
-  pool.checkin(c2);
+  await pool.checkin(c1);
+  await pool.checkin(c2);
   (c1 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => true;
   (c2 as unknown as { requiresReloading: () => boolean }).requiresReloading = () => false;
   const spy1 = vi.fn();
@@ -275,7 +294,7 @@ it("clearReloadableConnections only disconnects reloadable adapters", async () =
   expect(pool.stat().busy).toBe(0);
   const reused = await pool.checkout();
   expect(reused).toBe(c2);
-  pool.checkin(reused);
+  await pool.checkin(reused);
 });
 
 it("pin connection reuses leased connection and checks in on unpin", async () => {
@@ -370,7 +389,7 @@ it("the pinned connection holds a leased connection", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {
     const established = await pool.checkout();
-    pool.checkin(established);
+    await pool.checkin(established);
     expect(established.isInUse()).toBeFalsy();
 
     await new Thread(async () => {
@@ -739,12 +758,12 @@ describe("ConnectionPoolConfiguration query cache", () => {
         new Thread(async () => {
           const conn = await pool.checkout();
           cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
-          pool.checkin(conn);
+          await pool.checkin(conn);
         }).value(),
         new Thread(async () => {
           const conn = await pool.checkout();
           cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
-          pool.checkin(conn);
+          await pool.checkin(conn);
         }).value(),
       ]);
 
@@ -765,13 +784,13 @@ describe("ConnectionPoolConfiguration query cache", () => {
         cacheA = (conn as unknown as { _queryCache: Store | null })._queryCache;
         cacheA!.enabled = true;
         await cacheA!.computeIfAbsent(KEY, async () => new Result(["x"], [[1]]));
-        pool.checkin(conn);
+        await pool.checkin(conn);
       }).value();
 
       await new Thread(async () => {
         const conn = await pool.checkout();
         cacheB = (conn as unknown as { _queryCache: Store | null })._queryCache;
-        pool.checkin(conn);
+        await pool.checkin(conn);
       }).value();
 
       expect(cacheA).not.toBe(cacheB);
@@ -830,7 +849,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const pool = makeAmbientPool({ pool: 1 });
       try {
         const seed = await pool.checkout();
-        pool.checkin(seed);
+        await pool.checkin(seed);
         vi.spyOn(seed, "verifyBang").mockResolvedValue(undefined);
         (seed as unknown as { _transactionManager: unknown })._transactionManager = {
           beginTransaction: async () => {
@@ -858,7 +877,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const pool = makeAmbientPool({ pool: 1 });
       try {
         const seed = await pool.checkout();
-        pool.checkin(seed);
+        await pool.checkin(seed);
         vi.spyOn(seed, "verifyBang").mockRejectedValue(new Error("connection is dead"));
 
         const pinnedCount = (): number =>
@@ -881,21 +900,21 @@ describe("ConnectionPoolConfiguration query cache", () => {
       const conn = await pool.checkout();
       const qc = (conn as unknown as { _queryCache: Store | null })._queryCache;
       expect(qc).toBeInstanceOf(Store);
-      pool.checkin(conn);
+      await pool.checkin(conn);
       expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
     });
 
     it("checkout attaches a Store on the fast (idle) path", async () => {
       const pool = makePool(1);
       const seed = await pool.checkout();
-      pool.checkin(seed);
+      await pool.checkin(seed);
 
       await new Thread(async () => {
         const conn = await pool.checkout();
         expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(
           Store,
         );
-        pool.checkin(conn);
+        await pool.checkin(conn);
       }).value();
     });
   });
@@ -909,7 +928,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
       expect(qc.enabled).toBe(true);
       pool.disableQueryCacheBang();
       expect(qc.enabled).toBe(false);
-      pool.checkin(conn);
+      await pool.checkin(conn);
     });
 
     it("enableQueryCache enables for the duration of fn and clears on exit", async () => {
@@ -921,7 +940,7 @@ describe("ConnectionPoolConfiguration query cache", () => {
         expect(observed!.enabled).toBe(true);
         await observed!.computeIfAbsent("SELECT 1", async () => new Result(["x"], [[1]]));
         expect(observed!.size).toBe(1);
-        pool.checkin(conn);
+        await pool.checkin(conn);
       });
       pool.clearQueryCache();
       expect(observed!.enabled).toBe(false);
@@ -954,13 +973,13 @@ describe("ConnectionPoolConfiguration query cache", () => {
       let seenSize = -1;
       await new Thread(async () => {
         const conn = await pool.checkout();
-        pool.checkin(conn);
+        await pool.checkin(conn);
         seenSize = registry._map._map.size;
       }).value();
       expect(seenSize).toBeGreaterThan(0);
 
       const conn = await pool.checkout();
-      pool.checkin(conn);
+      await pool.checkin(conn);
       expect(registry._map._map.size).toBe(1);
     });
   });
@@ -995,7 +1014,7 @@ describe("checkout/checkin callbacks", () => {
       expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeInstanceOf(Store);
 
       const lazySpy = vi.spyOn(conn, "enableLazyTransactionsBang");
-      pool.checkin(conn);
+      await pool.checkin(conn);
 
       expect((conn as unknown as { _queryCache: Store | null })._queryCache).toBeNull();
       expect(lazySpy).toHaveBeenCalledTimes(1);
