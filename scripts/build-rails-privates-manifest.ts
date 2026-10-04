@@ -181,6 +181,7 @@ interface RubyMethod {
   name: string;
   visibility: "public" | "private" | "protected";
   included?: boolean;
+  file?: string;
 }
 interface RubyEntity {
   fqn: string;
@@ -367,7 +368,13 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
       // methods.
       for (const ent of klass) {
         if (ent === host) {
-          for (const m of ent.classMethods ?? []) note(host.file, m.name, m.visibility);
+          for (const m of ent.classMethods ?? []) {
+            note(host.file, m.name, m.visibility);
+            if (m.file && m.file !== host.file) {
+              if (m.visibility !== "public") noteEntity(m.file, host.fqn);
+              note(m.file, m.name, m.visibility);
+            }
+          }
         } else {
           for (const m of ent.instanceMethods ?? []) note(host.file, m.name, m.visibility);
           for (const m of ent.classMethods ?? []) note(host.file, m.name, m.visibility);
