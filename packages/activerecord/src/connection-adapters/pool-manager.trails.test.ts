@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Enumerator } from "@blazetrails/ruby-compat";
 import { PoolManager } from "./pool-manager.js";
 import { PoolConfig } from "./pool-config.js";
 import { ConnectionDescriptor } from "./abstract/connection-handler.js";
@@ -125,7 +126,9 @@ describe("PoolManager", () => {
     it("answers the role's pool configs when no block is given", () => {
       const c1 = makePoolConfig("primary");
       manager.setPoolConfig("writing", "default", c1);
-      expect(Array.from(manager.eachPoolConfig("writing") as Iterable<PoolConfig>)).toEqual([c1]);
+      const enumerator = manager.eachPoolConfig("writing");
+      expect(enumerator).toBeInstanceOf(Enumerator);
+      expect([...(enumerator as Enumerator<PoolConfig>)]).toEqual([c1]);
     });
   });
 
