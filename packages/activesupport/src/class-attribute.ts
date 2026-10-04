@@ -84,16 +84,14 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     const methods: PropertyDescriptor = { configurable: true, enumerable: false };
     if (rbModSingletonP(this)) {
       Object.assign(methods, delegators);
-    } else {
-      if (instanceReader) {
-        methods.get = function (this: any) {
-          if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
-            return this[`@${name}`];
-          } else {
-            return this.constructor[name];
-          }
-        };
-      }
+    } else if (instanceReader) {
+      methods.get = function (this: any) {
+        if (Object.prototype.hasOwnProperty.call(this, `@${name}`)) {
+          return this[`@${name}`];
+        } else {
+          return this.constructor[name];
+        }
+      };
     }
 
     if (instanceWriter) {
