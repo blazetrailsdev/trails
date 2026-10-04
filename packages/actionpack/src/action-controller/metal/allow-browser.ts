@@ -1,8 +1,72 @@
 import { UAParser } from "ua-parser-js";
+import { Notifications, TopLevel, extend, included } from "@blazetrails/activesupport";
+import { File, rbFSend } from "@blazetrails/ruby-compat";
 
 import type { Request } from "../../action-dispatch/http/request.js";
+import type { CallbackOptions, beforeAction } from "../../abstract-controller/callbacks.js";
 
 export type BrowserVersions = "modern" | Record<string, string | false>;
+
+type Block = ((this: any) => unknown) | string;
+
+/** @internal */
+export interface AllowBrowserClassHost {
+  beforeAction: OmitThisParameter<typeof beforeAction>;
+}
+
+interface AllowBrowserHost {
+  request: Request;
+  render(options: Record<string, unknown>): unknown;
+}
+
+export class AllowBrowser {
+  static ClassMethods = { allowBrowser };
+
+  static [included](base: AllowBrowserClassHost): void {
+    extend(base, AllowBrowser.ClassMethods);
+  }
+
+  /**
+   * @missingRailsCall require — PERMANENT
+   * @internal
+   */
+  async allowBrowser(
+    this: AllowBrowserHost,
+    { versions, block }: { versions: BrowserVersions; block: Block },
+  ): Promise<void> {
+    if (new BrowserBlocker(this.request, { versions: versions }).blocked) {
+      await Notifications.instrument(
+        "browser_block.action_controller",
+        { request: this.request, versions: versions },
+        () => (typeof block === "string" ? rbFSend(this, block) : block.call(this)),
+      );
+    }
+  }
+}
+
+export function allowBrowser(
+  this: AllowBrowserClassHost,
+  {
+    versions,
+    block = function (this: AllowBrowserHost) {
+      return this.render({
+        file: File.join(TopLevel.Trails!.root()!, "public/406-unsupported-browser.html"),
+        layout: false,
+        status: "not_acceptable",
+      });
+    },
+    ...options
+  }: { versions: BrowserVersions; block?: Block } & CallbackOptions,
+): void {
+  this.beforeAction(
+    (controller) =>
+      (controller as unknown as AllowBrowser).allowBrowser.call(controller as never, {
+        versions: versions,
+        block: block,
+      }),
+    options,
+  );
+}
 
 const SETS: Record<string, Record<string, string | false>> = {
   modern: { safari: "17.2", chrome: "120", firefox: "121", opera: "106", ie: false },
@@ -14,7 +78,7 @@ export class BrowserBlocker {
   private _parsed?: UAParser;
   private _expanded?: Record<string, string | false>;
 
-  constructor(request: Request, versions: BrowserVersions) {
+  constructor(request: Request, { versions }: { versions: BrowserVersions }) {
     this._request = request;
     this._versions = versions;
   }

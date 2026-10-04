@@ -583,7 +583,7 @@ describe("ControllerInstanceTests", () => {
   it("inspect", () => {
     class EmptyController extends Base {}
     const c = new EmptyController();
-    expect(c.inspect()).toMatch(/^#<EmptyController>$/);
+    expect(c.inspect()).toMatch(/^#<EmptyController:0x[0-9a-f]+>$/);
   });
 
   it.skip("action methods with inherited shadowed internal method", () => {});

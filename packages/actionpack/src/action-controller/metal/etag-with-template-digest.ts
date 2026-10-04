@@ -5,6 +5,7 @@ import {
   includeContent as _includeContent,
   noStore as _noStore,
   type ConditionalGetHost,
+  type Etagger,
 } from "./conditional-get.js";
 
 /** @internal */
@@ -26,7 +27,7 @@ export function noStore(this: ConditionalGetHost): void {
 
 /** @internal */
 export function combineEtags(
-  this: unknown,
+  this: { etaggers: Etagger[] },
   validator: unknown,
   options: Record<string, unknown> = {},
 ): unknown[] {

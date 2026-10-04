@@ -193,13 +193,13 @@ describe("AllowBrowserTest", () => {
       { only: ["modern"] },
     );
     const c = new C();
-    await c.dispatch("modern", makeRequest(CHROME_118), makeResponse());
+    const request = makeRequest(CHROME_118);
+    await c.dispatch("modern", request, makeResponse());
 
     expect(events.length).toBe(1);
     expect(events[0].name).toBe("browser_block.action_controller");
     expect(events[0].payload.versions).toBe("modern");
-    expect(events[0].payload.user_agent).toBe(CHROME_118);
-    expect(events[0].payload.method).toBe("GET");
+    expect(events[0].payload.request).toBe(request);
     expect(c.status).toBe(426);
   });
 });

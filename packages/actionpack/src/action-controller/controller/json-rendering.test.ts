@@ -21,7 +21,7 @@ describe("Controller JSON rendering integration", () => {
 
     const c = new PostsController();
     await c.dispatch("index", new Request(), new Response());
-    const [status, headers, body] = c.toRackResponse();
+    const [status, headers, body] = c.toA();
 
     expect(status).toBe(200);
     expect(headers["content-type"]).toBe("application/json; charset=utf-8");

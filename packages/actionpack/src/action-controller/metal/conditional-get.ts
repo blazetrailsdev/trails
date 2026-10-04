@@ -111,29 +111,19 @@ export function noStore(this: ConditionalGetHost): void {
   this.response.setHeader("cache-control", buildCacheControl({ noStore: true }));
 }
 
-type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
+export type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
 
-const _etaggers: Etagger[] = [];
-
-export function etag(block: Etagger): void {
-  _etaggers.push(block);
-}
-
-export function getEtaggers(): ReadonlyArray<Etagger> {
-  return _etaggers;
-}
-
-export function clearEtaggers(): void {
-  _etaggers.length = 0;
+export function etag(this: { etaggers: Etagger[] }, etagger: Etagger): void {
+  this.etaggers = [...this.etaggers, etagger];
 }
 
 /** @internal */
 export function combineEtags(
-  this: unknown,
+  this: { etaggers: Etagger[] },
   validator: unknown,
   options: Record<string, unknown> = {},
 ): unknown[] {
-  return [validator, ..._etaggers.map((etagger) => etagger.call(this, options))].filter(
+  return [validator, ...this.etaggers.map((etagger) => etagger.call(this, options))].filter(
     (e) => e !== null && e !== undefined,
   );
 }

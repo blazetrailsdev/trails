@@ -19,6 +19,7 @@ import {
 import {
   BigDecimal,
   Notifications,
+  cattrAccessor,
   ToJsonWithActiveSupportEncoder,
   asJson,
   include,
@@ -134,7 +135,12 @@ export class Parameters {
 
   static permitAllParameters = false;
   static actionOnUnpermittedParameters: OnUnpermitted = false;
-  static alwaysPermittedParameters: string[] = ["controller", "action"];
+  declare static alwaysPermittedParameters: string[];
+  declare alwaysPermittedParameters: string[];
+
+  static {
+    cattrAccessor.call(this, "alwaysPermittedParameters", { default: ["controller", "action"] });
+  }
 
   static hookIntoYamlLoading(): void {}
 
@@ -894,10 +900,7 @@ export class Parameters {
 
   /** @internal */
   unpermittedKeys(params: Parameters): string[] {
-    const allowed = new Set([
-      ...Object.keys(params._data),
-      ...Parameters.alwaysPermittedParameters,
-    ]);
+    const allowed = new Set([...Object.keys(params._data), ...this.alwaysPermittedParameters]);
     return Object.keys(this._data).filter((k) => !allowed.has(k));
   }
 

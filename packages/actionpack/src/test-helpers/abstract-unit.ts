@@ -421,7 +421,7 @@ class TestSetRequest extends DelegateClass(Request) {
         block(this);
       }
 
-      override toRackResponse(): RackResponse {
+      override toA(): RackResponse {
         return [200, {}, []] as unknown as RackResponse;
       }
     };
