@@ -1,11 +1,10 @@
-import { hasKey, rbModName } from "@blazetrails/ruby-compat";
+import { hasKey } from "@blazetrails/ruby-compat";
 import {
   foreignKey,
   underscore,
   singularize,
   pluralize,
   camelize,
-  demodulize,
 } from "@blazetrails/activesupport";
 import { joinHabtmTableNames } from "../../associations.js";
 import { ActiveRecord } from "../../namespaces.js";
@@ -81,15 +80,8 @@ export class HasAndBelongsToMany {
     joinModel.tableNameResolver = () => builder._tableName();
     joinModel.leftModel = lhsModel;
 
-    joinModel.addLeftAssociation("leftSide", {
-      anonymousClass: lhsModel,
-      foreignKey: this.options.foreignKey ?? `${underscore(demodulize(rbModName(lhsModel)!))}_id`,
-    });
+    joinModel.addLeftAssociation("leftSide", { anonymousClass: lhsModel });
     joinModel.addRightAssociation(this.associationName, this.belongsToOptions(this.options));
-    joinModel.primaryKey = [
-      joinModel.leftReflection.foreignKey(),
-      joinModel.rightReflection.foreignKey(),
-    ];
     return joinModel;
   }
 
