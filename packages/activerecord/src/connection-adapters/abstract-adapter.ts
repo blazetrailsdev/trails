@@ -2006,10 +2006,6 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  static readonly EXTENDED_TYPE_MAPS: InstanceType<
-    typeof Concurrent.Map<Record<string, unknown>, unknown>
-  > = new Concurrent.Map();
-
   quoteDefaultExpression(value: unknown, column: unknown): string {
     return abstractQuoteDefaultExpression.call(this, value, column as { sqlType?: string | null });
   }
@@ -2200,6 +2196,10 @@ export class AbstractAdapter implements Quoting {
       return m;
     })());
   }
+
+  static readonly EXTENDED_TYPE_MAPS: InstanceType<
+    typeof Concurrent.Map<Record<string, unknown>, unknown>
+  > = new Concurrent.Map();
 
   /** @internal */
   protected async rawConnectionForBlock(): Promise<unknown> {

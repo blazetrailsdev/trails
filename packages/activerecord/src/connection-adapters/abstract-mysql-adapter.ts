@@ -495,7 +495,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
         ]
   ): Promise<unknown> {
     const tableNames = args.filter(
-      (arg) => arg !== undefined && typeof arg !== "function",
+      (arg, index) => index < args.length - 2 || (arg !== undefined && typeof arg !== "function"),
     ) as string[];
     const options = extractOptionsBang(tableNames) as {
       ifExists?: boolean;
