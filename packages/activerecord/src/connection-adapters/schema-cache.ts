@@ -163,9 +163,11 @@ export class SchemaReflection {
     return new SchemaCache();
   }
 
+  /** @inventedArm then — CONVERGEABLE activerecord-converge-invented-control-flow-arms-connection-adapters-root-part-2-residue */
   private async cache(pool: Pool): Promise<SchemaCache> {
-    const newCache = this._cache || (await this.loadCache(pool)) || this.emptyCache();
-    return (this._cache ||= newCache);
+    return (this._cache ||= await this.loadCache(pool).then(
+      (newCache) => this._cache || newCache || this.emptyCache(),
+    ))!;
   }
 
   /** @missingRailsName cachePath — PERMANENT */
