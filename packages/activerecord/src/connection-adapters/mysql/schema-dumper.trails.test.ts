@@ -209,6 +209,7 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       d.tableName = "t";
       d.setConnection(stubConnection({ expression: "CONCAT(a, b)" }));
+      (d as any).supportsVirtualColumns = true;
       const opts = await (d as any).prepareColumnOptions(
         col({
           name: "full_name",
