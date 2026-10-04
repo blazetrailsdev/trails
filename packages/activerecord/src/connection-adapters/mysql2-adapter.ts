@@ -83,7 +83,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(connOptions.flags),
+        flags: withoutDefaultIgnoreSpace(connOptions.flags).filter(
+          (flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS",
+        ),
         multipleStatements: true,
         typeCast: composedTypeCast,
       });

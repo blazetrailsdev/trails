@@ -190,8 +190,11 @@ export class SchemaStatements extends BaseSchemaStatements {
     return super.createTable(
       tableName,
       {
-        options: (await defaultRowFormat.call(this as unknown as RowFormatHost)) ?? undefined,
         ...options,
+        options:
+          options?.options ??
+          (await defaultRowFormat.call(this as unknown as RowFormatHost)) ??
+          undefined,
       },
       fn,
     );

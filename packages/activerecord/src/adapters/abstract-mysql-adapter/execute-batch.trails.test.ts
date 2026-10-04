@@ -43,6 +43,18 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
       }
     });
 
+    it("batches when the config negates MULTI_STATEMENTS", async () => {
+      const testAdapter = new Mysql2Adapter({
+        uri: MYSQL_TEST_URL,
+        flags: ["-MULTI_STATEMENTS"],
+      } as never);
+      try {
+        await testAdapter.executeBatch(["SELECT 1", "SELECT 2"], "Batch");
+      } finally {
+        await testAdapter.disconnectBang();
+      }
+    });
+
     it("splits the statements against the server reported max_allowed_packet", async () => {
       const maxAllowedPacket = await adapter.maxAllowedPacket();
       expect(maxAllowedPacket).not.toBeNull();
