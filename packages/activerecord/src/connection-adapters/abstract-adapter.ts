@@ -1804,6 +1804,7 @@ export class AbstractAdapter implements Quoting {
   /**
    * @internal
    * @missingRailsCall compute_if_absent — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
+   * @inventedArm if — CONVERGEABLE adapter-extended-type-maps-onto-concurrent-map
    */
   get typeMap(): unknown {
     const ctor = this.constructor as typeof AbstractAdapter;
@@ -1884,10 +1885,10 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   async columnFor(tableName: string, columnName: string): Promise<import("./column.js").Column> {
-    const cols = await (this as any).columns(tableName);
-    const col = (cols as import("./column.js").Column[]).find((c) => c.name === columnName);
-    if (!col) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
-    return col;
+    columnName = toS(columnName);
+    const column = (await this.columns(tableName)).find((c) => c.name === columnName);
+    if (!column) throw new ActiveRecordError(`No such column: ${tableName}.${columnName}`);
+    return column;
   }
 
   /** @internal */

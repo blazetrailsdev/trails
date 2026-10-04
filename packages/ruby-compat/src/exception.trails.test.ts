@@ -16,6 +16,20 @@ describe("excSetupMessage", () => {
     expect(mesg.cause).toBe(cause);
   });
 
+  it("reads an own `cause: undefined` as a defined cause", () => {
+    const mesg = Object.assign(new Error("translated"), { cause: undefined });
+    excSetupMessage(mesg, new Error("driver"));
+    expect(mesg.cause).toBeUndefined();
+  });
+
+  it("settles the rescued exception's unset cause as nil", () => {
+    const errinfo = new Error("driver");
+    excSetupMessage(new Error("translated"), errinfo);
+    expect(errinfo.cause).toBeNull();
+    excSetupMessage(errinfo, new Error("later"));
+    expect(errinfo.cause).toBeNull();
+  });
+
   it("does not make a re-raised exception its own cause", () => {
     const mesg = new Error("same");
     excSetupMessage(mesg, mesg);

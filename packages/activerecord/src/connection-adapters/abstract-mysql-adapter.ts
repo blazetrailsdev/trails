@@ -479,6 +479,10 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.renameTableIndexes(tableName, newName, options);
   }
 
+  /**
+   * @inventedArm loop — CONVERGEABLE activerecord-converge-invented-control-flow-arms-abstract-quoting-and-table-ddl
+   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-abstract-quoting-and-table-ddl
+   */
   override async dropTable(
     ...args:
       | string[]
@@ -740,20 +744,20 @@ WHERE fk.referenced_column_name IS NOT NULL
 
     const chkInfo = await this.internalExecQuery(sql, "SCHEMA");
 
-    const checkConstraints: CheckConstraintDefinition[] = [];
-    for (const row of chkInfo.toArray()) {
-      const options = { name: row["name"] as string };
-      let expression = row["expression"] as string;
-      if (expression.startsWith("(") && expression.endsWith(")")) {
-        expression = expression.slice(1, -1);
-      }
-      expression = this.stripWhitespaceCharacters(expression);
-      if (!(await this.isMariadb())) {
-        expression = expression.replace(/\\'/g, "'");
-      }
-      checkConstraints.push(new CheckConstraintDefinition(tableName, expression, options));
-    }
-    return checkConstraints;
+    return Promise.all(
+      chkInfo.toArray().map(async (row) => {
+        const options = { name: row["name"] as string };
+        let expression = row["expression"] as string;
+        if (expression.startsWith("(") && expression.endsWith(")")) {
+          expression = expression.slice(1, -1);
+        }
+        expression = this.stripWhitespaceCharacters(expression);
+        if (!(await this.isMariadb())) {
+          expression = expression.replace(/\\'/g, "'");
+        }
+        return new CheckConstraintDefinition(tableName, expression, options);
+      }),
+    );
   }
 
   async tableOptions(tableName: string): Promise<Record<string, string | null> | null> {
@@ -1019,11 +1023,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     const rawConnection = this._connection as {
       warningCount?: unknown;
       query(sql: string): Promise<[unknown, unknown]>;
-    } | null;
-    const action = dbWarningsAction();
-    if (action == null || rawConnection == null) return;
+    };
+    if (dbWarningsAction() == null || (await this.warningCount(rawConnection)) === 0) return;
+
     const warningCount = await this.warningCount(rawConnection);
-    if (warningCount === 0) return;
 
     const [rawRows] = await rawConnection.query("SHOW WARNINGS");
     let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
@@ -1044,7 +1047,7 @@ WHERE fk.referenced_column_name IS NOT NULL
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
-      action.call(this, warning);
+      dbWarningsAction()!.call(this, warning);
     }
   }
 
