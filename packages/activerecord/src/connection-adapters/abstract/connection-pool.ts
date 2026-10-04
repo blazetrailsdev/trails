@@ -6,6 +6,7 @@ import {
   isMonOwned,
   Mutex,
   rbObjDup,
+  rtest,
   RuntimeError,
   synchronize,
   Thread,
@@ -311,7 +312,10 @@ export class ConnectionPool implements ReapablePool {
   }
 
   get migrationsPaths(): string | string[] {
-    return this.dbConfig.migrationsPaths || Migrator.migrationsPaths;
+    const migrationsPaths = this.dbConfig.migrationsPaths;
+    return (rtest(migrationsPaths) ? migrationsPaths : Migrator.migrationsPaths) as
+      | string
+      | string[];
   }
 
   get schemaMigration(): SchemaMigration {
@@ -332,8 +336,14 @@ export class ConnectionPool implements ReapablePool {
     return this.connectionLease().sticky === null;
   }
 
+  /** @inventedArm if — PERMANENT */
   async pinConnectionBang(lockThread = false): Promise<void> {
-    this._pinnedConnection ||= this.connectionLease()?.connection || (await this.checkout());
+    const connection =
+      this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
+    if (this._pinnedConnection != null && this._pinnedConnection !== connection) {
+      this.checkin(connection);
+    }
+    this._pinnedConnection ||= connection;
     this._pinnedConnectionsDepth += 1;
 
     if (!this._connections!.includes(this._pinnedConnection)) {

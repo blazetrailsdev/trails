@@ -121,7 +121,7 @@ export class ConnectionHandler {
       clobber?: boolean;
     } = {},
   ): Promise<ConnectionPool> {
-    const ownerName = this.determineOwnerName(options.ownerName ?? _base!, config);
+    const ownerName = this.determineOwnerName(options.ownerName ?? ActiveRecord.Base, config);
 
     const role = options.role ?? _base?.currentRole() ?? "writing";
     const shard = options.shard ?? _base?.currentShard() ?? "default";
@@ -151,9 +151,11 @@ export class ConnectionHandler {
         config: dbConfig.configurationHash,
       };
 
-      Notifications.instrument("!connection.active_record", payload);
-
-      return poolConfig.pool;
+      return Notifications.instrumenter.instrument(
+        "!connection.active_record",
+        payload,
+        () => poolConfig.pool,
+      );
     }
   }
 
