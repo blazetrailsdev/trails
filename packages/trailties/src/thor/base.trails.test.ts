@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ArgumentError,
   extend,
@@ -6,8 +6,6 @@ import {
   initializeIncludedModules,
   NoMethodError,
   rbFSend,
-  rbModAttrReader,
-  rbModAttrWriter,
   rbObjRespondTo,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -16,35 +14,28 @@ import { Command } from "./command.js";
 import { HashWithIndifferentAccess } from "./core-ext/hash-with-indifferent-access.js";
 import {
   AtLeastOneRequiredArgumentError,
+  Error as ThorError,
   ExclusiveArgumentError,
+  InvocationError,
+  UndefinedCommandError,
   UnknownArgumentError,
 } from "./error.js";
 import { Option } from "./parser/option.js";
 
 type Instance = Base & Record<string, unknown>;
-type Klass = BaseClass & (new (...args: unknown[]) => Instance);
+type Klass = BaseClass & { prototype: Record<string, unknown> } & (new (
+    ...args: unknown[]
+  ) => Instance);
 
 function baseclass(): Klass {
-  const all: Record<string, Command> = {};
   class Root {
     static baseclass(): unknown {
       return Root;
     }
-    static noCommands<T>(block: () => T): T {
-      return block();
+    static createCommand(this: Klass, meth: string): boolean {
+      this.commands()[meth] = new Command(meth, null, null, null, meth, {});
+      return true;
     }
-    static attrAccessor(...names: string[]): void {
-      rbModAttrReader(this, ...names);
-      rbModAttrWriter(this, ...names);
-    }
-    static commands(): Record<string, Command> {
-      if (!Object.hasOwn(this, "_commands")) this._commands = {};
-      return this._commands;
-    }
-    static allCommands(): Record<string, Command> {
-      return all;
-    }
-    declare static _commands: Record<string, Command>;
     constructor(...args: unknown[]) {
       initializeIncludedModules(this, ...args);
     }
@@ -310,6 +301,161 @@ describe("Thor::Base", () => {
           'You supplied :for => "nope", but the command "nope" could not be found.',
         ),
       );
+    });
+  });
+
+  describe(".commands / .all_commands", () => {
+    it("keeps each class's own commands and merges the parent's on every call", () => {
+      const parent = baseclass();
+      const child = subclass(parent);
+      child.prototype.build = () => {};
+      child.methodAdded("build");
+      expect(Object.keys(child.allCommands())).toEqual(["build"]);
+      expect(parent.commands()).toEqual({});
+
+      child.removeCommand("build");
+      expect(child.allCommands()).toEqual({});
+    });
+
+    it("undefines the method under :undefine", () => {
+      const klass = baseclass();
+      klass.prototype.build = () => {};
+      klass.methodAdded("build");
+      klass.removeCommand("build", { undefine: true });
+      expect(klass.prototype.build).toBeUndefined();
+    });
+  });
+
+  describe(".method_added", () => {
+    it("registers a defined method as a command and the class as a subclass", () => {
+      const klass = baseclass();
+      klass.methodAdded("missing");
+      expect(Base.subclasses()).not.toContain(klass);
+
+      klass.prototype.build = () => {};
+      klass.methodAdded("build");
+      expect(klass.commands()["build"]).toBeInstanceOf(Command);
+      expect(Base.subclasses()).toContain(klass);
+    });
+
+    it("skips a method declared inside no_commands", () => {
+      const klass = baseclass();
+      klass.prototype.helper = () => {};
+      klass.noCommands(() => klass.methodAdded("helper"));
+      expect(klass.isNoCommands()).toBe(false);
+      expect(klass.commands()).toEqual({});
+      klass.attrAccessor("name");
+      expect(klass.commands()).toEqual({});
+    });
+
+    it("raises for a Thor reserved word", () => {
+      const klass = baseclass();
+      klass.prototype.invoke = () => {};
+      expect(() => klass.methodAdded("invoke")).toThrow(RuntimeError);
+    });
+
+    it("calls initialize_added for initialize", () => {
+      const klass = baseclass();
+      const initializeAdded = vi.spyOn(klass, "initializeAdded");
+      klass.methodAdded("initialize");
+      expect(initializeAdded).toHaveBeenCalledOnce();
+      expect(klass.commands()).toEqual({});
+    });
+  });
+
+  describe(".public_command", () => {
+    it("re-exposes the parent's method on the class and registers it", () => {
+      const parent = baseclass();
+      parent.prototype.build = (name: string) => `built ${name}`;
+      const child = subclass(parent);
+      child.publicCommand("build");
+      expect(Object.hasOwn(child.prototype, "build")).toBe(true);
+      expect((new child() as Instance & { build(name: string): string }).build("app")).toBe(
+        "built app",
+      );
+      expect(Object.keys(child.commands())).toEqual(["build"]);
+    });
+  });
+
+  describe(".namespace", () => {
+    it("derives from the class name, and registers the class when set explicitly", () => {
+      const klass = baseclass();
+      Object.defineProperty(klass, "name", { value: "Scripts::MyScript" });
+      expect(klass.namespace()).toBe("scripts:my_script");
+      expect(Base.subclasses()).not.toContain(klass);
+      expect(klass.namespace("my_scripts")).toBe("my_scripts");
+      expect(klass.namespace()).toBe("my_scripts");
+      expect(Base.subclasses()).toContain(klass);
+    });
+  });
+
+  describe(".handle_no_command_error / .handle_argument_error", () => {
+    it("raises UndefinedCommandError over all_commands", () => {
+      const klass = baseclass();
+      klass.prototype.build = () => {};
+      klass.methodAdded("build");
+      expect(() => klass.handleNoCommandError("biuld")).toThrow(UndefinedCommandError);
+      expect(() => klass.handleNoCommandError("biuld", true)).toThrow(/in "root" namespace\./);
+    });
+
+    it("raises InvocationError naming the basename, the arguments and the banner", () => {
+      const klass = baseclass();
+      klass.basename = () => "thor";
+      klass.banner = () => "thor build NAME";
+      const command = new Command("build", null, null, null, "build NAME", {});
+      expect(() => klass.handleArgumentError(command, null, [], 1)).toThrow(
+        new InvocationError(
+          'ERROR: "thor build" was called with no arguments\nUsage: "thor build NAME"',
+        ),
+      );
+      expect(() => klass.handleArgumentError(command, null, ["a", "b"], 1)).toThrow(
+        /was called with arguments \["a", "b"\]/,
+      );
+    });
+  });
+
+  describe(".class_options_help", () => {
+    it("prints ungrouped options first, then each group, padded to the widest alias", () => {
+      const klass = baseclass();
+      klass.classOption("force", { type: "boolean", aliases: "-f", desc: "Overwrite" });
+      klass.classOption("skip", { type: "boolean", hide: true });
+      klass.classOption("orm", { type: "string", group: "runtime", default: "ar" });
+      const said: unknown[] = [];
+      const tables: unknown[] = [];
+      const shell = {
+        say: (m: unknown) => said.push(m),
+        printTable: (t: unknown) => tables.push(t),
+      };
+      klass.classOptionsHelp(shell as never);
+      expect(said).toEqual(["Options:", "", "Runtime options:", ""]);
+      expect(tables).toEqual([
+        [["-f, [--force]", "# Overwrite"]],
+        [
+          ["[--orm=ORM]", ""],
+          ["", "# Default: ar"],
+        ],
+      ]);
+    });
+  });
+
+  describe(".start", () => {
+    it("prints a Thor::Error through the shell, and re-raises it under :debug", async () => {
+      const klass = baseclass();
+      klass.dispatch = () => {
+        throw new ThorError("boom");
+      };
+      const givenArgs = ["build"];
+      const error = vi.fn();
+      vi.spyOn(console, "warn").mockImplementation(() => {});
+      await expect(klass.start(givenArgs, { shell: { error } as never })).resolves.toBeNull();
+      expect(error).toHaveBeenCalledWith("boom");
+      expect(givenArgs).toEqual(["build"]);
+      await expect(klass.start(givenArgs, { debug: true })).rejects.toThrow(ThorError);
+      vi.restoreAllMocks();
+    });
+
+    it("raises NotImplementedError from the dispatch signature", async () => {
+      await expect(baseclass().start([])).rejects.toThrow("NotImplementedError");
     });
   });
 });

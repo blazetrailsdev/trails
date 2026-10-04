@@ -1,27 +1,42 @@
 import {
   ArgumentError,
+  argv,
   aryDeleteIf,
+  compact,
   dup,
   eachPair,
   env,
+  Errno,
+  exit,
+  File,
   Hash,
   hashDelete,
   hasKey,
   initialize,
   last,
   merge,
+  max,
   mergeBang,
+  NotImplementedError,
   rbFSend,
   rbInspect,
+  rbModAttrReader,
+  rbModAttrWriter,
+  rbModName,
+  rbModPublicMethodDefined,
   rbObjAsString,
   rbObjClone,
   rbObjIsKindOf,
   rbObjRespondTo,
   rtest,
   RuntimeError,
+  stringSplit,
+  toI,
   warn,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
+import { Error as ThorError, InvocationError, UndefinedCommandError } from "./error.js";
+import { NestedContext } from "./nested-context.js";
 import type {
   HashWithIndifferentAccess,
   ThorOptions,
@@ -31,6 +46,8 @@ import { Arguments } from "./parser/arguments.js";
 import { Option, type OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import { Base as ThorBase } from "./shell.js";
+import type { Basic } from "./shell/basic.js";
+import { namespaceFromThorClass } from "./util.js";
 
 export const HELP_MAPPINGS = ["-h", "-?", "--help", "-D"];
 
@@ -62,6 +79,8 @@ export function deprecationWarning(message: string): void {
   }
 }
 
+const thorRunner: unknown = false;
+
 type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: string[][] };
 
 type RelationBlock = (this: BaseClass) => unknown;
@@ -70,8 +89,12 @@ interface BaseConfig {
   commandOptions?: Record<string, Option> | null;
   currentCommand?: Command | null;
   classOptions?: HashWithIndifferentAccess | null;
+  shell?: Basic | null;
+  debug?: unknown;
   [key: string]: unknown;
 }
+
+type OptionGroups = Map<string | null, Option[]>;
 
 export interface Base {
   options: ThorOptions<Record<string, unknown>>;
@@ -97,12 +120,18 @@ export interface BaseClass {
   _classAtLeastOneOptionNames?: string[][];
   /** @internal */
   _group?: string;
-  baseclass(): unknown;
-  fromSuperclass(method: string, defaultValue?: unknown): unknown;
+  /** @internal */
+  _commands?: Record<string, Command>;
+  /** @internal */
+  _allCommands?: Record<string, Command>;
+  /** @internal */
+  _noCommandsContext?: NestedContext;
+  /** @internal */
+  _namespace?: string;
+  banner(command: Command): string;
+  attrReader(...names: string[]): void;
+  attrWriter(...names: string[]): void;
   attrAccessor(...names: string[]): void;
-  noCommands<T>(block: () => T): T;
-  commands(): Record<string, Command>;
-  allCommands(): Record<string, Command>;
   checkUnknownOptionsBang(): void;
   checkUnknownOptions(): unknown;
   "checkUnknownOptions?"(config: BaseConfig): boolean;
@@ -125,10 +154,31 @@ export interface BaseClass {
   removeArgument(...names: unknown[]): void;
   removeClassOption(...names: string[]): void;
   group(name?: string | null): string;
+  commands(): Record<string, Command>;
+  allCommands(): Record<string, Command>;
+  removeCommand(...names: unknown[]): void;
+  noCommands<T>(block: () => T): T;
+  noCommandsContext(): NestedContext;
+  isNoCommands(): boolean;
+  namespace(name?: string | null): string;
+  start(givenArgs?: string[], config?: BaseConfig): Promise<unknown>;
+  publicCommand(...names: string[]): void;
+  handleNoCommandError(command: string, hasNamespace?: unknown): never;
+  handleArgumentError(command: Command, error: unknown, args: unknown[], arity: unknown): never;
+  isExitOnFailure(): boolean;
+  classOptionsHelp(shell: Basic, groups?: OptionGroups): void;
+  printOptions(shell: Basic, options: Option[], groupName?: string | null): void;
   isThorReservedWord(word: string, type: string): boolean;
   buildOption(name: string, options: OptionOptions, scope: Record<string, Option>): Option;
   buildOptions(options: Record<string, unknown>, scope: Record<string, Option>): void;
   findAndRefreshCommand(name: string): Command;
+  methodAdded(meth: string): void;
+  fromSuperclass(method: string, defaultValue?: unknown): unknown;
+  basename(): string | null;
+  baseclass(): unknown;
+  createCommand(meth: string): unknown;
+  initializeAdded(): void;
+  dispatch(command: unknown, givenArgs: string[], givenOpts: unknown, config: BaseConfig): unknown;
   registerOptionsRelationFor(target: string, relation: string, ...args: unknown[]): void;
   builtOptionNames(target: string, opt: { for?: string }, block: RelationBlock): string[];
   commandScopeMember(name: string, options?: { for?: string }): unknown;
@@ -192,7 +242,112 @@ export interface BaseClass {
   this.args = thorArgs.remaining();
 };
 
+function subclasses(this: object): BaseClass[] {
+  return ((this as { _subclasses?: BaseClass[] })._subclasses ||= []);
+}
+
+function registerKlassFile(klass: BaseClass): void {
+  if (!Base.subclasses().includes(klass)) Base.subclasses().push(klass);
+}
+
+function commands(this: BaseClass): Record<string, Command> {
+  if (!Object.hasOwn(this, "_commands")) this._commands = {};
+  return this._commands!;
+}
+
+function allCommands(this: BaseClass): Record<string, Command> {
+  if (!Object.hasOwn(this, "_allCommands")) {
+    this._allCommands = this.fromSuperclass("allCommands", {}) as Record<string, Command>;
+  }
+  return mergeBang(this._allCommands!, this.commands());
+}
+
+function removeCommand(this: BaseClass, ...names: unknown[]): void {
+  const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
+    undefine?: unknown;
+  };
+
+  names.forEach((name) => {
+    hashDelete(this.commands(), rbObjAsString(name));
+    hashDelete(this.allCommands(), rbObjAsString(name));
+    if (rtest(options.undefine)) {
+      Object.defineProperty(this.prototype, name as string, {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+}
+
+function noCommands<T>(this: BaseClass, block: () => T): T {
+  return this.noCommandsContext().enter(block);
+}
+
+function publicCommand(this: BaseClass, ...names: string[]): void {
+  names.forEach((name) => {
+    const superclass = Object.getPrototypeOf(this.prototype) as Record<
+      string,
+      (...args: unknown[]) => unknown
+    >;
+    Object.defineProperty(this.prototype, name, {
+      value: function (this: object, ...args: unknown[]) {
+        return superclass[name].apply(this, args);
+      },
+      writable: true,
+      configurable: true,
+    });
+    this.methodAdded(name);
+  });
+}
+
+function handleNoCommandError(
+  this: BaseClass,
+  command: string,
+  hasNamespace: unknown = thorRunner,
+): never {
+  throw new UndefinedCommandError(
+    command,
+    Object.keys(this.allCommands()),
+    rtest(hasNamespace) ? this.namespace() : null,
+  );
+}
+
+/** @internal */
+function findAndRefreshCommand(this: BaseClass, name: string): Command {
+  let command: Command | undefined;
+  if (this.commands()[rbObjAsString(name)] != null) {
+    return this.commands()[rbObjAsString(name)];
+  } else if ((command = this.allCommands()[rbObjAsString(name)]) != null) {
+    return (this.commands()[rbObjAsString(name)] = rbObjClone(command));
+  } else {
+    throw new ArgumentError(
+      `You supplied :for => ${rbInspect(name)}, but the command ${rbInspect(name)} could not be found.`,
+    );
+  }
+}
+
+/** @internal */
+function createCommand(this: BaseClass, meth: string): unknown {
+  return null;
+}
+
 export const ClassMethods = {
+  attrReader(this: BaseClass, ...names: string[]): void {
+    this.noCommands(() => rbModAttrReader(this, ...names));
+  },
+
+  attrWriter(this: BaseClass, ...names: string[]): void {
+    this.noCommands(() => rbModAttrWriter(this, ...names));
+  },
+
+  attrAccessor(this: BaseClass, ...names: string[]): void {
+    this.noCommands(() => {
+      rbModAttrReader(this, ...names);
+      rbModAttrWriter(this, ...names);
+    });
+  },
+
   checkUnknownOptionsBang(this: BaseClass): void {
     this._checkUnknownOptions = true;
   },
@@ -367,6 +522,133 @@ export const ClassMethods = {
     }
   },
 
+  commands,
+  tasks: commands,
+
+  allCommands,
+  allTasks: allCommands,
+
+  removeCommand,
+  removeTask: removeCommand,
+
+  noCommands,
+  noTasks: noCommands,
+
+  noCommandsContext(this: BaseClass): NestedContext {
+    if (!Object.hasOwn(this, "_noCommandsContext")) this._noCommandsContext = new NestedContext();
+    return this._noCommandsContext!;
+  },
+
+  isNoCommands(this: BaseClass): boolean {
+    return this.noCommandsContext().isEntered();
+  },
+
+  /** @inventedArm registerKlassFile — PERMANENT */
+  namespace(this: BaseClass, name: string | null = null): string {
+    if (rtest(name)) {
+      Base.registerKlassFile(this);
+      return (this._namespace = rbObjAsString(name));
+    } else {
+      if (!Object.hasOwn(this, "_namespace") || !rtest(this._namespace)) {
+        this._namespace = namespaceFromThorClass(this);
+      }
+      return this._namespace!;
+    }
+  },
+
+  async start(
+    this: BaseClass,
+    givenArgs: string[] = argv.slice(2),
+    config: BaseConfig = {},
+  ): Promise<unknown> {
+    try {
+      config.shell ||= new ThorBase.shell!();
+      return await this.dispatch(null, [...givenArgs], null, config);
+    } catch (e) {
+      if (e instanceof ThorError) {
+        if (rtest(config.debug) || env["THOR_DEBUG"] === "1") {
+          throw e;
+        } else {
+          config.shell!.error(e.message);
+        }
+        if (this.isExitOnFailure()) exit(1);
+        return null;
+      } else if (e instanceof Errno.EPIPE) {
+        return exit(0);
+      }
+      throw e;
+    }
+  },
+
+  publicCommand,
+  publicTask: publicCommand,
+
+  handleNoCommandError,
+  handleNoTaskError: handleNoCommandError,
+
+  handleArgumentError(
+    this: BaseClass,
+    command: Command,
+    error: unknown,
+    args: unknown[],
+    arity: unknown,
+  ): never {
+    const name = compact([command.ancestorName, command.name]).join(" ");
+    let msg = `ERROR: "${this.basename()} ${name}" was called with `;
+    if (args.length === 0) msg += "no arguments";
+    if (!(args.length === 0)) msg += "arguments " + rbInspect(args);
+    msg += `\nUsage: "${stringSplit(this.banner(command), "\n").join('"\n       "')}"`;
+    throw new InvocationError(msg);
+  },
+
+  isExitOnFailure(this: BaseClass): boolean {
+    deprecationWarning(
+      `Thor exit with status 0 on errors. To keep this behavior, you must define \`exit_on_failure?\` in \`${rbModName(this) ?? ""}\``,
+    );
+    return false;
+  },
+
+  /** @internal */
+  classOptionsHelp(this: BaseClass, shell: Basic, groups: OptionGroups = new Map()): void {
+    eachPair(this.classOptions(), (_, value) => {
+      if (!groups.has(value.group)) groups.set(value.group, []);
+      groups.get(value.group)!.push(value);
+    });
+
+    const globalOptions = hashDelete(groups, null) || [];
+    this.printOptions(shell, globalOptions);
+
+    groups.forEach((options, groupName) => {
+      this.printOptions(shell, options, groupName);
+    });
+  },
+
+  /** @internal */
+  printOptions(
+    this: BaseClass,
+    shell: Basic,
+    options: Option[],
+    groupName: string | null = null,
+  ): void {
+    if (options.length === 0) return;
+
+    const list: string[][] = [];
+    const padding = toI(max(options.map((o) => o.aliasesForUsage().length))) as number;
+    options.forEach((option) => {
+      if (rtest(option.hide)) return;
+      const item = [option.usage(padding)];
+      item.push(option.description != null ? `# ${option.description}` : "");
+
+      list.push(item);
+      if (rtest(option.isShowDefault())) list.push(["", `# Default: ${option.printDefault()}`]);
+      if (rtest(option.enum)) list.push(["", `# Possible values: ${option.enumToS()}`]);
+    });
+
+    shell.say(groupName != null ? `${groupName} options:` : "Options:");
+    shell.printTable(list, { indent: 2 });
+    shell.say("");
+  },
+
   /** @internal */
   isThorReservedWord(this: BaseClass, word: string, type: string): boolean {
     if (
@@ -405,20 +687,57 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  findAndRefreshCommand(this: BaseClass, name: string): Command {
-    let command: Command | undefined;
-    if (this.commands()[rbObjAsString(name)] != null) {
-      return this.commands()[rbObjAsString(name)];
-    } else if ((command = this.allCommands()[rbObjAsString(name)]) != null) {
-      return (this.commands()[rbObjAsString(name)] = rbObjClone(command));
-    } else {
-      throw new ArgumentError(
-        `You supplied :for => ${rbInspect(name)}, but the command ${rbInspect(name)} could not be found.`,
-      );
+  findAndRefreshCommand,
+  /** @internal */
+  findAndRefreshTask: findAndRefreshCommand,
+
+  /** @internal */
+  methodAdded(this: BaseClass, meth: string): void {
+    meth = rbObjAsString(meth);
+
+    if (meth === "initialize") {
+      this.initializeAdded();
+      return;
     }
+
+    if (!rbModPublicMethodDefined(this, meth)) return;
+
+    if (this.isNoCommands() || !rtest(this.createCommand(meth))) return;
+
+    this.isThorReservedWord(meth, "command");
+    Base.registerKlassFile(this);
   },
 
   fromSuperclass,
+
+  /** @internal */
+  basename(this: BaseClass): string | null {
+    return stringSplit(File.basename(argv[1]), " ")[0] ?? null;
+  },
+
+  /** @internal */
+  baseclass(this: BaseClass): unknown {
+    return null;
+  },
+
+  /** @internal */
+  createCommand,
+  /** @internal */
+  createTask: createCommand,
+
+  /** @internal */
+  initializeAdded(this: BaseClass): void {},
+
+  /** @internal */
+  dispatch(
+    this: BaseClass,
+    command: unknown,
+    givenArgs: string[],
+    givenOpts: unknown,
+    config: BaseConfig,
+  ): unknown {
+    throw new NotImplementedError();
+  },
 
   /** @internal */
   registerOptionsRelationFor(
@@ -491,4 +810,4 @@ export function fromSuperclass(
   }
 }
 
-export const Base = Object.assign(ThorBase, { ClassMethods });
+export const Base = Object.assign(ThorBase, { ClassMethods, subclasses, registerKlassFile });

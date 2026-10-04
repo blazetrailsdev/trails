@@ -1730,6 +1730,81 @@ synchronous await — ratified repo-wide here. This section is the
 wrapper's receipt: the wrapper raises no call or argument row, so no JSDoc tag
 applies.
 
+## Thor commands register through an explicit `methodAdded`
+
+Thor registers a command whenever the VM fires `method_added` for a public
+`def` (`vendor/thor/v1.3.2/lib/thor/base.rb:729-745`). `Thor.create_command`
+(`vendor/thor/v1.3.2/lib/thor.rb:560-583`) consumes the pending `@usage` /
+`@desc` / `@method_options` the preceding `desc` / `method_option` calls set,
+and clears them. `inherited` (`base.rb:721-725`) registers every subclass in
+`Thor::Base.subclasses` the moment it is defined.
+
+JS has no hook when a method is defined, and none when a class is. A class's
+`static {}` block runs after every prototype method exists. **The settled shape
+is that the class body fires the hook itself, where Ruby's `def` would be:**
+
+```ts
+class MyScript extends Thor {
+  static {
+    this.desc("zoo", "zoo around");
+    this.methodAdded("zoo");
+    this.noCommands(() => this.methodAdded("helper"));
+  }
+  zoo() {}
+  helper() {}
+}
+```
+
+`methodAdded` is Thor's own `method_added`, ported line for line, so
+`create_command` still consumes the pending `desc` state in declaration order.
+Three consequences follow, and they are ratified here:
+
+- **A Thor-private method is one that is never registered.** Ruby's
+  `method_added` fires for a private `def` too and `public_method_defined?`
+  drops it. trails has no run-time visibility to read (§ "Method visibility is
+  compile-time only"), so `rbModPublicMethodDefined` answers "defined" and the
+  registration itself is the mechanism: a TS-`private` / `protected` method is
+  not passed to `methodAdded`. `public_command` (`base.rb:606-611`) re-exposes
+  the parent's method on the subclass prototype and calls `methodAdded`, as its
+  `class_eval "def ..."` fires `method_added`.
+- **`no_commands` is ported verbatim** over `NestedContext`
+  (`base.rb:530-542`), and a helper is declared the way Ruby declares one. The
+  `thor-command-registration-lint-rule` story enforces the public half: every
+  public method of a Thor class is either passed to `methodAdded` or declared
+  inside `noCommands`, so a forgotten command cannot pass as a helper.
+- **`inherited` is deferred.** Its `@no_commands = 0` is the own-property memo
+  guard (§ "`inherited` is deferred to own-property memo guards").
+  `register_klass_file` runs from `methodAdded`, where Thor also calls it
+  (`base.rb:744`), and from `namespace(name)` when a namespace is set
+  explicitly, a call Thor's `namespace` does not make and which carries an
+  `@inventedArm registerKlassFile — PERMANENT` receipt. The one observable
+  difference from Ruby is that a Thor subclass with no command and no explicit
+  namespace is absent from `Thor::Base.subclasses`.
+
+The alternatives lose:
+
+- **Scanning the prototype** at first `commands` read cannot interleave with
+  `desc`: every method exists before any `static {}` runs, so the pending
+  `@usage` / `@desc` would attach to the wrong method, and `Thor::Group`'s
+  definition order (`group.rb:263-266`) and `invoke_from_option`'s
+  declaration-point command would be lost.
+- **`desc(name, usage, description)`**, naming the command, changes a
+  Rails-facing arity, and `desc for:` already means "amend an existing command".
+- **A decorator per command** (`@desc("zoo", "zoo around") zoo() {}`) replaces
+  Thor's DSL with one no Rails generator body is written in.
+- **Treating an unregistered public method as an implicit non-command** leaves
+  nothing to tell a forgotten command from a helper.
+- **A registration step per class** (`MyScript.register()`) for `inherited` is
+  invented surface on every Thor class, the same shape § "`inherited` is
+  deferred" rejects for models.
+
+`register_klass_file`'s `caller`-file arm feeds only `subclass_files`, whose
+one reader is the unported `Thor::Runner`; it is a scoped skip in
+`scripts/parity/conventions.ts`.
+
+This is a genuine language shortcoming, ratified repo-wide here. A new Thor
+class is not a new decision to argue.
+
 ## Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)
 
 `Rails::Autoloaders` (`railties/lib/rails/autoloaders.rb:12-28`) is a pair of
