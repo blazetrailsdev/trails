@@ -40,6 +40,6 @@ export function inherited(
   klass.helpersPath = helpersPath();
 
   if (Object.getPrototypeOf(klass) === base && base.includeAllHelpers) {
-    (klass as HelpersClass).helper("all");
+    (klass as HelpersClass).helper(":all");
   }
 }

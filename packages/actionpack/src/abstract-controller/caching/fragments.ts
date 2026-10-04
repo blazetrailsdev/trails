@@ -22,8 +22,10 @@ export interface FragmentsHost {
   instrumentPayload(key: unknown): Record<string, unknown>;
 }
 
-export const Fragments = {
-  [included](base: FragmentsClassMethods & { helperMethod?(...methods: string[]): void }): void {
+export class Fragments {
+  static [included](
+    base: FragmentsClassMethods & { helperMethod?(...methods: string[]): void },
+  ): void {
     if (typeof base === "function") {
       classAttribute.call(base, "fragmentCacheKeys");
     } else {
@@ -35,8 +37,8 @@ export const Fragments = {
     if (rbObjRespondTo(base, "helperMethod")) {
       base.helperMethod!("combinedFragmentCacheKey");
     }
-  },
-};
+  }
+}
 
 export function fragmentCacheKey(
   this: FragmentsClassMethods,

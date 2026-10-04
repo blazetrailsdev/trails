@@ -34,11 +34,9 @@ function allApplicationHelpers(): string[] {
 }
 
 export function modulesForHelpers(
-  args: ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
+  args: ReadonlyArray<HelperMethodsModule | string | Array<unknown>>,
 ): HelperMethodsModule[] {
-  const rest = (args as readonly unknown[]).filter(
-    (arg) => !(arg === "all" || (typeof arg === "symbol" && arg.description === "all")),
-  );
+  const rest = args.filter((arg) => arg !== ":all");
   const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
   return Resolution.modulesForHelpers(argsWithAll as Array<HelperMethodsModule | string>);
 }

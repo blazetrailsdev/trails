@@ -45,6 +45,10 @@ describe("modulesForHelpers", () => {
     expect(modulesForHelpers(["Foo"])).toEqual([FooHelper]);
   });
 
+  it("resolves a symbol prefix", () => {
+    expect(modulesForHelpers([":foo"])).toEqual([FooHelper]);
+  });
+
   it("translates `foo/bar` → `Foo::BarHelper`", () => {
     expect(modulesForHelpers(["foo/bar"])).toEqual([NamespacedHelper]);
   });

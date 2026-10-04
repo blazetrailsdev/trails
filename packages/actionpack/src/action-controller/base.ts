@@ -123,7 +123,6 @@ import {
   expireFragment,
   fragmentCacheKey,
   fragmentExist,
-  Fragments,
   readFragment,
   writeFragment,
   type FragmentsClassMethods,
@@ -972,7 +971,6 @@ Base.prototype.expireFragment = expireFragment;
   Base as unknown as CachingClassMethods & { viewCacheDependency: typeof viewCacheDependency }
 ).viewCacheDependency = viewCacheDependency;
 
-include(Base, Fragments);
 include(Base, Caching);
 extend(Base, ViewPathsClassMethods);
 extend(Base, DefaultHeaders.ClassMethods);

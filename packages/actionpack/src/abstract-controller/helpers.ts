@@ -7,7 +7,13 @@ import {
   isAnonymous,
   NameError,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  isSymbol,
+  Module,
+  rbObjIsKindOf,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 
 /** @internal */
 
@@ -85,10 +91,15 @@ export const Resolution = {
     return (modulesOrHelperPrefixes as readonly unknown[])
       .flat(Infinity)
       .map((moduleOrHelperPrefix) => {
-        if (moduleOrHelperPrefix !== null && typeof moduleOrHelperPrefix === "object") {
+        if (
+          rbObjIsKindOf(moduleOrHelperPrefix, Module) ||
+          (moduleOrHelperPrefix !== null && typeof moduleOrHelperPrefix === "object")
+        ) {
           return moduleOrHelperPrefix as HelperMethodsModule;
         } else if (typeof moduleOrHelperPrefix === "string") {
-          let helperPrefix = String(moduleOrHelperPrefix);
+          let helperPrefix = isSymbol(moduleOrHelperPrefix)
+            ? symbolToS(moduleOrHelperPrefix)
+            : moduleOrHelperPrefix;
           if (!/^[A-Z]/.test(helperPrefix)) helperPrefix = camelize(helperPrefix);
           return constantize(`${helperPrefix}Helper`) as HelperMethodsModule;
         } else {
@@ -156,8 +167,11 @@ export function helper(
   this: HelpersClass,
   ...args: Array<HelperArgument | ((mod: HelperMethodsModule) => void)>
 ): void {
+  const last = args.at(-1);
   const block =
-    typeof args.at(-1) === "function" ? (args.pop() as (mod: HelperMethodsModule) => void) : null;
+    typeof last === "function" && !rbObjIsKindOf(last, Module)
+      ? (args.pop() as (mod: HelperMethodsModule) => void)
+      : null;
   for (const mod of this.modulesForHelpers(args as HelperArgument[])) {
     if (isHelperIncluded(this._helpers, mod)) continue;
     const head = this._helpersForModification();
