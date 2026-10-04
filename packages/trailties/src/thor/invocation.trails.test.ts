@@ -45,7 +45,7 @@ class B extends Thor {
     (this as unknown as ThorClass).desc("hello", "hello");
     (this as unknown as ThorClass).methodAdded("hello");
   }
-  static dispatch(
+  static async dispatch(
     command: unknown,
     givenArgs: unknown,
     givenOpts: unknown,
