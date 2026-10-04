@@ -7,7 +7,7 @@ import { Temporal } from "@blazetrails/date";
 import { Duration } from "@blazetrails/activesupport";
 import { Error as ModelError } from "./error.js";
 import { NestedError } from "./nested-error.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, rbHash } from "@blazetrails/ruby-compat";
 import { Errors, Model } from "./index.js";
 import { I18n } from "./i18n.js";
 import { resetI18n } from "./test-helpers/i18n.js";
@@ -242,5 +242,25 @@ describe("Error and Errors surface", () => {
     e.add("name", ":blank");
     e.add("name", ":blank");
     expect(e.objects[0].equals(e.objects[1])).toBe(true);
+  });
+
+  it("eql and hash go through attributesForHash (error.rb:190-197)", () => {
+    const base = new Person();
+    const a = new ModelError(base, "name", ":too_long", { count: 5, if: "admin" });
+    const b = new ModelError(base, "name", ":too_long", { count: 5, unless: "guest" });
+
+    expect(a.eql(b)).toBe(true);
+    expect(rbHash(a)).toBe(rbHash(b));
+    expect(a.hash()).toBe(rbHash([base, "name", ":too_long", { count: 5 }]));
+
+    for (const other of [
+      new ModelError(new Person(), "name", ":too_long", { count: 5 }),
+      new ModelError(base, "title", ":too_long", { count: 5 }),
+      new ModelError(base, "name", ":too_short", { count: 5 }),
+      new ModelError(base, "name", ":too_long", { count: 6 }),
+    ]) {
+      expect(a.eql(other)).toBe(false);
+      expect(rbHash(a)).not.toBe(rbHash(other));
+    }
   });
 });

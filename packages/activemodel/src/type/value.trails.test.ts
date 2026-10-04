@@ -1,11 +1,49 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import { rbHash, rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
 import { ValueType, IntegerType, FloatType, DecimalType, BigIntegerType } from "../index.js";
 
 describe("ValueType", () => {
   it("type is nil for the unmapped default", () => {
     expect(new ValueType().type()).toBeUndefined();
+  });
+
+  describe("eql / hash (type/value.rb:121-131)", () => {
+    it("equal types are eql and hash alike under rbHash", () => {
+      const a = new ValueType({ precision: 8, limit: 4, scale: 2 });
+      const b = new ValueType({ precision: 8, limit: 4, scale: 2 });
+
+      expect(a.eql(b)).toBe(true);
+      expect(rbHash(a)).toBe(rbHash(b));
+      expect(a.hash()).toBe(rbHash([ValueType, 8, 2, 4]));
+    });
+
+    it("hashes the class, precision, scale and limit", () => {
+      const a = new ValueType({ precision: 8, limit: 4, scale: 2 });
+
+      for (const other of [
+        new IntegerType({ precision: 8, limit: 4, scale: 2 }),
+        new ValueType({ precision: 9, limit: 4, scale: 2 }),
+        new ValueType({ precision: 8, limit: 4, scale: 3 }),
+        new ValueType({ precision: 8, limit: 5, scale: 2 }),
+      ]) {
+        expect(a.eql(other)).toBe(false);
+        expect(rbHash(a)).not.toBe(rbHash(other));
+      }
+    });
+  });
+
+  it("eql is the aliased ==, so a subclass that overrides == does not change it (type/value.rb:127)", () => {
+    class Loose extends ValueType {
+      override equals(_other: ValueType): boolean {
+        return true;
+      }
+    }
+    const a = new Loose({ limit: 4 });
+    const b = new Loose({ limit: 8 });
+
+    expect(a.equals(b)).toBe(true);
+    expect(a.eql(b)).toBe(false);
   });
 
   describe("precision / scale / limit", () => {

@@ -3,6 +3,7 @@ import {
   except,
   isSymbol,
   kernelCatch,
+  rbHash,
   rbInspect,
   rbModConstSet,
   rbModName,
@@ -292,6 +293,12 @@ export class Error {
     );
   }
 
+  declare eql: Error["equals"];
+
+  hash(): number {
+    return rbHash(this.attributesForHash());
+  }
+
   /** @internal */
   protected attributesForHash(): [ModelBase, string, string | null, Record<string, unknown>] {
     return [this.base, this.attribute, this.rawType, except(this.options, ...CALLBACKS_OPTIONS)];
@@ -301,5 +308,7 @@ export class Error {
     return `#<${rbModName(this.constructor as typeof Error) ?? ""} attribute=${isSymbol(this.attribute) ? symbolToS(this.attribute) : this.attribute}, type=${isSymbol(this.type) ? symbolToS(this.type) : this.type}, options=${rbInspect(this.options)}>`;
   }
 }
+
+Error.prototype.eql = Error.prototype.equals;
 
 rbModConstSet(ActiveModel, "Error", Error);

@@ -161,8 +161,12 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   return false;
 }
 
-/** The `RHASH` of `hash_equal` (`vendor/ruby/v3.3.11/hash.c:3746`) over both JS seats. */
-function hashEntries(value: unknown): [unknown, unknown][] | null {
+/**
+ * The `RHASH` of `hash_equal` (`vendor/ruby/v3.3.11/hash.c:3746`) over both JS seats.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function hashEntries(value: unknown): [unknown, unknown][] | null {
   if (value instanceof Map) return [...value.entries()];
   if (
     typeof value === "object" &&

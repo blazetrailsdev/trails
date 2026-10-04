@@ -5,6 +5,7 @@ import {
   rbDeclareIvar,
   rbInspect as inspect,
   rbEqual,
+  rbHash,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { NoMethodError } from "../attribute-assignment.js";
@@ -107,6 +108,12 @@ export class ValueType<T = unknown> {
     );
   }
 
+  declare eql: ValueType["equals"];
+
+  hash(): number {
+    return rbHash([this.constructor, this.precision, this.scale, this.limit]);
+  }
+
   assertValidValue(_: unknown): void {}
 
   isSerialized(): boolean {
@@ -132,5 +139,7 @@ include(ValueType, SerializeCastValue);
 rbDeclareIvar(ValueType, "@precision", "_precision");
 rbDeclareIvar(ValueType, "@scale", "_scale");
 rbDeclareIvar(ValueType, "@limit", "__limit");
+
+ValueType.prototype.eql = ValueType.prototype.equals;
 
 registerConstant("ActiveModel::Type::Value", ValueType);

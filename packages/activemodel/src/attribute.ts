@@ -4,6 +4,7 @@ import { MissingAttributeError } from "./attribute-methods.js";
 import {
   hasKey,
   rbEqual,
+  rbHash,
   rbModConstSet,
   rbDeclareIvar,
   rbObjDup,
@@ -193,6 +194,12 @@ export abstract class Attribute {
     );
   }
 
+  declare eql: Attribute["equals"];
+
+  hash(): number {
+    return rbHash([this.constructor, this.name, this.valueBeforeTypeCast, this.type]);
+  }
+
   originalValueForDatabase(): unknown {
     if (this.originalAttribute !== null) {
       return this.originalAttribute.originalValueForDatabase();
@@ -369,6 +376,8 @@ export class Uninitialized extends Attribute {
     return undefined;
   }
 }
+
+Attribute.prototype.eql = Attribute.prototype.equals;
 
 rbModConstSet(ActiveModel, "Attribute", Attribute);
 rbModConstSet(Attribute, "FromDatabase", FromDatabase);
