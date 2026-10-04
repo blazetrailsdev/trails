@@ -1,5 +1,7 @@
 import { Hash } from "../../hash.js";
 import {
+  rbCDate,
+  rbCTime,
   rbModName,
   rbModToS,
   rbObjInstanceVariables,
@@ -28,15 +30,8 @@ type ZonedDateTime = {
 };
 type Instant = { toZonedDateTimeISO(timeZone: string): ZonedDateTime };
 
-function isKindOf(target: unknown, klassname: string): boolean {
-  const klass = registeredConstant(klassname);
-  return typeof klass === "function" && target instanceof klass;
-}
-
 /**
  * `Psych::Visitors::YAMLTree` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:15`).
- * It names `Date`, `DateTime` and `Time` through the `rb_cObject` table, as
- * `visit_Date` / `visit_DateTime` / `visit_Time` are found by class name (`:194-208`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -59,10 +54,13 @@ export class YAMLTree {
     if (typeof target === "string") return this.visitString(target);
     if (typeof target === "function") return this.visitClass(target);
     const tag = target == null ? null : temporalTag(target);
-    if (isKindOf(target, "DateTime")) return this.visitDateTime(target as DateTime);
-    if (isKindOf(target, "Date")) return this.visitDate(target as RubyDate);
+    const dateTime = registeredConstant("DateTime");
+    if (typeof dateTime === "function" && target instanceof dateTime) {
+      return this.visitDateTime(target as DateTime);
+    }
+    if (target instanceof rbCDate) return this.visitDate(target as RubyDate);
     if (
-      isKindOf(target, "Time") ||
+      target instanceof rbCTime ||
       tag === "Temporal.ZonedDateTime" ||
       tag === "Temporal.Instant"
     ) {
