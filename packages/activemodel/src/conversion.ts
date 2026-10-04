@@ -5,12 +5,55 @@ import {
   demodulize,
   wrap,
   extend,
-  included,
   classAttribute,
+  Concern,
+  Module,
+  type Included,
 } from "@blazetrails/activesupport";
 
 interface ConversionRecord {
   isPersisted(): boolean;
+  toKey(): unknown[] | null;
+}
+
+export const Conversion = new Module() as Module<{
+  toModel: typeof toModel;
+  toKey: typeof toKey;
+  toParam: typeof toParam;
+  toPartialPath: typeof toPartialPath;
+}> & {
+  ClassMethods: typeof ClassMethods;
+  included(base: null, block: (this: object) => void): void;
+};
+export type Conversion = Included<typeof Conversion>;
+extend(Conversion, Concern);
+
+Conversion.included(null, function (this: object) {
+  classAttribute.call(this, "paramDelimiter", { instanceReader: false, default: "-" });
+});
+
+export function toModel<T>(this: T): T {
+  return this;
+}
+
+export function toKey(this: object): unknown[] | null {
+  const key = rbObjRespondTo(this, "id") && (this as unknown as { id: unknown }).id;
+  return key != null && key !== false ? wrap(key) : null;
+}
+
+export function toParam(this: ConversionRecord): string | null {
+  let key: unknown[] | null;
+  return this.isPersisted() &&
+    (key = this.toKey()) &&
+    key.every((part) => part !== null && part !== undefined && part !== false)
+    ? key
+        .map(String)
+        .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter)
+    : null;
+}
+
+export function toPartialPath(this: object): string {
+  return (this.constructor as unknown as ConversionHost)._toPartialPath();
 }
 
 export function _toPartialPath(this: ConversionHost): string {
@@ -25,38 +68,13 @@ export function _toPartialPath(this: ConversionHost): string {
   })());
 }
 
-export class Conversion {
-  static [included](base: object): void {
-    extend(base, ClassMethods);
-    classAttribute.call(base, "paramDelimiter", { instanceReader: false, default: "-" });
-  }
-
-  toModel(): this {
-    return this;
-  }
-
-  toKey(): unknown[] | null {
-    const key = rbObjRespondTo(this, "id") && (this as unknown as { id: unknown }).id;
-    return key != null && key !== false ? wrap(key) : null;
-  }
-
-  toParam(): string | null {
-    let key: unknown[] | null;
-    return (this as unknown as ConversionRecord).isPersisted() &&
-      (key = this.toKey()) &&
-      key.every((part) => part !== null && part !== undefined && part !== false)
-      ? key
-          .map(String)
-          .join((this.constructor as unknown as { paramDelimiter: string }).paramDelimiter)
-      : null;
-  }
-
-  toPartialPath(): string {
-    return (this.constructor as unknown as ConversionHost)._toPartialPath();
-  }
-}
-
 export const ClassMethods = { _toPartialPath };
+Conversion.ClassMethods = ClassMethods;
+
+Conversion.defineMethod("toModel", toModel);
+Conversion.defineMethod("toKey", toKey);
+Conversion.defineMethod("toParam", toParam);
+Conversion.defineMethod("toPartialPath", toPartialPath);
 
 interface ConversionHost {
   name: string;
