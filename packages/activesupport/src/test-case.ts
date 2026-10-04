@@ -27,7 +27,7 @@ import {
   assertChanges,
   assertNoChanges,
 } from "./testing/assertions.js";
-import { assertErrorReported, assertNoErrorReported } from "./testing/error-reporter-assertions.js";
+import { ErrorReporterAssertions } from "./testing/error-reporter-assertions.js";
 import { stubConst } from "./testing/constant-stubbing.js";
 import {
   assertDeprecated,
@@ -52,6 +52,8 @@ export class TestCase extends Minitest.Test {
   declare static isFileFixturePath: () => boolean;
   declare isFileFixturePath: () => boolean;
   declare fileFixture: typeof FileFixtures.fileFixture;
+  declare assertNoErrorReported: typeof ErrorReporterAssertions.assertNoErrorReported;
+  declare assertErrorReported: typeof ErrorReporterAssertions.assertErrorReported;
   declare static setup: Extended<typeof SetupAndTeardownClassMethods>["setup"];
   declare static teardown: Extended<typeof SetupAndTeardownClassMethods>["teardown"];
 
@@ -103,9 +105,6 @@ export class TestCase extends Minitest.Test {
   static assertChanges = assertChanges;
   static assertNoChanges = assertNoChanges;
 
-  static assertErrorReported = assertErrorReported;
-  static assertNoErrorReported = assertNoErrorReported;
-
   static assertDeprecated = assertDeprecated;
   static assertNotDeprecated = assertNotDeprecated;
   static collectDeprecations = collectDeprecations;
@@ -119,6 +118,7 @@ export class TestCase extends Minitest.Test {
   static unfreezeTime = unfreezeTime;
 }
 
+include(TestCase, ErrorReporterAssertions);
 include(TestCase, FileFixtures);
 prepend(TestCase.prototype, {
   beforeSetup: setupAndTeardownBeforeSetup as PrependMethod,

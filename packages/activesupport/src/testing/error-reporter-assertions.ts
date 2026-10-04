@@ -122,3 +122,5 @@ export async function assertErrorReported(
   }
   return undefined;
 }
+
+export const ErrorReporterAssertions = { assertNoErrorReported, assertErrorReported };

@@ -14,7 +14,7 @@ import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
-import { FlashHash } from "../action-dispatch/middleware/flash.js";
+import type { FlashHash } from "../action-dispatch/middleware/flash.js";
 import {
   RequestForgeryProtection,
   commitCsrfToken,
@@ -26,8 +26,7 @@ import {
 import { respondTo } from "./metal/mime-responds.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import {
-  actionMethods,
-  addFlashTypes,
+  type addFlashTypes,
   Flash,
   type RedirectToResponseOptionsAndFlash,
 } from "./metal/flash.js";
@@ -325,9 +324,8 @@ export class Base extends Metal {
     this.abstractBang();
   }
 
-  get flash(): FlashHash {
-    return this.request.flash!;
-  }
+  declare readonly flash: FlashHash;
+  declare static addFlashTypes: typeof addFlashTypes;
 
   declare static _viewPaths: {
     (): PathSet;
@@ -353,8 +351,6 @@ export class Base extends Metal {
   declare static _layout: Parameters<typeof layout>[0];
   declare static _layoutConditions: Record<string, string[]>;
   declare static _flashTypes: string[];
-  static addFlashTypes = addFlashTypes;
-  static override actionMethods = actionMethods;
 
   static _routes: ViewContextRoutes | null = null;
 

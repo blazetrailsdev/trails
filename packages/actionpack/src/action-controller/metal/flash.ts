@@ -1,4 +1,4 @@
-import { classAttribute, included } from "@blazetrails/activesupport";
+import { classAttribute, extend, included } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../abstract-controller/base.js";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
@@ -25,9 +25,19 @@ export interface FlashClassHost extends HelpersClassMethods {
 }
 
 export class Flash {
-  static [included](base: FlashClassHost & { addFlashTypes(...types: string[]): void }): void {
+  static ClassMethods = { addFlashTypes, actionMethods };
+
+  static [included](base: FlashClassHost): void {
+    extend(base, Flash.ClassMethods);
     classAttribute.call(base, "_flashTypes", { instanceAccessor: false, default: [] });
-    base.addFlashTypes("alert", "notice");
+
+    Object.defineProperty(base.prototype, "flash", {
+      get(this: { request: { flash: FlashHash | null } }) {
+        return this.request.flash;
+      },
+      configurable: true,
+    });
+    (base as FlashClassHost & typeof Flash.ClassMethods).addFlashTypes("alert", "notice");
   }
 
   redirectTo<FlashType extends string = never>(

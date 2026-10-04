@@ -12,7 +12,14 @@ import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
-import { assertNil } from "@blazetrails/activesupport";
+import {
+  assertNil,
+  assertNothingRaised,
+  assertRespondTo,
+  include,
+} from "@blazetrails/activesupport";
+import { Metal } from "../metal.js";
+import { Flash as ControllerFlash } from "../metal/flash.js";
 
 class TestController extends Base {
   async redirectWithAlert(): Promise<void> {
@@ -223,8 +230,16 @@ describe("FlashIntegrationTest", () => {
   it.skip("flash factored into etag", () => {});
 
   it("flash usable in metal without helper", () => {
-    const controller = new Base();
-    expect("alert" in controller).toBe(true);
-    expect("notice" in controller).toBe(true);
+    let controllerClass: typeof Metal | null = null;
+
+    assertNothingRaised(() => {
+      controllerClass = class extends Metal {};
+      include(controllerClass, ControllerFlash);
+    });
+
+    const controller = new controllerClass!();
+
+    assertRespondTo(controller, "alert");
+    assertRespondTo(controller, "notice");
   });
 });

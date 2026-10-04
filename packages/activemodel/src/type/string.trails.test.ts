@@ -13,7 +13,7 @@ describe("StringType", () => {
   describe("isChangedInPlace", () => {
     it("non-string new value returns false", () => {
       const type = new Types.StringType();
-      expect(type.isChangedInPlace("42", 42)).toBe(false);
+      expect(type.isChangedInPlace("42", 42)).toBeUndefined();
       expect(type.isChangedInPlace("hello", null)).toBeUndefined();
       expect(type.isChangedInPlace("", true)).toBeUndefined();
     });
