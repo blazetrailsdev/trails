@@ -185,7 +185,7 @@ export function commitCsrfToken(this: CsrfController, request: CsrfRequest): voi
 export interface RequestForgeryProtectionHost extends ActionCallbackHost, HelpersClassMethods {
   new (...args: never[]): unknown;
   configAccessor(...names: string[]): void;
-  helperMethod: typeof helperMethod;
+  helperMethod: OmitThisParameter<typeof helperMethod>;
   beforeAction: typeof beforeAction;
   appendAfterAction: typeof afterAction;
   skipBeforeAction: typeof skipBeforeAction;

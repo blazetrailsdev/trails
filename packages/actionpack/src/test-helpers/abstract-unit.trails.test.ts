@@ -5,7 +5,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { include, type Included } from "@blazetrails/activesupport";
 import { URI } from "@blazetrails/ruby-compat";
 
-import { helper, type HelpersClassMethods } from "../abstract-controller/helpers.js";
 import { Base } from "../action-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -32,7 +31,7 @@ class FixtureLoadPathController extends Base {
     await this.render({ inline: "hello: <%= stratego() %>" });
   }
 }
-helper(FixtureLoadPathController as unknown as HelpersClassMethods, GamesHelper);
+FixtureLoadPathController.helper(GamesHelper);
 
 async function dispatch(action: string): Promise<unknown> {
   const controller = new FixtureLoadPathController();

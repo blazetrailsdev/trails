@@ -3,17 +3,16 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { NameError } from "@blazetrails/activesupport";
-
 import {
-  allHelpersFromPath,
-  defaultHelperModuleBang,
-  helper,
-  helperModulesFromPaths,
-  modulesForHelpers,
-  type HelperMethodsModule,
-  type HelpersClassMethods,
-} from "./helpers.js";
+  ArgumentError,
+  include,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
+
+import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from "./helpers.js";
+
+const { modulesForHelpers, allHelpersFromPath } = Resolution;
 
 const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
 const BarHelper: HelperMethodsModule = { bar: () => "BAR" };
@@ -25,49 +24,76 @@ const registry: Record<string, HelperMethodsModule> = {
   "Foo::BarHelper": NamespacedHelper,
 };
 
-const resolve = (name: string): HelperMethodsModule | undefined => registry[name];
+beforeAll(() => {
+  for (const [name, mod] of Object.entries(registry)) registerConstant(name, mod);
+});
+afterAll(() => {
+  for (const [name, mod] of Object.entries(registry)) unregisterConstant(name, mod);
+});
+
+function controller(name: string): HelpersClass {
+  const klass = { [name]: class {} }[name];
+  include(klass, Helpers);
+  return klass as unknown as HelpersClass;
+}
 
 describe("modulesForHelpers", () => {
   it("passes through already-resolved modules unchanged", () => {
-    expect(modulesForHelpers([FooHelper], { resolve })).toEqual([FooHelper]);
+    expect(modulesForHelpers([FooHelper])).toEqual([FooHelper]);
   });
 
   it("resolves a string prefix (snake_case)", () => {
-    expect(modulesForHelpers(["foo"], { resolve })).toEqual([FooHelper]);
+    expect(modulesForHelpers(["foo"])).toEqual([FooHelper]);
   });
 
   it("resolves a string prefix (already camel-cased) without re-camelizing", () => {
-    expect(modulesForHelpers(["Foo"], { resolve })).toEqual([FooHelper]);
+    expect(modulesForHelpers(["Foo"])).toEqual([FooHelper]);
   });
 
   it("resolves a symbol prefix", () => {
-    expect(modulesForHelpers([Symbol("foo")], { resolve })).toEqual([FooHelper]);
+    expect(modulesForHelpers([":foo"])).toEqual([FooHelper]);
   });
 
   it("translates `foo/bar` → `Foo::BarHelper`", () => {
-    expect(modulesForHelpers(["foo/bar"], { resolve })).toEqual([NamespacedHelper]);
+    expect(modulesForHelpers(["foo/bar"])).toEqual([NamespacedHelper]);
   });
 
   it("flattens nested arrays (Rails `args.flatten`)", () => {
-    expect(modulesForHelpers(["foo", ["bar"]], { resolve })).toEqual([FooHelper, BarHelper]);
+    expect(modulesForHelpers(["foo", ["bar"]])).toEqual([FooHelper, BarHelper]);
   });
 
   it("raises a NameError-shaped Error on an unknown name", () => {
-    expect(() => modulesForHelpers(["missing"], { resolve })).toThrow(
-      /uninitialized constant MissingHelper/,
-    );
+    expect(() => modulesForHelpers(["missing"])).toThrow(/uninitialized constant MissingHelper/);
   });
 
   it("raises TypeError for non-string/symbol/module entries", () => {
-    expect(() => modulesForHelpers([42 as unknown as string], { resolve })).toThrow(
+    expect(() => modulesForHelpers([42 as unknown as string])).toThrow(
       /must be a String, Symbol, or Module/,
     );
   });
+});
 
-  it("raises TypeError when an object has non-function values (not module-shaped)", () => {
-    expect(() =>
-      modulesForHelpers([{ x: 1 } as unknown as HelperMethodsModule], { resolve }),
-    ).toThrow(/must be a String, Symbol, or Module/);
+describe("modulesForHelpers (when Module)", () => {
+  it("passes a class module through", () => {
+    class ClassHelper {
+      shout(): string {
+        return "SHOUT";
+      }
+    }
+    const mod = ClassHelper as unknown as HelperMethodsModule;
+    expect(modulesForHelpers([mod])).toEqual([mod]);
+  });
+
+  it("passes a helpers module derived from another through", () => {
+    const derived = Object.create(FooHelper) as HelperMethodsModule;
+    expect(modulesForHelpers([derived])).toEqual([derived]);
+  });
+
+  it("raises ArgumentError for an object that is not a module", () => {
+    class NotAModule {}
+    for (const value of [new NotAModule(), new Map(), 42]) {
+      expect(() => modulesForHelpers([value as unknown as string])).toThrow(ArgumentError);
+    }
   });
 });
 
@@ -141,60 +167,34 @@ describe("helperModulesFromPaths", () => {
   afterAll(() => rmSync(root, { recursive: true, force: true }));
 
   it("globs + resolves in one shot", async () => {
-    const mods = await helperModulesFromPaths(root, { resolve });
+    const mods = await Resolution.helperModulesFromPaths(root);
     expect(mods).toEqual([BarHelper, FooHelper]);
   });
 });
 
 describe("defaultHelperModuleBang", () => {
   it("strips the Controller suffix and includes the matching helper", () => {
-    const cls: HelpersClassMethods = { name: "FooController" };
-    defaultHelperModuleBang(cls, { resolve });
+    const cls = controller("FooController");
+    cls.defaultHelperModuleBang();
     expect(cls._helpers!.foo.call({})).toBe("FOO");
   });
 
   it("swallows the NameError when the helper does not exist", () => {
-    const cls: HelpersClassMethods = { name: "MissingController" };
-    expect(() => defaultHelperModuleBang(cls, { resolve })).not.toThrow();
-    expect(cls._helpers).toBeUndefined();
-  });
-
-  it("re-raises unrelated resolver errors", () => {
-    const throwing = () => {
-      throw new Error("connection lost");
-    };
-    expect(() => defaultHelperModuleBang({ name: "FooController" }, { resolve: throwing })).toThrow(
-      /connection lost/,
-    );
-  });
-
-  it("is a no-op on an anonymous class (no name)", () => {
-    const cls: HelpersClassMethods = {};
-    defaultHelperModuleBang(cls, { resolve });
-    expect(cls._helpers).toBeUndefined();
+    const cls = controller("MissingController");
+    expect(() => cls.defaultHelperModuleBang()).not.toThrow();
+    expect(Object.keys(cls._helpers!)).toEqual([]);
   });
 
   it("still tries to resolve when the class name lacks a Controller suffix (Rails delete_suffix is a no-op then)", () => {
-    const cls: HelpersClassMethods = { name: "Plain" };
-    defaultHelperModuleBang(cls, { resolve });
-    expect(cls._helpers).toBeUndefined();
-  });
-
-  it("only swallows the NameError matching this specific helper name", () => {
-    const cls: HelpersClassMethods = { name: "FooController" };
-    const surprising = (name: string): HelperMethodsModule | undefined => {
-      if (name === "FooHelper") {
-        throw new NameError("uninitialized constant SomeOtherThing", "SomeOtherThing");
-      }
-      return undefined;
-    };
-    expect(() => defaultHelperModuleBang(cls, { resolve: surprising })).toThrow(/SomeOtherThing/);
+    const cls = controller("Plain");
+    cls.defaultHelperModuleBang();
+    expect(Object.keys(cls._helpers!)).toEqual([]);
   });
 
   it("composes with helper(): subsequent helper(cls, X) layers on top", () => {
-    const cls: HelpersClassMethods = { name: "FooController" };
-    defaultHelperModuleBang(cls, { resolve });
-    helper(cls, BarHelper);
+    const cls = controller("FooController");
+    cls.defaultHelperModuleBang();
+    cls.helper(BarHelper);
     expect(cls._helpers!.foo.call({})).toBe("FOO");
     expect(cls._helpers!.bar.call({})).toBe("BAR");
   });

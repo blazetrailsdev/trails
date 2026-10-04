@@ -1,10 +1,5 @@
-import {
-  allHelpersFromPath,
-  modulesForHelpers as abstractModulesForHelpers,
-  type HelperMethodsModule,
-  type HelperResolver,
-  type ResolutionOptions,
-} from "../../abstract-controller/helpers.js";
+import { registerConstant } from "@blazetrails/ruby-compat";
+import { Resolution, type HelperMethodsModule } from "../../abstract-controller/helpers.js";
 
 let _helpersPath: string[] = [];
 
@@ -17,7 +12,6 @@ export function setHelpersPath(paths: string[]): void {
 }
 
 let _applicationHelpers: string[] = [];
-let _applicationHelperConstants = new Map<string, HelperMethodsModule>();
 
 /** @noRailsEquivalent PERMANENT */
 export function setApplicationHelpers(
@@ -25,17 +19,12 @@ export function setApplicationHelpers(
   constants: Map<string, HelperMethodsModule>,
 ): void {
   _applicationHelpers = names;
-  _applicationHelperConstants = constants;
-}
-
-/** @noRailsEquivalent PERMANENT */
-export function applicationHelperResolver(): HelperResolver {
-  return (name) => _applicationHelperConstants.get(name);
+  for (const [name, mod] of constants) registerConstant(name, mod);
 }
 
 /** @noRailsEquivalent PERMANENT */
 export async function loadApplicationHelperNames(): Promise<string[]> {
-  _applicationHelpers = await allHelpersFromPath(_helpersPath);
+  _applicationHelpers = await Resolution.allHelpersFromPath(_helpersPath);
   return _applicationHelpers;
 }
 
@@ -45,15 +34,9 @@ function allApplicationHelpers(): string[] {
 }
 
 export function modulesForHelpers(
-  args: ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
-  options: ResolutionOptions = { resolve: applicationHelperResolver() },
+  args: ReadonlyArray<HelperMethodsModule | string | Array<unknown>>,
 ): HelperMethodsModule[] {
-  const rest = (args as readonly unknown[]).filter(
-    (arg) => !(arg === "all" || (typeof arg === "symbol" && arg.description === "all")),
-  );
+  const rest = args.filter((arg) => arg !== ":all");
   const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
-  return abstractModulesForHelpers(
-    argsWithAll as ReadonlyArray<HelperMethodsModule | string | symbol | Array<unknown>>,
-    options,
-  );
+  return Resolution.modulesForHelpers(argsWithAll as Array<HelperMethodsModule | string>);
 }

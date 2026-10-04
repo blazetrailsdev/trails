@@ -18,7 +18,7 @@ export type RedirectToResponseOptionsAndFlash<FlashType extends string = never> 
 
 /** @internal */
 export interface FlashClassHost extends HelpersClassMethods {
-  helperMethod?: typeof helperMethod;
+  helperMethod?: OmitThisParameter<typeof helperMethod>;
   prototype: object;
   _flashTypes: string[];
   methodAdded(name: string): void;

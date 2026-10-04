@@ -44,6 +44,7 @@ export {
 } from "./url-for.js";
 export {
   cache,
+  Caching,
   ConfigMethods,
   viewCacheDependencies,
   viewCacheDependency,
@@ -56,6 +57,7 @@ export {
   expireFragment,
   fragmentCacheKey,
   fragmentExist,
+  Fragments,
   instrumentFragmentCache,
   readFragment,
   writeFragment,
@@ -66,19 +68,16 @@ export {
 export {
   _helpersForModification,
   _helpersInstance,
-  allHelpersFromPath,
   clearHelpers,
   defaultHelperModuleBang,
   helper,
   helperMethod,
-  helperModulesFromPaths,
-  modulesForHelpers,
+  Helpers,
+  Resolution,
   type HelperMethodNameList,
   type HelperMethodsModule,
-  type HelperResolver,
   type HelpersClassMethods,
   type HelpersHost,
-  type ResolutionOptions,
 } from "./helpers.js";
 export {
   withRoutesHelpers,

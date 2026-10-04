@@ -83,7 +83,6 @@ export {
   helpersPath,
   setHelpersPath,
   setApplicationHelpers,
-  applicationHelperResolver,
   loadApplicationHelperNames,
   modulesForHelpers,
 } from "./metal/helpers.js";

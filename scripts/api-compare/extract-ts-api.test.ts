@@ -3015,7 +3015,9 @@ describe("extractFromProgram — extend() detection", () => {
       `,
     });
     const base = info.classes["base.ts:Base"];
-    expect(base.instanceMethods.map((m) => m.name)).toContain("humanAttributeName");
+    expect(base.classMethods.map((m) => m.name)).toContain("humanAttributeName");
+    expect(base.classMethods.every((m) => m.isStatic === true)).toBe(true);
+    expect(base.instanceMethods).toEqual([]);
     expect(base.extends).not.toContain("ClassMethods");
   });
 
@@ -3028,7 +3030,7 @@ describe("extractFromProgram — extend() detection", () => {
         extend(Base, { find() {}, findBy: () => {}, where: function () {} });
       `,
     });
-    expect(info.classes["base.ts:Base"].instanceMethods.map((m) => m.name).sort()).toEqual([
+    expect(info.classes["base.ts:Base"].classMethods.map((m) => m.name).sort()).toEqual([
       "find",
       "findBy",
       "where",

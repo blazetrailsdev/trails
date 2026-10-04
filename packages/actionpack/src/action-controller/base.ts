@@ -102,10 +102,16 @@ import {
   currentContentSecurityPolicy,
   isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import { helperMethod, type HelperMethodsModule } from "../abstract-controller/helpers.js";
+import {
+  Helpers as AbstractHelpers,
+  type HelperMethodsModule,
+  type HelpersClass,
+} from "../abstract-controller/helpers.js";
+import { modulesForHelpers } from "./metal/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
+  Caching,
   ConfigMethods,
   cache,
   viewCacheDependencies,
@@ -360,8 +366,16 @@ export class Base extends Metal {
   declare static isIncludeAllHelpers: boolean;
 
   declare static _helpers?: HelperMethodsModule;
-  declare static _helperMethods?: string[];
-  static helperMethod = helperMethod;
+  declare static _helperMethods: string[];
+  declare static helperMethod: HelpersClass["helperMethod"];
+  declare static helper: HelpersClass["helper"];
+  declare static clearHelpers: HelpersClass["clearHelpers"];
+  declare static _helpersForModification: HelpersClass["_helpersForModification"];
+  /** @internal */
+  declare static defaultHelperModuleBang: HelpersClass["defaultHelperModuleBang"];
+  declare static allHelpersFromPath: (typeof AbstractHelpers.ClassMethods)["allHelpersFromPath"];
+  declare static helperModulesFromPaths: (typeof AbstractHelpers.ClassMethods)["helperModulesFromPaths"];
+  static modulesForHelpers = modulesForHelpers;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
@@ -908,6 +922,7 @@ export class Base extends Metal {
   }
 }
 
+include(Base, AbstractHelpers);
 include(Base, AbstractControllerRendering);
 include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
@@ -956,36 +971,17 @@ Base.prototype.expireFragment = expireFragment;
   Base as unknown as CachingClassMethods & { viewCacheDependency: typeof viewCacheDependency }
 ).viewCacheDependency = viewCacheDependency;
 
-classAttribute.call(Base, "fragmentCacheKeys", { default: [] });
-Base.helperMethod("combinedFragmentCacheKey");
-
-extend(Base, ConfigMethods);
+include(Base, Caching);
 extend(Base, ViewPathsClassMethods);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);
 include(Base, RequestForgeryProtection);
 
-const _Configurable = Base as unknown as {
-  configAccessor(...names: string[]): void;
-} & CachingClassMethods;
-
-_Configurable.configAccessor("defaultStaticExtension");
-_Configurable.defaultStaticExtension ??= ".html";
-
-_Configurable.configAccessor("performCaching");
-if (_Configurable.performCaching == null) _Configurable.performCaching = true;
-
 mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 
 classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
-
-_Configurable.configAccessor("enableFragmentCacheLogging");
-_Configurable.enableFragmentCacheLogging = false;
-
-classAttribute.call(Base, "_viewCacheDependencies", { default: [] });
-Base.helperMethod("viewCacheDependencies");
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);

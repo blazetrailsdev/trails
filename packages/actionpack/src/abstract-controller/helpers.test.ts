@@ -3,19 +3,20 @@ import { include } from "@blazetrails/ruby-compat";
 
 import {
   _helpers,
-  _helpersForModification,
   _helpersInstance,
-  clearHelpers,
   defineHelpersModule,
-  helper,
   helperMethod,
+  Helpers,
   type HelperMethodsModule,
+  type HelpersClass,
   type HelpersClassMethods,
   type HelpersHost,
 } from "./helpers.js";
 
-function makeBase(): HelpersClassMethods & { name: string } {
-  return { name: "Base" } as HelpersClassMethods & { name: string };
+function makeBase(): HelpersClass {
+  const Base = class Base {};
+  include(Base, Helpers);
+  return Base as unknown as HelpersClass;
 }
 
 describe("helperMethod", () => {
@@ -52,7 +53,7 @@ describe("helperMethod", () => {
     const parent = makeBase();
     helperMethod.call(parent, "fromParent");
 
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "fromChild");
 
     expect(Object.keys(child._helpers!)).toEqual(["fromChild"]);
@@ -66,7 +67,7 @@ describe("helperMethod", () => {
     const parent = makeBase();
     helperMethod.call(parent, "early");
 
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "childOnly");
     helperMethod.call(parent, "late");
 
@@ -80,17 +81,17 @@ describe("helper", () => {
   it("includes a module's methods into _helpers", () => {
     const cls = makeBase();
     const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-    helper(cls, FooHelper);
+    cls.helper(FooHelper);
     expect(cls._helpers!.foo.call({})).toBe("FOO");
   });
 
   it("is idempotent when the same module is included twice", () => {
     const cls = makeBase();
     const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-    helper(cls, FooHelper);
+    cls.helper(FooHelper);
     const fooBefore = cls._helpers!.foo;
     const headProtoBefore = Object.getPrototypeOf(cls._helpers!);
-    helper(cls, FooHelper);
+    cls.helper(FooHelper);
     expect(cls._helpers!.foo).toBe(fooBefore);
     expect(Object.getPrototypeOf(cls._helpers!)).toBe(headProtoBefore);
   });
@@ -98,10 +99,10 @@ describe("helper", () => {
   it("a duplicate-include no-op does NOT fork the subclass helpers module", () => {
     const parent = makeBase();
     const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-    helper(parent, FooHelper);
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    parent.helper(FooHelper);
+    const child = Object.create(parent) as HelpersClass;
 
-    helper(child, FooHelper);
+    child.helper(FooHelper);
 
     expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
     expect(child._helpers).toBe(parent._helpers);
@@ -111,16 +112,16 @@ describe("helper", () => {
     const cls = makeBase();
     const A: HelperMethodsModule = { foo: () => "A.foo" };
     const B: HelperMethodsModule = { foo: () => "B.foo" };
-    helper(cls, A);
-    helper(cls, B);
+    cls.helper(A);
+    cls.helper(B);
     expect(cls._helpers!.foo.call({})).toBe("B.foo");
-    helper(cls, A);
+    cls.helper(A);
     expect(cls._helpers!.foo.call({})).toBe("B.foo");
   });
 
   it("evaluates a trailing block against the helpers module (Rails `helper do ... end`)", () => {
     const cls = makeBase();
-    helper(cls, (mod: HelperMethodsModule) => {
+    cls.helper((mod: HelperMethodsModule) => {
       mod.wadus = () => "wadus";
     });
     expect(cls._helpers!.wadus.call({})).toBe("wadus");
@@ -130,7 +131,7 @@ describe("helper", () => {
     const cls = makeBase();
     helperMethod.call(cls, "x");
     const Override: HelperMethodsModule = { x: () => "from-module" };
-    helper(cls, Override);
+    cls.helper(Override);
     expect(typeof cls._helpers!.x).toBe("function");
     expect(() => cls._helpers!.x.call({ controller: {} })).toThrow(/does not respond to 'x'/);
   });
@@ -138,7 +139,7 @@ describe("helper", () => {
   it("included modules stay live — methods added after include are visible", () => {
     const cls = makeBase();
     const Live: HelperMethodsModule = { early: () => "early" };
-    helper(cls, Live);
+    cls.helper(Live);
     Live.late = () => "late";
     expect(cls._helpers!.early.call({})).toBe("early");
     expect(cls._helpers!.late.call({})).toBe("late");
@@ -148,8 +149,8 @@ describe("helper", () => {
     const cls = makeBase();
     const A: HelperMethodsModule = { fromA: () => "A" };
     const B: HelperMethodsModule = { fromB: () => "B" };
-    helper(cls, A);
-    helper(cls, B);
+    cls.helper(A);
+    cls.helper(B);
     expect(cls._helpers!.fromA.call({})).toBe("A");
     expect(cls._helpers!.fromB.call({})).toBe("B");
   });
@@ -157,7 +158,7 @@ describe("helper", () => {
   it("an included module is enumerable, so including _helpers elsewhere carries it", () => {
     const cls = makeBase();
     const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-    helper(cls, FooHelper);
+    cls.helper(FooHelper);
 
     class ViewContext {}
     include(ViewContext, cls._helpers!);
@@ -168,8 +169,8 @@ describe("helper", () => {
 
   it("carries every layered module, and helper_method proxies with them", () => {
     const cls = makeBase();
-    helper(cls, { fromA: () => "A" } as HelperMethodsModule);
-    helper(cls, { fromB: () => "B" } as HelperMethodsModule);
+    cls.helper({ fromA: () => "A" } as HelperMethodsModule);
+    cls.helper({ fromB: () => "B" } as HelperMethodsModule);
     helperMethod.call(cls, "currentUser");
 
     class ViewContext {}
@@ -184,7 +185,7 @@ describe("helper", () => {
   it("accepts modules and a block mixed together", () => {
     const cls = makeBase();
     const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-    helper(cls, FooHelper, (mod: HelperMethodsModule) => {
+    cls.helper(FooHelper, (mod: HelperMethodsModule) => {
       mod.bar = () => "BAR";
     });
     expect(cls._helpers!.foo.call({})).toBe("FOO");
@@ -196,14 +197,14 @@ describe("identity tracking lives on the helpers module chain, not the class", (
   it("after clearHelpers, the same module can be re-included on the cleared child", () => {
     const parent = makeBase();
     const Shared: HelperMethodsModule = { shared: () => "S" };
-    helper(parent, Shared);
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    parent.helper(Shared);
+    const child = Object.create(parent) as HelpersClass;
 
-    helper(child, Shared);
+    child.helper(Shared);
     expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
 
-    clearHelpers(child);
-    helper(child, Shared);
+    child.clearHelpers();
+    child.helper(Shared);
     expect(child._helpers!.shared.call({})).toBe("S");
   });
 });
@@ -213,11 +214,11 @@ describe("clearHelpers", () => {
     const cls = makeBase();
     const ExtraHelper: HelperMethodsModule = { extra: () => "EXTRA" };
     helperMethod.call(cls, "keep");
-    helper(cls, ExtraHelper);
+    cls.helper(ExtraHelper);
     expect(typeof cls._helpers!.keep).toBe("function");
     expect(typeof cls._helpers!.extra).toBe("function");
 
-    clearHelpers(cls);
+    cls.clearHelpers();
 
     expect(cls._helperMethods).toEqual(["keep"]);
     expect(Object.keys(cls._helpers!)).toEqual(["keep"]);
@@ -245,16 +246,16 @@ describe("_helpersForModification", () => {
   it("returns the own module when present, else links the inherited one as an ancestor", () => {
     const parent = makeBase();
     helperMethod.call(parent, "fromParent");
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const child = Object.create(parent) as HelpersClass;
 
-    const mod = _helpersForModification(child);
+    const mod = child._helpersForModification();
     expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(true);
     expect(mod).not.toBe(parent._helpers);
     expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
     expect(Object.keys(mod)).toEqual([]);
     expect(typeof mod.fromParent).toBe("function");
 
-    expect(_helpersForModification(child)).toBe(mod);
+    expect(child._helpersForModification()).toBe(mod);
   });
 
   it("also flattens deeply nested array inputs", () => {
@@ -268,7 +269,7 @@ describe("_helpers (class-level reader/writer)", () => {
   it("reads from the class, falling through to the parent via prototype", () => {
     const parent = makeBase();
     helperMethod.call(parent, "fromParent");
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const child = Object.create(parent) as HelpersClass;
 
     expect(_helpers(child)).toBe(parent._helpers);
   });
@@ -284,7 +285,7 @@ describe("_helpers (class-level reader/writer)", () => {
   it("writer with null deletes the own slot to restore parent fallback", () => {
     const parent = makeBase();
     helperMethod.call(parent, "fromParent");
-    const child: HelpersClassMethods = Object.create(parent) as HelpersClassMethods;
+    const child = Object.create(parent) as HelpersClass;
     const ownMod = {} as HelperMethodsModule;
     _helpers(child, ownMod);
     expect(child._helpers).toBe(ownMod);
@@ -305,14 +306,14 @@ describe("_helpers (class-level reader/writer)", () => {
 
 describe("defineHelpersModule", () => {
   it("is idempotent per class — same class returns the same module", () => {
-    const cls = makeBase();
+    const cls: HelpersClassMethods = { name: "Base" };
     const first = defineHelpersModule(cls);
     const second = defineHelpersModule(cls);
     expect(second).toBe(first);
   });
 
   it("does NOT write cls._helpers (caller is responsible, per Rails)", () => {
-    const cls = makeBase();
+    const cls: HelpersClassMethods = { name: "Base" };
     defineHelpersModule(cls);
     expect(Object.prototype.hasOwnProperty.call(cls, "_helpers")).toBe(false);
   });
@@ -320,7 +321,7 @@ describe("defineHelpersModule", () => {
   it("splices the parent helpers module into the prototype chain", () => {
     const parent = makeBase();
     helperMethod.call(parent, "fromParent");
-    const child = makeBase();
+    const child: HelpersClassMethods = { name: "Child" };
     const mod = defineHelpersModule(child, parent._helpers);
     expect(Object.getPrototypeOf(mod)).toBe(parent._helpers);
     helperMethod.call(parent, "addedLater");

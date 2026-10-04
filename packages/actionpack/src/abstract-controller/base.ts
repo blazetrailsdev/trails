@@ -30,6 +30,9 @@ function allPublicMethodNames(proto: object | null | undefined): string[] {
 
 import {
   afterAction,
+  appendAfterAction,
+  appendAroundAction,
+  appendBeforeAction,
   aroundAction,
   beforeAction,
   prependAfterAction,
@@ -247,13 +250,13 @@ export class AbstractController {
 
   static beforeAction = beforeAction;
   static prependBeforeAction = prependBeforeAction;
-  static appendBeforeAction = beforeAction;
+  static appendBeforeAction = appendBeforeAction;
   static afterAction = afterAction;
   static prependAfterAction = prependAfterAction;
-  static appendAfterAction = afterAction;
+  static appendAfterAction = appendAfterAction;
   static aroundAction = aroundAction;
   static prependAroundAction = prependAroundAction;
-  static appendAroundAction = aroundAction;
+  static appendAroundAction = appendAroundAction;
   static skipBeforeAction = skipBeforeAction;
   static skipAfterAction = skipAfterAction;
   static skipAroundAction = skipAroundAction;
