@@ -7,10 +7,6 @@ const KEY_LENGTH = 32;
 const IV_LENGTH = 12;
 const AUTH_TAG_LENGTH = 16;
 
-function isBytes(value: unknown): value is string | Bytes {
-  return typeof value === "string" || value instanceof Uint8Array;
-}
-
 function toBytes(value: string | Bytes): Bytes {
   return typeof value === "string" ? Buffer.from(value, "latin1") : value;
 }
@@ -43,7 +39,7 @@ export class Aes256Gcm {
 
   encrypt(clearText: string | Bytes): Message {
     this._validateKeyLength(this.secret);
-    if (typeof clearText === "string") clearText = Buffer.from(clearText, "utf-8");
+    clearText = Buffer.from(clearText as Bytes);
 
     const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
     cipher.encrypt();
@@ -62,29 +58,29 @@ export class Aes256Gcm {
   }
 
   decrypt(encryptedMessage: Message): Bytes {
-    const iv = encryptedMessage.headers.get("iv");
-    const authTag = encryptedMessage.headers.get("at");
-    if (!isBytes(iv) || !isBytes(authTag)) throw new EncryptedContentIntegrity();
+    const encryptedData = toBytes(encryptedMessage.payload);
+    const iv = encryptedMessage.headers.iv;
+    const authTag = encryptedMessage.headers.authTag;
 
-    const authTagBuf = toBytes(authTag);
-    if (authTagBuf.length !== AUTH_TAG_LENGTH) throw new EncryptedContentIntegrity();
+    if (authTag == null || toBytes(authTag).length !== AUTH_TAG_LENGTH) {
+      throw new EncryptedContentIntegrity();
+    }
 
     try {
       const cipher = new Cipher(Aes256Gcm.CIPHER_TYPE);
 
       cipher.decrypt();
       cipher.key = this.secret;
-      cipher.iv = toBytes(iv);
+      cipher.iv = toBytes(iv!);
 
-      cipher.authTag = authTagBuf;
+      cipher.authTag = toBytes(authTag);
       cipher.authData = "";
 
-      const encryptedData = toBytes(encryptedMessage.payload);
       const decryptedData =
         encryptedData.length === 0 ? encryptedData : cipher.update(encryptedData);
       return Buffer.concat([decryptedData, cipher.final()]);
     } catch {
-      throw new Decryption("The provided key could not decrypt the data");
+      throw new Decryption();
     }
   }
 

@@ -3,6 +3,7 @@ import { Configurable } from "./configurable.js";
 import { EnvelopeEncryptionKeyProvider } from "./envelope-encryption-key-provider.js";
 import { KeyProvider } from "./key-provider.js";
 import { Encryptor } from "./encryptor.js";
+import type { Message } from "./message.js";
 import { assertEncryptorWorksWith } from "./test-helpers.js";
 import * as crypto from "crypto";
 
@@ -38,9 +39,9 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
     const key = provider.encryptionKey();
     const encryptedSecret = key.publicTags.encryptedDataKey;
     expect(
-      new Encryptor({ compress: false }).decrypt(encryptedSecret as string, {
-        key: provider.activePrimaryKey.secret,
-      }),
+      Configurable.cipher
+        .decrypt(encryptedSecret as Message, { key: provider.activePrimaryKey.secret })
+        .toString(),
     ).toBe(key.secret);
   });
 

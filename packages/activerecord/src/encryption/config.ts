@@ -2,7 +2,12 @@ import { Encryption } from "../namespaces.js";
 import { deflateSync, inflateSync } from "zlib";
 
 import { presence } from "@blazetrails/activesupport";
-import { OpenSSL, type DigestClass } from "@blazetrails/ruby-compat";
+import {
+  OpenSSL,
+  rbModAttrReader,
+  rbModAttrWriter,
+  type DigestClass,
+} from "@blazetrails/ruby-compat";
 
 import { Configuration } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -27,17 +32,35 @@ export class Config {
   private _primaryKey?: string | string[];
   private _deterministicKey?: string;
   private _keyDerivationSalt?: string;
-  storeKeyReferences: boolean = false;
-  supportUnencryptedData: boolean = false;
-  encryptFixtures: boolean = false;
-  validateColumnSize: boolean = true;
-  addToFilterParameters: boolean = true;
-  excludedFromFilterParameters: string[] = [];
-  previousSchemes: Scheme[] = [];
-  extendQueries: boolean = false;
-  hashDigestClass: DigestClass = OpenSSL.Digest.SHA1;
-  compressor: Compressor = Zlib;
-  forcedEncodingForDeterministicEncryption: string = "UTF-8";
+  declare storeKeyReferences: boolean;
+  declare supportUnencryptedData: boolean;
+  declare encryptFixtures: boolean;
+  declare validateColumnSize: boolean;
+  declare addToFilterParameters: boolean;
+  declare excludedFromFilterParameters: string[];
+  declare previousSchemes: Scheme[];
+  declare extendQueries: boolean;
+  declare hashDigestClass: DigestClass;
+  declare compressor: Compressor;
+  declare forcedEncodingForDeterministicEncryption: string;
+
+  static {
+    const attrs = [
+      "storeKeyReferences",
+      "hashDigestClass",
+      "supportUnencryptedData",
+      "encryptFixtures",
+      "validateColumnSize",
+      "addToFilterParameters",
+      "excludedFromFilterParameters",
+      "extendQueries",
+      "previousSchemes",
+      "forcedEncodingForDeterministicEncryption",
+      "compressor",
+    ];
+    rbModAttrReader(this, ...attrs);
+    rbModAttrWriter(this, ...attrs);
+  }
 
   constructor() {
     this.setDefaults();

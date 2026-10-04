@@ -65,7 +65,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     let capturedKlass: any = null;
     let capturedName: string | null = null;
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Configurable.onEncryptedAttributeDeclared((klass, name) => {
       capturedKlass = klass;
       capturedName = name;
     });
@@ -78,7 +78,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       expect(capturedKlass).toBe(modelClass);
       expect(capturedName).toBe("isbn");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
@@ -87,7 +87,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Configurable.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -99,7 +99,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toContain("named_pirate.catchphrase");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
@@ -108,7 +108,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Configurable.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -119,7 +119,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toContain("catchphrase");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 
@@ -130,7 +130,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Configurable.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -141,7 +141,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
       expect(filterParameters).toEqual([]);
     } finally {
-      dispose();
+      listeners.pop();
       Configurable.config.excludedFromFilterParameters = [];
     }
   });
@@ -165,7 +165,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     const autoFilteredParameters = new AutoFilteredParameters({ config: { filterParameters } });
     autoFilteredParameters.enable();
 
-    const dispose = Configurable.onEncryptedAttributeDeclared((klass, name) => {
+    const listeners = Configurable.onEncryptedAttributeDeclared((klass, name) => {
       autoFilteredParameters.attributeWasDeclared(klass, name);
     });
 
@@ -179,7 +179,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
       expect(filterParameters).toContain("payment_model.card_number");
       expect(filterParameters).not.toContain("payment_model.secret_token");
     } finally {
-      dispose();
+      listeners.pop();
     }
   });
 });

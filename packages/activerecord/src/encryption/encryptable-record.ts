@@ -1,7 +1,7 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
-import { filterMap } from "@blazetrails/activesupport";
+import { extractOptionsBang, filterMap, kernelArray as Array } from "@blazetrails/activesupport";
 import { Module, include } from "@blazetrails/ruby-compat";
 import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
@@ -138,38 +138,25 @@ export function validateColumnSize(this: any, attributeName: string): void {
   }
 }
 
-export function encrypts(this: any, ...namesAndOptions: unknown[]): void {
-  let options: SchemeOptions = {};
-  const names: string[] = [];
+export function encrypts(this: any, ...names: unknown[]): void {
+  const options: SchemeOptions = extractOptionsBang(names);
+  this.encryptedAttributes ||= new Set<string>();
 
-  for (const arg of namesAndOptions) {
-    if (typeof arg === "string") {
-      names.push(arg);
-    } else if (typeof arg === "object" && arg !== null) {
-      options = arg as SchemeOptions;
-    }
-  }
-
-  this.encryptedAttributes ??= new Set<string>();
-
-  for (const name of names) {
+  for (const name of names as string[]) {
     encryptAttribute.call(this, name, options);
   }
 }
 
 export function deterministicEncryptedAttributes(this: any): Set<string> {
-  if (Object.prototype.hasOwnProperty.call(this, "_deterministicEncryptedAttributes")) {
-    return this._deterministicEncryptedAttributes;
-  }
-  const result = new Set<string>();
-  for (const attributeName of this.encryptedAttributes ?? new Set<string>()) {
-    const type = this.typeForAttribute(attributeName) as EncryptedAttributeType;
-    if (type.deterministic) {
-      result.add(attributeName);
-    }
-  }
-  this._deterministicEncryptedAttributes = result;
-  return result;
+  return (
+    Object.getOwnPropertyDescriptor(this, "_deterministicEncryptedAttributes")?.value ||
+    (this._deterministicEncryptedAttributes = new Set(
+      Array<string>(this.encryptedAttributes).filter(
+        (attributeName) =>
+          (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
+      ),
+    ))
+  );
 }
 
 export function sourceAttributeFromPreservedAttribute(
@@ -256,27 +243,24 @@ export async function _createRecord(
 
 /** @internal */
 export function buildEncryptAttributeAssignments(this: any): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
-    result[attributeName] =
-      typeof this.readAttribute === "function"
-        ? this.readAttribute(attributeName)
-        : this[attributeName];
-  }
-  return result;
+  return Object.fromEntries(
+    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => [
+      attributeName,
+      this.readAttribute(attributeName),
+    ]),
+  );
 }
 
 /** @internal */
 export function buildDecryptAttributeAssignments(this: any): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  for (const attributeName of this.constructor.encryptedAttributes ?? new Set<string>()) {
-    const type = this.constructor.typeForAttribute(attributeName) as {
-      deserialize: (v: unknown) => unknown;
-    };
-    const encryptedValue = ciphertextFor.call(this, attributeName);
-    result[attributeName] = type.deserialize(encryptedValue);
-  }
-  return result;
+  return Object.fromEntries(
+    Array<string>(this.constructor.encryptedAttributes).map((attributeName) => {
+      const type = this.constructor.typeForAttribute(attributeName) as EncryptedAttributeType;
+      const encryptedValue = ciphertextFor.call(this, attributeName);
+      const newValue = type.deserialize(encryptedValue);
+      return [attributeName, newValue];
+    }),
+  );
 }
 
 /** @internal */
@@ -305,12 +289,9 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
 export function preserveOriginalEncrypted(this: any, name: string): void {
   const modelClass = this;
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_ignoreCasePreservedAttributes")) {
-    modelClass._ignoreCasePreservedAttributes = new Set<string>(
-      modelClass._ignoreCasePreservedAttributes ?? [],
-    );
-  }
-  modelClass._ignoreCasePreservedAttributes.add(name);
+  modelClass._ignoreCasePreservedAttributes = new Set<string>(
+    modelClass._ignoreCasePreservedAttributes,
+  ).add(name);
 
   const columnNames: string[] = this.columnNames?.() ?? [];
   if (

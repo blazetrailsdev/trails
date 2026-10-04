@@ -28,18 +28,15 @@ export class Cipher {
 
   /** @internal */
   private tryToDecryptWithEach(encryptedText: Message, { keys }: { keys: string[] }): Bytes {
-    if (keys.length === 0) throw new Decryption("No decryption keys provided");
-    let lastError: unknown;
-    for (let i = 0; i < keys.length; i++) {
+    for (const [index, key] of keys.entries()) {
       try {
-        return this.cipherFor(keys[i]).decrypt(encryptedText);
+        return this.cipherFor(key).decrypt(encryptedText);
       } catch (e) {
         if (!(e instanceof Decryption)) throw e;
-        lastError = e;
+        if (index === keys.length - 1) throw e;
       }
     }
-    const msg = lastError instanceof Error ? lastError.message : String(lastError);
-    throw new Decryption(msg);
+    return keys as unknown as Bytes;
   }
 
   /** @internal */

@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Configurable } from "./configurable.js";
 import { Context } from "./context.js";
+import { KeyGenerator } from "./key-generator.js";
 import { Encryption } from "../encryption.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {
@@ -40,9 +41,10 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
     for (const name of Context.PROPERTIES) {
       expect(name in Configurable).toBe(true);
     }
-    Encryption.withEncryptionContext({ frozenEncryption: true, keyGenerator: "kg" }, () => {
+    const keyGenerator = new KeyGenerator();
+    Encryption.withEncryptionContext({ frozenEncryption: true, keyGenerator }, () => {
       expect(Configurable.frozenEncryption).toBe(true);
-      expect(Configurable.keyGenerator).toBe("kg");
+      expect(Configurable.keyGenerator).toBe(keyGenerator);
       expect(Configurable.cipher).toBe(Encryption.context.cipher);
       expect(Configurable.messageSerializer).toBe(Encryption.context.messageSerializer);
       expect(Configurable.encryptor).toBe(Encryption.context.encryptor);
