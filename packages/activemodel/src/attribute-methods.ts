@@ -283,6 +283,10 @@ export const ClassMethods = {
     });
   },
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm answersWithAMethod — PERMANENT
+   */
   defineAttributeMethodPattern(
     this: ClassMethodsHost,
     pattern: AttributeMethodPattern,
