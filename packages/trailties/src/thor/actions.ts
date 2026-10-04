@@ -179,10 +179,9 @@ export async function findInSourcePaths(
 export async function inside<T>(
   this: ActionsHost,
   dir: string = "",
-  config: { verbose?: unknown } | InsideBlock<T> = {},
-  block?: InsideBlock<T>,
+  config: { verbose?: unknown } = {},
+  block: InsideBlock<T>,
 ): Promise<T> {
-  if (typeof config === "function") [config, block] = [{}, config];
   const verbose = fetch(config, "verbose", false);
   const pretend = this.options["pretend"];
 
@@ -191,15 +190,15 @@ export async function inside<T>(
   this._destinationStack.push(File.expandPath(dir, this.destinationRoot));
 
   if (!(await getFs().exists(this.destinationRoot)) && !rtest(pretend)) {
-    await getFs().mkdir!(this.destinationRoot, { recursive: true });
+    await FileUtils.mkdirPAsync(this.destinationRoot);
   }
 
   let result: T | null = null;
   if (rtest(pretend)) {
-    result = await (block!.length === 1 ? block!(this.destinationRoot) : (block as () => T)());
+    result = await (block.length === 1 ? block(this.destinationRoot) : (block as () => T)());
   } else {
     await FileUtils.cd(this.destinationRoot, async () => {
-      result = await (block!.length === 1 ? block!(this.destinationRoot) : (block as () => T)());
+      result = await (block.length === 1 ? block(this.destinationRoot) : (block as () => T)());
     });
   }
 
@@ -209,7 +208,7 @@ export async function inside<T>(
 }
 
 export function inRoot<T>(this: ActionsHost, block: () => T | Promise<T>): Promise<T> {
-  return this.inside(this._destinationStack[0], () => block());
+  return this.inside(this._destinationStack[0], {}, () => block());
 }
 
 /** @internal */
@@ -240,12 +239,12 @@ export const Actions = new Module((mod) => {
     extend(base, ClassMethods);
   };
 
-  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function* (
     this: ActionsHost,
     args: unknown[] = [],
     options: unknown[] | Record<string, unknown> = {},
     config: { behavior?: string | null; destinationRoot?: string | null } = {},
-  ): void {
+  ): Generator<void, void, void> {
     this.behavior = (() => {
       switch (toS(config.behavior)) {
         case "force":
@@ -259,6 +258,7 @@ export const Actions = new Module((mod) => {
       }
     })();
 
+    yield;
     this.destinationRoot = config.destinationRoot as string;
   };
 

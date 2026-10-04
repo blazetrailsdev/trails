@@ -610,6 +610,17 @@ describe("FileUtils", () => {
     expect(nodeFs.existsSync(tree)).toBe(false);
   });
 
+  it("mkdir_p awaited creates every missing parent and accepts an existing directory", async () => {
+    const deep = nodePath.join(root, "x", "y", "z");
+    expect(await FileUtils.mkdirPAsync(deep)).toEqual([deep]);
+    expect(nodeFs.statSync(deep).isDirectory()).toBe(true);
+    expect(await FileUtils.mkdirPAsync(deep)).toEqual([deep]);
+    expect(await FileUtils.mkdirPAsync(nodePath.join(root, "n"), { noop: true })).toEqual([
+      nodePath.join(root, "n"),
+    ]);
+    expect(nodeFs.existsSync(nodePath.join(root, "n"))).toBe(false);
+  });
+
   it("chdir is an alias for cd", () => {
     expect(FileUtils.chdir).toBe(FileUtils.cd);
   });

@@ -75,6 +75,20 @@ describe("Thor::Actions", () => {
         (new Counter([1], {}, { behavior: "revoke" }) as unknown as CounterInstance).behavior,
       ).toBe("revoke");
     });
+
+    it("when behavior is set to force, overwrite options", () => {
+      const runner = new Counter([1], { force: false, skip: true }, { behavior: "force" });
+      expect((runner as unknown as CounterInstance).behavior).toBe("invoke");
+      expect((runner as unknown as CounterInstance).options["force"]).toBe(true);
+      expect((runner as unknown as CounterInstance).options["skip"]).not.toBe(true);
+    });
+
+    it("when behavior is set to skip, overwrite options", () => {
+      const runner = new Counter([1], ["--force"], { behavior: "skip" });
+      expect((runner as unknown as CounterInstance).behavior).toBe("invoke");
+      expect((runner as unknown as CounterInstance).options["force"]).not.toBe(true);
+      expect((runner as unknown as CounterInstance).options["skip"]).toBe(true);
+    });
   });
 
   describe("accessors", () => {
@@ -109,7 +123,7 @@ describe("Thor::Actions", () => {
 
       it("always use the absolute root", async () => {
         const r = counter();
-        await r.inside("foo", () => {
+        await r.inside("foo", {}, () => {
           expect(r.relativeToOriginalDestinationRoot(file())).toBe("foo");
         });
       });
@@ -177,32 +191,36 @@ describe("Thor::Actions", () => {
 
   describe("#inside", () => {
     it("executes the block inside the given folder", async () => {
-      await counter().inside("foo", () => {
+      await counter().inside("foo", {}, () => {
         expect(Dir.pwd()).toBe(file());
       });
     });
 
     it("changes the base root", async () => {
       const r = counter();
-      await r.inside("foo", () => {
+      await r.inside("foo", {}, () => {
         expect(r.destinationRoot).toBe(file());
       });
     });
 
     it("creates the directory if it does not exist", async () => {
-      await counter().inside("foo", () => {
+      await counter().inside("foo", {}, () => {
         expect(File.isExist(file())).toBe(true);
       });
     });
 
     it("returns the value yielded by the block", async () => {
-      expect(await counter().inside("foo", () => 123)).toBe(123);
+      expect(await counter().inside("foo", {}, () => 123)).toBe(123);
     });
 
     describe("when pretending", () => {
       it("no directories should be created", async () => {
-        await counter({ pretend: true }).inside("bar", () => {});
+        await counter({ pretend: true }).inside("bar", {}, () => {});
         expect(File.isExist(File.join(destinationRoot, "bar"))).toBe(false);
+      });
+
+      it("returns the value yielded by the block", async () => {
+        expect(await counter().inside("foo", {}, () => 123)).toBe(123);
       });
     });
 
@@ -240,7 +258,7 @@ describe("Thor::Actions", () => {
   describe("#in_root", () => {
     it("executes the block in the root folder", async () => {
       const r = counter();
-      await r.inside("foo", () =>
+      await r.inside("foo", {}, () =>
         r.inRoot(() => {
           expect(Dir.pwd()).toBe(destinationRoot);
         }),
@@ -249,7 +267,7 @@ describe("Thor::Actions", () => {
 
     it("changes the base root", async () => {
       const r = counter();
-      await r.inside("foo", () =>
+      await r.inside("foo", {}, () =>
         r.inRoot(() => {
           expect(r.destinationRoot).toBe(destinationRoot);
         }),
@@ -258,7 +276,7 @@ describe("Thor::Actions", () => {
 
     it("returns to the previous state", async () => {
       const r = counter();
-      await r.inside("foo", async () => {
+      await r.inside("foo", {}, async () => {
         await r.inRoot(() => {});
         expect(r.destinationRoot).toBe(file());
       });

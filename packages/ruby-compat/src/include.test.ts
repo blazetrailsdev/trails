@@ -31,6 +31,31 @@ type DynProps = Record<string, unknown>;
 type DynSymbols = Record<symbol, unknown>;
 
 describe("initializeIncludedModules", () => {
+  it("runs a generator initializer's code before its yield ahead of the initializers beneath it", () => {
+    const calls: string[] = [];
+    const Inner = new Module();
+    (Inner as unknown as Record<symbol, unknown>)[initialize] = function () {
+      calls.push("inner");
+    };
+    const Outer = new Module();
+    (Outer as unknown as Record<symbol, unknown>)[initialize] = function* (name: string) {
+      calls.push(`before ${name}`);
+      yield;
+      calls.push(`after ${name}`);
+    };
+    class Root {
+      constructor(...args: unknown[]) {
+        initializeIncludedModules(this, ...args);
+      }
+    }
+    include(Root, Inner);
+    class Sub extends Root {}
+    include(Sub, Outer);
+
+    new Sub("x");
+    expect(calls).toEqual(["before x", "inner", "after x"]);
+  });
+
   it("seats a module's per-instance state as an own property at construction", () => {
     class Controller {
       constructor() {

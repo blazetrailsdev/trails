@@ -706,6 +706,48 @@ export class FileUtils {
     return list;
   }
 
+  /** {@link FileUtils.mkdirP} over the backend's async verbs
+   * (`vendor/ruby/v3.3.11/lib/fileutils.rb:365-388`).
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
+   */
+  static async mkdirPAsync(
+    list: string | string[],
+    { mode, noop, verbose }: { mode?: number; noop?: boolean; verbose?: boolean } = {},
+  ): Promise<string[]> {
+    list = fuList(list);
+    if (verbose === true)
+      fuOutputMessage(
+        `mkdir -p ${mode != null ? `-m ${mode.toString(8).padStart(3, "0")} ` : ""}${list.join(" ")}`,
+      );
+    if (noop === true) return list;
+
+    const isDirectoryAsync = (path: string): Promise<boolean> =>
+      getFs().stat!(path).then(
+        (stat) => stat.isDirectory(),
+        () => false,
+      );
+
+    for (const item of list) {
+      let path = removeTrailingSlash(item);
+
+      const stack: string[] = [];
+      while (!(await isDirectoryAsync(path)) && getPath().dirname(path) !== path) {
+        stack.push(path);
+        path = getPath().dirname(path);
+      }
+      for (const dir of stack.reverse()) {
+        try {
+          await getFs().mkdir!(removeTrailingSlash(dir));
+          if (mode != null) await getFs().chmod?.(dir, mode);
+        } catch (error) {
+          if (!isSystemCallError(error) || !(await isDirectoryAsync(dir))) throw error;
+        }
+      }
+    }
+
+    return list;
+  }
+
   /** `FileUtils.makedirs` (`vendor/ruby/v3.3.11/lib/fileutils.rb:392-394`), an alias of `mkdir_p`.
    * @noRailsEquivalent PERMANENT — Ruby stdlib `FileUtils` module function.
    */
