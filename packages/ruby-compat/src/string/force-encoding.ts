@@ -28,9 +28,9 @@ export function rbObjEncoding(obj: string | Uint8Array): Encoding {
  * `rb_str_force_encoding` leaves the receiver alone for it, so a `null` from
  * {@link Encoding.find} is the same no-op here.
  *
- * A `Uint8Array` receiver is a String held as its bytes. One whose bytes are
- * valid in `encoding` is the JS string they spell; any other keeps its bytes
- * and is associated with the encoding (`rb_enc_associate`,
+ * A `Uint8Array` receiver is a String held as its bytes. One forced to UTF-8
+ * whose bytes are valid UTF-8 is the JS string they spell; any other keeps its
+ * bytes and is associated with the encoding (`rb_enc_associate`,
  * `vendor/ruby/v3.3.11/encoding.c:1007`), which {@link rbObjEncoding} reads.
  *
  * @noRailsEquivalent PERMANENT
@@ -50,9 +50,9 @@ export function forceEncoding(
   if (string instanceof Uint8Array) {
     if (enc === null) return string;
     encodings.set(string, enc);
-    if (enc.decoderLabel === null) return string;
+    if (enc !== Encoding.UTF_8) return string;
     try {
-      return new TextDecoder(enc.decoderLabel, { fatal: true }).decode(string);
+      return new TextDecoder("utf-8", { fatal: true }).decode(string);
     } catch {
       return string;
     }

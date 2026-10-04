@@ -49,4 +49,10 @@ describe("forceEncoding resolves its argument through the Ruby registry", () => 
   it("reads a JS string as UTF-8", () => {
     expect(rbObjEncoding("café")).toBe(Encoding.UTF_8);
   });
+
+  it("keeps bytes forced to a non-UTF-8 encoding as bytes", () => {
+    const bytes = Uint8Array.of(0x63, 0x61, 0x66, 0xe9);
+    expect(forceEncoding(bytes, "ISO-8859-1")).toBe(bytes);
+    expect(rbObjEncoding(bytes)).toBe(Encoding.find("ISO-8859-1"));
+  });
 });

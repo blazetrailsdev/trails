@@ -16,7 +16,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
   load(serializedContent: string | Bytes): Message {
     let data: unknown;
     try {
-      data = MessagePack.load(serializedContent as Buffer);
+      data = MessagePack.load(serializedContent);
     } catch (e) {
       if (e instanceof MessagePackError) throw new Decryption("Failed to load MessagePack message");
       throw e;

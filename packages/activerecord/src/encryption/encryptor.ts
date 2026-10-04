@@ -1,5 +1,6 @@
 import { isPresent } from "@blazetrails/activesupport";
 import {
+  Encoding as RbEncoding,
   EncodingError,
   OpenSSL,
   forceEncoding,
@@ -13,7 +14,7 @@ import type { MessageSerializerLike } from "./message-serializer.js";
 import { Decryption, EncryptedContentIntegrity, Encoding, ForbiddenClass } from "./errors.js";
 import { type Compressor } from "./config.js";
 import { Encryption } from "../namespaces.js";
-import { normalizeEncoding, replaceUnencodable } from "./encoding-helpers.js";
+import { encode } from "./encoding-helpers.js";
 
 const THRESHOLD_TO_JUSTIFY_COMPRESSION = 140;
 
@@ -204,11 +205,15 @@ export class Encryptor {
 
   /** @internal */
   private forceEncodingIfNeeded(value: string | Bytes): string | Bytes {
-    const enc = this.forcedEncodingForDeterministicEncryption();
-    if (!enc) return value;
-    const normalized = normalizeEncoding(enc);
-    if (!normalized || normalized === "utf8") return value;
-    return replaceUnencodable(value as string, normalized === "ascii" ? 0x7f : 0xff);
+    if (
+      this.forcedEncodingForDeterministicEncryption() &&
+      value != null &&
+      rbObjEncoding(value) !== RbEncoding.find(this.forcedEncodingForDeterministicEncryption())
+    ) {
+      return encode(value, this.forcedEncodingForDeterministicEncryption());
+    } else {
+      return value;
+    }
   }
 
   /** @internal */

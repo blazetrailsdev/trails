@@ -26,7 +26,7 @@ export class Serializer {
     return packer.toBuffer();
   }
 
-  load(dumped: Buffer | string): unknown {
+  load(dumped: Uint8Array | string): unknown {
     return this.messagePackPool().unpacker((unpacker) => {
       unpacker.feedReference(dumped);
       if (unpacker.read() !== SIGNATURE_INT)

@@ -202,7 +202,7 @@ export class Unpacker {
     private factory: Factory,
   ) {}
 
-  feedReference(data: Buffer | string): this {
+  feedReference(data: Uint8Array | string): this {
     const buf = typeof data === "string" ? Buffer.from(data, "latin1") : data;
     this.buf = Buffer.concat([this.buf.subarray(this.pos), buf]);
     this.pos = 0;

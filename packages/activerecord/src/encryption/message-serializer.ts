@@ -1,5 +1,5 @@
 import { Encryption } from "../namespaces.js";
-import type { Bytes } from "@blazetrails/ruby-compat";
+import { JSON, type Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -15,15 +15,15 @@ export class MessageSerializer implements MessageSerializerLike {
     if (!(message instanceof Message)) {
       throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
     }
-    return JSON.stringify(this.messageToJson(message));
+    return JSON.dump(this.messageToJson(message));
   }
 
   load(serializedContent: string | Bytes): Message {
-    serializedContent = Buffer.from(serializedContent as string).toString();
     let data: unknown;
     try {
       data = JSON.parse(serializedContent);
-    } catch {
+    } catch (e) {
+      if (!(e instanceof SyntaxError)) throw e;
       throw new Encoding();
     }
     return this.parseMessage(data, 1);
