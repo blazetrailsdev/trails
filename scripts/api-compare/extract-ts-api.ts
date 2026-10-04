@@ -1137,7 +1137,7 @@ export function extractFromProgram(
           .filter((n): n is string => n !== undefined)
           .map((n) => `${relPath}:${n}`)
           .find((key) => info.classes[key] || info.modules[key]) ??
-        (attr.enclosingObjectLiteral === true ? `${relPath}:${attr.enclosing}` : undefined);
+        (attr.enclosingSeatsModule === true ? `${relPath}:${attr.enclosing}` : undefined);
       if (target === undefined) continue;
       if (!info.classes[target] && !info.modules[target]) {
         info.modules[target] = {
@@ -3180,7 +3180,7 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
  */
 interface ClassAttributeCall {
   enclosing?: string;
-  enclosingObjectLiteral?: boolean;
+  enclosingSeatsModule?: boolean;
   receiver?: string;
   names: string[];
   reader: boolean;
@@ -3259,7 +3259,7 @@ function readClassAttributeCall(
   const enclosing = enclosingEntity(node);
   return {
     ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
-    ...(enclosing?.objectLiteral === true ? { enclosingObjectLiteral: true } : {}),
+    ...(enclosing?.seatsModule === true ? { enclosingSeatsModule: true } : {}),
     ...(ts.isIdentifier(recv) ? { receiver: recv.text } : {}),
     names,
     reader: macro.reader,
@@ -3284,12 +3284,11 @@ function optionBool(
   return undefined;
 }
 
-function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean } | undefined {
+function enclosingEntity(node: ts.Node): { name: string; seatsModule: boolean } | undefined {
   for (let cur: ts.Node | undefined = node.parent; cur; cur = cur.parent) {
-    if (ts.isClassDeclaration(cur) && cur.name)
-      return { name: cur.name.text, objectLiteral: false };
+    if (ts.isClassDeclaration(cur) && cur.name) return { name: cur.name.text, seatsModule: false };
     if (ts.isVariableDeclaration(cur) && ts.isIdentifier(cur.name)) {
-      const objectLiteral =
+      const seatsModule =
         cur.initializer !== undefined &&
         ts.isObjectLiteralExpression(cur.initializer) &&
         ts.isVariableStatement(cur.parent.parent) &&
@@ -3302,10 +3301,51 @@ function enclosingEntity(node: ts.Node): { name: string; objectLiteral: boolean 
             ts.isIdentifier(prop.name.expression) &&
             (prop.name.expression.text === "included" || prop.name.expression.text === "extended"),
         );
-      return { name: cur.name.text, objectLiteral };
+      return { name: cur.name.text, seatsModule };
+    }
+    if (ts.isExpressionStatement(cur) && ts.isSourceFile(cur.parent)) {
+      const name = includedHookOwner(cur.expression);
+      if (name !== undefined) return { name, seatsModule: isExportedModuleConst(cur.parent, name) };
     }
   }
   return undefined;
+}
+
+/**
+ * The module a top-level `included do ... end` port hangs its block on:
+ * `X.included(null, fn)` or `X[included] = fn`, where the block's `this` is the
+ * includer and so names no entity itself.
+ */
+function includedHookOwner(expr: ts.Expression): string | undefined {
+  const hook =
+    ts.isCallExpression(expr) && ts.isPropertyAccessExpression(expr.expression)
+      ? expr.expression
+      : ts.isBinaryExpression(expr) &&
+          expr.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+          ts.isElementAccessExpression(expr.left)
+        ? expr.left
+        : undefined;
+  if (hook === undefined || !ts.isIdentifier(hook.expression)) return undefined;
+  const name = ts.isPropertyAccessExpression(hook) ? hook.name : hook.argumentExpression;
+  return ts.isIdentifier(name) && name.text === "included" ? hook.expression.text : undefined;
+}
+
+function isExportedModuleConst(sourceFile: ts.SourceFile, name: string): boolean {
+  return sourceFile.statements.some(
+    (stmt) =>
+      ts.isVariableStatement(stmt) &&
+      isExported(stmt) &&
+      stmt.declarationList.declarations.some((decl) => {
+        if (!ts.isIdentifier(decl.name) || decl.name.text !== name || !decl.initializer)
+          return false;
+        const init = unwrapAssertions(decl.initializer);
+        return (
+          ts.isNewExpression(init) &&
+          ts.isIdentifier(init.expression) &&
+          init.expression.text === "Module"
+        );
+      }),
+  );
 }
 
 /**

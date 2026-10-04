@@ -8,6 +8,7 @@ import {
   Hash,
   hasKey,
   isInclude,
+  rbFCaller,
   rbFSend,
   rbObjRespondTo,
   rbModConstDefined,
@@ -631,12 +632,11 @@ export function defineMethodAttribute(
             this: ReadWriteHost & {
               attribute(n: string): unknown;
               _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
+              missingAttribute(n: string, stack: string[]): never;
             },
           ) {
             if (!this._attributes.getAttribute(canonicalName).isInitialized()) {
-              throw new MissingAttributeError(
-                `missing attribute '${canonicalName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
-              );
+              this.missingAttribute(canonicalName, rbFCaller());
             }
             return this.attribute(canonicalName);
           },

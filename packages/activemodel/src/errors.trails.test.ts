@@ -695,3 +695,20 @@ describe("Errors frozen readers", () => {
     expect(errors.attributeNames).toEqual(["name"]);
   });
 });
+
+describe("Errors holding a Symbol-attribute Error", () => {
+  it("an Error whose @attribute is a Symbol is the attribute Errors#add stores", () => {
+    const person = new Person();
+    const errors = new Errors(person);
+    errors.add("name", ":blank");
+    const loaded = new ActiveModelError(person, ":name", ":invalid");
+    errors.errors.push(loaded);
+
+    expect(loaded.attribute).toBe("name");
+    expect(errors.attributeNames).toEqual(["name"]);
+    expect(errors.where("name")).toHaveLength(2);
+    expect(errors.messagesFor("name")).toEqual(["can't be blank", "is invalid"]);
+    expect([...errors.messages.keys()]).toEqual(["name"]);
+    expect([...errors.details.keys()]).toEqual(["name"]);
+  });
+});

@@ -2,9 +2,20 @@ import { describe, it, expect } from "vitest";
 import { Model } from "./index.js";
 import { ModelName, Naming } from "./naming.js";
 import { assert, assertNot, inflections } from "@blazetrails/activesupport";
+import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+
+class Post {
+  static TrackBack = class TrackBack {};
+}
+registerConstant("Post", Post);
+rbModConstSet(Post, "TrackBack", Post.TrackBack);
+
+const Blog = new Module() as Module & { Post: { name: string } };
+registerConstant("Blog", Blog);
+rbModConstSet(Blog, "Post", class Post {});
 
 describe("NamingTest", () => {
-  const modelName = new ModelName("Post::TrackBack");
+  const modelName = new ModelName(Post.TrackBack);
 
   it("singular", () => {
     expect(modelName.singular).toEqual("post_track_back");
@@ -48,8 +59,11 @@ describe("NamingHelpersTest", () => {
   class Sheep extends Model {}
 
   class NamedTrackBack extends Model {
+    static {
+      rbModConstSet(Post, "NamedTrackBack", this);
+    }
     static override get modelName(): ModelName {
-      return new ModelName("Post::NamedTrackBack");
+      return new ModelName(this);
     }
   }
   class TrackBack {
@@ -124,69 +138,69 @@ describe("NamingMethodDelegationTest", () => {
 
 describe("NamingWithNamespacedModelInSharedNamespaceTest", () => {
   it("singular", () => {
-    expect(new ModelName("Blog::Post").singular).toBe("blog_post");
+    expect(new ModelName(Blog.Post).singular).toBe("blog_post");
   });
 
   it("plural", () => {
-    expect(new ModelName("Blog::Post").plural).toBe("blog_posts");
+    expect(new ModelName(Blog.Post).plural).toBe("blog_posts");
   });
 
   it("element", () => {
-    expect(new ModelName("Blog::Post").element).toBe("post");
+    expect(new ModelName(Blog.Post).element).toBe("post");
   });
 
   it("collection", () => {
-    expect(new ModelName("Blog::Post").collection).toBe("blog/posts");
+    expect(new ModelName(Blog.Post).collection).toBe("blog/posts");
   });
 
   it("human", () => {
-    expect(new ModelName("Blog::Post").human()).toBe("Post");
+    expect(new ModelName(Blog.Post).human()).toBe("Post");
   });
 
   it("route key", () => {
-    expect(new ModelName("Blog::Post").routeKey).toBe("blog_posts");
+    expect(new ModelName(Blog.Post).routeKey).toBe("blog_posts");
   });
 
   it("param key", () => {
-    expect(new ModelName("Blog::Post").paramKey).toBe("blog_post");
+    expect(new ModelName(Blog.Post).paramKey).toBe("blog_post");
   });
 
   it("i18n key", () => {
-    expect(new ModelName("Blog::Post").i18nKey).toBe("blog/post");
+    expect(new ModelName(Blog.Post).i18nKey).toBe("blog/post");
   });
 });
 
 describe("NamingWithSuppliedModelNameTest", () => {
   it("singular", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.singular).toBe("article");
   });
   it("plural", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.plural).toBe("articles");
   });
   it("element", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.element).toBe("article");
   });
   it("collection", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.collection).toBe("articles");
   });
   it("human", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.human()).toBe("Article");
   });
   it("route key", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.routeKey).toBe("articles");
   });
   it("param key", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.paramKey).toBe("article");
   });
   it("i18n key", () => {
-    const name = new ModelName("Article");
+    const name = new ModelName(Blog.Post, null, "Article");
     expect(name.i18nKey).toBe("article");
   });
 });
@@ -196,7 +210,7 @@ describe("NamingWithSuppliedLocaleTest", () => {
     inflect.plural(/(e)l$/i, "$1lé");
   });
 
-  const modelName = new ModelName("Blog::Post", null, "Uzivatel", "cs");
+  const modelName = new ModelName(Blog.Post, null, "Uzivatel", "cs");
 
   it("singular", () => {
     expect(modelName.singular).toEqual("uzivatel");
@@ -207,75 +221,75 @@ describe("NamingWithSuppliedLocaleTest", () => {
 });
 
 describe("NamingUsingRelativeModelNameTest", () => {
-  const namespace = { name: "Blog" };
+  const namespace = Blog;
   it("singular", () => {
-    expect(new ModelName("Blog::Post", namespace).singular).toBe("blog_post");
+    expect(new ModelName(Blog.Post, namespace).singular).toBe("blog_post");
   });
   it("plural", () => {
-    expect(new ModelName("Blog::Post", namespace).plural).toBe("blog_posts");
+    expect(new ModelName(Blog.Post, namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Blog::Post", namespace).element).toBe("post");
+    expect(new ModelName(Blog.Post, namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Blog::Post", namespace).collection).toBe("blog/posts");
+    expect(new ModelName(Blog.Post, namespace).collection).toBe("blog/posts");
   });
   it("human", () => {
-    expect(new ModelName("Blog::Post", namespace).human()).toBe("Post");
+    expect(new ModelName(Blog.Post, namespace).human()).toBe("Post");
   });
   it("route key", () => {
-    expect(new ModelName("Blog::Post", namespace).routeKey).toBe("posts");
+    expect(new ModelName(Blog.Post, namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Blog::Post", namespace).paramKey).toBe("post");
+    expect(new ModelName(Blog.Post, namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Blog::Post", namespace).i18nKey).toBe("blog/post");
+    expect(new ModelName(Blog.Post, namespace).i18nKey).toBe("blog/post");
   });
 });
 
 describe("NamingWithNamespacedModelInIsolatedNamespaceTest", () => {
-  const namespace = { name: "Blog" };
+  const namespace = Blog;
   it("singular", () => {
-    expect(new ModelName("Blog::Post", namespace).singular).toBe("blog_post");
+    expect(new ModelName(Blog.Post, namespace).singular).toBe("blog_post");
   });
   it("human", () => {
-    expect(new ModelName("Blog::Post", namespace).human()).toBe("Post");
+    expect(new ModelName(Blog.Post, namespace).human()).toBe("Post");
   });
   it("plural", () => {
-    expect(new ModelName("Blog::Post", namespace).plural).toBe("blog_posts");
+    expect(new ModelName(Blog.Post, namespace).plural).toBe("blog_posts");
   });
   it("element", () => {
-    expect(new ModelName("Blog::Post", namespace).element).toBe("post");
+    expect(new ModelName(Blog.Post, namespace).element).toBe("post");
   });
   it("collection", () => {
-    expect(new ModelName("Blog::Post", namespace).collection).toBe("blog/posts");
+    expect(new ModelName(Blog.Post, namespace).collection).toBe("blog/posts");
   });
   it("route key", () => {
-    expect(new ModelName("Blog::Post", namespace).routeKey).toBe("posts");
+    expect(new ModelName(Blog.Post, namespace).routeKey).toBe("posts");
   });
   it("param key", () => {
-    expect(new ModelName("Blog::Post", namespace).paramKey).toBe("post");
+    expect(new ModelName(Blog.Post, namespace).paramKey).toBe("post");
   });
   it("i18n key", () => {
-    expect(new ModelName("Blog::Post", namespace).i18nKey).toBe("blog/post");
+    expect(new ModelName(Blog.Post, namespace).i18nKey).toBe("blog/post");
   });
 });
 
 describe("NameWithAnonymousClassTest", () => {
   it("anonymous class without name argument", () => {
-    expect(() => new ModelName("")).toThrow(/cannot be blank/);
+    expect(() => new ModelName(class {})).toThrow(/cannot be blank/);
   });
 
   it("anonymous class with name argument", () => {
-    const modelName = new ModelName("Anonymous");
+    const modelName = new ModelName(class {}, null, "Anonymous");
     expect(modelName.name).toEqual("Anonymous");
   });
 });
 
 describe("OverridingAccessorsTest", () => {
   it("overriding accessors keys", () => {
-    const modelName = new ModelName("Post::TrackBack");
+    const modelName = new ModelName(Post.TrackBack);
     modelName.singular = "singular";
     modelName.plural = "plural";
     modelName.element = "element";

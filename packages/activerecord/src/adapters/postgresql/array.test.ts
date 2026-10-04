@@ -6,7 +6,7 @@ import { Base, ColumnNotSerializableError, StatementInvalid } from "../../index.
 import { TimeZone, setZone, change as timeChange } from "@blazetrails/activesupport";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Array as OidArray } from "../../connection-adapters/postgresql/oid/array.js";
-import { ValueType, ModelName, StringType } from "@blazetrails/activemodel";
+import { ValueType, StringType } from "@blazetrails/activemodel";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 const textArray = new OidArray(new ValueType());
@@ -535,7 +535,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           this.validatesUniquenessOf("tags");
         }
         static override get modelName() {
-          return new ModelName(PgArray.name);
+          return PgArray.modelName;
         }
       }
       const e1 = await Klass.create({ tags: ["black", "blue"] });

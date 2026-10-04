@@ -5,6 +5,7 @@ import {
   kernelCatch,
   rbHash,
   rbInspect,
+  rbDeclareIvar,
   rbModConstSet,
   rbModName,
   rbObjDup,
@@ -79,7 +80,7 @@ export class Error {
   }
 
   base: ModelBase;
-  attribute: string;
+  private _attribute: string;
   type: string;
   rawType: string | null;
   options: Record<string, unknown>;
@@ -219,17 +220,21 @@ export class Error {
     rawType?: string | null,
   ) {
     this.base = base;
-    this.attribute = attribute;
+    this._attribute = attribute;
     this.rawType = rawType !== undefined ? rawType : type;
     this.type = type ?? ":invalid";
     this.options = options;
   }
 
   initializeDup(_other: Error): void {
-    this.attribute = rbObjDup(this.attribute);
+    this._attribute = rbObjDup(this._attribute);
     this.rawType = rbObjDup(this.rawType);
     this.type = rbObjDup(this.type);
     this.options = deepDup(this.options);
+  }
+
+  get attribute(): string {
+    return isSymbol(this._attribute) ? symbolToS(this._attribute) : this._attribute;
   }
 
   get message(): string | null {
@@ -313,3 +318,4 @@ export class Error {
 Error.prototype.eql = Error.prototype.equals;
 
 rbModConstSet(ActiveModel, "Error", Error);
+rbDeclareIvar(Error, "@attribute", "_attribute");

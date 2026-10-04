@@ -4,7 +4,14 @@
    how `include()` surfaces those members on the type side. */
 import { describe, expect, it } from "vitest";
 
-import { AttrNames, AttributeMethods, defineMethodAttribute } from "./attribute-methods.js";
+import {
+  AttrNames,
+  AttributeMethods,
+  MissingAttributeError,
+  defineMethodAttribute,
+} from "./attribute-methods.js";
+import { Attribute } from "./attribute.js";
+import { StringType } from "./type/string.js";
 import { Model } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
@@ -365,6 +372,35 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(caught?.stack).toBe(
       "MissingAttributeError: missing attribute 'title' for Person\n    at custom (backtrace.ts:1:1)",
     );
+  });
+
+  it("a generated reader raises an uninitialized attribute through #missing_attribute with the caller's frames", () => {
+    class Person extends Model {
+      declare static attribute: AttributesClassHalf["attribute"];
+
+      static {
+        include(this, Attributes);
+        this.attribute("name", "string");
+      }
+    }
+    interface Person extends Attributes {}
+
+    const person = new Person();
+    person._attributes.set("name", Attribute.uninitialized("name", new StringType()));
+    const readName = function readName() {
+      return (person as unknown as { name: unknown }).name;
+    };
+    let caught: Error | undefined;
+    try {
+      readName();
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).toBeInstanceOf(MissingAttributeError);
+    expect(caught?.message).toBe("missing attribute 'name' for Person");
+    const frames = caught!.stack!.split("\n");
+    expect(frames[0]).toBe("MissingAttributeError: missing attribute 'name' for Person");
+    expect(frames[1]).toContain("readName");
   });
 
   it("forwards a named parameter through a proxy call and through its alias", () => {
