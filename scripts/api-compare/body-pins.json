@@ -29070,13 +29070,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "columns_for_distinct",
-    "digest": "bb4f7d2f91627abf",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "configure_connection",
     "digest": "d2cd7bc27967f5fa",
     "ref": "v8.0.2"

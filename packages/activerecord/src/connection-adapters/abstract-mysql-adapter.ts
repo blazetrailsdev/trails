@@ -223,8 +223,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsExpressionIndex(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.13") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.13") >= 0;
   }
 
   supportsTransactionIsolation(): boolean {
@@ -271,8 +270,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsOptimizerHints(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("5.7.7") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("5.7.7") >= 0;
   }
 
   async supportsCommonTableExpressions(): Promise<boolean> {
@@ -293,8 +291,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async supportsInsertReturning(): Promise<boolean> {
-    if (await this.isMariadb()) return (await this.databaseVersion).compare("10.5.0") >= 0;
-    return false;
+    return (await this.isMariadb()) && (await this.databaseVersion).compare("10.5.0") >= 0;
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
@@ -433,9 +430,8 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
-  async currentDatabase(): Promise<string> {
-    const value = await this.queryValue("SELECT database()", "SCHEMA");
-    return value == null ? "" : String(value);
+  async currentDatabase(): Promise<string | null> {
+    return (await this.queryValue("SELECT database()", "SCHEMA")) as string | null;
   }
 
   async charset(): Promise<string | null> {
@@ -845,8 +841,8 @@ WHERE fk.referenced_column_name IS NOT NULL
         (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, "").trim(),
       ),
     ).map((column, i) => `${column} AS alias_${i}`);
-    if (orderColumns.length === 0) return columns;
-    return [...orderColumns, columns].join(", ");
+
+    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])].join(", ");
   }
 
   /** @missingRailsName config — PERMANENT */
@@ -929,7 +925,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
-  /** @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection */
+  /**
+   * @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
+   * @inventedArm if — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
+   */
   override quoteString(string: string): string {
     if (this._escapeState.noBackslashEscapes) {
       return string.replace(/'/g, "''");
@@ -1051,8 +1050,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   override isWarningIgnored(warning: { level?: string; [k: string]: unknown }): boolean {
-    if (warning.level === "Note") return true;
-    return super.isWarningIgnored(warning);
+    return warning.level === "Note" || super.isWarningIgnored(warning);
   }
 
   /** @internal */
@@ -1060,10 +1058,9 @@ WHERE fk.referenced_column_name IS NOT NULL
     exception: unknown,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    const exceptionMessage = exception instanceof Error ? exception.message : String(exception);
     switch (this.errorNumber(exception as Error & { errno?: number })) {
       case null:
-        if (/MySQL client is not connected/i.test(exceptionMessage)) {
+        if (/MySQL client is not connected/i.test((exception as Error).message)) {
           return new ConnectionNotEstablished(exception as Error, { connectionPool: this.pool });
         } else {
           return super.translateException(exception, { message, sql, binds });
@@ -1175,8 +1172,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async supportsInsertRawAliasSyntax(): Promise<boolean> {
-    if (await this.isMariadb()) return false;
-    return (await this.databaseVersion).compare("8.0.19") >= 0;
+    return !(await this.isMariadb()) && (await this.databaseVersion).compare("8.0.19") >= 0;
   }
 
   /** @internal */
@@ -1374,13 +1370,14 @@ WHERE fk.referenced_column_name IS NOT NULL
     toTable?: string | RemoveForeignKeyOptions,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    const optionsForm = typeof toTable === "object" && toTable !== null;
-    const opts: RemoveForeignKeyOptions = { ...(optionsForm ? toTable : options) };
-    if (opts.onUpdate === "restrict") delete opts.onUpdate;
-    if (opts.onDelete === "restrict") delete opts.onDelete;
-    return optionsForm
-      ? super.removeForeignKey(fromTable, opts)
-      : super.removeForeignKey(fromTable, toTable, opts);
+    if (typeof toTable === "object" && toTable !== null) {
+      options = toTable;
+      toTable = options.toTable;
+    }
+    options = { ...options };
+    if (options.onUpdate === "restrict") delete options.onUpdate;
+    if (options.onDelete === "restrict") delete options.onDelete;
+    return super.removeForeignKey(fromTable, toTable, options);
   }
 
   /** @internal */

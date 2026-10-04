@@ -1,7 +1,7 @@
 import { Concern } from "@blazetrails/activesupport";
-import { Module, extend, rbEqual } from "@blazetrails/ruby-compat";
+import { Hash, Module, extend, hashAref, hashAset } from "@blazetrails/ruby-compat";
 
-type DeduplicableClass = { registry(): Map<number, WeakRef<object>[]> };
+type DeduplicableClass = { registry(): Hash<object, object> };
 
 export const Deduplicable = new Module() as Module<{
   deduplicate: typeof deduplicate;
@@ -10,32 +10,11 @@ export const Deduplicable = new Module() as Module<{
 }> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 
-const registries = new WeakMap<object, Map<number, WeakRef<object>[]>>();
-const _finalizer =
-  typeof FinalizationRegistry !== "undefined"
-    ? new FinalizationRegistry<{ bucket: WeakRef<object>[] }>(({ bucket }) => {
-        for (let i = bucket.length - 1; i >= 0; i--) {
-          if (bucket[i].deref() === undefined) bucket.splice(i, 1);
-        }
-      })
-    : null;
+const registries = new WeakMap<object, Hash<object, object>>();
 
-export function deduplicate<T extends { hash(): number; deduplicated(): T }>(this: T): T {
-  const own = (this.constructor as unknown as DeduplicableClass).registry();
-  const hash = this.hash();
-  let bucket = own.get(hash);
-  if (!bucket) {
-    bucket = [];
-    own.set(hash, bucket);
-  }
-  for (const ref of bucket) {
-    const existing = ref.deref();
-    if (existing !== undefined && rbEqual(existing, this)) return existing as T;
-  }
-  const deduped = this.deduplicated();
-  bucket.push(new WeakRef(deduped));
-  _finalizer?.register(deduped, { bucket });
-  return deduped;
+export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
+  const registry = (this.constructor as unknown as DeduplicableClass).registry();
+  return (hashAref(registry, this) ?? hashAset(registry, this, this.deduplicated())) as T;
 }
 export const negate = deduplicate;
 
@@ -44,13 +23,10 @@ export function deduplicated<T extends object>(this: T): T {
   return Object.freeze(this);
 }
 
-export function registry(this: object): Map<number, WeakRef<object>[]> {
-  let own = registries.get(this);
-  if (!own) {
-    own = new Map<number, WeakRef<object>[]>();
-    registries.set(this, own);
-  }
-  return own;
+export function registry(this: object): Hash<object, object> {
+  const registry = registries.get(this) ?? new Hash<object, object>();
+  registries.set(this, registry);
+  return registry;
 }
 
 export const ClassMethods = {
