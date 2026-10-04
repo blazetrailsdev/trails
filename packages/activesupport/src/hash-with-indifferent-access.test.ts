@@ -9,7 +9,7 @@ import {
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import { assertIncludes, assertRaises, assertNil } from "./testing/assertions.js";
-import { dump } from "./yaml.js";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { deepDup } from "./hash-utils.js";
 
 const plainly = <V>(hash: Hash<string, V>): Record<string, unknown> =>
@@ -1237,7 +1237,7 @@ describe("HashWithIndifferentAccessTest", () => {
       foo = "bar";
     };
 
-    const yamlOutput = dump(new klass());
+    const yamlOutput = Psych.dump(new klass());
 
     assertIncludes(yamlOutput, "hash-with-ivars");
     assertIncludes(yamlOutput, "@foo: bar");

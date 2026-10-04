@@ -1,5 +1,5 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
-import { stringify } from "@blazetrails/activesupport/yaml";
+import { stringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { contentTag, type TagHelperHost } from "./tag-helper.js";
 
 export function debug(this: TagHelperHost, object: unknown): SafeBuffer {

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import * as YAML from "@blazetrails/activesupport/yaml";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { Base, ConfigurationError } from "./index.js";
 
 import { AdminUser } from "./test-helpers/models/admin/user.js";

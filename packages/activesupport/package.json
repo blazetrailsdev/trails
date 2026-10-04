@@ -106,10 +106,6 @@
       "types": "./dist/cache/*.d.ts",
       "default": "./dist/cache/*.js"
     },
-    "./yaml": {
-      "types": "./dist/yaml.d.ts",
-      "default": "./dist/yaml.js"
-    },
     "./*": {
       "types": "./dist/*.d.ts",
       "default": "./dist/*.js"
@@ -131,9 +127,6 @@
     "@blazetrails/tse-compiler": "workspace:*",
     "@blazetrails/date": "workspace:*",
     "tinyglobby": "^0.2.16"
-  },
-  "optionalDependencies": {
-    "yaml": "^2.8.3"
   },
   "peerDependencies": {
     "@blazetrails/nokogiri": "workspace:*"

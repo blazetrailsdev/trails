@@ -13,7 +13,7 @@ import {
 import { isDuplicable } from "@blazetrails/activesupport";
 import { ActiveModel } from "./namespaces.js";
 import type { UserProvidedDefault } from "./attribute/user-provided-default.js";
-import type { Coder } from "@blazetrails/activesupport/yaml";
+import type { Psych } from "@blazetrails/ruby-compat/psych";
 
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
   "@blazetrails/activemodel/UNINITIALIZED_ORIGINAL_VALUE",
@@ -230,7 +230,7 @@ export abstract class Attribute {
     );
   }
 
-  initWith(coder: Coder): void {
+  initWith(coder: Psych.Coder): void {
     const self = this as { -readonly [K in "name" | "type"]: Attribute[K] };
     self.name = (coder["name"] ?? null) as string | null;
     this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
@@ -240,7 +240,7 @@ export abstract class Attribute {
     if (this._hasValue) this._value = coder["value"];
   }
 
-  encodeWith(coder: Coder): void {
+  encodeWith(coder: Psych.Coder): void {
     coder["name"] = this.name;
     if (this.valueBeforeTypeCast != null) {
       coder["value_before_type_cast"] = this.valueBeforeTypeCast;

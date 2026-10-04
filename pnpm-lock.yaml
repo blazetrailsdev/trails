@@ -319,10 +319,6 @@ importers:
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri
-    optionalDependencies:
-      yaml:
-        specifier: ^2.8.3
-        version: 2.8.3
 
   packages/arel:
     dependencies:
@@ -442,7 +438,11 @@ importers:
         specifier: workspace:*
         version: link:../ruby-compat
 
-  packages/ruby-compat: {}
+  packages/ruby-compat:
+    optionalDependencies:
+      yaml:
+        specifier: ^2.8.3
+        version: 2.8.3
 
   packages/trails-tsc:
     dependencies:

@@ -1,8 +1,8 @@
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import {
-  DisallowedClass,
   parse as yamlParse,
   stringify as yamlStringify,
-} from "@blazetrails/activesupport/yaml";
+} from "@blazetrails/ruby-compat/psych-adapter";
 import { Hash, registerConstant } from "@blazetrails/ruby-compat";
 import { ColumnSerializer } from "./column-serializer.js";
 import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../active-record.js";
@@ -45,7 +45,7 @@ class SafeCoder {
     for (const permitted of [...this.permittedClasses, ...yamlColumnPermittedClasses()]) {
       if (typeof permitted === "function" && value instanceof permitted) return;
     }
-    throw new DisallowedClass("dump", value.constructor?.name ?? "Object");
+    throw new Psych.DisallowedClass("dump", value.constructor?.name ?? "Object");
   }
 }
 

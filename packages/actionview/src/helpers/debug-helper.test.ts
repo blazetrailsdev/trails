@@ -5,7 +5,7 @@ import { Base } from "../base.js";
 
 const view = new (Base.withEmptyTemplateCache())(null, {}, null);
 const debug = _debug.bind(view);
-import * as yaml from "@blazetrails/activesupport/yaml";
+import * as yaml from "@blazetrails/ruby-compat/psych-adapter";
 
 describe("DebugHelperTest", () => {
   afterEach(() => {

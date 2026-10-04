@@ -52,6 +52,7 @@ export const rubyCompatAliases = [
   { name: "spaceship", kind: "function", primitive: "Comparable's `<=>`" },
   { name: "fetch", kind: "function", firstParamType: "Record", primitive: "Hash#fetch" },
   { name: "KeyError", kind: "class", primitive: "KeyError" },
+  { name: "DisallowedClass", kind: "class", primitive: "Psych::DisallowedClass" },
 ];
 
 /** Minimal glob → RegExp for the subset used above: `**`, `*`, literals. */

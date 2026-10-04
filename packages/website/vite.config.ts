@@ -14,12 +14,15 @@ function pkgAlias(name: string, replacement: string) {
   };
 }
 
-function stubActivesupportYaml() {
+function stubPsychAdapter() {
   return {
-    name: "stub-activesupport-yaml",
+    name: "stub-psych-adapter",
     enforce: "pre" as const,
     resolveId(source: string, importer: string | undefined) {
-      if (source === "./yaml.js" && importer?.includes("/activesupport/src/")) {
+      if (
+        source === "@blazetrails/ruby-compat/psych-adapter" ||
+        (source.endsWith("/psych-adapter.js") && importer?.includes("/ruby-compat/"))
+      ) {
         return path.resolve(__dirname, "src/stubs/yaml-stub.ts");
       }
       return null;
@@ -28,7 +31,7 @@ function stubActivesupportYaml() {
 }
 
 export default defineConfig({
-  plugins: [stubActivesupportYaml(), tailwindcss(), sveltekit()],
+  plugins: [stubPsychAdapter(), tailwindcss(), sveltekit()],
   resolve: {
     alias: resolveEntries(packageEntries).map(([name, entry]) => pkgAlias(name, entry)),
   },

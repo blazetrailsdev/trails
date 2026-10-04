@@ -3,7 +3,10 @@ import { assertRespondTo } from "@blazetrails/activesupport";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base, Migration } from "../../index.js";
-import { stringify as yamlStringify, parse as yamlParse } from "@blazetrails/activesupport/yaml";
+import {
+  stringify as yamlStringify,
+  parse as yamlParse,
+} from "@blazetrails/ruby-compat/psych-adapter";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 class TagCollection {

@@ -11,7 +11,7 @@ import { YAMLColumn } from "../coders/yaml-column.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { DisallowedClass } from "@blazetrails/activesupport/yaml";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 
 fixtures([], { useTransactionalTests: false });
 
@@ -120,9 +120,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
 
   it("raises Psych::DisallowedClass when a previous-scheme candidate reaches the YAML coder", async () => {
     await expect(async () => PreviousSchemeYamlBook.findBy({ name: "Dune" })).rejects.toThrow(
-      DisallowedClass,
+      Psych.DisallowedClass,
     );
-    expect(() => PreviousSchemeYamlBook.where({ name: "Dune" })).toThrow(DisallowedClass);
+    expect(() => PreviousSchemeYamlBook.where({ name: "Dune" })).toThrow(Psych.DisallowedClass);
 
     const fullType = PreviousSchemeYamlBook.typeForAttribute("name") as {
       serialize(v: unknown): unknown;
@@ -131,7 +131,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       PreviousSchemeYamlBook.typeForAttribute("name") as unknown as EncryptedAttributeType
     ).previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
-    expect(() => fullType.serialize(av)).toThrow(DisallowedClass);
+    expect(() => fullType.serialize(av)).toThrow(Psych.DisallowedClass);
     expect(() => fullType.serialize(av)).toThrow(/Tried to dump unspecified class/);
   });
 });
