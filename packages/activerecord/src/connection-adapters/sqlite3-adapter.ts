@@ -23,7 +23,7 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { Concurrent, groupBy, rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, SystemCallError, groupBy, rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -206,8 +206,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         try {
           FileUtils.mkdirP(dirname);
         } catch (error) {
-          if (typeof (error as { code?: unknown } | null | undefined)?.code !== "string")
-            throw error;
+          if (!(error instanceof SystemCallError)) throw error;
           throw new NoDatabaseError(undefined, { connectionPool: this.pool });
         }
       }

@@ -3,7 +3,8 @@ import { StandardError } from "./standard-error.js";
 /**
  * Ruby's core `SystemCallError` (`vendor/ruby/v3.3.11/error.c:3380`
  * `rb_eSystemCallError`), the parent of every `Errno::` class. Its `errno` is
- * `syserr_errno` (`error.c:2812-2816`).
+ * `syserr_errno` (`error.c:2812-2816`). The fs layer's own errors carry a
+ * `.code` and no trails class, and are this class to `rescue SystemCallError`.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `SystemCallError`, which Rails
  * rescues without defining.
@@ -11,6 +12,15 @@ import { StandardError } from "./standard-error.js";
 export class SystemCallError extends StandardError {
   /** @noRailsEquivalent PERMANENT */
   errno: number | null = null;
+
+  /** @noRailsEquivalent PERMANENT */
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (
+      Function.prototype[Symbol.hasInstance].call(this, error) ||
+      (this === SystemCallError &&
+        typeof (error as { code?: unknown } | null | undefined)?.code === "string")
+    );
+  }
 }
 
 SystemCallError.prototype.name = "SystemCallError";
