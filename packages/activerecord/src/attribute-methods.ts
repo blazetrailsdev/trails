@@ -491,7 +491,10 @@ function attributeMethod(this: InstanceMethodHost, attrName: string): boolean {
   return this._attributes != null && (this._attributes.isKey(attrName) ?? false);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm fromEntries — CONVERGEABLE attributes-with-values-returns-the-index-with-hash
+ */
 export function attributesWithValues(
   this: InstanceMethodHost,
   attributeNames: string[],
