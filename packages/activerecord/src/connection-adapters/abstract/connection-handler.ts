@@ -2,7 +2,7 @@ import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import { ActiveRecord } from "../../namespaces.js";
-import { isSymbol, symbolToS, toEnum, type Enumerator } from "@blazetrails/ruby-compat";
+import { hashAset, isSymbol, toEnum, toS, type Enumerator } from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -97,7 +97,10 @@ export class ConnectionHandler {
     role?: string | null | ((pool: ConnectionPool) => void),
     block?: (pool: ConnectionPool) => void,
   ): Enumerator<ConnectionPool> | Map<string, PoolManager> {
-    if (typeof role === "function") [role, block] = [null, role];
+    if (typeof role === "function") {
+      block = role;
+      role = null;
+    }
     if (role === "all") role = null;
     if (!block) return toEnum<ConnectionPool>(this, "eachConnectionPool", role);
 
@@ -118,51 +121,40 @@ export class ConnectionHandler {
       clobber?: boolean;
     } = {},
   ): Promise<ConnectionPool> {
-    const ownerName =
-      this.determineOwnerName(options.ownerName ?? _base, config) ??
-      (config instanceof DatabaseConfig
-        ? new ConnectionDescriptor(config.name)
-        : new ConnectionDescriptor("primary"));
+    const ownerName = this.determineOwnerName(options.ownerName ?? _base!, config);
 
     const role = options.role ?? _base?.currentRole() ?? "writing";
     const shard = options.shard ?? _base?.currentShard() ?? "default";
     const clobber = options.clobber ?? false;
 
     const poolConfig = await this.resolvePoolConfig(config, ownerName, role, shard);
+    const dbConfig = poolConfig.dbConfig;
 
     const poolManager = this.setPoolManager(poolConfig.connectionDescriptor);
 
     const existingPoolConfig = poolManager.getPoolConfig(role, shard);
 
-    if (!clobber && existingPoolConfig && existingPoolConfig.dbConfig === poolConfig.dbConfig) {
-      if (!(ownerName instanceof ConnectionDescriptor)) {
-        const owner = ownerName;
-        if (
-          owner.isPrimaryClass?.() &&
-          existingPoolConfig.connectionDescriptor.name !== owner.name
-        ) {
-          existingPoolConfig.connectionDescriptor = owner;
-        }
+    if (!clobber && existingPoolConfig && existingPoolConfig.dbConfig === dbConfig) {
+      if (ownerName.isPrimaryClass() && existingPoolConfig.connectionDescriptor !== ownerName) {
+        existingPoolConfig.connectionDescriptor = ownerName;
       }
+
       return existingPoolConfig.pool;
-    }
-
-    if (existingPoolConfig) {
+    } else {
       await this.disconnectPoolFromPoolManager(poolManager, role, shard);
+      poolManager.setPoolConfig(role, shard, poolConfig);
+
+      const payload = {
+        connection_name: poolConfig.connectionDescriptor.name,
+        role,
+        shard,
+        config: dbConfig.configurationHash,
+      };
+
+      Notifications.instrument("!connection.active_record", payload);
+
+      return poolConfig.pool;
     }
-
-    poolManager.setPoolConfig(role, shard, poolConfig);
-
-    const payload = {
-      connection_name: poolConfig.connectionDescriptor.name,
-      role,
-      shard,
-      config: poolConfig.dbConfig.configurationHash,
-    };
-
-    Notifications.instrument("!connection.active_record", payload);
-
-    return poolConfig.pool;
   }
 
   hasActiveConnections(role?: string | null): boolean {
@@ -220,11 +212,7 @@ export class ConnectionHandler {
     const shard = options?.shard ?? "default";
     const poolManager = this.getPoolManager(connectionName);
     if (poolManager) {
-      const dbConfig = await this.disconnectPoolFromPoolManager(poolManager, role, shard);
-      if (poolManager.roleNames.length === 0) {
-        this._connectionNameToPoolManager.delete(connectionName!);
-      }
-      return dbConfig;
+      return await this.disconnectPoolFromPoolManager(poolManager, role, shard);
     }
     return undefined;
   }
@@ -270,12 +258,10 @@ export class ConnectionHandler {
 
   /** @internal */
   private setPoolManager(connectionDescriptor: ConnectionDescriptor): PoolManager {
-    let manager = this._connectionNameToPoolManager.get(connectionDescriptor.name);
-    if (!manager) {
-      manager = new PoolManager();
-      this._connectionNameToPoolManager.set(connectionDescriptor.name, manager);
-    }
-    return manager;
+    return (
+      this.connectionNameToPoolManager().get(connectionDescriptor.name) ||
+      hashAset(this.connectionNameToPoolManager(), connectionDescriptor.name, new PoolManager())
+    );
   }
 
   /** @internal */
@@ -314,13 +300,13 @@ export class ConnectionHandler {
 
   /** @internal */
   determineOwnerName(
-    ownerName: string | ConnectionOwner | undefined,
+    ownerName: string | ConnectionOwner,
     config?: DatabaseConfig | string | Record<string, unknown>,
-  ): ConnectionDescriptor | ConnectionOwner | undefined {
+  ): ConnectionDescriptor | ConnectionOwner {
     if (typeof ownerName === "string") {
-      return new ConnectionDescriptor(isSymbol(ownerName) ? symbolToS(ownerName) : ownerName);
+      return new ConnectionDescriptor(toS(ownerName));
     } else if (isSymbol(config)) {
-      return new ConnectionDescriptor(symbolToS(config));
+      return new ConnectionDescriptor(toS(config));
     } else {
       return ownerName;
     }

@@ -535,7 +535,6 @@ export interface AbstractAdapter {
   dataSourceExists(name: string): Promise<boolean | null>;
   sanitizeLimit(limit: unknown): number | Nodes.SqlLiteral;
   resetTransaction(): void;
-  resetTransaction(options: { restore: true }): Promise<void>;
   resetTransaction(
     options: { restore?: boolean },
     callback: () => Promise<unknown>,

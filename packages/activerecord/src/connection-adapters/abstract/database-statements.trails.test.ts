@@ -250,7 +250,7 @@ describe("DatabaseStatements", () => {
           savedName = name;
         },
       } as unknown as DatabaseStatementsHost;
-      await rollbackToSavepoint.call(host, "sp1");
+      await rollbackToSavepoint.call(host as never, "sp1");
       expect(savedName).toBe("sp1");
     });
   });
@@ -731,6 +731,7 @@ describe("execInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => supportsReturning,
       quoteColumnName: (c) => `"${c}"`,
+      primaryKey: () => null,
     };
     return host;
   }
@@ -845,6 +846,7 @@ describe("sqlForInsert", () => {
       typeCastedBinds,
       supportsInsertReturning: () => true,
       quoteColumnName: (c) => `"${c}"`,
+      primaryKey: () => null,
     };
     const [sql] = await sqlForInsert.call(
       host,
@@ -868,7 +870,7 @@ describe("sqlForInsert", () => {
         throw new Error("primaryKey() must not be called when pk=false");
       },
     };
-    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], null);
+    const [sql] = await sqlForInsert.call(host, "INSERT INTO t (x) VALUES (1)", false, [], []);
     expect(sql).toBe("INSERT INTO t (x) VALUES (1)");
   });
 

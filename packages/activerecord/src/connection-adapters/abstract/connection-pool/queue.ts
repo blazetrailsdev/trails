@@ -1,7 +1,7 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../../abstract-adapter.js";
 import { ConnectionTimeoutError } from "../../../errors.js";
 import { include, type Included } from "@blazetrails/activesupport";
-import { Process } from "@blazetrails/ruby-compat";
+import { aryDelete, Process, rbEnsure } from "@blazetrails/ruby-compat";
 
 interface Waiter {
   resolve: () => void;
@@ -107,22 +107,12 @@ export function withABiasFor<T>(this: BiasableQueueHost, thread: unknown, fn: ()
     previousCond = this._cond;
     this._cond = newCond = new BiasedConditionVariable(this._lock, this._cond, thread);
   });
-  const restore = () => {
+  return rbEnsure(fn, () => {
     synchronize(this, () => {
       if (previousCond) this._cond = previousCond;
       if (newCond) newCond.broadcastOnBiased();
     });
-  };
-  let result: T;
-  try {
-    result = fn();
-  } catch (error) {
-    restore();
-    throw error;
-  }
-  if (result instanceof Promise) return result.finally(restore) as T;
-  restore();
-  return result;
+  });
 }
 
 export const BiasableQueue = {
@@ -162,14 +152,7 @@ export class Queue {
 
   delete(element: DatabaseAdapter): DatabaseAdapter | undefined {
     return synchronize(this, () => {
-      let deleted: DatabaseAdapter | undefined;
-      for (let i = this._queue.length - 1; i >= 0; i--) {
-        if (this._queue[i] === element) {
-          this._queue.splice(i, 1);
-          deleted = element;
-        }
-      }
-      return deleted;
+      return aryDelete(this._queue, element);
     });
   }
 

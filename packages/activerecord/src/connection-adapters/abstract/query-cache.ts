@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -159,7 +159,7 @@ export class ConnectionPoolConfiguration {
     connection: QueryCacheHost,
   ): QueryCacheHost {
     super_(connection);
-    if (!connection._queryCache) connection._queryCache = this.queryCache;
+    connection._queryCache ||= this.queryCache;
     return connection;
   }
 
@@ -173,20 +173,10 @@ export class ConnectionPoolConfiguration {
     const oldDirties = cache.dirties;
     cache.enabled = false;
     cache.dirties = dirties;
-    const restore = () => {
+    return rbEnsure(fn, () => {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
-    };
-    let result: T | Promise<T>;
-    try {
-      result = fn();
-    } catch (error) {
-      restore();
-      throw error;
-    }
-    if (result instanceof Promise) return result.finally(restore);
-    restore();
-    return result;
+    });
   }
 
   enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
@@ -195,20 +185,10 @@ export class ConnectionPoolConfiguration {
     const oldDirties = cache.dirties;
     cache.enabled = true;
     cache.dirties = true;
-    const restore = () => {
+    return rbEnsure(fn, () => {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
-    };
-    let result: T | Promise<T>;
-    try {
-      result = fn();
-    } catch (error) {
-      restore();
-      throw error;
-    }
-    if (result instanceof Promise) return result.finally(restore);
-    restore();
-    return result;
+    });
   }
 
   enableQueryCacheBang(): void {
@@ -343,9 +323,7 @@ export function selectAll(
       const result =
         this.lookupSqlCache(sql, name, binds ?? []) ??
         super_.call(this, sql, name, binds, forwardOpts);
-      return result instanceof Promise
-        ? result.then((r) => FutureResult.wrap(r))
-        : FutureResult.wrap(result);
+      return Promise.resolve(result).then((result) => FutureResult.wrap(result));
     }
     return this.cacheSql(
       sql,

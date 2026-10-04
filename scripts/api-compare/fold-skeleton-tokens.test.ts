@@ -18,6 +18,13 @@ describe("foldSkeletonTokens", () => {
     ]);
   });
 
+  it("folds Ruby's `loop do … end` onto the loop its `for (;;)` port emits", () => {
+    const ruby = ["try", "ref:loop", "ref:wait", "if", "ref:remove"];
+    const ts = ["try", "loop", "ref:wait", "if", "ref:remove"];
+
+    expect(foldSkeletonTokens(ruby, "ruby", ts)).toEqual(foldSkeletonTokens(ts, "ts", ruby));
+  });
+
   it("matches Ruby `xs.each { |x| save(x) }` against its `for (const x of xs) this.save(x)` port", () => {
     const ruby = ["ref:each", "ref:save"];
     const ts = ["loop", "ref:save"];
