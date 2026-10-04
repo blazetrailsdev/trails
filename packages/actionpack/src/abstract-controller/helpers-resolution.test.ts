@@ -3,7 +3,12 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { include, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  include,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 
 import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from "./helpers.js";
 
@@ -61,10 +66,29 @@ describe("modulesForHelpers", () => {
     expect(() => modulesForHelpers(["missing"])).toThrow(/uninitialized constant MissingHelper/);
   });
 
-  it("raises ArgumentError for non-string/symbol/module entries", () => {
+  it("raises TypeError for non-string/symbol/module entries", () => {
     expect(() => modulesForHelpers([42 as unknown as string])).toThrow(
       /must be a String, Symbol, or Module/,
     );
+  });
+});
+
+describe("modulesForHelpers (when Module)", () => {
+  it("passes a class module through", () => {
+    class ClassHelper {
+      shout(): string {
+        return "SHOUT";
+      }
+    }
+    const mod = ClassHelper as unknown as HelperMethodsModule;
+    expect(modulesForHelpers([mod])).toEqual([mod]);
+  });
+
+  it("raises ArgumentError for an object that is not a module", () => {
+    class NotAModule {}
+    for (const value of [new NotAModule(), new Map(), 42]) {
+      expect(() => modulesForHelpers([value as unknown as string])).toThrow(ArgumentError);
+    }
   });
 });
 

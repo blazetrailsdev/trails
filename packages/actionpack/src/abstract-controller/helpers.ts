@@ -86,15 +86,19 @@ export function defineHelpersModule(
   return mod;
 }
 
+/** @internal */
+function isModuleObject(value: unknown): value is HelperMethodsModule {
+  if (value === null || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value) as object | null;
+  return proto === Object.prototype || proto === null;
+}
+
 export const Resolution = {
   modulesForHelpers(modulesOrHelperPrefixes: readonly HelperArgument[]): HelperMethodsModule[] {
     return (modulesOrHelperPrefixes as readonly unknown[])
       .flat(Infinity)
       .map((moduleOrHelperPrefix) => {
-        if (
-          rbObjIsKindOf(moduleOrHelperPrefix, Module) ||
-          (moduleOrHelperPrefix !== null && typeof moduleOrHelperPrefix === "object")
-        ) {
+        if (rbObjIsKindOf(moduleOrHelperPrefix, Module) || isModuleObject(moduleOrHelperPrefix)) {
           return moduleOrHelperPrefix as HelperMethodsModule;
         } else if (typeof moduleOrHelperPrefix === "string") {
           let helperPrefix = isSymbol(moduleOrHelperPrefix)
