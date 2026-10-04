@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashDelete } from "@blazetrails/ruby-compat";
+import { eachValue, hashDelete } from "@blazetrails/ruby-compat";
 import type { PoolConfig } from "./pool-config.js";
 
 export class PoolManager {
@@ -7,10 +7,7 @@ export class PoolManager {
 
   constructor() {
     this._roleToShardMapping = new Proxy({} as Record<string, Record<string, PoolConfig>>, {
-      get(h, k) {
-        if (typeof k !== "string") return Reflect.get(h, k);
-        return (h[k] ??= {});
-      },
+      get: (h, k) => (h[k as string] ??= {}),
     });
   }
 
@@ -35,35 +32,14 @@ export class PoolManager {
     return Object.values(this._roleToShardMapping).flatMap((shardMap) => Object.values(shardMap));
   }
 
-  eachPoolConfig(role: string | undefined, callback: (poolConfig: PoolConfig) => void): void;
-  eachPoolConfig(callback: (poolConfig: PoolConfig) => void): void;
-  eachPoolConfig(
-    roleOrCallback: string | undefined | ((poolConfig: PoolConfig) => void),
-    callback?: (poolConfig: PoolConfig) => void,
-  ): void {
-    let role: string | undefined;
-    let cb: (poolConfig: PoolConfig) => void;
-
-    if (typeof roleOrCallback === "function") {
-      cb = roleOrCallback;
-    } else {
-      role = roleOrCallback;
-      if (typeof callback !== "function") {
-        throw new ArgumentError("`eachPoolConfig` requires a callback when a role is provided.");
-      }
-      cb = callback;
-    }
-
+  /** @missingRailsName roleToShardMapping — PERMANENT */
+  eachPoolConfig(role: string | null = null, block?: (poolConfig: PoolConfig) => void): unknown {
     if (role != null) {
-      for (const poolConfig of Object.values(this._roleToShardMapping[role])) {
-        cb(poolConfig);
-      }
+      return eachValue(this._roleToShardMapping[role], block);
     } else {
-      for (const shardMap of Object.values(this._roleToShardMapping)) {
-        for (const poolConfig of Object.values(shardMap)) {
-          cb(poolConfig);
-        }
-      }
+      return eachValue(this._roleToShardMapping, (shardMap) => {
+        eachValue(shardMap, block!);
+      });
     }
   }
 

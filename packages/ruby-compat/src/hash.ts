@@ -1,3 +1,4 @@
+import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
 import { rbInspect } from "./object.js";
@@ -490,11 +491,19 @@ export function eachValue<T, R = never>(
   block: (value: T) => unknown,
 ): Record<string, T> | R;
 /**
- * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3061`): the values an
- * Enumerable call chained onto the Enumerator iterates.
+ * The blockless arm, `RETURN_SIZED_ENUMERATOR` (`hash.c:3061`): an Enumerator
+ * over the receiver's values.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
  */
-export function eachValue<T>(hash: Record<string, T>): T[];
+export function eachValue<T>(hash: Record<string, T>, block?: undefined): Enumerator<T>;
+/**
+ * A forwarded `&block`, which may be either arm.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
+ */
+export function eachValue<T>(
+  hash: Record<string, T>,
+  block: ((value: T) => unknown) | undefined,
+): Record<string, T> | Enumerator<T>;
 /**
  * The arms share one body.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
@@ -506,7 +515,13 @@ export function eachValue<T>(
   const own = ownMethod(receiver, "eachValue");
   if (own) return block ? own.call(receiver, block) : own.call(receiver);
   const hash = receiver as Record<string, T>;
-  if (!block) return Object.values(hash);
+  if (!block) {
+    return new Enumerator<T>(
+      { eachValue: (block: (value: T) => unknown) => eachValue(hash, block) },
+      "eachValue",
+      [],
+    );
+  }
   for (const key of Object.keys(hash)) {
     block(hash[key]);
   }
