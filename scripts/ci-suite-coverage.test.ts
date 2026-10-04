@@ -1403,9 +1403,9 @@ describe("CI runs every tooling test suite", () => {
     expect(skipped.filter((s) => !scripts.has(s) || run.includes(s))).toEqual([]);
 
     const lines = steps.flatMap((step) => (step.run ?? "").split("\n").map((l) => l.trim()));
-    expect(lines.some((l) => l.includes("receipt-audit.ts --package activerecord --gate"))).toBe(
-      true,
-    );
+    for (const pkg of ["activerecord", "activemodel"]) {
+      expect(lines.some((l) => l.includes(`receipt-audit.ts --package ${pkg} --gate`))).toBe(true);
+    }
     for (const id of ["method-order", "test-names"]) {
       const lint = lines.filter((l) => l.startsWith(`${id} after `));
       expect(lint).toHaveLength(1);

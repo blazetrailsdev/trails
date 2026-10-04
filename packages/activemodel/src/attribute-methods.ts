@@ -569,7 +569,6 @@ export const AttributeMethods = {
   },
 };
 
-/** @noRailsEquivalent PERMANENT */
 function answersWithAMethod(klass: unknown, name: string): boolean {
   const start = (klass as { prototype?: object }).prototype;
   for (

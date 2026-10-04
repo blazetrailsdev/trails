@@ -16014,6 +16014,13 @@
   {
     "package": "activemodel",
     "rubyFile": "attribute.rb",
+    "rubyName": "hash",
+    "digest": "a6ca117078295ff1",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "attribute.rb",
     "rubyName": "init_with",
     "digest": "78f87f63e743c9f9",
     "ref": "v8.0.2",
@@ -17288,6 +17295,13 @@
     "rubyFile": "error.rb",
     "rubyName": "generate_message",
     "digest": "6c67be2828ac002e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "error.rb",
+    "rubyName": "hash",
+    "digest": "9f442874a358e3de",
     "ref": "v8.0.2"
   },
   {
@@ -18680,6 +18694,13 @@
   {
     "package": "activemodel",
     "rubyFile": "type/value.rb",
+    "rubyName": "hash",
+    "digest": "bb9a716d7dcacaf2",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "type/value.rb",
     "rubyName": "initialize",
     "digest": "d3184ba5e9ca7a0f",
     "ref": "v8.0.2"
@@ -19552,6 +19573,13 @@
     "rubyFile": "validator.rb",
     "rubyName": "validate_each",
     "digest": "3563be650b93851e",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activemodel",
+    "rubyFile": "version.rb",
+    "rubyName": "version",
+    "digest": "a928486f9957840f",
     "ref": "v8.0.2"
   },
   {
