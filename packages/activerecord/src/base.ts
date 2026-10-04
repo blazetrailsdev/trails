@@ -1648,8 +1648,6 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    (ModelSchema.loadSchema as any).call(this);
-
     return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
