@@ -108,14 +108,7 @@ export class ValueType<T = unknown> {
     );
   }
 
-  eql(other: ValueType): boolean {
-    return (
-      this.constructor === other.constructor &&
-      this.precision === other.precision &&
-      this.scale === other.scale &&
-      this.limit === other.limit
-    );
-  }
+  declare eql: ValueType["equals"];
 
   hash(): number {
     return rbHash([this.constructor, this.precision, this.scale, this.limit]);
@@ -146,5 +139,7 @@ include(ValueType, SerializeCastValue);
 rbDeclareIvar(ValueType, "@precision", "_precision");
 rbDeclareIvar(ValueType, "@scale", "_scale");
 rbDeclareIvar(ValueType, "@limit", "__limit");
+
+ValueType.prototype.eql = ValueType.prototype.equals;
 
 registerConstant("ActiveModel::Type::Value", ValueType);

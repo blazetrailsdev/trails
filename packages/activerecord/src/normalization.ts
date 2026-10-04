@@ -127,9 +127,7 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     );
   }
 
-  eql(other: ValueType): boolean {
-    return this.equals(other);
-  }
+  declare eql: NormalizedValueType["equals"];
 
   hash(): number {
     return rbHash([this.constructor, this.castType, this.normalizer, this.normalizeNil]);
@@ -144,6 +142,8 @@ export class NormalizedValueType extends DelegateClass(ValueType) {
     return this.normalizer(value);
   }
 }
+
+NormalizedValueType.prototype.eql = NormalizedValueType.prototype.equals;
 
 include(NormalizedValueType, SerializeCastValue);
 
