@@ -49,8 +49,9 @@ export class UserProvidedDefault extends FromUser {
     self.type = type as ValueType | null;
     this.originalAttribute = originalAttribute as Attribute | null;
     if (values.length === 5) {
+      this._value = value;
       this._hasValue = true;
-      return (this._value = value);
+      return value;
     }
     return null;
   }
