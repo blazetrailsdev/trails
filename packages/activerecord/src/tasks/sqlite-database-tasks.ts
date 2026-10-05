@@ -1,4 +1,4 @@
-import { getChildProcessAsync, rbEqq, File, FileUtils } from "@blazetrails/ruby-compat";
+import { Errno, getChildProcessAsync, rbEqq, File, FileUtils } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
@@ -34,9 +34,7 @@ export class SQLiteDatabaseTasks {
       FileUtils.rm(file);
       FileUtils.rmF([`${file}-shm`, `${file}-wal`]);
     } catch (error: unknown) {
-      if ((error as { code?: string }).code === "ENOENT") {
-        throw new NoDatabaseError((error as Error).message);
-      }
+      if (error instanceof Errno.ENOENT) throw new NoDatabaseError(error.message);
       throw error;
     }
   }

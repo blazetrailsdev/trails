@@ -4869,20 +4869,7 @@ function isInstanceOfTest(expression: ts.Expression): boolean {
   if (expression.operatorToken.kind === ts.SyntaxKind.BarBarToken) {
     return isInstanceOfTest(expression.left) && isInstanceOfTest(expression.right);
   }
-  return (
-    expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword || isErrnoCodeTest(expression)
-  );
-}
-
-function isErrnoCodeTest(expression: ts.BinaryExpression): boolean {
-  if (expression.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) return false;
-  const left = unparenthesized(expression.left);
-  return (
-    ts.isPropertyAccessExpression(left) &&
-    left.name.text === "code" &&
-    ts.isStringLiteral(expression.right) &&
-    /^E[A-Z0-9]+$/.test(expression.right.text)
-  );
+  return expression.operatorToken.kind === ts.SyntaxKind.InstanceOfKeyword;
 }
 
 function unparenthesized(expression: ts.Expression): ts.Expression {

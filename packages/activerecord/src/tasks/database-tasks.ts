@@ -240,11 +240,11 @@ export class DatabaseTasks {
 
   static async migrate(options?: { skipInitialize?: boolean }): Promise<undefined>;
   static async migrate(
-    version: number | string | null,
+    version: number | null,
     options?: { skipInitialize?: boolean },
   ): Promise<undefined>;
   static async migrate(
-    version: number | string | null | { skipInitialize?: boolean } = null,
+    version: number | null | { skipInitialize?: boolean } = null,
     options: { skipInitialize?: boolean } = {},
   ): Promise<undefined> {
     if (version !== null && typeof version === "object") {
@@ -562,8 +562,9 @@ export class DatabaseTasks {
 
       switch (format) {
         case "ruby": {
-          file = this._resolveSchemaPath(file);
-          const mod = (await import(getPath().pathToFileURL!(file).href)) as {
+          const mod = (await import(
+            getPath().pathToFileURL!(this._resolveSchemaPath(file)).href
+          )) as {
             default?: (ctx: unknown) => Promise<void> | void;
             defineParams?: { version?: string | number };
           };
@@ -689,10 +690,8 @@ export class DatabaseTasks {
     if (seed && this.seedLoader) await this.loadSeed();
   }
 
-  static async dbConfigsWithVersions(
-    environment?: string,
-  ): Promise<Map<string | number, HashConfig[]>> {
-    const dbConfigsWithVersions = new Map<string | number, HashConfig[]>();
+  static async dbConfigsWithVersions(environment?: string): Promise<Map<number, HashConfig[]>> {
+    const dbConfigsWithVersions = new Map<number, HashConfig[]>();
     environment = this._normalizeEnv(environment);
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
       const dbConfig = pool.dbConfig;
