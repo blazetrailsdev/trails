@@ -1,10 +1,22 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { File, Rational, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
+import { beforeEach, describe, it, expect, afterEach } from "vitest";
+import {
+  File,
+  KeyError,
+  Rational,
+  StringIO,
+  block,
+  fetch,
+  type Tempfile,
+} from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
-import { BigDecimal, assertNil } from "@blazetrails/activesupport";
+import { BigDecimal, assertNil, assertRaises } from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
-import { Parameters, UnfilteredParameters } from "../../metal/strong-parameters.js";
+import {
+  ParameterMissing,
+  Parameters,
+  UnfilteredParameters,
+} from "../../metal/strong-parameters.js";
 
 const thisFile = new URL(import.meta.url).pathname;
 
@@ -38,6 +50,17 @@ for (const number of ["0", "1", "12"]) {
 }
 
 describe("ParametersPermitTest", () => {
+  let params: Parameters;
+  beforeEach(() => {
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: { first: "David", last: "Heinemeier Hansson" },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+  });
+
   afterEach(() => {
     Parameters.actionOnUnpermittedParameters = false;
     Parameters.permitAllParameters = false;
@@ -140,16 +163,17 @@ describe("ParametersPermitTest", () => {
     expect(raw).toEqual({ theme: "dark" });
   });
 
-  it("fetch raises ParameterMissing exception", () => {
-    const params = new Parameters({});
-    expect(() => params.fetch("missing")).toThrow(/key not found/);
+  it("fetch raises ParameterMissing exception", async () => {
+    const e = (await assertRaises([ParameterMissing], {}, () => {
+      params.fetch("foo");
+    })) as ParameterMissing;
+    expect(e.param).toBe("foo");
   });
 
   it("fetch with a default value of a hash does not mutate the object", () => {
-    const defaults = { a: "1" };
     const params = new Parameters({});
-    params.fetch("missing", defaults);
-    expect(defaults).toEqual({ a: "1" });
+    params.fetch("foo", {});
+    assertNil(params.get("foo"));
   });
 
   it("hashes in array values get wrapped", () => {
@@ -181,18 +205,34 @@ describe("ParametersPermitTest", () => {
   });
 
   it("fetch doesn't raise ParameterMissing exception if there is a default", () => {
-    const params = new Parameters({});
-    expect(params.fetch("missing", "default")).toBe("default");
+    expect(params.fetch("foo", "monkey")).toBe("monkey");
+    expect(
+      params.fetch(
+        "foo",
+        block(() => "monkey"),
+      ),
+    ).toBe("monkey");
   });
 
   it("fetch doesn't raise ParameterMissing exception if there is a default that is nil", () => {
-    const params = new Parameters({});
-    assertNil(params.fetch("missing", null));
+    assertNil(params.fetch("foo", null));
+    assertNil(
+      params.fetch(
+        "foo",
+        block(() => null),
+      ),
+    );
   });
 
-  it("KeyError in fetch block should not be covered up", () => {
-    const params = new Parameters({});
-    expect(() => params.fetch("missing")).toThrow(/key not found/);
+  it("KeyError in fetch block should not be covered up", async () => {
+    const params = new Parameters();
+    const e = (await assertRaises([KeyError], {}, () => {
+      params.fetch(
+        "missing_key",
+        block(() => fetch({}, "also_missing")),
+      );
+    })) as KeyError;
+    expect(e.message).toMatch(/"also_missing"$/);
   });
 
   it("not permitted is sticky beyond merges", () => {

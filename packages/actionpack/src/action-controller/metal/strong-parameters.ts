@@ -8,13 +8,16 @@ import {
   Rational,
   StringIO,
   KeyError,
+  aryFetch,
   block,
   type ConflictBlock,
   eachPair,
+  fetch,
   hasKey,
   isEmpty,
   merge,
   mergeBang,
+  rbBlockGivenP,
 } from "@blazetrails/ruby-compat";
 import {
   BigDecimal,
@@ -31,7 +34,7 @@ import {
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 import { ActionController } from "../../namespaces.js";
 
-export class ParameterMissing extends Error {
+export class ParameterMissing extends KeyError {
   readonly param: string;
   readonly keys: string[] | null;
   #cachedCorrections?: string[];
@@ -525,13 +528,26 @@ export class Parameters {
   }
 
   fetch(key: string, ...args: unknown[]): unknown {
-    if (key in this._data) {
-      return this.get(key);
-    }
-    if (args.length > 0) {
-      return this._convertValueToParameters(args[0]);
-    }
-    throw new KeyError(`key not found: "${key}"`);
+    const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
+    return this._convertValueToParameters(
+      fetch(
+        this._data,
+        key,
+        block(() => {
+          if (blockGiven) {
+            return blockGiven();
+          } else {
+            return aryFetch(
+              args,
+              0,
+              block(() => {
+                throw new ParameterMissing(key, Object.keys(this._data));
+              }),
+            );
+          }
+        }),
+      ),
+    );
   }
 
   dig(...keys: string[]): unknown {
