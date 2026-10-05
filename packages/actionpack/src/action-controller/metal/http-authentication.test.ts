@@ -319,6 +319,17 @@ describe("HttpAuthentication review regressions", () => {
     expect(nonce(secretKey, 1000.9)).toBe(Buffer.from(`1000:${digest}`).toString("base64"));
   });
 
+  it("Digest hashes a String key by its UTF-8 bytes", () => {
+    const request = new Request({
+      "action_dispatch.key_generator": { generateKey: () => "é" },
+      "action_dispatch.http_auth_salt": SALT,
+    });
+    const secretKey = secretToken(request);
+    expect(opaque(secretKey)).toBe(OpenSSL.Digest.MD5.hexdigest(Buffer.from([0xc3, 0xa9])));
+    const digest = OpenSSL.Digest.MD5.hexdigest(Buffer.from("1000:é", "utf-8"));
+    expect(nonce(secretKey, 1000)).toBe(Buffer.from(`1000:${digest}`).toString("base64"));
+  });
+
   it("Digest rejects a password procedure answering false, and raises without a uri", () => {
     const secretKey = secretToken(makeDigestRequest());
     const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonce(secretKey)}", opaque="${opaque(secretKey)}"`;

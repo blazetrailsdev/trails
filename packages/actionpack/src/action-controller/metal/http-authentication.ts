@@ -332,7 +332,7 @@ export namespace HttpAuthentication {
       const keyGenerator = request.keyGenerator!;
       const httpAuthSalt = request.httpAuthSalt as string;
       const key = keyGenerator.generateKey(httpAuthSalt);
-      return typeof key === "string" ? key : Buffer.from(key).toString("latin1");
+      return typeof key === "string" ? b(key) : Buffer.from(key).toString("latin1");
     }
 
     export function nonce(secretKey: string, time: number = Math.floor(Date.now() / 1000)): string {
