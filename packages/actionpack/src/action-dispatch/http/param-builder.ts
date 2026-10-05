@@ -1,11 +1,17 @@
-import { forceEncoding } from "@blazetrails/ruby-compat";
+import {
+  bytes,
+  forceEncoding,
+  isValidEncoding,
+  type Encoding,
+  type Hash,
+} from "@blazetrails/ruby-compat";
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
 import { RequestUtils, type ParamHash, type ParamValue } from "../request/utils.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
 
-export type EncodingTemplate = Record<string, string>;
+export type EncodingTemplate = Hash<string, Encoding | string>;
 
 /** @internal */
 const LEADING_BRACKETS_COMPAT = false;
@@ -157,12 +163,17 @@ export class ParamBuilder {
     if (k === "") return null;
 
     if (depth === 0 && typeof v === "string") {
-      let designatedEncoding: string | undefined;
-      if (encodingTemplate && (designatedEncoding = encodingTemplate[k])) {
+      let designatedEncoding: Encoding | string | undefined;
+      let validEncoding: boolean;
+      if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
+        v = String.fromCharCode(...bytes(v));
+        validEncoding = isValidEncoding(v, designatedEncoding);
         v = forceEncoding(v, designatedEncoding);
+      } else {
+        validEncoding = !/\p{Cs}/u.test(v);
       }
 
-      if (/\p{Cs}/u.test(v)) {
+      if (!validEncoding) {
         throw new InvalidParameterError(
           `Invalid encoding for parameter: ${v.replace(/\p{Cs}/gu, "\uFFFD")}`,
         );

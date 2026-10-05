@@ -57,7 +57,9 @@ export class CustomParamEncoder {
         !/\p{Cs}/u.test(controller) &&
         (
           request.controllerClassFor(controller) as {
-            actionEncodingTemplate(action: string | null | undefined): EncodingTemplate | false;
+            actionEncodingTemplate(
+              action: string | null | undefined,
+            ): EncodingTemplate | false | null;
           }
         ).actionEncodingTemplate(action)
       );
