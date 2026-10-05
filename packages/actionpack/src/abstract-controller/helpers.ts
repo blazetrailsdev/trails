@@ -140,7 +140,7 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
 
   for (const method of flat) {
     const mod = this._helpersForModification();
-    const attr = method.endsWith("=") ? method.slice(0, -1) : method;
+    const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
     const writer = this._helperMethods.includes(`${attr}=`);
     let proto = (this as { prototype?: object }).prototype ?? null;
     let descriptor: PropertyDescriptor | undefined;

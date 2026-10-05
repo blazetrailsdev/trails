@@ -50,6 +50,27 @@ describe("helperMethod", () => {
     expect(Object.hasOwn(view, "name")).toBe(false);
   });
 
+  it("a lone name= entry defines the attribute with both halves", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "name=");
+
+    const controller: { name?: string } = {};
+    const view = Object.create(cls._helpers!) as { controller: object; name?: string };
+    view.controller = controller;
+    view.name = "jamis";
+    expect(controller.name).toBe("jamis");
+    expect(view.name).toBe("jamis");
+  });
+
+  it("an operator name ending in = is forwarded as a method, not read as a writer", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "==");
+
+    const proxy = { controller: { "==": (other: unknown) => other === 1 } };
+    expect(cls._helpers!["=="].call(proxy, 1)).toBe(true);
+    expect(Object.hasOwn(cls._helpers!, "=")).toBe(false);
+  });
+
   it("a name= entry survives clearHelpers' replay", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name", "name=");

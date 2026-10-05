@@ -311,6 +311,7 @@ export interface Base
     Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
   routeFor(name: string, ...args: unknown[]): string;
@@ -396,7 +397,6 @@ export class Base extends Metal {
   static helperAttr = HelpersClassMethods.helperAttr;
   static helpers = HelpersClassMethods.helpers;
   static modulesForHelpers = HelpersClassMethods.modulesForHelpers;
-  helpers = helpers;
   /** @internal */
   declare _helperProxy?: ActionViewBase | null;
 
@@ -830,6 +830,7 @@ include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
 include(Base, Cookies);
+Base.prototype.helpers = helpers;
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
