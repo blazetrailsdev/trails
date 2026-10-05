@@ -1686,6 +1686,7 @@ export class PostgreSQLAdapter
       cancel(processID: number, secretKey: number): void;
     };
     const txClient = client as PgClientWithPid;
+    if (txClient.processID == null) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
       const cancelCon = new pg.Connection() as PgConnectionWithCancel;
       cancelCon.on("error", (error: unknown) => reject(error));

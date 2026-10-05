@@ -173,7 +173,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const args: string[] = [];
     if (rtest(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
-    args.push(File.expandPath(config.database!, trailsRoot() != null ? trailsRoot()! : undefined));
+    const root = trailsRoot();
+    args.push(File.expandPath(config.database!, root != null ? root : undefined));
     return this.findCmdAndExec(databaseCli()["sqlite"], ...args);
   }
 
