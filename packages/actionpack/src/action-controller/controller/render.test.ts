@@ -20,9 +20,11 @@ import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
   File,
+  Module,
   rbFPublicSend,
   rbModConstSet,
   rbObjIvarGet,
+  registerConstant,
   RuntimeError,
   stringToSym,
   Struct,
@@ -109,10 +111,8 @@ class ImplicitRenderTestController extends Base {
   emptyActionWithTemplate(): void {}
 }
 
-const Namespaced = { name: "Namespaced" } as {
-  name: string;
-  ImplicitRenderTestController: typeof Base;
-};
+const Namespaced = new Module() as Module & { ImplicitRenderTestController: typeof Base };
+registerConstant("Namespaced", Namespaced);
 rbModConstSet(
   Namespaced,
   "ImplicitRenderTestController",
