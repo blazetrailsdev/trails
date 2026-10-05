@@ -259,6 +259,29 @@ describe("LazyAttributeHash", () => {
   });
 });
 
+describe("LazyAttributeSet#fetch_value cast cache", () => {
+  it("deserializes a value once and answers later reads from casted_values, a cast nil included", () => {
+    let deserialized = 0;
+    const type = Object.create(typeRegistry.lookup("string"));
+    type.deserialize = (value: unknown) => {
+      deserialized++;
+      return value === "" ? null : value;
+    };
+    const lazy = new LazyAttributeSet(
+      { name: "Alice", bio: "" },
+      { name: type, bio: type },
+      {},
+      {},
+    );
+    expect(lazy.fetchValue("name")).toBe("Alice");
+    expect(lazy.fetchValue("name")).toBe("Alice");
+    expect(lazy.fetchValue("bio")).toBeNull();
+    expect(lazy.fetchValue("bio")).toBeNull();
+    expect(deserialized).toBe(2);
+    expect(Object.keys((lazy as any)._attributes as object)).toHaveLength(0);
+  });
+});
+
 describe("names Object.prototype answers", () => {
   const strType = typeRegistry.lookup("string");
   const names = ["constructor", "toString"];

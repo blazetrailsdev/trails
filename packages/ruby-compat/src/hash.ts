@@ -22,11 +22,33 @@ export function block<F extends (...args: never[]) => unknown>(
 ): F & { readonly [BLOCK]: true };
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
 export function block(fn: (...args: never[]) => unknown): unknown {
-  const blk = function (this: unknown, ...args: never[]): unknown {
-    return fn.apply(this, args);
-  };
-  Object.defineProperty(blk, "length", { value: fn.length });
-  return Object.assign(blk, { [BLOCK]: true as const });
+  let blk: ((this: unknown, ...args: never[]) => unknown) & { [BLOCK]?: true };
+  switch (fn.length) {
+    case 0:
+      blk = function (this: unknown, ...args: never[]): unknown {
+        return fn.apply(this, args);
+      };
+      break;
+    case 1:
+      blk = function (this: unknown, _a: never): unknown {
+        // eslint-disable-next-line prefer-rest-params
+        return fn.apply(this, arguments as unknown as never[]);
+      };
+      break;
+    case 2:
+      blk = function (this: unknown, _a: never, _b: never): unknown {
+        // eslint-disable-next-line prefer-rest-params
+        return fn.apply(this, arguments as unknown as never[]);
+      };
+      break;
+    default:
+      blk = function (this: unknown, ...args: never[]): unknown {
+        return fn.apply(this, args);
+      };
+      Object.defineProperty(blk, "length", { value: fn.length });
+  }
+  blk[BLOCK] = true;
+  return blk;
 }
 
 /**
@@ -40,9 +62,9 @@ export function rbBlockGivenP(value: unknown): value is Block<unknown> {
 }
 
 function ownMethod(hash: object, mid: string): ((...args: unknown[]) => unknown) | undefined {
-  if (hash instanceof Map) return undefined;
   const proto: unknown = Object.getPrototypeOf(hash);
   if (proto === Object.prototype || proto === null) return undefined;
+  if (hash instanceof Map) return undefined;
   const own = (hash as Record<string, unknown>)[mid];
   return typeof own === "function" ? (own as (...args: unknown[]) => unknown) : undefined;
 }
@@ -125,11 +147,21 @@ export function fetch(
   key: unknown,
   ...rest: unknown[]
 ): unknown {
-  const own = ownMethod(receiver, "fetch");
-  if (own) return own.call(receiver, key, ...rest);
+  const plain = Object.getPrototypeOf(receiver) === Object.prototype;
+  if (!plain) {
+    const own = ownMethod(receiver, "fetch");
+    if (own) return own.call(receiver, key, ...rest);
+  }
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
   const blockGiven = rbBlockGivenP(rest[0]);
-  if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
+  const isMap = !plain && hash instanceof Map;
+  if (
+    !(isMap
+      ? hash.has(key)
+      : plain
+        ? Object.hasOwn(hash, key as PropertyKey)
+        : hasKey(hash, key as string))
+  ) {
     if (blockGiven) {
       return (rest[0] as (key: unknown) => unknown)(key);
     } else if (rest.length === 0) {
@@ -141,7 +173,7 @@ export function fetch(
       return rest[0];
     }
   }
-  return hash instanceof Map ? hash.get(key) : hash[key as string];
+  return isMap ? hash.get(key) : (hash as Record<string, unknown>)[key as string];
 }
 
 /**
@@ -159,6 +191,7 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
   /* `vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
      chain, so `"toString" in {}` is an answer Ruby never gives. */
+  if (Object.getPrototypeOf(hash) === Object.prototype) return Object.hasOwn(hash, key);
   const own = ownMethod(hash, "isKey");
   if (own) return own.call(hash, key) as boolean;
   if (hash instanceof Map) return hash.has(key);
@@ -368,14 +401,18 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
-  const own = ownMethod(hash, "get");
-  if (own) return own.call(hash, key);
-  if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
-  const val = (hash as Record<string, unknown>)[key as string];
-  if (hasKey(hash, key as string)) return val;
   const proto: unknown = Object.getPrototypeOf(hash);
-  if (proto === null) return val === undefined ? null : val;
-  if (proto !== Object.prototype) return null;
+  if (proto !== Object.prototype) {
+    const own = ownMethod(hash, "get");
+    if (own) return own.call(hash, key);
+    if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
+    const val = (hash as Record<string, unknown>)[key as string];
+    if (hasKey(hash, key as string)) return val;
+    if (proto === null) return val === undefined ? null : val;
+    return null;
+  }
+  const val = (hash as Record<string, unknown>)[key as string];
+  if (Object.hasOwn(hash, key as PropertyKey)) return val;
   return val === undefined || val === Reflect.get(Object.prototype, key as string, hash)
     ? null
     : val;

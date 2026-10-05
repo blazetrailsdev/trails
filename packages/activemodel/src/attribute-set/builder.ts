@@ -81,10 +81,18 @@ export class LazyAttributeSet extends AttributeSet {
     return [...keys].filter((name) => this.getAttribute(name).isInitialized());
   }
 
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm hasKey — PERMANENT
+   */
   override fetchValue(name: string, block?: (name: string) => unknown): unknown {
     const attr = hashAref(this._attributes, name) as Attribute | null;
     if (attr) {
       return attr.value(block);
+    }
+
+    if (hasKey(this.castedValues, name)) {
+      return this.castedValues[name];
     }
 
     return fetch<unknown>(
