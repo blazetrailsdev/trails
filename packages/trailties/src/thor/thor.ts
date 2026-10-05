@@ -1,25 +1,39 @@
 import {
   ArgumentError,
   aryDelete,
+  arySlice,
+  cmp,
+  compact,
   eachPair,
+  first,
   hashDelete,
   include,
   initializeIncludedModules,
   isEmpty,
+  merge,
   mergeBang,
   puts,
+  Range,
+  rbCmpint,
   rbFCaller,
   rbInspect,
   rbObjAsString,
   rtest,
+  sort,
+  stringSplit,
   toS,
   STDOUT,
   union,
+  uniq,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass } from "./base.js";
-import { Command, HiddenCommand } from "./command.js";
+import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, thorRunner } from "./base.js";
+import { Command, DynamicCommand, HiddenCommand } from "./command.js";
+import { AmbiguousTaskError } from "./error.js";
 import { Arguments } from "./parser/arguments.js";
 import type { Option, OptionOptions } from "./parser/option.js";
+import { Options } from "./parser/options.js";
+import type { Basic } from "./shell/basic.js";
+import { thorClassesIn } from "./util.js";
 
 type Mappings = Record<string, string> | Map<string | string[], string>;
 
@@ -31,15 +45,16 @@ type CheckUnknownOptions = { only?: unknown; except?: unknown; [key: string]: un
 
 type Config = { currentCommand?: Command | null };
 
-type Instance = {
-  options: unknown;
+type Instance = Base & {
+  shell: Basic;
   invoke(...args: unknown[]): unknown;
+  invokeCommand(command: Command, ...args: unknown[]): Promise<unknown>;
 };
 
-export type ThorClass = typeof Thor &
-  Omit<BaseClass, keyof typeof Thor> & { normalizeCommandName(meth: string | null): string };
+export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
 export class Thor {
+  /** @noRailsEquivalent CONVERGEABLE port-thor-group */
   declare static Group: abstract new (...args: never[]) => object;
 
   /** @internal */
@@ -209,6 +224,72 @@ export class Thor {
   }
   declare static atLeastOne: typeof Thor.methodAtLeastOne;
 
+  static commandHelp(this: ThorClass, shell: Basic, commandName: string): void {
+    const meth = this.normalizeCommandName(commandName);
+    const command = this.allCommands()[meth];
+    if (!rtest(command)) this.handleNoCommandError(meth);
+
+    shell.say("Usage:");
+    shell.say(`  ${stringSplit(this.banner(command), "\n").join("\n  ")}`);
+    shell.say();
+    this.classOptionsHelp(shell, new Map([[null, Object.values(command.options)]]));
+    this.printExclusiveOptions(shell, command);
+    this.printAtLeastOneRequiredOptions(shell, command);
+
+    if (rtest(command.longDescription)) {
+      shell.say("Description:");
+      if (rtest(command.wrapLongDescription)) {
+        shell.printWrapped(command.longDescription!, { indent: 2 });
+      } else {
+        shell.say(command.longDescription);
+      }
+    } else {
+      shell.say(command.description);
+    }
+  }
+  declare static taskHelp: typeof Thor.commandHelp;
+
+  static help(this: ThorClass, shell: Basic, subcommand: unknown = false): void {
+    let list = this.printableCommands(true, subcommand);
+    (thorClassesIn(this) as ThorClass[]).forEach((klass) => {
+      list = list.concat(klass.printableCommands(false));
+    });
+    this.sortCommandsBang(list);
+
+    if (Object.hasOwn(this, "_packageName") && rtest(this._packageName)) {
+      shell.say(`${this._packageName} commands:`);
+    } else {
+      shell.say("Commands:");
+    }
+
+    shell.printTable(list, { indent: 2, truncate: true });
+    shell.say();
+    this.classOptionsHelp(shell);
+    this.printExclusiveOptions(shell);
+    this.printAtLeastOneRequiredOptions(shell);
+  }
+
+  static printableCommands(
+    this: ThorClass,
+    all: unknown = true,
+    subcommand: unknown = false,
+  ): string[][] {
+    return compact(
+      Object.entries(rtest(all) ? this.allCommands() : this.commands()).map(([_, command]) => {
+        if (command.isHidden()) return null;
+        const item: string[] = [];
+        item.push(this.banner(command, false, subcommand));
+        item.push(
+          rtest(command.description)
+            ? `# ${command.description!.replace(/[ \t\r\n\f\v]+/g, " ")}`
+            : "",
+        );
+        return item;
+      }),
+    );
+  }
+  declare static printableTasks: typeof Thor.printableCommands;
+
   static subcommands(this: ThorClass): string[] {
     if (!Object.hasOwn(this, "_subcommands") || !rtest(this._subcommands)) {
       this._subcommands = this.fromSuperclass("subcommands", []) as string[];
@@ -348,6 +429,108 @@ export class Thor {
   }
 
   /** @internal */
+  static printExclusiveOptions(
+    this: ThorClass,
+    shell: Basic,
+    command: Command | null = null,
+  ): void {
+    let opts: string[][] = [];
+    if (!(command == null)) opts = command.methodExclusiveOptionNames();
+    opts = opts.concat(this.classExclusiveOptionNames());
+    if (!isEmpty(opts)) {
+      shell.say("Exclusive Options:");
+      shell.printTable(
+        opts.map((ex) => ex.map((e) => `--${e}`)),
+        { indent: 2 },
+      );
+      shell.say();
+    }
+  }
+
+  /** @internal */
+  static printAtLeastOneRequiredOptions(
+    this: ThorClass,
+    shell: Basic,
+    command: Command | null = null,
+  ): void {
+    let opts: string[][] = [];
+    if (!(command == null)) opts = command.methodAtLeastOneOptionNames();
+    opts = opts.concat(this.classAtLeastOneOptionNames());
+    if (!isEmpty(opts)) {
+      shell.say("Required At Least One:");
+      shell.printTable(
+        opts.map((ex) => ex.map((e) => `--${e}`)),
+        { indent: 2 },
+      );
+      shell.say();
+    }
+  }
+
+  /** @internal */
+  static async dispatch(
+    this: ThorClass,
+    meth: string | null | undefined,
+    givenArgs: unknown[],
+    givenOpts: unknown[] | Record<string, unknown> | null,
+    config: BaseConfig,
+    block?: (instance: Instance) => void,
+  ): Promise<unknown> {
+    if (!rtest(meth)) meth = this.retrieveCommandName(givenArgs);
+    let command: Command | undefined = this.allCommands()[this.normalizeCommandName(meth)];
+
+    if (!rtest(command) && rtest(config.invokedViaSubcommand)) {
+      givenArgs.unshift(meth);
+      command = this.allCommands()[this.normalizeCommandName(this.defaultCommand())];
+    }
+
+    let args: unknown[];
+    let opts: unknown[] | Record<string, unknown> | null;
+    if (rtest(command)) {
+      [args, opts] = Options.split(givenArgs);
+      if (rtest(this.isStopOnUnknownOption(command)) && !isEmpty(args)) {
+        opts.forEach((opt) => args.push(opt));
+        opts.length = 0;
+      }
+    } else {
+      args = givenArgs;
+      opts = null;
+      command = new (this.dynamicCommandClass())(meth!);
+    }
+
+    opts = givenOpts || opts || [];
+    config.currentCommand = command;
+    config.commandOptions = command.options;
+
+    const instance = new this(args, opts, config) as unknown as Instance;
+    if (block !== undefined) block(instance);
+    args = instance.args;
+    const trailing = arySlice(args, new Range(this.arguments().length, -1));
+    return await instance.invokeCommand(command, trailing || []);
+  }
+
+  /** @internal */
+  static banner(
+    this: ThorClass,
+    command: Command,
+    namespace: unknown = null,
+    subcommand: unknown = false,
+  ): string {
+    return stringSplit(command.formattedUsage(this, thorRunner, subcommand), "\n")
+      .map((formattedUsage) => `${this.basename() ?? ""} ${formattedUsage}`)
+      .join("\n");
+  }
+
+  /** @internal */
+  static baseclass(this: ThorClass): typeof Thor {
+    return Thor;
+  }
+
+  /** @internal */
+  static dynamicCommandClass(this: ThorClass): typeof DynamicCommand {
+    return DynamicCommand;
+  }
+
+  /** @internal */
   static createCommand(this: ThorClass, meth: string): boolean {
     if (!Object.hasOwn(this, "_usage") || !rtest(this._usage)) this._usage = null;
     if (!Object.hasOwn(this, "_desc") || !rtest(this._desc)) this._desc = null;
@@ -398,6 +581,62 @@ export class Thor {
   }
 
   /** @internal */
+  static retrieveCommandName(this: ThorClass, args: unknown[]): string | null | undefined {
+    const meth = !isEmpty(args) ? toS(first(args)) : null;
+    if (rtest(meth) && (rtest(this.map()[meth!]) || !/^-/m.test(meth!))) {
+      return args.shift() as string | null | undefined;
+    }
+    return null;
+  }
+  /** @internal */
+  declare static retrieveTaskName: typeof Thor.retrieveCommandName;
+
+  /** @internal */
+  static normalizeCommandName(this: ThorClass, meth: string | null | undefined): string {
+    if (!rtest(meth)) return toS(this.defaultCommand()).replaceAll("-", "_");
+
+    const possibilities = this.findCommandPossibilities(meth!);
+    if (possibilities.length > 1) {
+      throw new AmbiguousTaskError(
+        `Ambiguous command ${meth} matches [${possibilities.join(", ")}]`,
+      );
+    }
+
+    if (isEmpty(possibilities)) {
+      meth ??= this.defaultCommand();
+    } else if (rtest(this.map()[meth!])) {
+      meth = this.map()[meth!];
+    } else {
+      meth = first(possibilities);
+    }
+
+    return toS(meth).replaceAll("-", "_");
+  }
+  /** @internal */
+  declare static normalizeTaskName: typeof Thor.normalizeCommandName;
+
+  /** @internal */
+  static findCommandPossibilities(this: ThorClass, meth: string): string[] {
+    const len = toS(meth).length;
+    const possibilities = sort(
+      Object.keys(merge(this.allCommands(), this.map())).filter((n) => meth === n.slice(0, len)),
+    );
+    const uniquePossibilities = uniq(
+      possibilities.map((k) => (rtest(this.map()[k]) ? this.map()[k] : k)),
+    );
+
+    if (possibilities.includes(meth)) {
+      return [meth];
+    } else if (uniquePossibilities.length === 1) {
+      return uniquePossibilities;
+    } else {
+      return possibilities;
+    }
+  }
+  /** @internal */
+  declare static findTaskPossibilities: typeof Thor.findCommandPossibilities;
+
+  /** @internal */
   static subcommandHelp(this: ThorClass, cmd: string): void {
     this.desc("help [COMMAND]", "Describe subcommands or one specific subcommand");
     const prototype = this.prototype;
@@ -417,8 +656,27 @@ export class Thor {
   /** @internal */
   declare static subtaskHelp: typeof Thor.subcommandHelp;
 
+  /** @internal */
+  static sortCommandsBang(this: ThorClass, list: string[][]): string[][] {
+    return list.sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]));
+  }
+
   constructor(...args: unknown[]) {
     initializeIncludedModules(this, ...args);
+  }
+
+  help(command: string | null = null, subcommand: unknown = false): void {
+    const klass = this.constructor as ThorClass;
+    const shell = (this as unknown as Instance).shell;
+    if (rtest(command)) {
+      if (klass.subcommands().includes(command!)) {
+        klass.subcommandClasses()[command!].help(shell, true);
+      } else {
+        klass.commandHelp(shell, command!);
+      }
+    } else {
+      klass.help(shell, subcommand);
+    }
   }
 }
 
@@ -431,5 +689,15 @@ Thor.subtasks = Thor.subcommands;
 Thor.subtask = Thor.subcommand;
 Thor.createTask = Thor.createCommand;
 Thor.subtaskHelp = Thor.subcommandHelp;
+Thor.taskHelp = Thor.commandHelp;
+Thor.printableTasks = Thor.printableCommands;
+Thor.retrieveTaskName = Thor.retrieveCommandName;
+Thor.normalizeTaskName = Thor.normalizeCommandName;
+Thor.findTaskPossibilities = Thor.findCommandPossibilities;
 
 include(Thor, Base);
+
+(Thor as ThorClass).map(new Map([[HELP_MAPPINGS, ":help"]]));
+
+(Thor as ThorClass).desc("help [COMMAND]", "Describe available commands or one specific command");
+(Thor as ThorClass).methodAdded("help");

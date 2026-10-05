@@ -14,9 +14,6 @@ type Instance = Invocation & {
 };
 
 class A extends Thor {
-  static baseclass(): unknown {
-    return A;
-  }
   log: string[] = [];
   static {
     (this as unknown as ThorClass).desc("one", "one");
@@ -36,16 +33,13 @@ class A extends Thor {
 }
 
 class B extends Thor {
-  static baseclass(): unknown {
-    return B;
-  }
   static dispatched: unknown[] = [];
   static {
     include(this, Actions);
     (this as unknown as ThorClass).desc("hello", "hello");
     (this as unknown as ThorClass).methodAdded("hello");
   }
-  static dispatch(
+  static async dispatch(
     command: unknown,
     givenArgs: unknown,
     givenOpts: unknown,
@@ -93,7 +87,8 @@ describe("Thor::Invocation", () => {
   });
 
   it("invoke_all awaits each command in order", async () => {
-    const a = build(A);
+    const shell = { say: () => {}, printTable: () => {} };
+    const a = build(A, [], {}, { shell });
     const result = (await a.invokeAll()).filter((r) => r != null);
     expect(result).toEqual([1, 2]);
     expect(a.log).toEqual(["one", "two"]);

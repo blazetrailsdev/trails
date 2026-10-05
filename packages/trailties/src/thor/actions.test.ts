@@ -26,9 +26,6 @@ type CounterInstance = ActionsHost & {
 };
 class Counter extends Thor {
   declare static addRuntimeOptionsBang: () => void;
-  static baseclass(): unknown {
-    return Counter;
-  }
   declare static classOptions: () => Record<string, unknown>;
   static {
     include(this, Shell);

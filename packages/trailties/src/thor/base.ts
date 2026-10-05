@@ -86,7 +86,12 @@ export function deprecationWarning(message: string): void {
   }
 }
 
-const thorRunner: unknown = false;
+export let thorRunner: unknown = false;
+
+/** @noRailsEquivalent PERMANENT */
+export function setThorRunner(value: unknown): void {
+  thorRunner = value;
+}
 
 type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: string[][] };
 

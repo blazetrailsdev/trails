@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, STDOUT } from "@blazetrails/ruby-compat";
-import { HELP_MAPPINGS } from "./base.js";
+import { HELP_MAPPINGS, setThorRunner } from "./base.js";
 import { Command, HiddenCommand } from "./command.js";
+import { AmbiguousCommandError, UndefinedCommandError } from "./error.js";
 import { Thor, type ThorClass } from "./thor.js";
 
 function thor(block: (klass: ThorClass) => void, parent: ThorClass = Thor as ThorClass): ThorClass {
@@ -144,7 +145,15 @@ describe("Thor", () => {
   describe(".map with mappings and keywords", () => {
     it("merges an Array-keyed mapping into the keywords", () => {
       const klass = thor((k) => k.map(new Map([[["-a", "-b"], "zoo"]]), { "-v": "version" }));
-      expect(klass.map()).toEqual({ "-a": "zoo", "-b": "zoo", "-v": "version" });
+      expect(klass.map()).toEqual({
+        "-h": ":help",
+        "-?": ":help",
+        "--help": ":help",
+        "-D": ":help",
+        "-a": "zoo",
+        "-b": "zoo",
+        "-v": "version",
+      });
     });
   });
 
@@ -287,6 +296,159 @@ describe("Thor", () => {
       });
       expect(Object.keys(klass.classOptions())).toEqual(["force"]);
       expect(klass.methodOptions()).toEqual({});
+    });
+  });
+
+  describe(".dispatch and the help screens", () => {
+    const calls: unknown[][] = [];
+
+    class Script extends Thor {
+      static {
+        (this as unknown as ThorClass).namespace("script");
+        (this as unknown as ThorClass).desc("zoo", "zoo\n  around");
+        (this as unknown as ThorClass).methodAdded("zoo");
+        (this as unknown as ThorClass).desc("animal TYPE", "horse around");
+        (this as unknown as ThorClass).longDesc("a long\nhorse");
+        (this as unknown as ThorClass).methodExclusive("fast", "slow");
+        (this as unknown as ThorClass).methodAdded("animal");
+        (this as unknown as ThorClass).desc("animal_prison", "lock up", { hide: true });
+        (this as unknown as ThorClass).methodAdded("animal_prison");
+        (this as unknown as ThorClass).desc("exec", "run it");
+        (this as unknown as ThorClass).methodAdded("exec");
+        (this as unknown as ThorClass).stopOnUnknownOptionBang("exec");
+        (this as unknown as ThorClass).map({ "-T": ":animal" });
+      }
+      zoo() {
+        calls.push(["zoo"]);
+        return "zoo";
+      }
+      async animal(type: string) {
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        calls.push(["animal", type]);
+        return type;
+      }
+      animal_prison() {
+        calls.push(["animal_prison"]);
+      }
+      exec(...args: unknown[]) {
+        calls.push(["exec", ...args]);
+      }
+    }
+    const script = Script as unknown as ThorClass;
+    const b = script.basename() ?? "";
+
+    const shell = () => {
+      const said: unknown[] = [];
+      const tables: unknown[] = [];
+      const wrapped: unknown[] = [];
+      return {
+        said,
+        tables,
+        wrapped,
+        say: (message: unknown = "") => said.push(message),
+        printTable: (table: unknown) => tables.push(table),
+        printWrapped: (...args: unknown[]) => wrapped.push(args),
+      };
+    };
+    const start = (args: string[], config: Record<string, unknown> = {}) =>
+      script.start(args, { shell: shell() as never, debug: true, ...config });
+
+    afterEach(() => {
+      calls.length = 0;
+      setThorRunner(false);
+    });
+
+    it("dispatches a command by name, by mapping and by unambiguous prefix", async () => {
+      await expect(start(["zoo"])).resolves.toBe("zoo");
+      await expect(start(["-T", "horse"])).resolves.toBe("horse");
+      await expect(start(["z"])).resolves.toBe("zoo");
+      await start(["animal-prison"]);
+      expect(calls).toEqual([["zoo"], ["animal", "horse"], ["zoo"], ["animal_prison"]]);
+    });
+
+    it("prefers an exact match and raises on an ambiguous prefix", async () => {
+      await expect(start(["animal", "cow"])).resolves.toBe("cow");
+      await expect(start(["anim"])).rejects.toThrow(
+        new AmbiguousCommandError("Ambiguous command anim matches [animal, animal_prison]"),
+      );
+      expect(script.findCommandPossibilities("--")).toEqual([":help"]);
+      expect(script.findCommandPossibilities("h")).toEqual(["help"]);
+    });
+
+    it("hands an unknown command to a DynamicCommand, which raises", async () => {
+      await expect(start(["nope"])).rejects.toThrow(UndefinedCommandError);
+    });
+
+    it("retrieves the command name unless the first argument is an unmapped switch", () => {
+      let args = ["-x", "zoo"];
+      expect(script.retrieveCommandName(args)).toBeNull();
+      expect(args).toEqual(["-x", "zoo"]);
+      args = ["-T", "horse"];
+      expect(script.retrieveCommandName(args)).toBe("-T");
+      expect(args).toEqual(["horse"]);
+      expect(script.retrieveCommandName([])).toBeNull();
+      expect(script.normalizeCommandName(null)).toBe("help");
+    });
+
+    it("yields the instance before invoking, and falls back to the default command for a subcommand", async () => {
+      const yielded: unknown[] = [];
+      const sub = class extends Script {} as unknown as ThorClass;
+      sub.defaultCommand("animal");
+      const config = { shell: shell() as never, invokedViaSubcommand: true };
+      await expect(
+        sub.dispatch(null, ["horse"], null, config, (instance) => yielded.push(instance)),
+      ).resolves.toBe("horse");
+      expect(yielded[0]).toBeInstanceOf(sub);
+      expect(calls).toEqual([["animal", "horse"]]);
+    });
+
+    it("treats everything after a regular argument as arguments under stop_on_unknown_option!", async () => {
+      await start(["exec", "echo", "--verbose", "foo"]);
+      expect(calls).toEqual([["exec", "echo", "--verbose", "foo"]]);
+    });
+
+    it("prints the sorted command list, without hidden commands, when no command is given", async () => {
+      const sh = shell();
+      await start([], { shell: sh });
+      await start(["-h"], { shell: sh });
+      expect(sh.said).toEqual(["Commands:", "", "Commands:", ""]);
+      expect(sh.tables[0]).toEqual([
+        [`${b} animal TYPE`, "# horse around"],
+        [`${b} exec`, "# run it"],
+        [`${b} help [COMMAND]`, "# Describe available commands or one specific command"],
+        [`${b} zoo`, "# zoo around"],
+      ]);
+      expect(script.printableCommands(false).map((item) => item[0])).toEqual([
+        `${b} zoo`,
+        `${b} animal TYPE`,
+        `${b} exec`,
+      ]);
+    });
+
+    it("prints the usage, exclusive options and description of one command", async () => {
+      const sh = shell();
+      await start(["help", "zoo"], { shell: sh });
+      expect(sh.said).toEqual(["Usage:", `  ${b} zoo`, "", "zoo\n  around"]);
+      sh.said.length = 0;
+      await start(["help", "animal"], { shell: sh });
+      expect(sh.said).toEqual([
+        "Usage:",
+        `  ${b} animal TYPE`,
+        "",
+        "Exclusive Options:",
+        "",
+        "Description:",
+      ]);
+      expect(sh.tables).toEqual([[["--fast", "--slow"]]]);
+      expect(sh.wrapped).toEqual([["a long\nhorse", { indent: 2 }]]);
+      await expect(start(["help", "nope"], { shell: sh })).rejects.toThrow(UndefinedCommandError);
+    });
+
+    it("shows the namespace in the banner under $thor_runner", () => {
+      const zoo = script.allCommands().zoo;
+      expect(script.banner(zoo)).toBe(`${b} zoo`);
+      setThorRunner(true);
+      expect(script.banner(zoo)).toBe(`${b} script:zoo`);
     });
   });
 });
