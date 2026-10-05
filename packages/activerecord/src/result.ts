@@ -189,7 +189,9 @@ export class Result {
         ? typeOverrides
         : this.columns.map((name, i) => this.#columnType(name, i, typeOverrides));
 
-      return this.rows.map((values) => values.map((value, i) => types[i].deserialize(value)));
+      return this.rows.map((values) =>
+        Array.from({ length: values.length }, (_, i) => types[i].deserialize(values[i])),
+      );
     }
   }
 
