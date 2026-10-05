@@ -1,6 +1,5 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { relationClassFor } from "./relation/delegation.js";
 import { compact, groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
@@ -23,17 +22,6 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
 
   override async ids(): Promise<unknown[]> {
     return uniq(await this._ids);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE relation-subclasses-inherit-clone-without-overrides
-   */
-  override clone(): Relation<T> {
-    const Ctor = relationClassFor.call(DisableJoinsAssociationRelation, this.model);
-    const rel = new Ctor(this.model, this.key, this._ids) as Relation<T>;
-    rel.initializeCopy(this as unknown as Relation<T>);
-    return rel;
   }
 
   // @ts-expect-error — Rails' override returns an Array, not a Relation (activerecord/lib/active_record/disable_joins_association_relation.rb:13-15)
