@@ -31,20 +31,12 @@ function assertEmpty(obj: string): void {
 
 async function assertOutputToStderr(block: () => unknown, expected: RegExp): Promise<void> {
   const actual = await capture(":stderr", block);
-  if (actual.search(expected) === -1) {
-    throw new globalThis.Error(
-      `expected block to output ${expected} to stderr, but output ${JSON.stringify(actual)}`,
-    );
-  }
+  if (actual.search(expected) === -1) throw new globalThis.Error(`no ${expected} in ${actual}`);
 }
 
 async function assertNoOutputToStderr(block: () => unknown): Promise<void> {
   const actual = await capture(":stderr", block);
-  if (actual !== "") {
-    throw new globalThis.Error(
-      `expected block to not output to stderr, but output ${JSON.stringify(actual)}`,
-    );
-  }
+  if (actual !== "") throw new globalThis.Error(`expected no stderr output, got ${actual}`);
 }
 
 describe("Thor", () => {
@@ -79,39 +71,31 @@ describe("Thor", () => {
       };
       await arityAsserter(
         ["zero_args", "one"],
-        'ERROR: "thor zero_args" was called with arguments ["one"]\n' +
-          'Usage: "thor scripts:arities:zero_args"',
+        'ERROR: "thor zero_args" was called with arguments ["one"]\nUsage: "thor scripts:arities:zero_args"',
       );
       await arityAsserter(
         ["one_arg"],
-        'ERROR: "thor one_arg" was called with no arguments\n' +
-          'Usage: "thor scripts:arities:one_arg ARG"',
+        'ERROR: "thor one_arg" was called with no arguments\nUsage: "thor scripts:arities:one_arg ARG"',
       );
       await arityAsserter(
         ["one_arg", "one", "two"],
-        'ERROR: "thor one_arg" was called with arguments ["one", "two"]\n' +
-          'Usage: "thor scripts:arities:one_arg ARG"',
+        'ERROR: "thor one_arg" was called with arguments ["one", "two"]\nUsage: "thor scripts:arities:one_arg ARG"',
       );
       await arityAsserter(
         ["one_arg", "one", "two"],
-        'ERROR: "thor one_arg" was called with arguments ["one", "two"]\n' +
-          'Usage: "thor scripts:arities:one_arg ARG"',
+        'ERROR: "thor one_arg" was called with arguments ["one", "two"]\nUsage: "thor scripts:arities:one_arg ARG"',
       );
       await arityAsserter(
         ["two_args", "one"],
-        'ERROR: "thor two_args" was called with arguments ["one"]\n' +
-          'Usage: "thor scripts:arities:two_args ARG1 ARG2"',
+        'ERROR: "thor two_args" was called with arguments ["one"]\nUsage: "thor scripts:arities:two_args ARG1 ARG2"',
       );
       await arityAsserter(
         ["optional_arg", "one", "two"],
-        'ERROR: "thor optional_arg" was called with arguments ["one", "two"]\n' +
-          'Usage: "thor scripts:arities:optional_arg [ARG]"',
+        'ERROR: "thor optional_arg" was called with arguments ["one", "two"]\nUsage: "thor scripts:arities:optional_arg [ARG]"',
       );
       await arityAsserter(
         ["multiple_usages"],
-        'ERROR: "thor multiple_usages" was called with no arguments\n' +
-          'Usage: "thor scripts:arities:multiple_usages ARG --foo"\n' +
-          '       "thor scripts:arities:multiple_usages ARG --bar"',
+        'ERROR: "thor multiple_usages" was called with no arguments\nUsage: "thor scripts:arities:multiple_usages ARG --foo"\n       "thor scripts:arities:multiple_usages ARG --bar"',
       );
     });
 
