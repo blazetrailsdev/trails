@@ -255,6 +255,7 @@ export {
   processAdapterConfig,
   rbArgv,
   rbProgname,
+  setArg0,
   registerProcessAdapter,
   setEnv,
   setExitCode,

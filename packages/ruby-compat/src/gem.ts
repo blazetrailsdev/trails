@@ -1,6 +1,7 @@
 import { Deprecate } from "./gem/deprecate.js";
 import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
+import { RbConfig } from "./rb-config.js";
 
 /**
  * `vendor/ruby/v3.3.11/lib/rubygems.rb:11` — `Gem`, answering only the keys trails'
@@ -35,5 +36,22 @@ export const Gem = {
    */
   get path(): string[] {
     return [Gem.defaultDir];
+  },
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems.rb:121` — `Gem::WIN_PATTERNS`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem::WIN_PATTERNS`.
+   */
+  WIN_PATTERNS: [/bccwin/i, /cygwin/i, /djgpp/i, /mingw/i, /mswin/i, /wince/i],
+
+  /**
+   * `vendor/ruby/v3.3.11/lib/rubygems.rb:1000` — `Gem.win_platform?`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem.win_platform?`.
+   */
+  isWinPlatform(): boolean {
+    const rubyPlatform = RbConfig.CONFIG["host_os"];
+    return Gem.WIN_PATTERNS.find((r) => r.test(rubyPlatform)) !== undefined;
   },
 };

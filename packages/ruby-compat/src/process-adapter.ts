@@ -72,6 +72,16 @@ export function rbProgname(): string {
   return prognameInternal;
 }
 
+/**
+ * MRI's `$0 =` (`set_arg0`, vendor/ruby/v3.3.11/ruby.c:2842-2849), the writer
+ * half of {@link rbProgname}.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function setArg0(val: string): void {
+  prognameInternal = val;
+}
+
 let currentAdapter: ProcessAdapter | null = null;
 
 function requireAdapter(): ProcessAdapter {
