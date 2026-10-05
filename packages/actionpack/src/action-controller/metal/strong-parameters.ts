@@ -7,14 +7,15 @@ import {
   IO,
   Rational,
   StringIO,
-  KeyError,
   block,
   type ConflictBlock,
   eachPair,
+  fetch,
   hasKey,
   isEmpty,
   merge,
   mergeBang,
+  rbBlockGivenP,
 } from "@blazetrails/ruby-compat";
 import {
   BigDecimal,
@@ -525,13 +526,21 @@ export class Parameters {
   }
 
   fetch(key: string, ...args: unknown[]): unknown {
-    if (key in this._data) {
-      return this.get(key);
-    }
-    if (args.length > 0) {
-      return this._convertValueToParameters(args[0]);
-    }
-    throw new KeyError(`key not found: "${key}"`);
+    const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
+    return this._convertValueToParameters(
+      fetch(
+        this._data,
+        key,
+        block(() => {
+          if (blockGiven) {
+            return blockGiven();
+          } else {
+            if (args.length > 0) return args[0];
+            throw new ParameterMissing(key, Object.keys(this._data));
+          }
+        }),
+      ),
+    );
   }
 
   dig(...keys: string[]): unknown {
