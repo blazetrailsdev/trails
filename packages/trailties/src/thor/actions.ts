@@ -18,6 +18,9 @@ import {
   rtest,
   toS,
 } from "@blazetrails/ruby-compat";
+import { addFile, createFile } from "./actions/create-file.js";
+import { addLink, createLink } from "./actions/create-link.js";
+import { emptyDirectory } from "./actions/empty-directory.js";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
 import type { Basic } from "./shell/basic.js";
@@ -43,6 +46,7 @@ export interface ActionsHost {
   shell: Basic;
   sayStatus(status: unknown, message: unknown, logStatus?: unknown): void;
   inside: typeof inside;
+  action: typeof action;
   /** @internal */
   _cleanupOptionsAndSet(options: unknown[] | Record<string, unknown>, key: string): void;
   _sourcePaths?: string[];
@@ -309,6 +313,11 @@ export const Actions = new Module((mod) => {
       inside,
       inRoot,
       apply,
+      emptyDirectory,
+      createFile,
+      addFile,
+      createLink,
+      addLink,
       _sharedConfiguration,
       _cleanupOptionsAndSet,
     });

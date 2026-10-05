@@ -145,6 +145,11 @@ export class Basic {
     );
   }
 
+  /** @missingRailsCall ask — CONVERGEABLE thor-create-file-conflict-has-no-file-collision-prompt */
+  fileCollision(destination: string, block?: () => unknown): unknown {
+    return true;
+  }
+
   printInColumns(array: unknown[]): void {
     const printer = new ColumnPrinter(this.stdout());
     printer.print(array);

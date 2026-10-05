@@ -157,6 +157,12 @@ type Claim = { tsExport: string; receiver?: ReceiverKind };
 
 const BY_BARE_NAME = byBareName();
 
+/** `string-new` is `core_new_kind`'s record of a `String.new(x)` site
+ *  (extract-ruby-api.rb), whose receiver is proven to be the String class. */
+function provenClass(kind: string): string {
+  return kind === "string-new" ? "string" : kind;
+}
+
 /** The ruby-compat export that ports Ruby call `rubyCall` on a receiver whose
  *  recorded kinds are `receiverKinds` (the Ruby body's `callReceivers` entry
  *  for the name, absent when every occurrence was an unqualified call), or
@@ -182,7 +188,8 @@ export function rubyCompatExport(
   if (receiverKinds === undefined || receiverKinds.length === 0) return undefined;
   const admitted = [...claims].filter(
     (claim) =>
-      claim.receiver !== undefined && receiverKinds.every((kind) => kind === claim.receiver),
+      claim.receiver !== undefined &&
+      receiverKinds.every((kind) => provenClass(kind) === claim.receiver),
   );
   return admitted.length === 1 ? admitted[0].tsExport : undefined;
 }
@@ -219,7 +226,9 @@ export function rubyCompatAliases(rubyCall: string, receiverKinds?: readonly str
       (claim) =>
         claim.receiver !== undefined &&
         PORTED_NAMES_BY_EXPORT.get(claim.tsExport)!.size === 1 &&
-        receiverKinds.every((kind) => kind === claim.receiver || UNPROVEN_RECEIVER_KINDS.has(kind)),
+        receiverKinds.every(
+          (kind) => provenClass(kind) === claim.receiver || UNPROVEN_RECEIVER_KINDS.has(kind),
+        ),
     )
     .map((claim) => claim.tsExport);
 }

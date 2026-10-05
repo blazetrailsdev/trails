@@ -549,6 +549,42 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.write} over the backend's async `writeFile`, falling back to its
+   * `writeFileSync`. `perm` is `IO.write`'s `perm:` option
+   * (`vendor/ruby/v3.3.11/io.c:6953`), the mode a created file is opened with.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.write` (`IO.write`,
+   * `vendor/ruby/v3.3.11/io.c:12377`).
+   */
+  static async writeAsync(
+    name: string,
+    string: string,
+    { perm }: { perm?: number } = {},
+  ): Promise<number> {
+    const fs = getFs();
+    const options = perm == null ? undefined : { mode: perm };
+    if (fs.writeFile) await fs.writeFile(name, string, options);
+    else fs.writeFileSync(name, string, options);
+    return new TextEncoder().encode(string).length;
+  }
+
+  /**
+   * {@link File.delete} over the backend's async `unlink`, falling back to its
+   * `unlinkSync`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.delete`
+   * (`vendor/ruby/v3.3.11/file.c:3202`).
+   */
+  static async deleteAsync(...files: string[]): Promise<number> {
+    const fs = getFs();
+    for (const file of files) {
+      if (fs.unlink) await fs.unlink(file);
+      else fs.unlinkSync(file);
+    }
+    return files.length;
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2575` `rb_file_s_chmod`, which answers the number of
    * files whose mode was set. A backend with no permission bits has no
    * `chmodSync`, and there the call is a no-op.
