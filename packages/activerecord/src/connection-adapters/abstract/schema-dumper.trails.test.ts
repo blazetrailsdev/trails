@@ -132,6 +132,7 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
 describe("SchemaDumper raises on a column whose type is not a valid native type", () => {
   const source = {
     tables: async () => ["widgets"],
+    supportsForeignKeys: () => false,
     columns: (_t: string) => [
       col("id", { type: "integer", sqlType: "integer" }),
       col("kind", { sqlType: "composite_type" }),
@@ -152,6 +153,7 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
   it("still dumps the table normally when every column type is a valid native type", async () => {
     const validSource = {
       tables: async () => ["widgets"],
+      supportsForeignKeys: () => false,
       columns: (_t: string) => [
         col("id", { type: "integer", sqlType: "integer" }),
         col("name", { type: "string", sqlType: "varchar(255)", limit: 255 }),
