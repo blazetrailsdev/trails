@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/no-namespace -- Ruby's `Psych` module is a
    namespace of module functions and classes; ESM syntax cannot spell `Psych.dump`. */
-import type { Node } from "yaml";
 import { yaml } from "./psych-adapter.js";
 import { Coder as PsychCoder } from "./psych/coder.js";
 import { ClassLoader as PsychClassLoader } from "./psych/class-loader.js";
@@ -134,6 +133,6 @@ export namespace Psych {
    */
   export function unsafeLoad(yamlString: string): unknown {
     const doc = yaml.parseDocument(yamlString);
-    return ToRuby.create().accept(doc.contents as Node | null);
+    return ToRuby.create().accept(doc.contents);
   }
 }

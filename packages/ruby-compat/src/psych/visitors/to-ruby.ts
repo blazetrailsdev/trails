@@ -1,6 +1,6 @@
 import { Range } from "../../range.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
-import type { Alias, Node, Scalar, YAMLMap, YAMLSeq } from "yaml";
+import type { Alias, Node, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
 import { yaml } from "../../psych-adapter.js";
 import { Coder } from "../coder.js";
@@ -51,12 +51,12 @@ export class ToRuby {
   }
 
   /** @noRailsEquivalent PERMANENT */
-  accept(o: Node | null): unknown {
+  accept(o: ParsedNode | null): unknown {
     if (o === null) return null;
     if (yaml.isAlias(o)) return this.visitPsychNodesAlias(o);
     if (yaml.isMap(o)) return this.visitMapping(o);
     if (yaml.isSeq(o)) return this.register(o, this.registerEmpty(o));
-    return this.register(o, this.deserialize(o as Scalar.Parsed));
+    return this.register(o, this.deserialize(o));
   }
 
   /**
@@ -88,8 +88,7 @@ export class ToRuby {
       case "!ruby/range": {
         const klass = this.classLoader.range() as typeof Range;
         const [begin, dots, end] = value.split(/([.]{2,3})/, 3);
-        const endpoint = (text: string): unknown =>
-          this.accept(yaml.parseDocument(text).contents as Node | null);
+        const endpoint = (text: string): unknown => this.accept(yaml.parseDocument(text).contents);
         return new klass(endpoint(begin), endpoint(end), dots === "...");
       }
       default:
@@ -132,12 +131,12 @@ export class ToRuby {
 
   private registerEmpty(o: YAMLSeq): unknown[] {
     const list = this.register(o, [] as unknown[]);
-    for (const c of o.items) list.push(this.accept(c as Node));
+    for (const c of o.items) list.push(this.accept(c as ParsedNode));
     return list;
   }
 
   private reviveHash(hash: Record<string, unknown>, o: YAMLMap): Record<string, unknown> {
-    for (const { key: k, value: v } of o.items as { key: Node; value: Node }[]) {
+    for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
       const key = String(this.accept(k));
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
