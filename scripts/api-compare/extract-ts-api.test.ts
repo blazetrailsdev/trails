@@ -1585,6 +1585,12 @@ describe("body call capture", () => {
           const kept: unknown[] = [];
           for (const m of runnable) if (await this.isRan(m)) kept.push(m);
         }
+        async early(runnable: unknown[], done: boolean) {
+          const kept: unknown[] = [];
+          if (done) return kept;
+          for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+          return undefined;
+        }
         async elsewhere(runnable: unknown[]) {
           const kept: unknown[] = [];
           const visit = async () => {
@@ -1610,6 +1616,7 @@ describe("body call capture", () => {
     expect(skeleton("mapped")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:wrap"]);
     expect(skeleton("alternate")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:skip"]);
     expect(skeleton("discarded")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
+    expect(skeleton("early")).toEqual(["if", "loop", "if", "ref:isRan", "ref:push"]);
     expect(skeleton("elsewhere")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:visit"]);
     expect(skeleton("external")).toEqual([
       "loop",

@@ -203,7 +203,7 @@ export interface SchemaHost {
   _tableName: string | null;
   tableNamePrefix: string;
   tableNameSuffix: string;
-  _sequenceName: string | null;
+  _sequenceName: string | null | Promise<string | null>;
   /** @internal */
   _explicitSequenceName?: boolean;
   _inheritanceColumn?: string | null;
@@ -307,9 +307,9 @@ export async function _returningColumnsForInsert(
   return memoize(pkArr.filter((p) => colNames.has(p)));
 }
 
-export async function resetSequenceName(this: SchemaHost): Promise<string | null> {
+export function resetSequenceName(this: SchemaHost): Promise<string | null> {
   this._explicitSequenceName = false;
-  return (this._sequenceName = await (this as unknown as typeof Base).withConnection((c) =>
+  return (this._sequenceName = (this as unknown as typeof Base).withConnection((c) =>
     (
       c as unknown as {
         defaultSequenceName(
@@ -683,7 +683,7 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
 
 export async function sequenceName(this: SchemaHost): Promise<string | null> {
   if (isBaseClass(this as unknown as typeof Base)) {
-    return ownSchemaMemo(this, "_sequenceName") ?? (await resetSequenceName.call(this));
+    return ownSchemaMemo(this, "_sequenceName") ?? resetSequenceName.call(this);
   } else {
     return (
       ownSchemaMemo(this, "_sequenceName") ??

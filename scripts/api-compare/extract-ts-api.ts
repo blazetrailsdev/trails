@@ -5074,11 +5074,11 @@ function awaitedCollect(
  * always truthy. The body is one `if` with no `else`, whose test awaits and
  * whose only statement pushes the loop's own element onto the filter's
  * result: a local declared as an empty array in a block enclosing the loop,
- * which the function returns by name. That is the block's predicate deciding
+ * whose last statement returns it by name. That is the block's predicate deciding
  * membership, as a `filter` callback's value does, and neither a loop nor an
  * arm. A push onto anything else (a field, a parameter, an array already
- * holding elements, one declared in another scope, one never returned) is a
- * side effect, and stays a loop with an arm.
+ * holding elements, one declared in another scope, one the block does not end
+ * by returning) is a side effect, and stays a loop with an arm.
  */
 function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined {
   const declared = statement.initializer;
@@ -5109,7 +5109,7 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
   const result = push.expression.expression.text;
   const owner = ts.findAncestor(statement, ts.isFunctionLike);
   if (owner === undefined) return undefined;
-  const declaresResult = (block: ts.Node): boolean =>
+  const declaresResult = (block: ts.Node): block is ts.Block =>
     ts.isBlock(block) &&
     block.statements.some(
       (s) =>
@@ -5123,26 +5123,19 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
             d.initializer.elements.length === 0,
         ),
     );
-  if (ts.findAncestor(statement.parent, (n) => n === owner || declaresResult(n)) === owner) {
-    if (!("body" in owner) || owner.body === undefined || !declaresResult(owner.body)) {
-      return undefined;
-    }
+  const scope = ts.findAncestor(statement.parent, (n) =>
+    n === owner ? "quit" : declaresResult(n),
+  );
+  if (scope === undefined || !ts.isBlock(scope)) return undefined;
+  const last = scope.statements[scope.statements.length - 1];
+  if (
+    !ts.isReturnStatement(last) ||
+    last.expression === undefined ||
+    !ts.isIdentifier(last.expression) ||
+    last.expression.text !== result
+  ) {
+    return undefined;
   }
-  let returnsResult = false;
-  const find = (n: ts.Node): void => {
-    if (n !== owner && ts.isFunctionLike(n)) return;
-    if (
-      ts.isReturnStatement(n) &&
-      n.expression !== undefined &&
-      ts.isIdentifier(n.expression) &&
-      n.expression.text === result
-    ) {
-      returnsResult = true;
-    }
-    ts.forEachChild(n, find);
-  };
-  find(owner);
-  if (!returnsResult) return undefined;
   let awaits = false;
   const scan = (n: ts.Node): void => {
     if (ts.isFunctionLike(n)) return;

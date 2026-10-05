@@ -71,3 +71,24 @@ describe("the async schema load warms the shared cache and replaces a synthesize
     );
   });
 });
+
+describe("a sequence lookup in flight does not overwrite a later writer", () => {
+  fixtures([]);
+  it("keeps a sequence name set while resetSequenceName is pending", async () => {
+    class Post extends Base {}
+    const pending = Post.resetSequenceName();
+    Post.sequenceName = "posts_nonstd_seq";
+    await pending;
+
+    expect(await Post.sequenceName).toBe("posts_nonstd_seq");
+  });
+
+  it("drops a lookup made for the previous table name", async () => {
+    class Post extends Base {}
+    const pending = Post.resetSequenceName();
+    Post.tableName = "comments";
+    await pending;
+
+    expect(Object.getOwnPropertyDescriptor(Post, "_sequenceName")!.value).toBeNull();
+  });
+});
