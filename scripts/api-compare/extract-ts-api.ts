@@ -3241,6 +3241,18 @@ function attrMacro(name: string): { reader: boolean; writer: boolean } | undefin
   }
 }
 
+function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if (element.name.text === id.text) return (element.propertyName ?? element.name).text;
+    }
+  }
+  return id.text;
+}
+
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
@@ -3263,7 +3275,7 @@ function readClassAttributeCall(
     const enclosing = enclosingEntity(node);
     return {
       ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
-      receiver: (callee.expression as ts.Identifier).text,
+      receiver: importedName(callee.expression as ts.Identifier, sourceFile),
       names,
       reader: false,
       writer: false,

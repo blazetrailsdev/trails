@@ -105,14 +105,11 @@ export function fetch<K, V>(hash: Map<K, V>, key: K, ...rest: unknown[]): unknow
  * Either arm, for a receiver typed as either.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
-export function fetch<T>(
-  hash:
-    | Record<string, unknown>
-    | Map<string, unknown>
-    | { fetch(key: string, ...rest: never): unknown },
+export function fetch<V>(
+  hash: Record<string, V> | Map<string, V>,
   key: string,
-  ...rest: [] | [T | Block<T>]
-): T;
+  ...rest: [] | [V | Block<V>]
+): V;
 /**
  * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
  * share one body over a rest parameter: an absent second argument is the

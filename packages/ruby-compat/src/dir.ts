@@ -270,8 +270,8 @@ export class Dir {
       const oldPath = Dir.pwd();
       chdir(path);
       chdirBlocking++;
-      const thread = storage.getStore() ?? Symbol("chdir");
-      if (chdirThread === null) chdirThread = thread;
+      if (chdirThread === null) chdirThread = Symbol("chdir");
+      const thread = chdirThread;
       const chdirRestore = (): void => {
         chdirBlocking--;
         if (chdirBlocking === 0) chdirThread = null;

@@ -6728,11 +6728,12 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
           args: unknown[];
           shell: unknown;
         }
-        export const Base = new Module();
-        Base.attrReader("options", "args");
-        Base.attrWriter("options");
+        import { Base as ThorBase } from "./shell.js";
+        ThorBase.attrReader("options", "args");
+        ThorBase.attrWriter("options");
         const names = ["shell"];
-        Base.attrReader(...names);
+        ThorBase.attrReader(...names);
+        export const Base = Object.assign(ThorBase, {});
       `,
     });
     const mod = info.classes["base.ts:Base"] ?? info.modules["base.ts:Base"];

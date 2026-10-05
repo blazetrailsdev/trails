@@ -117,6 +117,15 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("expect_to_be_kind_of")).toBe("instanceOf");
     expect(normalizeRailsKind("expect_to_be_falsey")).toBe("falsy");
     expect(normalizeRailsKind("expect_to_be_>")).toBe("operator");
+    expect(normalizeRailsKind("expect_not_to_be_falsey")).toBe("truthy");
+    expect(normalizeRailsKind("expect_to_be_instance_of")).toBe("instanceOf");
+    for (const matcher of ["a", "an", "kind_of", "an_instance_of", "instance_of"]) {
+      expect(normalizeRailsKind(`expect_not_to_be_${matcher}`)).toBeNull();
+    }
+    for (const matcher of ["within", "between"]) {
+      expect(normalizeRailsKind(`expect_to_be_${matcher}`)).toBeNull();
+      expect(normalizeRailsKind(`expect_not_to_be_${matcher}`)).toBeNull();
+    }
   });
 
   it("leaves receive and output unmapped, as their spy and helper ports are", () => {

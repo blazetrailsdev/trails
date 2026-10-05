@@ -153,6 +153,33 @@ describe("Dir.chdir", () => {
     expect(await Dir.chdir(join(root, "b"), async () => File.basename(Dir.pwd()))).toBe("b");
   });
 
+  it("raises for a block opened from a finished block's context while another is open", async () => {
+    const root = fixture();
+    let resume!: () => void;
+    let release!: () => void;
+    const resumed = new Promise<void>((resolve) => (resume = resolve));
+    let open!: Promise<string>;
+    let conflict!: Promise<unknown>;
+    await Dir.chdir(join(root, "a"), async () => {
+      open = resumed.then(() =>
+        Dir.chdir(join(root, "b"), async () => {
+          await new Promise<void>((resolve) => (release = resolve));
+          return File.basename(Dir.pwd());
+        }),
+      );
+      conflict = resumed.then(() =>
+        Promise.resolve()
+          .then(() => Dir.chdir(join(root, "sub"), async () => Dir.pwd()))
+          .catch((error: unknown) => error),
+      );
+    });
+
+    resume();
+    expect(String(await conflict)).toContain("conflicting chdir during another chdir block");
+    release();
+    expect(await open).toBe("b");
+  });
+
   it("restores nested async blocks in LIFO order", async () => {
     const start = Dir.pwd();
     const root = fixture();
