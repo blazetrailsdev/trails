@@ -21,6 +21,7 @@ import {
   ArgumentError,
   File,
   rbFPublicSend,
+  rbModConstSet,
   rbObjIvarGet,
   RuntimeError,
   stringToSym,
@@ -47,7 +48,7 @@ class TestControllerWithExtraEtags extends Base {
   static {
     this.viewPaths([
       new FixtureResolver({
-        "test/with_implicit_template.tse": "Hello explicitly!",
+        "test/withImplicitTemplate.tse": "Hello explicitly!",
         "test/hello_world.tse": "Hello world!",
       }),
     ]);
@@ -96,8 +97,8 @@ class ImplicitRenderTestController extends Base {
   static {
     this.viewPaths([
       new FixtureResolver({
-        "implicit_render_test/hello_world.tse": "Hello world!",
-        "implicit_render_test/empty_action_with_template.html.tse":
+        "implicit_render_test/helloWorld.tse": "Hello world!",
+        "implicit_render_test/emptyActionWithTemplate.html.tse":
           "<h1>Empty action rendered this implicitly.</h1>\n",
       }),
     ]);
@@ -108,12 +109,18 @@ class ImplicitRenderTestController extends Base {
   emptyActionWithTemplate(): void {}
 }
 
-const Namespaced = {
-  ImplicitRenderTestController: class ImplicitRenderTestController extends Base {
+const Namespaced = { name: "Namespaced" } as {
+  name: string;
+  ImplicitRenderTestController: typeof Base;
+};
+rbModConstSet(
+  Namespaced,
+  "ImplicitRenderTestController",
+  class extends Base {
     static {
       this.viewPaths([
         new FixtureResolver({
-          "namespaced/implicit_render_test/hello_world.tse": "Hello world!",
+          "namespaced/implicit_render_test/helloWorld.tse": "Hello world!",
         }),
       ]);
     }
@@ -122,7 +129,7 @@ const Namespaced = {
       this.freshWhen(null, { etag: "abc" });
     }
   },
-};
+);
 
 class InheritedRenderTestController extends ImplicitRenderTestController {
   helloWorld(): void {
@@ -863,8 +870,7 @@ describe("EtagRenderTest", () => {
     });
   });
 
-  // BLOCKED: implicit-render-looks-up-the-camelcase-action-name
-  it.skip("etag reflects implicit template digest", async () => {
+  it("etag reflects implicit template digest", async () => {
     await tc.get("withImplicitTemplate");
     assertResponse("ok");
     const etag = tc.response.etag;
@@ -874,7 +880,7 @@ describe("EtagRenderTest", () => {
     await tc.get("withImplicitTemplate");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "test/with_implicit_template", async () => {
+    await modifyTemplate(tc, "test/withImplicitTemplate", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("withImplicitTemplate");
       assertResponse("ok");
@@ -893,8 +899,7 @@ describe("NamespacedEtagRenderTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: implicit-render-looks-up-the-camelcase-action-name
-  it.skip("etag reflects template digest", async () => {
+  it("etag reflects template digest", async () => {
     await tc.get("helloWorld");
     assertResponse("ok");
     const etag = tc.response.etag;
@@ -904,7 +909,7 @@ describe("NamespacedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "namespaced/implicit_render_test/hello_world", async () => {
+    await modifyTemplate(tc, "namespaced/implicit_render_test/helloWorld", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");
@@ -923,8 +928,7 @@ describe("InheritedEtagRenderTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: implicit-render-looks-up-the-camelcase-action-name
-  it.skip("etag reflects template digest", async () => {
+  it("etag reflects template digest", async () => {
     await tc.get("helloWorld");
     assertResponse("ok");
     const etag = tc.response.etag;
@@ -934,7 +938,7 @@ describe("InheritedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "implicit_render_test/hello_world", async () => {
+    await modifyTemplate(tc, "implicit_render_test/helloWorld", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");
@@ -1008,15 +1012,13 @@ describe("ImplicitRenderTest", () => {
     assertResponse("no_content");
   });
 
-  // BLOCKED: implicit-render-looks-up-the-camelcase-action-name
-  it.skip("implicit success response with right format", async () => {
+  it("implicit success response with right format", async () => {
     await tc.get("emptyActionWithTemplate");
     expect(tc.response.body).toBe("<h1>Empty action rendered this implicitly.</h1>\n");
     assertResponse("success");
   });
 
-  // BLOCKED: implicit-render-looks-up-the-camelcase-action-name
-  it.skip("implicit unknown format response", async () => {
+  it("implicit unknown format response", async () => {
     await expect(tc.get("emptyActionWithTemplate", { format: "json" })).rejects.toThrow(
       UnknownFormat,
     );

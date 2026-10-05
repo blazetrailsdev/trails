@@ -6,7 +6,7 @@ import {
   type Extended,
 } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
-import { rbFSend, rbObjId, sprintf } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -178,7 +178,7 @@ export class AbstractController {
     if (Object.prototype.hasOwnProperty.call(this, "_controllerPath")) {
       return (this as unknown as { _controllerPath: string })._controllerPath;
     }
-    const name = this.name;
+    const name = rbModName(this);
     if (!name) return ((this as unknown as { _controllerPath: string })._controllerPath = "");
     const SUFFIX = "Controller";
     const stripped = name.endsWith(SUFFIX) ? name.slice(0, -SUFFIX.length) : name;
