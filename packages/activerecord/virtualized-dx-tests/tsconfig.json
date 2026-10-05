@@ -42,7 +42,8 @@
         "../../activesupport/src/core-ext/string/inflections.ts"
       ],
       "@blazetrails/activesupport/gzip": ["../../activesupport/src/gzip.ts"],
-      "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]
+      "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"],
+      "@blazetrails/activejob": ["../../activejob/src/index.ts"]
     }
   },
   "include": ["."]

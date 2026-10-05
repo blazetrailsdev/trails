@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { MissingTranslationData } from "./exceptions.js";
-import { config, newDoubleNestedCache, normalizeKeys, resetConfig, translateBang } from "./i18n.js";
+import {
+  config,
+  locale,
+  newDoubleNestedCache,
+  normalizeKeys,
+  resetConfig,
+  translateBang,
+  withLocale,
+} from "./i18n.js";
 import { resetClassConfig } from "./config.js";
 import { Simple } from "./backend/simple.js";
 
@@ -14,6 +22,33 @@ describe("I18n.translateBang", () => {
 
   it("raises MissingTranslationData for a bogus key", () => {
     expect(() => translateBang("bogus")).toThrow(MissingTranslationData);
+  });
+});
+
+describe("I18n.withLocale", () => {
+  beforeEach(() => {
+    resetConfig();
+    resetClassConfig();
+    config().enforceAvailableLocales = false;
+  });
+
+  it("keeps the locale set across an await and restores it when the block settles", async () => {
+    const promise = withLocale("de", async () => {
+      await Promise.resolve();
+      return locale();
+    });
+    expect(locale()).toBe("de");
+    expect(await promise).toBe("de");
+    expect(locale()).toBe("en");
+  });
+
+  it("restores the locale when an async block rejects", async () => {
+    const promise = withLocale("de", async () => {
+      await Promise.resolve();
+      throw new Error("boom");
+    });
+    await expect(promise).rejects.toThrow("boom");
+    expect(locale()).toBe("en");
   });
 });
 

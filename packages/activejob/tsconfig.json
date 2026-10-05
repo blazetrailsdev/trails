@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../activesupport" },
+    { "path": "../date" },
+    { "path": "../globalid" },
+    { "path": "../i18n" },
+    { "path": "../ruby-compat" }
+  ]
+}

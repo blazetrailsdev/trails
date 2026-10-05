@@ -323,6 +323,8 @@ const alias = {
     "packages/globalid/src/signed-global-id.ts",
   ),
   "@blazetrails/globalid": path.resolve(__dirname, "packages/globalid/src/index.ts"),
+  "@blazetrails/activejob/": path.resolve(__dirname, "packages/activejob/src") + "/",
+  "@blazetrails/activejob": path.resolve(__dirname, "packages/activejob/src/index.ts"),
   "@blazetrails/trails-tsc": path.resolve(__dirname, "packages/trails-tsc/src/index.ts"),
   "@blazetrails/trailties/engine": path.resolve(__dirname, "packages/trailties/src/engine.ts"),
   "@blazetrails/trailties/trailtie": path.resolve(__dirname, "packages/trailties/src/trailtie.ts"),
