@@ -1083,6 +1083,17 @@ export class IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/io.c:2379` `rb_io_flush`, which answers the stream.
+   * {@link write} holds no buffer.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO#flush`
+   * (`vendor/ruby/v3.3.11/io.c:2379`).
+   */
+  flush(): this {
+    return this;
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `IO#puts`
    * (`vendor/ruby/v3.3.11/io.c:15459`).
    */

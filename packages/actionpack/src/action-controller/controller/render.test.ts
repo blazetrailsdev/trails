@@ -1,7 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { Duration } from "@blazetrails/activesupport";
+import { MissingTemplate } from "@blazetrails/actionview";
+import { Duration, isBlank, isPresent, maxBy } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
+import {
+  ArgumentError,
+  File,
+  rbFPublicSend,
+  Struct,
+  type StructInstance,
+  Tempfile,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import type { Parameters } from "../metal/strong-parameters.js";
 import { TestCase } from "../test-case.js";
 import "../../test-helpers/abstract-unit.js";
 
@@ -12,6 +23,98 @@ class TestController extends Base {
     this.protectFromForgery();
 
     this.beforeAction("setVariableForLayout");
+
+    this.layout(":determineLayout");
+  }
+
+  private name(): null {
+    return null;
+  }
+
+  static {
+    this.helperMethod("name");
+  }
+
+  helloWorld(): void {}
+
+  async conditionalHello(): Promise<void> {
+    if (
+      this.isStale(null, {
+        lastModified: Time.now().utc().beginningOfDay(),
+        etag: [":foo", 123],
+        cacheControl: { noCache: true },
+      })
+    ) {
+      await this.render({ action: "hello_world" });
+    }
+  }
+
+  async conditionalHelloWithRecord(): Promise<void> {
+    const record = new (Struct.new("updatedAt", "cacheKey"))(
+      Time.now().utc().beginningOfDay(),
+      "foo/123",
+    );
+
+    if (this.isStale(record)) {
+      await this.render({ action: "hello_world" });
+    }
+  }
+
+  async conditionalHelloWithArrayOfRecords(): Promise<void> {
+    const record = new (Struct.new("updatedAt", "cacheKey"))(
+      Time.now().utc().beginningOfDay(),
+      "foo/123",
+    );
+    const oldRecord = new (Struct.new("updatedAt", "cacheKey"))(
+      Time.now().utc().beginningOfDay().yesterday(),
+      "bar/123",
+    );
+
+    if (this.isStale([record, oldRecord])) {
+      await this.render({ action: "hello_world" });
+    }
+  }
+
+  async dynamicRender(): Promise<void> {
+    await this.render(this.params.get("id") as string);
+  }
+
+  async dynamicRenderPermit(): Promise<void> {
+    await this.render((this.params.get("id") as Parameters).permit("file") as never);
+  }
+
+  async dynamicRenderWithFile(): Promise<void> {
+    const file = this.params.get("id") as string;
+    await this.render({ file });
+  }
+
+  static Collection = class Collection {
+    records: StructInstance[];
+
+    constructor(records: StructInstance[]) {
+      this.records = records;
+    }
+
+    maximum(attribute: string): unknown {
+      return rbFPublicSend(
+        maxBy(this.records, (record) => rbFPublicSend(record, attribute) as number),
+        attribute,
+      );
+    }
+  };
+
+  async conditionalHelloWithCollectionOfRecords(): Promise<void> {
+    const ts = Time.now().utc().beginningOfDay();
+
+    const record = new (Struct.new("updatedAt", "cacheKey"))(ts, "foo/123");
+    const oldRecord = new (Struct.new("updatedAt", "cacheKey"))(
+      ts.minusWithCoercion(Duration.days(1)) as Time,
+      "bar/123",
+    );
+
+    if (this.isStale(new TestController.Collection([record, oldRecord]))) {
+      await this.render({ action: "hello_world" });
+    }
   }
 
   async conditionalHelloWithExpiresIn(): Promise<void> {
@@ -93,6 +196,22 @@ class TestController extends Base {
     await this.render({ action: "hello_world" });
   }
 
+  async conditionalHelloWithBangs(): Promise<void> {
+    await this.render({ action: "hello_world" });
+  }
+  static {
+    this.beforeAction("handleLastModifiedAndEtags", { only: "conditionalHelloWithBangs" });
+  }
+
+  handleLastModifiedAndEtags(): void {
+    this.freshWhen(null, {
+      lastModified: Time.now().utc().beginningOfDay(),
+      etag: [":foo", 123],
+      public: false,
+      cacheControl: { noCache: true, public: true },
+    });
+  }
+
   async cacheControlDefaultHeaderWithExtrasPartiallyOverriddenByExpiresIn(): Promise<void> {
     this.response.headers.set(
       "Cache-Control",
@@ -117,6 +236,31 @@ class TestController extends Base {
   private setVariableForLayout(): void {
     this.variableForLayout = null;
   }
+
+  private determineLayout(): string | undefined {
+    switch (this.actionName) {
+      case "helloWorld":
+      case "layoutTest":
+      case "renderingWithoutLayout":
+      case "renderingNothingOnLayout":
+      case "renderTextHelloWorld":
+      case "renderTextHelloWorldWithLayout":
+      case "helloWorldWithLayoutFalse":
+      case "partialOnly":
+      case "accessingParamsInTemplate":
+      case "accessingParamsInTemplateWithLayout":
+      case "renderWithExplicitTemplate":
+      case "renderWithExplicitStringTemplate":
+      case "updatePage":
+      case "updatePageWithInstanceVariables":
+        return "layouts/standard";
+      case "actionTalkToLayout":
+      case "layoutOverridingLayout":
+        return "layouts/talk_from_action";
+      case "renderImplicitHtmlTemplateFromXhrRequest":
+        return this.request.xhr ? "layouts/xhr" : "layouts/standard";
+    }
+  }
 }
 
 describe("ExpiresInRenderTest", () => {
@@ -127,6 +271,64 @@ describe("ExpiresInRenderTest", () => {
     tc.controller = new TestController();
     await tc.beforeSetup();
     Base.viewPaths().paths.forEach((path) => path.clearCache!());
+  });
+
+  it("dynamic render with file", async () => {
+    expect(
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
+    ).toBeTruthy();
+    await expect(
+      tc.get("dynamicRenderWithFile", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+    ).rejects.toThrow(ArgumentError);
+  });
+
+  it("dynamic render with absolute path", async () => {
+    const file = Tempfile.new("name");
+    try {
+      file.write("secrets!");
+      file.flush();
+      await expect(tc.get("dynamicRender", { params: { id: file.path() } })).rejects.toThrow(
+        MissingTemplate,
+      );
+    } finally {
+      file.close();
+      file.unlink();
+    }
+  });
+
+  it("dynamic render", async () => {
+    expect(
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
+    ).toBeTruthy();
+    await expect(
+      tc.get("dynamicRender", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+    ).rejects.toThrow(MissingTemplate);
+  });
+
+  // BLOCKED: render-permitted-parameters-are-not-read-as-the-options-hash
+  it.skip("permitted dynamic render file hash", async () => {
+    expect(
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
+    ).toBeTruthy();
+    await expect(
+      tc.get("dynamicRenderPermit", {
+        params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
+      }),
+    ).rejects.toThrow(ArgumentError);
+  });
+
+  it("dynamic render file hash", async () => {
+    await expect(
+      tc.get("dynamicRender", {
+        params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
+      }),
+    ).rejects.toThrow(ArgumentError);
   });
 
   it("expires in header", async () => {
@@ -228,6 +430,164 @@ describe("ExpiresInRenderTest", () => {
   it("cache control no store overridden by expires now", async () => {
     await tc.get("cacheControlNoStoreOverriddenByExpiresNow");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
+  });
+});
+
+describe("LastModifiedRenderTest", () => {
+  let tc: TestCase;
+  let lastModified: string;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new TestController();
+    await tc.beforeSetup();
+    lastModified = Time.now().utc().beginningOfDay().httpdate();
+  });
+
+  it("responds with last modified", async () => {
+    await tc.get("conditionalHello");
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    await tc.get("conditionalHello");
+    expect(toI(tc.response.status)).toBe(304);
+    expect(isBlank(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified but etag differs", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    tc.request.setIfNoneMatch('"234"');
+    await tc.get("conditionalHello");
+    assertResponse("success");
+  });
+
+  it("request modified", async () => {
+    tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
+    await tc.get("conditionalHello");
+    expect(toI(tc.response.status)).toBe(200);
+    expect(isPresent(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("responds with custom cache control headers", async () => {
+    await tc.get("conditionalHello");
+    expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
+  });
+
+  it("responds with last modified with record", async () => {
+    await tc.get("conditionalHelloWithRecord");
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified with record", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    await tc.get("conditionalHelloWithRecord");
+    expect(toI(tc.response.status)).toBe(304);
+    expect(isBlank(tc.response.body)).toBe(true);
+    expect(tc.response.etag).not.toBeNull();
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified but etag differs with record", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    tc.request.setIfNoneMatch('"234"');
+    await tc.get("conditionalHelloWithRecord");
+    assertResponse("success");
+  });
+
+  it("request modified with record", async () => {
+    tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
+    await tc.get("conditionalHelloWithRecord");
+    expect(toI(tc.response.status)).toBe(200);
+    expect(isPresent(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
+  it.skip("responds with last modified with array of records", async () => {
+    await tc.get("conditionalHelloWithArrayOfRecords");
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
+  it.skip("request not modified with array of records", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    await tc.get("conditionalHelloWithArrayOfRecords");
+    expect(toI(tc.response.status)).toBe(304);
+    expect(isBlank(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified but etag differs with array of records", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    tc.request.setIfNoneMatch('"234"');
+    await tc.get("conditionalHelloWithArrayOfRecords");
+    assertResponse("success");
+  });
+
+  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
+  it.skip("request modified with array of records", async () => {
+    tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
+    await tc.get("conditionalHelloWithArrayOfRecords");
+    expect(toI(tc.response.status)).toBe(200);
+    expect(isPresent(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("responds with last modified with collection of records", async () => {
+    await tc.get("conditionalHelloWithCollectionOfRecords");
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified with collection of records", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    await tc.get("conditionalHelloWithCollectionOfRecords");
+    expect(toI(tc.response.status)).toBe(304);
+    expect(isBlank(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request not modified but etag differs with collection of records", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    tc.request.setIfNoneMatch('"234"');
+    await tc.get("conditionalHelloWithCollectionOfRecords");
+    assertResponse("success");
+  });
+
+  it("request modified with collection of records", async () => {
+    tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
+    await tc.get("conditionalHelloWithCollectionOfRecords");
+    expect(toI(tc.response.status)).toBe(200);
+    expect(isPresent(tc.response.body)).toBe(true);
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+  });
+
+  it("request with bang gets last modified", async () => {
+    await tc.get("conditionalHelloWithBangs");
+    expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
+    assertResponse("success");
+  });
+
+  it("request with bang obeys last modified", async () => {
+    tc.request.setIfModifiedSince(lastModified);
+    await tc.get("conditionalHelloWithBangs");
+    assertResponse("not_modified");
+  });
+
+  it("last modified works with less than too", async () => {
+    tc.request.setIfModifiedSince((Duration.years(5).ago() as Time).httpdate());
+    await tc.get("conditionalHelloWithBangs");
+    assertResponse("success");
+  });
+
+  it("last modified with custom cache control headers", async () => {
+    await tc.get("conditionalHelloWithBangs");
+    expect(tc.response.headers.get("Cache-Control")).toBe("public, no-cache");
+    assertResponse("success");
   });
 });
 
