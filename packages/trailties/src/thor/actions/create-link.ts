@@ -11,7 +11,7 @@ export const addLink = createLink;
 
 export class CreateLink extends CreateFile {
   override async isIdentical(): Promise<boolean> {
-    const source = File.expandPath((await this.render()) as string, File.dirname(this.destination));
+    const source = File.expandPath(await this.render(), File.dirname(this.destination));
     return (await this.isExists()) && (await File.isIdenticalAsync(source, this.destination));
   }
 
@@ -21,9 +21,9 @@ export class CreateLink extends CreateFile {
       if (this.config["symbolic"] == null) this.config["symbolic"] = true;
       if (await this.isExists()) await getFs().unlink!(this.destination);
       if (rtest(this.config["symbolic"])) {
-        await File.symlinkAsync((await this.render()) as string, this.destination);
+        await File.symlinkAsync(await this.render(), this.destination);
       } else {
-        await File.linkAsync((await this.render()) as string, this.destination);
+        await File.linkAsync(await this.render(), this.destination);
       }
     });
     return this.givenDestination;

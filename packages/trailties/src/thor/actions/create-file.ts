@@ -17,7 +17,7 @@ import type { ActionsHost } from "../actions.js";
 import { EmptyDirectory, type EmptyDirectoryBase } from "./empty-directory.js";
 
 type Block = () => unknown;
-type Data = string | Uint8Array | (() => unknown);
+type Data = string | (() => unknown);
 
 export function createFile(this: ActionsHost, destination: string, ...args: unknown[]): unknown {
   const block = (typeof last(args) === "function" ? args.pop() : undefined) as
@@ -32,7 +32,7 @@ export const addFile = createFile;
 export class CreateFile extends EmptyDirectory {
   data: Data;
   /** @internal */
-  private _render?: string | Uint8Array;
+  private _render?: string;
 
   constructor(
     base: EmptyDirectoryBase,
@@ -46,20 +46,19 @@ export class CreateFile extends EmptyDirectory {
 
   /** @missingRailsArgs force_encoding — PERMANENT */
   async isIdentical(): Promise<boolean> {
-    if (!(await this.isExists())) return false;
-    const render = await this.render();
-    return rbEqual(
-      await getFs().readFile(this.destination),
-      typeof render === "string"
-        ? Uint8Array.from(bytes(forceEncoding(rbStrSNew(render), "ASCII-8BIT")))
-        : render,
+    return (
+      (await this.isExists()) &&
+      rbEqual(
+        await getFs().readFile(this.destination),
+        Uint8Array.from(bytes(forceEncoding(rbStrSNew(await this.render()), "ASCII-8BIT"))),
+      )
     );
   }
 
-  async render(): Promise<string | Uint8Array> {
-    return (this._render ??= (typeof this.data === "function" ? await this.data() : this.data) as
-      | string
-      | Uint8Array);
+  async render(): Promise<string> {
+    return (this._render ??= (
+      typeof this.data === "function" ? await this.data() : this.data
+    ) as string);
   }
 
   override async invokeBang(): Promise<unknown> {

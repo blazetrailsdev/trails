@@ -3,6 +3,7 @@ import {
   FileUtils,
   File,
   getFs,
+  merge,
   rbFSend,
   rbObjRespondTo,
   rtest,
@@ -40,8 +41,8 @@ export class EmptyDirectory {
     config: Record<string, unknown> = {},
   ) {
     this.base = base;
-    this.config = { verbose: true, ...config };
-    this.destination = destination as string;
+    this.config = merge({ verbose: true }, config);
+    this.destination = destination;
   }
 
   get destination(): string {
@@ -117,7 +118,7 @@ export class EmptyDirectory {
   }
 
   /** @internal */
-  protected onConflictBehavior(_block: Block): void | Promise<void> {
+  protected onConflictBehavior(..._rest: unknown[]): void | Promise<void> {
     this.sayStatus("exist", ":blue");
   }
 
