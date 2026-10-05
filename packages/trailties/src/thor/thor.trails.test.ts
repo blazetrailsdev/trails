@@ -18,7 +18,6 @@ function thor(block: (klass: ThorClass) => void, parent: ThorClass = Thor as Tho
 describe("Thor", () => {
   afterEach(() => {
     vi.restoreAllMocks();
-    delete (Thor as { Group?: unknown }).Group;
   });
 
   describe(".desc and .create_command", () => {
@@ -229,10 +228,8 @@ describe("Thor", () => {
     });
 
     it("registers a Thor::Group as a command that invokes it, and a Thor as a subcommand", () => {
-      class Group {}
-      const group = class extends Group {} as unknown as ThorClass;
+      const group = class extends Thor.Group {} as unknown as ThorClass;
       const sub = thor(() => {});
-      Thor.Group = Group;
       const klass = thor((k) => {
         k.register(group, "gen", "gen NAME", "generates");
         k.register(sub, "sub", "sub SUBCOMMAND", "runs sub");
