@@ -7,6 +7,7 @@ import * as CacheHelper from "./helpers/cache-helper.js";
 import { CaptureHelper } from "./helpers/capture-helper.js";
 import { ContentExfiltrationPreventionHelper } from "./helpers/content-exfiltration-prevention-helper.js";
 import * as ControllerHelper from "./helpers/controller-helper.js";
+import { CsrfHelper } from "./helpers/csrf-helper.js";
 import * as DateHelper from "./helpers/date-helper.js";
 import * as DebugHelper from "./helpers/debug-helper.js";
 import * as FormHelper from "./helpers/form-helper.js";
@@ -29,6 +30,7 @@ export const Helpers = new Module((mod) => {
   mod.include(CaptureHelper);
   mod.include(ContentExfiltrationPreventionHelper);
   mod.include(ControllerHelper);
+  mod.include(CsrfHelper);
   mod.include(DateHelper);
   mod.include(DebugHelper);
   mod.include(FormHelper);

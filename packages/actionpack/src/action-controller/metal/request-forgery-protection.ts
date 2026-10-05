@@ -609,10 +609,9 @@ export function isValidAuthenticityToken(
 
 /** @internal */
 export function isAnyAuthenticityTokenValid(this: CsrfController): boolean {
-  for (const token of requestAuthenticityTokens.call(this)) {
-    if (this.isValidAuthenticityToken!(this.session, token)) return true;
-  }
-  return false;
+  return requestAuthenticityTokens
+    .call(this)
+    .some((token) => this.isValidAuthenticityToken!(this.session, token));
 }
 
 export type ProtectionMethodName = "null_session" | "reset_session" | "exception";

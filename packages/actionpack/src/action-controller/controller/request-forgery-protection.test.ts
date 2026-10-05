@@ -1,5 +1,13 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
-import { assertNothingRaised, assertRaises, include } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  Duration,
+  assertNothingRaised,
+  assertRaises,
+  include,
+  isBlank,
+  type Included,
+} from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   RoutingUrlFor,
@@ -8,15 +16,16 @@ import {
 } from "@blazetrails/actionview";
 import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import { TestCase } from "../test-case.js";
+import { TestCase, TestSession } from "../test-case.js";
 import {
+  CookieStore,
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
   RequestForgeryProtection,
   decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
-import "../../test-helpers/abstract-unit.js";
+import { CookieAssertions } from "../../test-helpers/abstract-unit.js";
 
 include(RoutingUrlFor, UrlFor);
 
@@ -238,6 +247,70 @@ class PerFormTokensController extends Base {
 PerFormTokensController.protectFromForgery({ with: "exception" });
 PerFormTokensController.perFormCsrfTokens = true;
 
+class SkipProtectionController extends Base {
+  private _skipRequested?: boolean;
+
+  skipRequested(): boolean | undefined {
+    return this._skipRequested;
+  }
+
+  setSkipRequested(skipRequested: boolean): void {
+    this._skipRequested = skipRequested;
+  }
+}
+include(SkipProtectionController, RequestForgeryProtectionActions);
+SkipProtectionController.protectFromForgery({ with: "exception" });
+SkipProtectionController.skipForgeryProtection({ if: "skipRequested" });
+
+class SkipProtectionWhenUnprotectedController extends Base {}
+include(SkipProtectionWhenUnprotectedController, RequestForgeryProtectionActions);
+SkipProtectionWhenUnprotectedController.skipForgeryProtection();
+
+class CookieCsrfTokenStorageStrategyController extends Base {
+  async reset(): Promise<void> {
+    this.resetCsrfToken(this.request);
+    this.head("ok");
+  }
+
+  async cookie(): Promise<void> {
+    await this.render({ inline: "<%= context.csrfMetaTags() %>" });
+  }
+
+  /** @internal */
+  private commitToken(): void {
+    this.request.commitCsrfToken();
+  }
+}
+include(CookieCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
+CookieCsrfTokenStorageStrategyController.afterAction("commitToken", { only: "cookie" });
+CookieCsrfTokenStorageStrategyController.protectFromForgery({
+  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  with: "exception",
+  store: "cookie",
+});
+
+class CustomCsrfTokenStorageStrategyController extends Base {
+  static CustomStrategy = class CustomStrategy {
+    fetch(request: { env: Record<string, unknown> }): string | null {
+      return request.env["custom_storage"] as string | null;
+    }
+
+    store(request: { env: Record<string, unknown> }, csrfToken: string): void {
+      request.env["custom_storage"] = csrfToken;
+    }
+
+    reset(request: { env: Record<string, unknown> }): void {
+      request.env["custom_storage"] = null;
+    }
+  };
+}
+include(CustomCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
+CustomCsrfTokenStorageStrategyController.protectFromForgery({
+  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  with: "reset_session",
+  store: new CustomCsrfTokenStorageStrategyController.CustomStrategy(),
+});
+
 class MockLogger {
   private _logged = new Map<string, string[]>();
 
@@ -271,14 +344,21 @@ const TOKEN = Buffer.from("railstestrailstestrailstestrails").toString("base64ur
 function RequestForgeryProtectionTests(
   controllerClass: new () => Base,
   assertBlockedOverride?: (block: () => Promise<unknown>) => Promise<unknown>,
+  overrides: {
+    testCase?: new (name: string) => TestCase;
+    setup?: (tc: TestCase) => void;
+    initializeCsrfToken?: (tc: TestCase, token: string) => void;
+    assertNotBlocked?: (tc: TestCase, block: () => Promise<unknown>) => Promise<void>;
+  } = {},
 ) {
   let tc: TestCase;
   let oldRequestForgeryProtectionToken: string | null;
 
   beforeEach(async ({ task }) => {
-    tc = new TestCase(task.name);
+    tc = new (overrides.testCase ?? TestCase)(task.name);
     tc.controller = new controllerClass();
     await tc.beforeSetup();
+    overrides.setup?.(tc);
     oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
   });
@@ -628,6 +708,7 @@ function RequestForgeryProtectionTests(
   });
 
   function initializeCsrfToken(token = TOKEN): void {
+    if (overrides.initializeCsrfToken) return overrides.initializeCsrfToken(tc, token);
     tc.session().set("_csrf_token", token);
   }
 
@@ -643,6 +724,7 @@ function RequestForgeryProtectionTests(
   }
 
   async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    if (overrides.assertNotBlocked) return overrides.assertNotBlocked(tc, block);
     tc.session().set("something_like_user_id", 1);
     await assertNothingRaised(block);
     expect(tc.session().get("something_like_user_id")).toBe(1);
@@ -676,7 +758,7 @@ function RequestForgeryProtectionTests(
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
   RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingResetSession);
 
-  // BLOCKED: port-action-view-csrf-helper-and-generated-layout-meta-tags
+  // BLOCKED: action-controller-test-case-has-no-assert-select
   it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
@@ -795,8 +877,13 @@ describe("FreeCookieControllerTest", () => {
     }
   });
 
-  // BLOCKED: port-action-view-csrf-helper-and-generated-layout-meta-tags
-  it.skip("should not emit a csrf-token meta tag", () => {});
+  it("should not emit a csrf-token meta tag", async ({ task }) => {
+    const tc = new TestCase(task.name);
+    tc.controller = new FreeCookieController();
+    await tc.beforeSetup();
+    await tc.get("meta");
+    expect(isBlank(tc.response.body)).toBe(true);
+  });
 });
 
 describe("CustomAuthenticityParamControllerTest", () => {
@@ -1173,30 +1260,248 @@ describe("PerFormTokensControllerTest", () => {
 });
 
 describe("SkipProtectionControllerTest", () => {
-  it.skip("should not allow post without token when not skipping", () => {});
-  it.skip("should allow post without token when skipping", () => {});
+  let tc: TestCase;
+  let controller: SkipProtectionController;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    controller = tc.controller = new SkipProtectionController();
+    await tc.beforeSetup();
+  });
+
+  it("should not allow post without token when not skipping", async () => {
+    controller.setSkipRequested(false);
+    await assertBlocked(() => tc.post("index"));
+  });
+
+  it("should allow post without token when skipping", async () => {
+    controller.setSkipRequested(true);
+    await assertNotBlocked(() => tc.post("index"));
+  });
+
+  async function assertBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertRaises([InvalidAuthenticityToken], {}, block);
+  }
+
+  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertNothingRaised(block);
+    tc.assertResponse("success");
+  }
 });
 
 describe("SkipProtectionWhenUnprotectedControllerTest", () => {
-  it.skip("should allow skip request when protection is not set", () => {});
+  let tc: TestCase;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new SkipProtectionWhenUnprotectedController();
+    await tc.beforeSetup();
+  });
+
+  it("should allow skip request when protection is not set", async () => {
+    await assertNotBlocked(() => tc.post("index"));
+  });
+
+  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertNothingRaised(block);
+    tc.assertResponse("success");
+  }
 });
 
 describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
-  it.skip("csrf token is stored in cookie", () => {});
-  it.skip("csrf token is stored in custom cookie", () => {});
-  it.skip("csrf token cookie has same site lax", () => {});
-  it.skip("csrf token cookie is http only", () => {});
-  it.skip("csrf token cookie is permanent", () => {});
-  it.skip("reset csrf token deletes cookie", () => {});
-  it.skip("should allow when session id in cookie matches session id", () => {});
-  it.skip("should not allow when session id in cookie does not match session id", () => {});
-  it.skip("should allow when session id in cookie and session id are nil", () => {});
-  it.skip("should not allow when session id in cookie but session id is nil", () => {});
-  it.skip("should allow when session id in cookie is nil and session created before token validation", () => {});
-  it.skip("should allow when session id in cookie is nil and session reset before token validation", () => {});
-  it.skip("should not allow when session id in cookie but request made with no session", () => {});
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include CookieAssertions`
+  class CookieCsrfTokenStorageStrategyControllerTest extends TestCase {}
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include CookieAssertions`; the merge is how `include()` types it
+  interface CookieCsrfTokenStorageStrategyControllerTest extends Included<
+    typeof CookieAssertions
+  > {}
+  include(CookieCsrfTokenStorageStrategyControllerTest, CookieAssertions);
+
+  class TestSession_ extends TestSession {
+    private _idWas: unknown;
+
+    constructor(idWas: unknown) {
+      super();
+      this._idWas = idWas;
+    }
+
+    override idWas(): unknown {
+      return this._idWas;
+    }
+  }
+
+  class NullSessionDummyKeyGenerator {
+    generateKey(_secret: string, _length: number | null = null): string {
+      return "03312270731a2ed0d11ed091c2338a06";
+    }
+  }
+
+  const { t } = RequestForgeryProtectionTests(
+    CookieCsrfTokenStorageStrategyController,
+    (block) => assertRaises([InvalidAuthenticityToken], {}, block),
+    {
+      testCase: CookieCsrfTokenStorageStrategyControllerTest,
+      setup(tc) {
+        tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
+        tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+      },
+      initializeCsrfToken: (_tc, token) => initializeCsrfToken(token),
+      assertNotBlocked: (_tc, block) => assertNotBlocked(block),
+    },
+  );
+  const tc = () => t() as CookieCsrfTokenStorageStrategyControllerTest;
+  const controller = () => tc().controller as CookieCsrfTokenStorageStrategyController;
+
+  async function stubFormAuthenticityToken(block: () => Promise<unknown>): Promise<void> {
+    const stub = vi.spyOn(controller(), "formAuthenticityToken").mockReturnValue(TOKEN);
+    try {
+      await block();
+    } finally {
+      stub.mockRestore();
+    }
+  }
+
+  it("csrf token is stored in cookie", async () => {
+    await tc().get("cookie");
+    expect(tc().session().isKey("_csrf_token")).toBe(false);
+    expect(tc().cookies().isKey("csrf_token")).toBe(true);
+  });
+
+  it("csrf token is stored in custom cookie", async () => {
+    (
+      controller() as unknown as { csrfTokenStorageStrategy: CookieStore }
+    ).csrfTokenStorageStrategy = new CookieStore("custom_cookie");
+    await tc().get("cookie");
+    expect(tc().cookies().isKey("csrf_token")).toBe(false);
+    expect(tc().cookies().isKey("custom_cookie")).toBe(true);
+  });
+
+  it("csrf token cookie has same site lax", async () => {
+    await tc().get("cookie");
+    tc().assertSetCookieAttributes("csrf_token", "SameSite=Lax");
+  });
+
+  it("csrf token cookie is http only", async () => {
+    await tc().get("cookie");
+
+    const cookies = tc().parseSetCookiesHeaders(tc().response.headers.get("Set-Cookie"));
+    const csrfTokenCookie = cookies.get("csrf_token")!;
+    expect(csrfTokenCookie["httponly"]).toBeTruthy();
+  });
+
+  it("csrf token cookie is permanent", async () => {
+    await tc().get("cookie");
+    expect(tc().response.headers.get("Set-Cookie")).toMatch(
+      new RegExp(`${Duration.years(20).fromNow().utc().year}`),
+    );
+  });
+
+  it("reset csrf token deletes cookie", async () => {
+    await tc().get("cookie");
+    await tc().get("reset");
+    expect(tc().cookies().get("csrf_token")).toBeUndefined();
+  });
+
+  it("should allow when session id in cookie matches session id", async () => {
+    initializeCsrfToken();
+
+    await stubFormAuthenticityToken(() =>
+      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should not allow when session id in cookie does not match session id", async () => {
+    initializeCsrfToken(TOKEN, new TestSession());
+
+    await stubFormAuthenticityToken(() =>
+      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should allow when session id in cookie and session id are nil", async () => {
+    tc().request.session = new TestSession({}, null as never) as never;
+    initializeCsrfToken(TOKEN, null);
+
+    await stubFormAuthenticityToken(() =>
+      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should not allow when session id in cookie but session id is nil", async () => {
+    initializeCsrfToken();
+    tc().request.session = new TestSession({}, null as never) as never;
+
+    await stubFormAuthenticityToken(() =>
+      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should allow when session id in cookie is nil and session created before token validation", async () => {
+    initializeCsrfToken(TOKEN, null);
+    tc().request.session = new TestSession_(null) as never;
+
+    await stubFormAuthenticityToken(() =>
+      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should allow when session id in cookie is nil and session reset before token validation", async () => {
+    initializeCsrfToken();
+    tc().request.session = new TestSession_(tc().session().id()) as never;
+
+    await stubFormAuthenticityToken(() =>
+      assertNotBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  it("should not allow when session id in cookie but request made with no session", async () => {
+    initializeCsrfToken();
+    tc().request.session = new TestSession_(null) as never;
+
+    await stubFormAuthenticityToken(() =>
+      assertBlocked(() => tc().post("index", { params: { custom_authenticity_token: TOKEN } })),
+    );
+  });
+
+  function initializeCsrfToken(
+    token = TOKEN,
+    session: { id(): unknown } | null = tc().session(),
+  ): void {
+    tc()
+      .cookies()
+      .encrypted.set("csrf_token", {
+        value: ActiveSupportJSON.encode({
+          token: token,
+          session_id: session?.id(),
+        }),
+        httpOnly: true,
+        sameSite: ":lax",
+      });
+  }
+
+  async function assertBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertRaises([InvalidAuthenticityToken], {}, block);
+  }
+
+  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertNothingRaised(block);
+    tc().assertResponse("success");
+  }
 });
 
 describe("CustomCsrfTokenStorageStrategyControllerTest", () => {
-  it.skip("csrf token is stored in custom location", () => {});
+  const { t } = RequestForgeryProtectionTests(CustomCsrfTokenStorageStrategyController, undefined, {
+    initializeCsrfToken: (_tc, token) => initializeCsrfToken(token),
+  });
+
+  it("csrf token is stored in custom location", async () => {
+    await t().post("index");
+    (t().controller as Base).commitCsrfToken(t().request);
+    expect(t().session().isKey("_csrf_token")).toBe(false);
+    expect(t().request.env["custom_storage"]).not.toBeNull();
+  });
+
+  function initializeCsrfToken(token = TOKEN): void {
+    t().request.env["custom_storage"] = token;
+  }
 });

@@ -202,8 +202,12 @@ export class CookieJar implements Iterable<[string, string]> {
     throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
   }
 
-  has(key: string): boolean {
-    return this._cookies.has(key);
+  isKey(name: string): boolean {
+    return this._cookies.has(String(name));
+  }
+
+  hasKey(name: string): boolean {
+    return this.isKey(name);
   }
 
   get keys(): string[] {
