@@ -21,6 +21,14 @@ import {
 import { addFile, createFile } from "./actions/create-file.js";
 import { addLink, createLink } from "./actions/create-link.js";
 import { emptyDirectory } from "./actions/empty-directory.js";
+import {
+  chmod,
+  commentLines,
+  gsubFile,
+  removeDir,
+  removeFile,
+  uncommentLines,
+} from "./actions/file-manipulation.js";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
 import type { Basic } from "./shell/basic.js";
@@ -318,6 +326,12 @@ export const Actions = new Module((mod) => {
       addFile,
       createLink,
       addLink,
+      chmod,
+      gsubFile,
+      uncommentLines,
+      commentLines,
+      removeFile,
+      removeDir,
       _sharedConfiguration,
       _cleanupOptionsAndSet,
     });
