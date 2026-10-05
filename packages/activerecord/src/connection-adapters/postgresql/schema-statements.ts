@@ -962,10 +962,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.removeConstraint(tableName, uniqueNameToDelete);
   }
 
-  /**
-   * @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
-   * @inventedArm loop — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map
-   */
+  /** @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const uniqueInfo = await this.internalExecQuery(

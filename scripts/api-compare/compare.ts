@@ -517,6 +517,29 @@ const NIL_GUARD_TOKEN = "if:nil-guard";
 const RETRY_LOOP_TOKEN = "loop:retry";
 
 /**
+ * A `for … of` whose multi-statement body awaits and ends by pushing onto a
+ * local (extract-ts-api.ts#awaitedCollect). It is the port of an awaiting
+ * `map` block (`activerecord/lib/active_record/explain.rb:21-29`) and equally
+ * of an `each` that `<<`s
+ * (`activerecord/lib/active_record/connection_handling.rb:98-104`), so it reads
+ * as `loop` while the Ruby stream still shows an unclaimed iteration, and as
+ * `ref:map` otherwise. With no counterpart it reads as `loop`.
+ */
+const COLLECT_LOOP_TOKEN = "loop:collect";
+
+function isPlainIteration(token: string, side: SkeletonSide): boolean {
+  if (token === "loop") return true;
+  if (!token.startsWith("ref:")) return false;
+  const name = token.slice("ref:".length);
+  if (side === "ts") return name === JS_ITERATION_CALLEE || TS_ITERATION_CALLEES.has(name);
+  return (
+    SKELETON_IDIOM_LOWERINGS.get(name)
+      ?.map((l) => l.join(" "))
+      .join() === "loop"
+  );
+}
+
+/**
  * The short-circuit MARKS: each is a `||` / `&&` one side spells where the
  * other spells one test, so each reads as its plain operator only while the
  * counterpart still shows an unclaimed one, and as nothing otherwise — the rule
@@ -577,6 +600,11 @@ export function foldSkeletonTokens(
   };
   let unclaimedIfs = unclaimed("if");
   let unclaimedLoops = unclaimed("loop");
+  let unclaimedIterations =
+    side !== "ts" || counterpart === undefined
+      ? Infinity
+      : counterpart.filter((t) => isPlainIteration(t, "ruby")).length -
+        skeleton.filter((t) => isPlainIteration(t, "ts")).length;
   const countOf = (tokens: readonly string[], token: string) =>
     tokens.filter((t) => t === token).length;
   const unclaimedShortCircuits = new Map(
@@ -607,6 +635,10 @@ export function foldSkeletonTokens(
     }
     if (token === NIL_GUARD_TOKEN) {
       folded.push(unclaimedIfs-- > 0 ? "if" : "and");
+      continue;
+    }
+    if (token === COLLECT_LOOP_TOKEN) {
+      folded.push(unclaimedIterations-- > 0 ? "loop" : "ref:map");
       continue;
     }
     if (token === RETRY_LOOP_TOKEN) {

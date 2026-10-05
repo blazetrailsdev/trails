@@ -913,6 +913,32 @@ describe("body call capture", () => {
     expect(skeleton("backwards")).toEqual(["if"]);
   });
 
+  it("emits no arm for an optional positional bound ahead of a required one", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        update(id: unknown, attributes?: object) {
+          if (attributes === undefined) [id, attributes] = [":all", id as object];
+          return this.find(id, attributes);
+        }
+        testsTheEarlier(id: unknown, attributes?: object) {
+          if (id === undefined) [id, attributes] = [":all", id];
+        }
+        movesSomethingElse(id: unknown, attributes?: object) {
+          if (attributes === undefined) [id, attributes] = [":all", this.defaults()];
+        }
+        afterSideEffect(id: unknown, attributes?: object) {
+          this.log(id);
+          if (attributes === undefined) [id, attributes] = [":all", id];
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("update")).toEqual(["ref:find"]);
+    expect(skeleton("testsTheEarlier")).toEqual(["if"]);
+    expect(skeleton("movesSomethingElse")).toEqual(["if", "ref:defaults"]);
+    expect(skeleton("afterSideEffect")).toEqual(["ref:log", "if"]);
+  });
+
   it("still emits one arm per case clause that carries its own body", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -1486,6 +1512,32 @@ describe("body call capture", () => {
           for (const attr of attributes) records.push(this.build(attr));
           return records;
         }
+        async block(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            let msg = await this.clause(sql);
+            if (sql) msg += this.render(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
+        async skipping(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            if (!sql) continue;
+            const msg = await this.clause(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
+        syncBlock(queries: string[]) {
+          const msgs: string[] = [];
+          for (const sql of queries) {
+            const msg = this.render(sql);
+            msgs.push(msg);
+          }
+          return msgs;
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
@@ -1493,6 +1545,9 @@ describe("body call capture", () => {
     expect(skeleton("braced")).toEqual(["ref:map", "ref:create"]);
     expect(skeleton("guarded")).toEqual(["loop", "if", "ref:push", "ref:create"]);
     expect(skeleton("sync")).toEqual(["loop", "ref:push", "ref:build"]);
+    expect(skeleton("block")).toEqual(["loop:collect", "ref:clause", "if", "ref:render"]);
+    expect(skeleton("skipping")).toEqual(["loop", "if", "ref:clause", "ref:push"]);
+    expect(skeleton("syncBlock")).toEqual(["loop", "ref:render", "ref:push"]);
   });
 
   it("marks a call made in a negated position with the ! prefix", () => {

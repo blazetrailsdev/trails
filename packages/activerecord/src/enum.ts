@@ -5,16 +5,10 @@ import {
   underscore,
   isBlank,
   pluralize,
+  presence,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import {
-  Module,
-  include,
-  isSymbol,
-  rbInspect,
-  symbolToS,
-  registerConstant,
-} from "@blazetrails/ruby-compat";
+import { Module, include, rbInspect, registerConstant, toS } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
@@ -69,12 +63,12 @@ export class EnumType extends ValueType<string> {
 
   cast(value: unknown): string | null {
     if (this._mapping.hasKey(value as string)) {
-      return isSymbol(value) ? symbolToS(value) : (value as string);
-    }
-    if (this._reverseMapping.has(value as EnumValue)) {
+      return toS(value);
+    } else if (this._reverseMapping.has(value as EnumValue)) {
       return this._reverseMapping.get(value as EnumValue)!;
+    } else {
+      return (presence(value) ?? null) as string | null;
     }
-    return isBlank(value) ? null : (value as string);
   }
 
   deserialize(value: unknown): string | null {
@@ -99,10 +93,16 @@ export class EnumType extends ValueType<string> {
 
   assertValidValue(value: unknown): void {
     if (!this._raiseOnInvalidValues) return;
-    if (isBlank(value)) return;
-    if (this._mapping.hasKey(value as string)) return;
-    if (this._reverseMapping.has(value as EnumValue)) return;
-    throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
+
+    if (
+      !(
+        isBlank(value) ||
+        this._mapping.hasKey(value as string) ||
+        this._reverseMapping.has(value as EnumValue)
+      )
+    ) {
+      throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
+    }
   }
 
   /** @internal */
@@ -400,13 +400,15 @@ const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, 
 
 /** @internal */
 export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumMethods {
-  let mod = _enumMethodsModuleRegistry.get(this);
-  if (!mod) {
-    mod = new EnumMethods(this);
-    include(this as unknown as new (...args: unknown[]) => unknown, mod);
-    _enumMethodsModuleRegistry.set(this, mod);
-  }
-  return mod;
+  return (
+    _enumMethodsModuleRegistry.get(this) ??
+    (() => {
+      const mod = new EnumMethods(this);
+      include(this as unknown as new (...args: unknown[]) => unknown, mod);
+      _enumMethodsModuleRegistry.set(this, mod);
+      return mod;
+    })()
+  );
 }
 
 /** @internal */
@@ -460,7 +462,7 @@ export function assertValidEnumDefinitionValues(
     if (keys.length === 0) {
       throw new ArgumentError(`Enum values ${rbInspect(values)} must not be empty.`);
     }
-    if (keys.some((k) => isBlank(k.startsWith(":") ? k.slice(1) : k))) {
+    if (keys.some((k) => isBlank(toS(k)))) {
       throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
     }
     return values;
@@ -478,7 +480,7 @@ export function assertValidEnumDefinitionValues(
         `Enum values ${rbInspect(values)} must only contain symbols or strings.`,
       );
     }
-    if (values.some((v) => isBlank(v.startsWith(":") ? v.slice(1) : v))) {
+    if (values.some((v) => isBlank(toS(v)))) {
       throw new ArgumentError(`Enum values ${rbInspect(values)} must not contain a blank name.`);
     }
     return values;
@@ -496,15 +498,13 @@ function isPlainHash(value: unknown): boolean {
 }
 
 /** @internal */
-export function assertValidEnumOptions(options: unknown): void {
-  if (!options || !isPlainHash(options)) return;
-
-  const invalidKeys = ["_prefix", "_suffix", "_scopes", "_default", "_instance_methods"];
-  const found = Object.keys(options).filter((k) => invalidKeys.includes(k));
-
-  if (found.length > 0) {
+export function assertValidEnumOptions(options: object): void {
+  const invalidKeys = Object.keys(options).filter((key) =>
+    ["_prefix", "_suffix", "_scopes", "_default", "_instance_methods"].includes(key),
+  );
+  if (invalidKeys.length > 0) {
     throw new ArgumentError(
-      `invalid option(s): ${found.map((k) => `:${k}`).join(", ")}. Valid options are: :prefix, :suffix, :scopes, :default, :instance_methods, and :validate.`,
+      `invalid option(s): ${invalidKeys.map((k) => `:${k}`).join(", ")}. Valid options are: :prefix, :suffix, :scopes, :default, :instance_methods, and :validate.`,
     );
   }
 }
