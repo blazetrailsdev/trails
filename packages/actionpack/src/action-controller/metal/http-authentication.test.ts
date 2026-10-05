@@ -1,32 +1,18 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
-import {
-  authenticate,
-  authenticationRequest,
-  authParam,
-  authScheme,
-  decodeCredentials,
-  encodeCredentials,
-  hasBasicCredentials,
-  userNameAndPassword,
-  authenticateOrRequestWithHttpBasic,
-  authenticateWithHttpBasic,
-  httpBasicAuthenticateOrRequestWith,
-  httpBasicAuthenticateWith,
-  requestHttpBasicAuthentication,
-  decodeDigestCredentials,
-  expectedResponse,
-  ha1,
-  encodeDigestCredentials,
-  nonce,
-  validateNonce,
-  opaque,
-  digestAuthenticationRequest,
-  secretToken,
-  validateDigestResponse,
-  requestHttpDigestAuthentication,
-} from "./http-authentication.js";
+import { HttpAuthentication } from "./http-authentication.js";
+
+const { Basic, Digest, Token } = HttpAuthentication;
+const { authenticate, authenticationRequest, authParam, authScheme, decodeCredentials } = Basic;
+const { encodeCredentials, hasBasicCredentials, userNameAndPassword } = Basic;
+const { authenticateOrRequestWithHttpBasic, authenticateWithHttpBasic } = Basic.ControllerMethods;
+const { httpBasicAuthenticateOrRequestWith, requestHttpBasicAuthentication } =
+  Basic.ControllerMethods;
+const { httpBasicAuthenticateWith } = Basic.ControllerMethods.ClassMethods;
+const { expectedResponse, ha1, nonce, validateNonce, opaque, secretToken } = Digest;
+const { validateDigestResponse } = Digest;
+const { requestHttpDigestAuthentication } = Digest.ControllerMethods;
 
 class TestController extends Base {}
 
@@ -92,7 +78,9 @@ describe("HttpAuthentication::Basic::ControllerMethods", () => {
     const ok = ctrl(encodeCredentials("u", "p"));
     expect(authenticateOrRequestWithHttpBasic.call(ok, null, null, () => "OK")).toBe("OK");
     const fail = ctrl();
-    expect(authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(false);
+    expect(authenticateOrRequestWithHttpBasic.call(fail, null, null, () => "OK")).toBe(
+      "HTTP Basic: Access denied.\n",
+    );
     expect(fail.status).toBe(401);
     expect(fail.headers.get("WWW-Authenticate")).toBe('Basic realm="Application"');
   });
@@ -111,7 +99,7 @@ describe("HttpAuthentication::Basic::ControllerMethods", () => {
     );
     const bad = ctrl(encodeCredentials("dhh", "wrong"));
     expect(httpBasicAuthenticateOrRequestWith.call(bad, { name: "dhh", password: "secret" })).toBe(
-      false,
+      "HTTP Basic: Access denied.\n",
     );
     expect(bad.status).toBe(401);
   });
@@ -165,7 +153,7 @@ describe("HttpAuthentication::Digest", () => {
   it("decode_credentials parses Digest header into key-value record", () => {
     const header =
       'Digest username="lifo", realm="SuperSecret", nonce="abc", uri="/", response="xyz"';
-    const creds = decodeDigestCredentials(header);
+    const creds = Digest.decodeCredentials(header);
     expect(creds.username).toBe("lifo");
     expect(creds.realm).toBe("SuperSecret");
     expect(creds.nonce).toBe("abc");
@@ -173,7 +161,7 @@ describe("HttpAuthentication::Digest", () => {
 
   it("decode_credentials handles quoted and unquoted values", () => {
     const header = 'Digest username="user", nc=00000001';
-    const creds = decodeDigestCredentials(header);
+    const creds = Digest.decodeCredentials(header);
     expect(creds.username).toBe("user");
     expect(creds.nc).toBe("00000001");
   });
@@ -237,14 +225,14 @@ describe("HttpAuthentication::Digest", () => {
       qop: "auth",
       uri: "/",
     };
-    const encoded = encodeDigestCredentials("GET", creds, "world", false);
+    const encoded = Digest.encodeCredentials("GET", creds, "world", false);
     expect(encoded).toMatch(/^Digest /);
     expect(encoded).toMatch(/response=/);
   });
 
   it("authentication_request sets 401 + WWW-Authenticate Digest header", () => {
     const c = makeDigestCtrl();
-    digestAuthenticationRequest(c, "SuperSecret", null);
+    Digest.authenticationRequest(c, "SuperSecret", null);
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.responseBody).toBe("HTTP Digest: Access denied.\n");
@@ -252,7 +240,7 @@ describe("HttpAuthentication::Digest", () => {
 
   it("authentication_request uses provided message", () => {
     const c = makeDigestCtrl();
-    digestAuthenticationRequest(c, "SuperSecret", "Authentication Failed");
+    Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
     expect(c.responseBody).toBe("Authentication Failed");
   });
 
@@ -284,5 +272,34 @@ describe("HttpAuthentication::Digest::ControllerMethods", () => {
     expect(c.status).toBe(401);
     expect(c.headers.get("WWW-Authenticate")).toMatch(/^Digest realm="SuperSecret"/);
     expect(c.responseBody).toBe("Auth Failed");
+  });
+});
+
+describe("HttpAuthentication::Token::ControllerMethods", () => {
+  it("authenticateWithHttpToken yields the token and its options", () => {
+    const c = ctrl(Token.encodeCredentials("lifo", { algorithm: "test" }));
+    expect(
+      c.authenticateWithHttpToken((token, options) => [token, options.get("algorithm")]),
+    ).toEqual(["lifo", "test"]);
+    expect(ctrl("Bearer lifo").authenticateWithHttpToken((token) => token)).toBe("lifo");
+    expect(ctrl("Basic lifo").authenticateWithHttpToken((token) => token)).toBeUndefined();
+  });
+
+  it("authenticateOrRequestWithHttpToken renders 401 with the Token challenge", async () => {
+    const c = ctrl('Token token="nope"');
+    await c.authenticateOrRequestWithHttpToken(
+      'Super"Secret',
+      "Authentication Failed\n",
+      () => false,
+    );
+    expect(c.status).toBe(401);
+    expect(c.headers.get("WWW-Authenticate")).toBe('Token realm="SuperSecret"');
+    expect(c.responseBody).toBe("Authentication Failed\n");
+  });
+
+  it("encodeCredentials inspects the token and each option", () => {
+    expect(Token.encodeCredentials('"quote" pretty', { nonce: 1 })).toBe(
+      'Token token="\\"quote\\" pretty", nonce="1"',
+    );
   });
 });

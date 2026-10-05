@@ -681,34 +681,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "authenticate_or_request_with_http_basic",
-    "digest": "df3a62bc0f71af80",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "authenticate_or_request_with_http_digest",
-    "digest": "15c19d82f381aa31",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "authenticate_with_http_basic",
-    "digest": "82b0e40a87935162",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "authenticate_with_http_digest",
-    "digest": "3cc492f405663a83",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "cleanup_view_runtime",
     "digest": "0a252ca5c7e40056",
     "ref": "v8.0.2"
@@ -793,13 +765,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "base.rb",
-    "rubyName": "http_basic_authenticate_or_request_with",
-    "digest": "33a299248f32f0a6",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
     "rubyName": "initialize",
     "digest": "cab1e19689f2ddff",
     "ref": "v8.0.2"
@@ -865,20 +830,6 @@
     "rubyFile": "base.rb",
     "rubyName": "render_to_string",
     "digest": "01c82edf8e6b62c2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "request_http_basic_authentication",
-    "digest": "b90720cabaaccefd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "request_http_digest_authentication",
-    "digest": "bfbd1ca85fe957d1",
     "ref": "v8.0.2"
   },
   {

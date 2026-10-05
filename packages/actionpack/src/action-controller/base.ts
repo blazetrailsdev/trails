@@ -5,6 +5,7 @@ import {
   mattrAccessor,
   extend,
   include,
+  type Included,
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import { File, getCrypto } from "@blazetrails/ruby-compat";
@@ -136,16 +137,7 @@ import {
   writeFragment,
   type FragmentsClassMethods,
 } from "../abstract-controller/caching/fragments.js";
-import {
-  authenticateOrRequestWithHttpBasic,
-  authenticateWithHttpBasic,
-  httpBasicAuthenticateOrRequestWith,
-  httpBasicAuthenticateWith,
-  requestHttpBasicAuthentication,
-  authenticateOrRequestWithHttpDigest,
-  authenticateWithHttpDigest,
-  requestHttpDigestAuthentication,
-} from "./metal/http-authentication.js";
+import { HttpAuthentication } from "./metal/http-authentication.js";
 import {
   sendFileHeadersBang,
   type SendDataOptions,
@@ -309,7 +301,11 @@ export const PROTECTED_IVARS: readonly string[] = [
 ];
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base {
+export interface Base
+  extends
+    Included<typeof HttpAuthentication.Basic.ControllerMethods>,
+    Included<typeof HttpAuthentication.Digest.ControllerMethods>,
+    Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   urlFor(options?: UrlForOptions): string;
@@ -662,15 +658,9 @@ export class Base extends Metal {
     this._wrapperOptions = dup;
   }
 
-  static httpBasicAuthenticateWith = httpBasicAuthenticateWith;
-  httpBasicAuthenticateOrRequestWith = httpBasicAuthenticateOrRequestWith;
-  authenticateOrRequestWithHttpBasic = authenticateOrRequestWithHttpBasic;
-  authenticateWithHttpBasic = authenticateWithHttpBasic;
-  requestHttpBasicAuthentication = requestHttpBasicAuthentication;
-
-  authenticateOrRequestWithHttpDigest = authenticateOrRequestWithHttpDigest;
-  authenticateWithHttpDigest = authenticateWithHttpDigest;
-  requestHttpDigestAuthentication = requestHttpDigestAuthentication;
+  declare static httpBasicAuthenticateWith: OmitThisParameter<
+    typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith
+  >;
 
   static rescueFrom(errorClass: new (...args: any[]) => Error, handler: RescueHandler): void {
     if (!Object.prototype.hasOwnProperty.call(this, "_rescueHandlers")) {
@@ -962,6 +952,9 @@ Base.prototype.expireFragment = expireFragment;
 
 include(Base, Caching);
 extend(Base, ViewPathsClassMethods);
+include(Base, HttpAuthentication.Basic.ControllerMethods);
+include(Base, HttpAuthentication.Digest.ControllerMethods);
+include(Base, HttpAuthentication.Token.ControllerMethods);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Redirecting);
 include(Base, Instrumentation);
