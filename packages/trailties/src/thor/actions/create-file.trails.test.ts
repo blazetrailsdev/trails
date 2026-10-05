@@ -6,9 +6,6 @@ import { Shell } from "../shell.js";
 import { Thor } from "../thor.js";
 
 class Script extends Thor {
-  static baseclass(): unknown {
-    return Script;
-  }
   static {
     include(this, Shell);
     include(this, Actions);
@@ -115,5 +112,57 @@ describe("Thor::Actions create_file, create_link and empty_directory (trails)", 
     });
     expect(File.isSymlink(File.join(root, "link.txt"))).toBe(true);
     expect(out).toMatch(/identical {2}link\.txt/);
+  });
+
+  it("forces a changed file when the shell answers the collision", async () => {
+    File.write(File.join(root, "a.txt"), "old");
+    const out = await capture(":stdout", () => host().createFile("a.txt", "new"));
+    expect(out).toMatch(/conflict {2}a\.txt\n\s+force {2}a\.txt/);
+    expect(File.read(File.join(root, "a.txt"))).toBe("new");
+  });
+
+  it("leaves an unknown encoded instruction as it is and converts a nil answer to an empty string", async () => {
+    const r = host() as Host & { blank(): null };
+    r.blank = () => null;
+    await capture(":stdout", async () => {
+      expect(await r.createFile("%missing%.rb", "x")).toBe("%missing%.rb");
+      expect(await r.createFile("a%blank%.rb", "x")).toBe("a.rb");
+    });
+  });
+
+  it("creates the file with the given perm", async () => {
+    await capture(":stdout", () => host().createFile("run.sh", "x", { perm: 0o755 }));
+    expect(File.stat(File.join(root, "run.sh")).mode & 0o777).toBe(0o755);
+  });
+
+  it("removes a created file on revoke and answers the given destination", async () => {
+    await capture(":stdout", () => host().createFile("a.txt", "x"));
+    let result: unknown;
+    await capture(":stdout", async () => {
+      result = await host({}, { behavior: "revoke" }).createFile("a.txt", "x");
+    });
+    expect(result).toBe("a.txt");
+    expect(File.isExist(File.join(root, "a.txt"))).toBe(false);
+  });
+
+  it("reports file_clash when the destination is a directory", async () => {
+    FileUtils.mkdirP(File.join(root, "doc"));
+    const out = await capture(":stdout", () => host().createFile("doc", "x"));
+    expect(out).toMatch(/file_clash {2}doc/);
+    expect(File.isDirectory(File.join(root, "doc"))).toBe(true);
+  });
+
+  it("creates a hard link with symbolic: false and replaces an existing link", async () => {
+    const source = File.join(root, "source.txt");
+    File.write(source, "x");
+    File.write(File.join(root, "other.txt"), "y");
+    await capture(":stdout", async () => {
+      await host().createLink("hard.txt", source, { symbolic: false });
+      await host({ force: true }).createLink("hard.txt", File.join(root, "other.txt"), {
+        symbolic: false,
+      });
+    });
+    expect(File.isSymlink(File.join(root, "hard.txt"))).toBe(false);
+    expect(File.read(File.join(root, "hard.txt"))).toBe("y");
   });
 });

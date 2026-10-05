@@ -64,8 +64,8 @@ export class CreateFile extends EmptyDirectory {
   override async invokeBang(): Promise<unknown> {
     await this.invokeWithConflictCheck(async () => {
       await FileUtils.mkdirPAsync(File.dirname(this.destination));
-      await getFs().writeFile!(this.destination, await this.render(), {
-        mode: this.config["perm"] as number | undefined,
+      await File.writeAsync(this.destination, await this.render(), {
+        perm: this.config["perm"] as number | undefined,
       });
     });
     return this.givenDestination;
@@ -100,10 +100,6 @@ export class CreateFile extends EmptyDirectory {
 
   /** @internal */
   protected isForceOnCollision(): unknown {
-    return (
-      this.base.shell as unknown as {
-        fileCollision(destination: string, block: () => unknown): unknown;
-      }
-    ).fileCollision(this.destination, () => this.render());
+    return this.base.shell.fileCollision(this.destination, () => this.render());
   }
 }

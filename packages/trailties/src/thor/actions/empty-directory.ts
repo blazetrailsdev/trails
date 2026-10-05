@@ -74,7 +74,7 @@ export class EmptyDirectory {
 
   /** @internal */
   protected set destination(destination: string | null | undefined) {
-    if (destination == null) return;
+    if (!rtest(destination)) return;
     this.givenDestination = this.convertEncodedInstructions(toS(destination));
     this._destination = File.expandPath(this.givenDestination, this.base.destinationRoot);
     this.relativeDestination = this.base.relativeToOriginalDestinationRoot(this._destination);
@@ -88,7 +88,7 @@ export class EmptyDirectory {
     return filename.replace(/%(.*?)%/g, (initialString: string, $1: string) => {
       const method = strip($1);
       return rbObjRespondTo(this.base, method, true)
-        ? (rbFSend(this.base, method) as string)
+        ? toS(rbFSend(this.base, method))
         : initialString;
     });
   }

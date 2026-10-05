@@ -1,4 +1,4 @@
-import { File, FileUtils, getFs, Hash, last, rbObjIsKindOf, rtest } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Hash, last, rbObjIsKindOf, rtest } from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
 import { CreateFile } from "./create-file.js";
 
@@ -19,7 +19,7 @@ export class CreateLink extends CreateFile {
     await this.invokeWithConflictCheck(async () => {
       await FileUtils.mkdirPAsync(File.dirname(this.destination));
       if (this.config["symbolic"] == null) this.config["symbolic"] = true;
-      if (await this.isExists()) await getFs().unlink!(this.destination);
+      if (await this.isExists()) await File.deleteAsync(this.destination);
       if (rtest(this.config["symbolic"])) {
         await File.symlinkAsync(await this.render(), this.destination);
       } else {
