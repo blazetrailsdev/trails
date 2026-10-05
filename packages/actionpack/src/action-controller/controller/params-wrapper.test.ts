@@ -1,180 +1,164 @@
-import { describe, it, expect } from "vitest";
-import { wrapParameters, applyParamsWrapper, deriveWrapperKey } from "../params-wrapper.js";
-import { Parameters } from "../metal/strong-parameters.js";
+import { assertCalled, assertEqual } from "@blazetrails/activesupport";
+import { except } from "@blazetrails/ruby-compat";
+import { afterEach, beforeEach, describe, it } from "vitest";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
+import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
+
+class UsersController extends Base {
+  static lastParameters: Record<string, unknown> | null = null;
+
+  parse() {
+    UsersController.lastParameters = except(this.request.params, "controller", "action");
+    this.head("ok");
+  }
+}
+
+class Person {
+  static attributeNames(): string[] {
+    return [];
+  }
+}
+
+class ParamsWrapperTest extends TestCase {
+  static {
+    this.tests(UsersController);
+  }
+
+  override setup(): void {
+    super.setup();
+    this.routes = SharedTestRoutes;
+  }
+}
 
 describe("ParamsWrapperTest", () => {
-  describe("wrapParameters", () => {
-    it("creates config with key", () => {
-      const config = wrapParameters("user");
-      expect(config.key).toBe("user");
-    });
+  let tc: ParamsWrapperTest;
 
-    it("defaults to json format", () => {
-      const config = wrapParameters("user");
-      expect(config.format.has("json")).toBe(true);
-    });
+  beforeEach(async ({ task }) => {
+    tc = new ParamsWrapperTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
 
-    it("accepts custom format", () => {
-      const config = wrapParameters("user", { format: "xml" });
-      expect(config.format.has("xml")).toBe(true);
-      expect(config.format.has("json")).toBe(false);
-    });
+  afterEach(() => {
+    UsersController.lastParameters = null;
+  });
 
-    it("accepts multiple formats", () => {
-      const config = wrapParameters("user", { format: ["json", "xml"] });
-      expect(config.format.has("json")).toBe(true);
-      expect(config.format.has("xml")).toBe(true);
-    });
+  async function withDefaultWrapperOptions(block: () => void | Promise<void>): Promise<void> {
+    const klass = tc.controller.constructor as typeof UsersController;
+    klass._setWrapperOptions({ format: [":json"] });
+    klass.inheritedParamsWrapper();
+    await block();
+  }
 
-    it("include restricts wrapped keys", () => {
-      const config = wrapParameters("user", { include: ["name", "email"] });
-      expect(config.include).not.toBeNull();
-      expect(config.include!.has("name")).toBe(true);
-      expect(config.include!.has("email")).toBe(true);
-    });
+  function assertParameters(expected: Record<string, unknown>): void {
+    assertEqual(expected, UsersController.lastParameters);
+  }
 
-    it("exclude adds to default exclusions", () => {
-      const config = wrapParameters("user", { exclude: ["admin"] });
-      expect(config.exclude.has("admin")).toBe(true);
-      expect(config.exclude.has("controller")).toBe(true);
+  it("specify wrapper name", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters("person");
+
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu" } });
+      assertParameters({ username: "sikachu", person: { username: "sikachu" } });
     });
   });
 
-  describe("applyParamsWrapper", () => {
-    it("wraps parameters under key", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({ name: "Dean", email: "d@e.com" });
-      const wrapped = applyParamsWrapper(params, config);
+  it("specify wrapper model", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters(Person);
 
-      const user = wrapped.get("user") as Parameters;
-      expect(user).toBeInstanceOf(Parameters);
-      expect(user.get("name")).toBe("Dean");
-      expect(user.get("email")).toBe("d@e.com");
-    });
-
-    it("preserves original params at top level", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({ name: "Dean" });
-      const wrapped = applyParamsWrapper(params, config);
-
-      expect(wrapped.get("name")).toBe("Dean");
-      expect(wrapped.get("user")).toBeInstanceOf(Parameters);
-    });
-
-    it("excludes framework parameters from wrapped hash", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({
-        name: "Dean",
-        controller: "users",
-        action: "create",
-        format: "json",
-      });
-      const wrapped = applyParamsWrapper(params, config);
-
-      const user = wrapped.get("user") as Parameters;
-      expect(user.get("name")).toBe("Dean");
-      expect(user.has("controller")).toBe(false);
-      expect(user.has("action")).toBe(false);
-      expect(user.has("format")).toBe(false);
-    });
-
-    it("excludes authenticity_token", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({
-        name: "Dean",
-        authenticity_token: "abc123",
-      });
-      const wrapped = applyParamsWrapper(params, config);
-
-      const user = wrapped.get("user") as Parameters;
-      expect(user.has("authenticity_token")).toBe(false);
-    });
-
-    it("excludes custom exclude keys", () => {
-      const config = wrapParameters("user", { exclude: ["admin"] });
-      const params = new Parameters({ name: "Dean", admin: "true" });
-      const wrapped = applyParamsWrapper(params, config);
-
-      const user = wrapped.get("user") as Parameters;
-      expect(user.has("admin")).toBe(false);
-    });
-
-    it("only includes specified keys when include is set", () => {
-      const config = wrapParameters("user", { include: ["name"] });
-      const params = new Parameters({ name: "Dean", email: "d@e.com", admin: "true" });
-      const wrapped = applyParamsWrapper(params, config);
-
-      const user = wrapped.get("user") as Parameters;
-      expect(user.get("name")).toBe("Dean");
-      expect(user.has("email")).toBe(false);
-      expect(user.has("admin")).toBe(false);
-    });
-
-    it("does not wrap for non-matching format", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({ name: "Dean" });
-      const result = applyParamsWrapper(params, config, "html");
-
-      expect(result.has("user")).toBe(false);
-    });
-
-    it("wraps for matching format", () => {
-      const config = wrapParameters("user", { format: "xml" });
-      const params = new Parameters({ name: "Dean" });
-      const result = applyParamsWrapper(params, config, "xml");
-
-      expect(result.has("user")).toBe(true);
-    });
-
-    it("does not wrap if key already exists", () => {
-      const config = wrapParameters("user");
-      const userParams = new Parameters({ name: "Existing" });
-      const params = new Parameters({ user: userParams, extra: "val" });
-      const result = applyParamsWrapper(params, config);
-
-      expect(result.get("user")).toBe(userParams);
-    });
-
-    it("does not wrap when no wrappable keys", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({ controller: "users", action: "create" });
-      const result = applyParamsWrapper(params, config);
-
-      expect(result.has("user")).toBe(false);
-    });
-
-    it("wraps empty params returns original", () => {
-      const config = wrapParameters("user");
-      const params = new Parameters({});
-      const result = applyParamsWrapper(params, config);
-
-      expect(result.has("user")).toBe(false);
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu" } });
+      assertParameters({ username: "sikachu", person: { username: "sikachu" } });
     });
   });
 
-  describe("deriveWrapperKey", () => {
-    it("derives from simple controller name", () => {
-      expect(deriveWrapperKey("UsersController")).toBe("user");
-    });
+  it("specify include option", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters({ include: "username" });
 
-    it("derives from singular controller name", () => {
-      expect(deriveWrapperKey("UserController")).toBe("user");
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+      assertParameters({
+        username: "sikachu",
+        title: "Developer",
+        user: { username: "sikachu" },
+      });
     });
+  });
 
-    it("derives from namespaced controller", () => {
-      expect(deriveWrapperKey("Admin::PostsController")).toBe("post");
+  it("specify exclude option", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters({ exclude: "title" });
+
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+      assertParameters({
+        username: "sikachu",
+        title: "Developer",
+        user: { username: "sikachu" },
+      });
     });
+  });
 
-    it("derives from slash-namespaced controller", () => {
-      expect(deriveWrapperKey("Admin/PostsController")).toBe("post");
+  it("specify both wrapper name and include option", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters("person", { include: "username" });
+
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+      assertParameters({
+        username: "sikachu",
+        title: "Developer",
+        person: { username: "sikachu" },
+      });
     });
+  });
 
-    it("handles controller without Controller suffix", () => {
-      expect(deriveWrapperKey("Posts")).toBe("post");
+  it("wrap parameters false", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters(false);
+      tc.request.env["CONTENT_TYPE"] = "application/json";
+      await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+      assertParameters({ username: "sikachu", title: "Developer" });
     });
+  });
 
-    it("lowercases first letter", () => {
-      expect(deriveWrapperKey("ArticlesController")).toBe("article");
+  it("specify format", async () => {
+    await withDefaultWrapperOptions(async () => {
+      UsersController.wrapParameters({ format: ":xml" });
+
+      tc.request.env["CONTENT_TYPE"] = "application/xml";
+      await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+      assertParameters({
+        username: "sikachu",
+        title: "Developer",
+        user: { username: "sikachu", title: "Developer" },
+      });
+    });
+  });
+
+  it("derived wrapped keys from specified model", async () => {
+    await withDefaultWrapperOptions(async () => {
+      await assertCalled(
+        Person,
+        "attributeNames",
+        null,
+        { times: 2, returns: ["username"] },
+        async () => {
+          UsersController.wrapParameters(Person);
+
+          tc.request.env["CONTENT_TYPE"] = "application/json";
+          await tc.post("parse", { params: { username: "sikachu", title: "Developer" } });
+          assertParameters({
+            username: "sikachu",
+            title: "Developer",
+            person: { username: "sikachu" },
+          });
+        },
+      );
     });
   });
 });

@@ -1,6 +1,24 @@
-import { hasKey, mergeBang, slice } from "@blazetrails/ruby-compat";
+import {
+  hasKey,
+  last,
+  merge,
+  mergeBang,
+  rbObjRespondTo,
+  slice,
+  toS,
+} from "@blazetrails/ruby-compat";
 
-import { demodulize, singularize, underscore } from "@blazetrails/activesupport";
+import {
+  any,
+  classify,
+  demodulize,
+  isAnonymous,
+  isPlainObject,
+  safeConstantize,
+  singularize,
+  underscore,
+  wrap,
+} from "@blazetrails/activesupport";
 
 import { ParseError } from "../../action-dispatch/http/parameters.js";
 
@@ -8,64 +26,149 @@ import { ParseError } from "../../action-dispatch/http/parameters.js";
 export const EXCLUDE_PARAMETERS = ["authenticity_token", "_method", "utf8"];
 
 export class Options {
-  name: string | null;
-  format: string[] | null;
-  include: string[] | null;
+  private _name: string | null;
+  format: string[];
+  private _include: string[] | null;
   exclude: string[] | null;
-  klass: unknown;
-  model: unknown;
-  nameSet: boolean;
+  klass: WrapperHostClass | null;
+  private _model: unknown;
+  private includeSet: boolean;
+  private nameSet: boolean;
 
+  static fromHash(hash: Record<string, unknown>): Options {
+    const name = (hash.name ?? null) as string | null;
+    const format = wrap(hash.format) as string[];
+    const include = hash.include != null ? wrap(hash.include).map((attr) => toS(attr)) : null;
+    const exclude = hash.exclude != null ? wrap(hash.exclude).map((attr) => toS(attr)) : null;
+    return new Options(name, format, include, exclude, null, null);
+  }
+
+  /** @internal */
   constructor(
-    name: string | null = null,
-    format: string[] | null = null,
-    include: string[] | null = null,
-    exclude: string[] | null = null,
-    klass: unknown = null,
-    model: unknown = null,
+    name: string | null,
+    format: string[],
+    include: string[] | null,
+    exclude: string[] | null,
+    klass: WrapperHostClass | null,
+    model: unknown,
   ) {
-    this.name = name;
+    this._name = name;
     this.format = format;
-    this.include = include;
+    this._include = include;
     this.exclude = exclude;
     this.klass = klass;
-    this.model = model;
+    this._model = model;
+    this.includeSet = include != null;
     this.nameSet = name != null;
   }
 
-  static fromHash(hash: Record<string, unknown>): Options {
-    const rawFormat = hash.format;
-    const format =
-      rawFormat == null
-        ? null
-        : Array.isArray(rawFormat)
-          ? (rawFormat as string[])
-          : [rawFormat as string];
-    return new Options(
-      (hash.name as string | null) ?? null,
-      format,
-      (hash.include as string[] | null) ?? null,
-      (hash.exclude as string[] | null) ?? null,
-      hash.klass ?? null,
-      hash.model ?? null,
-    );
+  get model(): unknown {
+    return this._model ?? (this.model = this._defaultWrapModel());
+  }
+
+  set model(model: unknown) {
+    this._model = model;
+  }
+
+  get include(): string[] | null {
+    if (this.includeSet) return this._include;
+
+    const m = this.model as WrapModel | null;
+    this.includeSet = true;
+
+    if (!(this._include != null || this.exclude != null)) {
+      if (rbObjRespondTo(m, "attributeNames") && any(m!.attributeNames!())) {
+        this.include = m!.attributeNames!();
+
+        if (
+          rbObjRespondTo(m, "storedAttributes") &&
+          Object.keys(m!.storedAttributes!()).length > 0
+        ) {
+          this.include = this._include!.concat(
+            Object.values(m!.storedAttributes!())
+              .flat()
+              .map((attr) => toS(attr)),
+          );
+        }
+
+        if (rbObjRespondTo(m, "attributeAliases") && any(Object.keys(m!.attributeAliases!()))) {
+          this.include = this._include!.concat(Object.keys(m!.attributeAliases!()));
+        }
+
+        if (
+          rbObjRespondTo(m, "nestedAttributesOptions") &&
+          any(Object.keys(m!.nestedAttributesOptions!()))
+        ) {
+          this.include = this._include!.concat(
+            Object.keys(m!.nestedAttributesOptions!()).map((key) => toS(key).concat("_attributes")),
+          );
+        }
+
+        return this._include;
+      }
+    }
+    return null;
+  }
+
+  set include(include: string[] | null) {
+    this._include = include;
+  }
+
+  get name(): string | null {
+    if (this.nameSet) return this._name;
+
+    const m = this.model as WrapModel | null;
+    this.nameSet = true;
+
+    if (!(this._name != null || isAnonymous(this.klass!))) {
+      return (this.name =
+        m != null ? underscore(demodulize(toS(m))) : singularize(this.klass!.controllerName()!));
+    }
+    return null;
+  }
+
+  set name(name: string | null) {
+    this._name = name;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE params-wrapper-options-is-not-a-struct */
+  toH(): Record<string, unknown> {
+    return {
+      name: this._name,
+      format: this.format,
+      include: this._include,
+      exclude: this.exclude,
+      klass: this.klass,
+      model: this._model,
+    };
+  }
+
+  private _defaultWrapModel(): unknown {
+    if (isAnonymous(this.klass!)) return null;
+    let modelName = classify(this.klass!.name.replace(/Controller$/, ""));
+    let modelKlass: unknown;
+
+    do {
+      if ((modelKlass = safeConstantize(modelName) ?? null) != null) {
+        break;
+      } else {
+        const namespaces = modelName.split("::");
+        if (namespaces.length >= 2) namespaces.splice(-2, 1);
+        if (last(namespaces) === modelName) break;
+        modelName = namespaces.join("::");
+      }
+    } while (modelKlass == null);
+
+    return modelKlass;
   }
 }
 
-export function wrapParameters(
-  params: Record<string, unknown>,
-  name: string,
-  include?: string[] | null,
-  exclude?: string[] | null,
-): Record<string, unknown> {
-  const wrapped: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(params)) {
-    if (key === name || key === "controller" || key === "action") continue;
-    if (include && !include.includes(key)) continue;
-    if (exclude && exclude.includes(key)) continue;
-    wrapped[key] = value;
-  }
-  return { ...params, [name]: wrapped };
+/** @internal */
+export interface WrapModel {
+  attributeNames?(): string[];
+  storedAttributes?(): Record<string, unknown[]>;
+  attributeAliases?(): Record<string, unknown>;
+  nestedAttributesOptions?(): Record<string, unknown>;
 }
 
 /** @internal */
@@ -82,7 +185,9 @@ export interface ParamsWrapperHost {
 
 /** @internal */
 export interface WrapperHostClass {
-  name?: string | null;
+  name: string;
+  controllerName(): string | null;
+  _wrapperOptions: Options;
 }
 
 /** @internal */
@@ -93,13 +198,37 @@ export function _setWrapperOptions(
   this._wrapperOptions = Options.fromHash(options);
 }
 
+export function wrapParameters(
+  this: WrapperHostClass,
+  nameOrModelOrOptions: unknown,
+  options: Record<string, unknown> = {},
+): void {
+  let model: unknown = null;
+
+  if (isPlainObject(nameOrModelOrOptions)) {
+    options = nameOrModelOrOptions as Record<string, unknown>;
+  } else if (nameOrModelOrOptions === false) {
+    options = merge(options, { format: [] });
+  } else if (typeof nameOrModelOrOptions === "string") {
+    options = merge(options, { name: nameOrModelOrOptions });
+  } else {
+    model = nameOrModelOrOptions;
+  }
+
+  const opts = Options.fromHash(merge(slice(this._wrapperOptions.toH(), "format"), options));
+  opts.model = model;
+  opts.klass = this;
+
+  this._wrapperOptions = opts;
+}
+
 /** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;
 }
 
 /** @internal */
-export function _wrapperFormats(this: ParamsWrapperHost): string[] | null {
+export function _wrapperFormats(this: ParamsWrapperHost): string[] {
   return this._wrapperOptions.format;
 }
 
@@ -141,11 +270,12 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
     if (!this.request.hasContentType()) return false;
     const ref = this.request.contentMimeType?.ref();
     if (!ref) return false;
-    const formats = _wrapperFormats.call(this);
-    const key = _wrapperKey.call(this);
-    if (!formats || !formats.includes(ref)) return false;
-    if (!key) return false;
-    return !hasKey(this.request.params, key);
+
+    return (
+      _wrapperFormats.call(this).includes(ref) &&
+      _wrapperKey.call(this) != null &&
+      !hasKey(this.request.params, _wrapperKey.call(this)!)
+    );
   } catch (err) {
     if (err instanceof ParseError) return false;
     throw err;
@@ -165,14 +295,4 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
   mergeBang(this.request.requestParameters, wrappedHash);
 
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
-}
-
-/** @internal */
-export function _defaultWrapModel(this: { _wrapperOptions: Options }): string | null {
-  const klass = this._wrapperOptions.klass as WrapperHostClass | null | undefined;
-  const name = klass?.name;
-  if (!name) return null;
-  const stripped = name.replace(/Controller$/, "");
-  if (!stripped) return null;
-  return underscore(singularize(demodulize(stripped)));
 }

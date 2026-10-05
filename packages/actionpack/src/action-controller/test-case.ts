@@ -15,6 +15,7 @@ import {
   TopLevel,
   toQuery,
   toXml,
+  fromXml,
   type Included,
 } from "@blazetrails/activesupport";
 import { TestCase as ActiveSupportTestCase } from "@blazetrails/activesupport/test-case";
@@ -550,7 +551,7 @@ include(TestCase, Behavior);
 export class TestRequest extends AbstractTestRequest {
   /** @internal */
   private _customParamParsers: Record<string, (raw: string) => unknown> = {
-    xml: (_raw) => ({}),
+    ":xml": (rawPost) => (fromXml(rawPost) as Record<string, unknown>)["hash"],
   };
 
   /** @internal */
