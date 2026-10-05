@@ -525,6 +525,7 @@ export class Parameters {
     return this;
   }
 
+  /** @inventedArm if — CONVERGEABLE strong-parameters-fetch-default-reads-through-array-fetch */
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
     return this._convertValueToParameters(
