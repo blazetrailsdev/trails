@@ -1,9 +1,10 @@
+import { keys } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 const attributeNamesOf = (klass: unknown): string[] =>
-  Object.keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
+  keys((klass as { attributeTypes(): Record<string, unknown> }).attributeTypes());
 
 describe("STI subclass attribute() registration", () => {
   it("keeps subclass attribute() calls on the subclass, not the STI base", async () => {

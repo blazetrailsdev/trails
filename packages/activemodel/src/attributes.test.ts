@@ -21,6 +21,7 @@ import {
   rbEqual,
   rbObjIvarGet,
   registerConstant,
+  hashAref,
 } from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
 import { UnknownAttributeError } from "./errors.js";
@@ -197,8 +198,8 @@ describe("AttributesTest", () => {
   it("children can override parents", () => {
     const klass = GrandchildModelForAttributesTest;
 
-    expect(klass.attributeTypes()["integer_field"]).toBeInstanceOf(StringType);
-    expect(klass.attributeTypes()["string_field"]).toBeInstanceOf(StringType);
+    expect(hashAref(klass.attributeTypes(), "integer_field")).toBeInstanceOf(StringType);
+    expect(hashAref(klass.attributeTypes(), "string_field")).toBeInstanceOf(StringType);
 
     const data = new GrandchildModelForAttributesTest({ integer_field: "4.4" });
 

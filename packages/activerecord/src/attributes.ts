@@ -6,7 +6,7 @@ import {
   AttributeRegistration,
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
-import { block, transformValues } from "@blazetrails/ruby-compat";
+import { block, hashAset, transformValues } from "@blazetrails/ruby-compat";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
   isSchemaLoaded,
@@ -38,7 +38,7 @@ export function defineAttribute(
 ): void {
   const { default: default_ = NO_DEFAULT_PROVIDED, userProvidedDefault = true } = options;
 
-  this.attributeTypes()[name] = castType;
+  hashAset(this.attributeTypes(), name, castType);
   defineDefaultAttribute.call(this, name, default_, castType, {
     fromUser: userProvidedDefault,
   });

@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type --
    Each model below spells `include ActiveModel::Attributes` in its class body; the empty
    class/interface merge beside it is how `include()` surfaces those members on the type side. */
@@ -77,7 +78,9 @@ describe("AcceptanceValidationTest (trails-only)", () => {
     }
     interface Agreement extends Attributes {}
 
-    expect(Agreement.attributeTypes()["terms"]!.type()).toBe("boolean");
+    expect((hashAref(Agreement.attributeTypes(), "terms") as { type(): string }).type()).toBe(
+      "boolean",
+    );
   });
 });
 

@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { ValueType } from "./index.js";
 import type { AttributeSet } from "./attribute-set.js";
@@ -95,14 +96,14 @@ describe("AttributeRegistrationTest", () => {
     const klass = classWith(null, (klass) => {
       klass.attribute("foo", TYPE_1);
     });
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
   });
 
   it(".attribute_types returns the default type when key is missing", () => {
     const klass = classWith(null, (klass) => {
       klass.attribute("foo", TYPE_1);
     });
-    expect(klass.attributeTypes()["bar"]).toEqual(new ValueType());
+    expect(hashAref(klass.attributeTypes(), "bar")).toEqual(new ValueType());
   });
 
   it(".type_for_attribute returns the registered attribute type", () => {
@@ -126,13 +127,13 @@ describe("AttributeRegistrationTest", () => {
     });
     expect(klass._defaultAttributes().keys()).toContain("foo");
     expect(klass._defaultAttributes().keys()).not.toContain("bar");
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
 
     klass.attribute("bar", TYPE_2);
     expect(klass._defaultAttributes().keys()).toContain("foo");
     expect(klass._defaultAttributes().keys()).toContain("bar");
-    expect(klass.attributeTypes()["foo"]).toBe(TYPE_1);
-    expect(klass.attributeTypes()["bar"]).toBe(TYPE_2);
+    expect(hashAref(klass.attributeTypes(), "foo")).toBe(TYPE_1);
+    expect(hashAref(klass.attributeTypes(), "bar")).toBe(TYPE_2);
   });
 
   it("attributes are inherited", () => {

@@ -12,7 +12,7 @@ import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal, TimeWithZone, assertNotCalled } from "@blazetrails/activesupport";
 import { DateTimeType } from "@blazetrails/activemodel";
 import { Time } from "@blazetrails/date";
-import { rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbObjClassname, keys } from "@blazetrails/ruby-compat";
 import { TimeZoneConverter } from "./attribute-methods/time-zone-conversion.js";
 
 import { registerModel } from "./associations.js";
@@ -265,17 +265,17 @@ describe("CustomPropertiesTest", () => {
     await loadSchemaFromAdapter.call(Klass);
     const columnCount = Klass.columns().length;
 
-    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 1);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 1);
     expect(Klass.attributeNames().length).toBe(columnCount + 1);
-    expect(Object.keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
+    expect(keys(Klass.attributeTypes()).includes("wibble")).toBeFalsy();
 
     Klass.attribute("wibble", new ValueType());
 
-    expect(Object.keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
+    expect(keys(Klass.attributeTypes()).length).toBe(columnCount + 2);
     expect(Object.keys(Klass.columnDefaults).length).toBe(columnCount + 2);
     expect(Klass.attributeNames().length).toBe(columnCount + 2);
-    expect(Object.keys(Klass.attributeTypes())).toContain("wibble");
+    expect(keys(Klass.attributeTypes())).toContain("wibble");
   });
 
   it("the given default value is cast from user", () => {

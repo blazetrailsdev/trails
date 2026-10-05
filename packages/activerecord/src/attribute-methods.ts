@@ -9,7 +9,10 @@ import {
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import {
   type Concurrent,
+  type Hash,
+  hasKey,
   isEmpty,
+  keys as hashKeys,
   rbClassSuperclass,
   rbFCaller,
   rbInspect as inspect,
@@ -570,7 +573,7 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 }
 
 interface AttributeNamesHost {
-  attributeTypes(): Record<string, unknown>;
+  attributeTypes(): Record<string, unknown> | Hash<string, unknown>;
   abstractClass?: boolean;
   _attributeNamesMemo?: { names: readonly string[] };
 }
@@ -586,7 +589,7 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
     this._attributeNamesMemo = { names: frozen };
     return frozen as string[];
   }
-  const names = Object.keys(this.attributeTypes());
+  const names = hashKeys(this.attributeTypes());
   if (exists !== undefined) {
     const frozen = Object.freeze(names);
     this._attributeNamesMemo = { names: frozen };
@@ -597,10 +600,10 @@ function classAttributeNames(this: AttributeNamesHost): string[] {
 
 /** @internal */
 function classHasAttribute(
-  this: { attributeTypes(): Record<string, unknown> },
+  this: { attributeTypes(): Record<string, unknown> | Hash<string, unknown> },
   attrName: string,
 ): boolean {
-  return Object.prototype.hasOwnProperty.call(this.attributeTypes(), attrName);
+  return hasKey(this.attributeTypes(), attrName);
 }
 
 export const ClassMethods = {
@@ -678,10 +681,14 @@ export function readAttributeBeforeTypeCast(this: InstanceMethodHost, attrName: 
 export function readAttributeForDatabase(this: InstanceMethodHost, attrName: string): unknown {
   return _readAttributeForDatabase(this as any, attrName);
 }
-export function attributesBeforeTypeCast(this: InstanceMethodHost): Record<string, unknown> {
+export function attributesBeforeTypeCast(
+  this: InstanceMethodHost,
+): Record<string, unknown> | Hash<string, unknown> {
   return _attributesBeforeTypeCast.call(this as any);
 }
-export function attributesForDatabase(this: InstanceMethodHost): Record<string, unknown> {
+export function attributesForDatabase(
+  this: InstanceMethodHost,
+): Record<string, unknown> | Hash<string, unknown> {
   return _attributesForDatabase(this as any);
 }
 export function attributeBeforeTypeCast(this: InstanceMethodHost, attrName: string): unknown {

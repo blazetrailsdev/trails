@@ -3,6 +3,7 @@ import {
   block,
   fetch,
   first,
+  type Hash,
   KeyError,
   last,
   rbEqual,
@@ -177,7 +178,7 @@ export class Result {
   }
 
   /** @missingRailsCall one? — CONVERGEABLE result-includes-enumerable-and-cast-values-asks-columns-one-p */
-  castValues(typeOverrides: ColumnTypes | ColumnType[] = {}): unknown[] {
+  castValues(typeOverrides: ColumnTypes | Hash<string, ColumnType> | ColumnType[] = {}): unknown[] {
     if (this.columns.length === 1) {
       const type = Array.isArray(typeOverrides)
         ? first(typeOverrides)!
@@ -233,7 +234,11 @@ export class Result {
     ));
   }
 
-  #columnType(name: string, index: number, typeOverrides: ColumnTypes): ColumnType {
+  #columnType(
+    name: string,
+    index: number,
+    typeOverrides: ColumnTypes | Hash<string, ColumnType>,
+  ): ColumnType {
     return columnType(this, name, index, typeOverrides);
   }
 }
@@ -253,7 +258,7 @@ export function columnType(
   result: Result,
   name: string,
   index: number,
-  typeOverrides: ColumnTypes,
+  typeOverrides: ColumnTypes | Hash<string, ColumnType>,
 ): ColumnType {
   const columnTypes = result.columnTypes;
   return fetch<ColumnType>(

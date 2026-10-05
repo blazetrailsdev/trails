@@ -43,7 +43,7 @@ interface MarshallingHost {
     reflectOnAllAssociations(): MarshallingReflection[];
     attributesBuilder(): { buildFromDatabase(values: Record<string, unknown>): unknown };
   };
-  attributesForDatabase(): Record<string, unknown>;
+  attributesForDatabase(): object;
   isNewRecord(): boolean;
   isAssociationCached(name: string): boolean;
   association(name: string): MarshallingAssociation;

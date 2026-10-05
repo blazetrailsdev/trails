@@ -1111,4 +1111,14 @@ describe("block (a marked `&block`)", () => {
     expect(fetch(new Map([["id", 1]]), "id", blk)).toBe(1);
     expect(() => fetch({}, "toString")).toThrow(KeyError);
   });
+
+  it("hashAref answers a Hash's default on a miss, as rb_hash_default_value does", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+    expect(hashAref(hash, "missing")).toBe(null);
+    hash.setDefault(7);
+    expect(hashAref(hash, "a")).toBe(1);
+    expect(hashAref(hash, "missing")).toBe(7);
+    expect(hashAref(new Hash<string, string>((_h, key) => `no ${key}`), "x")).toBe("no x");
+  });
 });

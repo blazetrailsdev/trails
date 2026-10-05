@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
@@ -62,14 +63,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       let boolean = await BooleanType.createBang({ archived: true, published: true } as any);
       await (boolean as any).reload();
       let attributes = (boolean as any).attributesBeforeTypeCast();
-      expect(attributes["archived"]).toBe(1);
-      expect(attributes["published"]).toBe("1");
+      expect(hashAref(attributes, "archived")).toBe(1);
+      expect(hashAref(attributes, "published")).toBe("1");
 
       boolean = await BooleanType.createBang({ archived: false, published: false } as any);
       await (boolean as any).reload();
       attributes = (boolean as any).attributesBeforeTypeCast();
-      expect(attributes["archived"]).toBe(0);
-      expect(attributes["published"]).toBe("0");
+      expect(hashAref(attributes, "archived")).toBe(0);
+      expect(hashAref(attributes, "published")).toBe("0");
 
       expect(adapter.typeCast(true)).toBe(1);
       expect(adapter.typeCast(false)).toBe(0);
@@ -81,14 +82,14 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       let boolean = await BooleanType.createBang({ archived: true, published: true } as any);
       await (boolean as any).reload();
       let attributes = (boolean as any).attributesBeforeTypeCast();
-      expect(attributes["archived"]).toBe(1);
-      expect(attributes["published"]).toBe("1");
+      expect(hashAref(attributes, "archived")).toBe(1);
+      expect(hashAref(attributes, "published")).toBe("1");
 
       boolean = await BooleanType.createBang({ archived: false, published: false } as any);
       await (boolean as any).reload();
       attributes = (boolean as any).attributesBeforeTypeCast();
-      expect(attributes["archived"]).toBe(0);
-      expect(attributes["published"]).toBe("0");
+      expect(hashAref(attributes, "archived")).toBe(0);
+      expect(hashAref(attributes, "published")).toBe("0");
 
       expect(adapter.typeCast(true)).toBe(1);
       expect(adapter.typeCast(false)).toBe(0);

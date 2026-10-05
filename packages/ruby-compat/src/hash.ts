@@ -128,7 +128,7 @@ export function fetch<K, V>(hash: Map<K, V>, key: K, ...rest: unknown[]): unknow
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
  */
 export function fetch<V>(
-  hash: Record<string, V> | Map<string, V>,
+  hash: Record<string, V> | Map<string, V> | { fetch(key: string, ...rest: never): unknown },
   key: string,
   ...rest: [] | [V | Block<V>]
 ): V;
@@ -395,9 +395,10 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
  * value, or `nil` when the key is absent, whichever hash it is given. A
  * receiver that is not a Hash is sent its own `[]`, which it must spell `get`,
  * the conventions table's default spelling for the operator. A miss on a
- * plain-object hash asks the hash itself, as `rb_hash_default_value`
- * (`vendor/ruby/v3.3.11/hash.c:2068`) does: a Proxy seating `hash.default=`
- * answers its default, and a member `Object.prototype` answers is `nil`.
+ * hash asks the hash itself, as `rb_hash_default_value`
+ * (`vendor/ruby/v3.3.11/hash.c:2068`) does: a `Hash` answers its `default`, a
+ * Proxy seating `hash.default=` on a plain object answers its default, and a
+ * member `Object.prototype` answers is `nil`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
@@ -405,7 +406,10 @@ export function hashAref(hash: object, key: unknown): unknown {
   if (proto !== Object.prototype) {
     const own = ownMethod(hash, "get");
     if (own) return own.call(hash, key);
-    if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
+    if (hash instanceof Map) {
+      if (hash.has(key)) return hash.get(key);
+      return hash instanceof Hash ? (hash.default(key) ?? null) : null;
+    }
     const val = (hash as Record<string, unknown>)[key as string];
     if (hasKey(hash, key as string)) return val;
     if (proto === null) return val === undefined ? null : val;
@@ -572,10 +576,10 @@ export function eachValue<K, T>(hash: Map<K, T>, block?: undefined): Enumerator<
  * Either arm, for a receiver typed as either.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
  */
-export function eachValue<T>(
-  hash: Record<string, T> | Map<unknown, T>,
+export function eachValue<T, R = never>(
+  hash: Record<string, T> | Map<unknown, T> | { eachValue(block: (value: T) => unknown): R },
   block: (value: T) => unknown,
-): Record<string, T> | Map<unknown, T>;
+): Record<string, T> | Map<unknown, T> | R;
 /**
  * A forwarded `&block`, which may be either arm.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).

@@ -6,7 +6,12 @@ import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
-import { FrozenError, rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  rbObjInstanceVariables,
+  rbObjIvarGet,
+  hashAref,
+} from "@blazetrails/ruby-compat";
 
 describe("Attributes#attribute_names", () => {
   class User extends Model {
@@ -167,8 +172,8 @@ describe("attributesBeforeTypeCast", () => {
 
     const u = new User({ name: "Alice", age: "25" });
     const raw = u._attributes.valuesBeforeTypeCast();
-    expect(raw.name).toBe("Alice");
-    expect(raw.age).toBe("25");
+    expect(hashAref(raw, "name")).toBe("Alice");
+    expect(hashAref(raw, "age")).toBe("25");
     expect(u._readAttribute("age")).toBe(25);
   });
 });

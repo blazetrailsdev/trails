@@ -24,10 +24,10 @@ import { AttributeSet } from "../attribute-set.js";
 type RbHash<T> = Record<string, T> | Hash<string, T>;
 
 export class Builder {
-  readonly types: Record<string, ValueType>;
+  readonly types: RbHash<ValueType>;
   readonly defaultAttributes: RbHash<Attribute>;
 
-  constructor(types: Record<string, ValueType>, defaultAttributes: RbHash<Attribute> = {}) {
+  constructor(types: RbHash<ValueType>, defaultAttributes: RbHash<Attribute> = {}) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
@@ -41,7 +41,7 @@ export class Builder {
 }
 
 export class LazyAttributeSet extends AttributeSet {
-  declare protected _attributes: Record<string, Attribute>;
+  declare protected _attributes: RbHash<Attribute>;
   private values: RbHash<unknown>;
   private types: RbHash<ValueType>;
   private additionalTypes: RbHash<ValueType>;
@@ -54,7 +54,7 @@ export class LazyAttributeSet extends AttributeSet {
     types: RbHash<ValueType>,
     additionalTypes: RbHash<ValueType>,
     defaultAttributes: RbHash<Attribute>,
-    attributes: Record<string, Attribute> = {},
+    attributes: RbHash<Attribute> = {},
   ) {
     super(attributes);
     this.values = values;
@@ -92,7 +92,7 @@ export class LazyAttributeSet extends AttributeSet {
     }
 
     if (hasKey(this.castedValues, name)) {
-      return this.castedValues[name];
+      return hashAref(this.castedValues, name);
     }
 
     return fetch<unknown>(
@@ -123,7 +123,7 @@ export class LazyAttributeSet extends AttributeSet {
     );
   }
 
-  protected override attributes(): Record<string, Attribute> {
+  protected override attributes(): RbHash<Attribute> {
     if (!this.materialized) {
       eachKey(this.values, (key) => this.getAttribute(key));
       eachKey(this.types, (key) => this.getAttribute(key));

@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError, RuntimeError } from "@blazetrails/activemodel";
@@ -475,11 +476,11 @@ describe("EnumTest", () => {
     expect((book as any).status).toBe("published");
   });
   it("attributes_for_database", () => {
-    expect((book as any).attributesForDatabase().status).toBe(2);
+    expect(hashAref((book as any).attributesForDatabase(), "status")).toBe(2);
 
     (book as any).status = "published";
 
-    expect((book as any).attributesForDatabase().status).toBe(2);
+    expect(hashAref((book as any).attributesForDatabase(), "status")).toBe(2);
   });
 
   it("invalid definition values raise an ArgumentError", async () => {
