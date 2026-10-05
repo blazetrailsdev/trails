@@ -16,7 +16,16 @@ import {
   type Extended,
   wrap,
 } from "@blazetrails/activesupport";
-import { format, max, stdout, rbInspect, rbObjRespondTo, toI } from "@blazetrails/ruby-compat";
+import {
+  format,
+  max,
+  stdout,
+  excToS,
+  rbFPublicSend,
+  rbInspect,
+  rbObjRespondTo,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -1636,19 +1645,18 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
     );
-    const currentVersion = (await this.currentVersion()) ?? 0;
-    const currentMigration = await migrator.currentMigration();
-    if (currentVersion !== 0 && !currentMigration) {
-      throw new UnknownMigrationVersionError(currentVersion);
+    if ((await this.currentVersion()) !== 0 && !(await migrator.currentMigration())) {
+      throw new UnknownMigrationVersionError((await this.currentVersion())!);
     }
-    const migrations = migrator.migrations;
+
     const startIndex =
-      currentVersion === 0
+      (await this.currentVersion()) === 0
         ? 0
-        : migrations.findIndex((m) => m.version === currentMigration!.version);
-    const finish = migrations[startIndex + steps];
-    const version = finish ? Number(finish.version) : 0;
-    return direction === "up" ? this.up(version) : this.down(version);
+        : migrator.migrations.indexOf((await migrator.currentMigration())!);
+
+    const finish = migrator.migrations[startIndex + steps];
+    const version = finish ? finish.version : 0;
+    return rbFPublicSend(this, direction, version) as Promise<MigrationProxy[]>;
   }
 }
 
@@ -1685,33 +1693,23 @@ export class Migrator {
 
   /** @internal */
   async withAdvisoryLock<T>(fn: () => Promise<T>): Promise<T> {
-    const lockId = await this.generateMigratorAdvisoryLockId();
-    const gotLock = await (await this.connection).getAdvisoryLock(lockId);
-    if (!gotLock) {
-      throw new ConcurrentMigrationError();
-    }
-    await this._ensureSchemaTable();
-    await this.loadMigrated();
-    const _sentinel = Symbol();
-    let fnResult: T | typeof _sentinel = _sentinel;
-    let fnError: unknown = _sentinel;
+    let lockId!: bigint;
+    let gotLock: boolean | undefined;
     try {
-      fnResult = await fn();
-    } catch (e) {
-      fnError = e;
+      lockId = await this.generateMigratorAdvisoryLockId();
+
+      gotLock = await (await this.connection).getAdvisoryLock(lockId);
+      if (!gotLock) {
+        throw new ConcurrentMigrationError();
+      }
+      await this.loadMigrated();
+      return await fn();
+    } finally {
+      if (gotLock && !(await (await this.connection).releaseAdvisoryLock(lockId))) {
+        // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` raises over the block's exception (migration.rb:1608-1612).
+        throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
+      }
     }
-    let released: boolean | undefined;
-    try {
-      released = await (await this.connection).releaseAdvisoryLock(lockId);
-    } catch (releaseErr) {
-      if (fnError !== _sentinel) throw fnError;
-      throw releaseErr;
-    }
-    if (fnError !== _sentinel) throw fnError;
-    if (released !== true) {
-      throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
-    }
-    return fnResult as T;
   }
 
   async run(): Promise<string | number | undefined> {
@@ -1762,12 +1760,11 @@ export class Migrator {
   /** @internal */
   async recordEnvironment(): Promise<void> {
     if (this.isDown()) return;
-    if (this._internalMetadata.enabled) {
-      await this._internalMetadata.set(
-        "environment",
-        (await this.connection).pool.dbConfig.envName as string,
-      );
-    }
+
+    await this._internalMetadata.set(
+      "environment",
+      (await this.connection).pool.dbConfig.envName as string,
+    );
   }
 
   /** @internal */
@@ -1806,8 +1803,9 @@ export class Migrator {
         return this.recordVersionStateAfterMigrating(migration.version);
       });
     } catch (e) {
-      const useTx = await this.isUseTransaction(migration);
-      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
+      let msg = "An error has occurred, ";
+      if (await this.isUseTransaction(migration)) msg += "this and ";
+      msg += `all later migrations canceled:\n\n${excToS(e)}`;
       throw Object.assign(new StandardError(msg), { cause: e });
     }
   }
@@ -1904,8 +1902,9 @@ export class Migrator {
 
   /** @internal */
   async isUseTransaction(migration: MigrationProxy): Promise<boolean> {
-    if (await migration.disableDdlTransaction) return false;
-    return (await this.connection).supportsDdlTransactions?.() ?? false;
+    return (
+      !(await migration.disableDdlTransaction) && (await this.connection).supportsDdlTransactions()
+    );
   }
 
   async currentMigration(): Promise<MigrationProxy | null> {
@@ -1924,11 +1923,11 @@ export class Migrator {
       for (const m of runnable) {
         if (!(await this.isRan(m))) kept.push(m);
       }
-      return kept;
-    }
-    if (this.target()) runnable.pop();
-    for (const m of runnable) {
-      if (await this.isRan(m)) kept.push(m);
+    } else {
+      if (this.target()) runnable.pop();
+      for (const m of runnable) {
+        if (await this.isRan(m)) kept.push(m);
+      }
     }
     return kept;
   }

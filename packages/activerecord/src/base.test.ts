@@ -49,6 +49,7 @@ import { Car } from "./test-helpers/models/car.js";
 import { Bulb, CustomBulb } from "./test-helpers/models/bulb.js";
 import { Edge } from "./test-helpers/models/edge.js";
 import { Joke, GoodJoke } from "./test-helpers/models/joke.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { ColumnName } from "./test-helpers/models/column-name.js";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Default } from "./test-helpers/models/default.js";
@@ -1382,11 +1383,11 @@ describe("BasicsTest", async () => {
     try {
       Joke.tableName = "funny_jokes";
       const beforeColumns = await Joke.columns();
-      const beforeSeq = Joke.sequenceName;
+      const beforeSeq = await Joke.sequenceName;
 
       Joke.tableName = "cold_jokes";
       const afterColumns = await Joke.columns();
-      const afterSeq = Joke.sequenceName;
+      const afterSeq = await Joke.sequenceName;
 
       expect(afterColumns).not.toEqual(beforeColumns);
       if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).not.toEqual(beforeSeq);
@@ -1395,14 +1396,14 @@ describe("BasicsTest", async () => {
     }
   });
 
-  it("dont clear sequence name when setting explicitly", () => {
+  it("dont clear sequence name when setting explicitly", async () => {
     const k = class extends Joke {};
     k.sequenceName = "black_jokes_seq";
     k.tableName = "cold_jokes";
-    const beforeSeq = k.sequenceName;
+    const beforeSeq = await k.sequenceName;
 
     k.tableName = "funny_jokes";
-    const afterSeq = k.sequenceName;
+    const afterSeq = await k.sequenceName;
 
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' trailing `unless before_seq.nil? && after_seq.nil?` (base_test.rb:1322)
     if (!(beforeSeq == null && afterSeq == null)) expect(afterSeq).toEqual(beforeSeq);
@@ -1448,23 +1449,18 @@ describe("BasicsTest", async () => {
     expect(k.tableName).toBe("foosks");
   });
 
-  it("sequence name with abstract class", () => {
-    class AbstractModel extends Base {
-      static {
-        this.abstractClass = true;
-      }
-    }
-    class ConcreteModel extends AbstractModel {}
-    expect(ConcreteModel.sequenceName).toBe("concrete_models_id_seq");
+  it("sequence name with abstract class", async (ctx) => {
+    const ak = class extends Base {};
+    ak.abstractClass = true;
+    const k = class extends ak {};
+    k.tableName = "projects";
+    const origName = await k.sequenceName;
+    ctx.skip(origName == null, "sequences not supported by db");
+    expect(origName).toEqual(await k.resetSequenceName());
   });
 
-  it("sequence name for cpk model", () => {
-    class CpkModel extends Base {
-      static {
-        this.primaryKey = ["store_id", "department_id"] as any;
-      }
-    }
-    expect(CpkModel.sequenceName).toBeNull();
+  it("sequence name for cpk model", async () => {
+    expect(await CpkBook.sequenceName).toBeNull();
   });
 
   const QUOTED_TYPE = async () => ((await Base.leaseConnection()) as any).quoteColumnName("type");

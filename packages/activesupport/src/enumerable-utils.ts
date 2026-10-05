@@ -166,7 +166,7 @@ export function indexBy<T, K extends string | number>(
   collection: T[],
   fn: (item: T) => K,
 ): Record<K, T> {
-  const result = {} as Record<K, T>;
+  const result = Object.create(null) as Record<K, T>;
   for (const item of collection) {
     result[fn(item)] = item;
   }

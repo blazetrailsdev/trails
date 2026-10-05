@@ -71,3 +71,77 @@ describe("the async schema load warms the shared cache and replaces a synthesize
     );
   });
 });
+
+describe("a sequence lookup in flight does not overwrite a later writer", () => {
+  fixtures([]);
+  it("keeps a sequence name set while resetSequenceName is pending", async () => {
+    class Post extends Base {}
+    const pending = Post.resetSequenceName();
+    Post.sequenceName = "posts_nonstd_seq";
+    await pending;
+
+    expect(await Post.sequenceName).toBe("posts_nonstd_seq");
+  });
+
+  it("asks the adapter again after a lookup that answered nil", async () => {
+    class Post extends Base {}
+    const withConnection = vi.spyOn(Post, "withConnection").mockResolvedValue(null);
+    try {
+      expect(await Post.sequenceName).toBeNull();
+      expect(await Post.sequenceName).toBeNull();
+      expect(withConnection).toHaveBeenCalledTimes(2);
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("memoizes the name a lookup answered", async () => {
+    class Post extends Base {}
+    const withConnection = vi.spyOn(Post, "withConnection").mockResolvedValue("posts_id_seq");
+    try {
+      expect(await Post.sequenceName).toBe("posts_id_seq");
+      expect(await Post.sequenceName).toBe("posts_id_seq");
+      expect(withConnection).toHaveBeenCalledTimes(1);
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("retries after a lookup that rejected", async () => {
+    class Post extends Base {}
+    const withConnection = vi
+      .spyOn(Post, "withConnection")
+      .mockRejectedValueOnce(new Error("connection lost"));
+    try {
+      await expect(Post.sequenceName).rejects.toThrow("connection lost");
+      await expect(Post.sequenceName).resolves.toEqual(await Post.resetSequenceName());
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("keeps a sequence name set before a pending lookup rejects", async () => {
+    class Post extends Base {}
+    const withConnection = vi
+      .spyOn(Post, "withConnection")
+      .mockRejectedValueOnce(new Error("connection lost"));
+    try {
+      const pending = Post.resetSequenceName();
+      Post.sequenceName = "posts_nonstd_seq";
+      await expect(pending).rejects.toThrow("connection lost");
+
+      expect(await Post.sequenceName).toBe("posts_nonstd_seq");
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("drops a lookup made for the previous table name", async () => {
+    class Post extends Base {}
+    const pending = Post.resetSequenceName();
+    Post.tableName = "comments";
+    await pending;
+
+    expect(Object.getOwnPropertyDescriptor(Post, "_sequenceName")!.value).toBeNull();
+  });
+});

@@ -504,11 +504,9 @@ interface DestroyRecord {
 }
 
 export async function destroy<T extends DestroyRecord>(this: T): Promise<T | false> {
-  if (this.isReadonly()) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-
   const self = this as any;
+  if (this.isReadonly()) self._raiseReadonlyRecordError();
+
   if (self._destroyCallbackAlreadyCalled) return this;
   self._destroyCallbackAlreadyCalled = true;
   try {
@@ -522,9 +520,7 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T | fal
 export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(
   this: T,
 ): Promise<T> {
-  const result = await this.destroy();
-  if (result === false) (this as any)._raiseRecordNotDestroyed();
-  return result as T;
+  return (await this.destroy()) || (this as any)._raiseRecordNotDestroyed();
 }
 
 interface AttributeSingleSave {
