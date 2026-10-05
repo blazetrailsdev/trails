@@ -202,9 +202,11 @@ export class CookieJar implements Iterable<[string, string]> {
     throw new KeyError(`key not found: "${name}"`, { receiver: this._cookies, key: name });
   }
 
-  has(key: string): boolean {
-    return this._cookies.has(key);
+  isKey(name: string): boolean {
+    return this._cookies.has(String(name));
   }
+
+  declare hasKey: CookieJar["isKey"];
 
   get keys(): string[] {
     return [...this._cookies.keys()];
@@ -454,6 +456,8 @@ export class AbstractCookieJar {
 
   protected commit(_name: string, _options: SerializedSetOptions): void {}
 }
+
+CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
 
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);

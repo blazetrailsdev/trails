@@ -30,11 +30,13 @@ export interface CallbackOptions {
   only?: string | string[];
   except?: string | string[];
   if?:
+    | `:${string}`
     | ((controller: AbstractController) => boolean)
-    | Array<((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
   unless?:
+    | `:${string}`
     | ((controller: AbstractController) => boolean)
-    | Array<((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
   prepend?: boolean;
   raise?: boolean;
 }
@@ -125,8 +127,9 @@ export function _normalizeCallbackOption(
   fromValue = new ActionFilter(filters, from, fromValue);
 
   const existing = options[to];
-  const list: Array<((controller: AbstractController) => boolean) | CallbackPredicateLike> =
-    existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
+  const list: Array<
+    `:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike
+  > = existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
   list.unshift(fromValue);
   options[to] = list;
 }
@@ -160,9 +163,11 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   if (pred === undefined) return undefined;
   const list = Array.isArray(pred) ? pred : [pred];
   return list.map((item) =>
-    typeof item === "function"
-      ? (item as unknown as CallbackCondition)
-      : (c: object) => item.isMatch(c as AbstractController),
+    typeof item === "string"
+      ? item
+      : typeof item === "function"
+        ? (item as unknown as CallbackCondition)
+        : (c: object) => item.isMatch(c as AbstractController),
   );
 }
 

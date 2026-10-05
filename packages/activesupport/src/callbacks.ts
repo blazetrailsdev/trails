@@ -99,6 +99,7 @@ export class MethodCall implements CallTemplate {
   private send(target: object, block?: (() => unknown) | null): unknown {
     const method = (target as Record<PropertyKey, unknown>)[this.methodName];
     if (typeof method !== "function") {
+      if (this.methodName in target) return method;
       throw new NoMethodError(
         `undefined method '${String(this.methodName)}' for an instance of ${target.constructor.name}`,
       );
