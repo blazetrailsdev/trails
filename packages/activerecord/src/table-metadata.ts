@@ -2,10 +2,8 @@ import { hasKey } from "@blazetrails/ruby-compat";
 import { Table } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
-import { reflectOnAssociation } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { Connection as TypeCasterConnection } from "./type-caster/connection.js";
-import { columnsHash } from "./model-schema.js";
 
 export class TableMetadata {
   private _klass: typeof Base | null;
@@ -26,25 +24,22 @@ export class TableMetadata {
     return this._arelTable.typeForAttribute(columnName);
   }
 
-  hasColumn(columnName: string): boolean {
-    if (!this._klass) return false;
-    const hash = columnsHash.call(this._klass);
-    return hasKey(hash, columnName);
+  hasColumn(columnName: string): boolean | null {
+    const columnsHash = this.klass?.columnsHash();
+    return columnsHash == null ? null : hasKey(columnsHash, columnName);
   }
 
   isAssociatedWith(tableName: string): any {
-    if (!this._klass) return null;
-    return reflectOnAssociation(this._klass, tableName);
+    return this.klass == null ? null : this.klass._reflectOnAssociation(tableName);
   }
 
   associatedTable(
     tableName: string,
     fallback?: (name: string) => typeof Base | null,
   ): TableMetadata {
-    const reflection = this._klass
-      ? (reflectOnAssociation(this._klass, tableName) ??
-        reflectOnAssociation(this._klass, singularize(tableName)))
-      : null;
+    const reflection: any =
+      this.klass!._reflectOnAssociation(tableName) ??
+      this.klass!._reflectOnAssociation(singularize(tableName));
 
     if (!reflection && tableName === this._arelTable.name) {
       return this;
@@ -61,15 +56,13 @@ export class TableMetadata {
 
     if (associationKlass) {
       let arelTable = (associationKlass as any).arelTable;
-      if (arelTable && arelTable.name !== tableName) {
-        arelTable = arelTable.alias(tableName);
-      }
+      if (arelTable.name !== tableName) arelTable = arelTable.alias(tableName);
       return new TableMetadata(associationKlass, arelTable, reflection);
+    } else {
+      const typeCaster = new TypeCasterConnection(this.klass as any, tableName);
+      const arelTable = new Table(tableName, { typeCaster });
+      return new TableMetadata(null, arelTable, reflection);
     }
-
-    const typeCaster = new TypeCasterConnection(this.klass as any, tableName);
-    const arelTable = new Table(tableName, { typeCaster });
-    return new TableMetadata(null, arelTable, reflection);
   }
 
   isPolymorphicAssociation(): boolean {
@@ -93,16 +86,11 @@ export class TableMetadata {
   }
 
   get predicateBuilder(): PredicateBuilder {
-    if (this._klass) {
-      const klass = this._klass as any;
-      const accessor = klass.predicateBuilder;
-      const modelPb =
-        klass._predicateBuilder ??
-        (typeof accessor === "function" ? accessor.call(klass) : accessor) ??
-        null;
-      if (modelPb && typeof modelPb.with === "function") return modelPb.with(this);
+    if (this.klass) {
+      return this.klass.predicateBuilder.with(this);
+    } else {
+      return new PredicateBuilder(this);
     }
-    return new PredicateBuilder(this);
   }
 
   get arelTable(): Table | any {

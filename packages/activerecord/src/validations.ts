@@ -1,5 +1,5 @@
 import type { AttrNameArg } from "@blazetrails/activemodel";
-import { I18n } from "@blazetrails/activemodel";
+import { I18n, Model } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 
 export type ValidationContextArg = string | string[] | null;
@@ -69,32 +69,13 @@ interface ValidationsHost {
   readAttribute(name: string): unknown;
 }
 
-let _superIsValid: ((context?: ValidationContextArg) => Promise<boolean>) | null = null;
-
-/** @internal */
-export function _setSuperIsValid(fn: (context?: ValidationContextArg) => Promise<boolean>): void {
-  _superIsValid = fn;
-}
-
 export async function isValid(
   this: ValidationsHost,
-  context?: ValidationContextArg,
+  context: ValidationContextArg = null,
 ): Promise<boolean> {
-  const effectiveContext =
-    context ?? this._validationContext ?? defaultValidationContext.call(this);
-  if (_superIsValid == null) {
-    throw new ActiveRecordError(
-      "ActiveRecord::Validations#isValid called before Base registered the super isValid",
-    );
-  }
-  const previousContext = this._validationContext;
-  this._validationContext = effectiveContext;
-  try {
-    const result = await _superIsValid.call(this, effectiveContext);
-    return this.errors.isEmpty() && result;
-  } finally {
-    this._validationContext = previousContext;
-  }
+  context ??= defaultValidationContext.call(this);
+  const output = await Model.prototype.isValid.call(this, context);
+  return this.errors.isEmpty() && output;
 }
 
 export function validate(this: ValidationsHost, context?: ValidationContextArg): Promise<boolean> {
@@ -112,12 +93,11 @@ export function defaultValidationContext(this: ValidationsHost): string {
 }
 
 /** @internal */
-export function performValidations(
+export async function performValidations(
   this: ValidationsHost,
-  options?: { validate?: boolean; context?: string },
+  options: { validate?: boolean; context?: string } = {},
 ): Promise<boolean> {
-  if (options?.validate === false) return Promise.resolve(true);
-  return this.isValid(options?.context);
+  return options.validate === false || (await this.isValid(options.context));
 }
 
 /** @noRailsEquivalent CONVERGEABLE ar-read-attribute-for-validation-is-not-send */

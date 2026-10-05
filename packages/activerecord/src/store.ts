@@ -7,7 +7,16 @@ import {
 } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
 import { YAMLColumn, type YamlColumnOptions } from "./coders/yaml-column.js";
-import { type Hash, Module, include } from "@blazetrails/ruby-compat";
+import {
+  type Hash,
+  Module,
+  block,
+  include,
+  rbClassSuperclass,
+  rbObjRespondTo,
+  rtest,
+  update,
+} from "@blazetrails/ruby-compat";
 
 interface CoderLike {
   dump(v: unknown): unknown;
@@ -30,7 +39,7 @@ export class IndifferentCoder {
   }
 
   load(yaml: unknown): HashWithIndifferentAccess<unknown> {
-    return asIndifferentHash(this.coder.load(yaml == null || yaml === false ? "" : yaml));
+    return asIndifferentHash(this.coder.load(rtest(yaml) ? yaml : ""));
   }
 }
 
@@ -53,17 +62,18 @@ export function localStoredAttributes(this: typeof Base): Record<string, string[
 }
 
 export function storedAttributes(this: typeof Base): Record<string, string[]> {
-  const modelClass = this;
-  const parent = Object.getPrototypeOf(modelClass) as typeof Base | null;
-  const parentAttrs =
-    typeof parent?.storedAttributes === "function" ? parent.storedAttributes() : {};
-  const local = localStoredAttributes.call(modelClass);
-  if (!local) return parentAttrs;
-  const merged: Record<string, string[]> = { ...parentAttrs };
-  for (const [store, keys] of Object.entries(local)) {
-    merged[store] = [...new Set([...(parentAttrs[store] ?? []), ...keys])];
+  const superclass = rbClassSuperclass(this);
+  const parent: Record<string, string[]> = rbObjRespondTo(superclass, "storedAttributes")
+    ? superclass!.storedAttributes()
+    : {};
+  if (localStoredAttributes.call(this)) {
+    update(
+      parent,
+      localStoredAttributes.call(this)!,
+      block((_k: string, a: string[], b: string[]) => [...new Set([...a, ...b])]),
+    );
   }
-  return merged;
+  return parent;
 }
 
 export class HashAccessor {

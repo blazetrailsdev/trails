@@ -23,6 +23,7 @@ function column(name: string, type: string, defaultFunction: string | null = nul
 const PRIMARY_KEY_ADAPTER = {
   primaryKey: async () => "id",
   lookupCastTypeFromColumn: () => new ValueType(),
+  supportsForeignKeys: () => false,
 };
 
 const EMPTY_SOURCE = {
@@ -73,6 +74,7 @@ describe("SchemaDumper trails-only cases", () => {
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: async () => ["dsl_types"],
+      supportsForeignKeys: () => false,
       columns: async () => [
         column("id", "integer"),
         column("r1", "int4range"),
@@ -116,6 +118,7 @@ describe("SchemaDumper trails-only cases", () => {
       await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: async () => ["non_helper_types"],
+      supportsForeignKeys: () => false,
       columns: async () => [
         column("id", "integer"),
         column("ts", "timestamptz"),
@@ -217,6 +220,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("fkIgnorePattern suppresses name for matching FK names, includes name for non-matching", async () => {
     const mkSource = (fkName: string) => ({
       tables: async () => ["books"],
+      supportsForeignKeys: () => true,
       columns: async (_t: string) => [column("id", "integer")],
       indexes: async () => [],
       foreignKeyColumnFor: () => "author_id",
@@ -244,6 +248,7 @@ describe("SchemaDumper trails-only cases", () => {
   it("chkIgnorePattern suppresses name for matching check constraint names, includes name for non-matching", async () => {
     const mkSource = (chkName: string) => ({
       tables: async () => ["products"],
+      supportsForeignKeys: () => false,
       columns: async (_t: string) => [column("price", "decimal")],
       indexes: async () => [],
       checkConstraints: async () => [
@@ -420,7 +425,12 @@ describe("SchemaDumper async header ordering", () => {
         log.push("types");
       }
     }
-    const source = { tables: async () => [], columns: async () => [], indexes: async () => [] };
+    const source = {
+      tables: async () => [],
+      supportsForeignKeys: () => false,
+      columns: async () => [],
+      indexes: async () => [],
+    };
     const dumper = new (OrderedDumper as any)(source);
     const result = (await dumper.dump(new StringIO())).string();
     expect(log).toEqual(["schemas", "extensions", "types"]);
@@ -435,6 +445,7 @@ describe("SchemaDumper async header ordering", () => {
 describe("formatColspec", () => {
   const dumper = SchemaDumper.create({
     tables: async () => [],
+    supportsForeignKeys: () => false,
     columns: async () => [],
     indexes: async () => [],
     lookupCastTypeFromColumn: () => new ValueType(),

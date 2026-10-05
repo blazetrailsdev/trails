@@ -188,8 +188,8 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
     (inv as any)._touchTime = touchTime;
 
     const written: [string, unknown][] = [];
-    const origWrite = (inv as any).writeAttribute.bind(inv);
-    (inv as any).writeAttribute = (attr: string, val: unknown) => {
+    const origWrite = (inv as any)._writeAttribute.bind(inv);
+    (inv as any)._writeAttribute = (attr: string, val: unknown) => {
       written.push([attr, val]);
       return origWrite(attr, val);
     };
@@ -198,6 +198,20 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
 
     expect(written).toEqual([["updated_at", touchTime]]);
     expect((inv as any).attributeChanged("updated_at")).toBe(false);
+  });
+});
+
+describe("maxUpdatedColumnTimestamp after touchLater", () => {
+  it("answers the Time the deferred touch wrote", async () => {
+    const invoice = await Invoice.create();
+    await Invoice.transaction(async () => {
+      await invoice.touchLater();
+      const max = (invoice as any).maxUpdatedColumnTimestamp();
+      expect(max).toBeInstanceOf(RubyTime);
+      expect(max.compare((invoice as any)._touchTime)).toBe(0);
+    });
+    const reloaded = await Invoice.find(invoice.id);
+    expect((reloaded as any).maxUpdatedColumnTimestamp()).toBeInstanceOf(RubyTime);
   });
 });
 

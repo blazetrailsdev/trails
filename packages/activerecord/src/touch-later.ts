@@ -22,37 +22,39 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
   const ctor = this.constructor as typeof Base;
   const self = this as any;
 
-  if (!self._deferTouchAttrs) {
-    self._deferTouchAttrs = [...self.timestampAttributesForUpdateInModel()];
-  }
-
+  self._deferTouchAttrs ??= self.timestampAttributesForUpdateInModel();
   if (names.length > 0) {
-    const aliases: Record<string, string> = (ctor as any).attributeAliases ?? {};
-    for (const name of names) {
-      const resolved = aliases[name] ?? name;
-      if (!self._deferTouchAttrs.includes(resolved)) self._deferTouchAttrs.push(resolved);
-    }
+    self._deferTouchAttrs = [
+      ...new Set([
+        ...self._deferTouchAttrs,
+        ...names.map((name) => {
+          name = String(name);
+          return ctor.attributeAliases[name] ?? name;
+        }),
+      ]),
+    ];
   }
 
   self._touchTime = self.currentTimeFromProperTimezone();
-  surreptitiouslyTouch.call(this, self._deferTouchAttrs as string[]);
+  surreptitiouslyTouch.call(this, self._deferTouchAttrs);
 
   await addToTransaction.call(this);
   self._newRecordBeforeLastCommit ||= false;
 
   for (const r of ctor.reflectOnAllAssociations()) {
-    const touch = r.options?.touch;
-    if (!touch) continue;
-    if (r.macro === "belongsTo") {
-      await BelongsToBuilder.touchRecord(
-        this,
-        (this as any).changesToSave,
-        r.foreignKey() ?? r.options?.foreignKey,
-        r.name,
-        touch,
-      );
-    } else if (r.macro === "hasOne") {
-      await HasOneBuilder.touchRecord(this, r.name, touch);
+    const touch = r.options.touch;
+    if (touch != null && touch !== false) {
+      if (r.macro === "belongsTo") {
+        await BelongsToBuilder.touchRecord(
+          this,
+          (this as any).changesToSave,
+          r.foreignKey(),
+          r.name,
+          touch,
+        );
+      } else if (r.macro === "hasOne") {
+        await HasOneBuilder.touchRecord(this, r.name, touch);
+      }
     }
   }
 }
@@ -85,15 +87,10 @@ export async function beforeCommittedBang(this: Base): Promise<void> {
 }
 
 /** @internal */
-export function surreptitiouslyTouch(this: Base, attrNames: string[]): void {
-  const time = (this as any)._touchTime;
+export function surreptitiouslyTouch(this: Base, attrNames: readonly string[]): void {
   for (const attrName of attrNames) {
-    (this as any).writeAttribute(attrName, time);
-    if (typeof (this as any).clearAttributeChange === "function") {
-      (this as any).clearAttributeChange(attrName);
-    } else if (typeof (this as any).clearAttributeChanges === "function") {
-      (this as any).clearAttributeChanges([attrName]);
-    }
+    this._writeAttribute(attrName, (this as any)._touchTime);
+    this.clearAttributeChange(attrName);
   }
 }
 
