@@ -201,6 +201,20 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
   });
 });
 
+describe("maxUpdatedColumnTimestamp after touchLater", () => {
+  it("answers the Time the deferred touch wrote", async () => {
+    const invoice = await Invoice.create();
+    await Invoice.transaction(async () => {
+      await invoice.touchLater();
+      const max = (invoice as any).maxUpdatedColumnTimestamp();
+      expect(max).toBeInstanceOf(RubyTime);
+      expect(max.compare((invoice as any)._touchTime)).toBe(0);
+    });
+    const reloaded = await Invoice.find(invoice.id);
+    expect((reloaded as any).maxUpdatedColumnTimestamp()).toBeInstanceOf(RubyTime);
+  });
+});
+
 describe("touchDeferredAttributes delegates to timestampTouch with deferred time (Story K gap 4)", () => {
   it("uses the stored _touchTime and clears deferred state", async () => {
     const { touchDeferredAttributes } = await import("./touch-later.js");

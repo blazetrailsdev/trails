@@ -331,7 +331,7 @@ export abstract class SchemaDumper {
       if (index < notIgnoredTables.length - 1) stream.puts("");
     }
 
-    if (this._fkHookHost() !== undefined) {
+    if (this._adapter().supportsForeignKeys()) {
       const foreignKeysStream = new StringIO();
       for (const tbl of notIgnoredTables) {
         await this.foreignKeys(tbl, foreignKeysStream);
@@ -645,7 +645,7 @@ export abstract class SchemaDumper {
   }
 
   /** @internal */
-  private _hookHost(method: "checkConstraints" | "foreignKeys"): unknown {
+  private _hookHost(method: "checkConstraints"): unknown {
     const candidates: unknown[] = [
       this._source,
       this._source instanceof AdapterSchemaSource ? this._source.adapter : undefined,
@@ -655,11 +655,6 @@ export abstract class SchemaDumper {
       if (typeof fn === "function") return c;
     }
     return undefined;
-  }
-
-  /** @internal */
-  private _fkHookHost(): unknown {
-    return this._hookHost("foreignKeys");
   }
 
   /** @internal */

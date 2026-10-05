@@ -40,6 +40,13 @@ describe("token-for relation finders", () => {
     expect(await TokenUser.findByTokenFor("token_snapshot", token)).toBeNull();
   });
 
+  it("raises for an id past Number.MAX_SAFE_INTEGER instead of signing a rounded one", () => {
+    const user = new TokenUser();
+    user.id = 2n ** 60n + 1n;
+    expect(user.id).toBe(2n ** 60n + 1n);
+    expect(() => user.generateTokenFor("lookup")).toThrow(TypeError);
+  });
+
   it("raises Ruby's Hash#fetch KeyError when a relation looks up an unknown purpose", async () => {
     await expect(TokenUser.where("1=1").findByTokenFor("bad", "token")).rejects.toThrow(
       /key not found: "bad"/,
