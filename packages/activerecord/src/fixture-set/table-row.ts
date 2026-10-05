@@ -199,7 +199,7 @@ export class TableRow {
             rtest((value = hashDelete(this._row, association.name)))
           ) {
             if (association.isPolymorphic()) {
-              const match = /\s*\(([^)]*)\)\s*$/.exec(value as string);
+              const match = (value as string).match(/\s*\(([^)]*)\)\s*$/);
               if (match) {
                 value = (value as string).slice(0, match.index);
                 this._row[association.joinForeignType!] = match[1];

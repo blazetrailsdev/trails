@@ -103,7 +103,7 @@ export class PrimaryKey {
 
 interface CachedSchemaSource {
   internalSchemaCache?: {
-    getCachedPrimaryKeys?(table: string): string | string[] | null | undefined;
+    getCachedPrimaryKeys?(table: string | null | undefined): string | string[] | null | undefined;
   };
 }
 
@@ -258,8 +258,8 @@ export function resetPrimaryKey(this: PrimaryKeyHost): void {
  * The `ActiveRecord::Base != self && table_exists?` arm reads the already-warmed
  * schema cache through `cachedSchemaCacheFor` (below), which resolves it without
  * leasing a connection; a cold cache falls through to the "id" convention.
- * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
- * itself has none.
+ * The cache peek answering `undefined` is the `table_exists?` test, and the
+ * second read is `schema_cache.primary_keys(table_name)`.
  *
  * @missingRailsCall table_exists? — CONVERGEABLE: `tableExists` is async in
  *   trails, and its synchronous cache-only view (`cachedTableExists`) leases a
@@ -279,17 +279,18 @@ export function getPrimaryKey(
   this: PrimaryKeyHost & { primaryKeyPrefixType?: string | null },
   baseName?: string | null,
 ): string | string[] | null {
-  let primaryKeys: string | string[] | null | undefined;
   if (baseName != null && this.primaryKeyPrefixType === "table_name") {
     return foreignKey(baseName, false);
   } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
     return foreignKey(baseName);
   } else if (
     ActiveRecord.Base !== (this as unknown) &&
-    (primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName!)) !==
-      undefined
+    cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) !== undefined
   ) {
-    return primaryKeys;
+    return cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) as
+      | string
+      | string[]
+      | null;
   } else {
     return "id";
   }
