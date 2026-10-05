@@ -29,7 +29,7 @@ import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
-import { rbPathToClass, registerConstant, registeredConstant } from "./variable.js";
+import { rbPathToClass, registeredConstant } from "./variable.js";
 import { verbose } from "./verbose.js";
 
 const MARSHAL_MAJOR = 4;
@@ -1391,5 +1391,4 @@ export const Marshal = {
   },
 };
 
-registerConstant("Rational", Rational);
 rbMarshalDefineCompat(Rational, Rational.compatible, nuratDumper, nuratLoader);

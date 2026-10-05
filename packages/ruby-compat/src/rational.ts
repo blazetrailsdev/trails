@@ -299,10 +299,13 @@ export class Rational {
   }
 }
 
-/** @internal `vendor/ruby/v3.3.11/rational.c:439` `nurat_int_check`. */
+/** @internal `vendor/ruby/v3.3.11/rational.c:439` `nurat_int_check`. It admits a
+ * Numeric answering `integer?`, which `nurat_canonicalize` then `assert`s is
+ * an Integer (`vendor/ruby/v3.3.11/rational.c:459-460`); the narrowing is that
+ * assertion, and `BigInt()` raises for a value that fails it. */
 function nuratIntCheck(num: unknown): asserts num is number | bigint {
   if (!rbIntegerTypeP(num)) {
-    if (!(num instanceof rbCNumeric) || !rtest(rbFSend(num, "integer?"))) {
+    if (!(num instanceof rbCNumeric) || !rtest(rbFSend(num, "isInteger"))) {
       throw new TypeError("not an integer");
     }
   }

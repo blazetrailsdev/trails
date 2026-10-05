@@ -397,6 +397,9 @@ describe("Marshal.load", () => {
     expect(() => Marshal.load("\x04\bU:\rRational[\x07i\x06f\x061")).toThrow(
       new TypeError("not an integer"),
     );
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07U:\rRational[\x07i\x06i\x07i\x06")).toThrow(
+      new TypeError("not an integer"),
+    );
     expect(() => Marshal.load("\x04\bU:\rRational[\x07i\x06i\x00")).toThrow(
       new ZeroDivisionError("divided by 0"),
     );

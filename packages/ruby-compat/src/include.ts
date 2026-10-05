@@ -1551,6 +1551,15 @@ for (const klass of [Rational, Complex, BigDecimal]) {
 }
 
 include(rbCNumeric, rbMComparable);
+
+/** `Numeric#integer?` (`vendor/ruby/v3.3.11/numeric.rb:29`). */
+Object.defineProperty(rbCNumeric.prototype, "isInteger", {
+  value: function isInteger(): boolean {
+    return false;
+  },
+  writable: true,
+  configurable: true,
+});
 include(rbCString, rbMComparable);
 include(rbCTime, rbMComparable);
 include(rbCDate, rbMComparable);
