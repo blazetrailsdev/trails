@@ -1,389 +1,32 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
+import { assertNothingRaised, assertRaises, type CallbackChain } from "@blazetrails/activesupport";
+import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { type AbstractController } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
+import "../../test-helpers/abstract-unit.js";
 
-function makeRequest(opts: Record<string, string> = {}): Request {
-  return new Request({
-    REQUEST_METHOD: opts.method ?? "GET",
-    PATH_INFO: opts.path ?? "/",
-    HTTP_HOST: opts.host ?? "localhost",
-    ...opts,
-  });
-}
-function makeResponse(): Response {
-  return new Response();
+type Ctor = new () => Base;
+let tc: TestCase;
+
+async function testProcess(controller: Ctor | Base, action = "show") {
+  tc.controller = typeof controller === "function" ? new controller() : controller;
+
+  return tc.process(action);
 }
 
-describe("FilterTest", () => {
-  it("before_action on controller", async () => {
-    const log: string[] = [];
-    class AppController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    AppController.beforeAction(() => {
-      log.push("before");
-    });
+function beforeActions(klass: typeof Base): unknown[] {
+  const filters = (
+    klass as unknown as { _processActionCallbacks: CallbackChain }
+  )._processActionCallbacks.entries.filter((c) => c.kind === "before");
+  return filters.map((c) => c.filter);
+}
 
-    const c = new AppController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["before", "action"]);
-  });
-
-  it("before_action halts with render", async () => {
-    class AuthController extends Base {
-      async index() {
-        await this.render({ plain: "protected" });
-      }
-    }
-    AuthController.beforeAction(async function (this: any, controller: any) {
-      await controller.render({ plain: "unauthorized", status: 401 });
-    });
-
-    const c = new AuthController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("unauthorized");
-    expect(c.status).toBe(401);
-  });
-
-  it("after_action runs after render", async () => {
-    const log: string[] = [];
-    class LogController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    LogController.afterAction(() => {
-      log.push("after");
-    });
-
-    const c = new LogController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["action", "after"]);
-  });
-
-  it("around_action wraps controller action", async () => {
-    const log: string[] = [];
-    class TimingController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    TimingController.aroundAction(async (_c, next) => {
-      log.push("start");
-      await next();
-      log.push("end");
-    });
-
-    const c = new TimingController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["start", "action", "end"]);
-  });
-
-  it("before_action with only option", async () => {
-    const log: string[] = [];
-    class OnlyController extends Base {
-      async index() {
-        await this.render({ plain: "index" });
-        log.push("index");
-      }
-      async show() {
-        await this.render({ plain: "show" });
-        log.push("show");
-      }
-    }
-    OnlyController.beforeAction(
-      () => {
-        log.push("auth");
-      },
-      { only: ["index"] },
-    );
-
-    const c1 = new OnlyController();
-    await c1.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["auth", "index"]);
-
-    log.length = 0;
-    const c2 = new OnlyController();
-    await c2.dispatch("show", makeRequest(), makeResponse());
-    expect(log).toEqual(["show"]);
-  });
-
-  it("before_action with except option", async () => {
-    const log: string[] = [];
-    class ExceptController extends Base {
-      async index() {
-        await this.render({ plain: "index" });
-        log.push("index");
-      }
-      async show() {
-        await this.render({ plain: "show" });
-        log.push("show");
-      }
-    }
-    ExceptController.beforeAction(
-      () => {
-        log.push("log");
-      },
-      { except: ["show"] },
-    );
-
-    const c1 = new ExceptController();
-    await c1.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["log", "index"]);
-
-    log.length = 0;
-    const c2 = new ExceptController();
-    await c2.dispatch("show", makeRequest(), makeResponse());
-    expect(log).toEqual(["show"]);
-  });
-
-  it("skip_before_action in child controller", async () => {
-    const log: string[] = [];
-    const authFn = () => {
-      log.push("auth");
-    };
-    class ParentController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    ParentController.beforeAction(authFn);
-
-    class ChildController extends ParentController {}
-    ChildController.skipBeforeAction(authFn);
-
-    const c = new ChildController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["action"]);
-  });
-
-  it("multiple before_actions run in order", async () => {
-    const log: string[] = [];
-    class MultiController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    MultiController.beforeAction(() => {
-      log.push("first");
-    });
-    MultiController.beforeAction(() => {
-      log.push("second");
-    });
-    MultiController.beforeAction(() => {
-      log.push("third");
-    });
-
-    const c = new MultiController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["first", "second", "third", "action"]);
-  });
-
-  it("prepend before_action runs before others", async () => {
-    const log: string[] = [];
-    class PrependController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    PrependController.beforeAction(() => {
-      log.push("normal");
-    });
-    PrependController.beforeAction(
-      () => {
-        log.push("prepended");
-      },
-      { prepend: true },
-    );
-
-    const c = new PrependController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["prepended", "normal", "action"]);
-  });
-
-  it("conditional filter with if", async () => {
-    const log: string[] = [];
-    class IfController extends Base {
-      admin = false;
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    IfController.beforeAction(
-      () => {
-        log.push("admin-check");
-      },
-      { if: (c) => (c as any).admin },
-    );
-
-    const c1 = new IfController();
-    c1.admin = true;
-    await c1.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["admin-check", "action"]);
-
-    log.length = 0;
-    const c2 = new IfController();
-    c2.admin = false;
-    await c2.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["action"]);
-  });
-
-  it("conditional filter with unless", async () => {
-    const log: string[] = [];
-    class UnlessController extends Base {
-      skipAuth = false;
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    UnlessController.beforeAction(
-      () => {
-        log.push("auth");
-      },
-      { unless: (c) => (c as any).skipAuth },
-    );
-
-    const c1 = new UnlessController();
-    await c1.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["auth", "action"]);
-
-    log.length = 0;
-    const c2 = new UnlessController();
-    c2.skipAuth = true;
-    await c2.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["action"]);
-  });
-
-  it("inherited filters from parent controller", async () => {
-    const log: string[] = [];
-    class ApplicationController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    ApplicationController.beforeAction(() => {
-      log.push("app-before");
-    });
-
-    class PostsController extends ApplicationController {
-      async index() {
-        await this.render({ plain: "posts" });
-        log.push("posts");
-      }
-    }
-    PostsController.beforeAction(() => {
-      log.push("posts-before");
-    });
-
-    const c = new PostsController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["app-before", "posts-before", "posts"]);
-  });
-
-  it("around_action can catch errors", async () => {
-    class ErrorController extends Base {
-      async index() {
-        throw new Error("boom");
-      }
-    }
-    let caught: Error | null = null;
-    ErrorController.aroundAction(async (_c, next) => {
-      try {
-        await next();
-      } catch (e) {
-        caught = e as Error;
-      }
-    });
-
-    const c = new ErrorController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(caught).not.toBeNull();
-    expect(caught!.message).toBe("boom");
-  });
-
-  it("after_action receives controller with action state", async () => {
-    let capturedAction = "";
-    class StateController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-      }
-    }
-    StateController.afterAction((controller) => {
-      capturedAction = controller.actionName;
-    });
-
-    const c = new StateController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(capturedAction).toBe("index");
-  });
-
-  it("around_action has access to action name", async () => {
-    let capturedAction = "";
-    class NameController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-      }
-    }
-    NameController.aroundAction(async (controller, next) => {
-      capturedAction = controller.actionName;
-      await next();
-    });
-
-    const c = new NameController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(capturedAction).toBe("index");
-  });
-
-  it("non-yielding around_action prevents action execution", async () => {
-    const log: string[] = [];
-    class BlockController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    BlockController.aroundAction(async () => {
-      log.push("blocked");
-    });
-
-    const c = new BlockController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["blocked"]);
-  });
-
-  it("after_action not called when around does not yield", async () => {
-    const log: string[] = [];
-    class NoYieldController extends Base {
-      async index() {
-        await this.render({ plain: "ok" });
-        log.push("action");
-      }
-    }
-    NoYieldController.aroundAction(async () => {
-      log.push("around");
-    });
-    NoYieldController.afterAction(() => {
-      log.push("after");
-    });
-
-    const c = new NoYieldController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(log).toEqual(["around"]);
-  });
-});
+function nameAs(klass: object, name: string): void {
+  Object.defineProperty(klass, "name", { value: name });
+}
 
 function rq(): Request {
   return new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "test.host" });
@@ -400,19 +43,319 @@ function push(name: string, prop = "ranFilter") {
   };
 }
 
-const _ftEnsureLogin = push("ensure_login");
-const _ftCleanUp = push("clean_up", "ranAfterAction");
-
 class FT_TestController extends Base {
   async show() {
-    await this.render({ plain: "ran action" });
+    await this.render({ inline: "ran action" });
+  }
+
+  private ensureLogin() {
+    push("ensure_login")(this);
+  }
+
+  private cleanUp() {
+    push("clean_up", "ranAfterAction")(this);
   }
 }
-FT_TestController.beforeAction(_ftEnsureLogin);
-FT_TestController.afterAction(_ftCleanUp);
+FT_TestController.beforeAction("ensureLogin");
+FT_TestController.afterAction("cleanUp");
 
-class FT_PrependingController extends FT_TestController {}
-FT_PrependingController.prependBeforeAction(push("wonderful_life"));
+class FT_ChangingTheRequirementsController extends FT_TestController {
+  async goWild() {
+    await this.render({ plain: "gobble" });
+  }
+}
+FT_ChangingTheRequirementsController.beforeAction("ensureLogin", { except: ["goWild"] });
+
+class FT_TestMultipleFiltersController extends Base {}
+FT_TestMultipleFiltersController.beforeAction("try1");
+FT_TestMultipleFiltersController.beforeAction("try2");
+FT_TestMultipleFiltersController.beforeAction("try3");
+for (const i of [1, 2, 3]) {
+  Object.assign(FT_TestMultipleFiltersController.prototype, {
+    async [`fail${i}`](this: Base) {
+      await this.render({ plain: String(i) });
+    },
+    [`try${i}`](this: Base) {
+      (this as any).try = i;
+      if (this.actionName === `fail${i}`) {
+        this.head(404);
+      }
+    },
+  });
+}
+
+class FT_RenderingController extends Base {
+  async show() {
+    (this as any).ranAction = true;
+    await this.render({ inline: "ran action" });
+  }
+
+  private async beforeActionRendering() {
+    push("before_action_rendering")(this);
+    await this.render({ inline: "something else" });
+  }
+
+  private unreachedAfterAction() {
+    (this as any).ranFilter.push("unreached_after_action_after_render");
+  }
+}
+FT_RenderingController.beforeAction("beforeActionRendering");
+FT_RenderingController.afterAction("unreachedAfterAction");
+
+class FT_RenderingForPrependAfterActionController extends FT_RenderingController {
+  private unreachedPrependAfterAction() {
+    (this as any).ranFilter.push("unreached_prepend_after_action_after_render");
+  }
+}
+FT_RenderingForPrependAfterActionController.prependAfterAction("unreachedPrependAfterAction");
+
+class FT_BeforeActionRedirectionController extends Base {
+  async show() {
+    (this as any).ranAction = true;
+    await this.render({ inline: "ran show action" });
+  }
+
+  async targetOfRedirection() {
+    (this as any).ranTargetOfRedirection = true;
+    await this.render({ inline: "ran target_of_redirection action" });
+  }
+
+  private beforeActionRedirects() {
+    push("before_action_redirects")(this);
+    this.redirectTo({ action: "target_of_redirection" });
+  }
+
+  private unreachedAfterAction() {
+    (this as any).ranFilter.push("unreached_after_action_after_redirection");
+  }
+}
+nameAs(FT_BeforeActionRedirectionController, "FilterTest::BeforeActionRedirectionController");
+FT_BeforeActionRedirectionController.beforeAction("beforeActionRedirects");
+FT_BeforeActionRedirectionController.afterAction("unreachedAfterAction");
+
+class FT_BeforeActionRedirectionForPrependAfterActionController extends FT_BeforeActionRedirectionController {
+  private unreachedPrependAfterActionAfterRedirection() {
+    (this as any).ranFilter.push("unreached_prepend_after_action_after_redirection");
+  }
+}
+nameAs(
+  FT_BeforeActionRedirectionForPrependAfterActionController,
+  "FilterTest::BeforeActionRedirectionForPrependAfterActionController",
+);
+FT_BeforeActionRedirectionForPrependAfterActionController.prependAfterAction(
+  "unreachedPrependAfterActionAfterRedirection",
+);
+
+class FT_PrependingController extends FT_TestController {
+  private wonderfulLife() {
+    push("wonderful_life")(this);
+  }
+}
+FT_PrependingController.prependBeforeAction("wonderfulLife");
+
+class FT_SkippingAndLimitedController extends FT_TestController {
+  async index() {
+    await this.render({ plain: "ok" });
+  }
+
+  async public() {
+    await this.render({ plain: "ok" });
+  }
+}
+FT_SkippingAndLimitedController.skipBeforeAction("ensureLogin");
+FT_SkippingAndLimitedController.beforeAction("ensureLogin", { only: "index" });
+
+class FT_SkippingAndReorderingController extends FT_TestController {
+  async index() {
+    await this.render({ plain: "ok" });
+  }
+
+  private findRecord() {
+    push("find_record")(this);
+  }
+}
+FT_SkippingAndReorderingController.skipBeforeAction("ensureLogin");
+FT_SkippingAndReorderingController.beforeAction("findRecord");
+FT_SkippingAndReorderingController.beforeAction("ensureLogin");
+
+class FT_ConditionalSkippingController extends FT_TestController {
+  async login() {
+    await this.render({ inline: "ran action" });
+  }
+
+  async changePassword() {
+    await this.render({ inline: "ran action" });
+  }
+
+  private findUser() {
+    push("find_user")(this);
+  }
+}
+FT_ConditionalSkippingController.skipBeforeAction("ensureLogin", { only: ["login"] });
+FT_ConditionalSkippingController.skipAfterAction("cleanUp", { only: ["login"] });
+FT_ConditionalSkippingController.beforeAction("findUser", { only: ["changePassword"] });
+
+class FT_AroundFilter {
+  executionLog?: string;
+
+  before(controller: Base) {
+    this.executionLog = "before";
+    if (rbObjRespondTo(controller, "executionLog"))
+      (controller.constructor as any).executionLog += " before aroundfilter ";
+    (controller as any).beforeRan = true;
+  }
+
+  after(controller: Base) {
+    (controller as any)._executionLog = this.executionLog + " and after";
+    (controller as any).afterRan = true;
+    if (rbObjRespondTo(controller, "executionLog"))
+      (controller.constructor as any).executionLog += " after aroundfilter ";
+  }
+
+  async around(controller: Base, block: () => Promise<void>) {
+    this.before(controller);
+    await block();
+    this.after(controller);
+  }
+}
+
+class FT_AppendedAroundFilter {
+  before(controller: Base) {
+    (controller.constructor as any).executionLog += " before appended aroundfilter ";
+  }
+
+  after(controller: Base) {
+    (controller.constructor as any).executionLog += " after appended aroundfilter ";
+  }
+
+  async around(controller: Base, block: () => Promise<void>) {
+    this.before(controller);
+    await block();
+    this.after(controller);
+  }
+}
+
+class FT_AroundFilterController extends FT_PrependingController {}
+FT_AroundFilterController.aroundAction(new FT_AroundFilter() as never);
+
+class FT_BeforeAfterClassFilterController extends FT_PrependingController {}
+{
+  const filter = new FT_AroundFilter();
+  FT_BeforeAfterClassFilterController.beforeAction(filter as never);
+  FT_BeforeAfterClassFilterController.afterAction(filter as never);
+}
+
+class FT_MixedFilterController extends FT_PrependingController {
+  static executionLog: string;
+
+  constructor() {
+    FT_MixedFilterController.executionLog = "";
+    super();
+  }
+
+  get executionLog() {
+    return FT_MixedFilterController.executionLog;
+  }
+}
+FT_MixedFilterController.beforeAction((c) => {
+  (c.constructor as any).executionLog += " before procfilter ";
+});
+FT_MixedFilterController.prependAroundAction(new FT_AroundFilter() as never);
+FT_MixedFilterController.afterAction((c) => {
+  (c.constructor as any).executionLog += " after procfilter ";
+});
+FT_MixedFilterController.appendAroundAction(new FT_AppendedAroundFilter() as never);
+
+class OutOfOrder extends Error {}
+class FT_MixedSpecializationController extends Base {
+  async foo() {
+    await this.render({ plain: "foo" });
+  }
+
+  async bar() {
+    await this.render({ plain: "bar" });
+  }
+
+  private first() {
+    (this as any)._first = true;
+  }
+
+  private second() {
+    if (!(this as any)._first) throw new OutOfOrder();
+  }
+}
+FT_MixedSpecializationController.beforeAction("first");
+FT_MixedSpecializationController.beforeAction("second", { only: "foo" });
+
+class FT_DynamicDispatchController extends Base {
+  private choose() {
+    this.actionName = this.params.get("choose") as string;
+  }
+}
+FT_DynamicDispatchController.beforeAction("choose");
+for (const action of ["foo", "bar", "baz"]) {
+  Object.assign(FT_DynamicDispatchController.prototype, {
+    async [action](this: Base) {
+      await this.render({ plain: action });
+    },
+  });
+}
+
+class FT_PrependingBeforeAndAfterController extends Base {
+  beforeAll() {
+    push("before_all")(this);
+  }
+
+  afterAll() {
+    push("after_all")(this);
+  }
+
+  betweenBeforeAllAndAfterAll() {
+    push("between_before_all_and_after_all")(this);
+  }
+
+  async show() {
+    await this.render({ plain: "hello" });
+  }
+}
+FT_PrependingBeforeAndAfterController.prependBeforeAction("beforeAll");
+FT_PrependingBeforeAndAfterController.prependAfterAction("afterAll");
+FT_PrependingBeforeAndAfterController.beforeAction("betweenBeforeAllAndAfterAll");
+FT_PrependingBeforeAndAfterController.afterAction("betweenBeforeAllAndAfterAll");
+
+class ErrorToRescue extends Error {}
+nameAs(ErrorToRescue, "FilterTest::ErrorToRescue");
+
+class FT_RescuingAroundFilterWithBlock {
+  async around(controller: Base, block: () => Promise<void>) {
+    try {
+      await block();
+    } catch (ex) {
+      if (!(ex instanceof ErrorToRescue)) throw ex;
+      await controller.render({ plain: `I rescued this: ${rbInspect(ex)}` });
+    }
+  }
+}
+
+class FT_RescuedController extends Base {
+  async show() {
+    throw new ErrorToRescue("Something made the bad noise.");
+  }
+}
+FT_RescuedController.aroundAction(new FT_RescuingAroundFilterWithBlock() as never);
+
+class FT_ImplicitActionsController extends Base {
+  private findOnly() {
+    (this as any).only = "Only";
+  }
+
+  private findExcept() {
+    (this as any).except = "Except";
+  }
+}
+nameAs(FT_ImplicitActionsController, "FilterTest::ImplicitActionsController");
+FT_ImplicitActionsController.beforeAction("findOnly", { only: "edit" });
+FT_ImplicitActionsController.beforeAction("findExcept", { except: "edit" });
 
 class FT_NonYieldingAroundFilterController extends Base {
   async index() {
@@ -568,6 +511,35 @@ FT_SkipFilterUsingIfAndExcept.skipBeforeAction(_sfuiaeCleanUpTmp, {
   except: ["login"],
 });
 
+class FT_ConditionalParentOfConditionalSkippingController extends FT_ConditionalFilterController {
+  private conditionalInParentBefore() {
+    push("conditional_in_parent_before")(this);
+  }
+
+  private conditionalInParentAfter() {
+    push("conditional_in_parent_after")(this);
+  }
+}
+FT_ConditionalParentOfConditionalSkippingController.beforeAction("conditionalInParentBefore", {
+  only: ["show", "anotherAction"],
+});
+FT_ConditionalParentOfConditionalSkippingController.afterAction("conditionalInParentAfter", {
+  only: ["show", "anotherAction"],
+});
+
+class FT_ChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
+FT_ChildOfConditionalParentController.skipBeforeAction("conditionalInParentBefore", {
+  only: "anotherAction",
+});
+FT_ChildOfConditionalParentController.skipAfterAction("conditionalInParentAfter", {
+  only: "anotherAction",
+});
+
+class FT_AnotherChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
+FT_AnotherChildOfConditionalParentController.skipBeforeAction("conditionalInParentBefore", {
+  only: "show",
+});
+
 const classFilterFn = (c: AbstractController) => {
   (c as any).ranClassAction = true;
 };
@@ -575,6 +547,11 @@ class FT_ClassController extends FT_ConditionalFilterController {}
 FT_ClassController.beforeAction(classFilterFn);
 
 describe("FilterTest", () => {
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    await tc.beforeSetup();
+  });
+
   it("non yielding around actions do not raise", async () => {
     await expect(run(new FT_NonYieldingAroundFilterController(), "index")).resolves.toBeDefined();
   });
@@ -597,42 +574,22 @@ describe("FilterTest", () => {
     expect(ctrl.values).toEqual(["before", "action", "after"]);
   });
 
-  it("prepending and appending around action", async () => {
-    let executionLog = "";
-    class MixedFilterController extends FT_PrependingController {}
-    MixedFilterController.beforeAction(() => {
-      executionLog += " before procfilter ";
-    });
-    MixedFilterController.prependAroundAction(async (_c, next) => {
-      executionLog += " before aroundfilter ";
-      await next();
-      executionLog += " after aroundfilter ";
-    });
-    MixedFilterController.afterAction(() => {
-      executionLog += " after procfilter ";
-    });
-    MixedFilterController.appendAroundAction(async (_c, next) => {
-      executionLog += " before appended aroundfilter ";
-      await next();
-      executionLog += " after appended aroundfilter ";
-    });
-    await run(new MixedFilterController());
-    expect(executionLog).toBe(
-      " before aroundfilter  before procfilter  before appended aroundfilter " +
-        " after appended aroundfilter  after procfilter  after aroundfilter ",
-    );
-  });
-
-  it.skip("after actions are not run if around action does not yield", async () => {
+  it("after actions are not run if around action does not yield", async () => {
     const c = await run(new FT_NonYieldingAroundFilterController(), "index");
     expect((c as any).filters).toEqual(["filter_one", "it didn't yield"]);
   });
 
-  it.skip("added action to inheritance graph", () => {});
+  it("added action to inheritance graph", () => {
+    expect(beforeActions(FT_TestController)).toEqual([":ensureLogin"]);
+  });
 
-  it.skip("base class in isolation", () => {});
+  it("base class in isolation", () => {
+    expect(beforeActions(Base)).toEqual([]);
+  });
 
-  it.skip("prepending action", () => {});
+  it("prepending action", () => {
+    expect(beforeActions(FT_PrependingController)).toEqual([":wonderfulLife", ":ensureLogin"]);
+  });
 
   it("running actions", async () => {
     const c = await run(new FT_PrependingController());
@@ -774,5 +731,381 @@ describe("FilterTest", () => {
       ((await run(new FT_BeforeAndAfterConditionController(), "showWithoutAction")) as any)
         .ranFilter,
     ).toBeUndefined();
+  });
+
+  it("around action", async () => {
+    await testProcess(FT_AroundFilterController);
+    expect((tc.controller as any).beforeRan).toBeTruthy();
+    expect((tc.controller as any).afterRan).toBeTruthy();
+  });
+
+  it("before after class action", async () => {
+    await testProcess(FT_BeforeAfterClassFilterController);
+    expect((tc.controller as any).beforeRan).toBeTruthy();
+    expect((tc.controller as any).afterRan).toBeTruthy();
+  });
+
+  it("having properties in around action", async () => {
+    await testProcess(FT_AroundFilterController);
+    expect((tc.controller as any)._executionLog).toBe("before and after");
+  });
+
+  it("prepending and appending around action", async () => {
+    await testProcess(FT_MixedFilterController);
+    expect(FT_MixedFilterController.executionLog).toBe(
+      " before aroundfilter  before procfilter  before appended aroundfilter " +
+        " after appended aroundfilter  after procfilter  after aroundfilter ",
+    );
+  });
+
+  it("rendering breaks actioning chain", async () => {
+    const response = await testProcess(FT_RenderingController);
+    expect(response.body).toBe("something else");
+    expect("ranAction" in tc.controller).toBe(false);
+  });
+
+  it("before action rendering breaks actioning chain for after action", async () => {
+    await testProcess(FT_RenderingController);
+    expect((tc.controller as any).ranFilter).toEqual(["before_action_rendering"]);
+    expect("ranAction" in tc.controller).toBe(false);
+  });
+
+  it("before action redirects breaks actioning chain for after action", async () => {
+    await testProcess(FT_BeforeActionRedirectionController);
+    tc.assertResponse("redirect");
+    expect(tc.redirectToUrl()).toBe(
+      "http://test.host/filter_test/before_action_redirection/target_of_redirection",
+    );
+    expect((tc.controller as any).ranFilter).toEqual(["before_action_redirects"]);
+  });
+
+  it("before action rendering breaks actioning chain for prepend after action", async () => {
+    await testProcess(FT_RenderingForPrependAfterActionController);
+    expect((tc.controller as any).ranFilter).toEqual(["before_action_rendering"]);
+    expect("ranAction" in tc.controller).toBe(false);
+  });
+
+  it("before action redirects breaks actioning chain for prepend after action", async () => {
+    await testProcess(FT_BeforeActionRedirectionForPrependAfterActionController);
+    tc.assertResponse("redirect");
+    expect(tc.redirectToUrl()).toBe(
+      "http://test.host/filter_test/before_action_redirection_for_prepend_after_action/target_of_redirection",
+    );
+    expect((tc.controller as any).ranFilter).toEqual(["before_action_redirects"]);
+  });
+
+  it("actions with mixed specialization run in order", async () => {
+    await assertNothingRaised(async () => {
+      const response = await testProcess(FT_MixedSpecializationController, "bar");
+      expect(response.body).toBe("bar");
+    });
+
+    await assertNothingRaised(async () => {
+      const response = await testProcess(FT_MixedSpecializationController, "foo");
+      expect(response.body).toBe("foo");
+    });
+  });
+
+  it("dynamic dispatch", async () => {
+    for (const action of ["foo", "bar", "baz"]) {
+      tc.request.queryParameters["choose"] = action;
+      const response = (await FT_DynamicDispatchController.action(action)(tc.request.env)).at(
+        -1,
+      ) as Response;
+      expect(response.body).toBe(action);
+    }
+  });
+
+  it("running prepended before and after action", async () => {
+    await testProcess(FT_PrependingBeforeAndAfterController);
+    expect((tc.controller as any).ranFilter).toEqual([
+      "before_all",
+      "between_before_all_and_after_all",
+      "between_before_all_and_after_all",
+      "after_all",
+    ]);
+  });
+
+  it("skipping and limiting controller", async () => {
+    await testProcess(FT_SkippingAndLimitedController, "index");
+    expect((tc.controller as any).ranFilter).toEqual(["ensure_login"]);
+    await testProcess(FT_SkippingAndLimitedController, "public");
+    expect("ranFilter" in tc.controller).toBe(false);
+  });
+
+  it("skipping and reordering controller", async () => {
+    await testProcess(FT_SkippingAndReorderingController, "index");
+    expect((tc.controller as any).ranFilter).toEqual(["find_record", "ensure_login"]);
+  });
+
+  it("conditional skipping of actions", async () => {
+    await testProcess(FT_ConditionalSkippingController, "login");
+    expect("ranFilter" in tc.controller).toBe(false);
+    await testProcess(FT_ConditionalSkippingController, "changePassword");
+    expect((tc.controller as any).ranFilter).toEqual(["ensure_login", "find_user"]);
+
+    await testProcess(FT_ConditionalSkippingController, "login");
+    expect("ranAfterAction" in tc.controller).toBe(false);
+    await testProcess(FT_ConditionalSkippingController, "changePassword");
+    expect((tc.controller as any).ranAfterAction).toEqual(["clean_up"]);
+  });
+
+  it("conditional skipping of actions when parent action is also conditional", async () => {
+    await testProcess(FT_ChildOfConditionalParentController);
+    expect((tc.controller as any).ranFilter).toEqual([
+      "conditional_in_parent_before",
+      "conditional_in_parent_after",
+    ]);
+    await testProcess(FT_ChildOfConditionalParentController, "anotherAction");
+    expect("ranFilter" in tc.controller).toBe(false);
+  });
+
+  it("condition skipping of actions when siblings also have conditions", async () => {
+    await testProcess(FT_ChildOfConditionalParentController);
+    expect((tc.controller as any).ranFilter).toEqual([
+      "conditional_in_parent_before",
+      "conditional_in_parent_after",
+    ]);
+    await testProcess(FT_AnotherChildOfConditionalParentController);
+    expect((tc.controller as any).ranFilter).toEqual(["conditional_in_parent_after"]);
+    await testProcess(FT_ChildOfConditionalParentController);
+    expect((tc.controller as any).ranFilter).toEqual([
+      "conditional_in_parent_before",
+      "conditional_in_parent_after",
+    ]);
+  });
+
+  it("changing the requirements", async () => {
+    await testProcess(FT_ChangingTheRequirementsController, "goWild");
+    expect("ranFilter" in tc.controller).toBe(false);
+  });
+
+  it("a rescuing around action", async () => {
+    let response: Awaited<ReturnType<typeof testProcess>> | null = null;
+    await assertNothingRaised(async () => {
+      response = await testProcess(FT_RescuedController);
+    });
+
+    expect(response!.successful).toBe(true);
+    expect(response!.body).toBe(
+      "I rescued this: #<FilterTest::ErrorToRescue: Something made the bad noise.>",
+    );
+  });
+
+  it("actions obey only and except for implicit actions", async () => {
+    await testProcess(FT_ImplicitActionsController, "show");
+    expect((tc.controller as any).except).toBe("Except");
+    expect("only" in tc.controller).toBe(false);
+    expect(tc.response.body).toBe("show");
+
+    await testProcess(FT_ImplicitActionsController, "edit");
+    expect((tc.controller as any).only).toBe("Only");
+    expect("except" in tc.controller).toBe(false);
+    expect(tc.response.body).toBe("edit");
+  });
+});
+
+class Before extends Error {}
+class After extends Error {}
+
+class PostsController extends Base {
+  private async defaultAction() {
+    await this.render({ inline: `${this.actionName} called` });
+  }
+}
+for (const action of ["raisesBefore", "raisesAfter", "raisesBoth", "noRaise", "noAction"]) {
+  Object.assign(PostsController.prototype, {
+    async [action](this: PostsController) {
+      await (this as any).defaultAction();
+    },
+  });
+}
+
+class ControllerWithSymbolAsFilter extends PostsController {
+  private async raiseBefore(block: () => Promise<void>) {
+    throw new Before();
+    await block();
+  }
+
+  private async raiseAfter(block: () => Promise<void>) {
+    await block();
+    throw new After();
+  }
+
+  private async withoutException(block: () => Promise<void>) {
+    const wtf = 1 + 1;
+
+    await block();
+
+    return wtf + 1;
+  }
+}
+ControllerWithSymbolAsFilter.aroundAction("raiseBefore", { only: "raisesBefore" });
+ControllerWithSymbolAsFilter.aroundAction("raiseAfter", { only: "raisesAfter" });
+ControllerWithSymbolAsFilter.aroundAction("withoutException", { only: "noRaise" });
+
+class ControllerWithFilterClass extends PostsController {
+  static YieldingFilter = class YieldingFilter {
+    static async around(_controller: Base, block: () => Promise<void>) {
+      await block();
+      throw new After();
+    }
+  };
+}
+ControllerWithFilterClass.aroundAction(ControllerWithFilterClass.YieldingFilter as never, {
+  only: "raisesAfter",
+});
+
+class ControllerWithFilterInstance extends PostsController {
+  static YieldingFilter = class YieldingFilter {
+    async around(_controller: Base, block: () => Promise<void>) {
+      await block();
+      throw new After();
+    }
+  };
+}
+ControllerWithFilterInstance.aroundAction(
+  new ControllerWithFilterInstance.YieldingFilter() as never,
+  {
+    only: "raisesAfter",
+  },
+);
+
+class ControllerWithProcFilter extends PostsController {}
+ControllerWithProcFilter.aroundAction(
+  async (c, b) => {
+    (c as any).before = true;
+    await b();
+    (c as any).after = true;
+  },
+  { only: "noRaise" },
+);
+
+class ControllerWithNestedFilters extends ControllerWithSymbolAsFilter {}
+ControllerWithNestedFilters.aroundAction("raiseBefore", "raiseAfter", "withoutException", {
+  only: "raisesBoth",
+});
+
+class ControllerWithAllTypesOfFilters extends PostsController {
+  private before() {
+    push("before")(this);
+  }
+
+  private async around(block: () => Promise<void>) {
+    (this as any).ranFilter.push("around (before yield)");
+    await block();
+    (this as any).ranFilter.push("around (after yield)");
+  }
+
+  private after() {
+    (this as any).ranFilter.push("after");
+  }
+
+  private async aroundAgain(block: () => Promise<void>) {
+    (this as any).ranFilter.push("around_again (before yield)");
+    await block();
+    (this as any).ranFilter.push("around_again (after yield)");
+  }
+}
+ControllerWithAllTypesOfFilters.beforeAction("before");
+ControllerWithAllTypesOfFilters.aroundAction("around");
+ControllerWithAllTypesOfFilters.afterAction("after");
+ControllerWithAllTypesOfFilters.aroundAction("aroundAgain");
+
+class ControllerWithTwoLessFilters extends ControllerWithAllTypesOfFilters {}
+ControllerWithTwoLessFilters.skipAroundAction("aroundAgain");
+ControllerWithTwoLessFilters.skipAfterAction("after");
+
+describe("YieldingAroundFiltersTest", () => {
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    await tc.beforeSetup();
+  });
+
+  it("base", async () => {
+    const controller = PostsController;
+    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+    await assertNothingRaised(() => testProcess(controller, "raisesBefore"));
+    await assertNothingRaised(() => testProcess(controller, "raisesAfter"));
+    await assertNothingRaised(() => testProcess(controller, "noAction"));
+  });
+
+  it("with symbol", async () => {
+    const controller = ControllerWithSymbolAsFilter;
+    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+    await assertRaises([Before], {}, () => testProcess(controller, "raisesBefore"));
+    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
+    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+  });
+
+  it("with class", async () => {
+    const controller = ControllerWithFilterClass;
+    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
+  });
+
+  it("with instance", async () => {
+    const controller = ControllerWithFilterInstance;
+    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
+  });
+
+  it("with proc", async () => {
+    await testProcess(ControllerWithProcFilter, "noRaise");
+    expect((tc.controller as any).before).toBeTruthy();
+    expect((tc.controller as any).after).toBeTruthy();
+  });
+
+  it("nested actions", async () => {
+    const controller = ControllerWithNestedFilters;
+    await assertNothingRaised(async () => {
+      try {
+        await testProcess(controller, "raisesBoth");
+      } catch (e) {
+        if (!(e instanceof Before || e instanceof After)) throw e;
+      }
+    });
+    await assertRaises([Before], {}, async () => {
+      try {
+        await testProcess(controller, "raisesBoth");
+      } catch (e) {
+        if (!(e instanceof After)) throw e;
+      }
+    });
+  });
+
+  it("action order with all action types", async () => {
+    await testProcess(ControllerWithAllTypesOfFilters, "noRaise");
+    expect((tc.controller as any).ranFilter.join(" ")).toBe(
+      "before around (before yield) around_again (before yield) around_again (after yield) after around (after yield)",
+    );
+  });
+
+  it("action order with skip action method", async () => {
+    await testProcess(ControllerWithTwoLessFilters, "noRaise");
+    expect((tc.controller as any).ranFilter.join(" ")).toBe(
+      "before around (before yield) around (after yield)",
+    );
+  });
+
+  it("first action in multiple before action chain halts", async () => {
+    const controller = new FT_TestMultipleFiltersController();
+    const response = await testProcess(controller, "fail1");
+    expect(response.body).toBe("");
+    expect((controller as any).try).toBe(1);
+  });
+
+  it("second action in multiple before action chain halts", async () => {
+    const controller = new FT_TestMultipleFiltersController();
+    const response = await testProcess(controller, "fail2");
+    expect(response.body).toBe("");
+    expect((controller as any).try).toBe(2);
+  });
+
+  it("last action in multiple before action chain halts", async () => {
+    const controller = new FT_TestMultipleFiltersController();
+    const response = await testProcess(controller, "fail3");
+    expect(response.body).toBe("");
+    expect((controller as any).try).toBe(3);
   });
 });

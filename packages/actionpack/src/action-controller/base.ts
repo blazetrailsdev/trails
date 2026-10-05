@@ -476,6 +476,16 @@ export class Base extends Metal {
   defaultRender = defaultRender;
 
   /** @internal */
+  override methodForAction(actionName: string): string | undefined {
+    return (
+      super.methodForAction(actionName) ??
+      (templateExists.call(this as never, String(actionName), _prefixes.call(this as never))
+        ? "defaultRender"
+        : undefined)
+    );
+  }
+
+  /** @internal */
   override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
     await super._dispatchAction(action, ...args);
     if (!this.performed) await this.defaultRender();

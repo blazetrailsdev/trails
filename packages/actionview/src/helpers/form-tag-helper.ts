@@ -43,6 +43,20 @@ export function setDefaultEnforceUtf8(value: boolean): void {
   defaultEnforceUtf8 = value;
 }
 
+export function formTag(
+  this: FormTagHelperHost,
+  urlForOptions: unknown = {},
+  options: Record<string, unknown> = {},
+  block?: (...args: unknown[]) => unknown,
+): SafeBuffer {
+  const htmlOptions = htmlOptionsForForm.call(this, urlForOptions, options);
+  if (block !== undefined) {
+    return formTagWithBody.call(this, htmlOptions, this.capture(block));
+  } else {
+    return formTagHtml.call(this, htmlOptions);
+  }
+}
+
 export function fieldId(
   this: FormTagHelperHost,
   objectName: unknown,
@@ -260,7 +274,7 @@ export const FormTagHelper = new Module((mod) => {
   mod.include(ContentExfiltrationPreventionHelper);
 
   mod.moduleEval((m) => {
-    Object.assign(m, { fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
+    Object.assign(m, { formTag, fieldId, fieldName, labelTag, submitTag, utf8EnforcerTag });
     Object.assign(m, { htmlOptionsForForm, extraTagsForForm, formTagHtml, formTagWithBody });
     Object.assign(m, { sanitizeToId, setDefaultDisableWith });
   });

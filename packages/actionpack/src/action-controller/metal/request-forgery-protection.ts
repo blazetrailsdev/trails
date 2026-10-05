@@ -199,6 +199,8 @@ export interface RequestForgeryProtectionHost extends ActionCallbackHost, Helper
 }
 
 export class RequestForgeryProtection {
+  static readonly AUTHENTICITY_TOKEN_LENGTH = 32;
+
   static [included](base: RequestForgeryProtectionHost): void {
     include(base, {
       resetCsrfToken,
@@ -210,6 +212,11 @@ export class RequestForgeryProtection {
       markForSameOriginVerificationBang,
       isVerifiedRequest,
       formAuthenticityToken,
+      realCsrfToken,
+      globalCsrfToken,
+      perFormCsrfToken,
+      maskToken,
+      unmaskToken,
       isValidAuthenticityToken,
       formAuthenticityParam,
       isProtectAgainstForgery,
@@ -428,7 +435,7 @@ export function isVerifiedRequest(this: CsrfController): boolean {
   );
 }
 
-const AUTHENTICITY_TOKEN_LENGTH = 32;
+const AUTHENTICITY_TOKEN_LENGTH = RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH;
 const CSRF_TOKEN_ENV_KEY = "action_controller.csrf_token";
 const GLOBAL_CSRF_TOKEN_IDENTIFIER = "!real_csrf_token";
 
