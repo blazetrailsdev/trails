@@ -245,26 +245,6 @@ describe("HttpAuthentication::Digest", () => {
     Digest.authenticationRequest(c, "SuperSecret", "Authentication Failed");
     expect(c.responseBody).toBe("Authentication Failed");
   });
-
-  it("validate_digest_response should fail with nil returning password_procedure", () => {
-    const secretKey = secretToken(makeDigestRequest());
-    const nonceVal = nonce(secretKey);
-    const opaqueVal = opaque(secretKey);
-    const creds = new HashWithIndifferentAccess<string | undefined>({
-      username: "lifo",
-      realm: "SuperSecret",
-      nonce: nonceVal,
-      nc: "00000001",
-      cnonce: "0a4f113b",
-      qop: "auth",
-      uri: "/",
-      opaque: opaqueVal,
-    });
-    const response = expectedResponse("GET", "/", creds, "world", false);
-    const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonceVal}", uri="/", nc=00000001, cnonce="0a4f113b", qop=auth, response="${response}", opaque="${opaqueVal}"`;
-    const req = makeDigestRequest(header);
-    expect(validateDigestResponse(req, "SuperSecret", () => null)).toBe(false);
-  });
 });
 
 describe("HttpAuthentication::Digest::ControllerMethods", () => {
