@@ -319,7 +319,7 @@ export class Options extends Arguments {
   /** @internal */
   protected override isCurrentIsValue(): unknown {
     if (this.isTreatedAsValue) return true;
-    return rtest(this.peek()) && (!this.isParsingOptions() || super.isCurrentIsValue());
+    return rtest(this.peek()) ? !this.isParsingOptions() || super.isCurrentIsValue() : this.peek();
   }
 
   /** @internal */

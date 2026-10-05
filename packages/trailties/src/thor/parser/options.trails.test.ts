@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FrozenError, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import {
   AtLeastOneRequiredArgumentError,
   ExclusiveArgumentError,
@@ -201,6 +201,18 @@ describe("Thor::Options", () => {
         "Not found at least one of required options '--foo', '--bar'",
       ),
     );
+  });
+
+  it("answers current_is_value? with the peek itself when it is nil or false", () => {
+    const currentIsValue = (peek: unknown) => {
+      const options = create({});
+      rbObjIvarSet(options, "@pile", [peek]);
+      return rbFSend(options, "isCurrentIsValue");
+    };
+    expect(currentIsValue(null)).toBeNull();
+    expect(currentIsValue(false)).toBe(false);
+    expect(currentIsValue("b")).toBe(true);
+    expect(currentIsValue("--b")).toBe(true);
   });
 
   it("assigns defaults under string keys and answers a frozen indifferent hash", () => {
