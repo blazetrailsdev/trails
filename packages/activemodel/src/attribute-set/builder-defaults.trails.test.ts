@@ -4,7 +4,7 @@ import { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import { registry } from "../type.js";
 import { ValueType } from "../type/value.js";
-import { Hash, Marshal, keys, rbEqual, rbObjDup } from "@blazetrails/ruby-compat";
+import { Hash, Marshal, hashAref, keys, rbEqual, rbObjDup } from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -87,7 +87,7 @@ describe("LazyAttributeHash defaultAttributes", () => {
 
     const restored = Object.create(LazyAttributeHash.prototype) as LazyAttributeHash;
     restored.marshalLoad(original.marshalDump());
-    expect(restored.delegateHash()["score"].value()).toBe(42);
+    expect((hashAref(restored.delegateHash(), "score") as Attribute).value()).toBe(42);
     const fresh = Object.create(LazyAttributeHash.prototype) as LazyAttributeHash;
     fresh.marshalLoad([types, {}, additional, defaults]);
     expect(fresh.get("status")!.value()).toBe("active");

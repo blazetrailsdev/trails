@@ -6719,6 +6719,32 @@ describe("extractFromProgram — classAttribute() generated accessors", () => {
     expect(seats("isConfig")).toEqual([]);
   });
 
+  it("credits a Module's attrReader / attrWriter with the instance half each installs", () => {
+    const info = extractFromFiles("/p", {
+      "base.ts": `
+        import { Module } from "@blazetrails/ruby-compat";
+        export interface Base {
+          options: unknown;
+          args: unknown[];
+          shell: unknown;
+        }
+        export const Base = new Module();
+        Base.attrReader("options", "args");
+        Base.attrWriter("options");
+        const names = ["shell"];
+        Base.attrReader(...names);
+      `,
+    });
+    const mod = info.classes["base.ts:Base"] ?? info.modules["base.ts:Base"];
+    const seats = (name: string) =>
+      [...mod.classMethods, ...mod.instanceMethods]
+        .filter((m) => m.name === name && m.bodyless !== true)
+        .map((m) => `${m.isStatic ? "static" : "instance"}${m.writer ? " writer" : ""}`);
+    expect(seats("options")).toEqual(["instance", "instance writer"]);
+    expect(seats("args")).toEqual(["instance"]);
+    expect(seats("shell")).toEqual([]);
+  });
+
   it("does not seat an object literal with no [included] or [extended] hook", () => {
     const info = extractFromFiles("/p", {
       "helpers.ts": `

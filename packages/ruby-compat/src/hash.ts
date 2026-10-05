@@ -102,6 +102,18 @@ export function fetch<K, V, T>(hash: Map<K, V>, key: K, defaultValue: T): V | T;
  */
 export function fetch<K, V>(hash: Map<K, V>, key: K, ...rest: unknown[]): unknown;
 /**
+ * Either arm, for a receiver typed as either.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`).
+ */
+export function fetch<T>(
+  hash:
+    | Record<string, unknown>
+    | Map<string, unknown>
+    | { fetch(key: string, ...rest: never): unknown },
+  key: string,
+  ...rest: [] | [T | Block<T>]
+): T;
+/**
  * `rb_hash_fetch_m` dispatches on `argc` and `rb_block_given_p`, so the arms
  * share one body over a rest parameter: an absent second argument is the
  * raising arm, and an explicitly-passed `undefined` is a default, exactly as
@@ -589,6 +601,21 @@ export function eachKey<T, R = never>(
  */
 export function eachKey<T>(hash: Record<string, T> | { eachKey(): string[] }): string[];
 /**
+ * Either arm, for a receiver typed as either.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
+ */
+export function eachKey<T>(
+  hash: Record<string, T> | Map<string, T> | { eachKey(block: (key: string) => unknown): unknown },
+  block: (key: string) => unknown,
+): unknown;
+/**
+ * Either arm, blockless.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
+ */
+export function eachKey<T>(
+  hash: Record<string, T> | Map<string, T> | { eachKey(): string[] },
+): string[];
+/**
  * The arms share one body.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_key` (`vendor/ruby/v3.3.11/hash.c:3098`).
  */
@@ -621,6 +648,17 @@ export function transformValues<T, U>(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
  */
 export function transformValues<K, T, U>(hash: Map<K, T>, block: (value: T) => U): Hash<K, U>;
+/**
+ * Either arm, for a receiver typed as either.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`).
+ */
+export function transformValues<T, U>(
+  hash:
+    | Record<string, T>
+    | Map<string, T>
+    | { transformValues(block: (value: T) => unknown): object },
+  block: (value: T) => U,
+): Record<string, U> | Hash<string, U>;
 /** @noRailsEquivalent PERMANENT — Ruby core `Hash#transform_values` (`vendor/ruby/v3.3.11/hash.c:3366`). */
 export function transformValues(
   hash: Record<string, unknown> | Map<unknown, unknown>,
@@ -777,6 +815,13 @@ export function dup<K, V>(hash: Hash<K, V>): Hash<K, V>;
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591`).
  */
 export function dup<T>(hash: Record<string, T>): Record<string, T>;
+/**
+ * Either arm, for a receiver typed as either.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591`).
+ */
+export function dup<T>(
+  hash: Record<string, T> | Hash<string, T>,
+): Record<string, T> | Hash<string, T>;
 /**
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591`).
  */

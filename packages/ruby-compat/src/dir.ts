@@ -1,4 +1,9 @@
 import { ArgumentError } from "./argument-error.js";
+import {
+  getAsyncContext,
+  type AsyncContext,
+  type AsyncContextAdapter,
+} from "./async-context-adapter.js";
 import { rbObjAsString } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
@@ -28,6 +33,26 @@ function isWritable(dir: string): boolean {
 
 /** `chdir_blocking` (`vendor/ruby/v3.3.11/dir.c:1044`), the count of open `Dir.chdir` blocks. */
 let chdirBlocking = 0;
+
+/**
+ * `chdir_thread` (`vendor/ruby/v3.3.11/dir.c:1045`), the owner of the open
+ * `Dir.chdir` blocks. A block runs under an owner of its own, carried by the
+ * async context as ruby-compat's `synchronize` carries a monitor's
+ * (`./monitor.js`), and a block opened inside it shares that owner.
+ */
+let chdirThread: symbol | null = null;
+let chdirStorage: AsyncContext<symbol> | null = null;
+let chdirAdapter: AsyncContextAdapter | null = null;
+
+/** The context whose store is `rb_thread_current()` as `chdir_path` reads it (`vendor/ruby/v3.3.11/dir.c:1083`). */
+function chdirContext(): AsyncContext<symbol> {
+  const adapter = getAsyncContext();
+  if (!chdirStorage || chdirAdapter !== adapter) {
+    chdirStorage = adapter.create<symbol>();
+    chdirAdapter = adapter;
+  }
+  return chdirStorage;
+}
 
 /** `Dir::SYSTMPDIR` (`vendor/ruby/v3.3.11/lib/tmpdir.rb:20`). */
 const SYSTMPDIR = "/tmp";
@@ -222,8 +247,9 @@ export class Dir {
    *
    * A block that returns a promise has not finished when it returns, so the
    * restore waits for it to settle, resolved or rejected. `chdir_path`'s
-   * `conflicting chdir` `RuntimeError` (`dir.c:1083`) raises only from another
-   * thread than the block's; JS has the one, so only its warning arm is ported.
+   * `conflicting chdir` `RuntimeError` (`dir.c:1083-1084`) raises from another
+   * thread than the block's, which here is a call from outside the open
+   * block's async context: a sibling promise, where a nested call shares it.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Dir.chdir`
    * (`vendor/ruby/v3.3.11/dir.c:1172`).
@@ -239,21 +265,28 @@ export class Dir {
       path = dist;
     }
 
-    if (chdirBlocking > 0 && block == null) {
-      warn("warning: conflicting chdir during another chdir block");
+    const storage = chdirContext();
+    if (chdirBlocking > 0) {
+      if (storage.getStore() !== chdirThread) {
+        throw new RuntimeError("conflicting chdir during another chdir block");
+      }
+      if (block == null) warn("warning: conflicting chdir during another chdir block");
     }
 
     if (block != null) {
       const oldPath = Dir.pwd();
       chdir(path);
       chdirBlocking++;
+      const thread = storage.getStore() ?? Symbol("chdir");
+      if (chdirThread === null) chdirThread = thread;
       const chdirRestore = (): void => {
         chdirBlocking--;
+        if (chdirBlocking === 0) chdirThread = null;
         chdir(oldPath);
       };
       let result: T;
       try {
-        result = block(path);
+        result = storage.run(thread, () => block(path));
       } catch (error) {
         chdirRestore();
         throw error;

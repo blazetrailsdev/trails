@@ -835,3 +835,6 @@ export function fromSuperclass(
 };
 
 export const Base = Object.assign(ThorBase, { ClassMethods, subclasses, registerKlassFile });
+
+Base.attrReader("options", "parentOptions", "args");
+Base.attrWriter("options", "parentOptions", "args");

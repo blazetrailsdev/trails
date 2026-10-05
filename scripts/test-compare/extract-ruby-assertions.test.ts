@@ -716,8 +716,24 @@ describe("Ruby extractor mocha expectation collection", () => {
             expect(described_class).to be < BCrypt::Error
           end
 
-          it "stays a bare expect" do
+          it "chains" do
             expect(shell).to receive(:say).and_return(nil)
+            expect(shell).to receive(:say)
+            expect(editor).to receive(:readline).with("> ", anything).and_return("yes")
+            expect(shell).not_to receive :exit
+            expect { wrap_text }.to output(expected).to_stdout
+            expect do
+              script.start
+            end.not_to output.to_stderr
+            expect(paths).to include("doc").and include("lib")
+          end
+
+          it "predicates" do
+            expect(option).to be_required
+            expect(file).not_to be_identical
+          end
+
+          it "stays a bare expect" do
             mock.expect(:call, nil)
           end
         end
@@ -736,6 +752,16 @@ describe("Ruby extractor mocha expectation collection", () => {
     ]);
     expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
     expect(k["operators"]).toEqual(["expect_to_be_>", "expect_to_be_kind_of"]);
-    expect(k["stays a bare expect"]).toEqual(["expect", "expect"]);
+    expect(k["chains"]).toEqual([
+      "expect_to_receive",
+      "expect_to_receive",
+      "expect_to_receive",
+      "expect_not_to_receive",
+      "expect_to_output",
+      "expect_not_to_output",
+      "expect_to_include",
+    ]);
+    expect(k["predicates"]).toEqual(["expect_to_be_required", "expect_not_to_be_identical"]);
+    expect(k["stays a bare expect"]).toEqual(["expect"]);
   });
 });

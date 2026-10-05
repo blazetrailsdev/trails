@@ -130,6 +130,48 @@ describe("Dir", () => {
   });
 });
 
+describe("Dir.chdir", () => {
+  it("raises for an async block that overlaps another from a sibling context", async () => {
+    // vendor/ruby/v3.3.11/dir.c:1083-1084
+    const start = Dir.pwd();
+    const root = fixture();
+    let release!: () => void;
+    const first = Dir.chdir(join(root, "a"), async () => {
+      await new Promise<void>((resolve) => (release = resolve));
+      return Dir.pwd();
+    });
+
+    expect(() => Dir.chdir(join(root, "b"), async () => Dir.pwd())).toThrow(
+      "conflicting chdir during another chdir block",
+    );
+    expect(() => Dir.chdir(join(root, "b"))).toThrow(
+      "conflicting chdir during another chdir block",
+    );
+
+    release();
+    expect(File.basename(await first)).toBe("a");
+    expect(Dir.pwd()).toBe(start);
+    expect(await Dir.chdir(join(root, "b"), async () => File.basename(Dir.pwd()))).toBe("b");
+  });
+
+  it("restores nested async blocks in LIFO order", async () => {
+    // vendor/ruby/v3.3.11/dir.c:1066-1076
+    const start = Dir.pwd();
+    const root = fixture();
+    const seen = await Dir.chdir(join(root, "a"), async () => {
+      await Promise.resolve();
+      const inner = await Dir.chdir(join(root, "b"), async () => {
+        await Promise.resolve();
+        return File.basename(Dir.pwd());
+      });
+      return [inner, File.basename(Dir.pwd())];
+    });
+
+    expect(seen).toEqual(["b", "a"]);
+    expect(Dir.pwd()).toBe(start);
+  });
+});
+
 describe("Dir.mktmpdir", () => {
   it("creates a 0700 directory named by Dir::Tmpname.create and answers its path", () => {
     const path = Dir.mktmpdir(["tmp", "cache"]);

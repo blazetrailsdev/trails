@@ -102,9 +102,24 @@ describe("normalizeRailsKind", () => {
     expect(normalizeRailsKind("expect_to_be_entered")).toBe("truthy");
     expect(normalizeRailsKind("expect_not_to_be_entered")).toBe("falsy");
     expect(normalizeRailsKind("expect_to_be_available")).toBe("truthy");
-    for (const predicate of ["required", "string", "boolean", "numeric"]) {
+    expect(normalizeRailsKind("expect")).toBeNull();
+  });
+
+  it("maps an RSpec predicate matcher to truthy / falsy, behind the explicit entries", () => {
+    for (const predicate of ["required", "string", "boolean", "numeric", "identical"]) {
       expect(normalizeRailsKind(`expect_to_be_${predicate}`)).toBe("truthy");
+      expect(normalizeRailsKind(`expect_not_to_be_${predicate}`)).toBe("falsy");
     }
+    expect(normalizeRailsKind("expect_to_be_empty")).toBe("empty");
+    expect(normalizeRailsKind("expect_not_to_be_empty")).toBe("notEmpty");
+    expect(normalizeRailsKind("expect_not_to_be_nil")).toBe("notNil");
+    expect(normalizeRailsKind("expect_to_be_a")).toBe("instanceOf");
+    expect(normalizeRailsKind("expect_to_be_kind_of")).toBe("instanceOf");
+    expect(normalizeRailsKind("expect_to_be_falsey")).toBe("falsy");
+    expect(normalizeRailsKind("expect_to_be_>")).toBe("operator");
+  });
+
+  it("leaves receive and output unmapped, as their spy and helper ports are", () => {
     expect(normalizeRailsKind("expect_to_receive")).toBeNull();
     expect(normalizeRailsKind("expect_to_output")).toBeNull();
     expect(normalizeRailsKind("expect")).toBeNull();

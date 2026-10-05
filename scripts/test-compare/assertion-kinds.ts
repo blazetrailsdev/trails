@@ -169,13 +169,7 @@ const RSPEC_MAP: Record<string, CanonicalKind> = {
   expect_to_be_truthy: "truthy",
   expect_not_to_be_truthy: "falsy",
   expect_to_be_empty: "empty",
-  expect_to_be_entered: "truthy",
-  expect_not_to_be_entered: "falsy",
-  expect_to_be_available: "truthy",
-  expect_to_be_required: "truthy",
-  expect_to_be_string: "truthy",
-  expect_to_be_boolean: "truthy",
-  expect_to_be_numeric: "truthy",
+  expect_not_to_be_empty: "notEmpty",
   expect_to_include: "includes",
   expect_not_to_include: "excludes",
   expect_to_match: "match",
@@ -293,6 +287,9 @@ export function normalizeRailsKind(name: string): CanonicalKind | null {
   const builtin = AREL_HELPER_ALIAS[name] ?? SPEC_FORM_ALIAS[name] ?? name;
   const direct = RAILS_MAP[builtin] ?? MSPEC_MAP[name] ?? RSPEC_MAP[name];
   if (direct) return direct;
+  // RSpec's `be_<pred>` is `<pred>?` truthy, the check `assert_predicate` makes.
+  const predicate = /^expect_(not_)?to_be_[a-z_]+$/.exec(name);
+  if (predicate) return predicate[1] === undefined ? "truthy" : "falsy";
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
   const must = /^must_(.+)$/.exec(name);
   if (must) return RAILS_MAP[`assert_${must[1]}`] ?? null;

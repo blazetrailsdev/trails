@@ -3230,12 +3230,29 @@ function attributeMacro(
   }
 }
 
+/**
+ * `Mod.attrReader("a", …)` / `Mod.attrWriter("a", …)` — `Module#attr_reader` /
+ * `#attr_writer` on a ruby-compat `Module` (include.ts), which install the
+ * instance half only; extract-ruby-api.rb credits `attr_*` the same way.
+ */
+function attrMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "attrReader":
+      return { reader: true, writer: false };
+    case "attrWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
-    expr.name.text === "call" &&
     ts.isIdentifier(expr.expression) &&
-    attributeMacro(expr.expression.text) !== undefined
+    (expr.name.text === "call"
+      ? attributeMacro(expr.expression.text) !== undefined
+      : attrMacro(expr.name.text) !== undefined)
   );
 }
 
@@ -3243,6 +3260,24 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  const callee = node.expression as ts.PropertyAccessExpression;
+  const attr = callee.name.text === "call" ? undefined : attrMacro(callee.name.text);
+  if (attr !== undefined) {
+    const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+    if (names.length === 0 || names.length !== node.arguments.length) return null;
+    const enclosing = enclosingEntity(node);
+    return {
+      ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      receiver: (callee.expression as ts.Identifier).text,
+      names,
+      reader: false,
+      writer: false,
+      instanceReader: attr.reader,
+      instanceWriter: attr.writer,
+      instancePredicate: false,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    };
+  }
   const [recv, ...rest] = node.arguments;
   if (recv === undefined) return null;
   const names: string[] = [];
