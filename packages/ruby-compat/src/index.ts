@@ -253,6 +253,8 @@ export {
   getProcessAdapter,
   onSignal,
   processAdapterConfig,
+  rbArgv,
+  rbProgname,
   registerProcessAdapter,
   setEnv,
   setExitCode,

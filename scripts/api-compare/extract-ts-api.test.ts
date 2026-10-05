@@ -1012,6 +1012,15 @@ describe("body call capture", () => {
           const { parameters = null } = typeof last === "object" ? (prefixes.pop() as object) : {};
           return this.run(prefixes, parameters);
         }
+        nullSafe(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          const kwargs = typeof last === "object" && last !== null ? prefixes.pop() : {};
+          return this.run(prefixes, kwargs);
+        }
+        otherNull(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" && prefixes !== null ? prefixes.pop() : {};
+        }
         inline(...prefixes: unknown[]) {
           const kwargs = typeof prefixes[prefixes.length - 1] === "object" ? prefixes.pop() : {};
           return this.run(prefixes, kwargs);
@@ -1039,6 +1048,8 @@ describe("body call capture", () => {
       cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
     expect(arms("prefix")).toEqual([]);
     expect(arms("inline")).toEqual([]);
+    expect(arms("nullSafe")).toEqual([]);
+    expect(arms("otherNull")).toContain("if");
     for (const kept of ["notASplat", "notTheLast", "declaredAfter", "defaulted"]) {
       expect(arms(kept)).toEqual(["if"]);
     }
@@ -1206,13 +1217,30 @@ describe("body call capture", () => {
           return rtest(this.cache) ? this.cache : (this.cache = this.compute());
         }
         other() {
-          return rtest(this.cache) ? this.compute() : this.cache;
+          return rtest(this.cache) ? this.compute() : this.fallback;
         }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("delimiter")).toEqual(["ref:rtest", "ref:cache", "or", "ref:compute"]);
     expect(skeleton("other")!.filter((t) => t === "if" || t === "or")).toEqual(["if"]);
+  });
+
+  it("reads `rtest(x) ? y : x` as the `and` of Ruby's `x && y`, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        isCurrentIsValue() {
+          return rtest(this.peek()) ? this.match(this.peek()) : this.peek();
+        }
+      }`,
+    );
+    expect(cls.instanceMethods[0].skeleton).toEqual([
+      "ref:rtest",
+      "ref:peek",
+      "and",
+      "ref:match",
+      "ref:peek",
+    ]);
   });
 
   it("reads the `&block` popped off a splat as a parameter binding, not as an arm", () => {

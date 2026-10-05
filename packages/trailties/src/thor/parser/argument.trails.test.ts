@@ -29,6 +29,11 @@ describe("Thor::Argument", () => {
     );
   });
 
+  it("falls through to the default banner for a false banner, and keeps an empty one", () => {
+    expect(new Argument("foo", { banner: false as never }).banner).toBe("FOO");
+    expect(new Argument("foo", { banner: "" }).banner).toBe("");
+  });
+
   it("shows a default unless it is an empty Array, String or Hash", () => {
     const showDefault = (default_: unknown) =>
       new Argument("foo", { required: false, default: default_ }).isShowDefault();

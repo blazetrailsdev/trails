@@ -775,7 +775,22 @@ export default defineConfig(
 
   {
     files: ["packages/trailties/src/thor/**/*.ts"],
-    ignores: ["**/*.test.ts"],
+    ignores: [
+      "packages/trailties/src/thor/actions.trails.test.ts",
+      "packages/trailties/src/thor/actions/create-file.trails.test.ts",
+      "packages/trailties/src/thor/actions/file-manipulation.trails.test.ts",
+      "packages/trailties/src/thor/line-editor/basic.test.ts",
+      "packages/trailties/src/thor/nested-context.test.ts",
+      "packages/trailties/src/thor/parser/argument.test.ts",
+      "packages/trailties/src/thor/parser/arguments.test.ts",
+      "packages/trailties/src/thor/parser/option.test.ts",
+      "packages/trailties/src/thor/parser/options.test.ts",
+      "packages/trailties/src/thor/shell.test.ts",
+      "packages/trailties/src/thor/shell.trails.test.ts",
+      "packages/trailties/src/thor/shell/color.test.ts",
+      "packages/trailties/src/thor/shell/table-printer.trails.test.ts",
+      "packages/trailties/src/thor/util.test.ts",
+    ],
     rules: {
       "blazetrails/thor-import-boundary": "error",
     },

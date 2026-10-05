@@ -6,6 +6,8 @@ import { RUBY_PLATFORM } from "./ruby-platform.js";
 import {
   __INTERNAL_resetProcessAdapter_TEST_ONLY,
   argv,
+  rbArgv,
+  rbProgname,
   env,
   getProcessAdapter,
   onSignal,
@@ -111,6 +113,17 @@ describe("processAdapter", () => {
     it("populates argv from the registered adapter", () => {
       registerProcessAdapter(makeFakeAdapter());
       expect(argv).toEqual(["fake-node", "fake-script"]);
+    });
+
+    it("derives $PROGRAM_NAME and ARGV from the snapshot", () => {
+      registerProcessAdapter(
+        makeFakeAdapter({ argvSnapshot: () => ["fake-node", "bin/fake script", "new", "--api"] }),
+      );
+      expect(rbProgname()).toBe("bin/fake script");
+      expect(rbArgv()).toEqual(["new", "--api"]);
+      registerProcessAdapter(makeFakeAdapter({ argvSnapshot: () => [] }));
+      expect(rbProgname()).toBe("");
+      expect(rbArgv()).toEqual([]);
     });
 
     it("array indexing works", () => {

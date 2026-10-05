@@ -1113,6 +1113,10 @@ describe("strip and matchOperator", () => {
     expect(matchOperator("😀yes", /yes/)).toBe(1);
     expect(matchOperator("no", /yes/)).toBeNull();
     expect(matchOperator({ matchOperator: (pattern: unknown) => [pattern] }, "p")).toEqual(["p"]);
+    expect(() => matchOperator([1], /a/)).toThrow(
+      new NoMethodError("undefined method '=~' for an instance of Array", "=~"),
+    );
+    expect(() => matchOperator(true, /a/)).toThrow(NoMethodError);
   });
 
   it("rbObjNotMatch negates the receiver's =~", () => {

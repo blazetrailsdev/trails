@@ -5,7 +5,7 @@ import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
 import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
-import { rbCString, rtest } from "../object.js";
+import { rbCString, rbObjClassname, rtest } from "../object.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
@@ -346,7 +346,9 @@ export function rbStrMatch(x: string, y: unknown): unknown {
  * Ruby's `obj =~ pattern` send, dispatched on the receiver's class:
  * `NilClass#=~` (`vendor/ruby/v3.3.11/object.c:4419` `nil_match`), which answers
  * `nil` for any pattern, `String#=~` ({@link rbStrMatch}), else the receiver's
- * own `matchOperator`.
+ * own `matchOperator`. A receiver with none raises `NoMethodError`
+ * (`rb_method_missing`, `vendor/ruby/v3.3.11/vm_eval.c:919`): `Object#=~` is gone
+ * since Ruby 3.2.
  *
  * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
  * for on `null` or a primitive.
@@ -354,7 +356,15 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 export function matchOperator(obj: unknown, pattern: unknown): unknown {
   if (obj == null) return NilClass.matchOperator(pattern);
   if (typeof obj === "string") return rbStrMatch(obj, pattern);
-  return (obj as { matchOperator(pattern: unknown): unknown }).matchOperator(pattern);
+  const method = (obj as { matchOperator?: unknown }).matchOperator;
+  if (typeof method !== "function") {
+    throw new NoMethodError(
+      `undefined method '=~' for an instance of ${rbObjClassname(obj)}`,
+      "=~",
+      { receiver: obj },
+    );
+  }
+  return (method as (pattern: unknown) => unknown).call(obj, pattern);
 }
 
 /**

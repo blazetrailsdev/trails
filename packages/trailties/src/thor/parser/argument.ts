@@ -59,7 +59,7 @@ export class Argument {
     this.required = hasKey(options, "required") ? options.required : true;
     this.type = type ?? "string";
     this.default = options.default ?? null;
-    this.banner = options.banner ?? this.defaultBanner();
+    this.banner = (rtest(options.banner) ? options.banner : this.defaultBanner()) as string | null;
     this.enum = options.enum ?? null;
 
     this.validateBang();

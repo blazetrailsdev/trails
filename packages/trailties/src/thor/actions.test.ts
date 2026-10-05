@@ -1,5 +1,4 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertEmpty, assertRaises, capture } from "@blazetrails/activesupport";
 import {
   Dir,
   File,
@@ -7,28 +6,20 @@ import {
   getChildProcess,
   getPath,
   include,
+  isEmpty,
   setExitCode,
+  stdout,
   SystemExit,
 } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "./actions.js";
-import { Shell } from "./shell.js";
 import { Thor } from "./thor.js";
-import { GeneratorBase } from "../generators/base.js";
-import { Error as ThorError } from "./error.js";
+import { Group, type GroupClass } from "./group.js";
 import * as Util from "./util.js";
 
 vi.mock("./util.js", async (importOriginal) => ({ ...(await importOriginal<typeof Util>()) }));
 
 let fixtures: string;
 let destinationRoot: string;
-
-class MyCounter extends GeneratorBase {}
-class ClearCounter extends MyCounter {
-  static override async sourceRoot(): Promise<string> {
-    return File.expandPath(File.join(fixtures, "bundle"));
-  }
-}
-class A extends GeneratorBase {}
 
 type CounterInstance = ActionsHost & {
   apply(path: string, config?: { verbose?: unknown }): Promise<void>;
@@ -38,14 +29,55 @@ type CounterInstance = ActionsHost & {
   runRubyScript(command: unknown, config?: Record<string, unknown>): Promise<unknown>;
   thor(command: unknown, ...args: unknown[]): Promise<unknown>;
 };
-class Counter extends Thor {
-  declare static addRuntimeOptionsBang: () => void;
-  declare static classOptions: () => Record<string, unknown>;
+type ActionsClass = Pick<GroupClass, "argument" | "removeArgument" | "classOptions"> & {
+  addRuntimeOptionsBang(): void;
+  sourcePaths(): string[];
+  sourceRoot(path?: string): Promise<string | null>;
+  sourcePathsForSearch(): Promise<string[]>;
+} & (new (...args: unknown[]) => CounterInstance);
+const MyCounter = class MyCounter extends Group {
   static {
-    include(this, Shell);
+    const klass = this as unknown as ActionsClass;
     include(this, Actions);
-    this.addRuntimeOptionsBang();
+    klass.addRuntimeOptionsBang();
+    klass.argument("first", { type: "numeric" });
+    klass.argument("second", { type: "numeric", default: 2 });
   }
+  static isExitOnFailure(): boolean {
+    return false;
+  }
+} as unknown as ActionsClass;
+const ClearCounter = class ClearCounter extends (MyCounter as unknown as typeof Group) {
+  static {
+    (this as unknown as ActionsClass).removeArgument("first", "second", { undefine: true });
+  }
+  static async sourceRoot(): Promise<string> {
+    return File.expandPath(File.join(fixtures, "bundle"));
+  }
+} as unknown as ActionsClass;
+class A extends Thor {
+  static {
+    include(this, Actions);
+  }
+}
+
+function assertEmpty(obj: string): void {
+  if (!isEmpty(obj)) throw new globalThis.Error(`Expected ${JSON.stringify(obj)} to be empty.`);
+}
+
+async function capture(_stream: string, block: () => unknown): Promise<string> {
+  let result = "";
+  const write = stdout.write;
+  (stdout as { write: typeof write }).write = (chunk) => {
+    result += chunk;
+    return true;
+  };
+  try {
+    await block();
+  } finally {
+    (stdout as { write: typeof write }).write = write;
+  }
+  return result;
 }
 
 beforeAll(async () => {
@@ -63,18 +95,16 @@ afterAll(() => {
 });
 
 describe("Thor::Actions", () => {
-  const runner = () => new MyCounter({ cwd: destinationRoot, output: () => {} });
-
   const counter = (options: Record<string, unknown> = {}) =>
-    new Counter([1], options, { destinationRoot }) as unknown as CounterInstance;
+    new MyCounter([1], options, { destinationRoot });
   const file = () => File.join(destinationRoot, "foo");
 
   describe("on include", () => {
     it("adds runtime options to the base class", () => {
-      expect(Object.keys(Counter.classOptions())).toContain("pretend");
-      expect(Object.keys(Counter.classOptions())).toContain("force");
-      expect(Object.keys(Counter.classOptions())).toContain("quiet");
-      expect(Object.keys(Counter.classOptions())).toContain("skip");
+      expect(Object.keys(MyCounter.classOptions())).toContain("pretend");
+      expect(Object.keys(MyCounter.classOptions())).toContain("force");
+      expect(Object.keys(MyCounter.classOptions())).toContain("quiet");
+      expect(Object.keys(MyCounter.classOptions())).toContain("skip");
     });
   });
 
@@ -84,43 +114,41 @@ describe("Thor::Actions", () => {
     });
 
     it("can have behavior revoke", () => {
-      expect(
-        (new Counter([1], {}, { behavior: "revoke" }) as unknown as CounterInstance).behavior,
-      ).toBe("revoke");
+      expect(new MyCounter([1], {}, { behavior: "revoke" }).behavior).toBe("revoke");
     });
 
     it("when behavior is set to force, overwrite options", () => {
-      const runner = new Counter([1], { force: false, skip: true }, { behavior: "force" });
-      expect((runner as unknown as CounterInstance).behavior).toBe("invoke");
-      expect((runner as unknown as CounterInstance).options["force"]).toBe(true);
-      expect((runner as unknown as CounterInstance).options["skip"]).not.toBe(true);
+      const runner = new MyCounter([1], { force: false, skip: true }, { behavior: "force" });
+      expect(runner.behavior).toBe("invoke");
+      expect(runner.options["force"]).toBe(true);
+      expect(runner.options["skip"]).not.toBe(true);
     });
 
     it("when behavior is set to skip, overwrite options", () => {
-      const runner = new Counter([1], ["--force"], { behavior: "skip" });
-      expect((runner as unknown as CounterInstance).behavior).toBe("invoke");
-      expect((runner as unknown as CounterInstance).options["force"]).not.toBe(true);
-      expect((runner as unknown as CounterInstance).options["skip"]).toBe(true);
+      const runner = new MyCounter([1], ["--force"], { behavior: "skip" });
+      expect(runner.behavior).toBe("invoke");
+      expect(runner.options["force"]).not.toBe(true);
+      expect(runner.options["skip"]).toBe(true);
     });
   });
 
   describe("accessors", () => {
     describe("#destination_root=", () => {
       it("gets the current directory and expands the path to set the root", () => {
-        const base = new Counter([1]) as unknown as CounterInstance;
+        const base = new MyCounter([1]);
         base.destinationRoot = "here";
         expect(base.destinationRoot).toBe(File.expandPath(File.join(Dir.pwd(), "here")));
       });
 
       it("does not use the current directory if one is given", () => {
         const root = File.expandPath("/");
-        const base = new Counter([1]) as unknown as CounterInstance;
+        const base = new MyCounter([1]);
         base.destinationRoot = root;
         expect(base.destinationRoot).toBe(root);
       });
 
       it("uses the current directory if none is given", () => {
-        const base = new Counter([1]) as unknown as CounterInstance;
+        const base = new MyCounter([1]);
         expect(base.destinationRoot).toBe(File.expandPath(Dir.pwd()));
       });
     });
@@ -182,13 +210,13 @@ describe("Thor::Actions", () => {
 
     describe("#find_in_source_paths", () => {
       it("raises an error if source path is empty", async () => {
-        await assertRaises([ThorError], { match: /Currently you have no source paths/ }, () =>
-          new A({ cwd: destinationRoot, output: () => {} }).findInSourcePaths("foo"),
-        );
+        await expect(
+          (new A() as unknown as CounterInstance).findInSourcePaths("foo"),
+        ).rejects.toThrow(/Currently you have no source paths/);
       });
 
       it("finds a template inside the source path", async () => {
-        const r = runner();
+        const r = counter();
         expect(await r.findInSourcePaths("doc")).toBe(File.expandPath("doc", fixtures));
         await expect(r.findInSourcePaths("README")).rejects.toThrow(
           /Could not find "README" in any of your source paths./,
@@ -301,7 +329,7 @@ describe("Thor::Actions", () => {
     let file: string;
 
     beforeAll(() => {
-      (Counter as unknown as { sourcePaths(): string[] }).sourcePaths().push(fixtures);
+      (MyCounter as unknown as { sourcePaths(): string[] }).sourcePaths().push(fixtures);
       template =
         'export default function (g) { this.foo = "FOO"; g.sayStatus("cool", "padding"); }\n';
       file = File.join(fixtures, "template.mjs");
@@ -405,9 +433,9 @@ describe("Thor::Actions", () => {
 
     describe("when pretending", () => {
       it("doesn't execute the command", async () => {
-        const r = new Counter([1], ["--pretend"], {
+        const r = new MyCounter([1], ["--pretend"], {
           destinationRoot,
-        }) as unknown as CounterInstance;
+        });
         const system = receiveSystem();
         await r.run("ls", { verbose: false });
         expect(system).not.toHaveBeenCalled();
@@ -457,7 +485,7 @@ describe("Thor::Actions", () => {
     describe("exit_on_failure? is true", () => {
       beforeEach(() => {
         vi.spyOn(
-          Counter as unknown as { isExitOnFailure(): boolean },
+          MyCounter as unknown as { isExitOnFailure(): boolean },
           "isExitOnFailure",
         ).mockReturnValue(true);
       });

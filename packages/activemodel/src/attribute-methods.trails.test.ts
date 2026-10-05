@@ -458,6 +458,25 @@ describe("attribute method prefix/suffix/affix", () => {
     expect((u as any)["clear_name"]()).toBe("Alice");
   });
 
+  it("binds a trailing null as a prefix or suffix, not as the keywords", () => {
+    class User extends Model {
+      declare static attributeMethodPrefix: AttributesClassHalf["attributeMethodPrefix"];
+      declare static attributeMethodSuffix: AttributesClassHalf["attributeMethodSuffix"];
+
+      static {
+        include(this, Attributes);
+      }
+    }
+
+    for (const bind of [
+      () => User.attributeMethodPrefix("clear_", null as never),
+      () => User.attributeMethodSuffix(null as never),
+    ]) {
+      expect(bind).toThrow(TypeError);
+      expect(bind).not.toThrow(/parameters/);
+    }
+  });
+
   it("defines suffixed methods for attributes", () => {
     class User extends Model {
       declare static attribute: AttributesClassHalf["attribute"];
