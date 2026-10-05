@@ -35,6 +35,12 @@ describe("Kernel#system", () => {
     });
     childProcessAdapterConfig.adapter = "failing";
     expect(await rbFSystem("true")).toBeNull();
+
+    registerChildProcessAdapter("failing", {
+      spawnSync: getChildProcess().spawnSync,
+      system: async () => ({ pid: 7, status: null, signal: null, error: new Error("EACCES") }),
+    });
+    expect(await rbFSystem("true")).toBeNull();
   });
 
   it("runs the command line through /bin/sh -c", async () => {
@@ -61,8 +67,8 @@ describe("Kernel#system", () => {
 
 describe("Open3.capture2e", () => {
   it("answers stdout and stderr merged, and a Process::Status", async () => {
-    const [output, status] = await Open3.capture2e("echo out; echo err 1>&2");
-    expect(output.split("\n").sort()).toEqual(["", "err", "out"]);
+    const [output, status] = await Open3.capture2e("echo out; echo err 1>&2; echo again");
+    expect(output).toBe("out\nerr\nagain\n");
     expect(status).toBeInstanceOf(Process.Status);
     expect(status.isSuccess()).toBe(true);
     expect(status.pid).toBeGreaterThan(0);

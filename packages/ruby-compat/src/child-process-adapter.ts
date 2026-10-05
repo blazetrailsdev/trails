@@ -42,9 +42,10 @@ export interface ChildProcessAdapter {
    */
   system?(command: string, env: Record<string, string | undefined>): Promise<WaitStatus>;
   /**
-   * Runs `command` through `/bin/sh -c` with stdout and stderr merged, as
-   * `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
-   * and resolves with what it wrote.
+   * Runs `command` through `/bin/sh -c` with stdout and stderr on one pipe,
+   * as `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
+   * and a stdin pipe closed at once (`open3.rb:928`), and resolves with what
+   * it wrote.
    */
   capture2e?(
     command: string,
@@ -103,8 +104,8 @@ type NodeReadable = {
 
 type NodeChild = {
   pid?: number;
+  stdin: { end(): void } | null;
   stdout: NodeReadable | null;
-  stderr: NodeReadable | null;
   on(event: "error", listener: (error: Error) => void): void;
   on(event: "close", listener: (code: number | null, signal: string | null) => void): void;
 };
@@ -116,17 +117,16 @@ type NodeChildProcess = {
 
 function spawnSh(
   cp: NodeChildProcess,
-  command: string,
+  args: string[],
   env: Record<string, string | undefined>,
   stdio: unknown,
   read: (chunk: string) => void,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
-    const child = cp.spawn("/bin/sh", ["-c", command], { env, stdio });
-    for (const io of [child.stdout, child.stderr]) {
-      io?.setEncoding("utf8");
-      io?.on("data", read);
-    }
+    const child = cp.spawn("/bin/sh", args, { env, stdio });
+    child.stdin?.end();
+    child.stdout?.setEncoding("utf8");
+    child.stdout?.on("data", read);
     child.on("error", (error) =>
       resolve({ pid: child.pid ?? null, status: null, signal: null, error }),
     );
@@ -163,11 +163,12 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
       };
     },
     system(command, env) {
-      return spawnSh(cp, command, env, "inherit", () => {});
+      return spawnSh(cp, ["-c", command], env, "inherit", () => {});
     },
     async capture2e(command, env) {
       let output = "";
-      const status = await spawnSh(cp, command, env, ["ignore", "pipe", "pipe"], (chunk) => {
+      const args = ["-c", 'exec 2>&1; eval "$1"', "sh", command];
+      const status = await spawnSh(cp, args, env, ["pipe", "pipe", "ignore"], (chunk) => {
         output += chunk;
       });
       return [output, status];

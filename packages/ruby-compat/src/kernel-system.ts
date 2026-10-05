@@ -10,7 +10,8 @@ import { rbExecargNew } from "./process.js";
  * `nil` when it could not be executed.
  *
  * The command line always runs through `/bin/sh -c` (`proc_exec_sh`,
- * `process.c:1788`), and the call is awaited where MRI blocks in
+ * `process.c:1788`), a waited child that reports a spawn error answers `nil`
+ * (`data->error != 0`, `process.c:4867-4875`), and the call is awaited where MRI blocks in
  * `rb_process_status_wait`. A host with no way to spawn raises
  * `rb_notimplement`'s `NotImplementedError` (`vendor/ruby/v3.3.11/error.c:3498`).
  *
