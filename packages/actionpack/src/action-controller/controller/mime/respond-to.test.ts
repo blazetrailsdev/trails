@@ -9,6 +9,7 @@ import {
   UnknownFormat,
 } from "../../metal/exceptions.js";
 import type { VariantCollector } from "../../metal/mime-responds.js";
+import { Logger } from "@blazetrails/activesupport";
 import { rbInspect } from "@blazetrails/ruby-compat";
 import { TestCase } from "../../test-case.js";
 
@@ -340,15 +341,20 @@ RespondToController.beforeAction((c) => {
   else if (Array.isArray(v)) controller.request.variant = v.map((x) => `:${x}`);
 });
 
-class MockLogger {
-  private _logged = new Map<string, string[]>();
+class MockLogger extends Logger {
+  private _logged: string[] = [];
 
-  logged(level: string): string[] {
-    return this._logged.get(level) ?? [];
+  constructor() {
+    super(null);
   }
 
-  info(message: string): void {
-    this._logged.set("info", [...this.logged("info"), message]);
+  logged(level: string): string[] {
+    return level === "info" ? this._logged : [];
+  }
+
+  override info(message?: string | (() => string)): boolean {
+    this._logged.push(typeof message === "function" ? message() : (message ?? ""));
+    return true;
   }
 }
 
@@ -401,7 +407,7 @@ describe("RespondToControllerTest", () => {
   it("variant without implicit rendering from xhr", async () => {
     const logger = new MockLogger();
     const oldLogger = Base.logger;
-    Base.logger = logger as never;
+    Base.logger = logger;
     try {
       await tc.get("variantWithoutImplicitTemplateRendering", {
         xhr: true,
@@ -418,7 +424,7 @@ describe("RespondToControllerTest", () => {
   it("variant without implicit rendering from api", async () => {
     const logger = new MockLogger();
     const oldLogger = Base.logger;
-    Base.logger = logger as never;
+    Base.logger = logger;
     try {
       await tc.get("variantWithoutImplicitTemplateRendering", {
         format: "json",
@@ -435,7 +441,7 @@ describe("RespondToControllerTest", () => {
   it("variant variant not set and without implicit rendering from xhr", async () => {
     const logger = new MockLogger();
     const oldLogger = Base.logger;
-    Base.logger = logger as never;
+    Base.logger = logger;
     try {
       await tc.get("variantWithoutImplicitTemplateRendering", { xhr: true });
       tc.assertResponse("no_content");
@@ -914,7 +920,7 @@ describe("RespondToControllerTest", () => {
       this.action ??= this.actionName;
 
       this.response.body = `${this.action} - ${rbInspect(this.formats)}`;
-    } as never;
+    };
 
     await tc.get("usingDefaults");
     expect(tc.response.body).toBe(`usingDefaults - ${rbInspect([":html"])}`);
