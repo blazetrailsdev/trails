@@ -1130,4 +1130,32 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "loadable. Ruby-only wire format, same as test_date_marshal.rb above; the " +
       "rest of the file stays counted.",
   },
+  {
+    // `testFile` is a substring match, so json_/serialized_attribute_test.rb and
+    // the activesupport/arel attribute_test.rb files match it too; `className`
+    // and `tests` keep them counted.
+    testFile: "attribute_test.rb",
+    className: "AttributeTest",
+    tests: [
+      "duping dups the value",
+      "an attribute is changed if it has been mutated",
+      "with_type preserves mutations",
+    ],
+    reason:
+      "Each asserts Ruby String identity or in-place mutation (`dup` yielding a second " +
+      'object, `value << "!"` marking the attribute changed). A JS string is an ' +
+      'immutable primitive with no identity (CLAUDE.md, "Ruby Strings are JS string ' +
+      'primitives"); the stubs stay `it.skip` under PERMANENT-SKIP in attribute.test.ts.',
+  },
+  {
+    // activerecord's cases/type/string_test.rb is `StringTypeTest`, so the
+    // className keeps it counted.
+    testFile: "type/string_test.rb",
+    className: "StringTest",
+    tests: ["cast strings are mutable"],
+    reason:
+      "Asserts `Type::String#cast` answers an unfrozen copy of a frozen String. A JS " +
+      'string is an immutable primitive (CLAUDE.md, "Ruby Strings are JS string ' +
+      'primitives"); the stub stays `it.skip` under PERMANENT-SKIP in type/string.test.ts.',
+  },
 ];
