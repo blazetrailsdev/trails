@@ -16,6 +16,7 @@ import {
   flattenIncludedMethodInfos,
   bodyInDefiningFile,
   crossFileCredit,
+  includerConstructorIsInitializeSeat,
   mixinMethodCreditedToOwnFile,
   moduleInitializeCandidates,
   reopeningMethodCreditedToOwnFile,
@@ -3368,6 +3369,67 @@ describe("splitOverriddenFileBuckets", () => {
       "deconstantize",
       "constantize",
     ]);
+  });
+});
+
+describe("includerConstructorIsInitializeSeat", () => {
+  const seat = [["@invoked:initializeIncludedModules", "initializeIncludedModules"]];
+
+  it("recognizes a constructor that only runs the included module's initialize", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(true);
+  });
+
+  it("holds a constructor that inlines the module's body to its call set", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        [...seat, ["classOptions", "merge"]],
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
+        undefined,
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves the class's own initialize, and any other method, alone", () => {
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "group.rb" },
+        "group.rb",
+        "constructor",
+        seat,
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "help", mixinFile: "base.rb" },
+        "group.rb",
+        "help",
+        seat,
+      ),
+    ).toBe(false);
   });
 });
 

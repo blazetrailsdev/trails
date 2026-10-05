@@ -6,10 +6,10 @@ import {
   hasKey,
   include,
   initializeIncludedModules,
-  isModuleIncluded,
   last,
   rbInspect,
   rbObjAsString,
+  rbObjClassname,
   rbObjClone,
   rbObjIsKindOf,
   rbObjRespondTo,
@@ -83,16 +83,11 @@ export class Group {
     return this._invocationBlocks!;
   }
 
-  /**
-   * @inventedArm isModuleIncluded — PERMANENT
-   * @inventedArm camelCase — PERMANENT
-   */
+  /** @inventedArm camelCase — PERMANENT */
   static invoke(this: GroupClass, ...names: unknown[]): void {
-    const block = (
-      typeof last(names) === "function" && !isModuleIncluded(last(names) as BaseClass, Base)
-        ? names.pop()
-        : undefined
-    ) as InvocationBlock | undefined;
+    const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
+      | InvocationBlock
+      | undefined;
     const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as InvokeOptions;
     const verbose = fetch(options, "verbose", true);
 
@@ -105,7 +100,7 @@ export class Group {
         value: async function (this: Instance) {
           const self = this.constructor as GroupClass;
           const prepared = self.prepareForInvocation(null, name);
-          const [klass, command] = Array.isArray(prepared) ? prepared : [prepared];
+          const [klass, command = null] = Array.isArray(prepared) ? prepared : [prepared];
 
           if (rtest(klass)) {
             this.sayStatus("invoke", name, verbose);
@@ -124,7 +119,7 @@ export class Group {
 
   /** @inventedArm camelCase — PERMANENT */
   static invokeFromOption(this: GroupClass, ...names: unknown[]): void {
-    const block = (typeof last(names) === "function" ? names.pop() : undefined) as
+    const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
       | InvocationBlock
       | undefined;
     const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as InvokeOptions;
@@ -150,7 +145,7 @@ export class Group {
           if (value === true) value = name;
           const self = this.constructor as GroupClass;
           const prepared = self.prepareForInvocation(name, value);
-          const [klass, command] = Array.isArray(prepared) ? prepared : [prepared];
+          const [klass, command = null] = Array.isArray(prepared) ? prepared : [prepared];
 
           if (rtest(klass)) {
             this.sayStatus("invoke", value, verbose);
@@ -310,15 +305,6 @@ export class Group {
   /** @internal */
   declare static createTask: typeof Group.createCommand;
 
-  /**
-   * @missingRailsCall class_options — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall merge — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall stop_on_unknown_option? — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall map — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall disable_required_check? — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall new — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   * @missingRailsCall check_unknown_options? — CONVERGEABLE call-gate-pairs-includer-constructor-with-included-module-initialize
-   */
   constructor(...args: unknown[]) {
     initializeIncludedModules(this, ...args);
   }
@@ -330,7 +316,7 @@ export class Group {
     command: unknown = null,
     ...args: unknown[]
   ): unknown {
-    const block = (typeof last(args) === "function" ? args.pop() : undefined) as
+    const block = (rbObjClassname(last(args)) === "Proc" ? args.pop() : undefined) as
       | ((...yielded: unknown[]) => unknown)
       | undefined;
     return this.withPadding(() => {

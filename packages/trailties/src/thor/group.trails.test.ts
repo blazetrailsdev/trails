@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, toS } from "@blazetrails/ruby-compat";
 import type { BaseConfig } from "./base.js";
 import { Command } from "./command.js";
 import { Group, type GroupClass } from "./group.js";
@@ -21,7 +21,7 @@ class Shell {
   }
   sayStatus(status: unknown, message: unknown, logStatus: unknown = true) {
     if (logStatus === false) return;
-    this.out.push(`${String(status)} ${String(message)} ${String(logStatus)} @${this.padding}`);
+    this.out.push(`${String(status)} ${toS(message)} ${String(logStatus)} @${this.padding}`);
   }
   printTable(rows: string[][]) {
     rows.forEach((row) => this.out.push(row.join(" ")));
@@ -138,19 +138,44 @@ describe("Thor::Group", () => {
       }
     }
     const klass = Invoker as unknown as GroupClass;
-    const block = () => {};
-    class ByClass extends Group {
-      static {
-        (this as unknown as GroupClass).invoke(Invoked, block);
-      }
-    }
-    expect((ByClass as unknown as GroupClass).invocations().get(Invoked)).toBe(false);
-    expect((ByClass as unknown as GroupClass).invocationBlocks().get(Invoked)).toBe(block);
     expect(Object.keys(klass.commands())).toEqual(["_invokeInvoked", "_invokeNowhere"]);
     expect(klass.invocations().get("invoked")).toBe(false);
     const shell = await start(Invoker, []);
     expect(log).toEqual(["invoked"]);
     expect(shell.out).toEqual(["invoke invoked true @0", 'error "nowhere" [not found] :red @0']);
+  });
+
+  it("invoke names the command after a class, and yields nil for its command", async () => {
+    const yielded: unknown[][] = [];
+    class ByClass extends Group {
+      static {
+        (this as unknown as GroupClass).invoke(
+          Invoked,
+          (_instance: unknown, klass: unknown, command: unknown) => {
+            yielded.push([klass, command]);
+          },
+        );
+      }
+    }
+    const klass = ByClass as unknown as GroupClass;
+    expect(Object.keys(klass.commands())).toEqual(["_invokeInvoked"]);
+    expect(klass.invocations().get(Invoked)).toBe(false);
+    const shell = await start(ByClass, []);
+    expect(shell.out).toEqual(["invoke Invoked true @0"]);
+    expect(yielded).toEqual([[Invoked, null]]);
+  });
+
+  it("invoke takes a class that is not a Thor class as a name, and rejects it when invoked", async () => {
+    class Plain {}
+    class ByPlain extends Group {
+      static {
+        (this as unknown as GroupClass).invoke(Plain);
+      }
+    }
+    const klass = ByPlain as unknown as GroupClass;
+    expect(Object.keys(klass.commands())).toEqual(["_invokePlain"]);
+    expect(klass.invocationBlocks().size).toBe(0);
+    await expect(start(ByPlain, [])).rejects.toThrow("Expected Thor class, got Plain");
   });
 
   it("_invoke_for_class_method dispatches on the block arity, inside the padding", async () => {

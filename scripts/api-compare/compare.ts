@@ -3469,6 +3469,35 @@ export function mixinMethodCreditedToOwnFile(
 }
 
 /**
+ * Is an includer's `constructor` only the chain seat for an included module's
+ * `initialize`?
+ *
+ * `Thor::Group` defines no `initialize`; it inherits `Thor::Base#initialize`
+ * (`thor/base.rb:53`) through `include Thor::Base` (`thor/group.rb:270`). A JS
+ * class still needs a constructor to run the module's `[initialize]` hook, and
+ * that constructor is `initializeIncludedModules(this, ...args)`: Ruby's
+ * implicit `super` into the module. It makes none of the module body's calls,
+ * so it is an `include` seam exactly as a one-line forwarder is, and the
+ * module's own bucket is where the body is compared.
+ *
+ * Narrow by construction: the method must arrive from a mixin defined in
+ * another Ruby file, and every constructor of that name in the TS file must
+ * call `initializeIncludedModules`. A constructor that inlines the module's
+ * body instead is still held to its call set.
+ */
+export function includerConstructorIsInitializeSeat(
+  rm: { rubyName: string; mixinFile?: string },
+  hostRubyFile: string,
+  tsName: string,
+  tsCallSets: readonly (readonly string[])[] | undefined,
+): boolean {
+  if (rm.rubyName !== "initialize" || tsName !== "constructor") return false;
+  if (rm.mixinFile === undefined || rm.mixinFile === hostRubyFile) return false;
+  if (tsCallSets === undefined || tsCallSets.length === 0) return false;
+  return tsCallSets.every((calls) => calls.includes("initializeIncludedModules"));
+}
+
+/**
  * Is this method defined by a *reopening* of the class in another Ruby file,
  * and ported to the TS file mirroring that reopening?
  *
@@ -6083,7 +6112,13 @@ export function main() {
               pkg,
               (f) => byFile.has(f),
               tsMethodsByFile,
-            ) !== null;
+            ) !== null ||
+            includerConstructorIsInitializeSeat(
+              { rubyName, mixinFile },
+              rubyFile,
+              directMatch,
+              tsCallsByFileName.get(expectedTs)?.get(directMatch),
+            );
           checkArity(
             rubyName,
             directMatch,
