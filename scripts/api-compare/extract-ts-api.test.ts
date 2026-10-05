@@ -934,6 +934,32 @@ describe("body call capture", () => {
           if (typeof unit === "function") block = unit as () => void;
           return this.run(unit, block)
         }
+        absent(unit: unknown, block?: () => void) {
+          if (block === undefined && typeof unit === "function") block = unit as () => void;
+          return this.run(unit, block)
+        }
+        loose(t: string, toTable: unknown = 0, options: object = {}) {
+          if (toTable != null && typeof toTable === "object") {
+            options = toTable;
+            toTable = 0;
+          }
+          return this.run(t, toTable, options);
+        }
+        otherProperty(t: string, toTable: unknown, options: { name?: string } = {}) {
+          if (typeof toTable === "object") {
+            options = toTable as object;
+            toTable = options.name;
+          }
+          return this.run(t, toTable, options);
+        }
+        splatLast(toTable: unknown, options: object = {}, ...rest: unknown[]) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, rest);
+        }
+        destructuredLast(toTable: unknown, options: object = {}, { force }: { force?: boolean } = {}) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, force);
+        }
         notLeading(t: string, toTable: unknown, options: object = {}) {
           this.log(t);
           if (typeof toTable === "object") options = toTable as object;
@@ -962,7 +988,18 @@ describe("body call capture", () => {
     expect(arms("removeIndex")).toEqual([]);
     expect(arms("removeForeignKey")).toEqual([]);
     expect(arms("block")).toEqual([]);
-    for (const kept of ["notLeading", "notAKindTest", "kindOfALocal", "coerce", "coerceLast"]) {
+    expect(arms("absent")).toEqual([]);
+    expect(arms("loose")).toEqual([]);
+    for (const kept of [
+      "otherProperty",
+      "splatLast",
+      "destructuredLast",
+      "notLeading",
+      "notAKindTest",
+      "kindOfALocal",
+      "coerce",
+      "coerceLast",
+    ]) {
       expect(arms(kept)).toEqual(["if"]);
     }
   });

@@ -5466,14 +5466,23 @@ function parameterKindTest(
       ) {
         return kind(e.left) && kind(e.right);
       }
+      const loose =
+        operator === ts.SyntaxKind.EqualsEqualsToken ||
+        operator === ts.SyntaxKind.ExclamationEqualsToken;
       if (
         operator !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
-        operator !== ts.SyntaxKind.ExclamationEqualsEqualsToken
+        operator !== ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+        !(loose && e.right.kind === ts.SyntaxKind.NullKeyword)
       ) {
         return false;
       }
       if (ts.isTypeOfExpression(e.left) && ts.isStringLiteral(e.right)) asked = e.left.expression;
-      else if (e.right.kind === ts.SyntaxKind.NullKeyword) asked = e.left;
+      else if (
+        e.right.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isIdentifier(e.right) && e.right.text === "undefined")
+      ) {
+        asked = e.left;
+      }
     } else if (
       ts.isCallExpression(e) &&
       e.arguments.length === 1 &&
@@ -5497,6 +5506,8 @@ function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
   const body = statement.parent;
   if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
   if (body.statements[0] !== statement) return false;
+  const final = body.parent.parameters[body.parent.parameters.length - 1];
+  if (final === undefined || !ts.isIdentifier(final.name) || final.dotDotDotToken) return false;
   const declared = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
   const parameters = declared.map((p) => p.name.getText());
   const tested = parameterKindTest(statement.expression, parameters);
@@ -5504,9 +5515,18 @@ function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
   const last = parameters[parameters.length - 1];
   const clears = (name: string, e: ts.Expression): boolean => {
     while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
-    if (e.kind === ts.SyntaxKind.NullKeyword || e.getText() === "undefined") return true;
-    if (ts.isPropertyAccessExpression(e)) return e.expression.getText() === last;
-    return e.getText() === declared[parameters.indexOf(name)].initializer?.getText();
+    if (e.kind === ts.SyntaxKind.NullKeyword) return true;
+    if (ts.isIdentifier(e) && e.text === "undefined") return true;
+    if (ts.isPropertyAccessExpression(e)) {
+      return ts.isIdentifier(e.expression) && e.expression.text === last && e.name.text === name;
+    }
+    const initializer = declared[parameters.indexOf(name)].initializer;
+    return (
+      initializer !== undefined &&
+      initializer.kind === e.kind &&
+      (ts.isLiteralExpression(e) || ts.isIdentifier(e)) &&
+      e.text === (initializer as ts.LiteralExpression | ts.Identifier).text
+    );
   };
   const isTested = (e: ts.Expression): boolean => {
     while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
