@@ -34,25 +34,24 @@ type DateClass = { GREGORIAN: number; strptime(str: string, fmt: string, sg: num
 
 /**
  * `Psych::ScalarScanner` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/scalar_scanner.rb:6`).
- * Ruby's `^` and `$` are line anchors, so each pattern carries `m`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export class ScalarScanner {
   /** @noRailsEquivalent PERMANENT */
   static readonly TIME =
-    /^-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|[ \t\r\n\f\v]+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:[ \t\r\n\f\v]*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?$/m;
+    /(?<![^\n])-?\d{4}-\d{1,2}-\d{1,2}(?:[Tt]|[ \t\r\n\f\v]+)\d{1,2}:\d\d:\d\d(?:\.\d*)?(?:[ \t\r\n\f\v]*(?:Z|[-+]\d{1,2}:?(?:\d\d)?))?(?![^\n])/;
 
   /** @noRailsEquivalent PERMANENT */
-  static readonly FLOAT = /^(?:[-+]?([0-9][0-9_,]*)?\.[0-9]*([eE][-+][0-9]+)?)$/m;
+  static readonly FLOAT = /(?<![^\n])(?:[-+]?([0-9][0-9_,]*)?\.[0-9]*([eE][-+][0-9]+)?)(?![^\n])/;
 
   /** @noRailsEquivalent PERMANENT */
   static readonly INTEGER_STRICT =
-    /^(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+)$/m;
+    /(?<![^\n])(?:[-+]?0b[0-1_]+|[-+]?0[0-7_]+|[-+]?(0|[1-9][0-9_]*)|[-+]?0x[0-9a-fA-F_]+)(?![^\n])/;
 
   /** @noRailsEquivalent PERMANENT */
   static readonly INTEGER_LEGACY =
-    /^(?:[-+]?0b[0-1_,]+|[-+]?0[0-7_,]+|[-+]?(?:0|[1-9](?:[0-9]|,[0-9]|_[0-9])*)|[-+]?0x[0-9a-fA-F_,]+)$/m;
+    /(?<![^\n])(?:[-+]?0b[0-1_,]+|[-+]?0[0-7_,]+|[-+]?(?:0|[1-9](?:[0-9]|,[0-9]|_[0-9])*)|[-+]?0x[0-9a-fA-F_,]+)(?![^\n])/;
 
   /** @noRailsEquivalent PERMANENT */
   readonly classLoader: ClassLoader;
@@ -77,18 +76,18 @@ export class ScalarScanner {
       ? ScalarScanner.INTEGER_STRICT
       : ScalarScanner.INTEGER_LEGACY;
     if (
-      /^[^\d.:-]?[\p{Alphabetic}_ \t\r\n\f\v!@#$%^&*(){}<>|/\\~;=]+/mu.test(string) ||
+      /(?<![^\n])[^\d.:-]?[\p{Alphabetic}_ \t\r\n\f\v!@#$%^&*(){}<>|/\\~;=]+/u.test(string) ||
       /\n/.test(string)
     ) {
       if (strlen(string) > 5) return string;
 
-      if (/^[^ytonf~]/im.test(string)) {
+      if (/(?<![^\n])[^ytonf~]/i.test(string)) {
         return string;
-      } else if (string === "~" || /^null$/im.test(string)) {
+      } else if (string === "~" || /(?<![^\n])null(?![^\n])/i.test(string)) {
         return null;
-      } else if (/^(yes|true|on)$/im.test(string)) {
+      } else if (/(?<![^\n])(yes|true|on)(?![^\n])/i.test(string)) {
         return true;
-      } else if (/^(no|false|off)$/im.test(string)) {
+      } else if (/(?<![^\n])(no|false|off)(?![^\n])/i.test(string)) {
         return false;
       } else {
         return string;
@@ -100,7 +99,7 @@ export class ScalarScanner {
         if (!(error instanceof ArgumentError)) throw error;
         return string;
       }
-    } else if (/^\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)$/m.test(string)) {
+    } else if (/(?<![^\n])\d{4}-(?:1[012]|0\d|\d)-(?:[12]\d|3[01]|0\d|\d)(?![^\n])/.test(string)) {
       try {
         const date = this.classLoader.date() as DateClass;
         return date.strptime(string, "%F", date.GREGORIAN);
@@ -108,28 +107,31 @@ export class ScalarScanner {
         if (!(error instanceof ArgumentError)) throw error;
         return string;
       }
-    } else if (/^\+?\.inf$/im.test(string)) {
+    } else if (/(?<![^\n])\+?\.inf(?![^\n])/i.test(string)) {
       return Infinity;
-    } else if (/^-\.inf$/im.test(string)) {
+    } else if (/(?<![^\n])-\.inf(?![^\n])/i.test(string)) {
       return -Infinity;
-    } else if (/^\.nan$/im.test(string)) {
+    } else if (/(?<![^\n])\.nan(?![^\n])/i.test(string)) {
       return NaN;
-    } else if (/^:./m.test(string)) {
-      const match = /^:(["'])(.*)\1/m.exec(string);
+    } else if (/(?<![^\n]):[^\n]/.test(string)) {
+      const match = /(?<![^\n]):(["'])([^\n]*)\1/.exec(string);
       if (match !== null) {
-        this.symbolCache.set(string, this.classLoader.symbolize(match[2].replace(/^:/m, "")));
+        this.symbolCache.set(
+          string,
+          this.classLoader.symbolize(match[2].replace(/(?<![^\n]):/, "")),
+        );
         return this.symbolCache.get(string);
       } else {
-        this.symbolCache.set(string, this.classLoader.symbolize(string.replace(/^:/m, "")));
+        this.symbolCache.set(string, this.classLoader.symbolize(string.replace(/(?<![^\n]):/, "")));
         return this.symbolCache.get(string);
       }
-    } else if (/^[-+]?[0-9][0-9_]*(:[0-5]?[0-9]){1,2}$/m.test(string)) {
+    } else if (/(?<![^\n])[-+]?[0-9][0-9_]*(:[0-5]?[0-9]){1,2}(?![^\n])/.test(string)) {
       let i = 0;
       string.split(":").forEach((n, e) => {
         i += Number(rbStrToI(n)) * 60 ** Math.abs(e - 2);
       });
       return i;
-    } else if (/^[-+]?[0-9][0-9_]*(:[0-5]?[0-9]){1,2}\.[0-9_]*$/m.test(string)) {
+    } else if (/(?<![^\n])[-+]?[0-9][0-9_]*(:[0-5]?[0-9]){1,2}\.[0-9_]*(?![^\n])/.test(string)) {
       let i = 0;
       string.split(":").forEach((n, e) => {
         i += rbStrToF(n) * 60 ** Math.abs(e - 2);
@@ -139,7 +141,7 @@ export class ScalarScanner {
       if (/^[-+]?\.\n?$/.test(string)) {
         return string;
       } else {
-        return kernelFloat(stringDelete(string, ",_").replace(/\.([Ee]|$)/gm, "$1"));
+        return kernelFloat(stringDelete(string, ",_").replace(/\.([Ee]|(?![^\n]))/g, "$1"));
       }
     } else if (integerRegex.test(string)) {
       return this.parseInt(string);
@@ -163,7 +165,7 @@ export class ScalarScanner {
     const split = stringSplit(string, /[ tT]/, 2);
     const date = split[0];
     let time: string | TimeInstance = split[1];
-    const [yy, m, dd] = /^(-?\d{4})-(\d{1,2})-(\d{1,2})/m
+    const [yy, m, dd] = /(?<![^\n])(-?\d{4})-(\d{1,2})-(\d{1,2})/
       .exec(date)!
       .slice(1)
       .map((x) => Number(rbStrToI(x)));
@@ -178,7 +180,7 @@ export class ScalarScanner {
     if ("Z" === md[3]) return time;
     if (md[3] == null) return klass.at(time.toI(), us);
 
-    const tz = /^([+-]?\d{1,2}):?(\d{1,2})?$/m
+    const tz = /(?<![^\n])([+-]?\d{1,2}):?(\d{1,2})?(?![^\n])/
       .exec(md[3])!
       .slice(1)
       .filter((digit) => digit != null)
@@ -191,6 +193,6 @@ export class ScalarScanner {
       offset += (tz[1] ?? 0) * 60;
     }
 
-    return new klass(yy, m, dd, hh, mm, rational(ss).add(rational(us, 1000000)), offset);
+    return new klass(yy, m, dd, hh, mm, rational(ss).add(rational(us).quo(1000000)), offset);
   }
 }

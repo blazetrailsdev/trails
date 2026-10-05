@@ -154,6 +154,15 @@ describe("Psych::ScalarScanner#tokenize arms", () => {
     expect(ss.tokenize("1,000.5")).toBe(1000.5);
   });
 
+  it("breaks a line at a newline only, as Ruby's ^ and $ do", () => {
+    for (const s of ["12\r", "1.5\u2028", "1.5\u2029", "0x1F\r", "+.inf\r"]) {
+      expect(ss.tokenize(s)).toBe(s);
+    }
+    expect(ss.tokenize(":a\rb")).toBe(":a\rb");
+    expect(ss.tokenize(":\r")).toBe(":\r");
+    expect(ss.tokenize("12\n")).toBe("12\n");
+  });
+
   it("strips the quotes of a quoted symbol and caches it", () => {
     expect(ss.tokenize(':"foo bar"')).toBe(":foo bar");
     expect(ss.tokenize(":'foo'")).toBe(":foo");

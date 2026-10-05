@@ -56,7 +56,7 @@ export class ToRuby {
     if (yaml.isAlias(o)) return this.visitPsychNodesAlias(o);
     if (yaml.isMap(o)) return this.visitMapping(o);
     if (yaml.isSeq(o)) return this.register(o, this.registerEmpty(o));
-    return this.register(o, this.deserialize(o));
+    return this.register(o, this.deserialize(o as Scalar.Parsed));
   }
 
   /**
@@ -69,9 +69,9 @@ export class ToRuby {
     return this.st.get(o.source);
   }
 
-  private deserialize(o: Scalar): unknown {
+  private deserialize(o: Scalar.Parsed): unknown {
     if (!o.tag && o.type !== yaml.Scalar.PLAIN) return o.value;
-    if (!o.tag) return this.ss.tokenize(o.source as string);
+    if (!o.tag) return this.ss.tokenize(o.source);
 
     const value = String(o.value);
     switch (o.tag) {
@@ -94,7 +94,7 @@ export class ToRuby {
       }
       default:
         if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return this.classLoader.symbolize(value);
-        return this.ss.tokenize(o.source as string);
+        return this.ss.tokenize(o.source);
     }
   }
 
