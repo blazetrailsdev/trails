@@ -315,9 +315,9 @@ export class Metal extends AbstractController {
     let contentType: unknown;
     if (options) {
       location = options.location;
-      contentType = options.content_type;
+      contentType = options.contentType;
       for (const [key, value] of Object.entries(options)) {
-        if (key === "location" || key === "content_type") continue;
+        if (key === "location" || key === "contentType") continue;
         this.headers.set(
           key
             .split(/[-_]/)
@@ -329,7 +329,7 @@ export class Metal extends AbstractController {
     }
     this.status = resolvedStatus;
     if (location !== undefined && location !== null) {
-      this.location = this.urlFor(String(location));
+      this.location = this.urlFor(location as string);
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {

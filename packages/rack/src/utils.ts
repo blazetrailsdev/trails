@@ -540,7 +540,7 @@ const httpStatusCodes = {
 
 export const HTTP_STATUS_CODES: Record<number, string> = httpStatusCodes;
 
-const SYMBOL_TO_STATUS_CODE: Record<string, number> = {};
+export const SYMBOL_TO_STATUS_CODE: Record<string, number> = {};
 for (const [code, msg] of Object.entries(HTTP_STATUS_CODES)) {
   SYMBOL_TO_STATUS_CODE[msg.toLowerCase().replace(/[\s-]/g, "_")] = parseInt(code);
 }

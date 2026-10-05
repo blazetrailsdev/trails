@@ -79,6 +79,7 @@ import {
   viewPathsLocale,
   viewPathsSetFormats,
   viewPathsSetLocale,
+  viewPathsViewPaths,
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
@@ -477,6 +478,10 @@ export class Base extends Metal {
   }
 
   detailsForLookup = detailsForLookup;
+
+  get viewPaths(): PathSet {
+    return viewPathsViewPaths.call(this as never);
+  }
 
   get formats(): ReadonlyArray<string | symbol> {
     return viewPathsFormats.call(this as never);

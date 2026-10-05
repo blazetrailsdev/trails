@@ -54,6 +54,7 @@ export {
   templateExists,
   isAnyTemplates,
   prependViewPath as viewPathsPrependViewPath,
+  viewPaths as viewPathsViewPaths,
   formats as viewPathsFormats,
   setFormats as viewPathsSetFormats,
   locale as viewPathsLocale,
