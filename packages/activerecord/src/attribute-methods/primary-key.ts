@@ -1,12 +1,13 @@
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { foreignKey } from "@blazetrails/activesupport";
+import { foreignKey, kernelArray } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
 } from "../attribute-methods.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
-import { AttributeMethods } from "../namespaces.js";
+import { ActiveRecord, AttributeMethods } from "../namespaces.js";
 
 /** @internal */
 export interface PrimaryKeyRecord {
@@ -22,8 +23,7 @@ export interface PrimaryKeyRecord {
 
 export function toKey(this: PrimaryKeyRecord): unknown[] | null {
   const key = this.id;
-  if (key == null || key === false) return null;
-  return Array.isArray(key) ? key : [key];
+  return rtest(key) ? kernelArray(key) : null;
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
@@ -103,7 +103,7 @@ export class PrimaryKey {
 
 interface CachedSchemaSource {
   internalSchemaCache?: {
-    getCachedPrimaryKeys?(table: string): string | string[] | null | undefined;
+    getCachedPrimaryKeys?(table: string | null | undefined): string | string[] | null | undefined;
   };
 }
 
@@ -258,8 +258,8 @@ export function resetPrimaryKey(this: PrimaryKeyHost): void {
  * The `ActiveRecord::Base != self && table_exists?` arm reads the already-warmed
  * schema cache through `cachedSchemaCacheFor` (below), which resolves it without
  * leasing a connection; a cold cache falls through to the "id" convention.
- * `ActiveRecord::Base != self` is carried by the `tableName` guard — `Base`
- * itself has none.
+ * The cache peek answering `undefined` is the `table_exists?` test, and the
+ * second read is `schema_cache.primary_keys(table_name)`.
  *
  * @missingRailsCall table_exists? — CONVERGEABLE: `tableExists` is async in
  *   trails, and its synchronous cache-only view (`cachedTableExists`) leases a
@@ -283,15 +283,17 @@ export function getPrimaryKey(
     return foreignKey(baseName, false);
   } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
     return foreignKey(baseName);
+  } else if (
+    ActiveRecord.Base !== (this as unknown) &&
+    cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) !== undefined
+  ) {
+    return cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName) as
+      | string
+      | string[]
+      | null;
+  } else {
+    return "id";
   }
-  try {
-    const tableName = this.tableName;
-    if (tableName != null) {
-      const primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName);
-      if (primaryKeys !== undefined) return primaryKeys;
-    }
-  } catch {}
-  return "id";
 }
 
 /** @internal */

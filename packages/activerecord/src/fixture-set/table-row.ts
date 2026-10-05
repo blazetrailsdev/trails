@@ -1,4 +1,4 @@
-import { hasKey, hashDelete } from "@blazetrails/ruby-compat";
+import { fetch, hasKey, hashDelete, rtest } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import type { TableRows } from "./table-rows.js";
@@ -180,9 +180,7 @@ export class TableRow {
     )._enums;
     for (const [name, values] of definedEnums ?? []) {
       if (hasKey(this._row, name)) {
-        const value = this._row[name];
-        this._row[name] =
-          typeof value === "string" && Object.hasOwn(values, value) ? values[value] : value;
+        this._row[name] = fetch(values, this._row[name] as string, this._row[name]);
       }
     }
   }
@@ -196,12 +194,12 @@ export class TableRow {
           const fkName = association.joinForeignKey;
 
           let value: unknown;
-          if (association.name !== fkName) {
-            value = hashDelete(this._row, association.name);
-          }
-          if (association.name !== fkName && value != null && value !== false) {
+          if (
+            association.name !== fkName &&
+            rtest((value = hashDelete(this._row, association.name)))
+          ) {
             if (association.isPolymorphic()) {
-              const match = typeof value === "string" ? /\s*\(([^)]*)\)\s*$/.exec(value) : null;
+              const match = (value as string).match(/\s*\(([^)]*)\)\s*$/);
               if (match) {
                 value = (value as string).slice(0, match.index);
                 this._row[association.joinForeignType!] = match[1];

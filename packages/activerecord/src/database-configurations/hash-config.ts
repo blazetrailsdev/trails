@@ -1,4 +1,4 @@
-import { fetch, File, hasKey, merge } from "@blazetrails/ruby-compat";
+import { fetch, File, hasKey, merge, rtest } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
@@ -115,17 +115,17 @@ export class HashConfig extends DatabaseConfig {
   }
 
   schemaDump(format: SchemaFormat = schemaFormat()): string | null {
-    if (
-      hasKey(this.configurationHash, "schemaDump") &&
-      this.configurationHash.schemaDump !== undefined
-    ) {
-      const val = this.configurationHash.schemaDump;
-      if (val === false || val === null) return null;
-      return val;
+    if (hasKey(this.configurationHash, "schemaDump")) {
+      const config = this.configurationHash.schemaDump;
+      if (rtest(config)) {
+        return config as string;
+      }
+      return null;
+    } else if (this.isPrimary()) {
+      return this.schemaFileType(format);
+    } else {
+      return `${this.name}_${this.schemaFileType(format)}`;
     }
-    const typeFile = this.schemaFileType(format);
-    if (!typeFile) return null;
-    return this.isPrimary() ? typeFile : `${this.name}_${typeFile}`;
   }
 
   databaseTasks(): boolean {

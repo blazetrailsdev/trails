@@ -6,7 +6,13 @@ import {
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
-import { ArgumentError, DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  DelegateClass,
+  rbEqual,
+  registerConstant,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { AttributeMethods } from "../namespaces.js";
 type ValueTypeInstance = InstanceType<typeof ValueType>;
 
@@ -60,7 +66,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     if (value instanceof TimeWithZone || value instanceof RubyTime || typeof value === "string") {
       try {
         const casted = super.cast(subtype.userInputInTimeZone(value));
-        return casted != null && casted !== false ? casted : super.cast(value);
+        return rtest(casted) ? casted : super.cast(value);
       } catch (e) {
         if (e instanceof ArgumentError) return null;
         throw e;

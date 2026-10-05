@@ -68,4 +68,16 @@ describe("ColumnSerializerTest", () => {
         " a 0 argument constructor.",
     );
   });
+
+  it("assert_valid_value accepts a primitive of the object class", () => {
+    const cs = new ColumnSerializer("attr", JsonCoder, String as never);
+    expect(() => cs.assertValidValue("x", { action: "dump" })).not.toThrow();
+    expect(() => cs.assertValidValue(1, { action: "dump" })).toThrow(SerializationTypeMismatch);
+  });
+
+  it("assert_valid_value accepts a primitive and a null-prototype object for Object", () => {
+    const cs = new ColumnSerializer("attr", JsonCoder);
+    expect(() => cs.assertValidValue("x", { action: "dump" })).not.toThrow();
+    expect(() => cs.assertValidValue(Object.create(null), { action: "dump" })).not.toThrow();
+  });
 });

@@ -7,6 +7,7 @@ import {
   rbHash,
   rbModConstSet,
   rbDeclareIvar,
+  rbObjAsString,
   rbObjDup,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -319,15 +320,21 @@ export class Null extends Attribute {
   }
 
   withValueFromDatabase(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 
   withValueFromUser(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 
   withCastValue(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+    throw new MissingAttributeError(
+      `can't write unknown attribute \`${rbObjAsString(this.name)}\``,
+    );
   }
 }
 

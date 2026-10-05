@@ -11,13 +11,12 @@ import type { RFC3986Parser } from "./rfc3986-parser.js";
  * unsent ones are not, and the list is exhaustive: `build` / `build2`
  * (`generic.rb:78,116`), `COMPONENT` / `component` (`generic.rb:46,313`),
  * `registry` and its `check_` / `set_` / `=` trio
- * (`generic.rb:252,750,755,760`), `opaque` and `opaque=`
- * (`generic.rb:277,916`), `check_userinfo` / `check_user` / `check_password`
+ * (`generic.rb:252,750,755,760`), `check_userinfo` / `check_user` / `check_password`
  * and the `userinfo=` / `user=` / `password=` setters
  * (`generic.rb:375,393,417,441,471,498`), `set_user` / `set_password`
- * (`generic.rb:524,534`), `escape_userpass` (`generic.rb:551`), `user` /
- * `password` (`generic.rb:568,573`), `decoded_user` / `decoded_password`
- * (`generic.rb:584,589`), `hostname` / `hostname=` (`generic.rb:668,685`),
+ * (`generic.rb:524,534`), `escape_userpass` (`generic.rb:551`),
+ * `decoded_user` / `decoded_password` (`generic.rb:584,589`), `hostname=`
+ * (`generic.rb:685`),
  * `hierarchical?` (`generic.rb:976`), `merge!` (`generic.rb:1096`), `route_from_path` / `route_from0` /
  * `route_from` / `route_to` (`generic.rb:1167,1206,1274,1314`), `normalize` /
  * `normalize!` (`generic.rb:1331,1340`), `==` / `hash` / `eql?` /
@@ -103,6 +102,16 @@ export class Generic {
     return this._host;
   }
 
+  /**
+   * `hostname` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:668`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get hostname(): string | null {
+    const v = this.host;
+    return v != null && v.startsWith("[") && v.endsWith("]") ? v.slice(1, -1) : v;
+  }
+
   /** `port` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:250`). */
   get port(): number | null {
     return this._port;
@@ -116,6 +125,15 @@ export class Generic {
   /** `query` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:266`). */
   get query(): string | null {
     return this._query;
+  }
+
+  /**
+   * `opaque` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:277`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get opaque(): string | null {
+    return this._opaque;
   }
 
   /**
@@ -191,6 +209,24 @@ export class Generic {
     } else {
       return this._user + ":" + this._password;
     }
+  }
+
+  /**
+   * `user` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:568`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get user(): string | null {
+    return this._user;
+  }
+
+  /**
+   * `password` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:573`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get password(): string | null {
+    return this._password;
   }
 
   /** `authority` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:579`) — the array of user,
@@ -337,6 +373,29 @@ export class Generic {
   /** `set_opaque` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:898`). */
   protected setOpaque(v: string | null): void {
     this._opaque = v;
+  }
+
+  /**
+   * `opaque=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:916`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  set opaque(v: string | null) {
+    this.checkOpaque(v);
+    this.setOpaque(v);
+  }
+
+  /** `check_opaque` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:876`). */
+  private checkOpaque(v: string | null): boolean | null {
+    if (v == null) return v;
+
+    if (this._host != null || this._port != null || this._user != null || this._path != null) {
+      throw new InvalidURIError("can not set opaque with host, port, userinfo or path");
+    } else if (!this.parser.regexp.OPAQUE?.test(v)) {
+      throw new InvalidComponentError(`bad component(expected opaque component): ${v}`);
+    }
+
+    return true;
   }
 
   /** `fragment=` (`vendor/ruby/v3.3.11/lib/uri/generic.rb:944`). */
