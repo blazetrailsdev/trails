@@ -30,7 +30,7 @@ function makeHost(
     contentMimeType: { ref: () => ":json" },
     requestParameters: {},
     filteredParameters: () => ({}),
-    params: {},
+    parameters: {},
     ...requestOverrides,
   };
   return { _wrapperOptions: merged, request };
@@ -79,20 +79,16 @@ describe("ParamsWrapper privates", () => {
     });
   });
 
-  it("_wrapParameters returns empty object when no key", () => {
-    expect(_wrapParameters.call(makeHost(), { name: "x" })).toEqual({});
-  });
-
   it("_wrapperEnabled true when format matches and key absent", () => {
     const host = makeHost(
       { name: "user", format: [":json"] },
-      { requestParameters: { name: "a" }, params: { name: "a" } },
+      { requestParameters: { name: "a" }, parameters: { name: "a" } },
     );
     expect(_wrapperEnabled.call(host)).toBe(true);
   });
 
   it("_wrapperEnabled false when wrapper key already present", () => {
-    const host = makeHost({ name: "user", format: [":json"] }, { params: { user: {} } });
+    const host = makeHost({ name: "user", format: [":json"] }, { parameters: { user: {} } });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
@@ -141,7 +137,7 @@ describe("ParamsWrapper privates", () => {
       { name: "user", include: ["name"] },
       {
         requestParameters,
-        params,
+        parameters: params,
         filteredParameters: () => filtered,
       },
     );

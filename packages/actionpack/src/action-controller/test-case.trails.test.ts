@@ -673,7 +673,7 @@ describe("ActionController::TestRequest helpers", () => {
     const req = TestRequest.create(null);
     const parsers = req.paramsParsers();
     expect(typeof parsers).toBe("object");
-    expect(parsers).toHaveProperty("xml");
+    expect(parsers).toHaveProperty([":xml"]);
   });
 });
 

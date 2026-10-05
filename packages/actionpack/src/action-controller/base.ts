@@ -1,7 +1,6 @@
 import {
   Benchmark,
   SafeBuffer,
-  any,
   classAttribute,
   mattrAccessor,
   extend,
@@ -9,7 +8,6 @@ import {
   type Included,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { rbObjDup } from "@blazetrails/ruby-compat";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
@@ -151,6 +149,7 @@ import {
   _performParameterWrapping,
   _setWrapperOptions,
   _wrapperEnabled,
+  inheritedParamsWrapper,
   wrapParameters,
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
@@ -615,19 +614,12 @@ export class Base extends Metal {
     });
   }
 
-  /** @internal */
   static _setWrapperOptions = _setWrapperOptions;
 
   static wrapParameters = wrapParameters;
 
   /** @internal */
-  static inheritedParamsWrapper(): void {
-    if (any(this._wrapperOptions.format)) {
-      const params = rbObjDup(this._wrapperOptions);
-      params.klass = this;
-      this._wrapperOptions = params;
-    }
-  }
+  static inheritedParamsWrapper = inheritedParamsWrapper;
 
   declare static httpBasicAuthenticateWith: OmitThisParameter<
     typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith

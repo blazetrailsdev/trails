@@ -32,7 +32,7 @@ describe("ActionController::Railtie action_controller.set_configs", () => {
     class WrappedController extends ActionController.Base {}
     await runTrailtieInitializers(Trailtie, app);
     runLoadHooks("action_controller", WrappedController);
-    expect(WrappedController._wrapperOptions.format).toEqual(["json"]);
+    expect(WrappedController._wrapperOptions.format).toEqual([":json"]);
   });
 
   it("set_configs raises on an option key ActionController::Base does not answer", async () => {

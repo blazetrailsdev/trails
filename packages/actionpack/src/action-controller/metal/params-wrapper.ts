@@ -1,9 +1,13 @@
 import {
+  except,
+  flatten,
   hasKey,
   last,
   merge,
   mergeBang,
+  rbObjDup,
   rbObjRespondTo,
+  rbStrSend,
   slice,
   toS,
 } from "@blazetrails/ruby-compat";
@@ -38,12 +42,17 @@ export class Options {
   static fromHash(hash: Record<string, unknown>): Options {
     const name = (hash.name ?? null) as string | null;
     const format = wrap(hash.format) as string[];
-    const include = hash.include != null ? wrap(hash.include).map((attr) => toS(attr)) : null;
-    const exclude = hash.exclude != null ? wrap(hash.exclude).map((attr) => toS(attr)) : null;
+    const include =
+      hash.include != null && hash.include !== false
+        ? wrap(hash.include).map((attr) => toS(attr))
+        : null;
+    const exclude =
+      hash.exclude != null && hash.exclude !== false
+        ? wrap(hash.exclude).map((attr) => toS(attr))
+        : null;
     return new Options(name, format, include, exclude, null, null);
   }
 
-  /** @internal */
   constructor(
     name: string | null,
     format: string[],
@@ -85,9 +94,7 @@ export class Options {
           Object.keys(m!.storedAttributes!()).length > 0
         ) {
           this.include = this._include!.concat(
-            Object.values(m!.storedAttributes!())
-              .flat()
-              .map((attr) => toS(attr)),
+            flatten(Object.values(m!.storedAttributes!())).map((attr) => toS(attr)),
           );
         }
 
@@ -145,7 +152,9 @@ export class Options {
 
   private _defaultWrapModel(): unknown {
     if (isAnonymous(this.klass!)) return null;
-    let modelName = classify(this.klass!.name.replace(/Controller$/, ""));
+    let modelName = classify(
+      rbStrSend(this.klass!.name, "deleteSuffix", "Controller")[0] as string,
+    );
     let modelKlass: unknown;
 
     do {
@@ -178,7 +187,7 @@ export interface ParamsWrapperHost {
     contentMimeType: { ref(): string | null } | null;
     requestParameters: Record<string, unknown>;
     filteredParameters(): Record<string, unknown>;
-    params: Record<string, unknown>;
+    parameters: Record<string, unknown>;
   };
   _wrapperOptions: Options;
 }
@@ -223,6 +232,15 @@ export function wrapParameters(
 }
 
 /** @internal */
+export function inheritedParamsWrapper(this: WrapperHostClass): void {
+  if (any(this._wrapperOptions.format)) {
+    const params = rbObjDup(this._wrapperOptions);
+    params.klass = this;
+    this._wrapperOptions = params;
+  }
+}
+
+/** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;
 }
@@ -237,21 +255,15 @@ export function _extractParameters(
   this: ParamsWrapperHost,
   parameters: Record<string, unknown>,
 ): Record<string, unknown> {
-  const opts = this._wrapperOptions;
-  if (opts.include) {
-    const includeOnly = opts.include;
-    const out: Record<string, unknown> = {};
-    for (const k of includeOnly) {
-      if (Object.hasOwn(parameters, k)) out[k] = parameters[k];
-    }
-    return out;
+  const includeOnly = this._wrapperOptions.include;
+  if (includeOnly != null) {
+    return slice(parameters, ...includeOnly);
+  } else if (this._wrapperOptions.exclude != null) {
+    const exclude = this._wrapperOptions.exclude.concat(EXCLUDE_PARAMETERS);
+    return except(parameters, ...exclude);
+  } else {
+    return except(parameters, ...EXCLUDE_PARAMETERS);
   }
-  const exclude = opts.exclude ? [...opts.exclude, ...EXCLUDE_PARAMETERS] : EXCLUDE_PARAMETERS;
-  const out: Record<string, unknown> = {};
-  for (const k of Object.keys(parameters)) {
-    if (!exclude.includes(k)) out[k] = parameters[k];
-  }
-  return out;
 }
 
 /** @internal */
@@ -259,22 +271,20 @@ export function _wrapParameters(
   this: ParamsWrapperHost,
   parameters: Record<string, unknown>,
 ): Record<string, unknown> {
-  const key = _wrapperKey.call(this);
-  if (!key) return {};
-  return { [key]: _extractParameters.call(this, parameters) };
+  return { [_wrapperKey.call(this)!]: _extractParameters.call(this, parameters) };
 }
 
 /** @internal */
 export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
   try {
     if (!this.request.hasContentType()) return false;
-    const ref = this.request.contentMimeType?.ref();
-    if (!ref) return false;
+
+    const ref = this.request.contentMimeType!.ref();
 
     return (
-      _wrapperFormats.call(this).includes(ref) &&
+      _wrapperFormats.call(this).includes(ref!) &&
       _wrapperKey.call(this) != null &&
-      !hasKey(this.request.params, _wrapperKey.call(this)!)
+      !hasKey(this.request.parameters, _wrapperKey.call(this)!)
     );
   } catch (err) {
     if (err instanceof ParseError) return false;
@@ -291,7 +301,7 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
     slice(this.request.filteredParameters(), ...wrappedKeys),
   );
 
-  mergeBang(this.request.params, wrappedHash);
+  mergeBang(this.request.parameters, wrappedHash);
   mergeBang(this.request.requestParameters, wrappedHash);
 
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
