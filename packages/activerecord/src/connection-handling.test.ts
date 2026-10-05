@@ -562,7 +562,7 @@ describe("ConnectionHandlingTest", () => {
       await BackfillModel.removeConnection();
     }
 
-    const resolved = new DatabaseConfigurations({}).resolve(configurationHash as any);
+    const resolved = new DatabaseConfigurations({}).resolve(configurationHash as any)!;
     expect(resolved.adapter).toBe("sqlite3");
   });
 });

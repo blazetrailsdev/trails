@@ -124,7 +124,7 @@ export class DatabaseConfigurations {
     return !!firstConfig && name === firstConfig.name;
   }
 
-  resolve(config: unknown): HashConfig {
+  resolve(config: unknown): HashConfig | null {
     if (config instanceof DatabaseConfig) return config as HashConfig;
     if (isSymbol(config)) {
       return this.resolveSymbolConnection(config);
@@ -134,7 +134,7 @@ export class DatabaseConfigurations {
         this.defaultEnv(),
         "primary",
         config as DatabaseConfigOptions | string,
-      ) as HashConfig;
+      );
     }
     throw new TypeError(
       `Invalid type for configuration. Expected Symbol, String, or Hash. Got ${rbInspect(config)}`,

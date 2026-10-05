@@ -400,15 +400,14 @@ const _enumMethodsModuleRegistry = new WeakMap<typeof import("./base.js").Base, 
 
 /** @internal */
 export function _enumMethodsModule(this: typeof import("./base.js").Base): EnumMethods {
-  return (
-    _enumMethodsModuleRegistry.get(this) ??
-    (() => {
-      const mod = new EnumMethods(this);
-      include(this as unknown as new (...args: unknown[]) => unknown, mod);
-      _enumMethodsModuleRegistry.set(this, mod);
-      return mod;
-    })()
-  );
+  let enumMethodsModule = _enumMethodsModuleRegistry.get(this);
+  enumMethodsModule ??= (() => {
+    const mod = new EnumMethods(this);
+    include(this as unknown as new (...args: unknown[]) => unknown, mod);
+    _enumMethodsModuleRegistry.set(this, mod);
+    return mod;
+  })();
+  return enumMethodsModule;
 }
 
 /** @internal */

@@ -71,7 +71,7 @@ export function defineDelegatedTypeMethods(
     function (this: Base, ...params: unknown[]): Base {
       const klass = rbFPublicSend(this, `${role}Class`) as new (...params: unknown[]) => Base;
       const record = new klass(...params);
-      (this as unknown as Record<string, unknown>)[role] = record;
+      rbFPublicSend(this, `${role}=`, record);
       return record;
     },
   );
@@ -87,23 +87,23 @@ export function defineDelegatedTypeMethods(
       return this.where({ [roleType]: typeName });
     });
 
-    defineMethod(this.prototype, `is${predicateSuffix}`, function (this: Base): boolean {
-      return this.readAttribute(roleType) === typeName;
+    const query = `is${predicateSuffix}`;
+    defineMethod(this.prototype, query, function (this: Base): boolean {
+      return rbFPublicSend(this, roleType) === typeName;
     });
 
     Object.defineProperty(this.prototype, singularName, {
       get(this: Base) {
-        if (this.readAttribute(roleType) !== typeName) return null;
-        return (this as unknown as Record<string, unknown>)[role];
+        if (rbFPublicSend(this, query)) return rbFPublicSend(this, role);
+        return null;
       },
       configurable: true,
     });
 
-    const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
-    Object.defineProperty(this.prototype, fkAccessorName, {
+    Object.defineProperty(this.prototype, camelize(`${singularSnake}_${primaryKey}`, false), {
       get(this: Base) {
-        if (this.readAttribute(roleType) !== typeName) return null;
-        return this.readAttribute(roleId);
+        if (rbFPublicSend(this, query)) return rbFPublicSend(this, roleId);
+        return null;
       },
       configurable: true,
     });
