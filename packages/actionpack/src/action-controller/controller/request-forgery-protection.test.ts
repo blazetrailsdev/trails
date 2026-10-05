@@ -252,7 +252,7 @@ class SkipProtectionController extends Base {
 }
 include(SkipProtectionController, RequestForgeryProtectionActions);
 SkipProtectionController.protectFromForgery({ with: "exception" });
-SkipProtectionController.skipForgeryProtection({ if: "skipRequested" });
+SkipProtectionController.skipForgeryProtection({ if: ":skipRequested" });
 
 class SkipProtectionWhenUnprotectedController extends Base {}
 include(SkipProtectionWhenUnprotectedController, RequestForgeryProtectionActions);

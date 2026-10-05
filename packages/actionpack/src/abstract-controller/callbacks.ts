@@ -30,13 +30,13 @@ export interface CallbackOptions {
   only?: string | string[];
   except?: string | string[];
   if?:
-    | string
+    | `:${string}`
     | ((controller: AbstractController) => boolean)
-    | Array<string | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
   unless?:
-    | string
+    | `:${string}`
     | ((controller: AbstractController) => boolean)
-    | Array<string | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
+    | Array<`:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike>;
   prepend?: boolean;
   raise?: boolean;
 }
@@ -128,7 +128,7 @@ export function _normalizeCallbackOption(
 
   const existing = options[to];
   const list: Array<
-    string | ((controller: AbstractController) => boolean) | CallbackPredicateLike
+    `:${string}` | ((controller: AbstractController) => boolean) | CallbackPredicateLike
   > = existing === undefined ? [] : Array.isArray(existing) ? existing.slice() : [existing];
   list.unshift(fromValue);
   options[to] = list;
@@ -164,7 +164,7 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   const list = Array.isArray(pred) ? pred : [pred];
   return list.map((item) =>
     typeof item === "string"
-      ? `:${item}`
+      ? item
       : typeof item === "function"
         ? (item as unknown as CallbackCondition)
         : (c: object) => item.isMatch(c as AbstractController),
