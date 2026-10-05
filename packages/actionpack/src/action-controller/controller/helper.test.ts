@@ -129,7 +129,6 @@ beforeAll(async () => {
   HelpersPathsController = class HelpersPathsController extends Base {
     static {
       this.helpersPath = paths;
-      this.includeAllHelpers = false;
       this.helper(":all");
     }
 
