@@ -1,5 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
+import { TEMPORAL_METHOD_TABLE, rbEnsure } from "@blazetrails/ruby-compat";
+import { IsolatedExecutionState } from "./isolated-execution-state.js";
 import { inTimeZone } from "./core-ext/date-and-time/zones.js";
 import type { TimeWithZone } from "./time-with-zone.js";
 import { TimeZone } from "./values/time-zone.js";
@@ -18,15 +19,15 @@ RubyTime.prototype.inTimeZone = function (this: RubyTime, zone?: unknown) {
 (TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).inTimeZone = inTimeZone;
 
 let _zoneDefault: TimeZone | null = null;
-let _zone: TimeZone | null | false | undefined = undefined;
 
 export function zone(): TimeZone | null {
-  if (_zone != null && _zone !== false) return _zone;
+  const timeZone = IsolatedExecutionState.get<TimeZone | null | false>(":time_zone");
+  if (timeZone != null && timeZone !== false) return timeZone;
   return _zoneDefault;
 }
 
 export function setZone(timeZone: TimeZone | string | number | Duration | null | false): void {
-  _zone = findZoneBang(timeZone);
+  IsolatedExecutionState.set(":time_zone", findZoneBang(timeZone));
 }
 
 export function zoneDefault(): TimeZone | null {
@@ -39,19 +40,17 @@ export function setZoneDefault(zone: TimeZone | null): void {
 
 export function useZone<T>(timeZone: string | TimeZone, fn: () => T): T {
   const newZone = findZoneBang(timeZone);
-  const prev = _zone;
-  _zone = newZone;
-  try {
-    const result = fn();
-    if (result != null && typeof (result as any).then === "function") {
-      throw new Error(
-        "useZone does not support async callbacks; the zone would be restored before awaited work runs",
-      );
-    }
-    return result;
-  } finally {
-    _zone = prev;
-  }
+  let oldZone: TimeZone | null;
+  return rbEnsure(
+    () => {
+      oldZone = zone();
+      setZone(newZone);
+      return fn();
+    },
+    () => {
+      setZone(oldZone);
+    },
+  );
 }
 
 export function findZone(timeZone: unknown): TimeZone | null | false {

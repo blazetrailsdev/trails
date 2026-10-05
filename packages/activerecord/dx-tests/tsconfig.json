@@ -57,7 +57,8 @@
       "@blazetrails/did-you-mean": ["../../did-you-mean/src/index.ts"],
       "@blazetrails/globalid": ["../../globalid/src/index.ts"],
       "@blazetrails/globalid/wire": ["../../globalid/src/wire.ts"],
-      "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"]
+      "@blazetrails/globalid/signed-global-id": ["../../globalid/src/signed-global-id.ts"],
+      "@blazetrails/activejob": ["../../activejob/src/index.ts"]
     }
   },
   "include": ["."]
