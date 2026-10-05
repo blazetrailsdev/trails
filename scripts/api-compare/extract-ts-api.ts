@@ -3486,7 +3486,6 @@ export function harvestModuleInstanceMethods(
   return out;
 }
 
-/** `mod[initialize] = function (...) {}`, through any cast on `mod`. */
 function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
   if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
     return undefined;

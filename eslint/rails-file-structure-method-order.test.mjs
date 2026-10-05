@@ -57,8 +57,6 @@ const fixture = {
       classes: { Casted: ["before", "database"], Quoted: ["database", "before"] },
       functions: [],
     },
-    // Two same-named classes nested in sibling classes, keyed by their
-    // enclosing class (thor/error.rb's two `SpellChecker`s), in OPPOSITE orders.
     "packages/arel/src/fixture-nested.ts": {
       classes: { "A.Checker": ["before", "database"], "B.Checker": ["database", "before"] },
       functions: [],
@@ -610,7 +608,6 @@ try {
           `class Casted {\n  before() {}\n  database() {}\n}\n` +
           `class Quoted {\n  database() {}\n  before() {}\n}\n`,
       },
-      // A class in a namespace takes the bucket keyed by its enclosing class.
       {
         filename: nestedFile,
         code:

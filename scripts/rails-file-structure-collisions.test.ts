@@ -43,7 +43,6 @@ describe("resolveLastSegmentCollision", () => {
 });
 
 describe("qualifyByParent", () => {
-  // vendor/thor/v1.3.2/lib/thor/error.rb:25-39,66-81.
   it("keys same-depth siblings under different parents by their enclosing class", () => {
     const fqns = [
       "Thor::UndefinedCommandError::SpellChecker",

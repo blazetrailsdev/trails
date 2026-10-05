@@ -210,9 +210,6 @@ function classNameOf(classBody) {
   return null;
 }
 
-// `Outer.Name` for a class declared in `namespace Outer { … }` — the port of a
-// Ruby class nested in `class Outer` when a sibling class nests a same-named
-// one (scripts/rails-file-structure-collisions.ts `qualifyByParent`).
 function qualifiedClassNameOf(classBody, name) {
   let node = classBody.parent?.parent;
   if (node?.type === "ExportNamedDeclaration") node = node.parent;

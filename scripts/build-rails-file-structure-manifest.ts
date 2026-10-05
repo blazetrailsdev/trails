@@ -189,7 +189,6 @@ const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [];
 const unresolvedCollisions: string[] = [];
 const usedExpectedCollisions = new Set<string>();
 
-// fqn → the manifest class key it owns; empty for a collision with no owner.
 const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): Map<string, string> => {
   const winner = resolveLastSegmentCollision(fqns);
   if (winner) return new Map([[winner, lastSegment(winner)]]);
@@ -361,7 +360,6 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     const have = new Set(order.declarations);
     for (const fqn of fqns) {
-      // A parent-qualified class is nested, and only top-level declarations order.
       const n = keyOf(rubyFile, fqn);
       if (n === undefined || n.includes(".") || have.has(n)) continue;
       have.add(n);
