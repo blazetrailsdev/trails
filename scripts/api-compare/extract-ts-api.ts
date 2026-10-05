@@ -5719,7 +5719,7 @@ function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
     const name = last.text;
     last = body.statements
       .flatMap((s) => (ts.isVariableStatement(s) ? [...s.declarationList.declarations] : []))
-      .find((d) => d.name.getText() === name)?.initializer;
+      .find((d) => d.name.getText() === name && d.end <= conditional.pos)?.initializer;
   }
   return (
     last !== undefined &&

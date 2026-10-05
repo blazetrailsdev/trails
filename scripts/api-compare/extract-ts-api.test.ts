@@ -1024,6 +1024,11 @@ describe("body call capture", () => {
           const first = prefixes[0];
           return typeof first === "object" ? prefixes.pop() : {};
         }
+        declaredAfter(...prefixes: unknown[]) {
+          const kwargs = typeof last === "object" ? prefixes.pop() : {};
+          const last = prefixes[prefixes.length - 1];
+          return this.run(kwargs, last);
+        }
         defaulted(...prefixes: unknown[]) {
           const last = prefixes[prefixes.length - 1];
           return typeof last === "object" ? prefixes.pop() : { parameters: true };
@@ -1034,7 +1039,7 @@ describe("body call capture", () => {
       cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
     expect(arms("prefix")).toEqual([]);
     expect(arms("inline")).toEqual([]);
-    for (const kept of ["notASplat", "notTheLast", "defaulted"]) {
+    for (const kept of ["notASplat", "notTheLast", "declaredAfter", "defaulted"]) {
       expect(arms(kept)).toEqual(["if"]);
     }
   });
