@@ -741,13 +741,14 @@ function rbCheckToArray(ary: unknown): unknown[] | null {
 }
 
 /**
- * `Kernel#Array` (`rb_Array`, `vendor/ruby/v3.3.11/object.c:3791`): the
+ * `Kernel#Array` (`rb_f_array`, `vendor/ruby/v3.3.11/object.c:3825`, over
+ * `rb_Array`, `vendor/ruby/v3.3.11/object.c:3791`): the
  * argument's `to_ary`, else its `to_a`, else the argument in a one-element
  * Array.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbArray(val: unknown): unknown[] {
+export function rbFArray(val: unknown): unknown[] {
   let tmp = rbCheckArrayType(val);
 
   if (tmp === null) {

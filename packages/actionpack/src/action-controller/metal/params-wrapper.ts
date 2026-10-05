@@ -5,7 +5,7 @@ import {
   last,
   merge,
   mergeBang,
-  rbArray,
+  rbFArray,
   rbObjDup,
   rbObjRespondTo,
   rbStrSend,
@@ -41,14 +41,14 @@ export class Options {
 
   static fromHash(hash: Record<string, unknown>): Options {
     const name = (hash.name ?? null) as string | null;
-    const format = rbArray(hash.format) as string[];
+    const format = rbFArray(hash.format) as string[];
     const include =
       hash.include != null && hash.include !== false
-        ? rbArray(hash.include).map((attr) => toS(attr))
+        ? rbFArray(hash.include).map((attr) => toS(attr))
         : null;
     const exclude =
       hash.exclude != null && hash.exclude !== false
-        ? rbArray(hash.exclude).map((attr) => toS(attr))
+        ? rbFArray(hash.exclude).map((attr) => toS(attr))
         : null;
     return new Options(name, format, include, exclude, null, null);
   }
