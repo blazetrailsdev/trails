@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { assertNothingRaised, assertRaises, include } from "@blazetrails/activesupport";
+import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
+import {
+  RoutingUrlFor,
+  embedAuthenticityTokenInRemoteForms,
+  setEmbedAuthenticityTokenInRemoteForms,
+} from "@blazetrails/actionview";
 import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
@@ -9,7 +15,10 @@ import {
   RequestForgeryProtection,
   decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
+import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import "../../test-helpers/abstract-unit.js";
+
+include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;
@@ -18,11 +27,72 @@ interface ActionsHost {
 
 const RequestForgeryProtectionActions = {
   async index(this: Base): Promise<void> {
-    await this.render({ plain: "" });
+    await this.render({ inline: "<%= context.formTag('/', {}, () => {}) %>" });
+  },
+
+  async showButton(this: Base): Promise<void> {
+    await this.render({ inline: "<%= context.buttonTo('New', '/') %>" });
   },
 
   async unsafe(this: Base): Promise<void> {
     await this.render({ plain: "pwn" });
+  },
+
+  async meta(this: Base): Promise<void> {
+    await this.render({ inline: "<%= context.csrfMetaTags() %>" });
+  },
+
+  async formForRemote(this: Base): Promise<void> {
+    await this.render({
+      inline: "<%= context.formFor('some_resource', { remote: true }, () => {}) %>",
+    });
+  },
+
+  async formForRemoteWithToken(this: Base): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formFor('some_resource', { remote: true, authenticityToken: true }, () => {}) %>",
+    });
+  },
+
+  async formForWithToken(this: Base): Promise<void> {
+    await this.render({
+      inline: "<%= context.formFor('some_resource', { authenticityToken: true }, () => {}) %>",
+    });
+  },
+
+  async formForRemoteWithExternalToken(this: Base): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formFor('some_resource', { remote: true, authenticityToken: 'external_token' }, () => {}) %>",
+    });
+  },
+
+  async formWithRemote(this: Base): Promise<void> {
+    await this.render({
+      inline: "<%= context.formWith({ scope: 'some_resource' }, () => {}) %>",
+    });
+  },
+
+  async formWithRemoteWithToken(this: Base): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formWith({ scope: 'some_resource', authenticityToken: true }, () => {}) %>",
+    });
+  },
+
+  async formWithLocalWithToken(this: Base): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formWith({ scope: 'some_resource', local: true, authenticityToken: true }, () => {}) %>",
+    });
+  },
+
+  async formWithRemoteWithExternalToken(this: Base): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formWith({ scope: 'some_resource', authenticityToken: 'external_token' }, () => {}) %>",
+    });
   },
 
   async sameOriginJs(this: Base): Promise<void> {
@@ -59,6 +129,16 @@ RequestForgeryProtectionControllerUsingException.protectFromForgery({
 });
 
 class RequestForgeryProtectionControllerUsingNullSession extends Base {
+  async signed(): Promise<void> {
+    this.cookies().signed.set("foo", "bar");
+    this.head("ok");
+  }
+
+  async encrypted(): Promise<void> {
+    this.cookies().encrypted.set("foo", "bar");
+    this.head("ok");
+  }
+
   async tryToResetSession(): Promise<void> {
     this.resetSession();
     this.head("ok");
@@ -66,7 +146,64 @@ class RequestForgeryProtectionControllerUsingNullSession extends Base {
 }
 RequestForgeryProtectionControllerUsingNullSession.protectFromForgery({ with: "null_session" });
 
-class FreeCookieController extends RequestForgeryProtectionControllerUsingResetSession {}
+class FakeException extends Error {}
+
+class CustomStrategy {
+  controller: unknown;
+
+  constructor(controller: unknown) {
+    this.controller = controller;
+  }
+
+  handleUnverifiedRequest(): void {
+    throw new FakeException("Raised a fake exception.");
+  }
+}
+
+class RequestForgeryProtectionControllerUsingCustomStrategy extends Base {
+  static FakeException = FakeException;
+  static CustomStrategy = CustomStrategy;
+}
+include(RequestForgeryProtectionControllerUsingCustomStrategy, RequestForgeryProtectionActions);
+RequestForgeryProtectionControllerUsingCustomStrategy.protectFromForgery({
+  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  with: CustomStrategy,
+});
+
+class PrependProtectForgeryBaseController extends Base {
+  calledCallbacks?: string[];
+
+  async index(): Promise<void> {
+    await this.render({ inline: "OK" });
+  }
+
+  /** @internal */
+  addCalledCallback(name: string): void {
+    this.calledCallbacks ??= [];
+    this.calledCallbacks.push(name);
+  }
+
+  /** @internal */
+  customAction(): void {
+    this.addCalledCallback("custom_action");
+  }
+
+  /** @internal */
+  verifyAuthenticityToken(): void {
+    this.addCalledCallback("verify_authenticity_token");
+  }
+}
+PrependProtectForgeryBaseController.beforeAction("customAction");
+
+class FreeCookieController extends RequestForgeryProtectionControllerUsingResetSession {
+  async index(): Promise<void> {
+    await this.render({ inline: "<%= context.formTag('/', {}, () => {}) %>" });
+  }
+
+  async showButton(): Promise<void> {
+    await this.render({ inline: "<%= context.buttonTo('New', '/') %>" });
+  }
+}
 FreeCookieController.allowForgeryProtection = false;
 
 class CustomAuthenticityParamController extends RequestForgeryProtectionControllerUsingResetSession {
@@ -131,13 +268,16 @@ class MockLogger {
 
 const TOKEN = Buffer.from("railstestrailstestrailstestrails").toString("base64url") + "=";
 
-describe("ActionController::RequestForgeryProtection", () => {
+function RequestForgeryProtectionTests(
+  controllerClass: new () => Base,
+  assertBlockedOverride?: (block: () => Promise<unknown>) => Promise<unknown>,
+) {
   let tc: TestCase;
   let oldRequestForgeryProtectionToken: string | null;
 
   beforeEach(async ({ task }) => {
     tc = new TestCase(task.name);
-    tc.controller = new RequestForgeryProtectionControllerUsingResetSession();
+    tc.controller = new controllerClass();
     await tc.beforeSetup();
     oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
     Base.requestForgeryProtectionToken = "custom_authenticity_token";
@@ -147,36 +287,70 @@ describe("ActionController::RequestForgeryProtection", () => {
     Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
   });
 
-  function initializeCsrfToken(token = TOKEN): void {
-    tc.session().set("_csrf_token", token);
-  }
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with token tag", () => {});
 
-  async function assertBlocked(block: () => Promise<unknown>): Promise<void> {
-    tc.session().set("something_like_user_id", 1);
-    await block();
-    expect(
-      tc.session().get("something_like_user_id"),
-      "session values are still present",
-    ).toBeUndefined();
-    tc.assertResponse("success");
-  }
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render button to with token tag", () => {});
 
-  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
-    tc.session().set("something_like_user_id", 1);
-    await assertNothingRaised(block);
-    expect(tc.session().get("something_like_user_id")).toBe(1);
-    tc.assertResponse("success");
-  }
+  it("should render form without token tag if remote", async () => {
+    await assertNotBlocked(() => tc.get("formForRemote"));
+    expect(tc.response.body).not.toMatch(/authenticity_token/);
+  });
 
-  async function forgeryProtectionOriginCheck(block: () => Promise<unknown>): Promise<void> {
-    const oldSetting = Base.forgeryProtectionOriginCheck;
-    Base.forgeryProtectionOriginCheck = true;
+  it("should render form with token tag if remote and embedding token is on", async () => {
+    const original = embedAuthenticityTokenInRemoteForms;
     try {
-      await block();
+      setEmbedAuthenticityTokenInRemoteForms(true);
+      await assertNotBlocked(() => tc.get("formForRemote"));
+      expect(tc.response.body).toMatch(/authenticity_token/);
     } finally {
-      Base.forgeryProtectionOriginCheck = oldSetting;
+      setEmbedAuthenticityTokenInRemoteForms(original);
     }
-  }
+  });
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with token tag if remote and external authenticity token requested and embedding is on", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with token tag if remote and external authenticity token requested", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with token tag if remote and authenticity token requested", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with token tag with authenticity token requested", () => {});
+
+  it("should render form with with token tag if remote", async () => {
+    await assertNotBlocked(() => tc.get("formWithRemote"));
+    expect(tc.response.body).toMatch(/authenticity_token/);
+  });
+
+  it("should render form with without token tag if remote and embedding token is off", async () => {
+    const original = embedAuthenticityTokenInRemoteForms;
+    try {
+      setEmbedAuthenticityTokenInRemoteForms(false);
+      await assertNotBlocked(() => tc.get("formWithRemote"));
+      expect(tc.response.body).not.toMatch(/authenticity_token/);
+    } finally {
+      setEmbedAuthenticityTokenInRemoteForms(original);
+    }
+  });
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with with token tag if remote and external authenticity token requested and embedding is on", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with with token tag if remote and external authenticity token requested", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with with token tag if remote and authenticity token requested", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with with token tag with authenticity token requested", () => {});
+
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should render form with with token tag if remote and embedding token is on", () => {});
 
   it("should allow get", async () => {
     await assertNotBlocked(() => tc.get("index"));
@@ -355,8 +529,91 @@ describe("ActionController::RequestForgeryProtection", () => {
     }
   });
 
+  it("should only allow same origin js get with xhr header", async () => {
+    await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+    await assertCrossOriginBlocked(() => tc.get("sameOriginJs", { format: "js" }));
+    await assertCrossOriginBlocked(() => {
+      tc.request.accept = "text/javascript";
+      return tc.get("negotiateSameOrigin");
+    });
+
+    await assertCrossOriginBlocked(() => {
+      tc.request.accept = "application/javascript";
+      return tc.get("negotiateSameOrigin");
+    });
+
+    await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true }));
+    await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true, format: "js" }));
+    await assertCrossOriginNotBlocked(() => {
+      tc.request.accept = "text/javascript";
+      return tc.get("negotiateSameOrigin", { xhr: true });
+    });
+  });
+
+  it("should warn on not same origin js", async () => {
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+    Base.logger = logger as never;
+
+    try {
+      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+
+      expect(logger.logged("warn").length).toBe(1);
+      expect(logger.logged("warn").at(-1)).toMatch(
+        /<script> tag on another site requested protected JavaScript/,
+      );
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+
+  it("should not warn if csrf logging disabled and not same origin js", async () => {
+    const oldLogger = Base.logger;
+    const logger = new MockLogger();
+    Base.logger = logger as never;
+    Base.logWarningOnCsrfFailure = false;
+
+    try {
+      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+
+      expect(logger.logged("warn").length).toBe(0);
+    } finally {
+      Base.logger = oldLogger;
+      Base.logWarningOnCsrfFailure = true;
+    }
+  });
+
+  it("should allow non get js without xhr header", async () => {
+    initializeCsrfToken();
+    await assertCrossOriginNotBlocked(() =>
+      tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
+    );
+    await assertCrossOriginNotBlocked(() =>
+      tc.post("sameOriginJs", { params: { format: "js", custom_authenticity_token: TOKEN } }),
+    );
+    await assertCrossOriginNotBlocked(() => {
+      tc.request.accept = "text/javascript";
+      return tc.post("negotiateSameOrigin", { params: { custom_authenticity_token: TOKEN } });
+    });
+  });
+
+  it("should only allow cross origin js get without xhr header if protection disabled", async () => {
+    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs"));
+    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { format: "js" }));
+    await assertCrossOriginNotBlocked(() => {
+      tc.request.accept = "text/javascript";
+      return tc.get("negotiateCrossOrigin");
+    });
+
+    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true }));
+    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true, format: "js" }));
+    await assertCrossOriginNotBlocked(() => {
+      tc.request.accept = "text/javascript";
+      return tc.get("negotiateCrossOrigin", { xhr: true });
+    });
+  });
+
   it("csrf token is not saved if it is nil", async () => {
-    await tc.get("index");
     (tc.controller as Base).commitCsrfToken(tc.request);
     expect(tc.session().get("_csrf_token")).toBeUndefined();
   });
@@ -369,177 +626,177 @@ describe("ActionController::RequestForgeryProtection", () => {
       }),
     );
   });
-});
 
-describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
-  it("raised exception message explains why it occurred", async ({ task }) => {
-    const tc = new TestCase(task.name);
-    tc.controller = new RequestForgeryProtectionControllerUsingException();
-    await tc.beforeSetup();
-    const oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+  function initializeCsrfToken(token = TOKEN): void {
+    tc.session().set("_csrf_token", token);
+  }
+
+  async function assertBlocked(block: () => Promise<unknown>): Promise<unknown> {
+    if (assertBlockedOverride) return assertBlockedOverride(block);
+    tc.session().set("something_like_user_id", 1);
+    await block();
+    expect(
+      tc.session().get("something_like_user_id"),
+      "session values are still present",
+    ).toBeUndefined();
+    tc.assertResponse("success");
+  }
+
+  async function assertNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    tc.session().set("something_like_user_id", 1);
+    await assertNothingRaised(block);
+    expect(tc.session().get("something_like_user_id")).toBe(1);
+    tc.assertResponse("success");
+  }
+
+  async function forgeryProtectionOriginCheck(block: () => Promise<unknown>): Promise<void> {
     const oldSetting = Base.forgeryProtectionOriginCheck;
-    Base.requestForgeryProtectionToken = "custom_authenticity_token";
     Base.forgeryProtectionOriginCheck = true;
     try {
-      tc.session().set("_csrf_token", TOKEN);
-      tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
-      const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
-        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
-      );
-      expect(exception.message).toMatch(
-        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
-      );
+      await block();
     } finally {
       Base.forgeryProtectionOriginCheck = oldSetting;
-      Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
     }
-  });
+  }
 
-  it.skip("should render form with token tag", () => {});
-  it.skip("should render button to with token tag", () => {});
-  it.skip("should render form without token tag if remote", () => {});
-  it.skip("should render form with token tag if remote and embedding token is on", () => {});
-  it.skip("should render form with token tag if remote and external authenticity token requested and embedding is on", () => {});
-  it.skip("should render form with token tag if remote and external authenticity token requested", () => {});
-  it.skip("should render form with token tag if remote and authenticity token requested", () => {});
-  it.skip("should render form with token tag with authenticity token requested", () => {});
-  it.skip("should render form with with token tag if remote", () => {});
-  it.skip("should render form with without token tag if remote and embedding token is off", () => {});
-  it.skip("should render form with with token tag if remote and external authenticity token requested and embedding is on", () => {});
-  it.skip("should render form with with token tag if remote and external authenticity token requested", () => {});
-  it.skip("should render form with with token tag if remote and authenticity token requested", () => {});
-  it.skip("should render form with with token tag with authenticity token requested", () => {});
-  it.skip("should render form with with token tag if remote and embedding token is on", () => {});
+  async function assertCrossOriginBlocked(block: () => Promise<unknown>): Promise<void> {
+    await assertRaises([InvalidCrossOriginRequest], {}, block);
+  }
 
-  describe("same origin js", () => {
-    let tc: TestCase;
-    let oldRequestForgeryProtectionToken: string | null;
+  async function assertCrossOriginNotBlocked(block: () => Promise<unknown>): Promise<void> {
+    tc.session().set("something_like_user_id", 1);
+    await assertNothingRaised(block);
+    expect(tc.session().get("something_like_user_id")).toBe(1);
+    tc.assertResponse("success");
+  }
 
-    beforeEach(async ({ task }) => {
-      tc = new TestCase(task.name);
-      tc.controller = new RequestForgeryProtectionControllerUsingException();
-      await tc.beforeSetup();
-      oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
-      Base.requestForgeryProtectionToken = "custom_authenticity_token";
-    });
-
-    afterEach(() => {
-      Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
-    });
-
-    async function assertCrossOriginBlocked(block: () => Promise<unknown>): Promise<void> {
-      await assertRaises([InvalidCrossOriginRequest], {}, block);
-    }
-
-    async function assertCrossOriginNotBlocked(block: () => Promise<unknown>): Promise<void> {
-      tc.session().set("something_like_user_id", 1);
-      await assertNothingRaised(block);
-      expect(tc.session().get("something_like_user_id")).toBe(1);
-      tc.assertResponse("success");
-    }
-
-    it("should only allow same origin js get with xhr header", async () => {
-      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
-      await assertCrossOriginBlocked(() => tc.get("sameOriginJs", { format: "js" }));
-      await assertCrossOriginBlocked(() => {
-        tc.request.accept = "text/javascript";
-        return tc.get("negotiateSameOrigin");
-      });
-
-      await assertCrossOriginBlocked(() => {
-        tc.request.accept = "application/javascript";
-        return tc.get("negotiateSameOrigin");
-      });
-
-      await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true }));
-      await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true, format: "js" }));
-      await assertCrossOriginNotBlocked(() => {
-        tc.request.accept = "text/javascript";
-        return tc.get("negotiateSameOrigin", { xhr: true });
-      });
-    });
-
-    it("should warn on not same origin js", async () => {
-      const oldLogger = Base.logger;
-      const logger = new MockLogger();
-      Base.logger = logger as never;
-
-      try {
-        await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
-
-        expect(logger.logged("warn").length).toBe(1);
-        expect(logger.logged("warn").at(-1)).toMatch(
-          /<script> tag on another site requested protected JavaScript/,
-        );
-      } finally {
-        Base.logger = oldLogger;
-      }
-    });
-
-    it("should not warn if csrf logging disabled and not same origin js", async () => {
-      const oldLogger = Base.logger;
-      const logger = new MockLogger();
-      Base.logger = logger as never;
-      Base.logWarningOnCsrfFailure = false;
-
-      try {
-        await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
-
-        expect(logger.logged("warn").length).toBe(0);
-      } finally {
-        Base.logger = oldLogger;
-        Base.logWarningOnCsrfFailure = true;
-      }
-    });
-
-    it("should allow non get js without xhr header", async () => {
-      tc.session().set("_csrf_token", TOKEN);
-      await assertCrossOriginNotBlocked(() =>
-        tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
-      );
-      await assertCrossOriginNotBlocked(() =>
-        tc.post("sameOriginJs", { params: { format: "js", custom_authenticity_token: TOKEN } }),
-      );
-      await assertCrossOriginNotBlocked(() => {
-        tc.request.accept = "text/javascript";
-        return tc.post("negotiateSameOrigin", { params: { custom_authenticity_token: TOKEN } });
-      });
-    });
-
-    it("should only allow cross origin js get without xhr header if protection disabled", async () => {
-      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs"));
-      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { format: "js" }));
-      await assertCrossOriginNotBlocked(() => {
-        tc.request.accept = "text/javascript";
-        return tc.get("negotiateCrossOrigin");
-      });
-
-      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true }));
-      await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true, format: "js" }));
-      await assertCrossOriginNotBlocked(() => {
-        tc.request.accept = "text/javascript";
-        return tc.get("negotiateCrossOrigin", { xhr: true });
-      });
-    });
-  });
-});
+  return { t: () => tc, initializeCsrfToken, forgeryProtectionOriginCheck };
+}
 
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
+  RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingResetSession);
+
   // BLOCKED: port-action-view-csrf-helper-and-generated-layout-meta-tags
   it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
 describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
-  it.skip("should allow to set signed cookies", () => {});
-  it.skip("should allow to set encrypted cookies", () => {});
+  class NullSessionDummyKeyGenerator {
+    generateKey(_secret: string, _length: number | null = null): string {
+      return "03312270731a2ed0d11ed091c2338a06";
+    }
+  }
 
-  it("should allow reset_session", async ({ task }) => {
-    const tc = new TestCase(task.name);
+  let tc: TestCase;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
     tc.controller = new RequestForgeryProtectionControllerUsingNullSession();
     await tc.beforeSetup();
+    tc.request.env["action_dispatch.key_generator"] = new NullSessionDummyKeyGenerator();
+    tc.request.env["action_dispatch.cookies_rotations"] = new RotationConfiguration();
+  });
+
+  it("should allow to set signed cookies", async () => {
+    await tc.post("signed");
+    tc.assertResponse("ok");
+  });
+
+  it("should allow to set encrypted cookies", async () => {
+    await tc.post("encrypted");
+    tc.assertResponse("ok");
+  });
+
+  it("should allow reset_session", async () => {
     await tc.post("tryToResetSession");
     tc.assertResponse("ok");
   });
+});
+
+describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
+  const { t, initializeCsrfToken, forgeryProtectionOriginCheck } = RequestForgeryProtectionTests(
+    RequestForgeryProtectionControllerUsingException,
+    (block) => assertRaises([InvalidAuthenticityToken], {}, block),
+  );
+
+  it("raised exception message explains why it occurred", async () => {
+    await forgeryProtectionOriginCheck(async () => {
+      initializeCsrfToken();
+      const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
+        t().request.setHeader("HTTP_ORIGIN", "http://bad.host");
+        return t().post("index", { params: { custom_authenticity_token: TOKEN } });
+      });
+      expect(exception.message).toMatch(
+        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      );
+    });
+  });
+});
+
+describe("RequestForgeryProtectionControllerUsingCustomStrategyTest", () => {
+  RequestForgeryProtectionTests(RequestForgeryProtectionControllerUsingCustomStrategy, (block) =>
+    assertRaises([RequestForgeryProtectionControllerUsingCustomStrategy.FakeException], {}, block),
+  );
+});
+
+describe("PrependProtectForgeryBaseControllerTest", () => {
+  class PrependTrueController extends PrependProtectForgeryBaseController {}
+  PrependTrueController.protectFromForgery({ prepend: true });
+
+  class PrependFalseController extends PrependProtectForgeryBaseController {}
+  PrependFalseController.protectFromForgery({ prepend: false });
+
+  class PrependDefaultController extends PrependProtectForgeryBaseController {}
+  PrependDefaultController.protectFromForgery();
+
+  let tc: TestCase;
+
+  beforeEach(({ task }) => {
+    tc = new TestCase(task.name);
+  });
+
+  it("verify authenticity token is prepended", async () => {
+    const controller = (tc.controller = new PrependTrueController());
+    await tc.beforeSetup();
+    await tc.get("index");
+    const expectedCallbackOrder = ["verify_authenticity_token", "custom_action"];
+    expect(controller.calledCallbacks).toEqual(expectedCallbackOrder);
+  });
+
+  it("verify authenticity token is not prepended", async () => {
+    const controller = (tc.controller = new PrependFalseController());
+    await tc.beforeSetup();
+    await tc.get("index");
+    const expectedCallbackOrder = ["custom_action", "verify_authenticity_token"];
+    expect(controller.calledCallbacks).toEqual(expectedCallbackOrder);
+  });
+
+  it("verify authenticity token is not prepended by default", async () => {
+    const controller = (tc.controller = new PrependDefaultController());
+    await tc.beforeSetup();
+    await tc.get("index");
+    const expectedCallbackOrder = ["custom_action", "verify_authenticity_token"];
+    expect(controller.calledCallbacks).toEqual(expectedCallbackOrder);
+  });
+});
+
+describe("FreeCookieControllerTest", () => {
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should not render form with token tag", () => {});
+  // BLOCKED: action-controller-test-case-has-no-assert-select
+  it.skip("should not render button to with token tag", () => {});
+
+  it("should allow all methods without token", async ({ task }) => {
+    const tc = new TestCase(task.name);
+    tc.controller = new FreeCookieController();
+    await tc.beforeSetup();
+    for (const method of ["post", "patch", "put", "delete"] as const) {
+      await assertNothingRaised(() => tc[method]("index"));
+    }
+  });
+
+  // BLOCKED: port-action-view-csrf-helper-and-generated-layout-meta-tags
+  it.skip("should not emit a csrf-token meta tag", () => {});
 });
 
 describe("CustomAuthenticityParamControllerTest", () => {
@@ -913,26 +1170,6 @@ describe("PerFormTokensControllerTest", () => {
     );
     tc.assertResponse("success");
   });
-});
-
-describe("PrependProtectForgeryBaseControllerTest", () => {
-  it.skip("verify authenticity token is prepended", () => {});
-  it.skip("verify authenticity token is not prepended", () => {});
-  it.skip("verify authenticity token is not prepended by default", () => {});
-});
-
-describe("FreeCookieControllerTest", () => {
-  it("should allow all methods without token", async ({ task }) => {
-    const tc = new TestCase(task.name);
-    tc.controller = new FreeCookieController();
-    await tc.beforeSetup();
-    for (const method of ["post", "patch", "put", "delete"] as const) {
-      await tc[method]("index");
-    }
-  });
-  it.skip("should not render form with token tag", () => {});
-  it.skip("should not render button to with token tag", () => {});
-  it.skip("should not emit a csrf-token meta tag", () => {});
 });
 
 describe("SkipProtectionControllerTest", () => {
