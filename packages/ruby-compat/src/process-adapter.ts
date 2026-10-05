@@ -1,4 +1,5 @@
 import { Errno, SystemCallError } from "./errno.js";
+import { RuntimeError } from "./runtime-error.js";
 import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
 
 export interface WriteStream {
@@ -79,6 +80,8 @@ export function rbProgname(): string {
  * @noRailsEquivalent PERMANENT
  */
 export function setArg0(val: string): void {
+  if (!currentAdapter && !tryAutoRegisterNode()) throw new RuntimeError("$0 not initialized");
+
   prognameInternal = val;
 }
 

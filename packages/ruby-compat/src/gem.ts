@@ -3,6 +3,8 @@ import { Version } from "./gem/version.js";
 import { getOs } from "./os-adapter.js";
 import { RbConfig } from "./rb-config.js";
 
+let winPlatform: boolean | null = null;
+
 /**
  * `vendor/ruby/v3.3.11/lib/rubygems.rb:11` — `Gem`, answering only the keys trails'
  * ports read: where installed packages live. A Node package is installed under the
@@ -51,7 +53,11 @@ export const Gem = {
    * @noRailsEquivalent PERMANENT — Ruby stdlib `Gem.win_platform?`.
    */
   isWinPlatform(): boolean {
-    const rubyPlatform = RbConfig.CONFIG["host_os"];
-    return Gem.WIN_PATTERNS.find((r) => r.test(rubyPlatform)) !== undefined;
+    if (winPlatform == null) {
+      const rubyPlatform = RbConfig.CONFIG["host_os"];
+      winPlatform = Gem.WIN_PATTERNS.find((r) => r.test(rubyPlatform)) != null;
+    }
+
+    return winPlatform;
   },
 };

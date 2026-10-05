@@ -31,7 +31,9 @@ beforeEach(() => {
   rbArgv().length = 0;
 });
 
-const __FILE__ = decodeURIComponent(new URL(import.meta.url).pathname);
+const __FILE__ = decodeURIComponent(
+  new URL(import.meta.url).pathname.replace(/^\/(?=[A-Z]:)/i, ""),
+);
 
 export async function capture(stream: string, block: () => unknown): Promise<string> {
   stream = stream.replace(/^:/, "");

@@ -16,9 +16,15 @@ export class MyScript extends Thor {
   declare options: Base["options"];
 
   static {
-    const klass = this as unknown as ThorClass;
-    klass.checkUnknownOptionsBang({ except: "with_optional" });
+    (this as unknown as ThorClass).checkUnknownOptionsBang({ except: "with_optional" });
+  }
 
+  static isExitOnFailure(): boolean {
+    return false;
+  }
+
+  static {
+    const klass = this as unknown as ThorClass;
     klass.attrAccessor("someAttribute");
     klass.attrWriter("anotherAttribute");
     klass.attrReader("anotherAttribute");
