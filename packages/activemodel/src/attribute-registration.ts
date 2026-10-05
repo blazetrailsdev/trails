@@ -106,7 +106,6 @@ export interface AttributeRegistrationHost extends AttributeHostInternals {
 type HostAsClass = new (...args: unknown[]) => unknown;
 
 export const ClassMethods = {
-  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   attribute(
     this: AttributeRegistrationHost,
     name: string,
@@ -114,7 +113,8 @@ export const ClassMethods = {
     options: AttributeOptions = {},
   ): void {
     if (type != null && typeof type !== "string" && !(type instanceof ValueType)) {
-      [type, options] = [null, type];
+      options = type;
+      type = null;
     }
     const { default: default_, ...opts } = options;
     const noDefault = default_ === undefined;

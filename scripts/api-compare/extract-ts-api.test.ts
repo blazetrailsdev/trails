@@ -913,6 +913,137 @@ describe("body call capture", () => {
     expect(skeleton("backwards")).toEqual(["if"]);
   });
 
+  it("emits no arm for a leading guard that moves an options hash or block out of a positional parameter", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        removeIndex(t: string, columnName: unknown = null, options: object = {}) {
+          if (!(typeof columnName === "string" || Array.isArray(columnName))) {
+            options = { ...(columnName as object), ...options };
+            columnName = null;
+          }
+          return this.run(t, columnName, options);
+        }
+        removeForeignKey(t: string, toTable?: string | { toTable?: string }, options: { toTable?: string } = {}) {
+          if (typeof toTable === "object" && toTable !== null) {
+            options = toTable;
+            toTable = options.toTable;
+          }
+          return this.run(t, toTable, options);
+        }
+        block(unit: unknown, block?: () => void) {
+          if (typeof unit === "function") block = unit as () => void;
+          return this.run(unit, block)
+        }
+        absent(unit: unknown, block?: () => void) {
+          if (block === undefined && typeof unit === "function") block = unit as () => void;
+          return this.run(unit, block)
+        }
+        loose(t: string, toTable: unknown = 0, options: object = {}) {
+          if (toTable != null && typeof toTable === "object") {
+            options = toTable;
+            toTable = 0;
+          }
+          return this.run(t, toTable, options);
+        }
+        otherProperty(t: string, toTable: unknown, options: { name?: string } = {}) {
+          if (typeof toTable === "object") {
+            options = toTable as object;
+            toTable = options.name;
+          }
+          return this.run(t, toTable, options);
+        }
+        splatLast(toTable: unknown, options: object = {}, ...rest: unknown[]) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, rest);
+        }
+        destructuredLast(toTable: unknown, options: object = {}, { force }: { force?: boolean } = {}) {
+          if (typeof toTable === "object") options = toTable as object;
+          return this.run(toTable, options, force);
+        }
+        notLeading(t: string, toTable: unknown, options: object = {}) {
+          this.log(t);
+          if (typeof toTable === "object") options = toTable as object;
+          return options;
+        }
+        notAKindTest(t: string, toTable: unknown, options: object = {}) {
+          if (this.supports(toTable)) options = toTable as object;
+          return options;
+        }
+        kindOfALocal(t: string, toTable: unknown, options: object = {}) {
+          if (typeof other === "object") options = toTable as object;
+          return options;
+        }
+        coerce(error: unknown, options: object = {}) {
+          if (typeof error === "string") error = new RuntimeError(error);
+          return this.report(error, options);
+        }
+        coerceLast(queryArray: string[], queryParams: unknown) {
+          if (typeof queryParams === "string") queryParams = this.parse(queryParams);
+          queryArray.push(this.build(queryParams));
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("removeIndex")).toEqual([]);
+    expect(arms("removeForeignKey")).toEqual([]);
+    expect(arms("block")).toEqual([]);
+    expect(arms("absent")).toEqual([]);
+    expect(arms("loose")).toEqual([]);
+    for (const kept of [
+      "otherProperty",
+      "splatLast",
+      "destructuredLast",
+      "notLeading",
+      "notAKindTest",
+      "kindOfALocal",
+      "coerce",
+      "coerceLast",
+    ]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
+  it("reads the keywords popped off a splat as a parameter binding, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        prefix(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          const { parameters = null } = typeof last === "object" ? (prefixes.pop() as object) : {};
+          return this.run(prefixes, parameters);
+        }
+        inline(...prefixes: unknown[]) {
+          const kwargs = typeof prefixes[prefixes.length - 1] === "object" ? prefixes.pop() : {};
+          return this.run(prefixes, kwargs);
+        }
+        notASplat(prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" ? prefixes.pop() : {};
+        }
+        notTheLast(...prefixes: unknown[]) {
+          const first = prefixes[0];
+          return typeof first === "object" ? prefixes.pop() : {};
+        }
+        declaredAfter(...prefixes: unknown[]) {
+          const kwargs = typeof last === "object" ? prefixes.pop() : {};
+          const last = prefixes[prefixes.length - 1];
+          return this.run(kwargs, last);
+        }
+        defaulted(...prefixes: unknown[]) {
+          const last = prefixes[prefixes.length - 1];
+          return typeof last === "object" ? prefixes.pop() : { parameters: true };
+        }
+      }`,
+    );
+    const arms = (name: string) =>
+      cls.instanceMethods.find((m) => m.name === name)!.skeleton!.filter((t) => !t.includes(":"));
+    expect(arms("prefix")).toEqual([]);
+    expect(arms("inline")).toEqual([]);
+    for (const kept of ["notASplat", "notTheLast", "declaredAfter", "defaulted"]) {
+      expect(arms(kept)).toEqual(["if"]);
+    }
+  });
+
   it("emits no arm for an optional positional bound ahead of a required one", () => {
     const cls = extractFromSource(
       `class Foo {

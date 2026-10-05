@@ -5447,6 +5447,112 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
   return onlyPositional && statement.expression.getText().includes(positional);
 }
 
+function parameterKindTest(
+  test: ts.Expression,
+  parameters: readonly string[],
+): string[] | undefined {
+  const tested: string[] = [];
+  const kind = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e)) e = e.expression;
+    if (ts.isPrefixUnaryExpression(e)) {
+      return e.operator === ts.SyntaxKind.ExclamationToken && kind(e.operand);
+    }
+    let asked: ts.Expression | undefined;
+    if (ts.isBinaryExpression(e)) {
+      const operator = e.operatorToken.kind;
+      if (
+        operator === ts.SyntaxKind.AmpersandAmpersandToken ||
+        operator === ts.SyntaxKind.BarBarToken
+      ) {
+        return kind(e.left) && kind(e.right);
+      }
+      const loose =
+        operator === ts.SyntaxKind.EqualsEqualsToken ||
+        operator === ts.SyntaxKind.ExclamationEqualsToken;
+      if (
+        operator !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+        operator !== ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+        !(loose && e.right.kind === ts.SyntaxKind.NullKeyword)
+      ) {
+        return false;
+      }
+      if (ts.isTypeOfExpression(e.left) && ts.isStringLiteral(e.right)) asked = e.left.expression;
+      else if (
+        e.right.kind === ts.SyntaxKind.NullKeyword ||
+        (ts.isIdentifier(e.right) && e.right.text === "undefined")
+      ) {
+        asked = e.left;
+      }
+    } else if (
+      ts.isCallExpression(e) &&
+      e.arguments.length === 1 &&
+      ts.isPropertyAccessExpression(e.expression) &&
+      ts.isIdentifier(e.expression.expression) &&
+      e.expression.expression.text === "Array" &&
+      e.expression.name.text === "isArray"
+    ) {
+      [asked] = e.arguments;
+    }
+    if (asked === undefined || !ts.isIdentifier(asked) || !parameters.includes(asked.text)) {
+      return false;
+    }
+    tested.push(asked.text);
+    return true;
+  };
+  return kind(test) ? tested : undefined;
+}
+
+function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  if (body.statements[0] !== statement) return false;
+  const final = body.parent.parameters[body.parent.parameters.length - 1];
+  if (final === undefined || !ts.isIdentifier(final.name) || final.dotDotDotToken) return false;
+  const declared = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const parameters = declared.map((p) => p.name.getText());
+  const tested = parameterKindTest(statement.expression, parameters);
+  if (tested === undefined) return false;
+  const last = parameters[parameters.length - 1];
+  const clears = (name: string, e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    if (e.kind === ts.SyntaxKind.NullKeyword) return true;
+    if (ts.isIdentifier(e) && e.text === "undefined") return true;
+    if (ts.isPropertyAccessExpression(e)) {
+      return ts.isIdentifier(e.expression) && e.expression.text === last && e.name.text === name;
+    }
+    const initializer = declared[parameters.indexOf(name)].initializer;
+    return (
+      initializer !== undefined &&
+      initializer.kind === e.kind &&
+      (ts.isLiteralExpression(e) || ts.isIdentifier(e)) &&
+      e.text === (initializer as ts.LiteralExpression | ts.Identifier).text
+    );
+  };
+  const isTested = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    return ts.isIdentifier(e) && e.text !== last && tested.includes(e.text);
+  };
+  let moves = false;
+  const rebinds = (branch: ts.Statement | undefined): boolean => {
+    if (branch === undefined) return true;
+    const statements = ts.isBlock(branch) ? [...branch.statements] : [branch];
+    return statements.every((s) => {
+      if (!ts.isExpressionStatement(s) || !ts.isBinaryExpression(s.expression)) return false;
+      const { left, operatorToken, right } = s.expression;
+      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+      if (!ts.isIdentifier(left) || !parameters.includes(left.text)) return false;
+      if (left.text === last) {
+        moves ||= ts.isObjectLiteralExpression(right)
+          ? right.properties.some((p) => ts.isSpreadAssignment(p) && isTested(p.expression))
+          : isTested(right);
+        return true;
+      }
+      return clears(left.text, right);
+    });
+  };
+  return rebinds(statement.thenStatement) && rebinds(statement.elseStatement) && moves;
+}
+
 /**
  * `if (attributes === undefined) [id, attributes] = [":all", id];`: the binding
  * of Ruby's optional positional AHEAD of a required one
@@ -5577,6 +5683,52 @@ function isBlockForward(conditional: ts.ConditionalExpression): boolean {
   );
 }
 
+function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
+  let popped = conditional.whenTrue;
+  while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
+    popped = popped.expression;
+  }
+  if (!ts.isCallExpression(popped) || !ts.isPropertyAccessExpression(popped.expression)) {
+    return false;
+  }
+  const splat = popped.expression.expression;
+  if (popped.expression.name.text !== "pop" || !ts.isIdentifier(splat)) return false;
+  const absent = conditional.whenFalse;
+  if (!ts.isObjectLiteralExpression(absent) || absent.properties.length > 0) return false;
+  const test = conditional.condition;
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    !ts.isTypeOfExpression(test.left) ||
+    !ts.isStringLiteral(test.right) ||
+    test.right.text !== "object"
+  ) {
+    return false;
+  }
+  let body: ts.Node = conditional;
+  while (!ts.isFunctionLike(body.parent)) {
+    if (ts.isSourceFile(body.parent)) return false;
+    body = body.parent;
+  }
+  const method = body.parent;
+  if (!method.parameters.some((p) => p.dotDotDotToken && p.name.getText() === splat.text)) {
+    return false;
+  }
+  let last: ts.Expression | undefined = test.left.expression;
+  if (ts.isIdentifier(last) && ts.isBlock(body)) {
+    const name = last.text;
+    last = body.statements
+      .flatMap((s) => (ts.isVariableStatement(s) ? [...s.declarationList.declarations] : []))
+      .find((d) => d.name.getText() === name && d.end <= conditional.pos)?.initializer;
+  }
+  return (
+    last !== undefined &&
+    ts.isElementAccessExpression(last) &&
+    last.expression.getText() === splat.text &&
+    last.argumentExpression.getText() === `${splat.text}.length - 1`
+  );
+}
+
 /**
  * `Object.hasOwn(klass, "_x") ? klass._x : undefined` (or its
  * `Object.prototype.hasOwnProperty.call` spelling): the read of a Ruby
@@ -5617,6 +5769,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit((n as ts.ConditionalExpression).whenTrue);
           return;
         }
+        if (isKwargsCapture(n as ts.ConditionalExpression)) return;
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
@@ -5644,6 +5797,12 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;
         if (isParameterRebinding(n as ts.IfStatement)) return;
         if (isLeadingOptionalBinding(n as ts.IfStatement)) return;
+        if (isKwargsRebindingGuard(n as ts.IfStatement)) {
+          visit((n as ts.IfStatement).thenStatement);
+          const alternate = (n as ts.IfStatement).elseStatement;
+          if (alternate !== undefined) visit(alternate);
+          return;
+        }
         tokens.push("if");
         break;
       }

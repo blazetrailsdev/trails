@@ -157,7 +157,6 @@ const NAME_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?=]?$/;
 const CALL_COMPILABLE_REGEXP = /^[a-zA-Z_]\w*[!?]?$/;
 
 export const ClassMethods = {
-  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   attributeMethodPrefix(
     this: ClassMethodsHost,
     ...prefixes: string[] | [...prefixes: string[], kwargs: { parameters?: string | null | false }]
@@ -172,7 +171,6 @@ export const ClassMethods = {
     this.undefineAttributeMethods();
   },
 
-  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-kwargs-rebinding-guard */
   attributeMethodSuffix(
     this: ClassMethodsHost,
     ...suffixes: string[] | [...suffixes: string[], kwargs: { parameters?: string | null | false }]
