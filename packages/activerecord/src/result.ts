@@ -82,7 +82,7 @@ export class Result {
 
   #hashRows: Record<string, unknown>[] | null = null;
   #columnIndexes: Record<string, number> | null = null;
-  #indexedRows: IndexedRow[] | null = null;
+  #indexedRows: readonly IndexedRow[] | null = null;
 
   constructor(columns: string[], rows: unknown[][], columnTypes: ColumnTypes | null = null) {
     this.columns = columns;
@@ -219,10 +219,10 @@ export class Result {
     })());
   }
 
-  get indexedRows(): IndexedRow[] {
+  get indexedRows(): readonly IndexedRow[] {
     return (this.#indexedRows ??= (() => {
       const columns = this.columnIndexes;
-      return Object.freeze(this.rows.map((row) => new IndexedRow(columns, row))) as IndexedRow[];
+      return Object.freeze(this.rows.map((row) => new IndexedRow(columns, row)));
     })());
   }
 

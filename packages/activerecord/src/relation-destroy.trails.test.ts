@@ -29,4 +29,18 @@ describe("RelationDestroyTrailsTest", () => {
     expect(await CpkBook.count()).toBe(booksBefore - 1);
     expect(destroyedBook.id).toEqual(book.id);
   });
+
+  it("delete takes a composite key as a list of tuples, as where(primary_key => ids) does", async () => {
+    const first = cpkBooks("cpk_great_author_first_book");
+    const second = cpkBooks("cpk_great_author_second_book");
+    const booksBefore = await CpkBook.count();
+
+    await expect(CpkBook.all().delete(first.id)).rejects.toThrow(
+      /Expected corresponding value for .* to be an Array/,
+    );
+    expect(await CpkBook.count()).toBe(booksBefore);
+
+    expect(await CpkBook.all().delete([first.id, second.id])).toBe(2);
+    expect(await CpkBook.count()).toBe(booksBefore - 2);
+  });
 });
