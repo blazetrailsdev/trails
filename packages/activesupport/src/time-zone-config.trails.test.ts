@@ -44,6 +44,19 @@ describe("Time.use_zone", () => {
     expect(zone()?.name).toBe("Alaska");
   });
 
+  it("returns a lazy thenable unevaluated, as Ruby returns an unloaded relation", () => {
+    let evaluated = false;
+    const relation = {
+      then(resolve: (value: string) => void) {
+        evaluated = true;
+        resolve("loaded");
+      },
+    };
+    expect(useZone("Hawaii", () => relation)).toBe(relation);
+    expect(evaluated).toBe(false);
+    expect(zone()).toBeNull();
+  });
+
   it("does not leak the zone between concurrent execution contexts", async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));
