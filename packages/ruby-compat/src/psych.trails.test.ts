@@ -1,20 +1,16 @@
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
-import { ArgumentError } from "./argument-error.js";
-import { Psych } from "./psych.js";
-import { registerConstant, registeredConstant, unregisterConstant } from "./variable.js";
+import { beforeEach, describe, it, expect, vi } from "vitest";
+import type { ArgumentError as ArgumentErrorClass } from "./argument-error.js";
+import type { Psych as PsychModule } from "./psych.js";
 
 describe("Psych with Date, DateTime and Time unseated", () => {
-  const seats = new Map<string, unknown>();
+  let Psych: typeof PsychModule;
+  let ArgumentError: typeof ArgumentErrorClass;
 
-  beforeEach(() => {
-    for (const name of ["Date", "DateTime", "Time"]) {
-      seats.set(name, registeredConstant(name));
-      unregisterConstant(name, seats.get(name));
-    }
-  });
-
-  afterEach(() => {
-    for (const [name, klass] of seats) if (klass !== undefined) registerConstant(name, klass);
+  // `ClassLoader::CACHE` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/class_loader.rb:58-65`)
+  beforeEach(async () => {
+    vi.resetModules();
+    ({ Psych } = await import("./psych.js"));
+    ({ ArgumentError } = await import("./argument-error.js"));
   });
 
   it("keeps a date-shaped or time-shaped scalar a String", () => {

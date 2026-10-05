@@ -16,7 +16,8 @@ import type { Document, Node, Scalar, YAMLMap } from "yaml";
 import { Psych } from "../../psych.js";
 import { yaml } from "../../psych-adapter.js";
 import { Coder, coderTag } from "../coder.js";
-import { tokenize } from "../scalar-scanner.js";
+import { ClassLoader } from "../class-loader.js";
+import { ScalarScanner } from "../scalar-scanner.js";
 
 type RubyTime = { isUtc(): boolean; strftime(format: string): string };
 type RubyDate = { gregorian(): { toS(): string } };
@@ -39,6 +40,23 @@ export class YAMLTree {
   private readonly st = new Map<object, Node>();
   private readonly doc = new yaml.Document();
   private anchors = 0;
+  private readonly ss: ScalarScanner;
+
+  /**
+   * `YAMLTree.create` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/visitors/yaml_tree.rb:48`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  static create(): YAMLTree {
+    const classLoader = new ClassLoader();
+    const ss = new ScalarScanner(classLoader);
+    return new YAMLTree(ss);
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor(ss: ScalarScanner) {
+    this.ss = ss;
+  }
 
   /** @noRailsEquivalent PERMANENT */
   accept(target: unknown): Node {
@@ -106,7 +124,7 @@ export class YAMLTree {
 
   private visitString(o: string): Node {
     const scalar = this.doc.createNode(o) as Scalar;
-    if (typeof tokenize(o) !== "string") scalar.type = yaml.Scalar.QUOTE_SINGLE;
+    if (typeof this.ss.tokenize(o) !== "string") scalar.type = yaml.Scalar.QUOTE_SINGLE;
     return scalar;
   }
 
