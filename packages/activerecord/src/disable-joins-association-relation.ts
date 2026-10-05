@@ -1,7 +1,7 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
 import { relationClassFor } from "./relation/delegation.js";
-import { rbEql, rbFSend, rbHash, take, uniq } from "@blazetrails/ruby-compat";
+import { compact, groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./relation/thenable.js";
 import type { Base } from "./base.js";
 
@@ -55,25 +55,17 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
 
   override async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
     await super.load(block);
-    const records = this._records;
+    let records: (T | undefined)[] = this._records;
 
-    const key = this.key;
-    const recordKey = (record: T): unknown =>
-      Array.isArray(key)
-        ? key.map((column) => record._readAttribute(column))
-        : record._readAttribute(key);
-
-    const recordsById = new Map<number, T[]>();
-    for (const record of records) {
-      const hash = rbHash(recordKey(record));
-      const bucket = recordsById.get(hash);
-      if (bucket) bucket.push(record);
-      else recordsById.set(hash, [record]);
-    }
-
-    this._records = (await this.ids()).flatMap((id) =>
-      (recordsById.get(rbHash(id)) ?? []).filter((record) => rbEql(recordKey(record), id)),
+    const { key } = this;
+    const recordsById = groupBy(records as T[], (record) =>
+      Array.isArray(key) ? key.map((column) => record.get(column)) : record.get(key),
     );
+
+    records = (await this.ids()).flatMap((id) => recordsById.get(id));
+    records = compact(records);
+
+    this._records = records as T[];
     return stripThenable(this);
   }
 }

@@ -58,7 +58,7 @@ export async function connectsTo(
 
   for (const [shard, dbKeys] of Object.entries(shardEntries)) {
     for (const [role, dbKey] of Object.entries(dbKeys)) {
-      const dbConfig = resolveConfigForConnection.call(this, dbKey);
+      const dbConfig = resolveConfigForConnection.call(this, dbKey)!;
 
       (this as any).connectionClass = true;
       connections.push(
@@ -397,7 +397,7 @@ export async function establishConnection(
       },
 ): Promise<ConnectionPool> {
   configOrEnv ??= `:${DEFAULT_ENV()}`;
-  const dbConfig = this.resolveConfigForConnection(configOrEnv);
+  const dbConfig = this.resolveConfigForConnection(configOrEnv)!;
   return this.connectionHandler.establishConnection(dbConfig, {
     ownerName: this,
     role: this.currentRole(),
@@ -436,7 +436,10 @@ export const ConnectionHandling = {
 };
 
 /** @internal */
-export function resolveConfigForConnection(this: typeof Base, configOrEnv: unknown): HashConfig {
+export function resolveConfigForConnection(
+  this: typeof Base,
+  configOrEnv: unknown,
+): HashConfig | null {
   if (!this.name) throw new Error("Anonymous class is not allowed.");
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
     ? "ActiveRecord::Base"

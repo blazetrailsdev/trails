@@ -32,6 +32,25 @@ describe("foldSkeletonTokens", () => {
     expect(foldSkeletonTokens(ruby)).toEqual(foldSkeletonTokens(ts));
   });
 
+  it("reads an awaiting collect loop as the `map` or the pushing `each` Ruby spells", () => {
+    const ts = ["loop:collect", "ref:clause"];
+
+    expect(foldSkeletonTokens(ts, "ts", ["ref:map", "ref:clause"])).toEqual([
+      "ref:map",
+      "ref:clause",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts", ["ref:each", "ref:clause"])).toEqual([
+      "loop",
+      "ref:clause",
+    ]);
+    expect(foldSkeletonTokens(["loop", ...ts], "ts", ["ref:each", "ref:map"])).toEqual([
+      "loop",
+      "ref:map",
+      "ref:clause",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts")).toEqual(["loop", "ref:clause"]);
+  });
+
   it("folds the JS iteration callee too, so a forEach port reads the same", () => {
     expect(foldSkeletonTokens(["ref:forEach", "ref:save"])).toEqual(["loop", "ref:save"]);
   });

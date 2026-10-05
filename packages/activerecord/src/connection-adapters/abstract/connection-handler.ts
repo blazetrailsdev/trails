@@ -257,7 +257,7 @@ export class ConnectionHandler {
     role: string,
     shard: string,
   ): Promise<PoolConfig> {
-    const dbConfig = ActiveRecord.Base.configurations().resolve(config);
+    const dbConfig = ActiveRecord.Base.configurations().resolve(config)!;
     await dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");

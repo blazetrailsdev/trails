@@ -153,7 +153,7 @@ export class DatabaseTasks {
   }
 
   static async create(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
       const handler = this.databaseAdapterFor(dbConfig);
@@ -193,7 +193,7 @@ export class DatabaseTasks {
   }
 
   static async drop(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const { NoDatabaseError } = await import("../errors.js");
     try {
       const handler = this.databaseAdapterFor(dbConfig);
@@ -279,7 +279,7 @@ export class DatabaseTasks {
   }
 
   static async purge(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const handler = this.databaseAdapterFor(dbConfig);
     if (handler.purge) {
       await handler.purge();
@@ -309,7 +309,7 @@ export class DatabaseTasks {
   static async charset(
     configuration: HashConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const handler = this.databaseAdapterFor(dbConfig);
     if (!handler.charset) {
       throw new NoMethodError(
@@ -331,7 +331,7 @@ export class DatabaseTasks {
   static async collation(
     configuration: HashConfig | string | Record<string, unknown>,
   ): Promise<string | null> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const handler = this.databaseAdapterFor(dbConfig);
     if (!handler.collation) {
       throw new NoMethodError(
@@ -406,7 +406,7 @@ export class DatabaseTasks {
   }
 
   /** @internal */
-  private static resolveConfiguration(configuration: unknown): HashConfig {
+  private static resolveConfiguration(configuration: unknown): HashConfig | null {
     return ActiveRecord.Base.configurations().resolve(configuration);
   }
 
@@ -475,7 +475,7 @@ export class DatabaseTasks {
     configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const filename = args.shift() as string;
     const flags = this.structureDumpFlagsFor(dbConfig.adapter);
     const handler = this.databaseAdapterFor(dbConfig, ...args);
@@ -489,7 +489,7 @@ export class DatabaseTasks {
     configuration: HashConfig | string | Record<string, unknown>,
     ...args: unknown[]
   ): Promise<void> {
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     const filename = args.shift() as string;
     const flags = this.structureLoadFlagsFor(dbConfig.adapter);
     const handler = this.databaseAdapterFor(dbConfig, ...args);
@@ -826,7 +826,7 @@ export class DatabaseTasks {
     file?: string,
   ): Promise<boolean> {
     void format;
-    const dbConfig = this.resolveConfiguration(configuration);
+    const dbConfig = this.resolveConfiguration(configuration)!;
     file ??= this.schemaDumpPath(dbConfig) ?? undefined;
     if (!file) return true;
     if (!File.isExist(file)) return true;

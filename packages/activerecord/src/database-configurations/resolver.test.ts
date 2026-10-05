@@ -8,7 +8,7 @@ import { ConnectionHandler } from "../connection-adapters/abstract/connection-ha
 
 function resolveDbConfig(poolConfig: string, config: RawConfigurations = {}) {
   const configs = new DatabaseConfigurations(config);
-  return configs.resolve(poolConfig);
+  return configs.resolve(poolConfig)!;
 }
 
 describe("PoolConfig", () => {

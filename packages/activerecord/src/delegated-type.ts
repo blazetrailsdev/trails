@@ -1,13 +1,6 @@
 import type { Base } from "./base.js";
-import {
-  camelize,
-  constantize,
-  inquiry,
-  singularize,
-  tableize,
-  underscore,
-} from "@blazetrails/activesupport";
-import { hashDelete, merge } from "@blazetrails/ruby-compat";
+import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
+import { hashDelete, merge, rbFPublicSend } from "@blazetrails/ruby-compat";
 import { autoloadModel } from "./associations.js";
 
 export interface DelegatedTypeOptions {
@@ -58,20 +51,16 @@ export function defineDelegatedTypeMethods(
 
   Object.defineProperty(this.prototype, `${role}Class`, {
     get(this: Base) {
-      const typeName = this.readAttribute(roleType) as string | null;
-      if (!typeName) return null;
-      autoloadModel(typeName);
-      return constantize(typeName) as typeof Base;
+      const type = rbFPublicSend(this, roleType) as string;
+      autoloadModel(type);
+      return constantize(type) as typeof Base;
     },
     configurable: true,
   });
 
   Object.defineProperty(this.prototype, `${role}Name`, {
     get(this: Base) {
-      const typeName = this.readAttribute(roleType) as string | null;
-      if (!typeName) return null;
-      const singular = underscore(typeName).replace(/\//g, "_");
-      return inquiry.call(singular);
+      return inquiry.call((rbFPublicSend(this, `${role}Class`) as typeof Base).modelName.singular);
     },
     configurable: true,
   });
@@ -79,18 +68,11 @@ export function defineDelegatedTypeMethods(
   defineMethod(
     this.prototype,
     `build${camelize(role, true)}`,
-    function (this: Base, attrs: Record<string, unknown> = {}): Base {
-      const typeName = this.readAttribute(roleType) as string | null;
-      if (!typeName) {
-        throw new Error(`Cannot build${camelize(role, true)}: ${roleType} is not set`);
-      }
-      autoloadModel(typeName);
-      const TargetClass = constantize(typeName) as typeof Base;
-      const instance = new (TargetClass as unknown as new (a: Record<string, unknown>) => Base)(
-        attrs,
-      );
-      (this as unknown as Record<string, unknown>)[role] = instance;
-      return instance;
+    function (this: Base, ...params: unknown[]): Base {
+      const klass = rbFPublicSend(this, `${role}Class`) as new (...params: unknown[]) => Base;
+      const record = new klass(...params);
+      rbFPublicSend(this, `${role}=`, record);
+      return record;
     },
   );
 
@@ -105,23 +87,23 @@ export function defineDelegatedTypeMethods(
       return this.where({ [roleType]: typeName });
     });
 
-    defineMethod(this.prototype, `is${predicateSuffix}`, function (this: Base): boolean {
-      return this.readAttribute(roleType) === typeName;
+    const query = `is${predicateSuffix}`;
+    defineMethod(this.prototype, query, function (this: Base): boolean {
+      return rbFPublicSend(this, roleType) === typeName;
     });
 
     Object.defineProperty(this.prototype, singularName, {
       get(this: Base) {
-        if (this.readAttribute(roleType) !== typeName) return null;
-        return (this as unknown as Record<string, unknown>)[role];
+        if (rbFPublicSend(this, query)) return rbFPublicSend(this, role);
+        return null;
       },
       configurable: true,
     });
 
-    const fkAccessorName = camelize(`${singularSnake}_${primaryKey}`, false);
-    Object.defineProperty(this.prototype, fkAccessorName, {
+    Object.defineProperty(this.prototype, camelize(`${singularSnake}_${primaryKey}`, false), {
       get(this: Base) {
-        if (this.readAttribute(roleType) !== typeName) return null;
-        return this.readAttribute(roleId);
+        if (rbFPublicSend(this, query)) return rbFPublicSend(this, roleId);
+        return null;
       },
       configurable: true,
     });

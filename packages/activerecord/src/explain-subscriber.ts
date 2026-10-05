@@ -21,11 +21,12 @@ export class ExplainSubscriber {
     }
   }
 
-  ignorePayload(payload: ExplainPayload): boolean {
-    if (payload.exception) return true;
-    if (payload.cached) return true;
-    if (ExplainSubscriber.IGNORED_PAYLOADS.includes(payload.name ?? "")) return true;
-    if (!payload.sql || !ExplainSubscriber.EXPLAINED_SQLS.test(payload.sql)) return true;
-    return false;
+  ignorePayload(payload: ExplainPayload): unknown {
+    return (
+      payload.exception ||
+      payload.cached ||
+      ExplainSubscriber.IGNORED_PAYLOADS.includes(payload.name!) ||
+      !payload.sql!.match(ExplainSubscriber.EXPLAINED_SQLS)
+    );
   }
 }

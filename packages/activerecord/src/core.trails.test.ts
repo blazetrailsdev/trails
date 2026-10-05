@@ -361,7 +361,7 @@ describe("configurations is a single process-global registry", () => {
       OverridingModel as unknown as typeof Base,
       ":global_registry_env",
     );
-    expect(resolved.database).toBe("db/global.sqlite3");
+    expect(resolved!.database).toBe("db/global.sqlite3");
   });
 });
 

@@ -1,6 +1,15 @@
 import type { Base } from "./base.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { classAttribute, extractOptionsBang, included, wrap } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  extractOptionsBang,
+  included,
+  isPresent,
+  kernelArray,
+  wrap,
+} from "@blazetrails/activesupport";
+import { rbEqual, rbFSend, rtest, toSym } from "@blazetrails/ruby-compat";
+import { ThroughReflection } from "./reflection.js";
 import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
@@ -45,72 +54,55 @@ export async function updateCounters(
 
 export type CounterCacheCounters = Record<string, number | CounterCacheTouchOption | undefined>;
 
-type ResetCountersOptions = { touch?: CounterCacheTouchOption };
-
 export async function resetCounters(
   this: typeof Base,
   id: unknown,
-  ...args: [...counterNames: string[], options: ResetCountersOptions] | [...counterNames: string[]]
-): Promise<void> {
-  let options: ResetCountersOptions = {};
-  const counterNames: string[] = [];
-  for (const arg of args) {
-    if (typeof arg === "string") {
-      counterNames.push(arg);
-    } else {
-      options = arg;
-    }
-  }
-
+  ...counters: [...counters: string[], options: { touch?: CounterCacheTouchOption }] | string[]
+): Promise<true> {
+  const { touch = null } = extractOptionsBang(counters) as { touch?: CounterCacheTouchOption };
   const object = await this.find(id);
-  const { collectionProxyFor: association } = await import("./associations.js");
-  const { reflectOnAllAssociations } = await import("./reflection.js");
 
   const updates: Record<string, unknown> = {};
-  for (const counter of counterNames) {
-    let counterAssociation = counter;
-    let hasManyAssociation: any = (this as any)._reflectOnAssociation?.(counterAssociation) ?? null;
-    if (!hasManyAssociation) {
-      const hasMany = reflectOnAllAssociations(this, "hasMany");
-      hasManyAssociation =
-        hasMany.find(
-          (association: any) =>
-            association.counterCacheColumn() &&
-            association.counterCacheColumn() === counterAssociation,
-        ) ?? null;
-      if (hasManyAssociation) counterAssociation = hasManyAssociation.pluralName;
+  for (let counterAssociation of counters as string[]) {
+    let hasManyAssociation: any = this._reflectOnAssociation(counterAssociation);
+    if (!rtest(hasManyAssociation)) {
+      const hasMany = this.reflectOnAllAssociations("hasMany");
+      hasManyAssociation = hasMany.find(
+        (association) =>
+          rtest(association.counterCacheColumn()) &&
+          toSym(association.counterCacheColumn()) === toSym(counterAssociation),
+      );
+      if (rtest(hasManyAssociation)) counterAssociation = hasManyAssociation.pluralName;
     }
-    if (!hasManyAssociation) {
+    if (!rtest(hasManyAssociation)) {
       throw new ArgumentError(`'${this.name}' has no association called '${counterAssociation}'`);
     }
 
-    const countReflection = hasManyAssociation;
-    if (hasManyAssociation.isThroughReflection?.()) {
+    if (hasManyAssociation instanceof ThroughReflection) {
       hasManyAssociation = hasManyAssociation.throughReflection;
     }
 
     const foreignKey = String(hasManyAssociation.foreignKey());
-    const childClass = hasManyAssociation.klass;
-    const reflection = reflectOnAllAssociations(childClass, "belongsTo").find(
-      (e: any) => String(e.foreignKey()) === foreignKey && !!e.options?.counterCache,
-    ) as any;
-    const counterName = reflection.counterCacheColumn();
+    const childClass = hasManyAssociation.klass as typeof Base;
+    const reflection = Object.values(childClass._reflections).find(
+      (e) =>
+        e.isBelongsTo() &&
+        String(e.foreignKey()) === foreignKey &&
+        isPresent(e.options.counterCache),
+    )!;
+    const counterName = reflection.counterCacheColumn()!;
 
-    const count = (await association(object, countReflection.name).count(":all")) as number;
-    const countWas = (object as any).readAttribute?.(counterName) ?? (object as any)[counterName];
-    const sameCount =
-      typeof countWas === "bigint" ? countWas === BigInt(count) : count === countWas;
-    if (!sameCount) {
-      updates[counterName] = typeof countWas === "bigint" ? BigInt(count) : count;
-    }
+    const countWas = rbFSend(object, counterName);
+    const count = await (rbFSend(object, counterAssociation) as any).count(":all");
+    if (!rbEqual(count, countWas)) updates[counterName] = count;
   }
 
-  if (options.touch) {
-    const names = wrap(options.touch !== true ? options.touch : undefined) as Array<
-      string | TouchAllOptions
-    >;
-    const touchOptions = extractOptionsBang(names) as TouchAllOptions;
-    const touchUpdates = this.touchAttributesWithTime(...(names as string[]), touchOptions.time);
+  if (rtest(touch)) {
+    let names: unknown;
+    if (touch !== true) names = touch;
+    names = wrap(names);
+    const options = extractOptionsBang(names as unknown[]) as TouchAllOptions;
+    const touchUpdates = this.touchAttributesWithTime(...(names as string[]), options.time);
     Object.assign(updates, touchUpdates);
   }
 
@@ -119,6 +111,8 @@ export async function resetCounters(
       .where(new Map([[this.primaryKey, [object.id]]]))
       .updateAll(updates);
   }
+
+  return true;
 }
 
 export function isCounterCacheColumn(this: typeof Base, name: string): boolean {
@@ -204,12 +198,7 @@ export async function destroyRow(
 
 /** @internal */
 export function _foreignKeysEqual(fkey1: unknown, fkey2: unknown): boolean {
-  if (fkey1 === fkey2) return true;
-  const arr1 = (Array.isArray(fkey1) ? fkey1 : [fkey1]).map((k) =>
-    typeof k === "string" ? k : String(k),
+  return (
+    rbEqual(fkey1, fkey2) || rbEqual(kernelArray(fkey1).map(toSym), kernelArray(fkey2).map(toSym))
   );
-  const arr2 = (Array.isArray(fkey2) ? fkey2 : [fkey2]).map((k) =>
-    typeof k === "string" ? k : String(k),
-  );
-  return arr1.length === arr2.length && arr1.every((k, i) => k === arr2[i]);
 }

@@ -25,7 +25,6 @@ export interface DatabaseConfigOptions {
   url?: string;
   replicaOf?: string;
   replica?: boolean;
-  _hidden?: boolean;
   [key: string]: unknown;
 }
 

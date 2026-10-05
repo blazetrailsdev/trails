@@ -5016,25 +5016,54 @@ function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
   return body.length === 1 && ts.isTryStatement(body[0]) && body[0].catchClause !== undefined;
 }
 
-function awaitedCollect(statement: ts.ForOfStatement): ts.Expression | undefined {
-  let body = statement.statement;
-  if (ts.isBlock(body)) {
-    if (body.statements.length !== 1) return undefined;
-    body = body.statements[0];
+/**
+ * The nodes a `for … of` body contributes when the loop is an awaiting
+ * `map`: `queries.map do |sql, binds| … end`
+ * (`activerecord/lib/active_record/explain.rb:21-29`) whose block awaits in
+ * the port, so `Array#map` cannot carry it without running the elements
+ * concurrently. The body ends by pushing the block's value onto a local, and
+ * nothing in it leaves an iteration early (a `continue` would make it a
+ * `filter_map`, a `break` a `take_while`). A one-statement body must push the
+ * awaited value itself, and is the `map`. A longer one must await somewhere,
+ * and is `block`: Ruby spells the same loop `each` with a `<<`
+ * (`activerecord/lib/active_record/connection_handling.rb:98-104`), so it is
+ * marked `loop:collect` and compare.ts#foldSkeletonTokens reads it against the
+ * Ruby stream.
+ */
+function awaitedCollect(
+  statement: ts.ForOfStatement,
+): { nodes: ts.Node[]; block: boolean } | undefined {
+  const body = statement.statement;
+  const statements = ts.isBlock(body) ? [...body.statements] : [body];
+  const last = statements.pop();
+  if (!last || !ts.isExpressionStatement(last) || !ts.isCallExpression(last.expression)) {
+    return undefined;
   }
-  if (!ts.isExpressionStatement(body) || !ts.isCallExpression(body.expression)) return undefined;
-  const push = body.expression;
+  const push = last.expression;
   const [pushed] = push.arguments;
   if (
     !ts.isPropertyAccessExpression(push.expression) ||
     !ts.isIdentifier(push.expression.expression) ||
     push.expression.name.text !== "push" ||
-    push.arguments.length !== 1 ||
-    !ts.isAwaitExpression(pushed)
+    push.arguments.length !== 1
   ) {
     return undefined;
   }
-  return pushed.expression;
+  if (statements.length === 0) {
+    return ts.isAwaitExpression(pushed) ? { nodes: [pushed.expression], block: false } : undefined;
+  }
+  let awaits = false;
+  let exits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    if (ts.isContinueStatement(n) || ts.isBreakStatement(n) || ts.isReturnStatement(n)) {
+      exits = true;
+    }
+    ts.forEachChild(n, scan);
+  };
+  [...statements, pushed].forEach(scan);
+  return awaits && !exits ? { nodes: [...statements, pushed], block: true } : undefined;
 }
 
 function isRescueClassGuard(statement: ts.Statement): boolean {
@@ -5301,6 +5330,64 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
 }
 
 /**
+ * `if (attributes === undefined) [id, attributes] = [":all", id];`: the binding
+ * of Ruby's optional positional AHEAD of a required one
+ * (`def update(id = :all, attributes)`,
+ * `activerecord/lib/active_record/persistence.rb:132`). Ruby fills the required
+ * parameter first, so a one-argument call binds `attributes`; a TS caller's one
+ * argument lands in the first slot, and the body moves it. The shape is exactly
+ * that: no `else`, ahead of anything but other binding guards, a test of the
+ * LATER parameter against `undefined`, and one destructuring write that moves
+ * the earlier parameter into it. That binds parameters, as
+ * {@link isParameterRebinding}'s move does, and is not an arm.
+ */
+function isLeadingOptionalBinding(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent) || statement.elseStatement) return false;
+  const bound = body.parent.parameters.map((p) => p.name.getText());
+  for (const earlier of body.statements) {
+    if (earlier === statement) break;
+    if (!ts.isIfStatement(earlier)) return false;
+    if (!isArgumentBindingGuard(earlier) && !isParameterRebinding(earlier)) return false;
+  }
+  const test = statement.expression;
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    !ts.isIdentifier(test.left) ||
+    test.right.getText() !== "undefined"
+  ) {
+    return false;
+  }
+  let move: ts.Statement = statement.thenStatement;
+  if (ts.isBlock(move)) {
+    if (move.statements.length !== 1) return false;
+    move = move.statements[0];
+  }
+  if (!ts.isExpressionStatement(move) || !ts.isBinaryExpression(move.expression)) return false;
+  const { left, right, operatorToken } = move.expression;
+  if (
+    operatorToken.kind !== ts.SyntaxKind.EqualsToken ||
+    !ts.isArrayLiteralExpression(left) ||
+    !ts.isArrayLiteralExpression(right) ||
+    left.elements.length !== 2 ||
+    right.elements.length !== 2
+  ) {
+    return false;
+  }
+  const [optional, required] = left.elements.map((e) => e.getText());
+  let moved = right.elements[1];
+  while (ts.isAsExpression(moved) || ts.isParenthesizedExpression(moved)) moved = moved.expression;
+  const at = bound.indexOf(optional);
+  return (
+    at >= 0 &&
+    bound.indexOf(required) > at &&
+    test.left.text === required &&
+    moved.getText() === optional
+  );
+}
+
+/**
  * `rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined`: the capture
  * of Ruby's `&block` after a splat (`def validates_with(*args, &block)`,
  * `activemodel/lib/active_model/validations/with.rb:88`). A TS rest parameter
@@ -5385,6 +5472,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         }
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;
         if (isParameterRebinding(n as ts.IfStatement)) return;
+        if (isLeadingOptionalBinding(n as ts.IfStatement)) return;
         tokens.push("if");
         break;
       }
@@ -5422,8 +5510,8 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         const collected = awaitedCollect(n as ts.ForOfStatement);
         if (collected !== undefined) {
           visit((n as ts.ForOfStatement).expression);
-          tokens.push("ref:map");
-          visit(collected);
+          tokens.push(collected.block ? "loop:collect" : "ref:map");
+          collected.nodes.forEach(visit);
           return;
         }
         tokens.push("loop");
