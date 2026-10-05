@@ -45,7 +45,12 @@ describe("UserProvidedDefault", () => {
     expect(dumped[4]).toBe(42);
 
     const loaded = Object.create(UserProvidedDefault.prototype) as UserProvidedDefault;
-    loaded.marshalLoad(dumped as never);
+    expect(loaded.marshalLoad(dumped)).toBe(42);
+    expect(
+      (Object.create(UserProvidedDefault.prototype) as UserProvidedDefault).marshalLoad(
+        dumped.slice(0, 4),
+      ),
+    ).toBeNull();
     expect(loaded.hasBeenRead()).toBe(true);
     expect(loaded.value()).toBe(42);
   });
