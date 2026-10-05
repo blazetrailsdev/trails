@@ -8,6 +8,7 @@ import { bytes } from "./bytes.js";
 import { rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
 import {
+  lastMatchGetter,
   matchOperator,
   rbObjNotMatch,
   rbStrSend,
@@ -1113,6 +1114,17 @@ describe("strip and matchOperator", () => {
     expect(matchOperator("😀yes", /yes/)).toBe(1);
     expect(matchOperator("no", /yes/)).toBeNull();
     expect(matchOperator({ matchOperator: (pattern: unknown) => [pattern] }, "p")).toEqual(["p"]);
+    expect(() => matchOperator([1], /a/)).toThrow(
+      new NoMethodError("undefined method '=~' for an instance of Array", "=~"),
+    );
+    expect(() => matchOperator(true, /a/)).toThrow(NoMethodError);
+  });
+
+  it("lastMatchGetter reads $& off the last String#=~", () => {
+    matchOperator("a12.5b", /\d+\.\d+/);
+    expect(lastMatchGetter()).toBe("12.5");
+    matchOperator("no", /yes/);
+    expect(lastMatchGetter()).toBeNull();
   });
 
   it("rbObjNotMatch negates the receiver's =~", () => {

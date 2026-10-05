@@ -163,7 +163,9 @@ export const ClassMethods = {
   ): void {
     const last = prefixes[prefixes.length - 1];
     const { parameters = null } =
-      typeof last === "object" ? (prefixes.pop() as { parameters?: string | null | false }) : {};
+      typeof last === "object" && last !== null
+        ? (prefixes.pop() as { parameters?: string | null | false })
+        : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(prefixes as string[]).map((prefix) => new AttributeMethodPattern({ prefix, parameters })),
@@ -177,7 +179,9 @@ export const ClassMethods = {
   ): void {
     const last = suffixes[suffixes.length - 1];
     const { parameters = null } =
-      typeof last === "object" ? (suffixes.pop() as { parameters?: string | null | false }) : {};
+      typeof last === "object" && last !== null
+        ? (suffixes.pop() as { parameters?: string | null | false })
+        : {};
     this.attributeMethodPatterns = [
       ...this.attributeMethodPatterns,
       ...(suffixes as string[]).map((suffix) => new AttributeMethodPattern({ suffix, parameters })),

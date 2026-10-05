@@ -6,6 +6,8 @@ import {
   Hash,
   isEmpty,
   isInclude,
+  lastMatchGetter,
+  matchOperator,
   Range,
   rbFSend,
   rbInspect,
@@ -13,8 +15,10 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjDup,
+  rbObjNotMatch,
   rbObjRespondTo,
   rbSetClassPathString,
+  rbStrToF,
   rtest,
   stringSplit,
   toI,
@@ -38,7 +42,7 @@ export class Arguments {
     const arguments_: unknown[] = [];
 
     for (const item of args) {
-      if (typeof item === "string" && /^-/m.test(item)) break;
+      if (typeof item === "string" && /(?<![^\n])-/.test(item)) break;
       arguments_.push(item);
     }
 
@@ -72,7 +76,7 @@ export class Arguments {
       aryDelete(this.nonAssignedRequired, argument);
       this.assigns[argument.humanName] = rbFSend(
         this,
-        `parse${argument.type.charAt(0).toUpperCase()}${argument.type.slice(1)}`,
+        `parse_${argument.type}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase()),
         argument.humanName,
       );
     }
@@ -87,7 +91,7 @@ export class Arguments {
 
   /** @internal */
   protected isNoOrSkip(arg: string): string | null {
-    const match = /^--(no|skip)-([-\w]+)$/m.exec(arg);
+    const match = /(?<![^\n])--(no|skip)-([-\w]+)(?![^\n])/.exec(arg);
     return match?.[2] ?? null;
   }
 
@@ -116,8 +120,10 @@ export class Arguments {
   }
 
   /** @internal */
-  protected isCurrentIsValue(): boolean {
-    return rtest(this.peek()) && !/^-{1,2}\S+/m.test(rbObjAsString(this.peek()));
+  protected isCurrentIsValue(): unknown {
+    return rtest(this.peek())
+      ? rbObjNotMatch(rbObjAsString(this.peek()), /(?<![^\n])-{1,2}[^ \t\r\n\f\v]+/)
+      : this.peek();
   }
 
   /** @internal */
@@ -125,7 +131,7 @@ export class Arguments {
     if (rbObjClassname(this.peek()) === "Hash") return this.shift();
     const hash = Object.create(null) as Record<string, string>;
 
-    while (this.isCurrentIsValue() && (this.peek() as string).includes(":")) {
+    while (rtest(this.isCurrentIsValue()) && (this.peek() as string).includes(":")) {
       const [key, value] = stringSplit(this.shift() as string, ":", 2);
       if (isInclude(hash, key)) {
         throw new MalformattedArgumentError(
@@ -143,7 +149,7 @@ export class Arguments {
 
     const array: unknown[] = [];
 
-    while (this.isCurrentIsValue()) {
+    while (rtest(this.isCurrentIsValue())) {
       const value = this.shift() as string;
 
       if (!isEmpty(value)) {
@@ -163,16 +169,16 @@ export class Arguments {
   protected parseNumeric(name: string): unknown {
     if (typeof this.peek() === "number" || typeof this.peek() === "bigint") return this.shift();
 
-    const match =
-      typeof this.peek() === "string" ? Arguments.NUMERIC.exec(this.peek() as string) : null;
-    if (!(match && match[0] === this.peek())) {
+    if (
+      !(rtest(matchOperator(this.peek(), Arguments.NUMERIC)) && lastMatchGetter() === this.peek())
+    ) {
       throw new MalformattedArgumentError(
         `Expected numeric value for '${name}'; got ${rbInspect(this.peek())}`,
       );
     }
 
     const value =
-      match[0].indexOf(".") !== -1 ? parseFloat(this.shift() as string) : toI(this.shift());
+      lastMatchGetter()!.indexOf(".") !== -1 ? rbStrToF(this.shift() as string) : toI(this.shift());
 
     this.validateEnumValueBang(name, value, "Expected '%s' to be one of %s; got %s");
 

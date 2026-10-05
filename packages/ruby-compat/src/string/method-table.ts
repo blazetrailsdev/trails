@@ -5,7 +5,7 @@ import { IndexError } from "../index-error.js";
 import { format } from "../kernel-format.js";
 import { NilClass } from "../nil-class.js";
 import { NoMethodError } from "../no-method-error.js";
-import { rbCString, rtest } from "../object.js";
+import { rbCString, rbObjClassname, rtest } from "../object.js";
 import { Range } from "../range.js";
 import { rbEqual } from "../rb-equal.js";
 import { rbHash } from "../rb-hash.js";
@@ -337,16 +337,35 @@ export function rbStrMatch(x: string, y: unknown): unknown {
   if (typeof y === "string") throw new TypeError("type mismatch: String given");
   if (y instanceof RegExp) {
     const match = rbRegSearch(y, x, 0, false);
+    backref = match;
     return match ? rbStrSublen(x, match.index) : null;
   }
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
+}
+
+let backref: RegExpExecArray | null = null;
+
+/**
+ * `$&` (`last_match_getter`, `vendor/ruby/v3.3.11/re.c:1989`, over
+ * `rb_reg_last_match` at `vendor/ruby/v3.3.11/re.c:1882`): the text of the last
+ * match, `nil` when it failed. `$~` is the one `String#=~` ({@link rbStrMatch})
+ * sets, as `rb_reg_search_set_match` does (`vendor/ruby/v3.3.11/re.c:1750,1783`).
+ * MRI keeps `$~` per frame; JS has no frame-local seat, so this is the last
+ * `=~` of the whole program and is read straight after it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function lastMatchGetter(): string | null {
+  return backref ? backref[0] : null;
 }
 
 /**
  * Ruby's `obj =~ pattern` send, dispatched on the receiver's class:
  * `NilClass#=~` (`vendor/ruby/v3.3.11/object.c:4419` `nil_match`), which answers
  * `nil` for any pattern, `String#=~` ({@link rbStrMatch}), else the receiver's
- * own `matchOperator`.
+ * own `matchOperator`. A receiver with none raises `NoMethodError`
+ * (`rb_method_missing`, `vendor/ruby/v3.3.11/vm_eval.c:919`): `Object#=~` is gone
+ * since Ruby 3.2.
  *
  * @noRailsEquivalent PERMANENT — a Ruby method send, which JS has no receiver
  * for on `null` or a primitive.
@@ -354,7 +373,15 @@ export function rbStrMatch(x: string, y: unknown): unknown {
 export function matchOperator(obj: unknown, pattern: unknown): unknown {
   if (obj == null) return NilClass.matchOperator(pattern);
   if (typeof obj === "string") return rbStrMatch(obj, pattern);
-  return (obj as { matchOperator(pattern: unknown): unknown }).matchOperator(pattern);
+  const method = (obj as { matchOperator?: unknown }).matchOperator;
+  if (typeof method !== "function") {
+    throw new NoMethodError(
+      `undefined method '=~' for an instance of ${rbObjClassname(obj)}`,
+      "=~",
+      { receiver: obj },
+    );
+  }
+  return (method as (pattern: unknown) => unknown).call(obj, pattern);
 }
 
 /**

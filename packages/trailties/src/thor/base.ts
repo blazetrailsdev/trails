@@ -1,6 +1,5 @@
 import {
   ArgumentError,
-  argv,
   aryDeleteIf,
   compact,
   eachPair,
@@ -21,6 +20,7 @@ import {
   mergeBang,
   NoMethodError,
   NotImplementedError,
+  rbArgv,
   rbFSend,
   rbInspect,
   rbModAttrReader,
@@ -33,6 +33,7 @@ import {
   rbObjDup,
   rbObjIsKindOf,
   rbObjRespondTo,
+  rbProgname,
   rtest,
   RuntimeError,
   stringSplit,
@@ -271,92 +272,6 @@ function registerKlassFile(klass: BaseClass): void {
   if (!Base.subclasses().includes(klass)) Base.subclasses().push(klass);
 }
 
-function commands(this: BaseClass): Record<string, Command> {
-  if (!Object.hasOwn(this, "_commands")) this._commands = {};
-  return this._commands!;
-}
-
-function allCommands(this: BaseClass): Record<string, Command> {
-  if (!Object.hasOwn(this, "_allCommands")) {
-    this._allCommands = this.fromSuperclass("allCommands", {}) as Record<string, Command>;
-  }
-  return mergeBang(this._allCommands!, this.commands());
-}
-
-function removeCommand(this: BaseClass, ...names: unknown[]): void {
-  const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
-    undefine?: unknown;
-  };
-
-  names.forEach((name) => {
-    hashDelete(this.commands(), rbObjAsString(name));
-    hashDelete(this.allCommands(), rbObjAsString(name));
-    if (rtest(options.undefine)) {
-      Object.defineProperty(this.prototype, rbObjAsString(name), {
-        value: undefined,
-        writable: true,
-        configurable: true,
-      });
-    }
-  });
-}
-
-function noCommands<T>(this: BaseClass, block: () => T): T {
-  return this.noCommandsContext().enter(block);
-}
-
-function publicCommand(this: BaseClass, ...names: string[]): void {
-  names.forEach((name) => {
-    const prototype = this.prototype;
-    Object.defineProperty(this.prototype, name, {
-      value: function (this: object, ...args: unknown[]) {
-        const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>)[name];
-        if (typeof superMethod !== "function") {
-          throw new NoMethodError(
-            `super: no superclass method '${name}' for an instance of ${rbModToS(prototype.constructor as never)}`,
-            name,
-          );
-        }
-        return superMethod.apply(this, args);
-      },
-      writable: true,
-      configurable: true,
-    });
-    this.methodAdded(name);
-  });
-}
-
-function handleNoCommandError(
-  this: BaseClass,
-  command: string,
-  hasNamespace: unknown = thorRunner,
-): never {
-  throw new UndefinedCommandError(
-    command,
-    Object.keys(this.allCommands()),
-    rtest(hasNamespace) ? this.namespace() : null,
-  );
-}
-
-/** @internal */
-function findAndRefreshCommand(this: BaseClass, name: string): Command {
-  let command: Command | undefined;
-  if (this.commands()[rbObjAsString(name)] != null) {
-    return this.commands()[rbObjAsString(name)];
-  } else if ((command = this.allCommands()[rbObjAsString(name)]) != null) {
-    return (this.commands()[rbObjAsString(name)] = rbObjClone(command));
-  } else {
-    throw new ArgumentError(
-      `You supplied :for => ${rbInspect(name)}, but the command ${rbInspect(name)} could not be found.`,
-    );
-  }
-}
-
-/** @internal */
-function createCommand(this: BaseClass, meth: string): unknown {
-  return null;
-}
-
 export const ClassMethods = {
   attrReader(this: BaseClass, ...names: string[]): void {
     this.noCommands(() => rbModAttrReader(this, ...names));
@@ -547,17 +462,43 @@ export const ClassMethods = {
     }
   },
 
-  commands,
-  tasks: commands,
+  commands(this: BaseClass): Record<string, Command> {
+    if (!Object.hasOwn(this, "_commands")) this._commands = {};
+    return this._commands!;
+  },
+  tasks: undefined as unknown as BaseClass["commands"],
 
-  allCommands,
-  allTasks: allCommands,
+  allCommands(this: BaseClass): Record<string, Command> {
+    if (!Object.hasOwn(this, "_allCommands")) {
+      this._allCommands = this.fromSuperclass("allCommands", {}) as Record<string, Command>;
+    }
+    return mergeBang(this._allCommands!, this.commands());
+  },
+  allTasks: undefined as unknown as BaseClass["allCommands"],
 
-  removeCommand,
-  removeTask: removeCommand,
+  removeCommand(this: BaseClass, ...names: unknown[]): void {
+    const options = (rbObjIsKindOf(last(names), Hash) ? names.pop() : {}) as {
+      undefine?: unknown;
+    };
 
-  noCommands,
-  noTasks: noCommands,
+    names.forEach((name) => {
+      hashDelete(this.commands(), rbObjAsString(name));
+      hashDelete(this.allCommands(), rbObjAsString(name));
+      if (rtest(options.undefine)) {
+        Object.defineProperty(this.prototype, rbObjAsString(name), {
+          value: undefined,
+          writable: true,
+          configurable: true,
+        });
+      }
+    });
+  },
+  removeTask: undefined as unknown as BaseClass["removeCommand"],
+
+  noCommands<T>(this: BaseClass, block: () => T): T {
+    return this.noCommandsContext().enter(block);
+  },
+  noTasks: undefined as unknown as BaseClass["noCommands"],
 
   noCommandsContext(this: BaseClass): NestedContext {
     if (!Object.hasOwn(this, "_noCommandsContext")) this._noCommandsContext = new NestedContext();
@@ -583,7 +524,7 @@ export const ClassMethods = {
 
   async start(
     this: BaseClass,
-    givenArgs: string[] = argv.slice(2),
+    givenArgs: string[] = rbArgv(),
     config: BaseConfig = {},
   ): Promise<unknown> {
     try {
@@ -605,11 +546,40 @@ export const ClassMethods = {
     }
   },
 
-  publicCommand,
-  publicTask: publicCommand,
+  publicCommand(this: BaseClass, ...names: string[]): void {
+    names.forEach((name) => {
+      const prototype = this.prototype;
+      Object.defineProperty(this.prototype, name, {
+        value: function (this: object, ...args: unknown[]) {
+          const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>)[name];
+          if (typeof superMethod !== "function") {
+            throw new NoMethodError(
+              `super: no superclass method '${name}' for an instance of ${rbModToS(prototype.constructor as never)}`,
+              name,
+            );
+          }
+          return superMethod.apply(this, args);
+        },
+        writable: true,
+        configurable: true,
+      });
+      this.methodAdded(name);
+    });
+  },
+  publicTask: undefined as unknown as BaseClass["publicCommand"],
 
-  handleNoCommandError,
-  handleNoTaskError: handleNoCommandError,
+  handleNoCommandError(
+    this: BaseClass,
+    command: string,
+    hasNamespace: unknown = thorRunner,
+  ): never {
+    throw new UndefinedCommandError(
+      command,
+      Object.keys(this.allCommands()),
+      rtest(hasNamespace) ? this.namespace() : null,
+    );
+  },
+  handleNoTaskError: undefined as unknown as BaseClass["handleNoCommandError"],
 
   handleArgumentError(
     this: BaseClass,
@@ -712,9 +682,20 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  findAndRefreshCommand,
+  findAndRefreshCommand(this: BaseClass, name: string): Command {
+    let command: Command | undefined;
+    if (this.commands()[rbObjAsString(name)] != null) {
+      return this.commands()[rbObjAsString(name)];
+    } else if ((command = this.allCommands()[rbObjAsString(name)]) != null) {
+      return (this.commands()[rbObjAsString(name)] = rbObjClone(command));
+    } else {
+      throw new ArgumentError(
+        `You supplied :for => ${rbInspect(name)}, but the command ${rbInspect(name)} could not be found.`,
+      );
+    }
+  },
   /** @internal */
-  findAndRefreshTask: findAndRefreshCommand,
+  findAndRefreshTask: undefined as unknown as BaseClass["findAndRefreshCommand"],
 
   /** @internal */
   methodAdded(this: BaseClass, meth: string): void {
@@ -737,7 +718,7 @@ export const ClassMethods = {
 
   /** @internal */
   basename(this: BaseClass): string | null {
-    return stringSplit(File.basename(argv[1] ?? ""), " ")[0] ?? null;
+    return stringSplit(File.basename(rbProgname()), " ")[0] ?? null;
   },
 
   /** @internal */
@@ -746,9 +727,11 @@ export const ClassMethods = {
   },
 
   /** @internal */
-  createCommand,
+  createCommand(this: BaseClass, meth: string): unknown {
+    return null;
+  },
   /** @internal */
-  createTask: createCommand,
+  createTask: undefined as unknown as BaseClass["createCommand"],
 
   /** @internal */
   initializeAdded(this: BaseClass): void {},
@@ -809,6 +792,15 @@ export const ClassMethods = {
     }
   },
 };
+
+ClassMethods.tasks = ClassMethods.commands;
+ClassMethods.allTasks = ClassMethods.allCommands;
+ClassMethods.removeTask = ClassMethods.removeCommand;
+ClassMethods.noTasks = ClassMethods.noCommands;
+ClassMethods.publicTask = ClassMethods.publicCommand;
+ClassMethods.handleNoTaskError = ClassMethods.handleNoCommandError;
+ClassMethods.findAndRefreshTask = ClassMethods.findAndRefreshCommand;
+ClassMethods.createTask = ClassMethods.createCommand;
 
 /** @internal */
 export function fromSuperclass(

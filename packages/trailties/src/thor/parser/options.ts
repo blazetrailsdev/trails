@@ -317,9 +317,9 @@ export class Options extends Arguments {
   }
 
   /** @internal */
-  protected override isCurrentIsValue(): boolean {
+  protected override isCurrentIsValue(): unknown {
     if (this.isTreatedAsValue) return true;
-    return rtest(this.peek()) && (!this.isParsingOptions() || super.isCurrentIsValue());
+    return rtest(this.peek()) ? !this.isParsingOptions() || super.isCurrentIsValue() : this.peek();
   }
 
   /** @internal */
@@ -350,7 +350,7 @@ export class Options extends Arguments {
 
   /** @internal */
   protected parseBoolean(switch_: string): boolean {
-    if (this.isCurrentIsValue()) {
+    if (rtest(this.isCurrentIsValue())) {
       if (["true", "TRUE", "t", "T", true].includes(this.peek() as string)) {
         this.shift();
         return true;

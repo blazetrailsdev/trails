@@ -48,6 +48,30 @@ const argvInternal: string[] = [];
 export const env = envInternal as Readonly<Record<string, string | undefined>>;
 export const argv = argvInternal as ReadonlyArray<string>;
 
+const rbArgvInternal: string[] = [];
+let prognameInternal = "";
+
+/**
+ * MRI's `ARGV` (`rb_argv`, vendor/ruby/v3.3.11/ruby.c:2980), which
+ * `ruby_set_argv` (vendor/ruby/v3.3.11/ruby.c:2984) fills with the arguments
+ * that follow the script name.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbArgv(): string[] {
+  return rbArgvInternal;
+}
+
+/**
+ * MRI's `$PROGRAM_NAME` / `$0` (`rb_progname`,
+ * vendor/ruby/v3.3.11/ruby.c:2970-2971): the name of the script being run.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbProgname(): string {
+  return prognameInternal;
+}
+
 let currentAdapter: ProcessAdapter | null = null;
 
 function requireAdapter(): ProcessAdapter {
@@ -368,6 +392,9 @@ export function registerProcessAdapter(adapter: ProcessAdapter): void {
   }
   argvInternal.length = 0;
   argvInternal.push(...argvSnapshot);
+  prognameInternal = argvSnapshot[1] ?? "";
+  rbArgvInternal.length = 0;
+  rbArgvInternal.push(...argvSnapshot.slice(2));
 }
 
 /** @noRailsEquivalent PERMANENT */
@@ -577,6 +604,8 @@ export function __INTERNAL_resetProcessAdapter_TEST_ONLY(): void {
   stdinLineno = 0;
   for (const k of Object.keys(envInternal)) delete envInternal[k];
   argvInternal.length = 0;
+  prognameInternal = "";
+  rbArgvInternal.length = 0;
 }
 
 tryAutoRegisterNode();
