@@ -5258,22 +5258,6 @@ function rtestFallback(conditional: ts.ConditionalExpression): ts.Expression | u
 }
 
 /**
- * The `y` of `rtest(x) ? y : x`, or undefined for any other conditional: Ruby's
- * `x && y` (`peek && peek.to_s !~ /^-{1,2}\S+/`,
- * `vendor/thor/v1.3.2/lib/thor/parser/arguments.rb:85`) spelled exactly, since
- * JS `&&` also stops on `0`, `""` and `NaN`. The twin of {@link rtestFallback},
- * and tokens as the `and` Ruby's operator emits.
- */
-function rtestConjunct(conditional: ts.ConditionalExpression): ts.Expression | undefined {
-  const test = conditional.condition;
-  if (!ts.isCallExpression(test) || !ts.isIdentifier(test.expression)) return undefined;
-  if (test.expression.text !== "rtest" || test.arguments.length !== 1) return undefined;
-  return test.arguments[0].getText() === conditional.whenFalse.getText()
-    ? conditional.whenTrue
-    : undefined;
-}
-
-/**
  * `throw e`, alone or as a block's only statement, where `e` is the catch
  * binding: the exception leaving a typed `catch` it did not match. Ruby's
  * `rescue TypeError, NoMethodError`
@@ -5764,16 +5748,7 @@ function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
   if (popped.expression.name.text !== "pop" || !ts.isIdentifier(splat)) return false;
   const absent = conditional.whenFalse;
   if (!ts.isObjectLiteralExpression(absent) || absent.properties.length > 0) return false;
-  let test = conditional.condition;
-  if (
-    ts.isBinaryExpression(test) &&
-    test.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-    ts.isBinaryExpression(test.left) &&
-    ts.isTypeOfExpression(test.left.left) &&
-    test.right.getText() === `${test.left.left.expression.getText()} !== null`
-  ) {
-    test = test.left;
-  }
+  const test = conditional.condition;
   if (
     !ts.isBinaryExpression(test) ||
     test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
@@ -5854,13 +5829,6 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit((n as ts.ConditionalExpression).condition);
           tokens.push("or");
           visit(fallback);
-          return;
-        }
-        const conjunct = rtestConjunct(n as ts.ConditionalExpression);
-        if (conjunct !== undefined) {
-          visit((n as ts.ConditionalExpression).condition);
-          tokens.push("and");
-          visit(conjunct);
           return;
         }
         tokens.push(isNilGuardConditional(n as ts.ConditionalExpression) ? "if:nil-guard" : "if");
