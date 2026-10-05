@@ -66,7 +66,7 @@ export {
   Buffer as LiveBuffer,
   Response as LiveResponse,
 } from "./metal/live.js";
-export { BasicAuth, TokenAuth, DigestAuth } from "./metal/http-authentication.js";
+export { HttpAuthentication } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";

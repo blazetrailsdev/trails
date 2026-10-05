@@ -109,14 +109,6 @@ export {
   ParamsTooDeepError,
 } from "./http/param-error.js";
 export { RequestId, type RequestIdOptions } from "./middleware/request-id.js";
-export {
-  BasicAuth,
-  TokenAuth,
-  DigestAuth,
-  type BasicAuthCredentials,
-  type TokenAuthCredentials,
-  type DigestAuthParams,
-} from "./http-authentication.js";
 export { ExceptionWrapper } from "./middleware/exception-wrapper.js";
 export { ShowExceptions } from "./middleware/show-exceptions.js";
 export { DebugExceptions } from "./middleware/debug-exceptions.js";

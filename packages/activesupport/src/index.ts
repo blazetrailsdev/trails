@@ -489,6 +489,7 @@ export {
   Singleton as DuplicableSingleton,
 } from "./core-ext/object/duplicable.js";
 export { CurrentAttributes } from "./current-attributes.js";
+export { SecurityUtils } from "./security-utils.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
 export { StringIO } from "@blazetrails/ruby-compat";
 export { EnvironmentInquirer } from "./environment-inquirer.js";

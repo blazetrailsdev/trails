@@ -2,13 +2,12 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../base.js";
 import type { Metal } from "../metal.js";
 import { Request } from "../../action-dispatch/http/request.js";
-import {
-  encodeCredentials,
-  authenticateOrRequestWithHttpBasic,
-  authenticateWithHttpBasic,
-  requestHttpBasicAuthentication,
-  httpBasicAuthenticateWith,
-} from "../metal/http-authentication.js";
+import { HttpAuthentication } from "../metal/http-authentication.js";
+
+const { encodeCredentials, ControllerMethods } = HttpAuthentication.Basic;
+const { authenticateOrRequestWithHttpBasic, authenticateWithHttpBasic } = ControllerMethods;
+const { requestHttpBasicAuthentication } = ControllerMethods;
+const { httpBasicAuthenticateWith } = ControllerMethods.ClassMethods;
 
 class TestController extends Base {}
 
@@ -53,7 +52,7 @@ describe("HttpBasicAuthenticationTest", () => {
       null,
       (user, pass) => user === "lifo" && pass === "world",
     );
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
@@ -69,7 +68,7 @@ describe("HttpBasicAuthenticationTest", () => {
       null,
       (user, pass) => user === longCred && pass === longCred,
     );
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
@@ -77,7 +76,7 @@ describe("HttpBasicAuthenticationTest", () => {
   it("unsuccessful authentication with  and no credentials", () => {
     const c = makeController();
     const result = authenticateOrRequestWithHttpBasic.call(c, "Application", null, () => true);
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
   });
@@ -117,7 +116,7 @@ describe("HttpBasicAuthenticationTest", () => {
       "Authentication Failed\n",
       (user, pass) => user === "pretty" && pass === "please",
     );
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
     expect(c.responseBody).toBe("Authentication Failed\n");
     expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
@@ -132,7 +131,7 @@ describe("HttpBasicAuthenticationTest", () => {
       null,
       (user, pass) => user === "David" && pass === "Goliath",
     );
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
   });
 
@@ -140,7 +139,7 @@ describe("HttpBasicAuthenticationTest", () => {
     const noColon = `Basic ${Buffer.from("George").toString("base64")}`;
     const c = makeController(noColon);
     const result = authenticateWithHttpBasic.call(c, (user, pass) => [user, pass]);
-    expect(result).toEqual(["George", ""]);
+    expect(result).toEqual(["George", undefined]);
     expect(c.status).toBe(200);
   });
 
@@ -182,7 +181,7 @@ describe("HttpBasicAuthenticationTest", () => {
     const okCtrl = makeController(encodeCredentials("David", "Goliath"));
     expect(beforeActionCalls[0](okCtrl)).toBe(true);
     const badCtrl = makeController(encodeCredentials("David", "WRONG!"));
-    expect(beforeActionCalls[0](badCtrl)).toBe(false);
+    expect(beforeActionCalls[0](badCtrl)).toBe(badCtrl.responseBody);
   });
 
   it("authentication request with wrong scheme", () => {
@@ -195,7 +194,7 @@ describe("HttpBasicAuthenticationTest", () => {
       null,
       (user, pass) => user === "David" && pass === "Goliath",
     );
-    expect(result).toBe(false);
+    expect(result).toBe(c.responseBody);
     expect(c.status).toBe(401);
   });
 });
