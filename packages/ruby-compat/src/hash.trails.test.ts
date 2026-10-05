@@ -507,8 +507,10 @@ describe("Hash#except on a Map-backed Hash", () => {
   it("returns a new bare Hash excluding the given keys", () => {
     class Sub<K, V> extends Hash<K, V> {}
     const hash = new Sub<string, number>();
+    hash.setDefault(7);
     hash.set("a", 100).set("b", 200).set("c", 300);
     const result = except(hash, "a", "nope");
+    expect(result.default()).toBe(new Hash().default());
     expect(result.constructor).toBe(Hash);
     expect([...result]).toEqual([
       ["b", 200],

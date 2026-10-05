@@ -683,9 +683,7 @@ export function except(
   const own = ownMethod(receiver, "except");
   if (own) return own.call(receiver, ...keys) as Record<string, unknown>;
   if (receiver instanceof Map) {
-    const result = new Hash<unknown, unknown>();
-    if (receiver instanceof Hash && receiver.isCompareByIdentity()) result.compareByIdentity();
-    for (const [key, value] of receiver) result.set(key, value);
+    const result = hashDupWithCompareById(receiver);
     for (const key of keys) {
       hashDelete(result, key);
     }
@@ -770,6 +768,15 @@ export function dup(
     return Object.assign(Object.create(null) as Record<string, unknown>, hash);
   }
   return hashDup(hash, hash.constructor as new () => Hash<unknown, unknown>);
+}
+
+function hashDupWithCompareById<K, V>(hash: Map<K, V>): Hash<K, V> {
+  const dup = new Hash<K, V>();
+  if (hash instanceof Hash && hash.isCompareByIdentity()) dup.compareByIdentity();
+  for (const [key, value] of hash) {
+    dup.set(key, value);
+  }
+  return dup;
 }
 
 /**
