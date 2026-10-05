@@ -16,3 +16,34 @@
 export function regexpEscape(string: string): string {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
+
+/**
+ * `rb_reg_to_s` (`vendor/ruby/v3.3.11/re.c:565`): the source in a non-capturing
+ * group carrying the pattern's own options, so it means the same spliced into
+ * another pattern. Ruby's `m` is JS's `s`, and JS's `m` (Ruby's always-on line
+ * anchors) is carried too, so a `^` ported from `\A` stays `\A`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegToS(re: RegExp): string {
+  let on = "";
+  let off = "";
+  for (const opt of "ims") {
+    if (re.flags.includes(opt)) on += opt;
+    else off += opt;
+  }
+  return `(?${on}${off ? `-${off}` : ""}:${re.source})`;
+}
+
+/**
+ * `rb_reg_equal` (`vendor/ruby/v3.3.11/re.c:3486`): the same source under the
+ * same options.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegEqual(re1: RegExp, re2: unknown): boolean {
+  if (re1 === re2) return true;
+  if (!(re2 instanceof RegExp)) return false;
+  if (re1.flags !== re2.flags) return false;
+  return re1.source === re2.source;
+}

@@ -59,7 +59,7 @@ export class EmptyDirectory {
     });
   }
 
-  async revokeBang(): Promise<string> {
+  async revokeBang(): Promise<unknown> {
     this.sayStatus("remove", ":red");
     if (!rtest(this.isPretend()) && (await this.isExists())) {
       await FileUtils.rmRfAsync(this.destination);
@@ -123,7 +123,7 @@ export class EmptyDirectory {
   }
 
   /** @internal */
-  protected sayStatus(status: string, color: string): void {
+  protected sayStatus(status: string, color: unknown): void {
     if (rtest(this.config["verbose"])) {
       this.base.shell.sayStatus(status, this.relativeDestination, color);
     }

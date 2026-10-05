@@ -11,10 +11,13 @@ import {
   rbStrSend,
   rtest,
   strNew,
+  toS,
 } from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
+import type { insertIntoFile } from "./inject-into-file.js";
 
 type GsubHost = ActionsHost & { gsubFile: typeof gsubFile };
+type InsertHost = ActionsHost & { insertIntoFile: typeof insertIntoFile };
 
 export async function chmod(
   this: ActionsHost,
@@ -32,6 +35,50 @@ export async function chmod(
   if (!rtest(this.options["pretend"])) {
     await FileUtils.chmodRAsync(mode, path);
   }
+}
+
+export function prependToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
+  const block = typeof last(args) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  config["after"] = /^/;
+  args.push(config);
+  return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
+}
+export const prependFile = prependToFile;
+
+export function appendToFile(this: InsertHost, path: string, ...args: unknown[]): unknown {
+  const block = typeof last(args) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  config["before"] = /$/;
+  args.push(config);
+  return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
+}
+export const appendFile = appendToFile;
+
+export function injectIntoClass(
+  this: InsertHost,
+  path: string,
+  klass: unknown,
+  ...args: unknown[]
+): unknown {
+  const block = typeof last(args) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  config["after"] = new RegExp(`class ${toS(klass)}\\n|class ${toS(klass)} .*\\n`);
+  args.push(config);
+  return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
+}
+
+export function injectIntoModule(
+  this: InsertHost,
+  path: string,
+  moduleName: unknown,
+  ...args: unknown[]
+): unknown {
+  const block = typeof last(args) === "function" ? args.pop() : undefined;
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  config["after"] = new RegExp(`module ${toS(moduleName)}\\n|module ${toS(moduleName)} .*\\n`);
+  args.push(config);
+  return this.insertIntoFile(path, ...args, ...(block ? [block] : []));
 }
 
 export async function gsubFile(

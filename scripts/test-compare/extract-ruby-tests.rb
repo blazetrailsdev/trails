@@ -1951,6 +1951,11 @@ class TestExtractor
   RSPEC_MATCHER_CHAIN = %i[method_add_arg method_add_block call command_call].freeze
 
   def rspec_expectation(node)
+    # `expect(x).to(eq(y))`: the parenthesised spelling of `expect(x).to eq(y)`.
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call &&
+       node[2].is_a?(Array) && node[2][0] == :arg_paren
+      node = [:command_call, node[1][1], node[1][2], node[1][3], node[2][1]]
+    end
     return nil unless node[0] == :command_call && (to = RSPEC_TO[ident_name(node[3])])
     recv = node[1]
     recv = recv[1] if recv.is_a?(Array) && recv[0] == :method_add_block

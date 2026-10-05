@@ -30,13 +30,20 @@ import { addFile, createFile } from "./actions/create-file.js";
 import { addLink, createLink } from "./actions/create-link.js";
 import { emptyDirectory } from "./actions/empty-directory.js";
 import {
+  appendFile,
+  appendToFile,
   chmod,
   commentLines,
   gsubFile,
+  injectIntoClass,
+  injectIntoModule,
+  prependFile,
+  prependToFile,
   removeDir,
   removeFile,
   uncommentLines,
 } from "./actions/file-manipulation.js";
+import { injectIntoFile, insertIntoFile } from "./actions/inject-into-file.js";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
 import { Options } from "./parser/options.js";
@@ -433,11 +440,19 @@ export const Actions = new Module((mod) => {
       createLink,
       addLink,
       chmod,
+      prependToFile,
+      prependFile,
+      appendToFile,
+      appendFile,
+      injectIntoClass,
+      injectIntoModule,
       gsubFile,
       uncommentLines,
       commentLines,
       removeFile,
       removeDir,
+      insertIntoFile,
+      injectIntoFile,
       _sharedConfiguration,
       _cleanupOptionsAndSet,
     });

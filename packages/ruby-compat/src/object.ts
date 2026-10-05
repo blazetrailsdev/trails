@@ -10,6 +10,7 @@ import { TypeError } from "./type-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { temporalTag } from "./temporal-tag.js";
+import { rbRegToS } from "./regexp.js";
 import { NoMethodError } from "./no-method-error.js";
 import { Hash } from "./hash.js";
 
@@ -1197,6 +1198,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (value instanceof RegExp) return rbRegToS(value);
   if (rbObjRespondTo(value, "toS")) {
     const str = (value as { toS(): unknown }).toS();
     if (str instanceof Uint8Array) return str;
