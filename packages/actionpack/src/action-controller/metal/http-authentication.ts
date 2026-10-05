@@ -1,6 +1,11 @@
 /* eslint-disable @typescript-eslint/no-namespace -- `HttpAuthentication::Basic`, `Digest` and `Token` each nest a `ControllerMethods` and share `authenticate` / `encode_credentials` / `authentication_request` (`action_controller/metal/http_authentication.rb:69,189,425`); nested namespaces keep every one at its Rails name. */
 import {
   ArgumentError,
+  b,
+  Base64,
+  forceEncoding,
+  isValidEncoding,
+  rbStrToI,
   OpenSSL,
   rbFSend,
   rbInspect,
@@ -73,12 +78,11 @@ export namespace HttpAuthentication {
           realm,
           message,
           (givenName: string, givenPassword: string): boolean => {
-            const nameMatches = SecurityUtils.secureCompare(String(givenName ?? ""), name);
-            const passwordMatches = SecurityUtils.secureCompare(
-              String(givenPassword ?? ""),
-              password,
+            return (
+              (Number(SecurityUtils.secureCompare(String(givenName ?? ""), name)) &
+                Number(SecurityUtils.secureCompare(String(givenPassword ?? ""), password))) ===
+              1
             );
-            return nameMatches && passwordMatches;
           },
         );
       }
@@ -129,7 +133,8 @@ export namespace HttpAuthentication {
     }
 
     export function decodeCredentials(request: Request): string {
-      return Buffer.from(authParam(request) ?? "", "base64").toString("utf-8");
+      const decoded = Base64.decode64(authParam(request) ?? "");
+      return isValidEncoding(decoded, "UTF-8") ? forceEncoding(decoded, "UTF-8") : decoded;
     }
 
     export function authScheme(request: Request): string {
@@ -141,7 +146,7 @@ export namespace HttpAuthentication {
     }
 
     export function encodeCredentials(userName: string, password: string): string {
-      return `Basic ${Buffer.from(`${userName}:${password}`).toString("base64")}`;
+      return `Basic ${Base64.strictEncode64(b(`${userName}:${password}`))}`;
     }
 
     export function authenticationRequest(
@@ -212,7 +217,7 @@ export namespace HttpAuthentication {
         opaque(secretKey) === credentials.get("opaque")
       ) {
         const password = passwordProcedure(credentials.get("username") as string);
-        if (password == null) return false;
+        if (password == null || (password as unknown) === false) return false;
 
         const method = (request.getHeader("rack.methodoverride.original_method") ??
           request.getHeader("REQUEST_METHOD")) as string;
@@ -220,7 +225,7 @@ export namespace HttpAuthentication {
 
         return [true, false].some((trailingQuestionMark) =>
           [true, false].some((passwordIsHa1) => {
-            const _uri = trailingQuestionMark ? uri + "?" : uri;
+            const _uri = trailingQuestionMark ? uri.concat("?") : uri;
             const expected = expectedResponse(method, _uri, credentials, password, passwordIsHa1);
             return expected === credentials.get("response");
           }),
@@ -327,14 +332,14 @@ export namespace HttpAuthentication {
       const keyGenerator = request.keyGenerator!;
       const httpAuthSalt = request.httpAuthSalt as string;
       const key = keyGenerator.generateKey(httpAuthSalt);
-      return Buffer.isBuffer(key) ? key.toString("binary") : key;
+      return typeof key === "string" ? key : Buffer.from(key).toString("latin1");
     }
 
     export function nonce(secretKey: string, time: number = Math.floor(Date.now() / 1000)): string {
-      const t = time;
+      const t = Math.trunc(time);
       const hashed = [t, secretKey];
-      const digest = OpenSSL.Digest.MD5.hexdigest(hashed.join(":"));
-      return Buffer.from(`${t}:${digest}`).toString("base64");
+      const digest = OpenSSL.Digest.MD5.hexdigest(Buffer.from(hashed.join(":"), "latin1"));
+      return Base64.strictEncode64(`${t}:${digest}`);
     }
 
     export function validateNonce(
@@ -344,7 +349,7 @@ export namespace HttpAuthentication {
       secondsToTimeout = 5 * 60,
     ): boolean {
       if (value == null) return false;
-      const t = parseInt(Buffer.from(value, "base64").toString("utf-8").split(":")[0], 10) || 0;
+      const t = Number(rbStrToI(stringSplit(Base64.decode64(value), ":")[0] ?? ""));
       return (
         nonce(secretKey, t) === value &&
         Math.abs(t - Math.floor(Date.now() / 1000)) <= secondsToTimeout
@@ -352,7 +357,7 @@ export namespace HttpAuthentication {
     }
 
     export function opaque(secretKey: string): string {
-      return OpenSSL.Digest.MD5.hexdigest(secretKey);
+      return OpenSSL.Digest.MD5.hexdigest(Buffer.from(secretKey, "latin1"));
     }
   }
 

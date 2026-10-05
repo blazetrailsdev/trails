@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import { OpenSSL } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { HttpAuthentication } from "./http-authentication.js";
@@ -302,5 +303,37 @@ describe("HttpAuthentication::Token::ControllerMethods", () => {
     expect(Token.encodeCredentials('"quote" pretty', { nonce: 1 })).toBe(
       'Token token="\\"quote\\" pretty", nonce="1"',
     );
+  });
+});
+
+describe("HttpAuthentication review regressions", () => {
+  it("Digest hashes the key generator's bytes, not their UTF-8 spelling", () => {
+    const key = Buffer.from([0x80, 0xff, 0x41]);
+    const request = new Request({
+      "action_dispatch.key_generator": { generateKey: () => key },
+      "action_dispatch.http_auth_salt": SALT,
+    });
+    const secretKey = secretToken(request);
+    expect(opaque(secretKey)).toBe(OpenSSL.Digest.MD5.hexdigest(key));
+    const digest = OpenSSL.Digest.MD5.hexdigest(Buffer.concat([Buffer.from("1000:"), key]));
+    expect(nonce(secretKey, 1000.9)).toBe(Buffer.from(`1000:${digest}`).toString("base64"));
+  });
+
+  it("Digest rejects a password procedure answering false, and raises without a uri", () => {
+    const secretKey = secretToken(makeDigestRequest());
+    const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonce(secretKey)}", opaque="${opaque(secretKey)}"`;
+    const request = makeDigestRequest(header);
+    expect(validateDigestResponse(request, "SuperSecret", () => false as never)).toBe(false);
+    expect(() => validateDigestResponse(request, "SuperSecret", () => "world")).toThrow(TypeError);
+  });
+
+  it("Basic keeps a credential's bytes when they are not valid UTF-8", () => {
+    const invalid = req(`Basic ${Buffer.from([0x75, 0xff, 0x3a, 0x70]).toString("base64")}`);
+    expect(userNameAndPassword(invalid)).toEqual(["u\xff", "p"]);
+    expect(userNameAndPassword(req(encodeCredentials("é", "ü")))).toEqual(["é", "ü"]);
+  });
+
+  it("Token reads the scheme at the start of any line, as Ruby's ^ does", () => {
+    expect(Token.tokenAndOptions(req("Basic x\nToken token=secret"))![0]).toBe("Basic x");
   });
 });
