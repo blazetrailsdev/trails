@@ -18,7 +18,7 @@ import {
 import { UrlFor } from "../../action-dispatch/routing/url-for.js";
 import "../../test-helpers/abstract-unit.js";
 
-include(RoutingUrlFor as unknown as new (...args: never[]) => unknown, UrlFor);
+include(RoutingUrlFor, UrlFor);
 
 interface ActionsHost {
   sameOriginJs(): Promise<void>;
@@ -178,13 +178,13 @@ class PrependProtectForgeryBaseController extends Base {
   }
 
   /** @internal */
-  addCalledCallback(name: string): void {
+  private addCalledCallback(name: string): void {
     this.calledCallbacks ??= [];
     this.calledCallbacks.push(name);
   }
 
   /** @internal */
-  customAction(): void {
+  private customAction(): void {
     this.addCalledCallback("custom_action");
   }
 
