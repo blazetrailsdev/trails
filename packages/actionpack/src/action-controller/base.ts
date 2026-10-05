@@ -146,9 +146,11 @@ import { HttpAuthentication } from "./metal/http-authentication.js";
 import { sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
-  _defaultWrapModel,
   _performParameterWrapping,
+  _setWrapperOptions,
   _wrapperEnabled,
+  inheritedParamsWrapper,
+  wrapParameters,
   type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import {
@@ -612,59 +614,12 @@ export class Base extends Metal {
     });
   }
 
-  static wrapParameters(
-    nameOrModelOrOptions:
-      | string
-      | false
-      | Record<string, unknown>
-      | (new (...args: never[]) => unknown),
-    options: Record<string, unknown> = {},
-  ): void {
-    let model: unknown = null;
-    let opts: Record<string, unknown> = options;
-    if (nameOrModelOrOptions === false) {
-      opts = { ...opts, format: [] };
-    } else if (typeof nameOrModelOrOptions === "string") {
-      opts = { ...opts, name: nameOrModelOrOptions };
-    } else if (
-      typeof nameOrModelOrOptions === "object" &&
-      nameOrModelOrOptions !== null &&
-      !Array.isArray(nameOrModelOrOptions)
-    ) {
-      opts = nameOrModelOrOptions;
-    } else {
-      model = nameOrModelOrOptions;
-    }
-    const current = this._wrapperOptions;
-    const merged = { format: current.format ?? [], ...opts };
-    const newOpts = ParamsWrapperOptions.fromHash(merged);
-    newOpts.model = model;
-    newOpts.klass = this;
-    if ((newOpts.format?.length ?? 0) > 0 && !newOpts.name) {
-      newOpts.name = _defaultWrapModel.call({ _wrapperOptions: newOpts });
-    }
-    this._wrapperOptions = newOpts;
-  }
+  static _setWrapperOptions = _setWrapperOptions;
+
+  static wrapParameters = wrapParameters;
 
   /** @internal */
-  static inheritedParamsWrapper(): void {
-    const inherited = this._wrapperOptions;
-    if (!inherited.format || inherited.format.length === 0) return;
-    const dup = ParamsWrapperOptions.fromHash({
-      format: inherited.format,
-      include: inherited.include,
-      exclude: inherited.exclude,
-    });
-    dup.model = inherited.model;
-    dup.klass = this;
-    if (inherited.nameSet) {
-      dup.name = inherited.name;
-      dup.nameSet = true;
-    } else {
-      dup.name = _defaultWrapModel.call({ _wrapperOptions: dup });
-    }
-    this._wrapperOptions = dup;
-  }
+  static inheritedParamsWrapper = inheritedParamsWrapper;
 
   declare static httpBasicAuthenticateWith: OmitThisParameter<
     typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith

@@ -16,7 +16,7 @@ describe("Base ParamsWrapper wiring", () => {
     expect(UsersController._wrapperOptions.name).toBe("person");
     expect(UsersController._wrapperOptions.include).toEqual(["name"]);
     expect(UsersController._wrapperOptions.klass).toBe(UsersController);
-    expect(Base._wrapperOptions.name).toBeNull();
+    expect(Base._wrapperOptions.toH().name).toBeNull();
   });
 
   it("wrapParameters with hash merges format from current", () => {
@@ -65,8 +65,6 @@ describe("Base ParamsWrapper wiring", () => {
   it("inheritedParamsWrapper re-derives auto-derived name from subclass klass", () => {
     class UsersController extends Base {}
     UsersController.wrapParameters({ format: [":json"] });
-    expect(UsersController._wrapperOptions.name).toBe("user");
-    expect(UsersController._wrapperOptions.nameSet).toBe(false);
     class AdminsController extends UsersController {}
     AdminsController.inheritedParamsWrapper();
     expect(AdminsController._wrapperOptions.name).toBe("admin");

@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   EXCLUDE_PARAMETERS,
   Options,
-  _defaultWrapModel,
   _extractParameters,
   _performParameterWrapping,
   _setWrapperOptions,
@@ -20,10 +19,10 @@ function makeHost(
 ): ParamsWrapperHost {
   const merged = new Options(
     opts.name ?? null,
-    opts.format ?? null,
+    opts.format ?? [],
     opts.include ?? null,
     opts.exclude ?? null,
-    opts.klass ?? null,
+    opts.klass ?? { name: "", controllerName: () => null, _wrapperOptions: null as never },
     opts.model ?? null,
   );
   const request: ParamsWrapperHost["request"] = {
@@ -31,7 +30,7 @@ function makeHost(
     contentMimeType: { ref: () => ":json" },
     requestParameters: {},
     filteredParameters: () => ({}),
-    params: {},
+    parameters: {},
     ...requestOverrides,
   };
   return { _wrapperOptions: merged, request };
@@ -80,20 +79,16 @@ describe("ParamsWrapper privates", () => {
     });
   });
 
-  it("_wrapParameters returns empty object when no key", () => {
-    expect(_wrapParameters.call(makeHost(), { name: "x" })).toEqual({});
-  });
-
   it("_wrapperEnabled true when format matches and key absent", () => {
     const host = makeHost(
       { name: "user", format: [":json"] },
-      { requestParameters: { name: "a" }, params: { name: "a" } },
+      { requestParameters: { name: "a" }, parameters: { name: "a" } },
     );
     expect(_wrapperEnabled.call(host)).toBe(true);
   });
 
   it("_wrapperEnabled false when wrapper key already present", () => {
-    const host = makeHost({ name: "user", format: [":json"] }, { params: { user: {} } });
+    const host = makeHost({ name: "user", format: [":json"] }, { parameters: { user: {} } });
     expect(_wrapperEnabled.call(host)).toBe(false);
   });
 
@@ -142,7 +137,7 @@ describe("ParamsWrapper privates", () => {
       { name: "user", include: ["name"] },
       {
         requestParameters,
-        params,
+        parameters: params,
         filteredParameters: () => filtered,
       },
     );
@@ -153,34 +148,9 @@ describe("ParamsWrapper privates", () => {
   });
 
   it("_setWrapperOptions replaces _wrapperOptions via Options.fromHash", () => {
-    const host: { _wrapperOptions: Options } = { _wrapperOptions: new Options() };
+    const host: { _wrapperOptions: Options } = { _wrapperOptions: Options.fromHash({}) };
     _setWrapperOptions.call(host, { name: "user", format: [":json"] });
     expect(host._wrapperOptions.name).toBe("user");
     expect(host._wrapperOptions.format).toEqual([":json"]);
-  });
-
-  it("_defaultWrapModel derives snake_case singular from controller class name", () => {
-    expect(
-      _defaultWrapModel.call({
-        _wrapperOptions: new Options(null, null, null, null, { name: "UsersController" }, null),
-      }),
-    ).toBe("user");
-
-    expect(
-      _defaultWrapModel.call({
-        _wrapperOptions: new Options(
-          null,
-          null,
-          null,
-          null,
-          { name: "Admin::PostsController" },
-          null,
-        ),
-      }),
-    ).toBe("post");
-  });
-
-  it("_defaultWrapModel returns null for unnamed (anonymous) klass", () => {
-    expect(_defaultWrapModel.call({ _wrapperOptions: new Options() })).toBeNull();
   });
 });

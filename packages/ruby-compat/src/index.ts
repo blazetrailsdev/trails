@@ -164,6 +164,7 @@ export {
   each,
   first,
   flatten,
+  rbFArray,
   groupBy,
   last,
   pack,

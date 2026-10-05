@@ -120,7 +120,7 @@ export class Trailtie extends BaseTrailtie {
         AbstractController.withRoutesHelpers(routes)(base);
 
         if (options.wrapParametersByDefault && rbObjRespondTo(base, "wrapParameters")) {
-          (base as unknown as typeof ActionController.Base).wrapParameters({ format: ["json"] });
+          (base as unknown as typeof ActionController.Base).wrapParameters({ format: [":json"] });
         }
 
         const filteredOptions = except(
