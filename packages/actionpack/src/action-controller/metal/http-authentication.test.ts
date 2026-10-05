@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Base } from "../base.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { HttpAuthentication } from "./http-authentication.js";
@@ -154,16 +155,16 @@ describe("HttpAuthentication::Digest", () => {
     const header =
       'Digest username="lifo", realm="SuperSecret", nonce="abc", uri="/", response="xyz"';
     const creds = Digest.decodeCredentials(header);
-    expect(creds.username).toBe("lifo");
-    expect(creds.realm).toBe("SuperSecret");
-    expect(creds.nonce).toBe("abc");
+    expect(creds.get("username")).toBe("lifo");
+    expect(creds.get("realm")).toBe("SuperSecret");
+    expect(creds.get("nonce")).toBe("abc");
   });
 
   it("decode_credentials handles quoted and unquoted values", () => {
     const header = 'Digest username="user", nc=00000001';
     const creds = Digest.decodeCredentials(header);
-    expect(creds.username).toBe("user");
-    expect(creds.nc).toBe("00000001");
+    expect(creds.get("username")).toBe("user");
+    expect(creds.get("nc")).toBe("00000001");
   });
 
   it("opaque is MD5 of secret key", () => {
@@ -198,7 +199,7 @@ describe("HttpAuthentication::Digest", () => {
   });
 
   it("expected_response matches ha1+ha2 digest computation", () => {
-    const creds = {
+    const creds = new HashWithIndifferentAccess<string | undefined>({
       username: "lifo",
       realm: "SuperSecret",
       nonce: "abc",
@@ -206,7 +207,7 @@ describe("HttpAuthentication::Digest", () => {
       cnonce: "xyz",
       qop: "auth",
       uri: "/",
-    };
+    });
     const password = "world";
     const ha1Val = ha1(creds, password);
     const response1 = expectedResponse("GET", "/", creds, password, false);
@@ -216,7 +217,7 @@ describe("HttpAuthentication::Digest", () => {
   });
 
   it("encode_credentials returns Digest header string with response field", () => {
-    const creds = {
+    const creds = new HashWithIndifferentAccess<string | undefined>({
       username: "lifo",
       realm: "SuperSecret",
       nonce: "abc",
@@ -224,7 +225,7 @@ describe("HttpAuthentication::Digest", () => {
       cnonce: "xyz",
       qop: "auth",
       uri: "/",
-    };
+    });
     const encoded = Digest.encodeCredentials("GET", creds, "world", false);
     expect(encoded).toMatch(/^Digest /);
     expect(encoded).toMatch(/response=/);
@@ -248,7 +249,7 @@ describe("HttpAuthentication::Digest", () => {
     const secretKey = secretToken(makeDigestRequest());
     const nonceVal = nonce(secretKey);
     const opaqueVal = opaque(secretKey);
-    const creds = {
+    const creds = new HashWithIndifferentAccess<string | undefined>({
       username: "lifo",
       realm: "SuperSecret",
       nonce: nonceVal,
@@ -257,7 +258,7 @@ describe("HttpAuthentication::Digest", () => {
       qop: "auth",
       uri: "/",
       opaque: opaqueVal,
-    };
+    });
     const response = expectedResponse("GET", "/", creds, "world", false);
     const header = `Digest username="lifo", realm="SuperSecret", nonce="${nonceVal}", uri="/", nc=00000001, cnonce="0a4f113b", qop=auth, response="${response}", opaque="${opaqueVal}"`;
     const req = makeDigestRequest(header);

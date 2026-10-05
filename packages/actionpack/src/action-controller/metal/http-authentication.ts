@@ -5,6 +5,7 @@ import {
   rbFSend,
   rbInspect,
   rbObjClassname,
+  stringSplit,
 } from "@blazetrails/ruby-compat";
 import { extend, included, type Included } from "@blazetrails/ruby-compat/include";
 import {
@@ -16,22 +17,13 @@ import {
 import type { Metal } from "../metal.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 
-function splitOnFirstWhitespace(s: string): [string, string?] {
-  const trimmed = s.replace(/^\s+/, "");
-  const m = /\s+/.exec(trimmed);
-  return m ? [trimmed.slice(0, m.index), trimmed.slice(m.index + m[0].length)] : [trimmed];
-}
-
-const reqAuth = (request: Request): string =>
-  request.authorization == null ? "" : String(request.authorization);
-
 const md5Hex = (data: string) => OpenSSL.Digest.MD5.hexdigest(data);
 
 type BasicController = Metal & Included<typeof HttpAuthentication.Basic.ControllerMethods>;
 type DigestController = Metal & Included<typeof HttpAuthentication.Digest.ControllerMethods>;
 type TokenController = Metal & Included<typeof HttpAuthentication.Token.ControllerMethods>;
 
-export type DigestCredentials = Record<string, string | undefined>;
+export type DigestCredentials = HashWithIndifferentAccess<string | undefined>;
 
 export interface BasicClassDSLHost {
   beforeAction(cb: (controller: Metal) => unknown, options?: unknown): unknown;
@@ -126,7 +118,7 @@ export namespace HttpAuthentication {
       loginProcedure: (userName: string, password: string) => T,
     ): T | undefined {
       if (hasBasicCredentials(request)) {
-        return loginProcedure(...userNameAndPassword(request));
+        return loginProcedure(...(userNameAndPassword(request) as [string, string]));
       }
     }
 
@@ -134,10 +126,8 @@ export namespace HttpAuthentication {
       return isPresent(request.authorization) && authScheme(request).toLowerCase() === "basic";
     }
 
-    export function userNameAndPassword(request: Request): [string, string] {
-      const decoded = decodeCredentials(request);
-      const idx = decoded.indexOf(":");
-      return idx === -1 ? [decoded, ""] : [decoded.slice(0, idx), decoded.slice(idx + 1)];
+    export function userNameAndPassword(request: Request): string[] {
+      return stringSplit(decodeCredentials(request), ":", 2);
     }
 
     export function decodeCredentials(request: Request): string {
@@ -145,11 +135,11 @@ export namespace HttpAuthentication {
     }
 
     export function authScheme(request: Request): string {
-      return splitOnFirstWhitespace(reqAuth(request))[0];
+      return stringSplit(String(request.authorization ?? ""), " ", 2)[0];
     }
 
     export function authParam(request: Request): string | undefined {
-      return splitOnFirstWhitespace(reqAuth(request))[1];
+      return stringSplit(String(request.authorization ?? ""), " ", 2)[1];
     }
 
     export function encodeCredentials(userName: string, password: string): string {
@@ -216,21 +206,25 @@ export namespace HttpAuthentication {
     ): boolean | undefined {
       const secretKey = secretToken(request);
       const credentials = decodeCredentialsHeader(request);
-      const validNonce = validateNonce(secretKey, request, credentials.nonce);
+      const validNonce = validateNonce(secretKey, request, credentials.get("nonce"));
 
-      if (validNonce && realm === credentials.realm && opaque(secretKey) === credentials.opaque) {
-        const password = passwordProcedure(credentials.username as string);
+      if (
+        validNonce &&
+        realm === credentials.get("realm") &&
+        opaque(secretKey) === credentials.get("opaque")
+      ) {
+        const password = passwordProcedure(credentials.get("username") as string);
         if (password == null) return false;
 
         const method = (request.getHeader("rack.methodoverride.original_method") ??
           request.getHeader("REQUEST_METHOD")) as string;
-        const uri = credentials.uri as string;
+        const uri = credentials.get("uri") as string;
 
         return [true, false].some((trailingQuestionMark) =>
           [true, false].some((passwordIsHa1) => {
             const _uri = trailingQuestionMark ? uri + "?" : uri;
             const expected = expectedResponse(method, _uri, credentials, password, passwordIsHa1);
-            return expected === credentials.response;
+            return expected === credentials.get("response");
           }),
         );
       }
@@ -246,14 +240,19 @@ export namespace HttpAuthentication {
       const ha1 = passwordIsHa1 ? password : Digest.ha1(credentials, password);
       const ha2 = md5Hex([String(httpMethod ?? "").toUpperCase(), uri].join(":"));
       return md5Hex(
-        [ha1, credentials.nonce, credentials.nc, credentials.cnonce, credentials.qop, ha2].join(
-          ":",
-        ),
+        [
+          ha1,
+          credentials.get("nonce"),
+          credentials.get("nc"),
+          credentials.get("cnonce"),
+          credentials.get("qop"),
+          ha2,
+        ].join(":"),
       );
     }
 
     export function ha1(credentials: DigestCredentials, password: string): string {
-      return md5Hex([credentials.username, credentials.realm, password].join(":"));
+      return md5Hex([credentials.get("username"), credentials.get("realm"), password].join(":"));
     }
 
     export function encodeCredentials(
@@ -262,16 +261,19 @@ export namespace HttpAuthentication {
       password: string,
       passwordIsHa1: boolean,
     ): string {
-      credentials.response = expectedResponse(
-        httpMethod,
-        credentials.uri as string,
-        credentials,
-        password,
-        passwordIsHa1,
+      credentials.set(
+        "response",
+        expectedResponse(
+          httpMethod,
+          credentials.get("uri") as string,
+          credentials,
+          password,
+          passwordIsHa1,
+        ),
       );
       return (
         "Digest " +
-        Object.entries(credentials)
+        [...credentials]
           .sort((x, y) => (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0))
           .map((v) => `${v[0]}='${v[1]}'`)
           .join(", ")
@@ -283,17 +285,19 @@ export namespace HttpAuthentication {
     }
 
     export function decodeCredentials(header: string | null | undefined): DigestCredentials {
-      const credentials: DigestCredentials = {};
-      const pairs = String(header ?? "")
-        .replace(/^Digest\s+/gm, "")
-        .split(",");
-      while (pairs.at(-1) === "") pairs.pop();
-      for (const pair of pairs) {
-        const eq = pair.indexOf("=");
-        const [key, value] = eq === -1 ? [pair, ""] : [pair.slice(0, eq), pair.slice(eq + 1)];
-        credentials[key.trim()] = value.replace(/^"|"$/gm, "").replace(/'/g, "");
-      }
-      return credentials;
+      return new HashWithIndifferentAccess(
+        Object.fromEntries(
+          stringSplit(String(header ?? "").replace(/^Digest\s+/gm, ""), ",").map((pair) => {
+            const [key, value] = stringSplit(pair, "=", 2);
+            return [
+              key.trim(),
+              String(value ?? "")
+                .replace(/^"|"$/gm, "")
+                .replace(/'/g, ""),
+            ];
+          }),
+        ),
+      );
     }
 
     export function authenticationHeader(controller: Metal, realm: string): void {
@@ -397,7 +401,7 @@ export namespace HttpAuthentication {
     export function tokenAndOptions(
       request: Request,
     ): [string | undefined, HashWithIndifferentAccess<string>] | undefined {
-      const authorizationRequest = reqAuth(request);
+      const authorizationRequest = String(request.authorization ?? "");
       if (TOKEN_REGEX.test(authorizationRequest)) {
         const params = tokenParamsFrom(authorizationRequest);
         return [
@@ -412,11 +416,7 @@ export namespace HttpAuthentication {
     }
 
     export function paramsArrayFrom(rawParams: string[]): (string | undefined)[][] {
-      return rawParams.map((param) => {
-        const fields = param.split(/=(.+)?/);
-        while (fields.length > 0 && (fields.at(-1) ?? "") === "") fields.pop();
-        return fields;
-      });
+      return rawParams.map((param) => stringSplit(param, /=(.+)?/));
     }
 
     export function rewriteParamValues(
@@ -429,9 +429,7 @@ export namespace HttpAuthentication {
     }
 
     export function rawParams(auth: string): string[] {
-      const _rawParams = auth
-        .replace(TOKEN_REGEX, "")
-        .split(AUTHN_PAIR_DELIMITERS)
+      const _rawParams = stringSplit(auth.replace(TOKEN_REGEX, ""), AUTHN_PAIR_DELIMITERS)
         .map((param) => param.trim())
         .filter((param) => param.length > 0);
 

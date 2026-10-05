@@ -139,7 +139,7 @@ describe("HttpBasicAuthenticationTest", () => {
     const noColon = `Basic ${Buffer.from("George").toString("base64")}`;
     const c = makeController(noColon);
     const result = authenticateWithHttpBasic.call(c, (user, pass) => [user, pass]);
-    expect(result).toEqual(["George", ""]);
+    expect(result).toEqual(["George", undefined]);
     expect(c.status).toBe(200);
   });
 
