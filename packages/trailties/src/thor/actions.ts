@@ -44,7 +44,7 @@ import {
   uncommentLines,
 } from "./actions/file-manipulation.js";
 import { injectIntoFile, insertIntoFile } from "./actions/inject-into-file.js";
-import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
+import { TEMPLATE_EXTNAME } from "./base.js";
 import { Error } from "./error.js";
 import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
@@ -53,6 +53,7 @@ import { rubyCommand } from "./util.js";
 export interface ActionsClassHost {
   name: string;
   baseclass(): unknown;
+  fromSuperclass(method: string, defaultValue?: unknown): unknown;
   _sourcePaths?: string[];
   _sourceRoot?: string | null;
   sourcePaths(): string[];
@@ -108,7 +109,7 @@ export const ClassMethods = {
     paths = paths.concat(this.sourcePaths());
     const sourceRoot = await this.sourceRoot();
     if (sourceRoot != null) paths.push(sourceRoot);
-    paths = paths.concat(fromSuperclass.call(this, "sourcePaths", []) as string[]);
+    paths = paths.concat(this.fromSuperclass("sourcePaths", []) as string[]);
     return paths;
   },
 

@@ -83,9 +83,7 @@
     "byFile": {}
   },
   "trailties": {
-    "total": 2,
-    "byFile": {
-      "generators/rails/model/model-generator.ts": 2
-    }
+    "total": 0,
+    "byFile": {}
   }
 }

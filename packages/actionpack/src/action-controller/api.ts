@@ -4,7 +4,16 @@ import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
-import { include } from "@blazetrails/activesupport";
+import { classAttribute, include } from "@blazetrails/activesupport";
+import {
+  Options as ParamsWrapperOptions,
+  _performParameterWrapping,
+  _setWrapperOptions,
+  _wrapperEnabled,
+  inheritedParamsWrapper,
+  wrapParameters,
+  type ParamsWrapperHost,
+} from "./metal/params-wrapper.js";
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -30,6 +39,31 @@ export class API extends Metal {
   /** @internal */
   async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
     return rateLimiting.call(this, args);
+  }
+
+  declare static _wrapperOptions: ParamsWrapperOptions;
+  declare static is_wrapperOptions: boolean;
+  declare _wrapperOptions: ParamsWrapperOptions;
+
+  static {
+    classAttribute.call(this, "_wrapperOptions", {
+      default: ParamsWrapperOptions.fromHash({ format: [] }),
+    });
+  }
+
+  static _setWrapperOptions = _setWrapperOptions;
+
+  static wrapParameters = wrapParameters;
+
+  /** @internal */
+  static inheritedParamsWrapper = inheritedParamsWrapper;
+
+  /** @internal */
+  async processAction(action: string, ...args: unknown[]): Promise<void> {
+    if (_wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
+      _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
+    }
+    await super.processAction(action, ...args);
   }
 
   render(options: RenderOptions = {}): void {
