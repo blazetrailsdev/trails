@@ -36,7 +36,6 @@ import {
 } from "./metal/conditional-get.js";
 import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
 import { EtagWithFlash } from "./metal/etag-with-flash.js";
-import { rbModSingletonP } from "@blazetrails/ruby-compat";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import { ParameterEncoding, type ParameterEncodingHost } from "./metal/parameter-encoding.js";
 import {
@@ -793,7 +792,6 @@ include(Base, AbstractControllerRendering);
 include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
-include(Base, Cookies);
 Base.prototype.helpers = helpers;
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
@@ -801,25 +799,13 @@ Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
-include(Base, Flash);
 include(Base, AllowBrowser);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
 extend(Base, ParameterEncoding.ClassMethods);
-const parameterEncodings = Symbol("_parameterEncodings");
-Object.defineProperty(Base, "_parameterEncodings", {
-  configurable: true,
-  get(this: typeof Base & { [parameterEncodings]?: unknown }) {
-    if (!Object.hasOwn(this, parameterEncodings) && !rbModSingletonP(this)) {
-      this.setupParamEncode();
-    }
-    return this[parameterEncodings];
-  },
-  set(this: typeof Base & { [parameterEncodings]?: unknown }, value: unknown) {
-    this[parameterEncodings] = value;
-  },
-});
+include(Base, Cookies);
+include(Base, Flash);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
