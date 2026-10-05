@@ -192,6 +192,16 @@ describe("Hash#key?", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);
     expect(hasKey({}, "offset")).toBe(false);
   });
+
+  it("reads a Map-backed Hash's table, as each_key walks it", () => {
+    const hash = new Map<string, unknown>([["offset", null]]);
+    expect(hasKey(hash, "offset")).toBe(true);
+    expect(hasKey(hash, "size")).toBe(false);
+    expect(eachKey(hash as never)).toEqual(["offset"]);
+    const seen: string[] = [];
+    expect(eachKey(hash as never, (key) => seen.push(key))).toBe(hash);
+    expect(seen).toEqual(["offset"]);
+  });
 });
 
 describe("Hash#include?", () => {

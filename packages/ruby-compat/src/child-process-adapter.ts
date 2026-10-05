@@ -18,8 +18,38 @@ export interface SpawnSyncResult {
   error?: Error;
 }
 
+/**
+ * What `waitpid(2)` reports for a child (`rb_process_status_wait`,
+ * `vendor/ruby/v3.3.11/process.c:1198`): `pid` is `null` when the child was
+ * never spawned, `status` its exit status and `null` when it did not exit, and
+ * `error` what the spawn failed with.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface WaitStatus {
+  pid: number | null;
+  status: number | null;
+  signal: string | null;
+  error?: Error;
+}
+
 export interface ChildProcessAdapter {
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
+  /**
+   * Runs `command` through `/bin/sh -c` with the parent's stdio, as
+   * `proc_exec_sh` does (`vendor/ruby/v3.3.11/process.c:1788`), and resolves
+   * once it has been waited for.
+   */
+  system?(command: string, env: Record<string, string | undefined>): Promise<WaitStatus>;
+  /**
+   * Runs `command` through `/bin/sh -c` with stdout and stderr merged, as
+   * `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
+   * and resolves with what it wrote.
+   */
+  capture2e?(
+    command: string,
+    env: Record<string, string | undefined>,
+  ): Promise<[output: string, status: WaitStatus]>;
 }
 
 const registry = new Map<string, ChildProcessAdapter>();
@@ -66,9 +96,43 @@ type NodeSpawnSyncResult = {
   error?: Error;
 };
 
+type NodeReadable = {
+  setEncoding(encoding: string): void;
+  on(event: "data", listener: (chunk: string) => void): void;
+};
+
+type NodeChild = {
+  pid?: number;
+  stdout: NodeReadable | null;
+  stderr: NodeReadable | null;
+  on(event: "error", listener: (error: Error) => void): void;
+  on(event: "close", listener: (code: number | null, signal: string | null) => void): void;
+};
+
 type NodeChildProcess = {
   spawnSync: (cmd: string, args: string[], opts?: unknown) => NodeSpawnSyncResult;
+  spawn: (cmd: string, args: string[], opts?: unknown) => NodeChild;
 };
+
+function spawnSh(
+  cp: NodeChildProcess,
+  command: string,
+  env: Record<string, string | undefined>,
+  stdio: unknown,
+  read: (chunk: string) => void,
+): Promise<WaitStatus> {
+  return new Promise((resolve) => {
+    const child = cp.spawn("/bin/sh", ["-c", command], { env, stdio });
+    for (const io of [child.stdout, child.stderr]) {
+      io?.setEncoding("utf8");
+      io?.on("data", read);
+    }
+    child.on("error", (error) =>
+      resolve({ pid: child.pid ?? null, status: null, signal: null, error }),
+    );
+    child.on("close", (status, signal) => resolve({ pid: child.pid ?? null, status, signal }));
+  });
+}
 
 function wrap(cp: NodeChildProcess): ChildProcessAdapter {
   return {
@@ -97,6 +161,16 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         stderr: typeof result.stderr === "string" ? result.stderr : String(result.stderr ?? ""),
         error: result.error,
       };
+    },
+    system(command, env) {
+      return spawnSh(cp, command, env, "inherit", () => {});
+    },
+    async capture2e(command, env) {
+      let output = "";
+      const status = await spawnSh(cp, command, env, ["ignore", "pipe", "pipe"], (chunk) => {
+        output += chunk;
+      });
+      return [output, status];
     },
   };
 }

@@ -133,6 +133,7 @@ export type {
   ChildProcessAdapter,
   SpawnSyncOptions,
   SpawnSyncResult,
+  WaitStatus,
 } from "./child-process-adapter.js";
 export { FloatDomainError } from "./float-domain-error.js";
 export { BigDecimal, toD } from "./big-decimal.js";
@@ -211,6 +212,7 @@ export { format, sprintf } from "./kernel-format.js";
 export { warn } from "./kernel-warn.js";
 export { kernelInteger } from "./kernel-integer.js";
 export { kernelRand } from "./kernel-rand.js";
+export { rbFSystem } from "./kernel-system.js";
 export { IndexError } from "./index-error.js";
 export { RangeError } from "./range-error.js";
 export { KeyError } from "./key-error.js";
@@ -237,6 +239,7 @@ export {
 export { Complex, complex } from "./complex.js";
 export { NotImplementedError } from "./not-implemented-error.js";
 export { prepend } from "./prepend.js";
+export { Open3 } from "./open3.js";
 export { Process } from "./process.js";
 export {
   SystemExit,

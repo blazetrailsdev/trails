@@ -152,6 +152,7 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
      chain, so `"toString" in {}` is an answer Ruby never gives. */
   const own = ownMethod(hash, "isKey");
   if (own) return own.call(hash, key) as boolean;
+  if (hash instanceof Map) return hash.has(key);
   return Object.hasOwn(hash, key);
 }
 
@@ -557,8 +558,8 @@ export function eachKey<T>(
 ): unknown {
   const own = ownMethod(hash, "eachKey");
   if (own) return block ? own.call(hash, block) : own.call(hash);
-  if (!block) return Object.keys(hash);
-  for (const key of Object.keys(hash)) {
+  if (!block) return keys(hash);
+  for (const key of keys(hash)) {
     block(key);
   }
   return hash;

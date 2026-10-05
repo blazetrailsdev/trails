@@ -5,7 +5,7 @@ import { ValueType } from "../type/value.js";
 export class UserProvidedDefault extends FromUser {
   /** @internal */
   readonly userProvidedValue: unknown;
-  private memoizedValueBeforeTypeCast: unknown;
+  declare private memoizedValueBeforeTypeCast: unknown;
 
   constructor(
     name: string | null,
@@ -13,7 +13,7 @@ export class UserProvidedDefault extends FromUser {
     type: ValueType | null,
     databaseDefault: Attribute | null = null,
   ) {
-    super(name, undefined, type, databaseDefault);
+    super(name, value, type, databaseDefault);
     this.userProvidedValue = value;
   }
 
@@ -33,7 +33,7 @@ export class UserProvidedDefault extends FromUser {
 
   marshalDump(): unknown[] {
     const result = [this.name, this.valueBeforeTypeCast, this.type, this.originalAttribute];
-    if (this._hasValue) result.push(this.value());
+    if (Object.hasOwn(this, "_value")) result.push(this.value());
     return result;
   }
 
@@ -50,7 +50,6 @@ export class UserProvidedDefault extends FromUser {
     this.originalAttribute = originalAttribute as Attribute | null;
     if (values.length === 5) {
       this._value = value;
-      this._hasValue = true;
       return value;
     }
     return null;

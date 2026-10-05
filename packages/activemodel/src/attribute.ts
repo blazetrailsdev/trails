@@ -32,8 +32,7 @@ export abstract class Attribute {
   readonly type: ValueType | null;
   /** @internal */
   originalAttribute: Attribute | null;
-  protected _value: unknown;
-  protected _hasValue: boolean;
+  declare protected _value: unknown;
   declare protected __valueForDatabase: unknown;
 
   static fromDatabase(
@@ -86,20 +85,11 @@ export abstract class Attribute {
     this.type = type;
     this.originalAttribute = originalAttribute;
 
-    if (value != null) {
-      this._value = value;
-      this._hasValue = true;
-    } else {
-      this._value = undefined;
-      this._hasValue = false;
-    }
+    if (value != null) this._value = value;
   }
 
   value(_?: (name: string) => unknown): unknown {
-    if (!this._hasValue) {
-      this._value = this.typeCast(this.valueBeforeTypeCast);
-      this._hasValue = true;
-    }
+    if (!Object.hasOwn(this, "_value")) this._value = this.typeCast(this.valueBeforeTypeCast);
     return this._value;
   }
 
@@ -182,7 +172,7 @@ export abstract class Attribute {
   }
 
   hasBeenRead(): boolean {
-    return this._hasValue;
+    return Object.hasOwn(this, "_value");
   }
 
   equals(other: Attribute): boolean {
@@ -218,7 +208,7 @@ export abstract class Attribute {
 
   /** @missingRailsName value — PERMANENT */
   private initializeDup(_other: Attribute): void {
-    if (isDuplicable(this._value)) {
+    if (this._value != null && isDuplicable(this._value)) {
       this._value = rbObjDup(this._value);
     }
   }
@@ -236,8 +226,7 @@ export abstract class Attribute {
     this._valueBeforeTypeCast = coder["value_before_type_cast"] ?? null;
     self.type = (coder["type"] ?? null) as ValueType | null;
     this.originalAttribute = (coder["original_attribute"] ?? null) as Attribute | null;
-    this._hasValue = hasKey(coder, "value");
-    if (this._hasValue) this._value = coder["value"];
+    if (hasKey(coder, "value")) this._value = coder["value"];
   }
 
   encodeWith(coder: Psych.Coder): void {
@@ -247,7 +236,7 @@ export abstract class Attribute {
     }
     if (this.type) coder["type"] = this.type;
     if (this.originalAttribute) coder["original_attribute"] = this.originalAttribute;
-    if (this._hasValue) coder["value"] = this.value();
+    if (Object.hasOwn(this, "_value")) coder["value"] = this.value();
   }
 
   withUserDefault(value: unknown): Attribute {
@@ -264,6 +253,8 @@ export abstract class Attribute {
   }
 }
 
+rbDeclareIvar(Attribute, "@value_before_type_cast", "_valueBeforeTypeCast");
+rbDeclareIvar(Attribute, "@value", "_value");
 rbDeclareIvar(Attribute, "@value_for_database", "__valueForDatabase");
 
 export class FromDatabase extends Attribute {
