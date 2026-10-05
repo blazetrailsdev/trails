@@ -5072,12 +5072,13 @@ function awaitedCollect(
  * (`activerecord/lib/active_record/migration.rb:1460-1469`) whose block awaits
  * in the port, so `Array#filter` cannot carry it: a callback's promise is
  * always truthy. The body is one `if` with no `else`, whose test awaits and
- * whose only statement pushes the loop's own element onto a local the
- * enclosing function declares as an empty array, the filter's result. That is
- * the block's predicate deciding membership, as a `filter` callback's value
- * does, and neither a loop nor an arm. A push onto anything else (a field, a
- * parameter, an array already holding elements) is a side effect, and stays a
- * loop with an arm.
+ * whose only statement pushes the loop's own element onto the filter's
+ * result: a local declared as an empty array in a block enclosing the loop,
+ * which the function returns by name. That is the block's predicate deciding
+ * membership, as a `filter` callback's value does, and neither a loop nor an
+ * arm. A push onto anything else (a field, a parameter, an array already
+ * holding elements, one declared in another scope, one never returned) is a
+ * side effect, and stays a loop with an arm.
  */
 function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined {
   const declared = statement.initializer;
@@ -5107,23 +5108,41 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
   }
   const result = push.expression.expression.text;
   const owner = ts.findAncestor(statement, ts.isFunctionLike);
-  let declaresResult = false;
+  if (owner === undefined) return undefined;
+  const declaresResult = (block: ts.Node): boolean =>
+    ts.isBlock(block) &&
+    block.statements.some(
+      (s) =>
+        ts.isVariableStatement(s) &&
+        s.declarationList.declarations.some(
+          (d) =>
+            ts.isIdentifier(d.name) &&
+            d.name.text === result &&
+            d.initializer !== undefined &&
+            ts.isArrayLiteralExpression(d.initializer) &&
+            d.initializer.elements.length === 0,
+        ),
+    );
+  if (ts.findAncestor(statement.parent, (n) => n === owner || declaresResult(n)) === owner) {
+    if (!("body" in owner) || owner.body === undefined || !declaresResult(owner.body)) {
+      return undefined;
+    }
+  }
+  let returnsResult = false;
   const find = (n: ts.Node): void => {
     if (n !== owner && ts.isFunctionLike(n)) return;
     if (
-      ts.isVariableDeclaration(n) &&
-      ts.isIdentifier(n.name) &&
-      n.name.text === result &&
-      n.initializer !== undefined &&
-      ts.isArrayLiteralExpression(n.initializer) &&
-      n.initializer.elements.length === 0
+      ts.isReturnStatement(n) &&
+      n.expression !== undefined &&
+      ts.isIdentifier(n.expression) &&
+      n.expression.text === result
     ) {
-      declaresResult = true;
+      returnsResult = true;
     }
     ts.forEachChild(n, find);
   };
-  if (owner !== undefined) find(owner);
-  if (!declaresResult) return undefined;
+  find(owner);
+  if (!returnsResult) return undefined;
   let awaits = false;
   const scan = (n: ts.Node): void => {
     if (ts.isFunctionLike(n)) return;

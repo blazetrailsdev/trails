@@ -307,9 +307,18 @@ export async function _returningColumnsForInsert(
   return memoize(pkArr.filter((p) => colNames.has(p)));
 }
 
-export function resetSequenceName(this: SchemaHost): void {
+export async function resetSequenceName(this: SchemaHost): Promise<string | null> {
   this._explicitSequenceName = false;
-  this._sequenceName = null;
+  return (this._sequenceName = await (this as unknown as typeof Base).withConnection((c) =>
+    (
+      c as unknown as {
+        defaultSequenceName(
+          tableName: string | null,
+          primaryKey: string | string[],
+        ): Promise<string | null> | string | null;
+      }
+    ).defaultSequenceName(this.tableName, this.primaryKey),
+  ));
 }
 
 export function isPrefetchPrimaryKey(this: SchemaHost): boolean {
@@ -672,13 +681,16 @@ export function inheritanceColumn(this: SchemaHost, value?: string | null): stri
   return this._inheritanceColumn ?? "type";
 }
 
-export function sequenceName(this: SchemaHost): string | null {
+export async function sequenceName(this: SchemaHost): Promise<string | null> {
   if (isBaseClass(this as unknown as typeof Base)) {
-    const pk = this.primaryKey;
-    if (Array.isArray(pk)) return this._sequenceName;
-    return this._sequenceName ?? `${this.tableName}_${pk}_seq`;
+    return ownSchemaMemo(this, "_sequenceName") ?? (await resetSequenceName.call(this));
+  } else {
+    return (
+      ownSchemaMemo(this, "_sequenceName") ??
+      (this._sequenceName = null) ??
+      baseClass.call(this as unknown as typeof Base).sequenceName
+    );
   }
-  return this._sequenceName ?? baseClass.call(this as unknown as typeof Base).sequenceName;
 }
 
 export function setSequenceName(this: SchemaHost, value: string | null): void {

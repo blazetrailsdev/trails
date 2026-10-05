@@ -771,7 +771,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
       await connection.resetPkSequenceBang(
         model.tableName!,
         model.primaryKey as string,
-        model.sequenceName,
+        await model.sequenceName,
       );
 
       await instance.saveBang();

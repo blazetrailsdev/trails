@@ -66,7 +66,7 @@ export const TestHelper = {
 
   async teardown(this: TestHelper): Promise<void> {
     TestModel.resetTableName();
-    TestModel.resetSequenceName();
+    await TestModel.resetSequenceName();
     await this.connection.dropTable("test_models", { ifExists: true });
   },
 };

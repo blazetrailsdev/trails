@@ -226,7 +226,7 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "p_";
       Base.tableNameSuffix = "_s";
       Thing.resetTableName();
-      Thing.resetSequenceName();
+      await Thing.resetSequenceName();
       await WeNeedThings.migrate("up");
       expect(await Thing.tableExists()).toBeTruthy();
       Thing.resetColumnInformation();
@@ -242,7 +242,7 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "";
       Base.tableNameSuffix = "";
       Thing.resetTableName();
-      Thing.resetSequenceName();
+      await Thing.resetSequenceName();
       await adapter.dropTable("p_things_s", "p_awesome_things_s", { ifExists: true });
     }
   });
@@ -1233,7 +1233,7 @@ describe("MigrationTest", () => {
       Base.tableNamePrefix = "prefix_";
       Base.tableNameSuffix = "_suffix";
       Reminder.resetTableName();
-      Reminder.resetSequenceName();
+      await Reminder.resetSequenceName();
       await WeNeedReminders.migrate("up");
       expect(await Reminder.tableExists()).toBeTruthy();
       Reminder.resetColumnInformation();
@@ -1243,7 +1243,7 @@ describe("MigrationTest", () => {
       await WeNeedReminders.migrate("down");
       await assertRaises([StatementInvalid], {}, () => Reminder.first());
     } finally {
-      Reminder.resetSequenceName();
+      await Reminder.resetSequenceName();
     }
   });
 
@@ -1634,7 +1634,7 @@ AND query LIKE '%${lockId}%'`;
       connection = await Base.leaseConnection();
       await connection.createTable("delete_me", { force: true }, () => {});
       Person.resetColumnInformation();
-      Person.resetSequenceName();
+      await Person.resetSequenceName();
     });
 
     afterEach(async () => {
@@ -1871,7 +1871,7 @@ AND query LIKE '%${lockId}%'`;
     beforeEach(async () => {
       connection = await Person.leaseConnection();
       Person.resetColumnInformation();
-      Person.resetSequenceName();
+      await Person.resetSequenceName();
     });
 
     afterEach(async () => {

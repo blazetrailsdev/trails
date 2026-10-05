@@ -1000,7 +1000,7 @@ export class Base extends Model {
 
   static _sequenceName: string | null = null;
 
-  static get sequenceName(): string | null {
+  static get sequenceName(): Promise<string | null> {
     return ModelSchema.sequenceName.call(this);
   }
 
