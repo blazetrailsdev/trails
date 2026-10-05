@@ -197,8 +197,7 @@ describe("AttributesTest", () => {
     expect(data.string_field).toEqual("default string");
   });
 
-  // BLOCKED: attributes-marshal-round-trip-needs-usrmarshal-arm
-  it.skip("attributes with proc defaults can be marshalled", () => {
+  it("attributes with proc defaults can be marshalled", () => {
     const data = new ModelForAttributesTest();
     const attributes = rbObjIvarGet(data, "@attributes");
     const roundTripped = Marshal.load(Marshal.dump(data)) as ModelForAttributesTest;

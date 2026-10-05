@@ -15,8 +15,12 @@ import {
   lessThan,
   lessThanOrEqual,
   Rational,
+  rational,
   rbCDate,
+  rbDbl2num,
+  rbDefineAllocFunc,
   rubyClass,
+  TEMPORAL_METHOD_TABLE,
 } from "@blazetrails/ruby-compat";
 import { rbWarning } from "./rb-warning.js";
 
@@ -5523,6 +5527,7 @@ export class Date extends rbCDate {
   }
 
   cmp(other: unknown): number | null {
+    if (other instanceof Temporal.PlainDate) other = new Date(other);
     if (!(other instanceof Date)) return cmpGen(this, other);
 
     if (!(simpleDatP(this) && simpleDatP(other) && this.isGregorian === other.isGregorian))
@@ -5717,8 +5722,18 @@ export class Date extends rbCDate {
     return deconstructKeys(this, keys, false);
   }
 
-  marshalDump(): [bigint, number, number, Rational, number, number] {
-    return [this.nth, this.mJd(), this.mDf(), this.mSf(), this.mOf(), this.sg];
+  marshalDump(): [bigint, number, number, number | bigint | Rational, number, number] {
+    const sf = this.mSf();
+    const a: [bigint, number, number, number | bigint | Rational, number, number] = [
+      this.nth,
+      this.mJd(),
+      this.mDf(),
+      wholenumP(sf) ? bigNorm(sf.numerator) : sf,
+      this.mOf(),
+      rbDbl2num(this.sg),
+    ];
+
+    return a;
   }
 
   marshalLoad(a: unknown[]): this {
@@ -5758,10 +5773,10 @@ export class Date extends rbCDate {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
@@ -6597,10 +6612,10 @@ export class DateTime extends DateWithoutParseStatics {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
@@ -6762,6 +6777,15 @@ export class DateTime extends DateWithoutParseStatics {
     );
   }
 }
+
+rbDefineAllocFunc(Date, (klass) => new klass(SEAT, 0n, 0, DEFAULT_SG));
+rbDefineAllocFunc(
+  DateTime,
+  (klass) => new klass(SEAT, 0n, 0, 0, new Rational(0, 1), 0, DEFAULT_SG),
+);
+
+TEMPORAL_METHOD_TABLE["Temporal.PlainDate"].marshalDump = (self: Temporal.PlainDate) =>
+  new Date(self).marshalDump();
 
 registerConstant("Date", Date);
 registerConstant("DateTime", DateTime);

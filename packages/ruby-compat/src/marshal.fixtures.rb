@@ -56,6 +56,7 @@ FIXTURES = {
   "object nested path" => Geo::Shape.new(:circle),
   "object link" => [shared, shared],
   "user marshal" => [cache = Cache.new(1, { posts => [shared] }), cache],
+  "rational" => [half = Rational(1, 2), half, Rational(-3, 4), Rational(2**70, 3)],
   "schema cache" => [20_240_101_000_000, { posts => [Column.new(id, :integer)] }, {}, { posts => id }, { posts => true }, {}],
 }
 

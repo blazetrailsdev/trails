@@ -1325,7 +1325,12 @@ export function rbDefineAllocFunc<K extends abstract new (...args: never) => obj
   allocFuncs.set(klass, func);
 }
 
-function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined {
+/**
+ * `rb_get_alloc_func` (`vendor/ruby/v3.3.11/vm_method.c:1286`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | undefined {
   for (; typeof klass === "function"; klass = Object.getPrototypeOf(klass)) {
     const allocator = allocFuncs.get(klass);
     if (allocator) return allocator;
@@ -1536,6 +1541,7 @@ classpaths.set(rbMComparable, { path: "Comparable", permanent: true });
 Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
+rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
 for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass, rbCNumeric);
   Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);
