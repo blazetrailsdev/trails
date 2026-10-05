@@ -21,6 +21,7 @@ import type {
   ColumnType,
 } from "../connection-adapters/abstract/schema-definitions.js";
 
+/** @inventedArm if — PERMANENT */
 export function find(version: string | number): unknown {
   version =
     typeof version === "number" && Number.isInteger(version) ? `${version}.0` : `${version}`;
@@ -515,7 +516,10 @@ export class V5_0 extends V5_1 {
     options?: Parameters<Current["createJoinTable"]>[2],
     fn?: Parameters<Current["createJoinTable"]>[3],
   ): Promise<void> {
-    if (typeof options === "function") [options, fn] = [{}, options];
+    if (typeof options === "function") {
+      fn = options;
+      options = undefined;
+    }
     const columnOptions = { type: "integer", ...options?.columnOptions };
     await super.createJoinTable(table1, table2, { ...options, columnOptions }, fn);
   }

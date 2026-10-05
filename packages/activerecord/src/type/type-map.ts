@@ -1,9 +1,10 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
+import { Concurrent, block as blockPass, rbEqq } from "@blazetrails/ruby-compat";
 
 export class TypeMap {
   private _mapping: Map<string | RegExp, (...args: string[]) => ValueType> = new Map();
   private _parent?: TypeMap;
-  private _cache: Map<string | null, ValueType> = new Map();
+  private _cache = new Concurrent.Map<string | null, ValueType>();
 
   constructor(parent?: TypeMap) {
     this._parent = parent;
@@ -13,12 +14,11 @@ export class TypeMap {
     return this.fetch(lookupKey, () => new ValueType());
   }
 
-  fetch(lookupKey: string | null, fallback?: (key: string) => ValueType): ValueType {
-    const cached = this._cache.get(lookupKey);
-    if (cached) return cached;
-    const result = this.performFetch(lookupKey, fallback);
-    this._cache.set(lookupKey, result);
-    return result;
+  fetch(lookupKey: string | null, block?: (key: string) => ValueType): ValueType {
+    return this._cache.fetchOrStore(
+      lookupKey,
+      blockPass(() => this.performFetch(lookupKey, block)),
+    );
   }
 
   registerType(
@@ -43,25 +43,15 @@ export class TypeMap {
   }
 
   /** @missingRailsCall call — PERMANENT */
-  protected performFetch(
-    lookupKey: string | null,
-    fallback?: (key: string) => ValueType,
-  ): ValueType {
-    const matchingPair = [...this._mapping.entries()]
-      .reverse()
-      .find(([key]) =>
-        typeof key === "string"
-          ? key === lookupKey
-          : lookupKey !== null && ((key.lastIndex = 0), key.test(lookupKey)),
-      );
+  protected performFetch(lookupKey: string | null, block?: (key: string) => ValueType): ValueType {
+    const matchingPair = [...this._mapping].reverse().find(([key]) => rbEqq(key, lookupKey));
 
     if (matchingPair) {
       return matchingPair[1](lookupKey as string);
     } else if (this._parent) {
-      return this._parent.performFetch(lookupKey, fallback);
-    } else if (fallback) {
-      return fallback(lookupKey as string);
+      return this._parent.performFetch(lookupKey, block);
+    } else {
+      return block!(lookupKey as string);
     }
-    return new ValueType();
   }
 }

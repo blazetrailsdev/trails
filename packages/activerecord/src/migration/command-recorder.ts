@@ -1,5 +1,20 @@
-import { Module, hasKey, include, uniq } from "@blazetrails/ruby-compat";
-import { extractOptionsBang, isPlainObject, methodMissingProxy } from "@blazetrails/activesupport";
+import {
+  Module,
+  compact,
+  hasKey,
+  hashDelete,
+  include,
+  isEmpty,
+  rbFSend,
+  rbObjDup,
+  uniq,
+} from "@blazetrails/ruby-compat";
+import {
+  extractOptionsBang,
+  isBlank,
+  isPlainObject,
+  methodMissingProxy,
+} from "@blazetrails/activesupport";
 
 import { ActiveRecord } from "../namespaces.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
@@ -94,29 +109,23 @@ export class CommandRecorder {
     ).call(this, args, block);
   }
 
-  /** @missingRailsName delegate — PERMANENT */
   async changeTable(
     tableName: string,
-    options: ((t: Table) => Promise<void> | void) | Record<string, unknown>,
-    fn?: (t: Table) => Promise<void> | void,
+    options: Record<string, unknown> | ((t: Table) => Promise<void> | void) = {},
+    block?: (t: Table) => Promise<void> | void,
   ): Promise<void> {
-    const callback = typeof options === "function" ? options : fn;
-    if (!callback) {
-      throw new TypeError(
-        "changeTable requires a callback. Rails change_table always takes a block.",
-      );
+    if (typeof options === "function") {
+      block = options;
+      options = {};
     }
-    const delegate = this._delegate as {
-      supportsBulkAlter?(): boolean;
+    const delegate = this.delegate as {
+      supportsBulkAlter(): boolean;
       updateTableDefinition(tableName: string, base: unknown): Table;
     };
-    const supportsBulk =
-      typeof delegate?.supportsBulkAlter === "function" && delegate.supportsBulkAlter() === true;
-
-    if (typeof options !== "function" && options["bulk"] && supportsBulk) {
-      const recorder = new CommandRecorder(this._delegate);
+    if (delegate.supportsBulkAlter() && options["bulk"]) {
+      const recorder = new CommandRecorder(this.delegate);
       recorder.reverting = this._reverting;
-      await callback(delegate.updateTableDefinition(tableName, recorder));
+      await block!(delegate.updateTableDefinition(tableName, recorder));
       const commands = recorder.commands;
       this._commands.push([
         "changeTable",
@@ -129,20 +138,13 @@ export class CommandRecorder {
           ).bulkChangeTable(tableName, commands),
       ]);
     } else {
-      await callback(delegate.updateTableDefinition(tableName, this));
+      await block!(delegate.updateTableDefinition(tableName, this));
     }
   }
 
-  async replay(migration: { [key: string]: (...args: any[]) => Promise<void> }): Promise<void> {
+  async replay(migration: unknown): Promise<void> {
     for (const [cmd, args, block] of this.commands) {
-      const rest = [...args, ...(block === undefined ? [] : [block])];
-      if (typeof migration[cmd] === "function") {
-        await migration[cmd](...rest);
-      } else {
-        await (
-          migration as unknown as { methodMissing(name: string, ...args: unknown[]): Promise<void> }
-        ).methodMissing(cmd, ...rest);
-      }
+      await rbFSend(migration, cmd, ...args, ...compact([block]));
     }
   }
 
@@ -238,31 +240,20 @@ export class CommandRecorder {
 
   /** @internal */
   invertRemoveIndex(args: unknown[]): [string, unknown[]] {
-    const a = args.slice();
-    let options: Record<string, unknown> = {};
-    if (
-      a.length > 0 &&
-      typeof a[a.length - 1] === "object" &&
-      a[a.length - 1] !== null &&
-      !Array.isArray(a[a.length - 1])
-    ) {
-      options = { ...(a.pop() as Record<string, unknown>) };
-    }
-    const table = a[0];
-    let columns = a[1];
-    if (columns === undefined) {
-      columns = options["column"];
-      delete options["column"];
-    }
-    if (!columns) {
+    const options = extractOptionsBang(args);
+    const table = args[0];
+    let columns = args[1];
+    columns ??= hashDelete(options, "column");
+    if (columns == null) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_index is only reversible if given a :column option.",
       );
     }
+
     delete options["ifExists"];
-    const result: unknown[] = [table, columns];
-    if (Object.keys(options).length > 0) result.push(options);
-    return ["addIndex", result];
+    args = [table, columns];
+    if (!isEmpty(options)) args.push(options);
+    return ["addIndex", args];
   }
 
   /** @internal */
@@ -303,25 +294,19 @@ export class CommandRecorder {
 
   /** @internal */
   invertRemoveForeignKey(args: unknown[]): [string, unknown[]] {
-    const a = args.slice();
-    let options: Record<string, unknown> = {};
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
-      options = { ...(a.pop() as Record<string, unknown>) };
-    }
-    const fromTable = a[0];
-    let toTable = a[1];
-    if (toTable === undefined) {
-      toTable = options["toTable"];
-      delete options["toTable"];
-    }
-    if (!toTable) {
+    const options = extractOptionsBang(args);
+    const fromTable = args[0];
+    let toTable = args[1];
+    toTable ??= hashDelete(options, "toTable");
+    if (toTable == null) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_foreign_key is only reversible if given a second table",
       );
     }
-    const result: unknown[] = [fromTable, toTable];
-    if (Object.keys(options).length > 0) result.push(options);
-    return ["addForeignKey", result];
+
+    const reversedArgs = [fromTable, toTable];
+    if (!isEmpty(options)) reversedArgs.push(options);
+    return ["addForeignKey", reversedArgs];
   }
 
   /** @internal */
@@ -376,10 +361,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const options =
-      args.length > 0 && typeof args[args.length - 1] === "object" && args[args.length - 1] !== null
-        ? (args[args.length - 1] as Record<string, unknown>)
-        : {};
+    const options = extractOptionsBang(rbObjDup(args));
     if (options["usingIndex"]) {
       throw new ActiveRecord.IrreversibleMigration(
         "add_unique_constraint is not reversible if given an using_index.",
@@ -392,17 +374,10 @@ export class CommandRecorder {
 
   /** @internal */
   invertRemoveUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    if (
-      a.length > 0 &&
-      typeof a[a.length - 1] === "object" &&
-      a[a.length - 1] !== null &&
-      !Array.isArray(a[a.length - 1])
-    ) {
-      a.pop();
-    }
-    const columns = a[1];
-    if (!columns) {
+    const dup = rbObjDup(args);
+    extractOptionsBang(dup);
+    const [_table, columns] = dup;
+    if (isBlank(columns)) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_unique_constraint is only reversible if given an column_name.",
       );
@@ -532,16 +507,10 @@ export class CommandRecorder {
 
   /** @internal */
   invertDropEnum(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    if (
-      a.length > 0 &&
-      typeof a[a.length - 1] === "object" &&
-      a[a.length - 1] !== null &&
-      !Array.isArray(a[a.length - 1])
-    ) {
-      a.pop();
-    }
-    if (a[1] === undefined) {
+    const dup = rbObjDup(args);
+    extractOptionsBang(dup);
+    const [_enum, values] = dup;
+    if (values == null) {
       throw new ActiveRecord.IrreversibleMigration(
         "drop_enum is only reversible if given a list of enum values.",
       );
@@ -586,16 +555,10 @@ export class CommandRecorder {
 
   /** @internal */
   invertDropVirtualTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    if (
-      a.length > 0 &&
-      typeof a[a.length - 1] === "object" &&
-      a[a.length - 1] !== null &&
-      !Array.isArray(a[a.length - 1])
-    ) {
-      a.pop();
-    }
-    if (a[1] === undefined) {
+    const dup = rbObjDup(args);
+    extractOptionsBang(dup);
+    const [_enum, values] = dup;
+    if (values == null) {
       throw new ActiveRecord.IrreversibleMigration(
         "drop_virtual_table is only reversible if given options.",
       );

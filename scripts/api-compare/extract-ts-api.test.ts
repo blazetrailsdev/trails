@@ -1261,6 +1261,19 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
   });
 
+  it("reads a plain function popped off a splat as the `&block` binding too", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        withLock(...args: unknown[]) {
+          const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
+          return typeof args[args.length - 1] === "string" ? args.pop() : this.transaction(block);
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("withLock")!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
   it("reads the spread-forward of a captured `&block` as the block itself, not as an arm", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -1780,6 +1793,11 @@ describe("body call capture", () => {
           for (const m of runnable) if (await this.isRan(m)) seen.push(m);
           for (const m of runnable) if (await this.isRan(m)) this.ran.push(m);
         }
+        async consumed(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (!(await this.isRan(m))) kept.push(m);
+          if (any(kept)) this.fail();
+        }
         async discarded(runnable: unknown[]) {
           const kept: unknown[] = [];
           for (const m of runnable) if (await this.isRan(m)) kept.push(m);
@@ -1811,6 +1829,7 @@ describe("body call capture", () => {
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("reject")).toEqual(["ref:filter", "ref:isRan"]);
     expect(skeleton("findAll")).toEqual(["ref:filter", "ref:isRan"]);
+    expect(skeleton("consumed")).toEqual(["ref:filter", "ref:isRan", "if", "ref:any", "ref:fail"]);
     expect(skeleton("sync")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
     expect(skeleton("mapped")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:wrap"]);
     expect(skeleton("alternate")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:skip"]);

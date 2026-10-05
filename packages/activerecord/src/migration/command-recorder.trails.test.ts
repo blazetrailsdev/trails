@@ -6,13 +6,16 @@ import { Table as PgTable } from "../connection-adapters/postgresql/schema-defin
 import { Table as MysqlTable } from "../connection-adapters/mysql/schema-definitions.js";
 
 const abstractDelegate = {
+  supportsBulkAlter: () => false,
   updateTableDefinition: (tableName: string, base: unknown) => new Table(tableName, base as never),
 };
 const pgDelegate = {
+  supportsBulkAlter: () => false,
   updateTableDefinition: (tableName: string, base: unknown) =>
     new PgTable(tableName, base as never),
 };
 const mysqlDelegate = {
+  supportsBulkAlter: () => false,
   updateTableDefinition: (tableName: string, base: unknown) =>
     new MysqlTable(tableName, base as never),
 };

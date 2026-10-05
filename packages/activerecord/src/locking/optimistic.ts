@@ -198,16 +198,15 @@ export async function _updateRow(
 }
 
 /** @internal */
-export function destroyRow(
+export async function destroyRow(
   this: InstanceLockingHost,
   superFn: () => number | Promise<number>,
-): number | Promise<number> {
-  const ctor = this.constructor;
-  if (!ctor.lockingEnabled) return superFn();
-  return Promise.resolve(superFn()).then((affected) => {
-    if (affected !== 1) throw new StaleObjectError(this, "destroy");
-    return affected;
-  });
+): Promise<number> {
+  const affectedRows = await superFn();
+  if (this.constructor.lockingEnabled && affectedRows !== 1) {
+    throw new StaleObjectError(this, "destroy");
+  }
+  return affectedRows;
 }
 
 /** @internal */

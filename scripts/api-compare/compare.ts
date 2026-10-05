@@ -209,6 +209,7 @@ function isEnumeratorReceiver(name: string, next: string | undefined): boolean {
   if (!isPlainLoop(name) || next?.startsWith("ref:") !== true) return false;
   const chained = next.slice("ref:".length);
   if (name === "each_with_index" && INDEXED_ENUMERATOR_CONSUMERS.has(chained)) return true;
+  if (name === "reverse_each" && REVERSED_ENUMERATOR_CONSUMERS.has(chained)) return true;
   return SKELETON_IDIOM_LOWERINGS.has(chained) && !isPlainLoop(chained);
 }
 
@@ -228,6 +229,15 @@ function isPlainLoop(name: string): boolean {
  * index, so the Enumerator stands for no loop of its own.
  */
 const INDEXED_ENUMERATOR_CONSUMERS = new Set(["map", "flat_map", "select", "reject", "to_a"]);
+
+/**
+ * The call-keeping iterators a blockless `reverse_each` is chained into:
+ * `@mapping.reverse_each.detect { |key, _| key === lookup_key }`
+ * (activerecord/lib/active_record/type/type_map.rb:44-46) is
+ * `[...this._mapping].reverse().find(([key]) => …)`, whose `find` carries the
+ * iteration, so the Enumerator stands for no loop of its own.
+ */
+const REVERSED_ENUMERATOR_CONSUMERS = new Set(["detect", "find", "map", "select", "reject"]);
 
 /**
  * The control tokens `counterpart` shows BEYOND the ones the Ruby stream
