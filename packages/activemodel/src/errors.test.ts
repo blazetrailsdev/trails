@@ -16,7 +16,14 @@ import {
   assertNil,
   extend,
 } from "@blazetrails/activesupport";
-import { FrozenError, Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  Marshal,
+  Module,
+  rbModConstSet,
+  rbObjIvarGet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Errors } from "./errors.js";
 import { Error as ModelError } from "./error.js";
@@ -728,8 +735,14 @@ describe("ErrorsTest", () => {
     expect(errors.errors).toEqual(errorsBeforeMerge.errors);
   });
 
-  it.skip("errors are marshalable", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
+  it("errors are marshalable", () => {
+    const errors = new Errors(new Person());
+    errors.add("name", ":invalid");
+    const serialized = Marshal.load(Marshal.dump(errors)) as Errors<Person>;
+
+    expect(rbObjIvarGet(serialized, "@base")!.constructor).toEqual(Person);
+    expect(serialized.messages).toEqual(errors.messages);
+    expect(serialized.details).toEqual(errors.details);
   });
 
   it("errors are compatible with YAML dumped from Rails 6.x", () => {
