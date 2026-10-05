@@ -1,5 +1,4 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import type { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import type { Request } from "../../action-dispatch/http/request.js";
 import { Base } from "../base.js";
 import { HttpAuthentication } from "../metal/http-authentication.js";
@@ -38,8 +37,7 @@ class DummyController extends Base {
   private authenticateWithRequest(): unknown {
     if (
       this.authenticateWithHttpToken(
-        (token: string, options: HashWithIndifferentAccess<string>) =>
-          token === '"quote" pretty' && options.get("algorithm") === "test",
+        (token, options) => token === '"quote" pretty' && options.get("algorithm") === "test",
       )
     ) {
       return (this.loggedIn = true);
@@ -64,28 +62,13 @@ const AUTH_HEADERS = [
   "REDIRECT_X_HTTP_AUTHORIZATION",
 ];
 
-function mockAuthorizationRequest(authorization: string): Request {
-  return { authorization } as Request;
-}
-
-function sampleRequest(token: string, options: Record<string, string> = { nonce: "def" }): Request {
-  const authorization = Object.entries(options)
-    .reduce((arr, [k, v]) => [...arr, `${k}="${v}"`], [`Token token="${token}"`])
-    .join(", ");
-  return mockAuthorizationRequest(authorization);
-}
-
-function malformedRequest(): Request {
-  return mockAuthorizationRequest("Token token=");
-}
-
-function sampleRequestWithoutTokenKey(token: string | null): Request {
-  return mockAuthorizationRequest(`Token ${token ?? ""}`);
-}
-
-function encodeCredentials(token: string, options: Record<string, unknown> = {}): string {
-  return Token.encodeCredentials(token, options);
-}
+const Timeout = {
+  async timeout(sec: number, block: () => Promise<void>): Promise<void> {
+    const started = performance.now();
+    await block();
+    if (performance.now() - started > sec * 1000) throw new Error("execution expired");
+  },
+};
 
 describe("HttpTokenAuthenticationTest", () => {
   let tc: TestCase;
@@ -153,9 +136,11 @@ describe("HttpTokenAuthenticationTest", () => {
     );
   });
 
-  it("authentication request with evil header", { timeout: 1000 }, async () => {
+  it("authentication request with evil header", async () => {
     tc.request.env["HTTP_AUTHORIZATION"] = "Token ." + " ".repeat(1024 * 80 - 8) + ".";
-    await tc.get("index");
+    await Timeout.timeout(1, async () => {
+      await tc.get("index");
+    });
 
     assertResponse("unauthorized");
     expect(tc.response.body, "Authentication header was not properly parsed").toBe(
@@ -284,4 +269,30 @@ describe("HttpTokenAuthenticationTest", () => {
     const expected = token;
     expect(actual).toBe(expected);
   });
+
+  function sampleRequest(
+    token: string,
+    options: Record<string, string> = { nonce: "def" },
+  ): Request {
+    const authorization = Object.entries(options)
+      .reduce((arr, [k, v]) => [...arr, `${k}="${v}"`], [`Token token="${token}"`])
+      .join(", ");
+    return mockAuthorizationRequest(authorization);
+  }
+
+  function malformedRequest(): Request {
+    return mockAuthorizationRequest("Token token=");
+  }
+
+  function sampleRequestWithoutTokenKey(token: string | null): Request {
+    return mockAuthorizationRequest(`Token ${token ?? ""}`);
+  }
+
+  function mockAuthorizationRequest(authorization: string): Request {
+    return { authorization } as Request;
+  }
+
+  function encodeCredentials(token: string, options: Record<string, unknown> = {}): string {
+    return Token.encodeCredentials(token, options);
+  }
 });
