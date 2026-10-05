@@ -206,9 +206,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return this._cookies.has(String(name));
   }
 
-  hasKey(name: string): boolean {
-    return this.isKey(name);
-  }
+  declare hasKey: CookieJar["isKey"];
 
   get keys(): string[] {
     return [...this._cookies.keys()];
@@ -458,6 +456,8 @@ export class AbstractCookieJar {
 
   protected commit(_name: string, _options: SerializedSetOptions): void {}
 }
+
+CookieJar.prototype.hasKey = CookieJar.prototype.isKey;
 
 include(CookieJar, ChainedCookieJars);
 include(AbstractCookieJar, ChainedCookieJars);
