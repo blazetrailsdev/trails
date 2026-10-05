@@ -1,6 +1,6 @@
 import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { NoMethodError } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,
@@ -41,14 +41,14 @@ export function cacheKey(this: Identifiable): string {
     return `${this.modelName.cacheKey}/new`;
   } else {
     if (this.cacheVersion() != null) {
-      return `${this.modelName.cacheKey}/${this.id}`;
+      return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}`;
     } else {
       const timestamp = this.maxUpdatedColumnTimestamp();
 
       if (timestamp != null) {
-        return `${this.modelName.cacheKey}/${this.id}-${toFs(timestamp.utc(), this.cacheTimestampFormat)}`;
+        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}-${toFs(timestamp.utc(), this.cacheTimestampFormat)}`;
       } else {
-        return `${this.modelName.cacheKey}/${this.id}`;
+        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}`;
       }
     }
   }
