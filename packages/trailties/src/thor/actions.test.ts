@@ -1,11 +1,23 @@
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { assertRaises, capture } from "@blazetrails/activesupport";
-import { Dir, File, FileUtils, getPath, include } from "@blazetrails/ruby-compat";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { assertEmpty, assertRaises, capture } from "@blazetrails/activesupport";
+import {
+  Dir,
+  File,
+  FileUtils,
+  getChildProcess,
+  getPath,
+  include,
+  setExitCode,
+  SystemExit,
+} from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "./actions.js";
 import { Shell } from "./shell.js";
 import { Thor } from "./thor.js";
 import { GeneratorBase } from "../generators/base.js";
 import { Error as ThorError } from "./error.js";
+import * as Util from "./util.js";
+
+vi.mock("./util.js", async (importOriginal) => ({ ...(await importOriginal<typeof Util>()) }));
 
 let fixtures: string;
 let destinationRoot: string;
@@ -23,6 +35,8 @@ type CounterInstance = ActionsHost & {
   foo?: string;
   inRoot<T>(block: () => T | Promise<T>): Promise<T>;
   relativeToOriginalDestinationRoot(path: string, removeDot?: boolean): string;
+  runRubyScript(command: unknown, config?: Record<string, unknown>): Promise<unknown>;
+  thor(command: unknown, ...args: unknown[]): Promise<unknown>;
 };
 class Counter extends Thor {
   declare static addRuntimeOptionsBang: () => void;
@@ -342,6 +356,196 @@ describe("Thor::Actions", () => {
       const content = await action(counter(), file, { verbose: false });
       expect(content).toMatch(/cool {2}padding/);
       expect(content).not.toMatch(/apply http/);
+    });
+  });
+
+  type Adapter = Required<ReturnType<typeof getChildProcess>>;
+  const receiveSystem = () =>
+    vi
+      .spyOn(getChildProcess() as Adapter, "system")
+      .mockResolvedValue({ pid: 1, status: 0, signal: null });
+
+  describe("#run", () => {
+    const action = (r: CounterInstance, ...args: Parameters<CounterInstance["run"]>) =>
+      capture(":stdout", () => r.run(...args));
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+      setExitCode(0);
+    });
+
+    describe("when not pretending", () => {
+      let system: ReturnType<typeof receiveSystem>;
+      beforeEach(() => {
+        system = receiveSystem();
+      });
+      afterEach(() => {
+        expect(system).toHaveBeenCalledWith("ls", expect.anything());
+      });
+
+      it("executes the command given", async () => {
+        await action(counter(), "ls");
+      });
+
+      it("logs status", async () => {
+        expect(await action(counter(), "ls")).toBe('         run  ls from "."\n');
+      });
+
+      it("does not log status if required", async () => {
+        assertEmpty(await action(counter(), "ls", { verbose: false }));
+      });
+
+      it("accepts a color as status", async () => {
+        const r = counter();
+        const sayStatus = vi.spyOn(r.shell, "sayStatus").mockImplementation(() => {});
+        await action(r, "ls", { verbose: ":yellow" });
+        expect(sayStatus).toHaveBeenCalledWith("run", 'ls from "."', ":yellow");
+      });
+    });
+
+    describe("when pretending", () => {
+      it("doesn't execute the command", async () => {
+        const r = new Counter([1], ["--pretend"], {
+          destinationRoot,
+        }) as unknown as CounterInstance;
+        const system = receiveSystem();
+        await r.run("ls", { verbose: false });
+        expect(system).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when not capturing", () => {
+      it("aborts when abort_on_failure is given and command fails", async () => {
+        await expect(action(counter(), "false", { abortOnFailure: true })).rejects.toThrow(
+          SystemExit,
+        );
+      });
+
+      it("succeeds when abort_on_failure is given and command succeeds", async () => {
+        await expect(action(counter(), "true", { abortOnFailure: true })).resolves.not.toThrow();
+      });
+
+      it("supports env option", async () => {
+        const system = vi.spyOn(getChildProcess() as Adapter, "system");
+        await action(counter(), "echo $BAR", { env: { BAR: "foo" } });
+        expect(system).toHaveBeenCalledWith("echo $BAR", expect.objectContaining({ BAR: "foo" }));
+      });
+    });
+
+    describe("when capturing", () => {
+      it("aborts when abort_on_failure is given, capture is given and command fails", async () => {
+        await expect(
+          action(counter(), "false", { abortOnFailure: true, capture: true }),
+        ).rejects.toThrow(SystemExit);
+      });
+
+      it("succeeds when abort_on_failure is given and command succeeds", async () => {
+        await expect(
+          action(counter(), "true", { abortOnFailure: true, capture: true }),
+        ).resolves.not.toThrow();
+      });
+
+      it("supports env option", async () => {
+        await capture(":stdout", async () => {
+          expect(await counter().run("echo $BAR", { env: { BAR: "foo" }, capture: true })).toBe(
+            "foo\n",
+          );
+        });
+      });
+    });
+
+    describe("exit_on_failure? is true", () => {
+      beforeEach(() => {
+        vi.spyOn(
+          Counter as unknown as { isExitOnFailure(): boolean },
+          "isExitOnFailure",
+        ).mockReturnValue(true);
+      });
+
+      it("aborts when command fails even if abort_on_failure is not given", async () => {
+        await expect(action(counter(), "false")).rejects.toThrow(SystemExit);
+      });
+
+      it("does not abort when abort_on_failure is false even if the command fails", async () => {
+        await expect(action(counter(), "false", { abortOnFailure: false })).resolves.not.toThrow();
+      });
+    });
+  });
+
+  describe("#run_ruby_script", () => {
+    let system: ReturnType<typeof receiveSystem>;
+    const action = (r: CounterInstance, ...args: Parameters<CounterInstance["runRubyScript"]>) =>
+      capture(":stdout", () => r.runRubyScript(...args));
+
+    beforeEach(() => {
+      vi.spyOn(Util, "rubyCommand").mockReturnValue("/opt/jruby");
+      system = receiveSystem();
+    });
+    afterEach(() => {
+      expect(system).toHaveBeenCalledWith("/opt/jruby script.rb", expect.anything());
+      vi.restoreAllMocks();
+    });
+
+    it("executes the ruby script", async () => {
+      await action(counter(), "script.rb");
+    });
+
+    it("logs status", async () => {
+      expect(await action(counter(), "script.rb")).toBe('         run  jruby script.rb from "."\n');
+    });
+
+    it("does not log status if required", async () => {
+      assertEmpty(await action(counter(), "script.rb", { verbose: false }));
+    });
+  });
+
+  describe("#thor", () => {
+    const action = (r: CounterInstance, ...args: Parameters<CounterInstance["thor"]>) =>
+      capture(":stdout", () => r.thor(...args));
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it("executes the thor command", async () => {
+      const system = receiveSystem();
+      await action(counter(), "list", { verbose: true });
+      expect(system).toHaveBeenCalledWith("thor list", expect.anything());
+    });
+
+    it("converts extra arguments to command arguments", async () => {
+      const system = receiveSystem();
+      await action(counter(), "list", "foo", "bar");
+      expect(system).toHaveBeenCalledWith("thor list foo bar", expect.anything());
+    });
+
+    it("converts options hash to switches", async () => {
+      const system = receiveSystem();
+      await action(counter(), "list", "foo", "bar", { foo: true });
+      expect(system).toHaveBeenCalledWith("thor list foo bar --foo", expect.anything());
+
+      system.mockClear();
+      await action(counter(), "list", { foo: [1, 2, 3] });
+      expect(system).toHaveBeenCalledWith("thor list --foo 1 2 3", expect.anything());
+    });
+
+    it("logs status", async () => {
+      const system = receiveSystem();
+      expect(await action(counter(), "list")).toBe('         run  thor list from "."\n');
+      expect(system).toHaveBeenCalledWith("thor list", expect.anything());
+    });
+
+    it("does not log status if required", async () => {
+      const system = receiveSystem();
+      assertEmpty(await action(counter(), "list", { foo: [1, 2, 3], verbose: false }));
+      expect(system).toHaveBeenCalledWith("thor list --foo 1 2 3", expect.anything());
+    });
+
+    it("captures the output when :capture is given", async () => {
+      const r = counter();
+      const run = vi.spyOn(r, "run").mockResolvedValue(undefined);
+      await action(r, "list", { capture: true });
+      expect(run).toHaveBeenCalledWith("list", expect.objectContaining({ capture: true }));
     });
   });
 });

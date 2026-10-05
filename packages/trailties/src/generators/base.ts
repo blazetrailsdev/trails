@@ -454,7 +454,8 @@ export abstract class GeneratorBase implements GeneratorActionsState {
       proto = Object.getPrototypeOf(proto) as GeneratorBase
     )
       commands.unshift(...(proto.constructor as typeof GeneratorBase).commands());
-    if (typeof (this.prototype as { run?: unknown }).run === "function") commands.push("run");
+    const run = (this.prototype as { run?: unknown }).run;
+    if (typeof run === "function" && run !== ThorActions.run) commands.push("run");
     for (const name of Object.keys(this.invocations()))
       commands.push(
         `_invokeFromOption${name.charAt(0).toUpperCase()}${name.slice(1).replace(/\W/g, "_")}`,
