@@ -47,20 +47,11 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     tests: ["attributes with proc defaults can be marshalled"],
     reason:
       "Round-trips a model through Marshal.load(Marshal.dump(data)) " +
-      "(activemodel/test/cases/attributes_test.rb:136-143). Ruby marshals any object graph by " +
-      "its ivars and resolves classes by constant name on load; JS has no such serializer to " +
-      "call, and the per-class marshal_dump/marshal_load hooks trails does port " +
-      "(LazyAttributeHash, UserProvidedDefault) have no engine driving them. A dup() round " +
-      "trip would assert something else under Rails' name.",
-  },
-  {
-    testFile: "errors_test.rb",
-    className: "ErrorsTest",
-    tests: ["errors are marshalable"],
-    reason:
-      "Deserializes an ActiveModel::Errors from Marshal.dump/load " +
-      "(activemodel/test/cases/errors_test.rb:670-678). Errors defines no marshal_dump, so " +
-      "it runs Ruby's generic ivar-by-ivar object reconstruction, and trails has no Marshal.",
+      "(activemodel/test/cases/attributes_test.rb:136-143). The proc default is a " +
+      "UserProvidedDefault, which Ruby dumps through its marshal_dump " +
+      "(activemodel/lib/active_model/attribute/user_provided_default.rb:29-38), and " +
+      "ruby-compat's Marshal has no marshal_dump / TYPE_USRMARSHAL arm yet, so the dump raises " +
+      "TypeError on the Proc. Tracked by attributes-marshal-round-trip-needs-usrmarshal-arm.",
   },
   {
     pattern: "message_pack.rb",

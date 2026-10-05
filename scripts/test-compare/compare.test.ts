@@ -501,16 +501,16 @@ describe("main cross-package and parked-stub credit", () => {
   });
 
   it("does not count a pending stub for an unported case as extra", async () => {
-    const name = "errors are marshalable";
-    const stubs = [tc(["ErrorsTest"], name, true), tc(["OtherTest"], name, true)];
+    const name = "attributes with proc defaults can be marshalled";
+    const stubs = [tc(["AttributesTest"], name, true), tc(["OtherTest"], name, true)];
     const result = await compare(
-      "errors_test.rb",
+      "attributes_test.rb",
       {
         activemodel: {
-          files: [{ file: `${PKG_SRC_DIRS.activemodel}errors.test.ts`, testCases: stubs }],
+          files: [{ file: `${PKG_SRC_DIRS.activemodel}attributes.test.ts`, testCases: stubs }],
         },
       },
-      [tc(["ErrorsTest"], name)],
+      [tc(["AttributesTest"], name)],
     );
     expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
   });
