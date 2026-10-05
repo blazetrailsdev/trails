@@ -14,6 +14,7 @@ import {
   indexWith,
   isPresent,
   many,
+  mergeBang,
   reverseMerge,
   reverseMergeBang,
   stringifyKeys,
@@ -203,7 +204,7 @@ export class InsertAll {
   mapKeyWithValue<T>(block: (key: string, value: unknown) => T): T[][] {
     return this.inserts.map((attributes) => {
       attributes = stringifyKeys(attributes);
-      Object.assign(attributes, this.scopeAttributes);
+      mergeBang(attributes, this.scopeAttributes);
       if (this.recordTimestamps()) reverseMergeBang(attributes, this.timestampsForCreate());
 
       this.verifyAttributes(attributes);

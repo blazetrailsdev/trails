@@ -2,7 +2,7 @@ import type { Base } from "./base.js";
 import { modelRegistry, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
-import { IndexedRow } from "./result.js";
+import type { IndexedRow } from "./result.js";
 import {
   camelize,
   classAttribute,
@@ -14,7 +14,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAref, rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -82,14 +82,13 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
 }
 
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
-  const superclass = rbClassSuperclass(this) as typeof Base;
   if (this === ActiveRecord.Base) {
     return false;
-  } else if (superclass.abstractClass) {
-    return superclass.isDescendsFromActiveRecord();
+  } else if (rbClassSuperclass(this)!.abstractClass) {
+    return rbClassSuperclass(this)!.isDescendsFromActiveRecord();
   } else {
     return (
-      superclass === ActiveRecord.Base ||
+      rbClassSuperclass(this) === ActiveRecord.Base ||
       !Object.keys(this.columnsHash()).includes(this.inheritanceColumn as string)
     );
   }
@@ -325,12 +324,7 @@ export function discriminateClassForRecord(
   record: Record<string, unknown> | IndexedRow,
 ): typeof Base {
   if (this.usingSingleTableInheritance(record)) {
-    const inheritanceColumn = this.inheritanceColumn as string;
-    return this.findStiClass(
-      (record instanceof IndexedRow
-        ? record.get(inheritanceColumn)
-        : record[inheritanceColumn]) as string,
-    );
+    return this.findStiClass(hashAref(record, this.inheritanceColumn) as string);
   } else {
     return this;
   }
@@ -341,11 +335,9 @@ export function usingSingleTableInheritance(
   this: typeof Base,
   record: Record<string, unknown> | IndexedRow,
 ): boolean {
-  const inheritanceColumn = this.inheritanceColumn as string;
   return (
-    isPresent(
-      record instanceof IndexedRow ? record.get(inheritanceColumn) : record[inheritanceColumn],
-    ) && this._hasAttribute(inheritanceColumn)
+    isPresent(hashAref(record, this.inheritanceColumn)) &&
+    this._hasAttribute(this.inheritanceColumn as string)
   );
 }
 
@@ -367,12 +359,12 @@ export function subclassFromAttributes(
   this: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
-  if (rbObjRespondTo(attrs, "isPermitted")) {
+  if (rbObjRespondTo(attrs, "permitted")) {
     attrs = (attrs as unknown as { toH(): Record<string, unknown> }).toH();
   }
 
-  if (isPlainObject(attrs)) {
-    const subclassName = attrs[this.inheritanceColumn as string];
+  if (attrs instanceof Map || isPlainObject(attrs)) {
+    const subclassName = hashAref(attrs, this.inheritanceColumn);
 
     if (isPresent(subclassName)) {
       return this.findStiClass(subclassName as string);
