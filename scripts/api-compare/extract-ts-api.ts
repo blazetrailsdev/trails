@@ -5066,6 +5066,52 @@ function awaitedCollect(
   return awaits && !exits ? { nodes: [...statements, pushed], block: true } : undefined;
 }
 
+/**
+ * The test of a `for … of` that is an awaiting `select` / `reject`:
+ * `runnable.reject { |m| ran?(m) }`
+ * (`activerecord/lib/active_record/migration.rb:1460-1469`) whose block awaits
+ * in the port, so `Array#filter` cannot carry it: a callback's promise is
+ * always truthy. The body is one `if` with no `else`, whose test awaits and
+ * whose only statement pushes the loop's own element onto a local. That is the
+ * block's predicate deciding membership, as a `filter` callback's value does,
+ * and neither a loop nor an arm.
+ */
+function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined {
+  const declared = statement.initializer;
+  if (!ts.isVariableDeclarationList(declared) || declared.declarations.length !== 1) {
+    return undefined;
+  }
+  const element = declared.declarations[0].name;
+  if (!ts.isIdentifier(element)) return undefined;
+  const single = (s: ts.Statement): ts.Statement | undefined =>
+    ts.isBlock(s) ? (s.statements.length === 1 ? s.statements[0] : undefined) : s;
+  const guard = single(statement.statement);
+  if (!guard || !ts.isIfStatement(guard) || guard.elseStatement !== undefined) return undefined;
+  const kept = single(guard.thenStatement);
+  if (!kept || !ts.isExpressionStatement(kept) || !ts.isCallExpression(kept.expression)) {
+    return undefined;
+  }
+  const push = kept.expression;
+  if (
+    !ts.isPropertyAccessExpression(push.expression) ||
+    !ts.isIdentifier(push.expression.expression) ||
+    push.expression.name.text !== "push" ||
+    push.arguments.length !== 1 ||
+    !ts.isIdentifier(push.arguments[0]) ||
+    push.arguments[0].text !== element.text
+  ) {
+    return undefined;
+  }
+  let awaits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    ts.forEachChild(n, scan);
+  };
+  scan(guard.expression);
+  return awaits ? guard.expression : undefined;
+}
+
 function isRescueClassGuard(statement: ts.Statement): boolean {
   if (!ts.isIfStatement(statement) || statement.elseStatement !== undefined) return false;
   const test = statement.expression;
@@ -5512,6 +5558,13 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit((n as ts.ForOfStatement).expression);
           tokens.push(collected.block ? "loop:collect" : "ref:map");
           collected.nodes.forEach(visit);
+          return;
+        }
+        const predicate = awaitedFilter(n as ts.ForOfStatement);
+        if (predicate !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push("ref:filter");
+          visit(predicate);
           return;
         }
         tokens.push("loop");

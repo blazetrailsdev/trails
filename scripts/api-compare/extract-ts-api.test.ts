@@ -1550,6 +1550,51 @@ describe("body call capture", () => {
     expect(skeleton("syncBlock")).toEqual(["loop", "ref:render", "ref:push"]);
   });
 
+  it("reads a for-of that keeps its element on an awaited test as a filter", () => {
+    // runnable.reject { |m| ran?(m) } / runnable.find_all { |m| ran?(m) }
+    // (activerecord/lib/active_record/migration.rb:1460-1469).
+    const cls = extractFromSource(
+      `class Foo {
+        async reject(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) {
+            if (!(await this.isRan(m))) kept.push(m);
+          }
+          return kept;
+        }
+        async findAll(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (await this.isRan(m)) kept.push(m);
+          return kept;
+        }
+        sync(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (this.isRan(m)) kept.push(m);
+          return kept;
+        }
+        async mapped(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) if (await this.isRan(m)) kept.push(this.wrap(m));
+          return kept;
+        }
+        async alternate(runnable: unknown[]) {
+          const kept: unknown[] = [];
+          for (const m of runnable) {
+            if (await this.isRan(m)) kept.push(m);
+            else this.skip(m);
+          }
+          return kept;
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("reject")).toEqual(["ref:filter", "ref:isRan"]);
+    expect(skeleton("findAll")).toEqual(["ref:filter", "ref:isRan"]);
+    expect(skeleton("sync")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
+    expect(skeleton("mapped")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:wrap"]);
+    expect(skeleton("alternate")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:skip"]);
+  });
+
   it("marks a call made in a negated position with the ! prefix", () => {
     // The faithful port of ActiveSupport's `exclude?` (`!include?`); the
     // call ratchet requires the marker before crediting a negating alias.

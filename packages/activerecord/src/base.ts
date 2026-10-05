@@ -681,7 +681,7 @@ export class Base extends Model {
   }
 
   static set tableName(name: string | null) {
-    ModelSchema.tableName.call(this, name);
+    ModelSchema.setTableName.call(this, name);
   }
 
   static get primaryKey(): string | string[] {
@@ -1005,7 +1005,7 @@ export class Base extends Model {
   }
 
   static set sequenceName(name: string | null) {
-    ModelSchema.sequenceName.call(this, name);
+    ModelSchema.setSequenceName.call(this, name);
   }
 
   static _ignoredColumns: string[] = [];
@@ -1015,7 +1015,7 @@ export class Base extends Model {
   }
 
   static set ignoredColumns(columns: string[]) {
-    ModelSchema.ignoredColumns.call(this, columns);
+    ModelSchema.setIgnoredColumns.call(this, columns);
   }
 
   static _suppressInitializeCallback = false;
