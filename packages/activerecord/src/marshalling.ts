@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
 import {
+  type Hash,
   Module,
   basicObjRespondTo,
   keys,
@@ -43,7 +44,7 @@ interface MarshallingHost {
     reflectOnAllAssociations(): MarshallingReflection[];
     attributesBuilder(): { buildFromDatabase(values: Record<string, unknown>): unknown };
   };
-  attributesForDatabase(): object;
+  attributesForDatabase(): Record<string, unknown> | Hash<string, unknown>;
   isNewRecord(): boolean;
   isAssociationCached(name: string): boolean;
   association(name: string): MarshallingAssociation;

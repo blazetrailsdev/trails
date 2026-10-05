@@ -1,4 +1,4 @@
-import { hashAref, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { type Hash, hashAref, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
@@ -216,7 +216,7 @@ export interface SchemaHost {
   _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
   _yamlEncoder?: YAMLEncoder;
-  attributeTypes(): Record<string, any>;
+  attributeTypes(): Record<string, any> | Hash<string, any>;
   _schemaLoaded?: boolean;
   loadSchemaBang(): void;
   /** @internal */
