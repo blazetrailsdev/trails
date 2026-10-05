@@ -1,4 +1,5 @@
 import { Errno, SystemCallError } from "./errno.js";
+import { RuntimeError } from "./runtime-error.js";
 import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
 
 export interface WriteStream {
@@ -70,6 +71,18 @@ export function rbArgv(): string[] {
  */
 export function rbProgname(): string {
   return prognameInternal;
+}
+
+/**
+ * MRI's `$0 =` (`set_arg0`, vendor/ruby/v3.3.11/ruby.c:2842-2849), the writer
+ * half of {@link rbProgname}.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function setArg0(val: string): void {
+  if (!currentAdapter && !tryAutoRegisterNode()) throw new RuntimeError("$0 not initialized");
+
+  prognameInternal = val;
 }
 
 let currentAdapter: ProcessAdapter | null = null;

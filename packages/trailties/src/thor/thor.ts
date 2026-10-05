@@ -62,7 +62,7 @@ export class Thor {
   /** @internal */
   static _defaultCommand?: string;
   /** @internal */
-  static _usage?: string | null;
+  static _usage?: string | string[] | null;
   /** @internal */
   static _desc?: string | null;
   /** @internal */
@@ -130,7 +130,7 @@ export class Thor {
 
   static desc(
     this: ThorClass,
-    usage: string | null,
+    usage: string | string[] | null,
     description: string | null,
     options: DescOptions = {},
   ): void {
