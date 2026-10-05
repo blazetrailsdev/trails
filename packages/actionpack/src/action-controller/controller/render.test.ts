@@ -38,8 +38,8 @@ import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { MissingExactTemplate, UnknownFormat } from "../metal/exceptions.js";
-import { type Buffer as LiveBuffer, Live } from "../metal/live.js";
-import * as Rendering from "../metal/rendering.js";
+import { type Buffer as LiveBuffer, Live, type LiveControllerHost } from "../metal/live.js";
+import { Rendering } from "../metal/rendering.js";
 import type { Parameters } from "../metal/strong-parameters.js";
 import { TestCase } from "../test-case.js";
 import "../../test-helpers/abstract-unit.js";
@@ -472,6 +472,22 @@ async function modifyTemplate(
   } finally {
     hash[key] = original;
     LookupContext.DetailsKey.clear();
+  }
+}
+
+class MetalTestController extends Metal {
+  declare render: (options: Record<string, unknown>) => void | Promise<void>;
+
+  static {
+    include(this, AbstractControllerRendering);
+    include(this, ActionViewRendering);
+    include(this, Rendering);
+  }
+
+  async accessingLoggerInTemplate(): Promise<void> {
+    await this.render({
+      inline: '<%= logger() == null ? "NilClass" : logger().constructor.name %>',
+    });
   }
 }
 
@@ -948,40 +964,32 @@ describe("InheritedEtagRenderTest", () => {
 });
 
 describe("MetalRenderTest", () => {
-  // BLOCKED: action-controller-rendering-is-not-an-includable-module
-  it.skip("access to logger in view", async ({ task }) => {
-    class MetalTestController extends Metal {
-      static {
-        include(this, AbstractControllerRendering);
-        include(this, ActionViewRendering);
-        include(this, Rendering as never);
-      }
+  let tc: TestCase;
 
-      async accessingLoggerInTemplate(): Promise<void> {
-        await (this as unknown as Base).render({ inline: "<%= rbObjClassname(logger()) %>" });
-      }
-    }
-
-    const tc = new TestCase(task.name);
-    tc.controller = new MetalTestController() as never;
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new MetalTestController();
     await tc.beforeSetup();
+  });
 
+  it("access to logger in view", async () => {
     await tc.get("accessingLoggerInTemplate");
     expect(tc.response.body).toBe("NilClass");
   });
 });
 
 describe("ActionControllerRenderTest", () => {
-  // BLOCKED: action-controller-rendering-is-not-an-includable-module
-  it.skip("direct render to string with body", async () => {
-    class MinimalController extends Metal {
-      static {
-        include(this, AbstractControllerRendering);
-        include(this, Rendering as never);
-      }
-    }
+  class MinimalController extends Metal {
+    declare renderToString: (options: Record<string, unknown>) => unknown;
 
-    const mc = new MinimalController() as unknown as Base;
+    static {
+      include(this, AbstractControllerRendering);
+      include(this, Rendering);
+    }
+  }
+
+  it("direct render to string with body", async () => {
+    const mc = new MinimalController();
     expect(await mc.renderToString({ body: ["Hello world!"] })).toBe("Hello world!");
   });
 });
@@ -1175,14 +1183,32 @@ class LiveTestController extends Base {
 describe("LiveHeadRenderTest", () => {
   let tc: TestCase;
 
+  class LiveHeadRenderTest extends TestCase {
+    static {
+      this.tests(LiveTestController);
+    }
+  }
+
   beforeEach(async ({ task }) => {
-    tc = new TestCase(task.name);
-    tc.controller = new LiveTestController();
+    tc = new LiveHeadRenderTest(task.name);
     await tc.beforeSetup();
+
+    const controller = tc.controller as LiveTestController & LiveControllerHost;
+    controller.newControllerThread = async (block) => {
+      void Promise.resolve().then(block);
+    };
+
+    const responseBody = Object.getOwnPropertyDescriptor(Metal.prototype, "responseBody")!;
+    Object.defineProperty(controller, "responseBody", {
+      configurable: true,
+      get: responseBody.get,
+      set(this: LiveTestController, body: string) {
+        Live.instanceMethod("responseBody")!.set!.call(this, body);
+      },
+    });
   });
 
-  // BLOCKED: live-process-takes-an-invented-run-action-parameter
-  it.skip("live head ok", async () => {
+  it("live head ok", async () => {
     await tc.get("testAction", { format: "json" });
 
     (tc.response.stream as LiveBuffer).onError(() => {

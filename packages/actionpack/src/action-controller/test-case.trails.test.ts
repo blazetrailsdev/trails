@@ -19,8 +19,6 @@ import {
   TestRequest,
   TestSession,
   newControllerThread,
-  originalCleanUpThreadLocals,
-  originalNewControllerThread,
 } from "./test-case.js";
 import {
   Buffer as LiveBuffer,
@@ -106,13 +104,16 @@ describe("TestCase._controllerClass", () => {
 
 describe("ActionController::Live under test_case.rb", () => {
   it("keeps the originals and runs the controller thread block inline", async () => {
-    expect(originalNewControllerThread).toBe(liveNewControllerThread);
-    expect(originalCleanUpThreadLocals).toBe(liveCleanUpThreadLocals);
-    expect(Live.newControllerThread).toBe(newControllerThread);
+    class LiveController extends Base {}
+    include(LiveController, Live);
+    const live = LiveController.prototype as unknown as Record<string, unknown>;
+    expect(live.originalNewControllerThread).toBe(liveNewControllerThread);
+    expect(live.originalCleanUpThreadLocals).toBe(liveCleanUpThreadLocals);
+    expect(live.newControllerThread).toBe(newControllerThread);
     expect(LiveBuffer.queueSize).toBeNull();
 
     const order: string[] = [];
-    const p = Live.newControllerThread.call({} as never, () => {
+    const p = newControllerThread.call({} as never, () => {
       order.push("inside");
     });
     order.push("after-call");
@@ -537,13 +538,14 @@ describe("TestCase class helpers", () => {
   class PostsController extends Base {}
 
   it("tests(string) resolves <Name>Controller via globalThis", () => {
-    registerConstant("WidgetController", PostsController);
+    class WidgetController extends Base {}
+    registerConstant("WidgetController", WidgetController);
     try {
       class Sub extends TestCase {}
       Sub.tests("widget");
-      expect(Sub.controllerClass).toBe(PostsController);
+      expect(Sub.controllerClass).toBe(WidgetController);
     } finally {
-      unregisterConstant("WidgetController", PostsController);
+      unregisterConstant("WidgetController", WidgetController);
     }
   });
 
@@ -679,19 +681,19 @@ describe("ActionController::TestRequest helpers", () => {
 
 describe("ActionController::LiveTestResponse predicates", () => {
   it("isSuccess is true for 2xx responses", () => {
-    const r = new LiveTestResponse(200, {}, [""]);
+    const r = new LiveTestResponse(200);
     expect(r.isSuccess).toBe(true);
-    const r4 = new LiveTestResponse(404, {}, [""]);
+    const r4 = new LiveTestResponse(404);
     expect(r4.isSuccess).toBe(false);
   });
 
   it("isMissing is true only for 404", () => {
-    expect(new LiveTestResponse(404, {}, [""]).isMissing).toBe(true);
-    expect(new LiveTestResponse(403, {}, [""]).isMissing).toBe(false);
+    expect(new LiveTestResponse(404).isMissing).toBe(true);
+    expect(new LiveTestResponse(403).isMissing).toBe(false);
   });
 
   it("isError is true for 5xx responses", () => {
-    expect(new LiveTestResponse(500, {}, [""]).isError).toBe(true);
-    expect(new LiveTestResponse(200, {}, [""]).isError).toBe(false);
+    expect(new LiveTestResponse(500).isError).toBe(true);
+    expect(new LiveTestResponse(200).isError).toBe(false);
   });
 });

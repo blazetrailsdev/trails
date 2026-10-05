@@ -1,3 +1,5 @@
+import { Concern, extend } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
 import { PathSet } from "./path-set.js";
@@ -162,3 +164,29 @@ export function locale(this: ViewPaths): string | null {
 export function setLocale(this: ViewPaths, value: string | null): void {
   lookupContext.call(this).locale = value;
 }
+
+export const ViewPaths = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as { included(base: null, block: (this: ViewPathsClass) => void): void }
+  ).included(null, function (this: ViewPathsClass) {
+    PathRegistry.setViewPaths(this, new PathSet());
+  });
+
+  mod.moduleEval((m) => {
+    Object.defineProperties(m, {
+      viewPaths: { get: viewPaths, configurable: true },
+      formats: { get: formats, set: setFormats, configurable: true },
+      locale: { get: locale, set: setLocale, configurable: true },
+      lookupContext: { get: lookupContext, configurable: true },
+    });
+  });
+  mod.defineMethod("templateExists", templateExists);
+  mod.defineMethod("isAnyTemplates", isAnyTemplates);
+  mod.defineMethod("_prefixes", _prefixes);
+  mod.defineMethod("detailsForLookup", detailsForLookup);
+  mod.defineMethod("appendViewPath", appendViewPath);
+  mod.defineMethod("prependViewPath", prependViewPath);
+}) as Module & { ClassMethods: typeof ClassMethods };
+ViewPaths.ClassMethods = ClassMethods;

@@ -7,6 +7,7 @@ import {
   ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
 import { Queue, RuntimeError, SizedQueue, merge } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 
 export class ClientDisconnected extends RuntimeError {}
 
@@ -181,27 +182,26 @@ export interface LiveControllerHost {
   request: { getHeader?(name: string): string | undefined; format?: unknown };
   response: Response;
   logger?: LoggerLike;
+  newControllerThread(block: () => void | Promise<void>): Promise<void>;
+  cleanUpThreadLocals(locals: unknown, thread: unknown): void;
+  logError(exception: unknown): void;
 }
 
-export async function process(
-  this: LiveControllerHost,
-  name: string,
-  runAction: (n: string) => void | Promise<void>,
-): Promise<void> {
+export async function process(this: LiveControllerHost, name: string): Promise<void> {
   let error: unknown = undefined;
   let errorSet = false;
-  await Live.newControllerThread.call(this, async () => {
+  await this.newControllerThread(async () => {
     try {
-      await runAction(name);
+      await Live.superMethod(this, "process")!(name);
     } catch (e) {
       const resp = this.response;
       if (resp?.committed) {
         try {
           resp.stream.callOnError();
-        } catch (inner) {
-          Live.logError.call(this, inner);
+        } catch (exception) {
+          this.logError(exception);
         } finally {
-          Live.logError.call(this, e);
+          this.logError(e);
           try {
             resp.stream.close();
           } catch {
@@ -213,16 +213,15 @@ export async function process(
         errorSet = true;
       }
     } finally {
-      Live.cleanUpThreadLocals.call(this, [], null);
-      if (!this.response.committed) this.response.close();
+      this.cleanUpThreadLocals([], null);
+
+      this.response.commitBang();
     }
   });
-  if (errorSet) throw error;
-}
 
-export function responseBody(this: LiveControllerHost, body: string): void {
-  this.response.body = body;
-  this.response.close();
+  await this.response.awaitCommit();
+
+  if (errorSet) throw error;
 }
 
 export interface SendStreamOptions {
@@ -317,11 +316,22 @@ export function logError(this: { logger?: LoggerLike }, exception: unknown): voi
   logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
 }
 
-export const Live = {
-  process,
-  responseBody,
-  sendStream,
-  newControllerThread,
-  cleanUpThreadLocals,
-  logError,
-};
+export const Live: Module = new Module((mod) => {
+  mod.defineMethod("process", process);
+  mod.moduleEval((m) => {
+    Object.defineProperty(m, "responseBody", {
+      configurable: true,
+      get(this: LiveControllerHost) {
+        return mod.superMethod(this, "responseBody")!();
+      },
+      set(this: LiveControllerHost, body: unknown) {
+        mod.superMethod(this, "responseBody=")!(body);
+        if (this.response) this.response.close();
+      },
+    });
+  });
+  mod.defineMethod("sendStream", sendStream);
+  mod.defineMethod("newControllerThread", newControllerThread);
+  mod.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
+  mod.defineMethod("logError", logError);
+});

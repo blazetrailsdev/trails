@@ -1,4 +1,4 @@
-import { htmlEscape, isPresent } from "@blazetrails/activesupport";
+import { htmlEscape, isPresent, Module } from "@blazetrails/activesupport";
 import {
   DoubleRenderError,
   render as abstractRender,
@@ -177,3 +177,68 @@ export function renderer(controller: ControllerClass): Renderer {
 export function setupRendererBang(controller: ControllerClass): void {
   _renderers.set(controller, Renderer.for(controller));
 }
+
+export const Rendering: Module = new Module((mod) => {
+  mod.defineMethod("render", function (this: AbstractRenderHost, ...args: unknown[]) {
+    if (this.responseBody != null) throw new DoubleRenderError();
+    return mod.superMethod(this, "render")!(...args);
+  });
+
+  mod.defineMethod("renderToString", function (this: AbstractRenderHost, ...args: unknown[]) {
+    const result = mod.superMethod(this, "renderToString")!(...args);
+    const toString = (result: unknown): unknown => {
+      if (
+        typeof (result as { [Symbol.iterator]?: unknown } | null)?.[Symbol.iterator] ===
+          "function" &&
+        typeof result !== "string"
+      ) {
+        let string = "";
+        for (const r of result as Iterable<unknown>) string += r;
+        return string;
+      } else {
+        return result;
+      }
+    };
+    return typeof (result as PromiseLike<unknown> | null)?.then === "function"
+      ? Promise.resolve(result).then(toString)
+      : toString(result);
+  });
+
+  mod.defineMethod(
+    "renderToBody",
+    function (this: AbstractRenderHost, options: Record<string, unknown> = {}) {
+      const orPriorities = (body: unknown): unknown => {
+        if (body != null && body !== false) return body;
+        const priority = _renderInPriorities(options);
+        return priority != null && priority !== false ? priority : " ";
+      };
+      const body = mod.superMethod(this, "renderToBody")?.(options);
+      return typeof (body as PromiseLike<unknown> | null)?.then === "function"
+        ? Promise.resolve(body).then(orPriorities)
+        : orPriorities(body);
+    },
+  );
+
+  mod.defineMethod("processAction", function (this: object, ...args: unknown[]) {
+    processAction.call(this as never);
+    return mod.superMethod(this, "processAction")!(...args);
+  });
+
+  mod.defineMethod("_processVariant", _processVariant);
+  mod.defineMethod("_renderInPriorities", _renderInPriorities);
+  mod.defineMethod("_setHtmlContentType", _setHtmlContentType);
+  mod.defineMethod("_setRenderedContentType", _setRenderedContentType);
+  mod.defineMethod("_setVaryHeader", _setVaryHeader);
+
+  mod.defineMethod("_normalizeOptions", function (this: object, options: Record<string, unknown>) {
+    _normalizeOptions(options);
+    return mod.superMethod(this, "_normalizeOptions")!(options);
+  });
+
+  mod.defineMethod("_normalizeText", _normalizeText);
+
+  mod.defineMethod("_processOptions", function (this: object, options: Record<string, unknown>) {
+    _processOptions.call(this as never, options);
+    return mod.superMethod(this, "_processOptions")!(options);
+  });
+});
