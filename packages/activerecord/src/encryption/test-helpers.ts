@@ -19,7 +19,7 @@ import { Encryption } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
 import { Key } from "./key.js";
-import { prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAref, prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Fixture } from "../fixtures.js";
 import { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { Encryption, Errors };
@@ -461,7 +461,7 @@ function _assertEncryptedAttributeOnModel(
 
   if (expectedValue !== null && expectedValue !== undefined) {
     const dbValues = model._attributes.valuesForDatabase();
-    const dbValue = dbValues[attrName];
+    const dbValue = hashAref(dbValues, attrName);
     const type = model._attributes?.getAttribute?.(attrName)?.type;
     const rawSerialized =
       type && typeof type.castType?.serialize === "function"

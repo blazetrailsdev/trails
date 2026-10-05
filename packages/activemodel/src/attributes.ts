@@ -6,7 +6,7 @@ import {
   type Included,
   included,
 } from "@blazetrails/activesupport";
-import { type Hash, Module, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, Module, keys, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -54,8 +54,10 @@ export interface AttributeOptions {
   range?: boolean;
 }
 
-export function attributeNames(this: { attributeTypes(): Record<string, ValueType> }): string[] {
-  return Object.keys(this.attributeTypes());
+export function attributeNames(this: {
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
+}): string[] {
+  return keys(this.attributeTypes());
 }
 
 export function freeze<T extends AttributeInstanceHost>(this: T): T {

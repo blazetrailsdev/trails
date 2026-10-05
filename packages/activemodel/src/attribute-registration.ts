@@ -1,5 +1,5 @@
 import { DescendantsTracker, extend, included, registerSubclass } from "@blazetrails/activesupport";
-import { block as rbBlock, fetch, rbObjAsString } from "@blazetrails/ruby-compat";
+import { Hash, block as rbBlock, fetch, hashAref, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import * as Type from "./type.js";
 import { AttributeSet } from "./attribute-set.js";
@@ -13,20 +13,20 @@ export interface AttributeRegistrationClassMethods {
   ): void;
   _defaultAttributes(): AttributeSet;
   decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
-  attributeTypes(): Record<string, ValueType | null>;
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
   typeForAttribute(name: string, block?: () => ValueType): ValueType | null;
 }
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
-  _cachedAttributeTypes?: Record<string, ValueType | null> | null;
+  _cachedAttributeTypes?: Record<string, ValueType | null> | Hash<string, ValueType | null> | null;
   _attributesBuilder?: unknown;
   _pendingAttributeModifications?: PendingModification[];
   attributeAliases?: Record<string, string>;
   /** @internal */
   resolveAttributeName(name: string): string;
 
-  attributeTypes(): Record<string, ValueType | null>;
+  attributeTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null>;
   /** @internal */
   pendingAttributeModifications(): PendingModification[];
   /** @internal */
@@ -153,22 +153,28 @@ export const ClassMethods = {
   },
 
   /** @inventedArm if — PERMANENT */
-  attributeTypes(this: AttributeHostInternals): Record<string, ValueType | null> {
+  attributeTypes(
+    this: AttributeHostInternals,
+  ): Record<string, ValueType | null> | Hash<string, ValueType | null> {
     if (Object.hasOwn(this, "_cachedAttributeTypes") && this._cachedAttributeTypes) {
       return this._cachedAttributeTypes;
     }
     const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
-    const cast = host._defaultAttributes().castTypes();
-    const proxy = new Proxy(cast, {
-      get(target, prop, receiver) {
-        if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
-          return Type.defaultValue();
-        }
-        return Reflect.get(target, prop, receiver);
-      },
-    });
-    this._cachedAttributeTypes = proxy;
-    return proxy;
+    let hash = host._defaultAttributes().castTypes();
+    if (hash instanceof Hash) {
+      hash.setDefault(Type.defaultValue());
+    } else {
+      hash = new Proxy(hash, {
+        get(target, prop, receiver) {
+          if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
+            return Type.defaultValue();
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    }
+    this._cachedAttributeTypes = hash;
+    return hash;
   },
 
   typeForAttribute(
@@ -181,7 +187,7 @@ export const ClassMethods = {
     if (block) {
       return fetch(this.attributeTypes(), attributeName, rbBlock(block));
     } else {
-      return this.attributeTypes()[attributeName];
+      return hashAref(this.attributeTypes(), attributeName) as ValueType | null;
     }
   },
 

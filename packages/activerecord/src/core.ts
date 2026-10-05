@@ -8,7 +8,10 @@ import {
   rbObjClass,
   rbObjIsKindOf,
   Module,
+  type Hash,
   hasKey,
+  hashAref,
+  keys as hashKeys,
   include,
   rbHash,
   rbModConstSet,
@@ -188,7 +191,9 @@ export class ClassMethods {
     this: (abstract new (...args: never) => unknown) & {
       abstractClass: boolean;
       isConnected(): boolean;
-      attributeTypes(): Record<string, { type(): string | null | undefined } | null>;
+      attributeTypes():
+        | Record<string, { type(): string | null | undefined } | null>
+        | Hash<string, { type(): string | null | undefined } | null>;
     },
   ): string {
     const name = rbModSingletonP(this)
@@ -203,8 +208,12 @@ export class ClassMethods {
     } else if (!isSchemaLoaded.call(this as never) && !this.isConnected()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
     } else if (cachedTableExists.call(this as never)) {
-      const attrList = Object.entries(this.attributeTypes())
-        .map(([name, type]) => `${name}: ${type!.type() ?? ""}`)
+      const attributeTypes = this.attributeTypes();
+      const attrList = hashKeys(attributeTypes)
+        .map((name) => {
+          const type = hashAref(attributeTypes, name) as { type(): string | null | undefined };
+          return `${name}: ${type.type() ?? ""}`;
+        })
         .join(", ");
       return `${name}(${attrList})`;
     } else {

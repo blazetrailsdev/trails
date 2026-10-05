@@ -20,7 +20,13 @@ import {
   TimeType,
   UnknownAttributeError as AMUnknownAttributeError,
 } from "@blazetrails/activemodel";
-import { ArgumentError, Module, basicObjRespondTo, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  Module,
+  basicObjRespondTo,
+  NoMethodError,
+  hashAref,
+} from "@blazetrails/ruby-compat";
 import { Base, DangerousAttributeError, Type, UnknownAttributeError } from "./index.js";
 
 import { GeneratedAttributeMethods } from "./attribute-methods.js";
@@ -1223,7 +1229,7 @@ describe("AttributeMethodsTest", () => {
   });
   it.skipIf(adapterType !== "mysql")("read attributes_before_type_cast on a boolean", async () => {
     const bool = (await BooleanModel.createBang({ value: false } as any)) as any;
-    expect((await bool.reload()).attributesBeforeTypeCast()["value"]).toBe(0);
+    expect(hashAref((await bool.reload()).attributesBeforeTypeCast(), "value")).toBe(0);
   });
   it("read overridden attribute with predicate respects override", () => {
     const topic = CanonicalTopic.new() as any;

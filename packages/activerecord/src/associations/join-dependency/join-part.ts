@@ -1,3 +1,4 @@
+import type { Hash } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
 import type { JoinAssociation } from "./join-association.js";
@@ -25,8 +26,10 @@ export abstract class JoinPart {
     return this.baseKlass.primaryKey as string;
   }
 
-  attributeTypes(): Record<string, unknown> {
-    return (this.baseKlass as { attributeTypes(): Record<string, unknown> }).attributeTypes();
+  attributeTypes(): Record<string, unknown> | Hash<string, unknown> {
+    return (
+      this.baseKlass as { attributeTypes(): Record<string, unknown> | Hash<string, unknown> }
+    ).attributeTypes();
   }
 
   isMatch(other: JoinPart): boolean {

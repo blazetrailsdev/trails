@@ -23,6 +23,7 @@ import {
   block,
   fetch,
   first,
+  type Hash,
   isEmpty,
   isModuleIncluded,
   rbFPublicSend,
@@ -114,7 +115,7 @@ interface CalculationRelation {
     primaryKey: string | string[];
     name: string;
     typeForAttribute?(name: string, block?: () => ColumnType): ColumnType | null;
-    attributeTypes(): Record<string, ColumnType>;
+    attributeTypes(): ColumnTypes | Hash<string, ColumnType>;
     _serializedAttributes?: { get(name: string): { load(raw: unknown): unknown } | undefined };
     withConnection<R>(fn: (conn: CalculationConnection) => R | Promise<R>): Promise<R>;
     ensureSchemaLoaded(): Promise<void>;
@@ -992,7 +993,7 @@ export async function typeCastPluckValues(
   columns: Array<string | ArelNode | unknown>,
 ): Promise<unknown[]> {
   await this.model.ensureSchemaLoaded();
-  let castTypes: ColumnTypes | ColumnType[];
+  let castTypes: ColumnTypes | Hash<string, ColumnType> | ColumnType[];
   if (result.columns.length !== columns.length) {
     castTypes = this.model.attributeTypes();
   } else {

@@ -5,7 +5,14 @@ import { registry } from "./type.js";
 import { Builder, LazyAttributeHash } from "./attribute-set/builder.js";
 import { IntegerType } from "./type/integer.js";
 import { StringType } from "./type/string.js";
-import { FrozenError, KeyError, NoMethodError, block } from "@blazetrails/ruby-compat";
+import {
+  FrozenError,
+  Hash,
+  KeyError,
+  NoMethodError,
+  block,
+  hashAref,
+} from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -58,8 +65,8 @@ describe("AttributeSetTest", () => {
     const builder = new Builder({ foo: new IntegerType(), bar: new StringType() });
     const attributes = builder.buildFromDatabase({ foo: 1, bar: "a" });
     const types = attributes.castTypes();
-    expect(types.foo).toBeInstanceOf(IntegerType);
-    expect(types.bar).toBeInstanceOf(StringType);
+    expect(hashAref(types, "foo")).toBeInstanceOf(IntegerType);
+    expect(hashAref(types, "bar")).toBeInstanceOf(StringType);
   });
 
   it("#key? returns true for initialized attributes", () => {
@@ -238,5 +245,21 @@ describe("AttributeSet over a LazyAttributeHash store", () => {
     const clone = Object.assign(Object.create(AttributeSet.prototype) as AttributeSet, set);
     clone.initializeClone(set);
     expect(() => clone.writeFromDatabase("foo", 2)).toThrow(FrozenError);
+  });
+
+  it("a Hash-held set, as Marshal.load answers one, transforms into a Hash", () => {
+    const hash = new Hash<string, Attribute>();
+    hash.set("foo", Attribute.fromDatabase("foo", "1", typeRegistry.lookup("integer")));
+    const attributes = new AttributeSet(hash);
+
+    const types = attributes.castTypes();
+    expect(types).toBeInstanceOf(Hash);
+    expect(hashAref(types, "foo")).toBeInstanceOf(IntegerType);
+    expect(hashAref(attributes.valuesBeforeTypeCast(), "foo")).toBe("1");
+    expect(hashAref(attributes.valuesForDatabase(), "foo")).toBe(1);
+    expect(attributes.fetch("foo").value()).toBe(1);
+    const seen: string[] = [];
+    attributes.eachValue((attr) => seen.push(attr.name!));
+    expect(seen).toEqual(["foo"]);
   });
 });

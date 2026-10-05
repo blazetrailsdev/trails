@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { YAMLEncoder } from "./yaml-encoder.js";
 import { AttributeSet } from "../attribute-set.js";
@@ -65,7 +66,7 @@ describe("YAMLEncoder", () => {
       concise_attributes: [Attribute.fromUser("qty", 5, null)],
     });
     expect(decoded.fetchValue("qty")).toBe(5);
-    expect(decoded.castTypes().qty).toBe(custom);
+    expect(hashAref(decoded.castTypes(), "qty")).toBe(custom);
   });
 
   it("uninitialized attributes round-trip as uninitialized", () => {
@@ -78,7 +79,7 @@ describe("YAMLEncoder", () => {
 
     const decoded = localEncoder.decode(coder);
     expect(decoded.isKey("score")).toBe(false);
-    expect(decoded.castTypes().score).toBe(intType);
+    expect(hashAref(decoded.castTypes(), "score")).toBe(intType);
   });
 
   it("attr not among the default types is kept with its own type", () => {

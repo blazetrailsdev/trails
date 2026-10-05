@@ -1,4 +1,13 @@
-import { type Hash, isEmpty, rbModConstSet, rbModName } from "@blazetrails/ruby-compat";
+import {
+  type Hash,
+  block as rbBlock,
+  fetch,
+  hasKey,
+  hashAref,
+  isEmpty,
+  rbModConstSet,
+  rbModName,
+} from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
@@ -725,10 +734,9 @@ export class Base extends Model {
     (ModelSchema.loadSchema as any).call(this);
     const resolved = (this as any).attributeAliases?.[name] ?? name;
     if (block) {
-      const attributeTypes = this.attributeTypes();
-      return Object.hasOwn(attributeTypes, resolved) ? attributeTypes[resolved] : block();
+      return fetch(this.attributeTypes(), resolved, rbBlock(block));
     }
-    return this.attributeTypes()[resolved];
+    return hashAref(this.attributeTypes(), resolved) as ValueType | null;
   }
 
   static get arelTable(): Table {
@@ -1903,7 +1911,7 @@ export class Base extends Model {
   declare attributePresent: (attrName: string) => boolean;
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
   declare attributes: Record<string, unknown>;
-  declare attributesBeforeTypeCast: () => Record<string, unknown>;
+  declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
   declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
@@ -2268,7 +2276,7 @@ export class Base extends Model {
   static hasAttribute(attrName: string): boolean {
     attrName = String(attrName);
     attrName = this.attributeAliases[attrName] ?? attrName;
-    return Object.hasOwn(this.attributeTypes(), attrName);
+    return hasKey(this.attributeTypes(), attrName);
   }
 
   generateTokenFor(purpose: string): string {

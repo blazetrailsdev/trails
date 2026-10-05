@@ -21,7 +21,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 
-type Attributes = Record<string, Attribute> | LazyAttributeHash;
+type Attributes = Record<string, Attribute> | Hash<string, Attribute> | LazyAttributeHash;
 
 export class AttributeSet {
   protected _attributes: Attributes;
@@ -53,15 +53,15 @@ export class AttributeSet {
     hashAset(this._attributes, name, value);
   }
 
-  castTypes(): Record<string, ValueType | null> {
+  castTypes(): Record<string, ValueType | null> | Hash<string, ValueType | null> {
     return transformValues(this.attributes(), (attr) => attr.type);
   }
 
-  valuesBeforeTypeCast(): Record<string, unknown> {
+  valuesBeforeTypeCast(): Record<string, unknown> | Hash<string, unknown> {
     return transformValues(this.attributes(), (attr) => attr.valueBeforeTypeCast);
   }
 
-  valuesForDatabase(): Record<string, unknown> {
+  valuesForDatabase(): Record<string, unknown> | Hash<string, unknown> {
     return transformValues(this.attributes(), (attr) => attr.valueForDatabase);
   }
 

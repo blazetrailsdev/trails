@@ -8,6 +8,7 @@ import {
 import {
   first,
   Hash,
+  hasKey,
   isEmpty,
   partition,
   rbEqual,
@@ -307,7 +308,7 @@ export class JoinDependency {
         const attributeTypes = this.joinRoot.attributeTypes();
         columnTypes = Object.fromEntries(
           columnNames
-            .filter((k) => Object.hasOwn(columnTypes, k) && !Object.hasOwn(attributeTypes, k))
+            .filter((k) => Object.hasOwn(columnTypes, k) && !hasKey(attributeTypes, k))
             .map((k) => [k, columnTypes[k]]),
         );
       }
