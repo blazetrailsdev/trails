@@ -3,6 +3,7 @@ import {
   StringIO,
   partition,
   rbEqq,
+  rbInspect,
   rbObjAsString,
   regexpEscape,
   toS,
@@ -726,7 +727,7 @@ export abstract class SchemaDumper {
   /** @internal */
   formatOptions(options: Record<string, unknown>): string {
     return Object.entries(options)
-      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
+      .map(([key, value]) => `${key}: ${rbInspect(value)}`)
       .join(", ");
   }
 
