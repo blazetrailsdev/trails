@@ -716,9 +716,9 @@ export interface Response extends Omit<
   "status" | "headers" | "mediaType" | "contentLength" | "cacheControl"
 > {
   get lastModified(): Date | undefined;
-  set lastModified(t: Date | Time | { epochMilliseconds: number } | undefined);
+  set lastModified(t: Date | Time | { epochMilliseconds: number });
   get date(): Date | undefined;
-  set date(t: Date | Time | undefined);
+  set date(t: Date | Time);
 }
 export interface CookieOptions {
   value: string;

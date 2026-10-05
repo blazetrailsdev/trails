@@ -196,3 +196,28 @@ describe("ActionController::Instrumentation#redirect_to", () => {
     expect(result).toBe(302);
   });
 });
+
+describe("ActionController::Instrumentation#send_file / #send_data (instrumentation.rb:36-47)", () => {
+  it("instruments send_data with the options and send_file with the path merged in", async () => {
+    const data: Record<string, unknown>[] = [];
+    const file: Record<string, unknown>[] = [];
+    const offData = subscribeOnce("send_data.action_controller", data);
+    const offFile = subscribeOnce("send_file.action_controller", file);
+    try {
+      const c = new (class extends Base {})();
+      c.setResponseBang(new Response());
+      await c.sendData("hi", { filename: "a.txt" });
+      expect(data).toEqual([{ filename: "a.txt" }]);
+
+      const missing = new (class extends Base {})();
+      missing.setResponseBang(new Response());
+      expect(() => missing.sendFile("/nonexistent/file", { type: "text/plain" })).toThrow(
+        /Cannot read file/,
+      );
+      expect(file[0]).toMatchObject({ type: "text/plain", path: "/nonexistent/file" });
+    } finally {
+      offData();
+      offFile();
+    }
+  });
+});

@@ -23,7 +23,7 @@ export interface FreshWhenOptions {
   etag?: unknown;
   weakEtag?: unknown;
   strongEtag?: unknown;
-  lastModified?: Date | Time | { epochMilliseconds: number } | null | undefined;
+  lastModified?: Date | Time | { epochMilliseconds: number } | false | null | undefined;
   public?: boolean;
   cacheControl?: CacheControlHash;
   template?: string | false | null;
@@ -43,10 +43,19 @@ export function freshWhen(
   }: FreshWhenOptions = {},
 ): void {
   hashDelete(this.response.cacheControl, "noStore");
-  if (strongEtag == null || strongEtag === false) weakEtag ??= etag ?? object;
-  lastModified ??= (tryCall(object as object, "updatedAt") ??
-    tryCall(object as object, "maximum", "updatedAt") ??
-    null) as Date | null;
+  if (strongEtag == null || strongEtag === false) {
+    if (weakEtag == null || weakEtag === false) {
+      weakEtag = etag != null && etag !== false ? etag : object;
+    }
+  }
+  if (lastModified == null || lastModified === false) {
+    const updatedAt = tryCall(object as object, "updatedAt");
+    lastModified = (
+      updatedAt != null && updatedAt !== false
+        ? updatedAt
+        : tryCall(object as object, "maximum", "updatedAt")
+    ) as Date | null;
+  }
 
   if (strongEtag != null && strongEtag !== false) {
     this.response.strongEtag(
@@ -58,7 +67,7 @@ export function freshWhen(
     );
   }
 
-  if (lastModified != null) this.response.lastModified = lastModified as Date;
+  if (lastModified != null) this.response.lastModified = lastModified;
   if (public_) this.response.cacheControl.public = true;
   mergeBang(this.response.cacheControl, cacheControl);
 

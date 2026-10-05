@@ -168,13 +168,13 @@ export class Response {
     return parseHttpDate(this.getHeader(LAST_MODIFIED));
   }
 
-  set lastModified(t: Date | Time | { epochMilliseconds: number } | undefined) {
+  set lastModified(t: Date | Time | { epochMilliseconds: number }) {
     if (t instanceof Time) {
       this.setHeader(LAST_MODIFIED, t.utc().httpdate());
       return;
     }
     // boundary: bridge a Temporal.Instant to Date for the RFC 1123 rendering.
-    const utc = "epochMilliseconds" in t! ? new Date(t.epochMilliseconds) : (t as Date);
+    const utc = "epochMilliseconds" in t ? new Date(t.epochMilliseconds) : t;
     this.setHeader(LAST_MODIFIED, utc.toUTCString());
   }
 
@@ -182,8 +182,8 @@ export class Response {
     return parseHttpDate(this.getHeader(DATE));
   }
 
-  set date(t: Date | Time | undefined) {
-    this.setHeader(DATE, t instanceof Time ? t.utc().httpdate() : (t as Date).toUTCString());
+  set date(t: Date | Time) {
+    this.setHeader(DATE, t instanceof Time ? t.utc().httpdate() : t.toUTCString());
   }
 
   get etag(): string | undefined {

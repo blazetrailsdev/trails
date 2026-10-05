@@ -245,7 +245,7 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
     expect(c.headers.get("cache-control")).toBe(
       "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
     );
-    expect(c.headers.get("date")).toBeDefined();
+    expect(c.headers.get("date")).toMatch(/ GMT$/);
   });
 
   it("freshWhen merges the cacheControl option", async () => {
@@ -258,6 +258,40 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
     const c = new CcController();
     await c.dispatch("index", makeRequest(), new Response());
     expect(c.headers.get("cache-control")).toBe("public, no-cache");
+  });
+});
+
+describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.rb:316-322)", () => {
+  class ForeverController extends Base {
+    yielded = false;
+    async index() {
+      this.httpCacheForever({ public: true }, () => (this.yielded = true));
+      if (!this.performed) await this.render({ plain: "ok" });
+    }
+  }
+
+  it("renders a hundred-year public immutable max-age and yields when stale", async () => {
+    const c = new ForeverController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.yielded).toBe(true);
+    expect(c.headers.get("cache-control")).toBe("max-age=3155695200, public, immutable");
+    expect(c.headers.get("etag")).toMatch(/^W\//);
+  });
+
+  it("answers 304 without yielding when the request is fresh", async () => {
+    const first = new ForeverController();
+    await first.dispatch("index", makeRequest(), new Response());
+    const request = new Request({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      HTTP_HOST: "localhost",
+      HTTP_IF_NONE_MATCH: first.headers.get("etag")!,
+      HTTP_IF_MODIFIED_SINCE: first.headers.get("last-modified")!,
+    });
+    const c = new ForeverController();
+    await c.dispatch("index", request, new Response());
+    expect(c.yielded).toBe(false);
+    expect(c.status).toBe(304);
   });
 });
 
