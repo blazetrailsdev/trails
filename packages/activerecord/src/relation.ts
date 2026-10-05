@@ -1701,9 +1701,9 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.cacheKey();
   }
 
-  initializeCopy(_other: Relation<T, G>): void {
+  initializeCopy(other: Relation<T, G>): this {
     this._values = { ...this._values };
-    this.reset();
+    return this.reset();
   }
 
   clone(): Relation<T, G> {
