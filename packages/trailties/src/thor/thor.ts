@@ -14,6 +14,7 @@ import {
   mergeBang,
   puts,
   Range,
+  rbCmpint,
   rbFCaller,
   rbInspect,
   rbObjAsString,
@@ -44,9 +45,7 @@ type CheckUnknownOptions = { only?: unknown; except?: unknown; [key: string]: un
 
 type Config = { currentCommand?: Command | null };
 
-type Instance = {
-  options: unknown;
-  args: unknown[];
+type Instance = Base & {
   shell: Basic;
   invoke(...args: unknown[]): unknown;
   invokeCommand(command: Command, ...args: unknown[]): Promise<unknown>;
@@ -281,7 +280,9 @@ export class Thor {
         const item: string[] = [];
         item.push(this.banner(command, false, subcommand));
         item.push(
-          rtest(command.description) ? `# ${command.description!.replace(/\s+/g, " ")}` : "",
+          rtest(command.description)
+            ? `# ${command.description!.replace(/[ \t\r\n\f\v]+/g, " ")}`
+            : "",
         );
         return item;
       }),
@@ -472,7 +473,7 @@ export class Thor {
     givenArgs: unknown[],
     givenOpts: unknown[] | Record<string, unknown> | null,
     config: BaseConfig,
-    block?: (instance: never) => void,
+    block?: (instance: Instance) => void,
   ): Promise<unknown> {
     if (!rtest(meth)) meth = this.retrieveCommandName(givenArgs);
     let command: Command | undefined = this.allCommands()[this.normalizeCommandName(meth)];
@@ -487,7 +488,7 @@ export class Thor {
     if (rtest(command)) {
       [args, opts] = Options.split(givenArgs);
       if (rtest(this.isStopOnUnknownOption(command)) && !isEmpty(args)) {
-        args.push(...opts);
+        opts.forEach((opt) => args.push(opt));
         opts.length = 0;
       }
     } else {
@@ -501,7 +502,7 @@ export class Thor {
     config.commandOptions = command.options;
 
     const instance = new this(args, opts, config) as unknown as Instance;
-    if (block !== undefined) block(instance as never);
+    if (block !== undefined) block(instance);
     args = instance.args;
     const trailing = arySlice(args, new Range(this.arguments().length, -1));
     return await instance.invokeCommand(command, trailing || []);
@@ -657,7 +658,7 @@ export class Thor {
 
   /** @internal */
   static sortCommandsBang(this: ThorClass, list: string[][]): string[][] {
-    return list.sort((a, b) => cmp(a[0], b[0])!);
+    return list.sort((a, b) => rbCmpint(cmp(a[0], b[0]), a[0], b[0]));
   }
 
   constructor(...args: unknown[]) {
