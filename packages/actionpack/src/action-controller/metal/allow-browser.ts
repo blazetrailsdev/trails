@@ -35,7 +35,7 @@ export const ClassMethods = {
         return this.render({
           file: File.join(TopLevel.Trails!.root()!, "public/406-unsupported-browser.html"),
           layout: false,
-          status: "not_acceptable",
+          status: ":not_acceptable",
         });
       },
       ...options

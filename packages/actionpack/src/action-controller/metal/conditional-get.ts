@@ -129,7 +129,9 @@ export const ConditionalGet = new Module((mod) => {
       classAttribute.call(this, "etaggers", { default: [] });
     },
   );
-}) as Module & { ClassMethods: typeof ClassMethods };
+
+  mod.defineMethod("combineEtags", combineEtags);
+}) as Module<{ combineEtags: typeof combineEtags }> & { ClassMethods: typeof ClassMethods };
 ConditionalGet.ClassMethods = ClassMethods;
 
 /** @internal */

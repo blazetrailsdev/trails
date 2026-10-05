@@ -37,17 +37,6 @@ export function combineEtags(
   return _combineEtags.call(this, validator, options);
 }
 
-export function flashEtagger(request: {
-  flash?: {
-    isEmpty(): boolean;
-    toHash?(): unknown;
-  };
-}): unknown | undefined {
-  const flash = request.flash;
-  if (!flash || flash.isEmpty()) return undefined;
-  return flash.toHash ? flash.toHash() : flash;
-}
-
 export const EtagWithFlash = new Module((mod) => {
   extend(mod, Concern);
 

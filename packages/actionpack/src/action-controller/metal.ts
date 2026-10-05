@@ -10,7 +10,7 @@ import {
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect, rbModSingletonP } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -106,6 +106,10 @@ const INCLUDE: Strategy = (list, action) => (list ?? []).includes(action);
 const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
 const NULL: Strategy = () => true;
 
+function inherited(this: typeof Metal, subclass: typeof Metal): void {
+  subclass.middlewareStack = this.middlewareStack.dup();
+}
+
 export class Metal extends AbstractController {
   static {
     this.abstractBang();
@@ -118,6 +122,19 @@ export class Metal extends AbstractController {
 
   static {
     classAttribute.call(this, "middlewareStack", { default: new MiddlewareStack() });
+    const reader = Object.getOwnPropertyDescriptor(this, "middlewareStack")!;
+    Object.defineProperty(this, "middlewareStack", {
+      ...reader,
+      get(this: typeof Metal) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
+    });
   }
 
   _request!: Request;
@@ -177,14 +194,11 @@ export class Metal extends AbstractController {
   }
 
   static middleware(): MiddlewareStack {
-    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack")) {
-      this.middlewareStack = this.middlewareStack.dup();
-    }
     return this.middlewareStack;
   }
 
   static use(...args: unknown[]): void {
-    this.middleware().use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
+    this.middlewareStack.use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
   static action(this: typeof Metal, name: string): RackApp {
@@ -196,8 +210,8 @@ export class Metal extends AbstractController {
       return controller.toA();
     };
 
-    if (this.middleware().isAny()) {
-      return this.middleware().build(name, app);
+    if (this.middlewareStack.isAny()) {
+      return this.middlewareStack.build(name, app);
     } else {
       return app;
     }
@@ -209,8 +223,8 @@ export class Metal extends AbstractController {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    if (this.middleware().isAny()) {
-      return await this.middleware().build(name, async () => {
+    if (this.middlewareStack.isAny()) {
+      return await this.middlewareStack.build(name, async () => {
         const controller = new this();
         await controller.dispatch(name, req, res);
         return controller.toA();

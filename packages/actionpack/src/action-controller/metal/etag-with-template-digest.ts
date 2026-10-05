@@ -75,15 +75,6 @@ export function determineTemplateEtag(
   return lookupAndDigestTemplate.call(this, template);
 }
 
-export function templateEtagger(
-  controller: { actionName?: string },
-  lookupContext?: TemplateLookupContext,
-  options?: { template?: string | false },
-): string | undefined {
-  if (!lookupContext) return undefined;
-  return determineTemplateEtag.call({ ...controller, lookupContext }, options);
-}
-
 export const EtagWithTemplateDigest = new Module((mod) => {
   extend(mod, Concern);
 

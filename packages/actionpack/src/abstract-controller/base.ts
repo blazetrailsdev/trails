@@ -125,6 +125,7 @@ export class AbstractController {
     "toA",
     "sendAction",
     "allowBrowser",
+    "combineEtags",
     "render",
     "renderToString",
     "redirectTo",
