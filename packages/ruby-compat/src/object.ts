@@ -208,6 +208,14 @@ export const rbCClass = rbDefineClass("Class");
  * @noRailsEquivalent PERMANENT
  */
 export const rbCNumeric = rbDefineClass("Numeric");
+/** `Numeric#integer?` (`vendor/ruby/v3.3.11/numeric.rb:29`). */
+Object.defineProperty(rbCNumeric.prototype, "isInteger", {
+  value: function isInteger(): boolean {
+    return false;
+  },
+  writable: true,
+  configurable: true,
+});
 
 /**
  * `rb_cString` (`vendor/ruby/v3.3.11/string.c:12121`).
