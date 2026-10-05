@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, env, setEnv, stderr } from "@blazetrails/ruby-compat";
+import { ArgumentError, env, rational, setEnv, stderr, toD } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "../core-ext/hash-with-indifferent-access.js";
 import { Option } from "./option.js";
 
@@ -45,6 +45,19 @@ describe("Thor::Option", () => {
     expect(option.switchName).toBe("--foo-bar");
     expect(option.humanName).toBe("foo-bar");
     expect(new Option("-f").humanName).toBe("f");
+  });
+
+  it("infers :numeric for every Numeric, a Rational and a BigDecimal included", () => {
+    for (const value of [1, 1.5, 10n, rational(1, 3), toD("1.5")]) {
+      expect(Option.parse("foo", value).type).toBe("numeric");
+    }
+  });
+
+  it("accepts every Numeric as a :numeric option's default under checkDefaultType", () => {
+    for (const value of [1, 1.5, 10n, rational(1, 3), toD("1.5")]) {
+      const option = new Option("foo", { type: "numeric", default: value, checkDefaultType: true });
+      expect(option.default).toBe(value);
+    }
   });
 
   it("names itself an Option in Argument's errors", () => {

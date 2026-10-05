@@ -5,9 +5,11 @@ import {
   hasKey,
   isEmpty,
   isSymbol,
+  rbCNumeric,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
+  rbObjIsKindOf,
   rbSetClassPathString,
   rtest,
   symbolToS,
@@ -72,7 +74,7 @@ export class Option extends Argument {
       }
     } else if (value === true || value === false) {
       type = "boolean";
-    } else if (typeof value === "number" || typeof value === "bigint") {
+    } else if (rbObjIsKindOf(value, rbCNumeric)) {
       type = "numeric";
     } else if (
       rbObjClassname(value) === "Hash" ||
@@ -165,7 +167,7 @@ export class Option extends Argument {
       return;
     } else if (this.default === true || this.default === false) {
       defaultType = rtest(this.isRequired()) ? "string" : "boolean";
-    } else if (typeof this.default === "number" || typeof this.default === "bigint") {
+    } else if (rbObjIsKindOf(this.default, rbCNumeric)) {
       defaultType = "numeric";
     } else if (isSymbol(this.default)) {
       defaultType = "string";
