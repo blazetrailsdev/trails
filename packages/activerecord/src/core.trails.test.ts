@@ -365,8 +365,27 @@ describe("configurations is a single process-global registry", () => {
   });
 });
 
+describe("inspection_filter", () => {
+  it("a subclass assigning filter_attributes gets its own filter, reset on reassignment", () => {
+    class FilteredTopic extends Topic {}
+    expect(FilteredTopic.inspectionFilter()).toBe(Topic.inspectionFilter());
+
+    FilteredTopic.filterAttributes = ["title"];
+    const filter = FilteredTopic.inspectionFilter();
+    expect(filter).not.toBe(Topic.inspectionFilter());
+    expect(FilteredTopic.inspectionFilter()).toBe(filter);
+
+    FilteredTopic.filterAttributes = ["content"];
+    expect(FilteredTopic.inspectionFilter()).not.toBe(filter);
+  });
+});
+
 describe("compare", () => {
   fixtures(["topics"]);
+
+  it("find_by with an empty hash takes the cached path", async () => {
+    expect(await Topic.findBy({})).toBeInstanceOf(Topic);
+  });
 
   it("orders same-class records by primary key and reports nil as undefined", async () => {
     const first = await Topic.find(1);
@@ -377,12 +396,12 @@ describe("compare", () => {
     expect(first.compare(first)).toBe(0);
 
     expect(new Topic({ title: "a" }).compare(new Topic({ title: "b" }))).toBe(0);
-    expect(first.compare(new Topic({ title: "a" }))).toBeUndefined();
-    expect(first.compare("not a topic")).toBeUndefined();
+    expect(first.compare(new Topic({ title: "a" }))).toBeNull();
+    expect(first.compare("not a topic")).toBeNull();
 
     const reply = await Reply.find(2);
     expect(first.compare(reply)).toBe(-1);
-    expect(reply.compare(first)).toBeUndefined();
+    expect(reply.compare(first)).toBeNull();
   });
 });
 

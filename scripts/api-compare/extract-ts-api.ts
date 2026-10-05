@@ -5184,12 +5184,19 @@ function isArgumentBindingGuard(statement: ts.IfStatement): boolean {
     const declaration = ts.isVariableStatement(earlier)
       ? earlier.declarationList.declarations[0]
       : undefined;
-    const call = declaration?.initializer;
-    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration.name)) return false;
+    let call = declaration?.initializer;
+    while (call && (ts.isAsExpression(call) || ts.isParenthesizedExpression(call))) {
+      call = call.expression;
+    }
+    if (!call || !ts.isCallExpression(call) || !ts.isIdentifier(declaration!.name)) return false;
+    if (splat.some((name) => call.expression.getText() === `${name}.pop`)) {
+      bound.push(declaration!.name.text);
+      continue;
+    }
     const [rest] = call.arguments;
     if (call.expression.getText() !== "extractOptionsBang" || !ts.isIdentifier(rest)) return false;
     if (!splat.includes(rest.text)) return false;
-    bound.push(declaration.name.text);
+    bound.push(declaration!.name.text);
   }
   let test = statement.expression;
   let message: RegExp;
@@ -5316,6 +5323,35 @@ function isBlockCapture(conditional: ts.ConditionalExpression): boolean {
   return popped.getText() === `${args}.pop()` && conditional.whenFalse.getText() === "undefined";
 }
 
+/**
+ * `Object.hasOwn(klass, "_x") ? klass._x : undefined` (or its
+ * `Object.prototype.hasOwnProperty.call` spelling): the read of a Ruby
+ * class-level ivar, `@x` in a `def self.` body
+ * (`activerecord/lib/active_record/core.rb:230` `@connection_class ||= false`).
+ * A Ruby ivar belongs to the object it is set on, so a subclass reads nil; a JS
+ * static is inherited through the constructor chain, so the port has to ask for
+ * the own property. That is the ivar read itself, which Ruby emits no token
+ * for, and is not an arm.
+ */
+function isOwnIvarRead(conditional: ts.ConditionalExpression): boolean {
+  const test = conditional.condition;
+  if (!ts.isCallExpression(test) || test.arguments.length !== 2) return false;
+  const callee = test.expression.getText();
+  if (callee !== "Object.hasOwn" && callee !== "Object.prototype.hasOwnProperty.call") return false;
+  const [owner, field] = test.arguments;
+  if (!ts.isStringLiteral(field)) return false;
+  const absent = conditional.whenFalse.getText();
+  if (absent !== "undefined" && absent !== "null") return false;
+  let read = conditional.whenTrue;
+  while (ts.isAsExpression(read) || ts.isParenthesizedExpression(read)) read = read.expression;
+  if (!ts.isPropertyAccessExpression(read) || read.name.text !== field.text) return false;
+  let receiver: ts.Expression = read.expression;
+  while (ts.isAsExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
+    receiver = receiver.expression;
+  }
+  return receiver.getText() === owner.getText();
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -5323,6 +5359,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     switch (n.kind) {
       case ts.SyntaxKind.ConditionalExpression: {
         if (isBlockCapture(n as ts.ConditionalExpression)) return;
+        if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
           visit((n as ts.ConditionalExpression).condition);

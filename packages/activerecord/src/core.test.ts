@@ -253,7 +253,7 @@ describe("CoreTest", () => {
     const topicFindByCache = Topic._findByStatementCache!.get(usingPreparedStatements)!;
 
     await assertDifference(
-      () => topicFindByCache.size,
+      () => topicFindByCache.size(),
       +1,
       null,
       async () => {
@@ -261,7 +261,7 @@ describe("CoreTest", () => {
       },
     );
     await assertNoDifference(
-      () => topicFindByCache.size,
+      () => topicFindByCache.size(),
       null,
       async () => {
         await Topic.findBy({ id: 1 });

@@ -6,6 +6,7 @@ import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbEnsure } from "@blazetrails/ruby-compat";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,
@@ -112,87 +113,45 @@ export function connectedToMany<T>(
   this: typeof Base,
   ...args: [typeof Base, ...(typeof Base)[], ConnectedToManyOptions, () => T]
 ): T;
-export function connectedToMany<T>(this: typeof Base, ...args: unknown[]): T {
-  const fn = args[args.length - 1] as () => T;
-  const options = args[args.length - 2] as ConnectedToManyOptions;
-  const classArgs = args.slice(0, args.length - 2);
-  const normalized = classArgs.flat() as (typeof Base)[];
-
-  if (normalized.length === 0) {
-    throw new ArgumentError("must provide at least one class.");
-  }
-
-  if (!options?.role) {
-    throw new ArgumentError("must provide a `role`.");
-  }
-
-  if (typeof fn !== "function") {
-    throw new ArgumentError("must provide a block.");
-  }
-
-  if (!isBaseClass(this)) {
-    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
-    throw new NotImplementedError("connected_to_many can only be called on ActiveRecord::Base.");
-  }
-
-  if (normalized.some((klass) => isBaseClass(klass))) {
-    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
-    throw new NotImplementedError("connected_to_many cannot include ActiveRecord::Base.");
-  }
-
+export function connectedToMany<T>(this: typeof Base, ...classes: unknown[]): T {
+  const block = classes.pop() as () => T;
+  const options = classes.pop() as ConnectedToManyOptions;
+  if (!("role" in options)) throw new ArgumentError("missing keyword: :role");
   const { role, shard } = options;
-  const preventWrites = role === readingRole() || !!options.preventWrites;
+  let { preventWrites = false } = options;
+  classes = classes.flat();
 
-  const klasses: any[] = [...normalized];
-  let entry!: Parameters<typeof appendToConnectedToStack>[0];
-  appendToConnectedToStack((entry = { role, shard, preventWrites, klasses }));
+  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
+  return rbEnsure(
+    () => {
+      if ((this as unknown) !== ActiveRecord.Base || classes.includes(ActiveRecord.Base)) {
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:169 cluster=connection-pool
+        throw new NotImplementedError(
+          "connected_to_many can only be called on ActiveRecord::Base.",
+        );
+      }
 
-  let result: T;
-  try {
-    result = fn();
-  } catch (error) {
-    removeStackEntry(entry);
-    throw error;
-  }
+      if (role === readingRole()) preventWrites = true;
 
-  return withCleanup(result, () => removeStackEntry(entry));
+      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: classes }));
+      return block();
+    },
+    () => {
+      const stack = connectedToStack();
+      stack.splice(stack.lastIndexOf(entry as never), 1);
+    },
+  );
 }
 
-export function connectedToAllShards<T>(
+export async function connectedToAllShards<T>(
   this: typeof Base,
-  options: { role?: string; preventWrites?: boolean },
-  fn: () => T,
-): T[] | Promise<Awaited<T>[]> {
-  const keys = shardKeys.call(this);
-  const results: T[] = [];
-
-  for (const shard of keys) {
-    const result = connectedTo.call(
-      this,
-      { shard, role: options.role, preventWrites: options.preventWrites },
-      fn,
-    ) as T;
-
-    if (isThenable(result)) {
-      const asyncResults = async (): Promise<Awaited<T>[]> => {
-        const awaited = results as Awaited<T>[];
-        awaited.push((await result) as Awaited<T>);
-        for (const remaining of keys.slice(keys.indexOf(shard) + 1)) {
-          const r = connectedTo.call(
-            this,
-            { shard: remaining, role: options.role, preventWrites: options.preventWrites },
-            fn,
-          );
-          awaited.push((await r) as Awaited<T>);
-        }
-        return awaited;
-      };
-      return asyncResults();
-    }
-
-    results.push(result);
+  { role, preventWrites }: { role?: string; preventWrites?: boolean },
+  blk: () => T,
+): Promise<Awaited<T>[]> {
+  const results: Awaited<T>[] = [];
+  for (const shard of shardKeys.call(this)) {
+    results.push(await (connectedTo.call(this, { shard, role, preventWrites }, blk) as T));
   }
-
   return results;
 }
 
@@ -227,16 +186,14 @@ export function whilePreventingWrites<T>(this: typeof Base, fn: () => T, enabled
 
 export function prohibitShardSwapping<T>(fn: () => T, enabled: boolean | null = true): T {
   const prevValue = IsolatedExecutionState.get<boolean | null>(PROHIBIT_SHARD_SWAPPING_KEY);
-  IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, enabled);
-  let result: T;
-  try {
-    result = fn();
-  } catch (error) {
-    IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, prevValue);
-    throw error;
-  }
-  return withCleanup(result, () =>
-    IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, prevValue),
+  return rbEnsure(
+    () => {
+      IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, enabled);
+      return fn();
+    },
+    () => {
+      IsolatedExecutionState.set(PROHIBIT_SHARD_SWAPPING_KEY, prevValue);
+    },
   );
 }
 
@@ -258,16 +215,12 @@ export function releaseConnection(this: typeof Base): boolean {
   return this.connectionPool().releaseConnection();
 }
 
-export function withConnection<T>(
+export async function withConnection<T>(
   this: typeof Base,
   fn: (conn: DatabaseAdapter) => T | Promise<T>,
   options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },
 ): Promise<T> {
-  try {
-    return Promise.resolve(this.connectionPool().withConnection(fn, options)) as Promise<T>;
-  } catch (err) {
-    return Promise.reject(err);
-  }
+  return this.connectionPool().withConnection(fn, options);
 }
 
 export function connectionDbConfig(this: typeof Base) {
@@ -366,10 +319,7 @@ export function schemaCache(this: typeof Base) {
 }
 
 export function clearCacheBang(this: typeof Base): void {
-  const cache = schemaCache.call(this);
-  if (cache && typeof cache.clearBang === "function") {
-    cache.clearBang();
-  }
+  this.connectionPool().schemaCache.clearBang();
 }
 
 export function shardKeys(this: typeof Base): string[] {
@@ -381,25 +331,10 @@ export function isSharded(this: typeof Base): boolean {
   return shardKeys.call(this).length > 0;
 }
 
-function isThenable(value: unknown): value is PromiseLike<unknown> {
-  return value != null && typeof (value as any).then === "function";
-}
-
-function withCleanup<T>(result: T, cleanup: () => void): T {
-  if (isThenable(result)) {
-    return Promise.resolve(result).finally(cleanup) as T;
-  }
-  cleanup();
-  return result;
-}
-
-function removeStackEntry(entry: object): void {
-  const stack = connectedToStack();
-  const index = stack.lastIndexOf(entry as any);
-  if (index !== -1) stack.splice(index, 1);
-}
-
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE with-role-and-shard-loads-an-async-blocks-relation-without-an-invented-arm
+ */
 export function withRoleAndShard<T>(
   this: typeof Base,
   role: string | undefined,
@@ -407,37 +342,24 @@ export function withRoleAndShard<T>(
   preventWrites: boolean,
   fn: () => T,
 ): T {
-  const resolvedPreventWrites = role === readingRole() || preventWrites;
-  let entry!: Parameters<typeof appendToConnectedToStack>[0];
-  appendToConnectedToStack(
-    (entry = {
-      role,
-      shard,
-      preventWrites: resolvedPreventWrites,
-      klasses: [this] as any[],
-    }),
+  let entry: Parameters<typeof appendToConnectedToStack>[0] | undefined;
+  return rbEnsure(
+    () => {
+      if (role === readingRole()) preventWrites = true;
+
+      appendToConnectedToStack((entry = { role, shard, preventWrites, klasses: [this] }));
+      const load = (returnValue: unknown) => {
+        if (returnValue instanceof ActiveRecord.Relation) return returnValue.load();
+        return returnValue;
+      };
+      const returnValue = fn();
+      return (returnValue instanceof Promise ? returnValue.then(load) : load(returnValue)) as T;
+    },
+    () => {
+      const stack = connectedToStack();
+      stack.splice(stack.lastIndexOf(entry as never), 1);
+    },
   );
-
-  let result: T;
-  try {
-    result = fn();
-  } catch (error) {
-    removeStackEntry(entry);
-    throw error;
-  }
-
-  if (result instanceof ActiveRecord.Relation) {
-    return withCleanup(result.load() as T, () => removeStackEntry(entry));
-  }
-
-  if (isThenable(result)) {
-    const loaded = Promise.resolve(result as unknown).then((v) =>
-      v instanceof ActiveRecord.Relation ? v.load() : v,
-    );
-    return withCleanup(loaded as unknown as T, () => removeStackEntry(entry));
-  }
-
-  return withCleanup(result, () => removeStackEntry(entry));
 }
 
 /** @internal */

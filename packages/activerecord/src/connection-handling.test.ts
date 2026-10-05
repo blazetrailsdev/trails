@@ -602,6 +602,36 @@ describe("withRoleAndShard loads Relation return values within scope (Story K ga
     expect(result).toBe(42);
   });
 
+  it("an overlapping async block removes its own entry when it settles first", async () => {
+    const { withRoleAndShard } = await import("./connection-handling.js");
+    class FakeModel extends Base {}
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => (release = resolve));
+    const seen: (string | undefined)[] = [];
+
+    const outer = withRoleAndShard.call(FakeModel as any, "outer", undefined, false, async () => {
+      await Promise.resolve();
+    });
+    const inner = withRoleAndShard.call(FakeModel as any, "inner", undefined, false, async () => {
+      await gate;
+      seen.push(connectedToStack().at(-1)?.role);
+    });
+    await outer;
+    release();
+    await inner;
+
+    expect(seen).toEqual(["inner"]);
+    expect(connectedToStack().some((entry) => entry.role === "outer")).toBe(false);
+    expect(connectedToStack().some((entry) => entry.role === "inner")).toBe(false);
+  });
+
+  it("connected_to_many raises ArgumentError without a role", () => {
+    class AbstractConn extends Base {}
+    expect(() => Base.connectedToMany([AbstractConn], {} as never, () => {})).toThrow(
+      "missing keyword: :role",
+    );
+  });
+
   it("calls .load() on a Relation returned from an async block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");
     let loadCalled = false;
