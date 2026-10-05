@@ -1,8 +1,10 @@
 import {
+  Encoding,
   File,
   FileUtils,
   Marshal,
   Zlib,
+  forceEncoding,
   isModuleIncluded,
   registerConstant,
   sort,
@@ -350,6 +352,7 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
+  /** @inventedArm forceEncoding — PERMANENT */
   static async _loadFrom(filename: string): Promise<SchemaCache | null> {
     try {
       if (!File.isFile(filename)) return null;
@@ -357,7 +360,7 @@ export class SchemaCache {
         if (filename.includes(".dump")) {
           return Marshal.load(file) as SchemaCache;
         } else {
-          const parsed = yamlParse(file, {
+          const parsed = yamlParse(forceEncoding(file, Encoding.UTF_8), {
             customTags: RUBY_OBJECT_TAGS,
             maxAliasCount: -1,
           }) as Record<string, Record<string, unknown[]> | null>;
@@ -379,11 +382,15 @@ export class SchemaCache {
     }
   }
 
+  /**
+   * @missingRailsArgs read — PERMANENT
+   * @inventedArm binread — PERMANENT
+   */
   private static async read<T>(filename: string, callback: (data: string) => T): Promise<T> {
     if (File.extname(filename) === ".gz") {
       return Zlib.GzipReader.open(filename, async (gz) => callback(await gz.read()));
     }
-    return callback(File.read(filename));
+    return callback(File.binread(filename));
   }
 
   initializeDup(): SchemaCache {
@@ -530,10 +537,11 @@ export class SchemaCache {
     });
   }
 
+  /** @inventedArm from — PERMANENT */
   async dumpTo(filename: string): Promise<void> {
     await this.open(filename, (f) => {
       if (filename.includes(".dump")) {
-        f.write(Marshal.dump(this));
+        f.write(Uint8Array.from(Marshal.dump(this), (byte) => byte.charCodeAt(0)));
       } else {
         const coder: Record<string, unknown> = {};
         this.encodeWith(coder);
@@ -613,7 +621,7 @@ export class SchemaCache {
    */
   private async open(
     filename: string,
-    block: (file: { write(string: string): unknown }) => unknown,
+    block: (file: { write(string: string | Uint8Array): unknown }) => unknown,
   ): Promise<unknown> {
     FileUtils.mkdirP(File.dirname(filename));
 

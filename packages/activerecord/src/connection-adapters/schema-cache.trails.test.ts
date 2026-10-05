@@ -356,7 +356,7 @@ describe("SchemaCacheMarshalDumpTest", () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  async function dumped(): Promise<SchemaCache> {
+  async function dumped(table = "people", comment: string | null = null): Promise<SchemaCache> {
     const cache = new SchemaCache();
     await cache.add(
       new FakePool({
@@ -368,25 +368,42 @@ describe("SchemaCacheMarshalDumpTest", () => {
               { sqlType: "bigint(20)", type: "integer" },
               { extra: "auto_increment" },
             ),
+            true,
+            { comment },
           ),
         ],
-        indexes: async () => [new IndexDefinition("people", "index_people_on_id", true, ["id"])],
+        indexes: async () => [new IndexDefinition(table, "index_people_on_id", true, ["id"])],
         primaryKey: async () => "id",
-        dataSources: async () => ["people"],
+        dataSources: async () => [table],
       }),
-      "people",
+      table,
     );
     return cache;
   }
 
-  it("a .dump file holds the cache as TYPE_USRMARSHAL over marshal_dump", async () => {
+  it("a .dump file holds the bytes Marshal.dump answers, TYPE_USRMARSHAL over marshal_dump", async () => {
     const filename = path.join(tmpDir, "schema_cache.dump");
-    await (await dumped()).dumpTo(filename);
+    const cache = await dumped("pe\u00f3ple", "x".repeat(200));
+    await cache.dumpTo(filename);
 
-    expect(
-      File.read(filename).startsWith("\x04\bU:2ActiveRecord::ConnectionAdapters::SchemaCache[\v0"),
-    ).toBe(true);
+    const bytes = File.binread(filename);
+    expect(bytes).toBe(Marshal.dump(cache));
+    expect(bytes.startsWith("\x04\bU:2ActiveRecord::ConnectionAdapters::SchemaCache[\v0")).toBe(
+      true,
+    );
   });
+
+  it.each(["schema_cache.dump", "schema_cache.dump.gz"])(
+    "%s round-trips a non-ASCII table name and a string longer than 127 bytes",
+    async (basename) => {
+      const filename = path.join(tmpDir, basename);
+      await (await dumped("pe\u00f3ple", "x".repeat(200))).dumpTo(filename);
+      const loaded = (await SchemaCache._loadFrom(filename))!;
+
+      const [column] = await loaded.columns(new FakePool({}), "pe\u00f3ple");
+      expect(column.comment).toBe("x".repeat(200));
+    },
+  );
 
   it.each(["schema_cache.dump", "schema_cache.dump.gz"])(
     "%s loads through Marshal.load and marshal_load",
@@ -408,12 +425,12 @@ describe("SchemaCacheMarshalDumpTest", () => {
     },
   );
 
-  it("Marshal.load revives the cache from the bytes of a .dump Rails wrote", async () => {
+  it("_load_from loads a .dump Rails wrote", async () => {
     const fixture = new URL(
       "../test-helpers/support/schema_cache_fixtures/rails_8_0_2_sqlite3.dump",
       import.meta.url,
     );
-    const loaded = Marshal.load(File.binread(fixture.pathname)) as SchemaCache;
+    const loaded = (await SchemaCache._loadFrom(fixture.pathname))!;
     const pool = new FakePool({});
 
     expect(loaded).toBeInstanceOf(SchemaCache);
