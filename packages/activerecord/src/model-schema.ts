@@ -1,4 +1,4 @@
-import { rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAref, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
@@ -177,17 +177,23 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
 }
 
 export function contentColumns(this: typeof Base): any[] {
-  return columns
-    .call(this as unknown as SchemaHost)
-    .filter(
-      (c: { name: string }) =>
-        !(
-          c.name === this.primaryKey ||
-          c.name === this.inheritanceColumn ||
-          c.name.endsWith("_id") ||
-          c.name.endsWith("_count")
+  const host = this as unknown as SchemaHost;
+  return (
+    ownSchemaMemo(host, "_contentColumns") ??
+    (host._contentColumns = Object.freeze(
+      columns
+        .call(host)
+        .filter(
+          (c: { name: string }) =>
+            !(
+              c.name === this.primaryKey ||
+              c.name === this.inheritanceColumn ||
+              c.name.endsWith("_id") ||
+              c.name.endsWith("_count")
+            ),
         ),
-    );
+    ) as any[])
+  );
 }
 
 export interface SchemaHost {
@@ -213,6 +219,10 @@ export interface SchemaHost {
   loadSchemaBang(): void;
   /** @internal */
   _columnNames?: readonly string[];
+  /** @internal */
+  _contentColumns?: any[];
+  /** @internal */
+  _symbolColumnToStringNameHash?: Record<string, string>;
   connection: any;
   prototype: object;
   superclass?: SchemaHost;
@@ -342,8 +352,14 @@ export function columnForAttribute(this: SchemaHost, name: string): any {
   return name in hash ? hash[name] : new NullColumn(name);
 }
 
-export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | undefined {
-  return indexBy(columnNames.call(this as unknown as typeof Base), (name) => name)[nameSymbol];
+export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | null {
+  const symbolColumnToStringNameHash =
+    ownSchemaMemo(this, "_symbolColumnToStringNameHash") ??
+    (this._symbolColumnToStringNameHash = indexBy(
+      columnNames.call(this as unknown as typeof Base),
+      (name) => name,
+    ));
+  return hashAref(symbolColumnToStringNameHash, nameSymbol) as string | null;
 }
 
 function clearAdapterDataSourceCache(host: SchemaHost): void {
@@ -478,6 +494,8 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _columnsHash?: unknown;
     _columns?: unknown;
     _columnNames?: unknown;
+    _contentColumns?: unknown;
+    _symbolColumnToStringNameHash?: unknown;
     _attributeNamesMemo?: unknown;
   };
   const bag = host as CacheBag;
@@ -487,6 +505,8 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._cachedAttributeTypes = null;
   bag._columns = undefined;
   bag._columnNames = undefined;
+  bag._contentColumns = undefined;
+  bag._symbolColumnToStringNameHash = undefined;
   bag._attributeNamesMemo = undefined;
   host._columnsHash = filteredHash;
 

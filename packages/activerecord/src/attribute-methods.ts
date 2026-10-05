@@ -82,7 +82,7 @@ export function isRespondTo(
 
   if (this._attributes) {
     const column = (
-      this.constructor as unknown as { symbolColumnToString(name: string): string | undefined }
+      this.constructor as unknown as { symbolColumnToString(name: string): string | null }
     ).symbolColumnToString(name);
     if (column != null) {
       return _hasAttribute.call(this, column);
