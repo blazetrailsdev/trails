@@ -4418,10 +4418,14 @@ function checkNumeric(obj: unknown, field: string): asserts obj is number | bigi
   if (!kNumericP(obj)) throw new TypeError(`invalid ${field} (not numeric)`);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE plain-date-seat-equals-date-is-not-symmetric
+ */
 function cmpGen(self: Date, other: unknown): number | null {
   if (kNumericP(other)) return self.ajd.cmp(other);
   else if (other instanceof Date) return self.ajd.cmp(other.ajd);
+  else if (other instanceof Temporal.PlainDate) return self.ajd.cmp(new Date(other).ajd);
   return null;
 }
 
@@ -5527,7 +5531,6 @@ export class Date extends rbCDate {
   }
 
   cmp(other: unknown): number | null {
-    if (other instanceof Temporal.PlainDate) other = new Date(other);
     if (!(other instanceof Date)) return cmpGen(this, other);
 
     if (!(simpleDatP(this) && simpleDatP(other) && this.isGregorian === other.isGregorian))

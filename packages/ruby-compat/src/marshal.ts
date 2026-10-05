@@ -4,7 +4,7 @@ import { Hash } from "./hash.js";
 import { Module, rbGetAllocFunc } from "./include.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
-import { Rational, compatible, nuratDumper, nuratLoader } from "./rational.js";
+import { Rational, nuratDumper, nuratLoader } from "./rational.js";
 import {
   FL_SINGLETON,
   T_ICLASS,
@@ -27,6 +27,7 @@ import { RuntimeError } from "./runtime-error.js";
 import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
+import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
 import { rbPathToClass, registerConstant, registeredConstant } from "./variable.js";
 import { verbose } from "./verbose.js";
@@ -368,27 +369,26 @@ function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
 }
 
 /**
- * `rb_class_real` (`vendor/ruby/v3.3.11/object.c:255`). A core class no JS
- * constructor seats (`rbCDate`, the class of a `Temporal.PlainDate`) is
- * reopened by the constructor seated at its path, which extends it
- * (`class Date extends rbCDate`), and that one is the class the path names.
+ * `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). `obj.constructor` is
+ * `rb_class_real(CLASS_OF(obj))`: a singleton class's prototype keeps the
+ * real class there. A Temporal value has no class of its own: it is the seat
+ * of a core class ({@link rbObjClass}), and the class its path names is the
+ * constant seated there, which reopens it (`class Date extends rbCDate`).
+ *
+ * @inventedArm if — PERMANENT
  */
-function rbClassReal(cl: AnyClass): AnyClass {
-  const path = rbModName(cl);
-  const real = path === null ? undefined : registeredConstant(path);
-  return typeof real === "function" && Object.getPrototypeOf(real) === cl ? (real as AnyClass) : cl;
-}
-
-/** `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). */
 function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
   const realObj = arg.compatTbl?.get(obj);
   if (realObj !== undefined) {
     obj = realObj;
   }
-  const klass = rbObjClass(obj) as AnyClass;
+  let klass = obj.constructor as AnyClass;
+  if (temporalTag(obj) !== null) {
+    klass = registeredConstant(rbModToS(rbObjClass(obj))) as AnyClass;
+  }
   wExtended(Object.getPrototypeOf(obj) as object | null, arg, check);
   wByte(type, arg);
-  const path = class2path(rbClassReal(klass));
+  const path = class2path(klass);
   wUnique(path, arg);
 }
 
@@ -559,7 +559,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
           arg.compatTbl = new Map();
         }
         arg.compatTbl.set(obj as object, realObj);
-        if (obj !== realObj) hasiv = 0;
+        if (obj !== realObj && encname === null) hasiv = 0;
       }
     }
     if (hasiv) wByte(TYPE_IVAR, arg);
@@ -1392,4 +1392,4 @@ export const Marshal = {
 };
 
 registerConstant("Rational", Rational);
-rbMarshalDefineCompat(Rational, compatible, nuratDumper, nuratLoader);
+rbMarshalDefineCompat(Rational, Rational.compatible, nuratDumper, nuratLoader);

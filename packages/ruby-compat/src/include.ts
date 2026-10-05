@@ -33,6 +33,7 @@ import {
   FL_SINGLETON,
   T_ICLASS,
   classpaths,
+  rbSetClassPathString,
   rbAnyToS,
   rbCBasicObject,
   rbCClass,
@@ -1542,6 +1543,8 @@ Object.setPrototypeOf(rbCClass, Module);
 Object.setPrototypeOf(rbCClass.prototype, Module.prototype);
 
 rbDefineAllocFunc(Rational, (klass) => new klass(0, 1));
+classpaths.set(Rational, { path: "Rational", permanent: true });
+rbSetClassPathString(Rational.compatible, Rational, "compatible");
 for (const klass of [Rational, Complex, BigDecimal]) {
   Object.setPrototypeOf(klass, rbCNumeric);
   Object.setPrototypeOf(klass.prototype, rbCNumeric.prototype);

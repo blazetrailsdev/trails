@@ -103,6 +103,11 @@ export class Rational {
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   readonly denominator: bigint;
 
+  /** `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), pathed at
+   * the foot of include.ts.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  declare static compatible: abstract new () => { marshalLoad(a: unknown): unknown };
+
   /**
    * `vendor/ruby/v3.3.11/rational.c:481` `nurat_s_canonicalize_internal`, the C
    * constructor every `Rational` goes through — there is no public
@@ -284,6 +289,9 @@ export class Rational {
   }
 
   /** `vendor/ruby/v3.3.11/rational.c:1857` `nurat_marshal_dump` (`Rational#marshal_dump`).
+   * Its `rb_copy_generic_ivar(a, self)` has no ivar table to write: a JS Array
+   * holds no ivars, which is why `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`)
+   * counts none on one.
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   marshalDump(): [bigint, bigint] {
     const a: [bigint, bigint] = [this.numerator, this.denominator];
@@ -312,13 +320,9 @@ function nuratCanonicalize(num: bigint, den: bigint): [num: bigint, den: bigint]
   return [num, den];
 }
 
-/**
- * `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), the class
- * `Marshal.load` allocates in a Rational's place and sends `marshal_load`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export class compatible {
+/** @internal `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), the
+ * class `Marshal.load` allocates in a Rational's place and sends `marshal_load`. */
+class compatible {
   /** `vendor/ruby/v3.3.11/rational.c:1869` `nurat_marshal_load`.
    * @noRailsEquivalent PERMANENT */
   marshalLoad(a: unknown): this {
@@ -347,6 +351,8 @@ export class compatible {
   }
 }
 
+Rational.compatible = compatible;
+
 /**
  * `vendor/ruby/v3.3.11/rational.c:1831` `nurat_dumper`.
  *
@@ -362,7 +368,7 @@ export function nuratDumper(self: Rational): Rational {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function nuratLoader(self: Rational, a: compatible): Rational {
+export function nuratLoader(self: Rational, a: object): Rational {
   let num: unknown = rbObjIvarGet(a, "@numerator");
   let den: unknown = rbObjIvarGet(a, "@denominator");
   nuratIntCheck(num);

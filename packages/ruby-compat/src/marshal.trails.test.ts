@@ -5,7 +5,13 @@ import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
 import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
 import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
-import { rbObjIvarGet, rbObjIvarSet, rbObjSingletonClass, rbSetClassPathString } from "./object.js";
+import {
+  rbModName,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbObjSingletonClass,
+  rbSetClassPathString,
+} from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
@@ -360,6 +366,10 @@ describe("Marshal.load", () => {
       "(-3/4)",
       "(1180591620717411303424/3)",
     ]);
+  });
+
+  it("paths the compat class under Rational", () => {
+    expect(rbModName(Rational.compatible)).toBe("Rational::compatible");
   });
 
   it("loads a Rational canonical and not reduced", () => {
