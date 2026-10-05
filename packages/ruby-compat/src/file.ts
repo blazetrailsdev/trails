@@ -226,6 +226,16 @@ export class File extends IO {
   }
 
   /**
+   * {@link File.isExist} over the backend's async `exists`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File.exist?`
+   * (`vendor/ruby/v3.3.11/file.c:1806`).
+   */
+  static async isExistAsync(fileName: string): Promise<boolean> {
+    return getFs().exists(fileName);
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:2196` `rb_file_identical_p` — `false` unless both
    * names stat successfully and report the same `st_dev` and `st_ino`
    * (`file.c:2201-2205`). Either argument may be an open stream, which
@@ -558,14 +568,14 @@ export class File extends IO {
    */
   static async writeAsync(
     name: string,
-    string: string,
+    string: string | Uint8Array,
     { perm }: { perm?: number } = {},
   ): Promise<number> {
     const fs = getFs();
     const options = perm == null ? undefined : { mode: perm };
     if (fs.writeFile) await fs.writeFile(name, string, options);
     else fs.writeFileSync(name, string, options);
-    return new TextEncoder().encode(string).length;
+    return typeof string === "string" ? new TextEncoder().encode(string).length : string.length;
   }
 
   /**
