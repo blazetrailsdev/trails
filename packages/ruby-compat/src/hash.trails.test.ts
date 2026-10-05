@@ -1120,5 +1120,6 @@ describe("block (a marked `&block`)", () => {
     expect(hashAref(hash, "a")).toBe(1);
     expect(hashAref(hash, "missing")).toBe(7);
     expect(hashAref(new Hash<string, string>((_h, key) => `no ${key}`), "x")).toBe("no x");
+    expect(hashAref(new Hash<string, string | undefined>(() => undefined), "x")).toBe(null);
   });
 });
