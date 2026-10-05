@@ -537,7 +537,6 @@ export class SchemaCache {
     });
   }
 
-  /** @inventedArm from — PERMANENT */
   async dumpTo(filename: string): Promise<void> {
     await this.open(filename, (f) => {
       if (filename.includes(".dump")) {

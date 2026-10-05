@@ -264,6 +264,32 @@ describe("SchemaCacheGzipDumpTest", () => {
     expect(columns.map((c) => c.name)).toEqual(["なまえ"]);
   });
 
+  it.each(["schema_cache.yml", "schema_cache.yml.gz"])(
+    "%s is written as UTF-8 and a non-ASCII column name reads back from its bytes",
+    async (basename) => {
+      const cache = new SchemaCache();
+      await cache.columns(
+        new FakePool({
+          columns: async () => [
+            new Column("なまえ", null, new SqlTypeMetadata({ sqlType: "text", type: "text" })),
+          ],
+          dataSourceExists: async () => true,
+        }),
+        "weirds",
+      );
+      const filename = path.join(tmpDir, basename);
+      await cache.dumpTo(path.join(tmpDir, "schema_cache.yml"));
+      await cache.dumpTo(filename);
+
+      expect(fs.readFileSync(path.join(tmpDir, "schema_cache.yml"), "utf8")).toContain(
+        "name: なまえ",
+      );
+      const loaded = (await SchemaCache._loadFrom(filename))!;
+      const [column] = await loaded.columns(new FakePool({}), "weirds");
+      expect(column.name).toBe("なまえ");
+    },
+  );
+
   it("dumping into a missing directory creates it", async () => {
     const cache = await populatedCache();
     const filename = path.join(tmpDir, "nested", "deeper", "schema_cache.json");

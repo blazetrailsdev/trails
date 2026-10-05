@@ -309,7 +309,10 @@ function singletonDumpUnableP(klass: object): boolean {
 /**
  * `w_extended` (`vendor/ruby/v3.3.11/marshal.c:550`), over the prototype
  * chain `CLASS_OF(obj)` heads. Nothing is prepended to a singleton class, so
- * `RCLASS_ORIGIN` is the class itself.
+ * `RCLASS_ORIGIN` is the class itself: the `origin != klass` half of the
+ * singleton check and the `RICLASS_IS_ORIGIN` guard (`marshal.c:561-562`) have
+ * no iclass to meet. `rb_class_name` answers an anonymous module's temporary
+ * path, which `w_unique` refuses (`must_not_be_anonymous`, `marshal.c:530`).
  */
 function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
   if (check && klass !== null && Object.hasOwn(klass, FL_SINGLETON)) {
@@ -319,9 +322,10 @@ function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
     klass = Object.getPrototypeOf(klass) as object | null;
   }
   while (klass !== null && Object.hasOwn(klass, T_ICLASS)) {
-    const path = rbModName((klass as Record<symbol, object>)[T_ICLASS]);
+    const m = (klass as Record<symbol, AnyClass | Module>)[T_ICLASS];
+    const path = rbModName(m) ?? (m instanceof Module ? m.inspect() : rbModToS(m));
     wByte(TYPE_EXTENDED, arg);
-    wUnique(path ?? rbModToS((klass as Record<symbol, AnyClass>)[T_ICLASS]), arg);
+    wUnique(path, arg);
     klass = Object.getPrototypeOf(klass) as object | null;
   }
 }
@@ -848,6 +852,8 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
  * `r_copy_ivar` (`vendor/ruby/v3.3.11/marshal.c:1727`), over `copy_ivar_i`
  * (`marshal.c:1716`). Only a `T_OBJECT` carries ivars here: a JS Array, Hash
  * or String has no ivar table.
+ *
+ * @inventedArm if — PERMANENT
  */
 function rCopyIvar(v: object, data: unknown): object {
   if (tObjectP(data)) {

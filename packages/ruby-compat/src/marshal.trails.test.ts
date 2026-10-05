@@ -203,6 +203,11 @@ describe("Marshal.dump", () => {
     expect(hex(Marshal.dump(extended))).toBe(
       "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
     );
+
+    const anonymous = new Shape(":circle");
+    extend(anonymous, new Module());
+    expect(() => Marshal.dump(anonymous)).toThrow(TypeError);
+    expect(() => Marshal.dump(anonymous)).toThrow(/^can't dump anonymous class #<Module:0x/);
   });
 
   it("dumps marshal_dump's value without the singleton check", () => {

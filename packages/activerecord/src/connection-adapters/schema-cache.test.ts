@@ -19,7 +19,7 @@ import { StatementInvalid } from "../errors.js";
 import { SchemaStatements } from "./abstract/schema-statements.js";
 import type { SchemaQuoter } from "./abstract/assert-schema-adapter.js";
 import { include, assertRaises } from "@blazetrails/activesupport";
-import { File, FileUtils, Tempfile } from "@blazetrails/ruby-compat";
+import { File, FileUtils, Marshal, Tempfile } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { fixtures } from "../test-fixtures.js";
 import { withSecondPool } from "../support/setup-second-pool.js";
@@ -244,13 +244,11 @@ describe("SchemaCacheTest", () => {
 
     await cache.add("courses");
 
-    const dumped = new SchemaCache();
-    dumped.marshalLoad(
-      (
-        cache as unknown as { _schemaReflection: SchemaReflection }
-      )._schemaReflection.loadedCache!.marshalDump(),
-    );
-    cache = dumped;
+    cache = Marshal.load(
+      Marshal.dump(
+        (cache as unknown as { _schemaReflection: SchemaReflection })._schemaReflection.loadedCache,
+      ),
+    ) as SchemaCache;
 
     await assertNoQueries(false, async () => {
       expect((await cache.columns(pool, "courses")).length).toBe(3);
