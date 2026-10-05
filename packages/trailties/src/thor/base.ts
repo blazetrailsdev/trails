@@ -202,6 +202,9 @@ export interface BaseClass {
   commandScopeMember(name: string, options?: { for?: string }): unknown;
 }
 
+ThorBase.attrReader("options", "parentOptions", "args");
+ThorBase.attrWriter("options", "parentOptions", "args");
+
 (ThorBase as unknown as Record<symbol, unknown>)[initialize] = function (
   this: Base,
   args: unknown[] = [],

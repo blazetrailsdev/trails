@@ -3230,12 +3230,36 @@ function attributeMacro(
   }
 }
 
+function attrMacro(name: string): { reader: boolean; writer: boolean } | undefined {
+  switch (name) {
+    case "attrReader":
+      return { reader: true, writer: false };
+    case "attrWriter":
+      return { reader: false, writer: true };
+    default:
+      return undefined;
+  }
+}
+
+function importedName(id: ts.Identifier, sourceFile: ts.SourceFile): string {
+  for (const statement of sourceFile.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if (element.name.text === id.text) return (element.propertyName ?? element.name).text;
+    }
+  }
+  return id.text;
+}
+
 function isClassAttributeCallee(expr: ts.Expression): boolean {
   return (
     ts.isPropertyAccessExpression(expr) &&
-    expr.name.text === "call" &&
     ts.isIdentifier(expr.expression) &&
-    attributeMacro(expr.expression.text) !== undefined
+    (expr.name.text === "call"
+      ? attributeMacro(expr.expression.text) !== undefined
+      : attrMacro(expr.name.text) !== undefined)
   );
 }
 
@@ -3243,6 +3267,24 @@ function readClassAttributeCall(
   node: ts.CallExpression,
   sourceFile: ts.SourceFile,
 ): ClassAttributeCall | null {
+  const callee = node.expression as ts.PropertyAccessExpression;
+  const attr = callee.name.text === "call" ? undefined : attrMacro(callee.name.text);
+  if (attr !== undefined) {
+    const names = node.arguments.filter(ts.isStringLiteralLike).map((arg) => arg.text);
+    if (names.length === 0 || names.length !== node.arguments.length) return null;
+    const enclosing = enclosingEntity(node);
+    return {
+      ...(enclosing !== undefined ? { enclosing: enclosing.name } : {}),
+      receiver: importedName(callee.expression as ts.Identifier, sourceFile),
+      names,
+      reader: false,
+      writer: false,
+      instanceReader: attr.reader,
+      instanceWriter: attr.writer,
+      instancePredicate: false,
+      line: sourceFile.getLineAndCharacterOfPosition(node.getStart()).line + 1,
+    };
+  }
   const [recv, ...rest] = node.arguments;
   if (recv === undefined) return null;
   const names: string[] = [];

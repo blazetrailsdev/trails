@@ -50,6 +50,28 @@ function subclass(parent: Klass): Klass {
 }
 
 describe("Thor::Base", () => {
+  describe("attr_accessor :options, :parent_options, :args", () => {
+    it("gives an including class the three accessors, each over its ivar", () => {
+      const klass = baseclass();
+      for (const name of ["options", "parentOptions", "args"]) {
+        let accessor: PropertyDescriptor | undefined;
+        for (let o: object | null = klass.prototype; o && !accessor; o = Object.getPrototypeOf(o)) {
+          accessor = Object.getOwnPropertyDescriptor(o, name);
+        }
+        expect(typeof accessor?.get).toBe("function");
+        expect(typeof accessor?.set).toBe("function");
+      }
+      const instance = new klass(["extra"]);
+      expect(Object.hasOwn(instance, "options")).toBe(false);
+      expect(instance._args).toEqual(["extra"]);
+      expect(instance._options).toBe(instance.options);
+      expect(instance.parentOptions).toBeNull();
+      instance.parentOptions = { force: true };
+      expect(instance._parentOptions).toEqual({ force: true });
+      expect(instance.parentOptions).toBe(instance._parentOptions);
+    });
+  });
+
   describe("#initialize", () => {
     it("assigns each declared argument through its writer and keeps the rest in args", () => {
       const klass = baseclass();

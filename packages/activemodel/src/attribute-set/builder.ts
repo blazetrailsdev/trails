@@ -21,14 +21,13 @@ import {
 import { ValueType } from "../type/value.js";
 import { AttributeSet } from "../attribute-set.js";
 
+type RbHash<T> = Record<string, T> | Hash<string, T>;
+
 export class Builder {
   readonly types: Record<string, ValueType>;
-  readonly defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>;
+  readonly defaultAttributes: RbHash<Attribute>;
 
-  constructor(
-    types: Record<string, ValueType>,
-    defaultAttributes: Record<string, Attribute> | Hash<string, Attribute> = {},
-  ) {
+  constructor(types: Record<string, ValueType>, defaultAttributes: RbHash<Attribute> = {}) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
@@ -43,18 +42,18 @@ export class Builder {
 
 export class LazyAttributeSet extends AttributeSet {
   declare protected _attributes: Record<string, Attribute>;
-  private values: Record<string, unknown>;
-  private types: Record<string, ValueType>;
-  private additionalTypes: Record<string, ValueType>;
-  private defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>;
-  private castedValues: Record<string, unknown>;
+  private values: RbHash<unknown>;
+  private types: RbHash<ValueType>;
+  private additionalTypes: RbHash<ValueType>;
+  private defaultAttributes: RbHash<Attribute>;
+  private castedValues: RbHash<unknown>;
   private materialized: boolean;
 
   constructor(
-    values: Record<string, unknown>,
-    types: Record<string, ValueType>,
-    additionalTypes: Record<string, ValueType>,
-    defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>,
+    values: RbHash<unknown>,
+    types: RbHash<ValueType>,
+    additionalTypes: RbHash<ValueType>,
+    defaultAttributes: RbHash<Attribute>,
     attributes: Record<string, Attribute> = {},
   ) {
     super(attributes);
@@ -158,14 +157,14 @@ export class LazyAttributeSet extends AttributeSet {
 }
 
 export class LazyAttributeHash {
-  declare private _delegateHash: Record<string, Attribute>;
-  declare private types: Record<string, ValueType>;
-  declare private values: Record<string, unknown>;
-  declare private additionalTypes: Record<string, ValueType>;
-  declare private defaultAttributes: Record<string, Attribute>;
+  declare private _delegateHash: RbHash<Attribute>;
+  declare private types: RbHash<ValueType>;
+  declare private values: RbHash<unknown>;
+  declare private additionalTypes: RbHash<ValueType>;
+  declare private defaultAttributes: RbHash<Attribute>;
   declare private materialized: boolean;
 
-  transformValues<T>(fn: (attr: Attribute) => T): Record<string, T> {
+  transformValues<T>(fn: (attr: Attribute) => T): RbHash<T> {
     return transformValues(this.materialize(), fn);
   }
 
@@ -177,16 +176,16 @@ export class LazyAttributeHash {
     return fetch(this.materialize(), name, ...rest);
   }
 
-  except(...names: string[]): Record<string, Attribute> | Hash<string, Attribute> {
+  except(...names: string[]): RbHash<Attribute> {
     return except(this.materialize(), ...names);
   }
 
   constructor(
-    types: Record<string, ValueType>,
-    values: Record<string, unknown>,
-    additionalTypes: Record<string, ValueType> = {},
-    defaultAttributes: Record<string, Attribute> = {},
-    delegateHash: Record<string, Attribute> = {},
+    types: RbHash<ValueType>,
+    values: RbHash<unknown>,
+    additionalTypes: RbHash<ValueType> = {},
+    defaultAttributes: RbHash<Attribute> = {},
+    delegateHash: RbHash<Attribute> = {},
   ) {
     this.initialize(types, values, additionalTypes, defaultAttributes, delegateHash);
   }
@@ -233,11 +232,11 @@ export class LazyAttributeHash {
   }
 
   marshalDump(): [
-    Record<string, ValueType>,
-    Record<string, unknown>,
-    Record<string, ValueType>,
-    Record<string, Attribute>,
-    Record<string, Attribute>,
+    RbHash<ValueType>,
+    RbHash<unknown>,
+    RbHash<ValueType>,
+    RbHash<Attribute>,
+    RbHash<Attribute>,
   ] {
     return [
       this.types,
@@ -254,7 +253,7 @@ export class LazyAttributeHash {
   }
 
   /** @internal */
-  protected materialize(): Record<string, Attribute> {
+  protected materialize(): RbHash<Attribute> {
     if (!this.materialized) {
       eachKey(this.values, (key) => this.get(key));
       eachKey(this.types, (key) => this.get(key));
@@ -266,7 +265,7 @@ export class LazyAttributeHash {
   }
 
   /** @internal */
-  delegateHash(): Record<string, Attribute> {
+  delegateHash(): RbHash<Attribute> {
     return this._delegateHash;
   }
 
@@ -299,11 +298,11 @@ export class LazyAttributeHash {
   }
 
   private initialize(
-    types: Record<string, ValueType>,
-    values: Record<string, unknown>,
-    additionalTypes: Record<string, ValueType> = {},
-    defaultAttributes: Record<string, Attribute> = {},
-    delegateHash: Record<string, Attribute> = {},
+    types: RbHash<ValueType>,
+    values: RbHash<unknown>,
+    additionalTypes: RbHash<ValueType> = {},
+    defaultAttributes: RbHash<Attribute> = {},
+    delegateHash: RbHash<Attribute> = {},
   ): void {
     this.types = types;
     this.values = values;

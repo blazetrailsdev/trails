@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeSet, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
+import { hasKey, hashAref, keys } from "@blazetrails/ruby-compat";
 import { registry } from "../type.js";
 
 const typeRegistry = registry();
@@ -142,13 +143,13 @@ describe("LazyAttributeHash", () => {
 
   it("delegateHash returns an empty map before any access", () => {
     const hash = new LazyAttributeHash({ name: strType }, {});
-    expect(Object.keys(hash.delegateHash()).length).toBe(0);
+    expect(keys(hash.delegateHash()).length).toBe(0);
   });
 
   it("delegateHash reflects materialized entries after []", () => {
     const hash = new LazyAttributeHash({ name: strType }, { name: "Bob" });
     hash.get("name");
-    expect(Object.hasOwn(hash.delegateHash(), "name")).toBe(true);
+    expect(hasKey(hash.delegateHash(), "name")).toBe(true);
   });
 
   it("assignDefaultValue materializes from the value/type tables", () => {
@@ -161,19 +162,19 @@ describe("LazyAttributeHash", () => {
     const hash = new LazyAttributeHash({}, {});
     expect(hash.assignDefaultValue("missing")).toBeUndefined();
     expect(hash.get("missing")).toBeUndefined();
-    expect(Object.hasOwn(hash.delegateHash(), "missing")).toBe(false);
+    expect(hasKey(hash.delegateHash(), "missing")).toBe(false);
   });
 
   it("transform_values materializes and maps every attribute", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
     const result = hash.transformValues((attr) => attr);
-    expect(result["age"].value()).toBe(42);
+    expect((hashAref(result, "age") as Attribute).value()).toBe(42);
   });
 
   it("transform_values is generic over the block result", () => {
     const hash = new LazyAttributeHash({ age: intType }, { age: "42" });
-    const result: Record<string, unknown> = hash.transformValues((attr) => attr.type);
-    expect(result["age"]).toBe(intType);
+    const result = hash.transformValues((attr) => attr.type);
+    expect(hashAref(result, "age")).toBe(intType);
   });
 
   it("each_value yields every materialized attribute", () => {
@@ -246,7 +247,7 @@ describe("LazyAttributeHash", () => {
     expect(copy.delegateHash()).not.toBe(hash.delegateHash());
     expect(copy.get("age")).toBe(age);
     copy.set("name", Attribute.null("name"));
-    expect(Object.keys(hash.delegateHash())).toEqual(["age"]);
+    expect(keys(hash.delegateHash())).toEqual(["age"]);
     expect(copy.isKey("constructor")).toBe(false);
     expect(copy.get("constructor")).toBeUndefined();
   });

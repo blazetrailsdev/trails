@@ -1948,6 +1948,7 @@ class TestExtractor
   end
 
   RSPEC_TO = { "to" => "to", "not_to" => "not_to", "to_not" => "not_to" }.freeze
+  RSPEC_MATCHER_CHAIN = %i[method_add_arg method_add_block call command_call].freeze
 
   def rspec_expectation(node)
     return nil unless node[0] == :command_call && (to = RSPEC_TO[ident_name(node[3])])
@@ -1965,12 +1966,11 @@ class TestExtractor
       return ["expect_#{to}_#{name}", recv, nil]
     end
     args = nil
-    if matcher.is_a?(Array) && matcher[0] == :method_add_arg
-      args = matcher[2]
+    while matcher.is_a?(Array) && RSPEC_MATCHER_CHAIN.include?(matcher[0])
+      args = matcher[0] == :method_add_arg ? matcher[2] : nil
       matcher = matcher[1]
-    elsif matcher.is_a?(Array) && matcher[0] == :command
-      args = matcher[2]
     end
+    args = matcher[2] if matcher.is_a?(Array) && matcher[0] == :command
     return nil unless matcher.is_a?(Array) && %i[fcall vcall command].include?(matcher[0])
     name = ident_name(matcher[1])
     name = "be_nil" if name == "be" && literal_token(positional_args(args)&.first) == "x:nil"
