@@ -4,7 +4,7 @@ import { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import { registry } from "../type.js";
 import { ValueType } from "../type/value.js";
-import { Marshal, keys, rbObjDup } from "@blazetrails/ruby-compat";
+import { Hash, Marshal, keys, rbEqual, rbObjDup } from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -128,8 +128,10 @@ describe("LazyAttributeHash defaultAttributes", () => {
     expect(names(loaded)).toEqual(names(original));
     expect(names(loaded)).toHaveLength(2);
 
-    expect(keys(loaded.except("score"))).toEqual(keys(original.except("score")));
-    expect(keys(loaded.except("score"))).toEqual(["status"]);
+    const excepted = loaded.except("score");
+    expect(excepted).toBeInstanceOf(Hash);
+    expect(keys(excepted)).toEqual(["status"]);
+    expect(rbEqual(excepted, original.except("score"))).toBe(true);
 
     const copy = rbObjDup(loaded);
     expect(copy.delegateHash()).not.toBe(loaded.delegateHash());
