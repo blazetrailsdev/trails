@@ -1,68 +1,79 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
+import { FixtureResolver, LookupContext, TemplateHandlers } from "@blazetrails/actionview";
 import {
   determineTemplateEtag,
   lookupAndDigestTemplate,
   pickTemplateForEtag,
 } from "./etag-with-template-digest.js";
 
+function controller(actionName: string) {
+  const prefixes = ["posts"];
+  return {
+    actionName,
+    lookupContext: new LookupContext(
+      [new FixtureResolver({ "posts/show.html.html": "show", "posts/index.html.html": "index" })],
+      {},
+      prefixes,
+    ),
+    _prefixes: () => prefixes,
+  };
+}
+
+beforeAll(() => {
+  TemplateHandlers.registerTemplateHandler("html", {
+    call: (_template: unknown, source: string) => `return ${JSON.stringify(source)};`,
+  });
+});
+
 describe("pickTemplateForEtag", () => {
   it("returns template from options when provided", () => {
-    expect(pickTemplateForEtag.call({}, { template: "posts/show" })).toBe("posts/show");
+    expect(pickTemplateForEtag.call(controller("show"), { template: "posts/index" })).toBe(
+      "posts/index",
+    );
   });
 
   it("returns undefined when template is false", () => {
-    expect(pickTemplateForEtag.call({ actionName: "show" }, { template: false })).toBeUndefined();
+    expect(pickTemplateForEtag.call(controller("show"), { template: false })).toBeUndefined();
   });
 
-  it("falls back to controller actionName when template not in options", () => {
-    expect(pickTemplateForEtag.call({ actionName: "index" }, {})).toBe("index");
+  it("falls back to the action template's virtual path", () => {
+    expect(pickTemplateForEtag.call(controller("index"), {})).toBe("posts/index");
   });
 
-  it("returns undefined when no options and no actionName", () => {
-    expect(pickTemplateForEtag.call({}, undefined)).toBeUndefined();
+  it("returns undefined when the action has no template", () => {
+    expect(pickTemplateForEtag.call(controller("missing"), {})).toBeUndefined();
   });
 });
 
 describe("lookupAndDigestTemplate", () => {
-  it("returns digest from lookupContext.digestFor", () => {
-    const ctx = { digestFor: (_t: string) => "abc123" };
-    expect(lookupAndDigestTemplate.call({ lookupContext: ctx }, "show")).toBe("abc123");
-  });
-
-  it("returns undefined when digestFor returns null", () => {
-    const ctx = { digestFor: (_t: string) => null };
-    expect(lookupAndDigestTemplate.call({ lookupContext: ctx }, "show")).toBeUndefined();
-  });
-
-  it("returns undefined when digestFor is not present", () => {
-    expect(lookupAndDigestTemplate.call({ lookupContext: {} }, "show")).toBeUndefined();
+  it("digests the template through the Digestor", () => {
+    const host = controller("show");
+    const digest = lookupAndDigestTemplate.call(host, "posts/show");
+    expect(digest).toMatch(/^[0-9a-f]{32}$/);
+    expect(digest).not.toBe(lookupAndDigestTemplate.call(host, "posts/index"));
   });
 });
 
 describe("determineTemplateEtag", () => {
-  it("returns template digest when template resolved and context has digestFor", () => {
-    const ctx = { digestFor: (t: string) => `digest-${t}` };
-    expect(determineTemplateEtag.call({ lookupContext: ctx }, { template: "posts/show" })).toBe(
-      "digest-posts/show",
+  it("returns the digest of the template option", () => {
+    const host = controller("show");
+    expect(determineTemplateEtag.call(host, { template: "posts/index" })).toBe(
+      lookupAndDigestTemplate.call(host, "posts/index"),
     );
   });
 
   it("returns undefined when template is false", () => {
-    const ctx = { digestFor: () => "should-not-be-called" };
-    expect(
-      determineTemplateEtag.call({ actionName: "show", lookupContext: ctx }, { template: false }),
-    ).toBeUndefined();
+    expect(determineTemplateEtag.call(controller("show"), { template: false })).toBeUndefined();
   });
 
-  it("uses actionName when no template option", () => {
-    const ctx = { digestFor: (t: string) => `digest-${t}` };
-    expect(determineTemplateEtag.call({ actionName: "index", lookupContext: ctx }, undefined)).toBe(
-      "digest-index",
+  it("uses the action template when no template option", () => {
+    const host = controller("index");
+    expect(determineTemplateEtag.call(host, {})).toBe(
+      lookupAndDigestTemplate.call(host, "posts/index"),
     );
   });
 
-  it("returns undefined when no template and no actionName", () => {
-    const ctx = { digestFor: () => "x" };
-    expect(determineTemplateEtag.call({ lookupContext: ctx }, undefined)).toBeUndefined();
+  it("returns undefined when the action has no template", () => {
+    expect(determineTemplateEtag.call(controller("missing"), {})).toBeUndefined();
   });
 });
