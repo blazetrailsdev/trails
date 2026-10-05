@@ -3230,11 +3230,6 @@ function attributeMacro(
   }
 }
 
-/**
- * `Mod.attrReader("a", …)` / `Mod.attrWriter("a", …)` — `Module#attr_reader` /
- * `#attr_writer` on a ruby-compat `Module` (include.ts), which install the
- * instance half only; extract-ruby-api.rb credits `attr_*` the same way.
- */
 function attrMacro(name: string): { reader: boolean; writer: boolean } | undefined {
   switch (name) {
     case "attrReader":

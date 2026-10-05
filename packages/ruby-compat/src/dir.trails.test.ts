@@ -132,7 +132,6 @@ describe("Dir", () => {
 
 describe("Dir.chdir", () => {
   it("raises for an async block that overlaps another from a sibling context", async () => {
-    // vendor/ruby/v3.3.11/dir.c:1083-1084
     const start = Dir.pwd();
     const root = fixture();
     let release!: () => void;
@@ -155,7 +154,6 @@ describe("Dir.chdir", () => {
   });
 
   it("restores nested async blocks in LIFO order", async () => {
-    // vendor/ruby/v3.3.11/dir.c:1066-1076
     const start = Dir.pwd();
     const root = fixture();
     const seen = await Dir.chdir(join(root, "a"), async () => {

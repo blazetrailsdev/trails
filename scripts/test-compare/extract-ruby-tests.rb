@@ -1965,8 +1965,6 @@ class TestExtractor
       name = const && %i[< <=].include?(matcher[2]) ? "be_kind_of" : "be_#{matcher[2]}"
       return ["expect_#{to}_#{name}", recv, nil]
     end
-    # A chained matcher (`receive(:y).and_return(z)`, `output(x).to_stdout`) is
-    # named by the first call of its chain, the matcher itself.
     args = nil
     while matcher.is_a?(Array) && RSPEC_MATCHER_CHAIN.include?(matcher[0])
       args = matcher[0] == :method_add_arg ? matcher[2] : nil

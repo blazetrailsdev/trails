@@ -34,17 +34,10 @@ function isWritable(dir: string): boolean {
 /** `chdir_blocking` (`vendor/ruby/v3.3.11/dir.c:1044`), the count of open `Dir.chdir` blocks. */
 let chdirBlocking = 0;
 
-/**
- * `chdir_thread` (`vendor/ruby/v3.3.11/dir.c:1045`), the owner of the open
- * `Dir.chdir` blocks. A block runs under an owner of its own, carried by the
- * async context as ruby-compat's `synchronize` carries a monitor's
- * (`./monitor.js`), and a block opened inside it shares that owner.
- */
 let chdirThread: symbol | null = null;
 let chdirStorage: AsyncContext<symbol> | null = null;
 let chdirAdapter: AsyncContextAdapter | null = null;
 
-/** The context whose store is `rb_thread_current()` as `chdir_path` reads it (`vendor/ruby/v3.3.11/dir.c:1083`). */
 function chdirContext(): AsyncContext<symbol> {
   const adapter = getAsyncContext();
   if (!chdirStorage || chdirAdapter !== adapter) {

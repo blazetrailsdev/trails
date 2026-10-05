@@ -287,7 +287,6 @@ export function normalizeRailsKind(name: string): CanonicalKind | null {
   const builtin = AREL_HELPER_ALIAS[name] ?? SPEC_FORM_ALIAS[name] ?? name;
   const direct = RAILS_MAP[builtin] ?? MSPEC_MAP[name] ?? RSPEC_MAP[name];
   if (direct) return direct;
-  // RSpec's `be_<pred>` is `<pred>?` truthy, the check `assert_predicate` makes.
   const predicate = /^expect_(not_)?to_be_[a-z_]+$/.exec(name);
   if (predicate) return predicate[1] === undefined ? "truthy" : "falsy";
   // Spec forms: `must_equal` ~ `assert_equal`, `wont_equal` ~ `refute_equal`.
