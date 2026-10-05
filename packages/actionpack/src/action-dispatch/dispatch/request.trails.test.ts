@@ -133,6 +133,11 @@ describe("Request", () => {
         qux: "ハ",
       });
       expect(() => ParamBuilder.fromHash({ qux: "\udc83n" })).toThrow(InvalidParameterError);
+      expect(() => ParamBuilder.fromHash({ baz: "\udc83" }, { encodingTemplate })).toThrow(
+        InvalidParameterError,
+      );
+      const frozen = Object.freeze({ qux: Object.freeze(["ハ"]) }) as never;
+      expect(ParamBuilder.fromHash(frozen, { encodingTemplate })).toEqual({ qux: ["ハ"] });
     });
 
     it("action_encoding_template answers only a declared action, per class", () => {

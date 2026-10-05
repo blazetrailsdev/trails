@@ -1,4 +1,4 @@
-import { bytes, forceEncoding, toS } from "@blazetrails/ruby-compat";
+import { bytes, forceEncoding, isValidEncoding, toS } from "@blazetrails/ruby-compat";
 import { InvalidParameterError } from "../http/param-error.js";
 import { MissingController } from "../http/request.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
@@ -17,10 +17,14 @@ export class RequestUtils {
 
   static eachParamValue(params: ParamValue, block: (param: string) => string | void): ParamValue {
     if (Array.isArray(params)) {
-      params.forEach((element, i) => (params[i] = RequestUtils.eachParamValue(element, block)));
+      params.forEach((element, i) => {
+        const replaced = RequestUtils.eachParamValue(element, block);
+        if (replaced !== element) params[i] = replaced;
+      });
     } else if (params !== null && typeof params === "object") {
       for (const [key, value] of Object.entries(params)) {
-        params[key] = RequestUtils.eachParamValue(value, block);
+        const replaced = RequestUtils.eachParamValue(value, block);
+        if (replaced !== value) params[key] = replaced;
       }
     } else if (typeof params === "string") {
       return block(params) ?? params;
@@ -69,12 +73,19 @@ export class CustomParamEncoder {
     if (!encodingTemplate) return params;
     for (const [key, value] of Object.entries(params)) {
       if (key === "controller" || key === "action") continue;
-      params[key] = RequestUtils.eachParamValue(value, (param) => {
+      const replaced = RequestUtils.eachParamValue(value, (param) => {
         if (encodingTemplate.get(toS(key))) {
-          const b = bytes(param).map((byte) => String.fromCharCode(byte));
-          return forceEncoding(b.join(""), encodingTemplate.get(toS(key))!);
+          const b = bytes(param);
+          const forced = b.map((byte) => String.fromCharCode(byte)).join("");
+          if (!isValidEncoding(forced, encodingTemplate.get(toS(key))!)) {
+            return b
+              .map((byte) => String.fromCharCode(byte < 0x80 ? byte : 0xdc00 + byte))
+              .join("");
+          }
+          return forceEncoding(forced, encodingTemplate.get(toS(key))!);
         }
       });
+      if (replaced !== value) params[key] = replaced;
     }
     return params;
   }
