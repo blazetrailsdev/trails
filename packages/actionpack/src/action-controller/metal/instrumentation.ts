@@ -1,7 +1,9 @@
 import {
+  attrInternal,
   ExecutionContext,
   include,
   included,
+  initialize,
   Notifications,
   toF,
 } from "@blazetrails/activesupport";
@@ -26,7 +28,14 @@ export class Instrumentation {
   static [included](base: LoggerIncludingClass): void {
     include(base, Logger);
   }
+
+  declare viewRuntime: number | null;
+
+  static [initialize](this: Instrumentation): void {
+    this.viewRuntime = null;
+  }
 }
+attrInternal.call(Instrumentation.prototype, "viewRuntime");
 
 interface InstrumentationHost {
   actionName?: string;

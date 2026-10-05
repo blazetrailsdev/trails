@@ -68,10 +68,6 @@ export class MemoryRateLimitStore implements RateLimitStore {
   }
 }
 
-export function isRateLimited(count: number, limit: number): boolean {
-  return count > limit;
-}
-
 export interface RateLimitingClassHost {
   beforeAction: Function; // eslint-disable-line @typescript-eslint/no-unsafe-function-type
   cacheStore?: RateLimitStore | null;
@@ -147,7 +143,7 @@ export async function rateLimiting(
     .filter((part): part is string => part != null)
     .join(":");
   const count = await args.store.increment(cacheKey, 1, { expiresIn: args.within });
-  if (count != null && isRateLimited(count, args.to)) {
+  if (count != null && count > args.to) {
     await Notifications.instrument(
       "rate_limit.action_controller",
       { request: this.request },

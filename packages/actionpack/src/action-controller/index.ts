@@ -18,14 +18,6 @@ export {
   type IntegrationRequestOptions,
 } from "../action-dispatch/testing/integration.js";
 export {
-  wrapParameters,
-  applyParamsWrapper,
-  deriveWrapperKey,
-  type WrapParametersOptions,
-  type ParamsWrapperConfig,
-} from "./params-wrapper.js";
-
-export {
   Parameters,
   ParameterMissing,
   ExpectedParameterMissing,
@@ -74,11 +66,7 @@ export { fragmentCacheKey } from "./caching.js";
 export { defaultFormBuilder } from "./form-builder.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
-export { renderForApi } from "./api/api-rendering.js";
-export {
-  inherited as inheritedWithHelpers,
-  type HelpersPathControllerClass,
-} from "./trailties/helpers.js";
+export { type HelpersPathControllerClass } from "./trailties/helpers.js";
 export {
   helperAttr,
   helpersPath,
@@ -91,7 +79,6 @@ export { RescueRegistry } from "./metal/rescue.js";
 export { ParameterEncodingRegistry } from "./metal/parameter-encoding.js";
 export {
   MemoryRateLimitStore,
-  isRateLimited,
   rateLimit,
   type RateLimitOptions,
   type RateLimitStore,

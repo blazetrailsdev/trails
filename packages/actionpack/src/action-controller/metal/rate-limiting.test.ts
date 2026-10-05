@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   MemoryRateLimitStore,
-  isRateLimited,
   rateLimit,
   rateLimiting,
   type RateLimitStore,
@@ -14,17 +13,6 @@ import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
-
-describe("isRateLimited", () => {
-  it("returns false when count is at or below the limit", () => {
-    expect(isRateLimited(1, 3)).toBe(false);
-    expect(isRateLimited(3, 3)).toBe(false);
-  });
-
-  it("returns true once the count exceeds the limit", () => {
-    expect(isRateLimited(4, 3)).toBe(true);
-  });
-});
 
 describe("MemoryRateLimitStore", () => {
   it("increments a counter for the given key", () => {

@@ -1,15 +1,4 @@
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
-import { deleteHeaderCaseInsensitive } from "./header-utils.js";
-
-export function applyPermissionsPolicy(
-  headers: Record<string, string>,
-  policy: string | false,
-): void {
-  deleteHeaderCaseInsensitive(headers, "permissions-policy");
-  if (policy !== false) {
-    headers["permissions-policy"] = policy;
-  }
-}
 
 export function buildPermissionsPolicy(directives: Record<string, string | string[]>): string {
   const parts: string[] = [];
