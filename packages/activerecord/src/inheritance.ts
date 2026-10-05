@@ -8,12 +8,13 @@ import {
   classAttribute,
   constantize,
   included,
+  isPlainObject,
   isPresent,
   safeConstantize,
   underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbClassSuperclass, rbModName } from "@blazetrails/ruby-compat";
+import { rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -81,20 +82,21 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
 }
 
 export function isDescendsFromActiveRecord(this: typeof Base): boolean {
-  const modelClass = this;
-  if (Object.prototype.hasOwnProperty.call(modelClass, "_isActiveRecordBase")) return false;
-  const superclass = rbClassSuperclass(modelClass);
-  if (!superclass || superclass === Function.prototype || typeof superclass.name !== "string")
-    return true;
-  if (superclass.abstractClass) return isDescendsFromActiveRecord.call(superclass);
-  if (Object.prototype.hasOwnProperty.call(superclass, "_isActiveRecordBase")) return true;
-  return !Object.keys(modelClass.columnsHash()).includes(modelClass.inheritanceColumn as string);
+  const superclass = rbClassSuperclass(this) as typeof Base;
+  if (this === ActiveRecord.Base) {
+    return false;
+  } else if (superclass.abstractClass) {
+    return superclass.isDescendsFromActiveRecord();
+  } else {
+    return (
+      superclass === ActiveRecord.Base ||
+      !Object.keys(this.columnsHash()).includes(this.inheritanceColumn as string)
+    );
+  }
 }
 
 export function isBaseClass(modelClass: typeof Base): boolean {
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_computedBaseClass"))
-    setBaseClass(modelClass);
-  return (modelClass as any)._computedBaseClass === modelClass;
+  return modelClass.baseClass === modelClass;
 }
 
 /** @internal */
@@ -312,10 +314,9 @@ export function initializeInternalsCallback(this: Base): void {
 /** @internal */
 export function ensureProperType(this: Base): void {
   const klass = this.constructor as typeof Base;
-  if (!isFinderNeedsTypeCondition(klass)) return;
-  const inheritCol = klass.inheritanceColumn;
-  if (inheritCol === null) return;
-  (this as any)._writeAttribute(inheritCol, stiName(klass));
+  if (klass.isFinderNeedsTypeCondition()) {
+    this._writeAttribute(klass.inheritanceColumn as string, klass.stiName());
+  }
 }
 
 /** @internal */
@@ -366,21 +367,16 @@ export function subclassFromAttributes(
   this: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
-  if (!attrs) return null;
-
-  let attrsHash = attrs;
-  if (typeof (attrs as any).toH === "function") {
-    attrsHash = (attrs as any).toH();
-  } else if (typeof (attrs as any).toObject === "function") {
-    attrsHash = (attrs as any).toObject();
+  if (rbObjRespondTo(attrs, "isPermitted")) {
+    attrs = (attrs as unknown as { toH(): Record<string, unknown> }).toH();
   }
 
-  if (!attrsHash || typeof attrsHash !== "object") return null;
+  if (isPlainObject(attrs)) {
+    const subclassName = attrs[this.inheritanceColumn as string];
 
-  const subclassName = attrsHash[this.inheritanceColumn as string];
-
-  if (isPresent(subclassName)) {
-    return this.findStiClass(subclassName as string);
+    if (isPresent(subclassName)) {
+      return this.findStiClass(subclassName as string);
+    }
   }
   return null;
 }

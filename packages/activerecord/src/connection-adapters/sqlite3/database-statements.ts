@@ -72,8 +72,12 @@ export async function execRollbackDbTransaction(this: InternalBeginTransactionHo
   });
 }
 
-export function highPrecisionCurrentTimestamp(): string {
-  return "STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')";
+const HIGH_PRECISION_CURRENT_TIMESTAMP = Arel.sql("STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')", {
+  retryable: true,
+});
+
+export function highPrecisionCurrentTimestamp(): Arel.Nodes.SqlLiteral {
+  return HIGH_PRECISION_CURRENT_TIMESTAMP;
 }
 
 export async function execute(

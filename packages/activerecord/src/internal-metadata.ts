@@ -1,10 +1,7 @@
 import { Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
-import type { BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
-import { NoMethodError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
-import { EnvironmentStorageError } from "./migration.js";
 import { ActiveRecordError } from "./errors.js";
 import { first } from "@blazetrails/ruby-compat";
 import {
@@ -92,18 +89,16 @@ export class InternalMetadata {
   async get(key: string): Promise<string | null> {
     if (!this.enabled) return null;
     return await this._pool.withConnection(async (connection) => {
-      const entry = await this.selectEntry(connection, key);
-      if (!entry) return null;
-      const value = entry[this.valueKey];
-      if (value == null) return null;
-      return String(value);
+      let entry: Record<string, unknown> | null;
+      if ((entry = await this.selectEntry(connection, key)) != null) {
+        return entry[this.valueKey] as string | null;
+      }
+      return null;
     });
   }
 
   async set(key: string, value: string): Promise<void> {
-    if (!this.enabled) {
-      throw new EnvironmentStorageError();
-    }
+    if (!this.enabled) return;
     await this._pool.withConnection((connection) =>
       this.updateOrCreateEntry(connection, key, value),
     );
@@ -142,11 +137,7 @@ export class InternalMetadata {
   }
 
   async tableExists(): Promise<boolean> {
-    const schemaCache: BoundSchemaReflection | null = this._pool.schemaCache;
-    if (schemaCache === null) {
-      throw new NoMethodError("undefined method 'data_source_exists?' for nil");
-    }
-    return (await schemaCache.dataSourceExists(this.tableName)) ?? false;
+    return (await this._pool.schemaCache!.dataSourceExists(this.tableName)) ?? false;
   }
 
   private currentTime(connection: DatabaseAdapter): string {
