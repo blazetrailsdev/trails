@@ -5448,6 +5448,115 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
 }
 
 /**
+ * The parameters a test asks the KIND of, when that is all it asks:
+ * `typeof p === "…"`, `p === null` and `Array.isArray(p)`, joined by `&&` /
+ * `||` / `!`. `undefined` for a test that reads anything else.
+ */
+function parameterKindTest(
+  test: ts.Expression,
+  parameters: readonly string[],
+): string[] | undefined {
+  const tested: string[] = [];
+  const kind = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e)) e = e.expression;
+    if (ts.isPrefixUnaryExpression(e)) {
+      return e.operator === ts.SyntaxKind.ExclamationToken && kind(e.operand);
+    }
+    let asked: ts.Expression | undefined;
+    if (ts.isBinaryExpression(e)) {
+      const operator = e.operatorToken.kind;
+      if (
+        operator === ts.SyntaxKind.AmpersandAmpersandToken ||
+        operator === ts.SyntaxKind.BarBarToken
+      ) {
+        return kind(e.left) && kind(e.right);
+      }
+      if (
+        operator !== ts.SyntaxKind.EqualsEqualsEqualsToken &&
+        operator !== ts.SyntaxKind.ExclamationEqualsEqualsToken
+      ) {
+        return false;
+      }
+      if (ts.isTypeOfExpression(e.left) && ts.isStringLiteral(e.right)) asked = e.left.expression;
+      else if (e.right.kind === ts.SyntaxKind.NullKeyword) asked = e.left;
+    } else if (
+      ts.isCallExpression(e) &&
+      e.arguments.length === 1 &&
+      ts.isPropertyAccessExpression(e.expression) &&
+      ts.isIdentifier(e.expression.expression) &&
+      e.expression.expression.text === "Array" &&
+      e.expression.name.text === "isArray"
+    ) {
+      [asked] = e.arguments;
+    }
+    if (asked === undefined || !ts.isIdentifier(asked) || !parameters.includes(asked.text)) {
+      return false;
+    }
+    tested.push(asked.text);
+    return true;
+  };
+  return kind(test) ? tested : undefined;
+}
+
+/**
+ * `if (!(typeof columnName === "string" || Array.isArray(columnName))) { options
+ * = { ...columnName, ...options }; columnName = null; }`: the binding of Ruby's
+ * keywords, or block, past an optional positional
+ * (`def remove_index(table_name, column_name = nil, **options)`,
+ * `activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:966`).
+ * Ruby binds those at the call; a TS caller hands the hash in the positional's
+ * slot, so the body moves it. The shape is exactly that: the first statement of
+ * the body, a test that only asks what kind of value a parameter holds, guarded
+ * statements that each assign a parameter, and one of them handing the tested
+ * parameter, or a spread of it, to the LAST parameter. Any other parameter is
+ * cleared as {@link isParameterRebinding} clears one, or read back off the last
+ * (`toTable = options.toTable`). The move onto the last parameter keeps a
+ * coercion an arm (`error = RuntimeError.new(error) if error.is_a?(String)`,
+ * `activesupport/lib/active_support/error_reporter.rb:146`). Wider than
+ * {@link isParameterRebinding} in what the guard may assign, and narrower in
+ * where it may sit.
+ */
+function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
+  const body = statement.parent;
+  if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
+  if (body.statements[0] !== statement) return false;
+  const declared = body.parent.parameters.filter((p) => ts.isIdentifier(p.name));
+  const parameters = declared.map((p) => p.name.getText());
+  const tested = parameterKindTest(statement.expression, parameters);
+  if (tested === undefined) return false;
+  const last = parameters[parameters.length - 1];
+  const clears = (name: string, e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    if (e.kind === ts.SyntaxKind.NullKeyword || e.getText() === "undefined") return true;
+    if (ts.isPropertyAccessExpression(e)) return e.expression.getText() === last;
+    return e.getText() === declared[parameters.indexOf(name)].initializer?.getText();
+  };
+  const isTested = (e: ts.Expression): boolean => {
+    while (ts.isParenthesizedExpression(e) || ts.isAsExpression(e)) e = e.expression;
+    return ts.isIdentifier(e) && e.text !== last && tested.includes(e.text);
+  };
+  let moves = false;
+  const rebinds = (branch: ts.Statement | undefined): boolean => {
+    if (branch === undefined) return true;
+    const statements = ts.isBlock(branch) ? [...branch.statements] : [branch];
+    return statements.every((s) => {
+      if (!ts.isExpressionStatement(s) || !ts.isBinaryExpression(s.expression)) return false;
+      const { left, operatorToken, right } = s.expression;
+      if (operatorToken.kind !== ts.SyntaxKind.EqualsToken) return false;
+      if (!ts.isIdentifier(left) || !parameters.includes(left.text)) return false;
+      if (left.text === last) {
+        moves ||= ts.isObjectLiteralExpression(right)
+          ? right.properties.some((p) => ts.isSpreadAssignment(p) && isTested(p.expression))
+          : isTested(right);
+        return true;
+      }
+      return clears(left.text, right);
+    });
+  };
+  return rebinds(statement.thenStatement) && rebinds(statement.elseStatement) && moves;
+}
+
+/**
  * `if (attributes === undefined) [id, attributes] = [":all", id];`: the binding
  * of Ruby's optional positional AHEAD of a required one
  * (`def update(id = :all, attributes)`,
@@ -5578,6 +5687,60 @@ function isBlockForward(conditional: ts.ConditionalExpression): boolean {
 }
 
 /**
+ * `typeof last === "object" ? prefixes.pop() : {}`, `last` being
+ * `prefixes[prefixes.length - 1]`: the capture of Ruby's keywords after a splat
+ * (`def attribute_method_prefix(*prefixes, parameters: nil)`,
+ * `activemodel/lib/active_model/attribute_methods.rb:106`). A TS rest parameter
+ * comes last, so the keywords ride in the splat and are popped off it. That
+ * binds parameters, as {@link isBlockCapture}'s pop does, and is not an arm.
+ */
+function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
+  let popped = conditional.whenTrue;
+  while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
+    popped = popped.expression;
+  }
+  if (!ts.isCallExpression(popped) || !ts.isPropertyAccessExpression(popped.expression)) {
+    return false;
+  }
+  const splat = popped.expression.expression;
+  if (popped.expression.name.text !== "pop" || !ts.isIdentifier(splat)) return false;
+  const absent = conditional.whenFalse;
+  if (!ts.isObjectLiteralExpression(absent) || absent.properties.length > 0) return false;
+  const test = conditional.condition;
+  if (
+    !ts.isBinaryExpression(test) ||
+    test.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    !ts.isTypeOfExpression(test.left) ||
+    !ts.isStringLiteral(test.right) ||
+    test.right.text !== "object"
+  ) {
+    return false;
+  }
+  let body: ts.Node = conditional;
+  while (!ts.isFunctionLike(body.parent)) {
+    if (ts.isSourceFile(body.parent)) return false;
+    body = body.parent;
+  }
+  const method = body.parent;
+  if (!method.parameters.some((p) => p.dotDotDotToken && p.name.getText() === splat.text)) {
+    return false;
+  }
+  let last: ts.Expression | undefined = test.left.expression;
+  if (ts.isIdentifier(last) && ts.isBlock(body)) {
+    const name = last.text;
+    last = body.statements
+      .flatMap((s) => (ts.isVariableStatement(s) ? [...s.declarationList.declarations] : []))
+      .find((d) => d.name.getText() === name)?.initializer;
+  }
+  return (
+    last !== undefined &&
+    ts.isElementAccessExpression(last) &&
+    last.expression.getText() === splat.text &&
+    last.argumentExpression.getText() === `${splat.text}.length - 1`
+  );
+}
+
+/**
  * `Object.hasOwn(klass, "_x") ? klass._x : undefined` (or its
  * `Object.prototype.hasOwnProperty.call` spelling): the read of a Ruby
  * class-level ivar, `@x` in a `def self.` body
@@ -5617,6 +5780,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit((n as ts.ConditionalExpression).whenTrue);
           return;
         }
+        if (isKwargsCapture(n as ts.ConditionalExpression)) return;
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {
@@ -5644,6 +5808,12 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;
         if (isParameterRebinding(n as ts.IfStatement)) return;
         if (isLeadingOptionalBinding(n as ts.IfStatement)) return;
+        if (isKwargsRebindingGuard(n as ts.IfStatement)) {
+          visit((n as ts.IfStatement).thenStatement);
+          const alternate = (n as ts.IfStatement).elseStatement;
+          if (alternate !== undefined) visit(alternate);
+          return;
+        }
         tokens.push("if");
         break;
       }
