@@ -105,6 +105,7 @@ describe("rubyCompatExport", () => {
 
   it("credits String.new on a constant receiver only through rbStrSNew", () => {
     expect(rubyCompatAliases("new", ["const"])).toEqual(["rbStrSNew"]);
+    expect(rubyCompatAliases("new", ["string-new"])).toEqual(["rbStrSNew"]);
     expect(rubyCompatExport("new", ["const"])).toBeUndefined();
     expect(rubyCompatAliases("new")).toEqual([]);
   });

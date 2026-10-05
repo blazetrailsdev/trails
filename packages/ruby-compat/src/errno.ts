@@ -74,10 +74,56 @@ class EPIPE extends SystemCallError {
 }
 
 /**
+ * `Errno::EEXIST`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "EEXIST"` is this
+ * class to `rescue Errno::EEXIST`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EEXIST`, which Thor rescues
+ * without defining.
+ */
+class EEXIST extends SystemCallError {
+  static readonly Errno = 17;
+  readonly code = "EEXIST";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "File exists" : `File exists - ${mesg}`);
+    this.name = "Errno::EEXIST";
+    this.errno = EEXIST.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EEXIST";
+  }
+}
+
+/**
+ * `Errno::EISDIR`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "EISDIR"` is this
+ * class to `rescue Errno::EISDIR`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::EISDIR`, which Thor rescues
+ * without defining.
+ */
+class EISDIR extends SystemCallError {
+  static readonly Errno = 21;
+  readonly code = "EISDIR";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "Is a directory" : `Is a directory - ${mesg}`);
+    this.name = "Errno::EISDIR";
+    this.errno = EISDIR.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "EISDIR";
+  }
+}
+
+/**
  * Ruby's core `Errno` module (`vendor/ruby/v3.3.11/error.c:2666-2694`), holding the
  * `SystemCallError` subclass for each errno a raise site in ruby-compat names.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { ENOTTY, EPIPE };
+export const Errno = { EEXIST, EISDIR, ENOTTY, EPIPE };
