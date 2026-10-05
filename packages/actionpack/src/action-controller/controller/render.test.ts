@@ -16,8 +16,6 @@ import type { Parameters } from "../metal/strong-parameters.js";
 import { TestCase } from "../test-case.js";
 import "../../test-helpers/abstract-unit.js";
 
-const dir = new URL(".", import.meta.url).pathname;
-
 class TestController extends Base {
   declare variableForLayout: unknown;
 
@@ -277,7 +275,9 @@ describe("ExpiresInRenderTest", () => {
 
   it("dynamic render with file", async () => {
     expect(
-      await File.isExistAsync(File.expandPath("../../test-helpers/abstract-unit.ts", dir)),
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
     ).toBeTruthy();
     await expect(
       tc.get("dynamicRenderWithFile", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
@@ -300,7 +300,9 @@ describe("ExpiresInRenderTest", () => {
 
   it("dynamic render", async () => {
     expect(
-      await File.isExistAsync(File.expandPath("../../test-helpers/abstract-unit.ts", dir)),
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
     ).toBeTruthy();
     await expect(
       tc.get("dynamicRender", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
@@ -310,7 +312,9 @@ describe("ExpiresInRenderTest", () => {
   // BLOCKED: render-permitted-parameters-are-not-read-as-the-options-hash
   it.skip("permitted dynamic render file hash", async () => {
     expect(
-      await File.isExistAsync(File.expandPath("../../test-helpers/abstract-unit.ts", dir)),
+      await File.isExistAsync(
+        File.expandPath("../../test-helpers/abstract-unit.ts", import.meta.dirname),
+      ),
     ).toBeTruthy();
     await expect(
       tc.get("dynamicRenderPermit", {
