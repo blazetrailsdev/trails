@@ -702,6 +702,9 @@ describe("Ruby extractor mocha expectation collection", () => {
             expect(command.options[:foo]).to be
             expect(defined?(Blat)).not_to be
             expect(task).to be(other)
+            expect(invoke!("doc/README")).to(
+              eq("   unchanged  doc/README\\n")
+            )
           end
 
           it "blocks" do
@@ -749,6 +752,7 @@ describe("Ruby extractor mocha expectation collection", () => {
       "expect_to_be_truthy",
       "expect_not_to_be_truthy",
       "expect_to_be",
+      "expect_to_eq",
     ]);
     expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
     expect(k["operators"]).toEqual(["expect_to_be_>", "expect_to_be_kind_of"]);

@@ -1,4 +1,5 @@
 import { rbCString, rbObjRespondTo, rtest } from "./object.js";
+import { rbRegEqual } from "./regexp.js";
 import { temporalTag, widenPlainDate } from "./temporal-tag.js";
 
 /**
@@ -137,6 +138,7 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   /* boundary: a JS Date is one of the values a ported `==` is handed, and
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`)
      compare by value where JS `===` does not. */
+  if (a instanceof RegExp) return rbRegEqual(a, b);
   if (a instanceof Date) return b instanceof Date && a.getTime() === b.getTime();
   /* `rb_hash_equal` (`vendor/ruby/v3.3.11/hash.c:3808`), which `hash_equal`
      (`hash.c:3746`) answers by size and then by `rb_equal` per key. A Ruby
