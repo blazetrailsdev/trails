@@ -44,7 +44,8 @@ describe("UserProvidedDefault", () => {
     expect(dumped).toHaveLength(5);
     expect(dumped[4]).toBe(42);
 
-    const loaded = UserProvidedDefault.marshalLoad(dumped as never);
+    const loaded = Object.create(UserProvidedDefault.prototype) as UserProvidedDefault;
+    loaded.marshalLoad(dumped as never);
     expect(loaded.hasBeenRead()).toBe(true);
     expect(loaded.value()).toBe(42);
   });
