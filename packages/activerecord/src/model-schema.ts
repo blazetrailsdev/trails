@@ -307,9 +307,10 @@ export async function _returningColumnsForInsert(
   return memoize(pkArr.filter((p) => colNames.has(p)));
 }
 
+/** @inventedArm if — PERMANENT */
 export function resetSequenceName(this: SchemaHost): Promise<string | null> {
   this._explicitSequenceName = false;
-  return (this._sequenceName = (this as unknown as typeof Base).withConnection((c) =>
+  const sequenceName = (this as unknown as typeof Base).withConnection((c) =>
     (
       c as unknown as {
         defaultSequenceName(
@@ -318,7 +319,11 @@ export function resetSequenceName(this: SchemaHost): Promise<string | null> {
         ): Promise<string | null> | string | null;
       }
     ).defaultSequenceName(this.tableName, this.primaryKey),
-  ));
+  );
+  sequenceName.then(undefined, () => {
+    if (this._sequenceName === sequenceName) this._sequenceName = null;
+  });
+  return (this._sequenceName = sequenceName);
 }
 
 export function isPrefetchPrimaryKey(this: SchemaHost): boolean {

@@ -83,6 +83,35 @@ describe("a sequence lookup in flight does not overwrite a later writer", () => 
     expect(await Post.sequenceName).toBe("posts_nonstd_seq");
   });
 
+  it("retries after a lookup that rejected", async () => {
+    class Post extends Base {}
+    const withConnection = vi
+      .spyOn(Post, "withConnection")
+      .mockRejectedValueOnce(new Error("connection lost"));
+    try {
+      await expect(Post.sequenceName).rejects.toThrow("connection lost");
+      await expect(Post.sequenceName).resolves.toEqual(await Post.resetSequenceName());
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("keeps a sequence name set before a pending lookup rejects", async () => {
+    class Post extends Base {}
+    const withConnection = vi
+      .spyOn(Post, "withConnection")
+      .mockRejectedValueOnce(new Error("connection lost"));
+    try {
+      const pending = Post.resetSequenceName();
+      Post.sequenceName = "posts_nonstd_seq";
+      await expect(pending).rejects.toThrow("connection lost");
+
+      expect(await Post.sequenceName).toBe("posts_nonstd_seq");
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
   it("drops a lookup made for the previous table name", async () => {
     class Post extends Base {}
     const pending = Post.resetSequenceName();
