@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { assertNothingRaised, assertRaises, include } from "@blazetrails/activesupport";
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import {
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
+  RequestForgeryProtection,
+  decodeCsrfToken,
 } from "../metal/request-forgery-protection.js";
 import "../../test-helpers/abstract-unit.js";
 
@@ -72,6 +74,32 @@ class CustomAuthenticityParamController extends RequestForgeryProtectionControll
     return "foobar";
   }
 }
+
+class PerFormTokensController extends Base {
+  async index(): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.formTag(context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+    });
+  }
+
+  async buttonTo(): Promise<void> {
+    await this.render({
+      inline:
+        "<%= context.buttonTo('Button', context.params.get('form_path') ?? '/per_form_tokens/post_one', { method: context.params.get('form_method') }) %>",
+    });
+  }
+
+  async postOne(): Promise<void> {
+    await this.render({ plain: "" });
+  }
+
+  async postTwo(): Promise<void> {
+    await this.render({ plain: "" });
+  }
+}
+PerFormTokensController.protectFromForgery({ with: "exception" });
+PerFormTokensController.perFormCsrfTokens = true;
 
 class MockLogger {
   private _logged = new Map<string, string[]>();
@@ -497,7 +525,7 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
 });
 
 describe("RequestForgeryProtectionControllerUsingResetSessionTest", () => {
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
+  // BLOCKED: port-action-view-csrf-helper-and-generated-layout-meta-tags
   it.skip("should emit a csrf-param meta tag and a csrf-token meta tag", () => {});
 });
 
@@ -561,50 +589,330 @@ describe("CustomAuthenticityParamControllerTest", () => {
 });
 
 describe("PerFormTokensControllerTest", () => {
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("per form token is same size as global token", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("accepts token for correct path and method", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("accepts token with path with query params", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("rejects token for incorrect path", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("rejects token for incorrect method", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("accepts global csrf token", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("returns hmacd token", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("chomps slashes", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("ignores trailing slash during generation", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("handles empty path as request path", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("handles query string", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("handles fragment", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("ignores trailing slash during validation", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("method is case insensitive", () => {});
-  it.skip("rejects garbage path", () => {});
-  it.skip("rejects token for incorrect method button to", () => {});
-  it.skip("Accepts proper token for implicit post method on button_to tag", () => {});
-  it.skip("Accepts proper token for delete method on button_to tag", () => {});
-  it.skip("Accepts proper token for post method on button_to tag", () => {});
-  it.skip("Accepts proper token for patch method on button_to tag", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("does not return old csrf token", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("accepts old csrf token", () => {});
-  it.skip("handles relative paths", () => {});
-  it.skip("handles relative paths with dot", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("ignores origin during generation", () => {});
-  // BLOCKED: port-request-forgery-protection-per-form-token-and-meta-tag-tests
-  it.skip("ignores origin during generation with protocol-relative url", () => {});
+  let tc: TestCase;
+  let oldRequestForgeryProtectionToken: string | null;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new PerFormTokensController();
+    await tc.beforeSetup();
+    oldRequestForgeryProtectionToken = Base.requestForgeryProtectionToken;
+    Base.requestForgeryProtectionToken = "custom_authenticity_token";
+  });
+
+  afterEach(() => {
+    Base.requestForgeryProtectionToken = oldRequestForgeryProtectionToken;
+  });
+
+  function assertPresenceAndFetchFormCsrfToken(): string {
+    const input = tc.response.body.match(/<input[^>]*name="custom_authenticity_token"[^>]*>/);
+    expect(input).not.toBeNull();
+    const formCsrfToken = input![0].match(/value="([^"]*)"/)?.[1];
+    expect(formCsrfToken).not.toBeNull();
+    return formCsrfToken!;
+  }
+
+  function assertMatchesSessionTokenOnServer(formToken: string, method = "post"): void {
+    const actual = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(formToken));
+    const expected = rbFSend(
+      tc.controller,
+      "perFormCsrfToken",
+      null,
+      "/per_form_tokens/post_one",
+      method,
+    );
+    expect(actual).toEqual(expected);
+  }
+
+  it("per form token is same size as global token", async () => {
+    await tc.get("index");
+
+    const expected = RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH;
+    const actual = (rbFSend(tc.controller, "perFormCsrfToken", null, "/path", "post") as Bytes)
+      .length;
+    expect(actual).toBe(expected);
+  });
+
+  it("accepts token for correct path and method", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("accepts token with path with query params", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    tc.request.env["QUERY_STRING"] = "key=value";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+  });
+
+  it("rejects garbage path", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/foo/bar<";
+    const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    expect(exception.message).toMatch("Can't verify CSRF token authenticity.");
+  });
+
+  it("rejects token for incorrect path", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_two";
+    await assertRaises([InvalidAuthenticityToken], {}, () =>
+      tc.post("postTwo", { params: { custom_authenticity_token: formToken } }),
+    );
+  });
+
+  it("rejects token for incorrect method", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertRaises([InvalidAuthenticityToken], {}, () =>
+      tc.patch("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+  });
+
+  it("rejects token for incorrect method button to", async () => {
+    await tc.get("buttonTo", { params: { form_method: "delete" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken, "delete");
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertRaises([InvalidAuthenticityToken], {}, () =>
+      tc.patch("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+  });
+
+  it("Accepts proper token for implicit post method on button_to tag", async () => {
+    await tc.get("buttonTo");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken, "post");
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+  });
+
+  for (const verb of ["delete", "post", "patch"] as const) {
+    it(`Accepts proper token for ${verb} method on button_to tag`, async () => {
+      await tc.get("buttonTo", { params: { form_method: verb } });
+
+      const formToken = assertPresenceAndFetchFormCsrfToken();
+
+      assertMatchesSessionTokenOnServer(formToken, verb);
+
+      tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+      await assertNothingRaised(() =>
+        tc[verb]("postOne", { params: { custom_authenticity_token: formToken } }),
+      );
+    });
+  }
+
+  it("accepts global csrf token", async () => {
+    await tc.get("index");
+
+    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: token } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("does not return old csrf token", async () => {
+    await tc.get("index");
+
+    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+
+    const unmaskedToken = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(token));
+
+    expect(unmaskedToken).not.toEqual(rbFSend(tc.controller, "realCsrfToken"));
+  });
+
+  it("returns hmacd token", async () => {
+    await tc.get("index");
+
+    const token = rbFSend(tc.controller, "formAuthenticityToken") as string;
+
+    const unmaskedToken = rbFSend(tc.controller, "unmaskToken", decodeCsrfToken(token));
+
+    expect(unmaskedToken).toEqual(rbFSend(tc.controller, "globalCsrfToken"));
+  });
+
+  it("accepts old csrf token", async () => {
+    await tc.get("index");
+
+    const nonHmacToken = rbFSend(
+      tc.controller,
+      "maskToken",
+      rbFSend(tc.controller, "realCsrfToken"),
+    );
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: nonHmacToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("chomps slashes", async () => {
+    await tc.get("index", { params: { form_path: "/per_form_tokens/post_one?foo=bar" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    assertMatchesSessionTokenOnServer(formToken);
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken, baz: "foo" } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("ignores trailing slash during generation", async () => {
+    await tc.get("index", { params: { form_path: "/per_form_tokens/post_one/" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("handles empty path as request path", async () => {
+    await tc.get("index", { params: { form_path: "" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("handles relative paths", async () => {
+    await tc.get("index", { params: { form_path: "post_one" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("handles relative paths with dot", async () => {
+    await tc.get("index", { params: { form_path: "./post_one" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("handles query string", async () => {
+    await tc.get("index", { params: { form_path: "./post_one?a=b" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("handles fragment", async () => {
+    await tc.get("index", { params: { form_path: "./post_one#a" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("ignores origin during generation", async () => {
+    await tc.get("index", {
+      params: { form_path: "https://example.com/per_form_tokens/post_one/" },
+    });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("ignores trailing slash during validation", async () => {
+    await tc.get("index");
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
+
+  it("method is case insensitive", async () => {
+    await tc.get("index", { params: { form_method: "POST" } });
+
+    const formToken = assertPresenceAndFetchFormCsrfToken();
+
+    tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
+    await assertNothingRaised(() =>
+      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+    );
+    tc.assertResponse("success");
+  });
 });
 
 describe("PrependProtectForgeryBaseControllerTest", () => {
