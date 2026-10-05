@@ -12,6 +12,7 @@ import {
   isPresent,
   runLoadHooks,
   singularize,
+  filterMap,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { rtest } from "@blazetrails/ruby-compat";
@@ -132,9 +133,16 @@ const PQTRANS_IDLE = 0;
 const PQTRANS_ACTIVE = 1;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;
-const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
 
-type RawConnection = pg.Client & { transactionStatus(): number };
+const CONNECTION_OK = 0;
+const CONNECTION_BAD = 1;
+
+type RawConnection = pg.Client & {
+  transactionStatus(): number;
+  status(): number;
+  cancel(): Promise<void>;
+  block(): Promise<void>;
+};
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -155,6 +163,7 @@ import {
   commitDbTransaction as pgCommitDbTransaction,
   execRollbackDbTransaction as pgExecRollbackDbTransaction,
   execRestartDbTransaction as pgExecRestartDbTransaction,
+  cancelAnyRunningQuery as pgCancelAnyRunningQuery,
   highPrecisionCurrentTimestamp as pgHighPrecisionCurrentTimestamp,
   buildExplainClause as pgBuildExplainClause,
   setConstraints as pgSetConstraints,
@@ -280,10 +289,14 @@ export class PostgreSQLAdapter
     if (rtest(pgConfig.variables)) {
       setEnv(
         "PGOPTIONS",
-        Object.entries(pgConfig.variables as Record<string, unknown>)
-          .filter(([, value]) => value !== ":default")
-          .map(([name, value]) => `-c ${name}=${String(value).replace(/[ \\]/g, "\\$&")}`)
-          .join(" "),
+        filterMap(
+          Object.entries(pgConfig.variables as Record<string, unknown>),
+          ([name, value]) => {
+            if (!(value === ":default")) {
+              return `-c ${name}=${String(value).replace(/[ \\]/g, "\\$&")}`;
+            }
+          },
+        ).join(" "),
       );
     }
     return this.findCmdAndExec(databaseCli()["postgresql"], config.database!);
@@ -429,7 +442,6 @@ export class PostgreSQLAdapter
   /** @internal */
   declare _statements: StatementPool;
   private _closed = false;
-  private _closingDriver: Promise<void> | null = null;
   private _acquireGeneration = 0;
   private _acquiringGen = -1;
   private _discardedAcquireGenerations = new Set<number>();
@@ -696,25 +708,26 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      const conn = this._rawConnection;
       this._client = null;
       if (this._acquiring) this._acquireGeneration++;
-      this._closingDriver = conn?.end().catch(() => {}) ?? null;
-      await this._closingDriver;
+      try {
+        await this._rawConnection?.end();
+      } catch {}
       this._rawConnection = null;
     });
   }
 
   override discardBang(): void {
-    const conn = this._rawConnection;
+    super.discardBang();
+    try {
+      abandonRawSocket(this._rawConnection);
+    } catch {}
     this._rawConnection = null;
     this._client = null;
     void this._statements.reset();
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
     this._acquireGeneration++;
-    abandonRawSocket(conn);
-    super.discardBang();
   }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
@@ -1647,6 +1660,12 @@ export class PostgreSQLAdapter
           return PQTRANS_IDLE;
       }
     };
+    (client as RawConnection).status = (): number => {
+      const { _ending, _ended } = client as PgClientLiveness;
+      return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
+    };
+    (client as RawConnection).cancel = () => this._cancel(client);
+    (client as RawConnection).block = () => this._blockUntilCommandSettles(client);
     const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
     if (connection == null) return;
     connection.on("readyForQuery", (message: { status?: string }) => {
@@ -1657,7 +1676,7 @@ export class PostgreSQLAdapter
     });
   }
 
-  private async _cancelAnyRunningQuery(): Promise<void> {
+  private _cancel(client: pg.Client): Promise<void> {
     type PgClientWithPid = pg.Client & {
       processID?: number | null;
       secretKey?: number | null;
@@ -1666,31 +1685,22 @@ export class PostgreSQLAdapter
       connect(portOrPath: string | number, host?: string): void;
       cancel(processID: number, secretKey: number): void;
     };
-    const txClient = this._client as PgClientWithPid | null;
-    if (
-      this._rawConnection == null ||
-      IDLE_TRANSACTION_STATUSES.includes(this._rawConnection.transactionStatus())
-    ) {
-      return;
-    }
-    if (txClient?.processID == null) return;
-    try {
-      await new Promise<void>((resolve, reject) => {
-        const cancelCon = new pg.Connection() as PgConnectionWithCancel;
-        cancelCon.on("error", (error: unknown) => reject(error));
-        cancelCon.on("end", () => resolve());
-        cancelCon.once("connect", () => {
-          cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
-        });
-        const { host, port } = txClient;
-        if (host?.startsWith("/")) {
-          cancelCon.connect(`${host}/.s.PGSQL.${port}`);
-        } else {
-          cancelCon.connect(port, host);
-        }
+    const txClient = client as PgClientWithPid;
+    if (txClient.processID == null) return Promise.resolve();
+    return new Promise<void>((resolve, reject) => {
+      const cancelCon = new pg.Connection() as PgConnectionWithCancel;
+      cancelCon.on("error", (error: unknown) => reject(error));
+      cancelCon.on("end", () => resolve());
+      cancelCon.once("connect", () => {
+        cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
       });
-      await this._blockUntilCommandSettles(txClient);
-    } catch {}
+      const { host, port } = txClient;
+      if (host?.startsWith("/")) {
+        cancelCon.connect(`${host}/.s.PGSQL.${port}`);
+      } else {
+        cancelCon.connect(port, host);
+      }
+    });
   }
 
   /** @internal */
@@ -2151,6 +2161,9 @@ export interface PostgreSQLAdapter {
 
   execRestartDbTransaction(): Promise<void>;
 
+  /** @internal */
+  cancelAnyRunningQuery(): Promise<void>;
+
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
 
   buildExplainClause(options?: ExplainOption[]): Promise<string>;
@@ -2448,7 +2461,6 @@ export interface PreparedStatement {
 export class StatementPool extends GenericStatementPool<PreparedStatement> {
   private _connection: PostgreSQLAdapter;
   private _counter = 0;
-  private _deallocating: Promise<void> = Promise.resolve();
 
   constructor(connection: PostgreSQLAdapter, maxSize = 1000) {
     super(maxSize);
@@ -2459,19 +2471,15 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
     return `a${++this._counter}`;
   }
 
-  protected override dealloc(key: PreparedStatement): void | Promise<void> {
-    const client = this._connection._rawConnection as (pg.Client & PgClientLiveness) | null;
-    if (!client || client._ending === true || client._ended === true) return;
-    const deallocSql = `DEALLOCATE ${pgQuoteColumnName(key.name)}`;
-    this._deallocating = this._deallocating
-      .then(() => {
-        return client.query(deallocSql);
-      })
-      .then(
-        () => {},
-        () => {},
-      );
-    return this._deallocating;
+  protected override async dealloc(key: PreparedStatement): Promise<void> {
+    try {
+      const conn = this._connection._rawConnection;
+      if (conn) {
+        if (conn.status() === CONNECTION_OK) {
+          await conn.query(`DEALLOCATE ${pgQuoteColumnName(key.name)}`);
+        }
+      }
+    } catch {}
   }
 }
 
@@ -2501,6 +2509,7 @@ PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).commitDbTransaction = pgCommitDbTransaction;
 (PostgreSQLAdapter.prototype as any).execRollbackDbTransaction = pgExecRollbackDbTransaction;
 (PostgreSQLAdapter.prototype as any).execRestartDbTransaction = pgExecRestartDbTransaction;
+(PostgreSQLAdapter.prototype as any).cancelAnyRunningQuery = pgCancelAnyRunningQuery;
 (PostgreSQLAdapter.prototype as any).highPrecisionCurrentTimestamp =
   pgHighPrecisionCurrentTimestamp;
 (PostgreSQLAdapter.prototype as any).buildExplainClause = pgBuildExplainClause;

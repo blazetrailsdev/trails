@@ -432,8 +432,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         });
         await new Promise<void>((r) => setTimeout(r, 200));
         await (
-          other as unknown as { _cancelAnyRunningQuery(): Promise<void> }
-        )._cancelAnyRunningQuery();
+          other as unknown as { cancelAnyRunningQuery(): Promise<void> }
+        ).cancelAnyRunningQuery();
         await sleep;
         expect(sleepError).toBeInstanceOf(QueryCanceled);
         await other.rollbackDbTransaction();
@@ -453,7 +453,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
         const internals = other as unknown as {
-          _cancelAnyRunningQuery(): Promise<void>;
+          cancelAnyRunningQuery(): Promise<void>;
           _blockUntilCommandSettles(client: unknown): Promise<void>;
         };
         const blockUntilCommandSettles = internals._blockUntilCommandSettles.bind(other);
@@ -465,7 +465,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         };
 
         let cancelReturned = false;
-        const cancel = internals._cancelAnyRunningQuery().then(() => {
+        const cancel = internals.cancelAnyRunningQuery().then(() => {
           cancelReturned = true;
         });
         await new Promise<void>((r) => setTimeout(r, 50));

@@ -133,7 +133,7 @@ interface TransactionHost {
   /** @internal */
   _discardRawConnection(): void;
   /** @internal */
-  _cancelAnyRunningQuery(): Promise<void>;
+  cancelAnyRunningQuery(): Promise<void>;
   constructor: { _isConnectionError(err: unknown): boolean };
 }
 
@@ -220,7 +220,7 @@ export async function commitDbTransaction(this: TransactionHost): Promise<unknow
 }
 
 export async function execRollbackDbTransaction(this: TransactionHost): Promise<void> {
-  await this._cancelAnyRunningQuery();
+  await this.cancelAnyRunningQuery();
   try {
     await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
       allowRetry: false,
@@ -232,7 +232,7 @@ export async function execRollbackDbTransaction(this: TransactionHost): Promise<
 }
 
 export async function execRestartDbTransaction(this: TransactionHost): Promise<void> {
-  await this._cancelAnyRunningQuery();
+  await this.cancelAnyRunningQuery();
   await this.internalExecute("ROLLBACK AND CHAIN", "TRANSACTION", [], {
     allowRetry: false,
     materializeTransactions: true,
@@ -261,7 +261,11 @@ export async function buildExplainClause(options: ExplainOption[] = []): Promise
 /** @internal */
 interface CancelAnyRunningQueryHost {
   /** @internal */
-  _cancelAnyRunningQuery(): void;
+  _rawConnection: {
+    transactionStatus(): number;
+    cancel(): Promise<void>;
+    block(): Promise<void>;
+  } | null;
 }
 
 export async function setConstraints(
@@ -277,9 +281,25 @@ export async function setConstraints(
   await this.execute(`SET CONSTRAINTS ${list} ${deferred.toUpperCase()}`);
 }
 
+const PQTRANS_IDLE = 0;
+const PQTRANS_INTRANS = 2;
+const PQTRANS_INERROR = 3;
+
+const IDLE_TRANSACTION_STATUSES = [PQTRANS_IDLE, PQTRANS_INTRANS, PQTRANS_INERROR];
+
 /** @internal */
-export function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): void {
-  this._cancelAnyRunningQuery();
+export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Promise<void> {
+  try {
+    if (
+      this._rawConnection == null ||
+      IDLE_TRANSACTION_STATUSES.includes(this._rawConnection.transactionStatus())
+    ) {
+      return;
+    }
+
+    await this._rawConnection.cancel();
+    await this._rawConnection.block();
+  } catch {}
 }
 
 /** @internal */

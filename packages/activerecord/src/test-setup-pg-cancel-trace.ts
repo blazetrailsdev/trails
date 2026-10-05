@@ -15,7 +15,7 @@ interface CancelRecord {
 interface TracedAdapter {
   _client: { processID?: number | null } | null;
   _rawConnection: { transactionStatus(): number } | null;
-  _cancelAnyRunningQuery(...args: unknown[]): Promise<void>;
+  cancelAnyRunningQuery(...args: unknown[]): Promise<void>;
 }
 
 const TRACE_KEY = Symbol.for("activerecord.pg.cancelTrace");
@@ -79,9 +79,9 @@ const state = installWorkerTrace();
 const proto = PostgreSQLAdapter.prototype as unknown as TracedAdapter & { [WRAPPED_KEY]?: true };
 
 if (!proto[WRAPPED_KEY]) {
-  const original = proto._cancelAnyRunningQuery;
+  const original = proto.cancelAnyRunningQuery;
   proto[WRAPPED_KEY] = true;
-  proto._cancelAnyRunningQuery = function (this: TracedAdapter, ...args: unknown[]) {
+  proto.cancelAnyRunningQuery = function (this: TracedAdapter, ...args: unknown[]) {
     state.records.push({
       at: now(),
       pid: this._client?.processID,
