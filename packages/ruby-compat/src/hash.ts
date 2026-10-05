@@ -22,11 +22,31 @@ export function block<F extends (...args: never[]) => unknown>(
 ): F & { readonly [BLOCK]: true };
 /** @noRailsEquivalent PERMANENT — Ruby's `&` block-pass, whose `rb_block_given_p` (`vendor/ruby/v3.3.11/eval.c:866`) TypeScript has no equivalent of; one mark serves every yield signature. */
 export function block(fn: (...args: never[]) => unknown): unknown {
-  const blk = function (this: unknown, ...args: never[]): unknown {
-    return fn.apply(this, args);
-  };
-  Object.defineProperty(blk, "length", { value: fn.length });
-  return Object.assign(blk, { [BLOCK]: true as const });
+  let blk: ((this: unknown, ...args: never[]) => unknown) & { [BLOCK]?: true };
+  switch (fn.length) {
+    case 0:
+      blk = function (this: unknown, ...args: never[]): unknown {
+        return fn.apply(this, args);
+      };
+      break;
+    case 1:
+      blk = function (this: unknown, a: never, ...args: never[]): unknown {
+        return fn.call(this, a, ...args);
+      };
+      break;
+    case 2:
+      blk = function (this: unknown, a: never, b: never, ...args: never[]): unknown {
+        return fn.call(this, a, b, ...args);
+      };
+      break;
+    default:
+      blk = function (this: unknown, ...args: never[]): unknown {
+        return fn.apply(this, args);
+      };
+      Object.defineProperty(blk, "length", { value: fn.length });
+  }
+  blk[BLOCK] = true;
+  return blk;
 }
 
 /**
@@ -40,9 +60,9 @@ export function rbBlockGivenP(value: unknown): value is Block<unknown> {
 }
 
 function ownMethod(hash: object, mid: string): ((...args: unknown[]) => unknown) | undefined {
-  if (hash instanceof Map) return undefined;
   const proto: unknown = Object.getPrototypeOf(hash);
   if (proto === Object.prototype || proto === null) return undefined;
+  if (hash instanceof Map) return undefined;
   const own = (hash as Record<string, unknown>)[mid];
   return typeof own === "function" ? (own as (...args: unknown[]) => unknown) : undefined;
 }
@@ -116,6 +136,15 @@ export function fetch(
   key: unknown,
   ...rest: unknown[]
 ): unknown {
+  /* A hit returns the stored value whatever else was passed
+     (`vendor/ruby/v3.3.11/hash.c:2190-2192`), and a plain-object hash has no
+     `fetch` of its own to dispatch to, so its hit is answered ahead of the arms. */
+  if (
+    Object.getPrototypeOf(receiver) === Object.prototype &&
+    Object.hasOwn(receiver, key as PropertyKey)
+  ) {
+    return (receiver as Record<string, unknown>)[key as string];
+  }
   const own = ownMethod(receiver, "fetch");
   if (own) return own.call(receiver, key, ...rest);
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
