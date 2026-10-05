@@ -122,7 +122,12 @@ import {
   type HelperMethodsModule,
   type HelpersClass,
 } from "../abstract-controller/helpers.js";
-import { modulesForHelpers } from "./metal/helpers.js";
+import {
+  ClassMethods as HelpersClassMethods,
+  helperAttr,
+  helpers,
+  modulesForHelpers,
+} from "./metal/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
@@ -393,7 +398,14 @@ export class Base extends Metal {
   declare static defaultHelperModuleBang: HelpersClass["defaultHelperModuleBang"];
   declare static allHelpersFromPath: (typeof AbstractHelpers.ClassMethods)["allHelpersFromPath"];
   declare static helperModulesFromPaths: (typeof AbstractHelpers.ClassMethods)["helperModulesFromPaths"];
+  static helperAttr = helperAttr;
+  static helpers = HelpersClassMethods.helpers;
+  /** @internal */
+  static _helperProxy?: ActionViewBase;
   static modulesForHelpers = modulesForHelpers;
+  helpers = helpers;
+  /** @internal */
+  declare _helperProxy?: ActionViewBase | null;
 
   constructor(...args: unknown[]) {
     super(...(args as []));

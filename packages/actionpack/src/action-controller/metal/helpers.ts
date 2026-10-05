@@ -1,5 +1,12 @@
+import { extend, type InheritableOptions } from "@blazetrails/activesupport";
+import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { registerConstant } from "@blazetrails/ruby-compat";
-import { Resolution, type HelperMethodsModule } from "../../abstract-controller/helpers.js";
+import {
+  Resolution,
+  type HelperMethodNameList,
+  type HelperMethodsModule,
+  type HelpersClass,
+} from "../../abstract-controller/helpers.js";
 
 let _helpersPath: string[] = [];
 
@@ -28,6 +35,31 @@ export async function loadApplicationHelperNames(): Promise<string[]> {
   return _applicationHelpers;
 }
 
+export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[]): void {
+  ((attrs as readonly unknown[]).flat(Infinity) as string[]).forEach((attr) =>
+    this.helperMethod(attr, `${attr}=`),
+  );
+}
+
+export interface HelperProxyClass {
+  _helperProxy?: ActionViewBase;
+  _helpers?: HelperMethodsModule;
+}
+
+type ConfigReceiver = { config(): InheritableOptions };
+
+export const ClassMethods = {
+  helpers(this: HelperProxyClass): ActionViewBase {
+    if (!Object.hasOwn(this, "_helperProxy") || this._helperProxy == null) {
+      const proxy = ActionViewBase.empty();
+      proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
+      extend(proxy, this._helpers!);
+      this._helperProxy = proxy;
+    }
+    return this._helperProxy;
+  },
+};
+
 /** @internal */
 function allApplicationHelpers(): string[] {
   return _applicationHelpers;
@@ -39,4 +71,11 @@ export function modulesForHelpers(
   const rest = args.filter((arg) => arg !== ":all");
   const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
   return Resolution.modulesForHelpers(argsWithAll as Array<HelperMethodsModule | string>);
+}
+
+export function helpers(this: {
+  _helperProxy?: ActionViewBase | null;
+  viewContext(): ActionViewBase;
+}): ActionViewBase {
+  return (this._helperProxy ??= this.viewContext());
 }

@@ -1461,13 +1461,26 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
   if (extendedHook) return extendedHook(klass);
   if (mod instanceof Module) return mod.extendObject(klass);
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
-  const keys = isClassModule
-    ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))
-    : Object.keys(mod);
+  const owners = new Map<string, object>();
+  if (isClassModule) {
+    for (const key of Object.getOwnPropertyNames(mod)) {
+      if (!STATIC_CLASS_KEYS.has(key)) owners.set(key, mod);
+    }
+  } else {
+    for (
+      let ancestor: object | null = mod;
+      ancestor && ancestor !== Object.prototype;
+      ancestor = Object.getPrototypeOf(ancestor) as object | null
+    ) {
+      for (const key of Object.keys(ancestor)) {
+        if (!owners.has(key)) owners.set(key, ancestor);
+      }
+    }
+  }
   const installed = trackedKeys(klass, extendedKeys);
 
-  for (const key of keys) {
-    const modDesc = Object.getOwnPropertyDescriptor(mod, key);
+  for (const [key, owner] of owners) {
+    const modDesc = Object.getOwnPropertyDescriptor(owner, key);
     if (!modDesc || /^[A-Z]/.test(key)) continue;
     if (!modDesc.get && !modDesc.set && typeof modDesc.value !== "function") continue;
     const existing = Object.getOwnPropertyDescriptor(klass, key);

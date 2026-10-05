@@ -80,6 +80,7 @@ export {
   type HelpersPathControllerClass,
 } from "./trailties/helpers.js";
 export {
+  helperAttr,
   helpersPath,
   setHelpersPath,
   setApplicationHelpers,
