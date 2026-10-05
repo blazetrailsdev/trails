@@ -96,7 +96,6 @@ export class MethodCall implements CallTemplate {
     return [target, block, this.methodName];
   }
 
-  /** @inventedArm if — PERMANENT */
   private send(target: object, block?: (() => unknown) | null): unknown {
     const method = (target as Record<PropertyKey, unknown>)[this.methodName];
     if (typeof method !== "function") {
