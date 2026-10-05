@@ -1,6 +1,7 @@
 import type { ConnectionPool, NullPool } from "./connection-adapters/abstract/connection-pool.js";
 import { ActiveRecordError } from "./errors.js";
-import { first } from "@blazetrails/ruby-compat";
+import { first, format, toI } from "@blazetrails/ruby-compat";
+import { toI as stringToI } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import { Table, SelectManager, InsertManager, DeleteManager, Nodes, star } from "@blazetrails/arel";
 
@@ -102,8 +103,7 @@ export class SchemaMigration {
   }
 
   static normalizeMigrationNumber(number: string | number): string {
-    const n = parseInt(String(number), 10);
-    return String(isNaN(n) ? 0 : n).padStart(3, "0");
+    return format("%.3d", toI(number));
   }
 
   async normalizedVersions(): Promise<string[]> {
@@ -113,9 +113,6 @@ export class SchemaMigration {
 
   async integerVersions(): Promise<number[]> {
     const vers = await this.versions();
-    return vers.map((v) => {
-      const n = parseInt(v, 10);
-      return isNaN(n) ? 0 : n;
-    });
+    return vers.map((v) => stringToI(v));
   }
 }

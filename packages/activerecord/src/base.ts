@@ -67,7 +67,6 @@ import { idsName as _idsName } from "./associations/builder/collection-associati
 import {
   isValid as validationsIsValid,
   defaultValidationContext,
-  _setSuperIsValid,
   type ValidationContextArg,
 } from "./validations.js";
 import * as _Validations from "./validations.js";
@@ -2916,8 +2915,6 @@ for (const [name, fn] of [
     enumerable: false,
   });
 }
-
-_setSuperIsValid(Model.prototype.isValid);
 
 {
   Object.defineProperty(Base.prototype, "attributes", {

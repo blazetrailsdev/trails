@@ -258,7 +258,7 @@ export function tally<T extends string | number>(collection: T[]): Record<string
 }
 
 export function filterMap<T, U>(
-  collection: T[],
+  collection: readonly T[],
   fn: (item: T) => U | false | null | undefined,
 ): U[] {
   const result: U[] = [];

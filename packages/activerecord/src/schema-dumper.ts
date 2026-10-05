@@ -1,4 +1,13 @@
-import { STDOUT, StringIO, partition, rbObjAsString, type IO } from "@blazetrails/ruby-compat";
+import {
+  STDOUT,
+  StringIO,
+  partition,
+  rbEqq,
+  rbObjAsString,
+  regexpEscape,
+  toS,
+  type IO,
+} from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import { any, camelize, cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
@@ -335,12 +344,9 @@ export abstract class SchemaDumper {
 
   /** @internal */
   isIgnored(tableName: string): boolean {
-    return this._ignoreTables.some((ignored) => {
-      const stripped = this.removePrefixAndSuffix(tableName);
-      if (typeof ignored === "string") return stripped === ignored;
-      ignored.lastIndex = 0;
-      return ignored.test(stripped);
-    });
+    return this._ignoreTables.some((ignored) =>
+      rbEqq(ignored, this.removePrefixAndSuffix(tableName)),
+    );
   }
 
   /** @internal */
@@ -348,12 +354,10 @@ export abstract class SchemaDumper {
     if (isBlank(this._options.tableNamePrefix) && isBlank(this._options.tableNameSuffix)) {
       return table;
     }
-    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const prefix = escape((this._options.tableNamePrefix as string | undefined) ?? "");
-    const suffix = escape((this._options.tableNameSuffix as string | undefined) ?? "");
-    const re = new RegExp(`^${prefix}(.+)${suffix}$`);
-    const m = table.match(re);
-    return m ? m[1] : table;
+
+    const prefix = regexpEscape(toS(this._options.tableNamePrefix));
+    const suffix = regexpEscape(toS(this._options.tableNameSuffix));
+    return table.replace(new RegExp(`^${prefix}(.+)${suffix}$`), "$1");
   }
 
   /**
@@ -666,16 +670,16 @@ export abstract class SchemaDumper {
     return checkParts;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE schema-dumper-option-brace-arm-in-four-statement-builders
+   */
   async foreignKeys(table: string, stream: IO | StringIO): Promise<undefined> {
-    const host = this._hookHost("foreignKeys") as
-      | {
-          foreignKeys(table: string): Promise<ForeignKeyDefinition[] | undefined>;
-          foreignKeyColumnFor(table: string, column: string): string;
-        }
-      | undefined;
-    if (!host) return;
-    const foreignKeys = (await host.foreignKeys(table)) ?? [];
+    const connection = this._adapter() as {
+      foreignKeys(table: string): Promise<ForeignKeyDefinition[]>;
+      foreignKeyColumnFor(table: string, column: string): string;
+    };
+    const foreignKeys = await connection.foreignKeys(table);
     if (any(foreignKeys)) {
       const addForeignKeyStatements = foreignKeys.map((foreignKey) => {
         const parts = [
@@ -683,7 +687,7 @@ export abstract class SchemaDumper {
           JSON.stringify(this.removePrefixAndSuffix(foreignKey.toTable)),
         ];
 
-        if (foreignKey.column !== host.foreignKeyColumnFor(foreignKey.toTable, "id")) {
+        if (foreignKey.column !== connection.foreignKeyColumnFor(foreignKey.toTable, "id")) {
           parts.push(`column: ${JSON.stringify(foreignKey.column)}`);
         }
 
@@ -726,15 +730,8 @@ export abstract class SchemaDumper {
 
   /** @internal */
   formatOptions(options: Record<string, unknown>): string {
-    const isIdent = /^[a-zA-Z_$][\w$]*$/;
     return Object.entries(options)
-      .map(([k, v]) => {
-        const key = isIdent.test(k) ? k : JSON.stringify(k);
-        if (typeof v === "function") {
-          return `${key}: () => ${JSON.stringify((v as () => unknown)())}`;
-        }
-        return `${key}: ${JSON.stringify(v)}`;
-      })
+      .map(([key, value]) => `${key}: ${JSON.stringify(value)}`)
       .join(", ");
   }
 

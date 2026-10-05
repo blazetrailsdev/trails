@@ -1,9 +1,15 @@
 import type { Base } from "./base.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
-import { JSON, classAttribute, included, underscore } from "@blazetrails/activesupport";
+import {
+  JSON,
+  classAttribute,
+  compactBlank,
+  included,
+  underscore,
+} from "@blazetrails/activesupport";
 import type { Temporal } from "@blazetrails/date";
 import { UnknownPrimaryKey } from "./errors.js";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, toS } from "@blazetrails/ruby-compat";
 
 export interface SignedId {
   readonly signedIdVerifierSecret: string | (() => string | null | undefined) | null | undefined;
@@ -17,29 +23,22 @@ export const SignedId = {
 
 export class ClassMethods {
   static get signedIdVerifier(): MessageVerifier {
-    if ((this as any)._signedIdVerifier) {
-      return (this as any)._signedIdVerifier;
-    }
+    return ((this as any)._signedIdVerifier ??= (() => {
+      let secret = (this as any).signedIdVerifierSecret as
+        | string
+        | (() => string | null | undefined)
+        | null
+        | undefined;
+      if (typeof secret === "function") secret = secret();
 
-    let secret = (this as any).signedIdVerifierSecret as
-      | string
-      | (() => string | null | undefined)
-      | null
-      | undefined;
-    if (typeof secret === "function") secret = secret();
-    if (secret == null) {
-      throw new ArgumentError(
-        "You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids",
-      );
-    }
-
-    const verifier = new MessageVerifier(secret, {
-      digest: "SHA256",
-      serializer: JSON,
-      url_safe: true,
-    });
-    (this as any)._signedIdVerifier = verifier;
-    return verifier;
+      if (secret == null) {
+        throw new ArgumentError(
+          "You must set ActiveRecord::Base.signed_id_verifier_secret to use signed ids",
+        );
+      } else {
+        return new MessageVerifier(secret, { digest: "SHA256", serializer: JSON, url_safe: true });
+      }
+    })());
   }
 
   static set signedIdVerifier(verifier: MessageVerifier) {
@@ -56,19 +55,19 @@ function _hasPrimaryKey(pk: unknown): boolean {
 
 export function signedId(
   instance: Base,
-  options?: { purpose?: string; expiresIn?: number; expiresAt?: Temporal.Instant },
+  {
+    expiresIn,
+    expiresAt,
+    purpose,
+  }: { expiresIn?: number; expiresAt?: Temporal.Instant; purpose?: string } = {},
 ): string {
-  if (!instance.isPersisted()) {
-    throw new Error("Cannot get a signed_id for a new record");
-  }
-  const ctor = instance.constructor as typeof Base;
-  const verifier = ctor.signedIdVerifier;
-  const coerce = (v: unknown): unknown =>
-    Array.isArray(v) ? (v as unknown[]).map(coerce) : typeof v === "bigint" ? Number(v) : v;
-  return verifier.generate(coerce(instance.id), {
-    expiresIn: options?.expiresIn,
-    expiresAt: options?.expiresAt,
-    purpose: ctor.combineSignedIdPurposes(options?.purpose) || undefined,
+  if (instance.isNewRecord()) throw new ArgumentError("Cannot get a signed_id for a new record");
+
+  const klass = instance.constructor as typeof Base;
+  return klass.signedIdVerifier.generate(instance.id, {
+    expiresIn,
+    expiresAt,
+    purpose: klass.combineSignedIdPurposes(purpose),
   });
 }
 
@@ -109,8 +108,5 @@ export async function findSignedBang<T extends typeof Base>(
 }
 
 export function combineSignedIdPurposes(modelClass: typeof Base, purpose?: string): string {
-  const base = (modelClass as any).baseClass ?? modelClass;
-  const parts = [underscore(base.name)];
-  if (purpose) parts.push(String(purpose));
-  return parts.filter(Boolean).join("/");
+  return compactBlank([underscore(modelClass.baseClass.name), toS(purpose)]).join("/");
 }

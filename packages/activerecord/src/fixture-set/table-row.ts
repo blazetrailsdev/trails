@@ -52,7 +52,7 @@ export class HasManyThroughProxy extends ReflectionProxy {
     return this._association.throughReflection.tableName;
   }
 
-  get timestampColumnNames(): string[] {
+  get timestampColumnNames(): readonly string[] {
     return this._association.throughReflection.klass.allTimestampAttributesInModel();
   }
 }

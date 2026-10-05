@@ -1,28 +1,23 @@
+import { getEnv } from "@blazetrails/activesupport";
+import { setEnv } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { schemaFormat } from "./active-record.js";
 
 export class TestDatabases {
   static async createAndLoadSchema(i: number, { envName }: { envName: string }): Promise<void> {
-    const old = process.env.VERBOSE;
-    process.env.VERBOSE = "false";
+    const old = getEnv("VERBOSE");
+    setEnv("VERBOSE", "false");
 
     try {
-      const configs = Base.configurations().configsFor({ envName });
-      for (const dbConfig of configs) {
+      for (const dbConfig of Base.configurations().configsFor({ envName })) {
         dbConfig._database = `${dbConfig.database}-${i}`;
+
         await DatabaseTasks.reconstructFromSchema(dbConfig, schemaFormat(), undefined);
       }
     } finally {
-      try {
-        await Base.establishConnection();
-      } finally {
-        if (old !== undefined) {
-          process.env.VERBOSE = old;
-        } else {
-          delete process.env.VERBOSE;
-        }
-      }
+      await Base.establishConnection();
+      setEnv("VERBOSE", old);
     }
   }
 }

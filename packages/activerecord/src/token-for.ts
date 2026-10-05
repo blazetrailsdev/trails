@@ -45,9 +45,7 @@ export class TokenDefinition {
   }
 
   payloadFor(model: Base): unknown[] {
-    const coerce = (v: unknown): unknown => (typeof v === "bigint" ? Number(v) : v);
-    const id = Array.isArray(model.id) ? (model.id as unknown[]).map(coerce) : coerce(model.id);
-    return this.block ? [id, asJson(this.block.call(model, model))] : [id];
+    return this.block ? [model.id, asJson(this.block.call(model, model))] : [model.id];
   }
 
   generateToken(model: Base): string {
@@ -61,9 +59,11 @@ export class TokenDefinition {
     token: string,
     block: (id: unknown) => Promise<Base | null>,
   ): Promise<Base | null> {
-    const verified = this.messageVerifier().verified(token, { purpose: this.fullPurpose() });
-    const payload = Array.isArray(verified) && verified.length > 0 ? verified : null;
-    const model = payload ? await block(payload[0]) : null;
+    const payload = this.messageVerifier().verified(token, { purpose: this.fullPurpose() }) as
+      | unknown[]
+      | null;
+    let model: Base | null = null;
+    if (payload != null) model = await block(payload[0]);
     return model && JSON.stringify(this.payloadFor(model)) === JSON.stringify(payload)
       ? model
       : null;

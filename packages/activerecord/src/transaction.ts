@@ -1,4 +1,4 @@
-import { SecureRandom } from "@blazetrails/ruby-compat";
+import { uuidV4 } from "@blazetrails/activesupport";
 import { Transaction as InternalTransaction } from "./connection-adapters/abstract/transaction.js";
 
 export class Transaction {
@@ -33,11 +33,10 @@ export class Transaction {
   }
 
   uuid(): string | null {
-    if (this.isClosed()) return null;
-    if (!this._uuid) {
-      this._uuid = SecureRandom.uuid();
+    if (this._internalTransaction != null) {
+      return (this._uuid ??= uuidV4());
     }
-    return this._uuid;
+    return null;
   }
 
   static readonly NULL_TRANSACTION = new Transaction(null);

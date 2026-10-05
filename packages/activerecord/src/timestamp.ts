@@ -1,6 +1,6 @@
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
-import { currentTimeInstant, indexWith } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
+import { Rational, max } from "@blazetrails/ruby-compat";
+import { currentTimeInstant, filterMap, indexWith } from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { defaultTimezone } from "./active-record.js";
 
@@ -15,21 +15,21 @@ const UPDATED_ATTRS = ["updated_at", "updated_on"];
 
 export interface TimestampHost {
   attributeAliases?: Record<string, string>;
-  columnNames?: string[] | (() => string[]);
-  _timestampAttributesForCreateInModel?: string[];
-  _timestampAttributesForUpdateInModel?: string[];
-  _allTimestampAttributesInModel?: string[];
+  columnNames(): readonly string[];
+  _timestampAttributesForCreateInModel?: readonly string[];
+  _timestampAttributesForUpdateInModel?: readonly string[];
+  _allTimestampAttributesInModel?: readonly string[];
   timestampAttributesForCreate(): string[];
   timestampAttributesForUpdate(): string[];
-  timestampAttributesForCreateInModel(): string[];
-  timestampAttributesForUpdateInModel(): string[];
-  allTimestampAttributesInModel(): string[];
+  timestampAttributesForCreateInModel(): readonly string[];
+  timestampAttributesForUpdateInModel(): readonly string[];
+  allTimestampAttributesInModel(): readonly string[];
   currentTimeFromProperTimezone(): RubyTime;
 }
 
 interface TimestampInstanceHost {
   _touchRecord: boolean | null;
-  readAttribute?(name: string): unknown;
+  readAttribute(name: string): unknown;
   _readAttribute?(name: string): unknown;
   _writeAttribute?(name: string, val: unknown): void;
   isWillSaveChangeToAttribute?(name: string): boolean;
@@ -37,8 +37,8 @@ interface TimestampInstanceHost {
   hasChangesToSave?: boolean;
   id?: unknown;
   recordTimestamps?: boolean;
-  timestampAttributesForUpdateInModel(): string[];
-  allTimestampAttributesInModel(): string[];
+  timestampAttributesForUpdateInModel(): readonly string[];
+  allTimestampAttributesInModel(): readonly string[];
   currentTimeFromProperTimezone(): RubyTime;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
@@ -67,35 +67,23 @@ export type CounterCacheTouchOption =
   | Array<string | { time?: RubyTime }>
   | { time?: RubyTime };
 
-export function timestampAttributesForCreateInModel(this: TimestampHost): string[] {
-  if (this._timestampAttributesForCreateInModel) return this._timestampAttributesForCreateInModel;
-  const names =
-    typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
-  const cols = new Set(names);
-  this._timestampAttributesForCreateInModel = this.timestampAttributesForCreate().filter((a) =>
-    cols.has(a),
-  );
-  return this._timestampAttributesForCreateInModel;
+export function timestampAttributesForCreateInModel(this: TimestampHost): readonly string[] {
+  return (this._timestampAttributesForCreateInModel ??= Object.freeze(
+    this.timestampAttributesForCreate().filter((name) => this.columnNames().includes(name)),
+  ));
 }
 
-export function timestampAttributesForUpdateInModel(this: TimestampHost): string[] {
-  if (this._timestampAttributesForUpdateInModel) return this._timestampAttributesForUpdateInModel;
-  const names =
-    typeof this.columnNames === "function" ? this.columnNames() : (this.columnNames ?? []);
-  const cols = new Set(names);
-  this._timestampAttributesForUpdateInModel = this.timestampAttributesForUpdate().filter((a) =>
-    cols.has(a),
-  );
-  return this._timestampAttributesForUpdateInModel;
+export function timestampAttributesForUpdateInModel(this: TimestampHost): readonly string[] {
+  return (this._timestampAttributesForUpdateInModel ??= Object.freeze(
+    this.timestampAttributesForUpdate().filter((name) => this.columnNames().includes(name)),
+  ));
 }
 
-export function allTimestampAttributesInModel(this: TimestampHost): string[] {
-  if (this._allTimestampAttributesInModel) return this._allTimestampAttributesInModel;
-  this._allTimestampAttributesInModel = [
+export function allTimestampAttributesInModel(this: TimestampHost): readonly string[] {
+  return (this._allTimestampAttributesInModel ??= Object.freeze([
     ...this.timestampAttributesForCreateInModel(),
     ...this.timestampAttributesForUpdateInModel(),
-  ];
-  return this._allTimestampAttributesInModel;
+  ]));
 }
 
 /** @missingRailsCall with_connection — CONVERGEABLE timestamp-current-time-from-proper-timezone-reads-the-connection-default-timezone */
@@ -204,20 +192,12 @@ export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
 
 /** @internal */
 export function maxUpdatedColumnTimestamp(this: TimestampInstanceHost): RubyTime | null {
-  const attrs = this.timestampAttributesForUpdateInModel();
-  let max: RubyTime | null = null;
-  for (const attr of attrs) {
-    const v = this.readAttribute?.(attr);
-    if (v == null) continue;
-    const inst: RubyTime =
-      v instanceof RubyTime
-        ? v
-        : RubyTime.at(
-            new Rational(Temporal.Instant.from(String(v)).epochNanoseconds, 1_000_000_000n),
-          );
-    if (max === null || inst.toR().cmp(max.toR()) > 0) max = inst;
-  }
-  return max;
+  return max(
+    filterMap(this.timestampAttributesForUpdateInModel(), (attr) => {
+      const v = this.readAttribute(attr) as RubyTime | { toTime(): RubyTime } | null | false;
+      return v != null && v !== false && (v instanceof RubyTime ? v : v.toTime());
+    }),
+  );
 }
 
 /** @internal */
@@ -231,13 +211,13 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
 export const Timestamp = {
   recordUpdateTimestamps,
   shouldRecordTimestamps,
-  timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): string[] {
+  timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.timestampAttributesForCreateInModel();
   },
-  timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): string[] {
+  timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.timestampAttributesForUpdateInModel();
   },
-  allTimestampAttributesInModel(this: { constructor: TimestampHost }): string[] {
+  allTimestampAttributesInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.allTimestampAttributesInModel();
   },
   currentTimeFromProperTimezone(this: { constructor: TimestampHost }): RubyTime {

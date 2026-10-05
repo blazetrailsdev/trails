@@ -188,8 +188,8 @@ describe("surreptitiouslyTouch reads _touchTime from instance (Story K gap 3)", 
     (inv as any)._touchTime = touchTime;
 
     const written: [string, unknown][] = [];
-    const origWrite = (inv as any).writeAttribute.bind(inv);
-    (inv as any).writeAttribute = (attr: string, val: unknown) => {
+    const origWrite = (inv as any)._writeAttribute.bind(inv);
+    (inv as any)._writeAttribute = (attr: string, val: unknown) => {
       written.push([attr, val]);
       return origWrite(attr, val);
     };

@@ -1,4 +1,4 @@
-import { base58 } from "@blazetrails/activesupport";
+import { base58, camelize } from "@blazetrails/activesupport";
 import { StandardError } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { generateSecureTokenOn } from "./active-record.js";
@@ -13,21 +13,18 @@ const MINIMUM_TOKEN_LENGTH = 24;
 export function hasSecureToken(
   this: typeof Base,
   attribute: string = "token",
-  options?: { length?: number; on?: "create" | "initialize" },
+  {
+    length = MINIMUM_TOKEN_LENGTH,
+    on = generateSecureTokenOn(),
+  }: { length?: number; on?: "create" | "initialize" } = {},
 ): void {
-  const length = options?.length ?? MINIMUM_TOKEN_LENGTH;
   if (length < MINIMUM_TOKEN_LENGTH) {
     throw new MinimumLengthError(
       `Token requires a minimum length of ${MINIMUM_TOKEN_LENGTH} characters.`,
     );
   }
 
-  const methodName =
-    attribute === "token"
-      ? "regenerateToken"
-      : `regenerate${attribute.charAt(0).toUpperCase() + attribute.slice(1).replace(/_([a-z])/g, (_, c) => c.toUpperCase())}`;
-
-  Object.defineProperty(this.prototype, methodName, {
+  Object.defineProperty(this.prototype, camelize(`regenerate_${attribute}`, false), {
     value: function (this: Base): Promise<true | undefined> {
       return this.updateBang({
         [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken({ length }),
@@ -37,7 +34,6 @@ export function hasSecureToken(
     configurable: true,
   });
 
-  const on = options?.on ?? generateSecureTokenOn();
   this.setCallback(on, on === "initialize" ? "after" : "before", function (this: any) {
     if (this.isNewRecord() && !this.queryAttribute(attribute)) {
       this[attribute] = (this.constructor as typeof Base).generateUniqueSecureToken({ length });
