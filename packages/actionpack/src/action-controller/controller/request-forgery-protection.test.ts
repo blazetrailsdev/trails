@@ -248,15 +248,7 @@ PerFormTokensController.protectFromForgery({ with: "exception" });
 PerFormTokensController.perFormCsrfTokens = true;
 
 class SkipProtectionController extends Base {
-  private _skipRequested?: boolean;
-
-  skipRequested(): boolean | undefined {
-    return this._skipRequested;
-  }
-
-  setSkipRequested(skipRequested: boolean): void {
-    this._skipRequested = skipRequested;
-  }
+  skipRequested?: boolean;
 }
 include(SkipProtectionController, RequestForgeryProtectionActions);
 SkipProtectionController.protectFromForgery({ with: "exception" });
@@ -1270,12 +1262,12 @@ describe("SkipProtectionControllerTest", () => {
   });
 
   it("should not allow post without token when not skipping", async () => {
-    controller.setSkipRequested(false);
+    controller.skipRequested = false;
     await assertBlocked(() => tc.post("index"));
   });
 
   it("should allow post without token when skipping", async () => {
-    controller.setSkipRequested(true);
+    controller.skipRequested = true;
     await assertNotBlocked(() => tc.post("index"));
   });
 

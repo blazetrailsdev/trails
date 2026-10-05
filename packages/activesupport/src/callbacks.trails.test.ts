@@ -255,6 +255,25 @@ describe("MethodCall", () => {
       /undefined method 'iDontExist' for an instance of Target/,
     );
   });
+
+  it("sends a condition naming an accessor property", () => {
+    const history: string[] = [];
+    class Target extends Model {
+      skipRequested = false;
+      record(): void {
+        history.push("record");
+      }
+    }
+    Target.defineCallbacks("save");
+    Target.setCallback("save", "before", ":record", { unless: ":skipRequested" });
+
+    const target = new Target();
+    target.runCallbacks("save");
+    target.skipRequested = true;
+    target.runCallbacks("save");
+
+    expect(history).toEqual(["record"]);
+  });
 });
 
 describe("normalizeCallbackParams (trails)", () => {
