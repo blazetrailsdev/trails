@@ -7,12 +7,16 @@ import {
   tryCall,
 } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { hashDelete, mergeBang } from "@blazetrails/ruby-compat";
+import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat";
 import type { Metal } from "../metal.js";
 import type { CacheControlHash } from "../../action-dispatch/http/cache.js";
 
 export type ConditionalGetHost = Pick<Metal, "request" | "response" | "head"> & {
   etaggers: Etagger[];
+  freshWhen: typeof freshWhen;
+  isStale: typeof isStale;
+  expiresIn: typeof expiresIn;
+  combineEtags: typeof combineEtags;
 };
 
 export interface FreshWhenOptions {
@@ -33,7 +37,7 @@ export function freshWhen(
     weakEtag = null,
     strongEtag = null,
     lastModified = null,
-    public: isPublic = false,
+    public: public_ = false,
     cacheControl = {},
     template = null,
   }: FreshWhenOptions = {},
@@ -46,16 +50,16 @@ export function freshWhen(
 
   if (strongEtag != null && strongEtag !== false) {
     this.response.strongEtag(
-      combineEtags.call(this, strongEtag, { lastModified, public: isPublic, template }),
+      this.combineEtags(strongEtag, { lastModified, public: public_, template }),
     );
   } else if ((weakEtag != null && weakEtag !== false) || (template != null && template !== false)) {
     this.response.weakEtag(
-      combineEtags.call(this, weakEtag, { lastModified, public: isPublic, template }),
+      this.combineEtags(weakEtag, { lastModified, public: public_, template }),
     );
   }
 
   if (lastModified != null) this.response.lastModified = lastModified as Date;
-  if (isPublic) this.response.cacheControl.public = true;
+  if (public_) this.response.cacheControl.public = true;
   mergeBang(this.response.cacheControl, cacheControl);
 
   if (this.request.fresh(this.response)) this.head("not_modified");
@@ -66,7 +70,7 @@ export function isStale(
   object: unknown = null,
   freshnessKwargs: FreshWhenOptions = {},
 ): boolean {
-  freshWhen.call(this, object, freshnessKwargs);
+  this.freshWhen(object, freshnessKwargs);
   return !this.request.fresh(this.response);
 }
 
@@ -91,23 +95,22 @@ export function expiresIn(
 }
 
 export function expiresNow(this: ConditionalGetHost): void {
-  const cacheControl = this.response.cacheControl;
-  for (const key of Object.keys(cacheControl)) delete cacheControl[key];
-  cacheControl.noCache = true;
+  hashReplace(this.response.cacheControl, { noCache: true });
 }
 
+/** @missingRailsArgs stale? — PERMANENT */
 export function httpCacheForever(
   this: ConditionalGetHost,
-  { public: isPublic = false }: { public?: boolean } = {},
+  { public: public_ = false }: { public?: boolean } = {},
   block?: () => void,
 ): void {
-  expiresIn.call(this, Duration.years(100), { public: isPublic, immutable: true });
+  this.expiresIn(Duration.years(100), { public: public_, immutable: true });
 
   if (
-    isStale.call(this, null, {
+    this.isStale(null, {
       etag: this.request.fullpath,
       lastModified: Time.new(2011, 1, 1).utc(),
-      public: isPublic,
+      public: public_,
     })
   ) {
     block?.();
@@ -115,9 +118,7 @@ export function httpCacheForever(
 }
 
 export function noStore(this: ConditionalGetHost): void {
-  const cacheControl = this.response.cacheControl;
-  for (const key of Object.keys(cacheControl)) delete cacheControl[key];
-  cacheControl.noStore = true;
+  hashReplace(this.response.cacheControl, { noStore: true });
 }
 
 export type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;

@@ -284,6 +284,21 @@ export function update<T>(
 export const mergeBang = update;
 
 /**
+ * Ruby `Hash#replace` (`vendor/ruby/v3.3.11/hash.c:2967` `rb_hash_replace`) — empties
+ * the receiver, copies `hash2`'s entries into it, and returns the receiver.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#replace` (`vendor/ruby/v3.3.11/hash.c:2967`).
+ */
+export function hashReplace<H extends object>(hash: H, hash2: object): H {
+  if (Object.isFrozen(hash)) {
+    throw new FrozenError(`can't modify frozen Hash: ${rbInspect(hash)}`, { receiver: hash });
+  }
+  if (hash === hash2) return hash;
+  for (const key of Object.keys(hash)) delete (hash as Record<string, unknown>)[key];
+  Object.assign(hash, hash2);
+  return hash;
+}
+
+/**
  * Ruby `Hash#delete` (`vendor/ruby/v3.3.11/hash.c:2441` `rb_hash_delete_m`) — removes
  * the entry and returns its stored value, or `nil` when the key is absent,
  * where the block form yields the key instead.

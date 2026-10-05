@@ -230,3 +230,48 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
     );
   });
 });
+
+describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)", () => {
+  it("expiresIn merges into the response cache-control hash and renders it on commit", async () => {
+    class ExpiresController extends Base {
+      async index() {
+        this.noStore();
+        this.expiresIn(3600, { staleWhileRevalidate: 60, immutable: true, "s-maxage": 10 });
+        await this.render({ plain: "ok" });
+      }
+    }
+    const c = new ExpiresController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.headers.get("cache-control")).toBe(
+      "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
+    );
+    expect(c.headers.get("date")).toBeDefined();
+  });
+
+  it("freshWhen merges the cacheControl option", async () => {
+    class CcController extends Base {
+      async index() {
+        this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
+        if (!this.performed) await this.render({ plain: "ok" });
+      }
+    }
+    const c = new CcController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.headers.get("cache-control")).toBe("public, no-cache");
+  });
+});
+
+describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
+  it("process_action records show_detailed_exceptions? on the request env when rescuing", async () => {
+    class BoomController extends Base {
+      async index() {
+        throw new RangeError("boom");
+      }
+    }
+    BoomController.rescueFrom(RangeError, () => {});
+    const c = new BoomController();
+    const request = makeRequest();
+    await c.dispatch("index", request, new Response());
+    expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
+  });
+});

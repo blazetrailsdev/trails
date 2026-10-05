@@ -387,47 +387,6 @@ describe("ActionController::Base conditional GET", () => {
     });
   });
 
-  it("expiresIn merges into the response cache-control hash and renders it on commit", async () => {
-    class ExpiresController extends Base {
-      async index() {
-        this.noStore();
-        this.expiresIn(3600, { staleWhileRevalidate: 60, immutable: true, "s-maxage": 10 });
-        await this.render({ plain: "ok" });
-      }
-    }
-    const c = new ExpiresController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("cache-control")).toBe(
-      "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
-    );
-    expect(c.headers.get("date")).toBeDefined();
-  });
-
-  it("freshWhen merges the cacheControl option", async () => {
-    class CcController extends Base {
-      async index() {
-        this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
-        if (!this.performed) await this.render({ plain: "ok" });
-      }
-    }
-    const c = new CcController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("cache-control")).toBe("public, no-cache");
-  });
-
-  it("process_action records show_detailed_exceptions? on the request env when rescuing", async () => {
-    class BoomController extends Base {
-      async index() {
-        throw new RangeError("boom");
-      }
-    }
-    BoomController.rescueFrom(RangeError, () => {});
-    const c = new BoomController();
-    const request = makeRequest();
-    await c.dispatch("index", request, makeResponse());
-    expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
-  });
-
   it("expiresNow sets no-cache", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());

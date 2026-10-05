@@ -47,10 +47,10 @@ export function sendFile(
     throw new MissingFile(`Cannot read file ${path}`);
   }
 
-  if (!options.urlBasedFilename) options.filename ||= File.basename(path);
+  if (!options.urlBasedFilename) options.filename ??= File.basename(path);
   this.sendFileHeadersBang(options);
 
-  this.status = options.status || 200;
+  this.status = options.status ?? 200;
   if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
   this.response.sendFile(path);
 }

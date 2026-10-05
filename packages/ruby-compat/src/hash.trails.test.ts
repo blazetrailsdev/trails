@@ -16,6 +16,7 @@ import {
   hashAref,
   hashAset,
   hashDelete,
+  hashReplace,
   isInclude,
   keepIf,
   merge,
@@ -673,6 +674,19 @@ describe("eachValue", () => {
     const enumerator = eachValue({ a: 1, b: null });
     expect(enumerator).toBeInstanceOf(Enumerator);
     expect([...enumerator]).toEqual([1, null]);
+  });
+});
+
+describe("hashReplace", () => {
+  it("empties the receiver, copies the other hash, and returns the receiver", () => {
+    const hash: Record<string, unknown> = { foo: 0, bar: 1 };
+    expect(hashReplace(hash, { baz: 2 })).toBe(hash);
+    expect(hash).toEqual({ baz: 2 });
+    expect(hashReplace(hash, hash)).toEqual({ baz: 2 });
+  });
+
+  it("raises FrozenError on a frozen receiver", () => {
+    expect(() => hashReplace(Object.freeze({ foo: 0 }), {})).toThrow(/can't modify frozen Hash/);
   });
 });
 

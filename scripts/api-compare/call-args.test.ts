@@ -182,6 +182,14 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     ).toBe("match");
   });
 
+  // metal/conditional_get.rb:137 `fresh_when(..., public: false, ...)`.
+  it("reads a strict-mode reserved Ruby name as the same name with a trailing underscore", () => {
+    expect(
+      compareCallArgs(site("combine_etags", ["id:public"]), site("combineEtags", ["id:public_"]))
+        .verdict,
+    ).toBe("match");
+  });
+
   // metal/conditional_get.rb:294 `merge!(public: options.delete(:public))`.
   it("reads a nested Ruby call as its receiver-keyed ruby-compat export", () => {
     expect(

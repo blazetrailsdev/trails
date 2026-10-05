@@ -26,6 +26,7 @@ import {
   ConditionalGet,
   type ClassMethods as ConditionalGetClassMethods,
   type Etagger,
+  type combineEtags,
   type expiresIn,
   type expiresNow,
   type freshWhen,
@@ -694,6 +695,8 @@ export class Base extends Metal {
   declare expiresNow: typeof expiresNow;
   declare httpCacheForever: typeof httpCacheForever;
   declare noStore: typeof noStore;
+  /** @internal */
+  declare combineEtags: typeof combineEtags;
 
   /** @internal */
   _actionHasLayout?: boolean;
