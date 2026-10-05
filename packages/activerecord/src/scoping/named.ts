@@ -1,4 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
+import { isPlainObject } from "@blazetrails/activesupport";
 import { defineModule, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
@@ -85,14 +86,15 @@ export function defaultScoped(
 ): any;
 export function defaultScoped(
   this: NamedHost,
-  scopeOrOptions?: any,
-  options?: { allQueries?: boolean | null },
+  scope?: any,
+  options: { allQueries?: boolean | null } = {},
 ): any {
-  const kwargsOnly =
-    scopeOrOptions != null && Object.getPrototypeOf(scopeOrOptions) === Object.prototype;
-  const scope = (kwargsOnly ? undefined : scopeOrOptions) ?? this.relation?.();
-  const opts = kwargsOnly ? (scopeOrOptions as { allQueries?: boolean | null }) : options;
-  return Default.buildDefaultScope.call(this, scope, { allQueries: opts?.allQueries }) ?? scope;
+  if (isPlainObject(scope)) {
+    options = scope;
+    scope = undefined;
+  }
+  scope ??= this.relation!();
+  return Default.buildDefaultScope.call(this, scope, { allQueries: options.allQueries }) || scope;
 }
 
 export function defaultExtensions(this: NamedHost): any[] {

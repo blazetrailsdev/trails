@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbInspect, registerConstant, toS } from "@blazetrails/ruby-compat";
 import { BigIntegerType } from "@blazetrails/activemodel";
 
 export class DecimalWithoutScale extends BigIntegerType {
@@ -7,8 +7,7 @@ export class DecimalWithoutScale extends BigIntegerType {
   }
 
   override typeCastForSchema(value: unknown): string {
-    const s = value == null ? "" : String(value);
-    return JSON.stringify(s);
+    return rbInspect(toS(value));
   }
 }
 

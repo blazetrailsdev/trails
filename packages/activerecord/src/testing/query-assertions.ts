@@ -1,4 +1,5 @@
 import { Notifications, _assertNothingRaisedOrWarn, assert } from "@blazetrails/activesupport";
+import { rbEqq } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 
 /** @internal */
@@ -88,12 +89,7 @@ export async function assertQueriesMatch<T>(
   return await Notifications.subscribed(counter, "sql.active_record", async () => {
     const result = (await _assertNothingRaisedOrWarn("assert_queries_match", fn)) as T;
     const queries = includeSchema ? counter.logAll : counter.log;
-    const matchedQueries = queries.filter((query) => {
-      if (typeof match === "string") return match === query;
-      match.lastIndex = 0;
-      return match.test(query);
-    });
-    if (typeof match !== "string") match.lastIndex = 0;
+    const matchedQueries = queries.filter((query) => rbEqq(match, query));
 
     if (count !== undefined) {
       assert(

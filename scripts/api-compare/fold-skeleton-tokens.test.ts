@@ -71,6 +71,13 @@ describe("foldSkeletonTokens", () => {
     expect(foldSkeletonTokens(["ref:reverse_each", "ref:save"])).toEqual(["loop", "ref:save"]);
   });
 
+  it("reads a blockless reverse_each chained into detect as no loop of its own", () => {
+    expect(foldSkeletonTokens(["ref:reverse_each", "ref:detect", "if"])).toEqual([
+      "ref:detect",
+      "if",
+    ]);
+  });
+
   it("leaves control tokens and constructors untouched", () => {
     const skeleton = ["if", "new:Relation", "try", "throw", "ref:get"];
     expect(foldSkeletonTokens(skeleton)).toEqual(skeleton);

@@ -1,4 +1,4 @@
-import { Hash } from "../hash.js";
+import { Hash, rbBlockGivenP, type Block } from "../hash.js";
 import { rbModConstSet } from "../include.js";
 
 /**
@@ -21,6 +21,7 @@ export const Concurrent = { name: "Concurrent" } as { readonly name: string; Map
  */
 export class Map<K, V> {
   private readonly backend = new Hash<K, V>();
+  private readonly defaultProc?: (key: K) => V;
 
   /**
    * `initial_capacity:` is a sizing hint the MRI backend never reads
@@ -28,7 +29,48 @@ export class Map<K, V> {
    *
    * @noRailsEquivalent PERMANENT
    */
-  constructor(_options: { initialCapacity?: number } | null = null) {}
+  constructor(
+    _options: { initialCapacity?: number } | null = null,
+    defaultProc?: (map: Map<K, V>, key: K) => V,
+  ) {
+    if (defaultProc) this.defaultProc = (key) => defaultProc(this, key);
+  }
+
+  /**
+   * `Concurrent::Map#[]`: the stored value (`vendor/ruby/v3.3.11/hash.c:2121`
+   * `rb_hash_aref`), else the `default_proc` given to `new`, called with the
+   * map and the missing key.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  get(key: K): V | undefined {
+    if (this.backend.has(key)) {
+      return this.backend.get(key);
+    } else if (this.defaultProc) {
+      return this.defaultProc(key);
+    } else {
+      return undefined;
+    }
+  }
+
+  /**
+   * `Concurrent::Map#fetch_or_store`: the stored value when the key is present
+   * (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`), else the block's value, or
+   * the default value, stored under it (`vendor/ruby/v3.3.11/hash.c:2941` `rb_hash_aset`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  fetchOrStore(key: K, defaultValue: V | Block<V>): V {
+    if (this.backend.has(key)) {
+      return this.backend.get(key)!;
+    } else {
+      const value = rbBlockGivenP(defaultValue)
+        ? (defaultValue as unknown as (key: K) => V)(key)
+        : defaultValue;
+      this.backend.set(key, value);
+      return value;
+    }
+  }
 
   /**
    * `NonConcurrentMapBackend#compute_if_absent`: the stored value when the key

@@ -22,24 +22,26 @@ export class Serialized extends DelegateClass(ValueType) {
     return IndifferentHashAccessor;
   }
 
+  /** @inventedArm if — CONVERGEABLE serialized-deserialize-decodes-binary-subtype-bytes-in-line */
   deserialize(value: unknown): unknown {
-    if (this.isDefaultValue(value)) return value;
-    const deserialized = this.subtype!.deserialize?.(value) ?? value;
-    const forCoder =
-      this.subtype!.type?.() === "binary" && deserialized instanceof Uint8Array
-        ? Buffer.from(deserialized).toString("utf8")
-        : deserialized;
-    return this.coder.load(forCoder);
+    if (this.isDefaultValue(value)) {
+      return value;
+    } else {
+      const deserialized = super.deserialize(value);
+      return this.coder.load(
+        this.subtype!.type() === "binary" && deserialized instanceof Uint8Array
+          ? Buffer.from(deserialized).toString("utf8")
+          : deserialized,
+      );
+    }
   }
 
   serialize(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (this.isDefaultValue(value)) return null;
-    const dumped = this.coder.dump(value);
-    if (this.subtype?.serialize) {
-      return this.subtype.serialize(dumped);
+    if (value == null) return null;
+    if (!this.isDefaultValue(value)) {
+      return super.serialize(this.coder.dump(value));
     }
-    return dumped;
+    return null;
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {

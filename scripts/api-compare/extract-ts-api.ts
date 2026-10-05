@@ -5154,11 +5154,14 @@ function awaitedCollect(
  * always truthy. The body is one `if` with no `else`, whose test awaits and
  * whose only statement pushes the loop's own element onto the filter's
  * result: a local declared as an empty array in a block enclosing the loop,
- * whose last statement returns it by name. That is the block's predicate deciding
- * membership, as a `filter` callback's value does, and neither a loop nor an
- * arm. A push onto anything else (a field, a parameter, an array already
- * holding elements, one declared in another scope, one the block does not end
- * by returning) is a side effect, and stays a loop with an arm.
+ * which reads it by name after the loop (`return kept`, or the `.any?` of
+ * `Array(value).reject { … }.any?`,
+ * `activerecord/lib/active_record/validations/associated.rb:9`). That is the
+ * block's predicate deciding membership, as a `filter` callback's value does,
+ * and neither a loop nor an arm. A push onto anything else (a field, a
+ * parameter, an array already holding elements, one declared in another scope,
+ * one the block never reads afterwards) is a side effect, and stays a loop
+ * with an arm.
  */
 function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined {
   const declared = statement.initializer;
@@ -5207,15 +5210,10 @@ function awaitedFilter(statement: ts.ForOfStatement): ts.Expression | undefined 
     n === owner ? "quit" : declaresResult(n),
   );
   if (scope === undefined || !ts.isBlock(scope)) return undefined;
-  const last = scope.statements[scope.statements.length - 1];
-  if (
-    !ts.isReturnStatement(last) ||
-    last.expression === undefined ||
-    !ts.isIdentifier(last.expression) ||
-    last.expression.text !== result
-  ) {
-    return undefined;
-  }
+  const at = scope.statements.findIndex((s) => s.pos <= statement.pos && statement.end <= s.end);
+  const reads = (n: ts.Node): boolean =>
+    (ts.isIdentifier(n) && n.text === result) || ts.forEachChild(n, reads) === true;
+  if (!scope.statements.slice(at + 1).some(reads)) return undefined;
   let awaits = false;
   const scan = (n: ts.Node): void => {
     if (ts.isFunctionLike(n)) return;
@@ -5657,13 +5655,26 @@ function isLeadingOptionalBinding(statement: ts.IfStatement): boolean {
  * `rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined`: the capture
  * of Ruby's `&block` after a splat (`def validates_with(*args, &block)`,
  * `activemodel/lib/active_model/validations/with.rb:88`). A TS rest parameter
- * comes last, so the block rides in the splat and is popped off it. That binds
+ * comes last, so the block rides in the splat and is popped off it. The test is
+ * `typeof args[args.length - 1] === "function"` where no positional can be
+ * callable (`def with_lock(*args)`,
+ * `activerecord/lib/active_record/locking/pessimistic.rb:92`). That binds
  * a parameter, as {@link isArgumentBindingGuard}'s raise does, and is not an arm.
  */
 function isBlockCapture(conditional: ts.ConditionalExpression): boolean {
   const test = conditional.condition;
-  if (!ts.isCallExpression(test) || test.expression.getText() !== "rbBlockGivenP") return false;
-  const [last] = test.arguments;
+  let last: ts.Expression | undefined;
+  if (ts.isCallExpression(test) && test.expression.getText() === "rbBlockGivenP") {
+    [last] = test.arguments;
+  } else if (
+    ts.isBinaryExpression(test) &&
+    test.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken &&
+    ts.isTypeOfExpression(test.left) &&
+    ts.isStringLiteral(test.right) &&
+    test.right.text === "function"
+  ) {
+    last = test.left.expression;
+  }
   if (!last || !ts.isElementAccessExpression(last) || !ts.isIdentifier(last.expression)) {
     return false;
   }

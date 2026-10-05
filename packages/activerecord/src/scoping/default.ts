@@ -32,33 +32,22 @@ export class Default {
     }
 
     if (this.defaultScopeOverride) {
-      return evaluateDefaultScope.call(this, () => {
-        const prev = ScopeRegistry.currentScope(this);
-        this.setCurrentScope(relation);
-        try {
-          return this.defaultScope();
-        } finally {
-          this.setCurrentScope(prev);
-        }
-      });
-    }
-
-    const scopes: DefaultScope[] = this.defaultScopes ?? [];
-    if (any(scopes)) {
-      return evaluateDefaultScope.call(this, () => {
-        let combinedScope = relation;
-        for (const scopeObj of scopes) {
+      return evaluateDefaultScope.call(this, () => relation.scoping(() => this.defaultScope()));
+    } else if (any(this.defaultScopes)) {
+      return evaluateDefaultScope.call(this, () =>
+        (this.defaultScopes as DefaultScope[]).reduce((combinedScope, scopeObj) => {
           if (isExecuteScope(allQueries, scopeObj)) {
             const scope =
               typeof scopeObj.scope === "function"
                 ? scopeObj.scope
                 : scopeObj.scope.call.bind(scopeObj.scope);
 
-            combinedScope = scope.call(combinedScope) || combinedScope;
+            return scope.call(combinedScope) || combinedScope;
+          } else {
+            return combinedScope;
           }
-        }
-        return combinedScope;
-      });
+        }, relation),
+      );
     }
   }
 

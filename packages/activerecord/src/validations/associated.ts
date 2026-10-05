@@ -1,5 +1,5 @@
 import { EachValidator } from "@blazetrails/activemodel";
-import { kernelArray } from "@blazetrails/activesupport";
+import { any, kernelArray } from "@blazetrails/activesupport";
 
 export function validatesAssociated(
   this: {
@@ -13,19 +13,17 @@ export function validatesAssociated(
 
 export class AssociatedValidator extends EachValidator {
   /**
-   * @missingRailsCall any? — PERMANENT
    * @missingRailsCall merge — PERMANENT
    * @missingRailsCall reject — PERMANENT
    */
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
-    const values = kernelArray(value);
-
-    let anyInvalid = false;
-    for (const association of values) {
-      if (!(await isValidObject(association, context))) anyInvalid = true;
+    const rejected: unknown[] = [];
+    for (const association of kernelArray(value)) {
+      if (!(await isValidObject(association, context))) rejected.push(association);
     }
-    if (anyInvalid) {
+
+    if (any(rejected)) {
       record.errors.add(attribute, ":invalid", { ...this.options, value });
     }
   }

@@ -1,6 +1,14 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
-import { isBlank, kernelArray } from "@blazetrails/activesupport";
-import { except, hasKey, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
+import {
+  except,
+  hasKey,
+  rbClassSuperclass,
+  rbModSingletonP,
+  rbObjAsString,
+  rbObjRespondTo,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { stripThenable } from "../relation/thenable.js";
 
@@ -23,39 +31,22 @@ export class UniquenessValidator extends EachValidator {
   /** @internal */
   declare isCoveredByUniqueIndex: typeof isCoveredByUniqueIndex;
 
-  constructor(options: Record<string, unknown> = {}) {
-    if (options.conditions != null && typeof options.conditions !== "function") {
+  constructor(options: Record<string, unknown>) {
+    if (rtest(options.conditions) && !rbObjRespondTo(options.conditions, "call")) {
       throw new ArgumentError(
-        `${options.conditions} was passed as :conditions but is not callable. ` +
+        `${rbObjAsString(options.conditions)} was passed as :conditions but is not callable. ` +
           "Pass a callable instead: `conditions: -> { where(approved: true) }`",
       );
     }
-    const scopes =
-      options.scope == null ? [] : Array.isArray(options.scope) ? options.scope : [options.scope];
-    if (!scopes.every((scope) => typeof scope === "string")) {
-      let scopeRepr: string;
-      try {
-        scopeRepr = JSON.stringify(options.scope) ?? String(options.scope);
-      } catch {
-        scopeRepr = String(options.scope);
-      }
+    if (!kernelArray(options.scope).every((scope) => typeof scope === "string")) {
       throw new ArgumentError(
-        `${scopeRepr} is not supported format for :scope option. ` +
+        `${rbObjAsString(options.scope)} is not supported format for :scope option. ` +
           "Pass a symbol or an array of symbols instead: `scope: :user_id`",
       );
     }
-    if (
-      Object.prototype.hasOwnProperty.call(options, "caseSensitive") &&
-      typeof options.caseSensitive !== "boolean"
-    ) {
-      throw new Error(
-        `${options.caseSensitive} is not a supported value for :caseSensitive option. ` +
-          "Pass a boolean instead: `caseSensitive: false`",
-      );
-    }
     super(options);
-    this._klass = options.class ?? null;
-    if (rbModSingletonP(this._klass)) this._klass = Object.getPrototypeOf(this._klass);
+    this._klass = options.class;
+    if (rbModSingletonP(this._klass)) this._klass = rbClassSuperclass(this._klass);
   }
 
   /** @internal */
@@ -68,88 +59,55 @@ export class UniquenessValidator extends EachValidator {
 
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     value = await value;
-    if (value === undefined) return;
-    const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
-    if (value == null && o.allowNil === true) return;
-    if (isBlank(value) && o.allowBlank === true) return;
-
-    const finderClass = this.findFinderClassFor(record) ?? record.constructor;
-    if (!finderClass.where) return;
-
+    const finderClass = this.findFinderClassFor(record);
     value = mapEnumAttribute(finderClass, attribute, value);
 
-    if (
-      record.isPersisted?.() &&
-      !(await isValidationNeeded(this, finderClass, record, attribute))
-    ) {
+    if (record.isPersisted() && !(await isValidationNeeded(this, finderClass, record, attribute))) {
       return;
     }
 
-    const opts = this.options as any;
-
     let relation = await this.buildRelation(finderClass, attribute, value);
-
-    if (record.isPersisted?.()) {
-      const pk = finderClass.primaryKey;
-      if (pk == null) {
+    if (record.isPersisted()) {
+      if (finderClass.primaryKey != null) {
+        relation = relation.where().not(new Map([[finderClass.primaryKey, [record.idInDatabase]]]));
+      } else {
         throw new UnknownPrimaryKey(
           finderClass,
           "Cannot validate uniqueness for persisted record without primary key.",
         );
       }
-      if (Array.isArray(pk)) {
-        const dbVals = pk.map((col: string) =>
-          record.attributeChanged(col) ? record.attributeWas(col) : record.readAttribute(col),
-        );
-        relation = relation.where().not(new Map([[pk, [dbVals]]]));
-      } else {
-        const dbVal = record.attributeChanged(pk)
-          ? record.attributeWas(pk)
-          : record.readAttribute(pk);
-        relation = relation.where().not({ [pk]: [dbVal] });
-      }
     }
-
     relation = await this.scopeRelation(record, relation);
 
-    if (opts?.conditions && typeof opts.conditions === "function") {
-      const conditioned =
-        opts.conditions.length === 0
-          ? opts.conditions.call(relation)
-          : opts.conditions.call(relation, record);
-      if (conditioned != null) relation = conditioned;
+    if (rtest(this.options.conditions)) {
+      const conditions = this.options.conditions as (this: any, record?: any) => any;
+      relation =
+        conditions.length === 0 ? conditions.call(relation) : conditions.call(relation, record);
     }
 
-    const exists = await relation.isExists();
-    if (exists) {
-      const errorOpts: Record<string, unknown> = except(
-        opts ?? {},
+    if (await relation.isExists()) {
+      const errorOptions: Record<string, unknown> = except(
+        this.options,
         "caseSensitive",
         "scope",
         "conditions",
-        "class",
       );
-      errorOpts.value = value;
+      errorOptions.value = value;
 
-      record.errors.add(attribute, ":taken", errorOpts);
+      record.errors.add(attribute, ":taken", errorOptions);
     }
   }
 
   /** @internal */
   private findFinderClassFor(record: any): any {
-    let current = record.constructor;
-    let lastConcrete: any = null;
-    while (current) {
-      if (!current.abstractClass && typeof current.where === "function") {
-        lastConcrete = current;
-      }
-      if (current === this._klass) break;
-      const parent = Object.getPrototypeOf(current);
-      if (!parent || parent === Function.prototype || parent === Object) break;
-      if (typeof parent.where !== "function") break;
-      current = parent;
+    let currentClass = record.constructor;
+    let foundClass = null;
+    for (;;) {
+      if (!currentClass.abstractClass) foundClass = currentClass;
+      if (currentClass === this._klass) break;
+      currentClass = rbClassSuperclass(currentClass);
     }
-    return lastConcrete ?? record.constructor;
+    return foundClass;
   }
 
   /** @internal */

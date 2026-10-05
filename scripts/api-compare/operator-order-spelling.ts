@@ -184,8 +184,8 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // → attribute-methods.ts `get` / `set`.
   "ActiveRecord::AttributeMethods": { "[]": ["get"], "[]=": ["set"] },
   // type/adapter_specific_registry.rb:63 `def <=>(other)` →
-  // type/adapter-specific-registry.ts `Registration#compare`.
-  "ActiveRecord::Type::Registration": { "<=>": ["compare"] },
+  // type/adapter-specific-registry.ts `Registration#compareTo`.
+  "ActiveRecord::Type::Registration": { "<=>": ["compareTo"] },
   // migration.rb:629 `def self.[](version)` → migration.ts `static get`.
   "ActiveRecord::Migration": { "self.[]": ["get"] },
   // schema.rb:72 `def self.[](version)` → schema.ts `static get`.
