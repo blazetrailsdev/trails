@@ -1308,6 +1308,18 @@ export function rbObjIvarGet(obj: object, iv: string): unknown {
 }
 
 /**
+ * `Kernel#instance_variable_defined?` (`rb_obj_ivar_defined`, `vendor/ruby/v3.3.11/object.c:2942`):
+ * whether `obj` has an own field for ivar `iv`, a `nil`-valued one included.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#instance_variable_defined?`
+ * (`vendor/ruby/v3.3.11/object.c:2942`).
+ */
+export function rbObjIvarDefined(obj: object, iv: string): boolean {
+  const id = idForVar(obj, iv);
+  return Object.hasOwn(obj, ivarField(obj, id));
+}
+
+/**
  * `Kernel#instance_variable_set` (`rb_obj_ivar_set_m`, `vendor/ruby/v3.3.11/object.c:2914`):
  * sets ivar `iv` as an own field of `obj`, never through a setter, as
  * `rb_ivar_set` (`vendor/ruby/v3.3.11/variable.c:1923`) writes the ivar table

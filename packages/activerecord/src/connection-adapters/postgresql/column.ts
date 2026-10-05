@@ -2,7 +2,7 @@ import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { isPresent } from "@blazetrails/activesupport";
-import { rbHash, rbStrSend } from "@blazetrails/ruby-compat";
+import { rbHash, rbStrSend, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
   private _serial: boolean;
@@ -106,3 +106,5 @@ export class Column extends BaseColumn {
     super.encodeWith(coder);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::Column", Column);

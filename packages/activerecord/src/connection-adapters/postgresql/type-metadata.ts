@@ -1,4 +1,4 @@
-import { rbHash } from "@blazetrails/ruby-compat";
+import { rbHash, registerConstant } from "@blazetrails/ruby-compat";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class TypeMetadata extends SqlTypeMetadata {
@@ -33,3 +33,5 @@ export class TypeMetadata extends SqlTypeMetadata {
     return rbHash(TypeMetadata) ^ rbHash(super.hash()) ^ rbHash(this.oid) ^ rbHash(this.fmod);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata", TypeMetadata);

@@ -5,6 +5,7 @@ import {
   isSymbol,
   keywordSplat,
   merge,
+  registerConstant,
   slice,
   symbolToS,
   update,
@@ -1278,3 +1279,5 @@ Table.defineColumnMethods(
 );
 Table.prototype.blob = Table.prototype.binary;
 Table.prototype.numeric = Table.prototype.decimal;
+
+registerConstant("ActiveRecord::ConnectionAdapters::IndexDefinition", IndexDefinition);

@@ -15,6 +15,14 @@ module Geo
   end
 end
 
+class Cache
+  attr_reader :version, :columns
+
+  def initialize(version, columns) = (@version, @columns = version, columns)
+  def marshal_dump = [@version, @columns]
+  def marshal_load(array) = (@version, @columns = array)
+end
+
 a = "a"
 e = :"é"
 shared = Column.new(a, :string)
@@ -47,6 +55,7 @@ FIXTURES = {
   "class and module" => [Column, Geo::Shape, Geo::Kind],
   "object nested path" => Geo::Shape.new(:circle),
   "object link" => [shared, shared],
+  "user marshal" => [cache = Cache.new(1, { posts => [shared] }), cache],
   "schema cache" => [20_240_101_000_000, { posts => [Column.new(id, :integer)] }, {}, { posts => id }, { posts => true }, {}],
 }
 

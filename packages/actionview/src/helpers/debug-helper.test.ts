@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { SafeBuffer } from "@blazetrails/activesupport";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { debug as _debug } from "./debug-helper.js";
 import { Base } from "../base.js";
 
@@ -41,6 +42,21 @@ describe("DebugHelperTest", () => {
     expect(out).toContain('<code class="debug_dump">');
     expect(out).toContain("</code>");
     expect(out).not.toContain("<pre");
+  });
+
+  it("falls back to inspect when Marshal.dump refuses the object", () => {
+    const stringify = vi.spyOn(yaml, "stringify");
+    expect(debug(() => {}).toString()).toContain('<code class="debug_dump">');
+
+    class Company {
+      name = "firebase";
+    }
+    const company = new Company();
+    Object.assign(rbObjSingletonClass(company).prototype, { area: () => 1 });
+    const out = debug(company).toString();
+    expect(out).toContain('<code class="debug_dump">');
+    expect(out).toContain("name: &quot;firebase&quot;");
+    expect(stringify).not.toHaveBeenCalled();
   });
 
   it("fallback inspect renders shared (non-cyclic) refs normally, not as Circular", () => {

@@ -5,3 +5,4 @@ packages/actionpack/src/test-helpers/fixtures/multipart/* binary
 # Shell scripts must keep LF endings even on Windows checkouts; CRLF makes
 # them unparseable by /usr/bin/env in Linux containers.
 *.sh text eol=lf
+packages/activerecord/src/test-helpers/support/schema_cache_fixtures/*.dump binary

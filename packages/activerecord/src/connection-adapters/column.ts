@@ -2,7 +2,7 @@ import { Deduplicable } from "./deduplicable.js";
 import type { ClassMethods, deduplicate } from "./deduplicable.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { humanize } from "@blazetrails/activesupport";
-import { Encoding, include, rbHash } from "@blazetrails/ruby-compat";
+import { Encoding, include, rbHash, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Column {
   declare static registry: typeof ClassMethods.registry;
@@ -157,3 +157,6 @@ export class NullColumn extends Column {
     super(name, null);
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::Column", Column);
+registerConstant("ActiveRecord::ConnectionAdapters::NullColumn", NullColumn);
