@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 export class TypeMetadata extends SqlTypeMetadata {
@@ -21,3 +22,5 @@ export class TypeMetadata extends SqlTypeMetadata {
     return other instanceof TypeMetadata && super.equals(other) && this.extra === other.extra;
   }
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata", TypeMetadata);

@@ -3,9 +3,9 @@ import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
-import { Module, rbModConstSet } from "./include.js";
+import { Module, extend, rbModConstSet } from "./include.js";
 import { Marshal } from "./marshal.js";
-import { rbSetClassPathString } from "./object.js";
+import { rbObjSingletonClass, rbSetClassPathString } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
 import { registerConstant, unregisterConstant } from "./variable.js";
@@ -31,12 +31,30 @@ const Geo = { name: "Geo", Shape };
 rbSetClassPathString(Shape, Geo, "Shape");
 const Kind = rbModConstSet(Geo, "Kind", new Module());
 
+class Cache {
+  declare version: unknown;
+  declare columns: unknown;
+
+  constructor(version: unknown, columns: unknown) {
+    this.version = version;
+    this.columns = columns;
+  }
+
+  marshalDump(): unknown[] {
+    return [this.version, this.columns];
+  }
+
+  marshalLoad(array: unknown[]): void {
+    [this.version, this.columns] = array;
+  }
+}
+
 function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: H): H {
   for (const [key, value] of pairs) h.set(key, value);
   return h;
 }
 
-const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Geo, Hash };
+const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Hash };
 
 beforeAll(() => {
   for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);
@@ -56,6 +74,7 @@ function hex(str: string): string {
 const shared = new Column("a", ":string");
 const cycle: unknown[] = [];
 cycle.push(cycle);
+const cache = new Cache(1, new Map([["posts", [shared]]]));
 
 const VALUES: Record<string, unknown> = {
   nil: null,
@@ -95,6 +114,7 @@ const VALUES: Record<string, unknown> = {
   "class and module": [Column, Shape, Kind],
   "object nested path": new Shape(":circle"),
   "object link": [shared, shared],
+  "user marshal": [cache, cache],
   "schema cache": [
     20240101000000,
     new Map([["posts", [new Column("id", ":integer")]]]),
@@ -126,6 +146,7 @@ const LOADED: Record<string, unknown> = {
     ],
     new Hash(),
   ),
+  "user marshal": Array(2).fill(new Cache(1, hash([["posts", [shared]]], new Hash()))),
   "schema cache": [
     20240101000000,
     hash([["posts", [new Column("id", ":integer")]]], new Hash()),
@@ -157,6 +178,44 @@ describe("Marshal.dump", () => {
     }
     expect(() => Marshal.dump(new Tagged())).toThrow(
       new TypeError("no _dump_data is defined for class Tagged"),
+    );
+  });
+
+  it("raises TypeError for an object with singleton methods or singleton ivars", () => {
+    const methods = new Shape(":circle");
+    Object.assign(rbObjSingletonClass(methods).prototype, { area: () => 1 });
+    const ivars = new Shape(":circle");
+    Object.assign(rbObjSingletonClass(ivars), { sides: 0 });
+    const array = Ary.of(1);
+    Object.assign(rbObjSingletonClass(array).prototype, { area: () => 1 });
+    for (const obj of [methods, ivars, array]) {
+      expect(() => Marshal.dump(obj)).toThrow(new TypeError("singleton can't be dumped"));
+    }
+  });
+
+  it("dumps an object with an empty singleton class as its class, and an extended one under TYPE_EXTENDED", () => {
+    const shape = new Shape(":circle");
+    rbObjSingletonClass(shape);
+    expect(hex(Marshal.dump(shape))).toBe(fixtures["object nested path"]);
+
+    const extended = new Shape(":circle");
+    extend(extended, Kind);
+    expect(hex(Marshal.dump(extended))).toBe(
+      "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65",
+    );
+  });
+
+  it("dumps marshal_dump's value without the singleton check", () => {
+    const obj = new Cache(1, new Map([["posts", [shared]]]));
+    Object.assign(rbObjSingletonClass(obj).prototype, { area: () => 1 });
+    expect(hex(Marshal.dump([obj, obj]))).toBe(fixtures["user marshal"]);
+  });
+
+  it("raises RuntimeError for a marshal_dump that returns an instance of the same class", () => {
+    const obj = new Cache(1, null);
+    obj.marshalDump = () => new Cache(2, null) as unknown as unknown[];
+    expect(() => Marshal.dump(obj)).toThrow(
+      new RuntimeError("Cache#marshal_dump returned same class instance"),
     );
   });
 
@@ -246,6 +305,19 @@ describe("Marshal.load", () => {
     expect(loaded[0]).toBe(loaded);
     const [a, b] = Marshal.load(bytes("object link")) as [Column, Column];
     expect(b).toBe(a);
+  });
+
+  it("loads TYPE_USRMARSHAL through marshal_load without running the constructor, linked as one object", () => {
+    const [a, b] = Marshal.load(bytes("user marshal")) as Cache[];
+    expect(a).toBeInstanceOf(Cache);
+    expect(b).toBe(a);
+    expect(a.version).toBe(1);
+  });
+
+  it("raises TypeError for a TYPE_USRMARSHAL class with no marshal_load", () => {
+    expect(() => Marshal.load("\x04\bU:\vColumn0")).toThrow(
+      new TypeError("instance of Column needs to have method `marshal_load'"),
+    );
   });
 
   it("loads a Class and a Module as the constants their paths name", () => {

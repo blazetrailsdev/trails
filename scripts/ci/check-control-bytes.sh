@@ -2,7 +2,7 @@
 set -euo pipefail
 
 CONTROL_RE='[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]|\xC2[\x80-\x9F]'
-BINARY_RE='\.(png|jpe?g)$|(^|/)packages/rack/test/multipart/|(^|/)packages/actionpack/src/test-helpers/fixtures/multipart/'
+BINARY_RE='\.(png|jpe?g)$|(^|/)packages/rack/test/multipart/|(^|/)packages/actionpack/src/test-helpers/fixtures/multipart/|(^|/)packages/activerecord/src/test-helpers/support/schema_cache_fixtures/.*\.dump$'
 
 usage() {
   cat <<'MSG'

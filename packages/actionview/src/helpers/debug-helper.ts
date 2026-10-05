@@ -1,9 +1,11 @@
 import { SafeBuffer, htmlEscape } from "@blazetrails/activesupport";
+import { Marshal } from "@blazetrails/ruby-compat";
 import { stringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { contentTag, type TagHelperHost } from "./tag-helper.js";
 
 export function debug(this: TagHelperHost, object: unknown): SafeBuffer {
   try {
+    Marshal.dump(object);
     const yaml = stringify(object);
     return contentTag.call(this, "pre", htmlEscape(yaml), { class: "debug_dump" });
   } catch {

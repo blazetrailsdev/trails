@@ -1,4 +1,12 @@
-import { File, FileUtils, Zlib, isModuleIncluded, sort } from "@blazetrails/ruby-compat";
+import {
+  File,
+  FileUtils,
+  Marshal,
+  Zlib,
+  isModuleIncluded,
+  registerConstant,
+  sort,
+} from "@blazetrails/ruby-compat";
 import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
 import {
   parse as yamlParse,
@@ -342,24 +350,30 @@ export class SchemaCache {
   private _indexes = new Map<string, IndexDefinition[]>();
   private _version: string | number | null = null;
 
-  /** @missingRailsCall load — CONVERGEABLE schema-cache-load-from-ports-the-marshal-and-yaml-load-arms */
   static async _loadFrom(filename: string): Promise<SchemaCache | null> {
     try {
       if (!File.isFile(filename)) return null;
-      const data = await SchemaCache.read(filename, (content) => content);
-      const parsed = yamlParse(data, {
-        customTags: RUBY_OBJECT_TAGS,
-        maxAliasCount: -1,
-      }) as Record<string, Record<string, unknown[]> | null>;
-      const cache = new SchemaCache();
-      cache.initWith({
-        ...parsed,
-        columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
-        primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
-        data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
-        indexes: new Map(Object.entries(parsed["indexes"] ?? {}) as [string, IndexDefinition[]][]),
+      return await SchemaCache.read(filename, (file) => {
+        if (filename.includes(".dump")) {
+          return Marshal.load(file) as SchemaCache;
+        } else {
+          const parsed = yamlParse(file, {
+            customTags: RUBY_OBJECT_TAGS,
+            maxAliasCount: -1,
+          }) as Record<string, Record<string, unknown[]> | null>;
+          const cache = new SchemaCache();
+          cache.initWith({
+            ...parsed,
+            columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
+            primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
+            data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
+            indexes: new Map(
+              Object.entries(parsed["indexes"] ?? {}) as [string, IndexDefinition[]][],
+            ),
+          });
+          return cache;
+        }
       });
-      return cache;
     } catch {
       return null;
     }
@@ -518,9 +532,13 @@ export class SchemaCache {
 
   async dumpTo(filename: string): Promise<void> {
     await this.open(filename, (f) => {
-      const coder: Record<string, unknown> = {};
-      this.encodeWith(coder);
-      f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS }));
+      if (filename.includes(".dump")) {
+        f.write(Marshal.dump(this));
+      } else {
+        const coder: Record<string, unknown> = {};
+        this.encodeWith(coder);
+        f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS }));
+      }
     });
   }
 
@@ -689,3 +707,5 @@ export function deepDeduplicate<T>(value: T): T {
   }
   return value;
 }
+
+registerConstant("ActiveRecord::ConnectionAdapters::SchemaCache", SchemaCache);

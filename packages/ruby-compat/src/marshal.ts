@@ -5,6 +5,9 @@ import { Module } from "./include.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import {
+  FL_SINGLETON,
+  T_ICLASS,
+  rbFSend,
   rbInspect,
   rbModName,
   rbModSingletonP,
@@ -13,8 +16,10 @@ import {
   rbObjClass,
   rbObjClassname,
   rbObjInstanceVariables,
+  rbObjIvarDefined,
   rbObjIvarGet,
   rbObjIvarSet,
+  rbObjRespondTo,
   rtest,
 } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
@@ -35,6 +40,8 @@ const TYPE_FIXNUM = 0x69;
 
 const TYPE_UCLASS = 0x43;
 const TYPE_OBJECT = 0x6f;
+const TYPE_EXTENDED = 0x65;
+const TYPE_USRMARSHAL = 0x55;
 const TYPE_FLOAT = 0x66;
 const TYPE_BIGNUM = 0x6c;
 const TYPE_STRING = 0x22;
@@ -273,9 +280,56 @@ function hashEach(key: unknown, value: unknown, arg: DumpArg, limit: number): vo
   wObject(value, arg, limit);
 }
 
+/**
+ * `check_userdump_arg` (`vendor/ruby/v3.3.11/marshal.c:198`), under
+ * `dump_funcall` (`marshal.c:210`). `check_dump_arg` (`marshal.c:188`) guards
+ * a `dump_arg` a re-entered `Marshal.dump` freed, which a JS object never is.
+ */
+function dumpFuncall(obj: object, sym: string, name: string): unknown {
+  const ret = rbFSend(obj, sym);
+  const klass = Object.getPrototypeOf(obj) as object | null;
+  if (ret !== null && typeof ret === "object" && Object.getPrototypeOf(ret) === klass) {
+    throw new RuntimeError(`${rbModToS(rbObjClass(obj))}#${name} returned same class instance`);
+  }
+  return ret;
+}
+
+/**
+ * `SINGLETON_DUMP_UNABLE_P` (`vendor/ruby/v3.3.11/marshal.c:545`): `klass` is
+ * the singleton class's method table, its prototype, whose `constructor` and
+ * `FL_SINGLETON` seats `rbObjSingletonClass` writes are not methods.
+ */
+function singletonDumpUnableP(klass: object): boolean {
+  return (
+    Reflect.ownKeys(klass).some((mid) => mid !== "constructor" && mid !== FL_SINGLETON) ||
+    Object.keys((klass as Record<symbol, object>)[FL_SINGLETON]).length > 0
+  );
+}
+
+/**
+ * `w_extended` (`vendor/ruby/v3.3.11/marshal.c:550`), over the prototype
+ * chain `CLASS_OF(obj)` heads. Nothing is prepended to a singleton class, so
+ * `RCLASS_ORIGIN` is the class itself.
+ */
+function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
+  if (check && klass !== null && Object.hasOwn(klass, FL_SINGLETON)) {
+    if (singletonDumpUnableP(klass)) {
+      throw new TypeError("singleton can't be dumped");
+    }
+    klass = Object.getPrototypeOf(klass) as object | null;
+  }
+  while (klass !== null && Object.hasOwn(klass, T_ICLASS)) {
+    const path = rbModName((klass as Record<symbol, object>)[T_ICLASS]);
+    wByte(TYPE_EXTENDED, arg);
+    wUnique(path ?? rbModToS((klass as Record<symbol, AnyClass>)[T_ICLASS]), arg);
+    klass = Object.getPrototypeOf(klass) as object | null;
+  }
+}
+
 /** `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). */
-function wClass(type: number, obj: object, arg: DumpArg): void {
+function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
   const klass = obj.constructor as AnyClass;
+  wExtended(Object.getPrototypeOf(obj) as object | null, arg, check);
   wByte(type, arg);
   const path = class2path(klass);
   wUnique(path, arg);
@@ -285,6 +339,7 @@ function wClass(type: number, obj: object, arg: DumpArg): void {
 function wUclass(obj: object, sup: AnyClass, arg: DumpArg): void {
   const klass = obj.constructor as AnyClass | undefined;
 
+  wExtended(Object.getPrototypeOf(obj) as object | null, arg, true);
   if (klass !== undefined && klass !== sup) {
     wByte(TYPE_UCLASS, arg);
     wUnique(class2path(klass), arg);
@@ -425,6 +480,15 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
       return;
     }
 
+    if (rbObjRespondTo(obj, "marshalDump", true)) {
+      wRemember(obj, arg);
+
+      const v = dumpFuncall(obj as object, "marshalDump", "marshal_dump");
+      wClass(TYPE_USRMARSHAL, obj as object, arg, false);
+      wObject(v, arg, limit);
+      return;
+    }
+
     wRemember(key, arg);
 
     hasiv = hasIvars((encname = encodingName(obj)));
@@ -501,7 +565,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wObject(ifnone, arg, limit);
       }
     } else if (tObjectP(obj)) {
-      wClass(TYPE_OBJECT, obj, arg);
+      wClass(TYPE_OBJECT, obj, arg, true);
       wObjivar(obj, arg, limit);
     } else {
       throw new TypeError(`no _dump_data is defined for class ${rbObjClassname(obj)}`);
@@ -780,6 +844,20 @@ function rIvar(obj: unknown, hasEncoding: { value: boolean } | null, arg: LoadAr
   return obj;
 }
 
+/**
+ * `r_copy_ivar` (`vendor/ruby/v3.3.11/marshal.c:1727`), over `copy_ivar_i`
+ * (`marshal.c:1716`). Only a `T_OBJECT` carries ivars here: a JS Array, Hash
+ * or String has no ivar table.
+ */
+function rCopyIvar(v: object, data: unknown): object {
+  if (tObjectP(data)) {
+    for (const vid of rbObjInstanceVariables(data)) {
+      if (!rbObjIvarDefined(v, vid)) rbObjIvarSet(v, vid, rbObjIvarGet(data, vid));
+    }
+  }
+  return v;
+}
+
 /** `path2class` (`vendor/ruby/v3.3.11/marshal.c:1790`). */
 function path2class(path: string): AnyClass {
   const v = rbPathToClass(path);
@@ -987,6 +1065,21 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         break;
       }
 
+      case TYPE_USRMARSHAL: {
+        const name = rUnique(arg);
+        const klass = path2class(name);
+
+        v = objAllocByKlass(klass);
+        if (!rbObjRespondTo(v, "marshalLoad", true)) {
+          throw new TypeError(`instance of ${name} needs to have method \`marshal_load'`);
+        }
+        v = rEntry(v, arg);
+        const data = rObject(arg);
+        rbFSend(v, "marshalLoad", data);
+        v = rCopyIvar(v as object, data);
+        break;
+      }
+
       case TYPE_OBJECT: {
         const idx = rPrepare(arg);
         v = objAllocByPath(rUnique(arg));
@@ -1088,8 +1181,12 @@ export const Marshal = {
    * schema-cache dump holds
    * (`vendor/rails/v8.0.2/activerecord/lib/active_record/connection_adapters/schema_cache.rb:416-418`):
    * `nil`, `true`, `false`, Integer, Float, String, Symbol, Array, Hash and a
-   * plain ivar object, plus Class and Module. Any other value takes the
-   * `T_DATA` arm's `TypeError`.
+   * plain ivar object, plus Class and Module, and an object answering
+   * `marshal_dump` (`TYPE_USRMARSHAL`, `marshal.c:910`). Any other value takes
+   * the `T_DATA` arm's `TypeError`, and an object whose singleton class holds
+   * a method or an ivar takes `w_extended`'s (`marshal.c:556`), which is what
+   * `DebugHelper#debug` probes for
+   * (`vendor/rails/v8.0.2/actionview/lib/action_view/helpers/debug_helper.rb:29`).
    *
    * @boundary: a JS string carries no encoding tag, so `encoding_name`
    *  (`marshal.c:661`) answers UTF-8 for every String and `has_ivars`
@@ -1108,10 +1205,8 @@ export const Marshal = {
    *  internal slots, a Temporal value, or an instance of a class carrying
    *  `Symbol.toStringTag` is `T_DATA` and takes its `TypeError`.
    *
-   * Not ported: the `anIO` argument; `w_extended` (`marshal.c:550`) and the
-   * `marshal_dump` arm (`marshal.c:910`), which are
-   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`; and the `_dump`,
-   * Regexp and Struct arms, which nothing calls.
+   * Not ported: the `anIO` argument; and the `_dump`, Regexp and Struct arms,
+   * which nothing calls.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Marshal.dump` (`vendor/ruby/v3.3.11/marshal.c:1207`).
    */
@@ -1122,7 +1217,8 @@ export const Marshal = {
   /**
    * `Marshal.load(source)` (`marshal_load`, `vendor/ruby/v3.3.11/marshal.c:2434`,
    * over `r_object_for`, `marshal.c:1868`), for a String source holding what
-   * {@link Marshal.dump} writes.
+   * {@link Marshal.dump} writes. `TYPE_USRMARSHAL` (`marshal.c:2217`) allocates the
+   * class and sends it `marshal_load`.
    *
    * @boundary: a String with no `E` / `encoding` ivar loads as its bytes, one
    *  character per byte, and one with the ivar is re-read through
@@ -1136,9 +1232,7 @@ export const Marshal = {
    *  whose table holds no core class, so a `compare_by_identity` Hash loads
    *  only once `Hash` is seated.
    *
-   * Not ported: the `proc` and `freeze:` arguments and an IO source; and the
-   * `TYPE_USRMARSHAL` arm, which is
-   * `ruby-compat-has-no-marshal-for-schema-cache-and-debug`, with
+   * Not ported: the `proc` and `freeze:` arguments and an IO source; and
    * `TYPE_USERDEF`, `TYPE_DATA`, `TYPE_EXTENDED`, Regexp and Struct, which
    * nothing calls.
    *

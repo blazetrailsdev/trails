@@ -5,6 +5,8 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
+import { Column as Sqlite3Column } from "./sqlite3/column.js";
+import { File, Marshal } from "@blazetrails/ruby-compat";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -340,5 +342,97 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
     expect(columns.get("people")![1].sqlTypeMetadata).toBe(
       columns.get("people")![0].sqlTypeMetadata,
     );
+  });
+});
+
+describe("SchemaCacheMarshalDumpTest", () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-marshal-test-"));
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  async function dumped(): Promise<SchemaCache> {
+    const cache = new SchemaCache();
+    await cache.add(
+      new FakePool({
+        columns: async () => [
+          new MysqlColumn(
+            "id",
+            null,
+            new MysqlTypeMetadata(
+              { sqlType: "bigint(20)", type: "integer" },
+              { extra: "auto_increment" },
+            ),
+          ),
+        ],
+        indexes: async () => [new IndexDefinition("people", "index_people_on_id", true, ["id"])],
+        primaryKey: async () => "id",
+        dataSources: async () => ["people"],
+      }),
+      "people",
+    );
+    return cache;
+  }
+
+  it("a .dump file holds the cache as TYPE_USRMARSHAL over marshal_dump", async () => {
+    const filename = path.join(tmpDir, "schema_cache.dump");
+    await (await dumped()).dumpTo(filename);
+
+    expect(
+      File.read(filename).startsWith("\x04\bU:2ActiveRecord::ConnectionAdapters::SchemaCache[\v0"),
+    ).toBe(true);
+  });
+
+  it.each(["schema_cache.dump", "schema_cache.dump.gz"])(
+    "%s loads through Marshal.load and marshal_load",
+    async (basename) => {
+      const filename = path.join(tmpDir, basename);
+      await (await dumped()).dumpTo(filename);
+      const loaded = (await SchemaCache._loadFrom(filename))!;
+      const pool = new FakePool({});
+
+      const [column] = await loaded.columns(pool, "people");
+      expect(column).toBeInstanceOf(MysqlColumn);
+      expect((column as MysqlColumn).isAutoIncrement()).toBe(true);
+      expect(Object.keys(await loaded.columnsHash(pool, "people"))).toEqual(["id"]);
+      expect(await loaded.primaryKeys(pool, "people")).toBe("id");
+      expect(await loaded.dataSourceExists(pool, "people")).toBe(true);
+      const [index] = await loaded.indexes(pool, "people");
+      expect(index).toBeInstanceOf(IndexDefinition);
+      expect(index.columns).toEqual(["id"]);
+    },
+  );
+
+  it("Marshal.load revives the cache from the bytes of a .dump Rails wrote", async () => {
+    const fixture = new URL(
+      "../test-helpers/support/schema_cache_fixtures/rails_8_0_2_sqlite3.dump",
+      import.meta.url,
+    );
+    const loaded = Marshal.load(File.binread(fixture.pathname)) as SchemaCache;
+    const pool = new FakePool({});
+
+    expect(loaded).toBeInstanceOf(SchemaCache);
+    expect(loaded.schemaVersion).toBe(20240101000000);
+    const columns = await loaded.columns(pool, "courses");
+    expect(columns.map((column) => column.name)).toEqual(["id", "name", "college_id"]);
+    expect(columns[0]).toBeInstanceOf(Sqlite3Column);
+    expect(columns[0].sqlType).toBe("INTEGER");
+    expect(columns[1].null).toBe(false);
+    expect(Object.keys(await loaded.columnsHash(pool, "courses"))).toEqual([
+      "id",
+      "name",
+      "college_id",
+    ]);
+    expect(await loaded.primaryKeys(pool, "courses")).toBe("id");
+    expect(await loaded.dataSourceExists(pool, "courses")).toBe(true);
+    const [index] = await loaded.indexes(pool, "courses");
+    expect(index).toBeInstanceOf(IndexDefinition);
+    expect(index.name).toBe("index_courses_on_college_id");
+    expect(index.columns).toEqual(["college_id"]);
   });
 });

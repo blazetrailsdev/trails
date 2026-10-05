@@ -1,6 +1,6 @@
 import { Deduplicable } from "./deduplicable.js";
 import type { ClassMethods, deduplicate } from "./deduplicable.js";
-import { include, rbHash } from "@blazetrails/ruby-compat";
+import { include, rbHash, registerConstant } from "@blazetrails/ruby-compat";
 
 export class SqlTypeMetadata {
   declare static registry: typeof ClassMethods.registry;
@@ -63,3 +63,5 @@ export class SqlTypeMetadata {
 }
 
 include(SqlTypeMetadata, Deduplicable);
+
+registerConstant("ActiveRecord::ConnectionAdapters::SqlTypeMetadata", SqlTypeMetadata);
