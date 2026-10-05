@@ -841,7 +841,10 @@ export class TableDefinition {
     return this;
   }
 
-  checkConstraint(expression: string, options: { name?: string; validate?: boolean } = {}): this {
+  checkConstraint(
+    expression: string,
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
+  ): this {
     this.checkConstraints.push(this.newCheckConstraintDefinition(expression, options));
     return this;
   }
@@ -914,7 +917,7 @@ export class TableDefinition {
 
   newCheckConstraintDefinition(
     expression: string,
-    options: { name?: string; validate?: boolean } = {},
+    options: { name?: string; validate?: boolean | null; [key: string]: unknown } = {},
   ): CheckConstraintDefinition {
     options = this.conn.checkConstraintOptions(this.name, expression, options) as {
       name?: string;

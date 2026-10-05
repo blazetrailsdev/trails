@@ -764,7 +764,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       }
 
       for (const chk of checks) {
-        definition.checkConstraint(chk.expression, chk.options as { name?: string });
+        definition.checkConstraint(chk.expression, chk.options);
       }
 
       if (block) block(definition);

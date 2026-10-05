@@ -1336,7 +1336,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override quotedScope(
     name?: string | null,
     options: { type?: string } = {},
-  ): { schema: string; name: string | null; type: string | null } {
+  ): { schema: string; name?: string; type?: string } {
     let schema: string | null;
     [schema, name] = this.extractSchemaQualifiedName(name ?? "");
     let type: string | null = null;
@@ -1351,11 +1351,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         type = "'f'";
         break;
     }
-    const scope = { name: null, type: null } as {
-      schema: string;
-      name: string | null;
-      type: string | null;
-    };
+    const scope = {} as { schema: string; name?: string; type?: string };
     scope.schema = schema ? this.quote(schema) : "ANY (current_schemas(false))";
     if (name) scope.name = this.quote(name);
     if (type) scope.type = type;

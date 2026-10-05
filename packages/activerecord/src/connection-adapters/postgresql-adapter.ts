@@ -292,7 +292,7 @@ export class PostgreSQLAdapter
         filterMap(
           Object.entries(pgConfig.variables as Record<string, unknown>),
           ([name, value]) => {
-            if (!(value === ":default")) {
+            if (value !== ":default") {
               return `-c ${name}=${String(value).replace(/[ \\]/g, "\\$&")}`;
             }
           },
@@ -1686,7 +1686,6 @@ export class PostgreSQLAdapter
       cancel(processID: number, secretKey: number): void;
     };
     const txClient = client as PgClientWithPid;
-    if (txClient.processID == null) return Promise.resolve();
     return new Promise<void>((resolve, reject) => {
       const cancelCon = new pg.Connection() as PgConnectionWithCancel;
       cancelCon.on("error", (error: unknown) => reject(error));
@@ -2326,7 +2325,7 @@ export interface PostgreSQLAdapter {
   quotedScope(
     name?: string | null,
     options?: { type?: string },
-  ): { schema: string; name: string | null; type: string | null };
+  ): { schema: string; name?: string; type?: string };
 
   /** @internal */
   extractSchemaQualifiedName(string: string): [string | null, string];
