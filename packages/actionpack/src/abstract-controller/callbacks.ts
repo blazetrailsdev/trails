@@ -40,7 +40,14 @@ export interface CallbackOptions {
 }
 
 /** @internal */
-type CallbackFilter = ActionCallback | AroundCallback | string;
+type CallbackObject = {
+  before?(controller: never): unknown;
+  after?(controller: never): unknown;
+  around?(controller: never, block: () => Promise<void>): unknown;
+};
+
+/** @internal */
+type CallbackFilter = ActionCallback | AroundCallback | string | CallbackObject;
 
 /** @internal */
 type CallbackOptionsWithFilters = CallbackOptions & {
@@ -194,7 +201,7 @@ export function _registerActionCallback(
 export function _skipActionCallback(
   klass: ActionCallbackHost,
   kind: CallbackKind,
-  filter: ActionCallback | AroundCallback | string,
+  filter: CallbackFilter,
   options: CallbackOptions,
 ): void {
   const asOpts: ASCallbackOptions & { raise?: boolean } = {};
@@ -212,7 +219,7 @@ export type ActionCallbackHost = Pick<
   "defineCallbacks" | "setCallback" | "skipCallback"
 >;
 
-type ActionCallbackArgs<T> = Array<T | string | CallbackOptions>;
+type ActionCallbackArgs<T> = Array<T | string | CallbackObject | CallbackOptions>;
 
 export function beforeAction(
   this: ActionCallbackHost,

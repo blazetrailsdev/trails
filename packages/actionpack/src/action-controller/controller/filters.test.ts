@@ -266,13 +266,13 @@ class FT_AppendedAroundFilter {
 }
 
 class FT_AroundFilterController extends FT_PrependingController {}
-FT_AroundFilterController.aroundAction(new FT_AroundFilter() as never);
+FT_AroundFilterController.aroundAction(new FT_AroundFilter());
 
 class FT_BeforeAfterClassFilterController extends FT_PrependingController {}
 {
   const filter = new FT_AroundFilter();
-  FT_BeforeAfterClassFilterController.beforeAction(filter as never);
-  FT_BeforeAfterClassFilterController.afterAction(filter as never);
+  FT_BeforeAfterClassFilterController.beforeAction(filter);
+  FT_BeforeAfterClassFilterController.afterAction(filter);
 }
 
 class FT_MixedFilterController extends FT_PrependingController {
@@ -290,11 +290,11 @@ class FT_MixedFilterController extends FT_PrependingController {
 FT_MixedFilterController.beforeAction((c) => {
   (c.constructor as typeof FT_MixedFilterController).executionLog += " before procfilter ";
 });
-FT_MixedFilterController.prependAroundAction(new FT_AroundFilter() as never);
+FT_MixedFilterController.prependAroundAction(new FT_AroundFilter());
 FT_MixedFilterController.afterAction((c) => {
   (c.constructor as typeof FT_MixedFilterController).executionLog += " after procfilter ";
 });
-FT_MixedFilterController.appendAroundAction(new FT_AppendedAroundFilter() as never);
+FT_MixedFilterController.appendAroundAction(new FT_AppendedAroundFilter());
 
 class OutOfOrder extends Error {}
 class FT_MixedSpecializationController extends Base {
@@ -372,7 +372,7 @@ class FT_RescuedController extends Base {
     throw new ErrorToRescue("Something made the bad noise.");
   }
 }
-FT_RescuedController.aroundAction(new FT_RescuingAroundFilterWithBlock() as never);
+FT_RescuedController.aroundAction(new FT_RescuingAroundFilterWithBlock());
 
 class FT_ImplicitActionsController extends Base {
   private findOnly() {
@@ -984,7 +984,7 @@ class ControllerWithFilterClass extends PostsController {
     }
   };
 }
-ControllerWithFilterClass.aroundAction(ControllerWithFilterClass.YieldingFilter as never, {
+ControllerWithFilterClass.aroundAction(ControllerWithFilterClass.YieldingFilter, {
   only: "raisesAfter",
 });
 
@@ -996,12 +996,9 @@ class ControllerWithFilterInstance extends PostsController {
     }
   };
 }
-ControllerWithFilterInstance.aroundAction(
-  new ControllerWithFilterInstance.YieldingFilter() as never,
-  {
-    only: "raisesAfter",
-  },
-);
+ControllerWithFilterInstance.aroundAction(new ControllerWithFilterInstance.YieldingFilter(), {
+  only: "raisesAfter",
+});
 
 class ControllerWithProcFilter extends PostsController {}
 ControllerWithProcFilter.aroundAction(
