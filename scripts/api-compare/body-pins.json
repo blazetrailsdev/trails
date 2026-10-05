@@ -1542,13 +1542,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/etag_with_flash.rb",
-    "rubyName": "include_content?",
-    "digest": "3b165b60e919dcd1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "metal/etag_with_flash.rb",
     "rubyName": "no_store",
     "digest": "c31900ba4149689c",
     "ref": "v8.0.2"
@@ -1607,13 +1600,6 @@
     "rubyFile": "metal/etag_with_template_digest.rb",
     "rubyName": "http_cache_forever",
     "digest": "23cd21f1c59a1340",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "metal/etag_with_template_digest.rb",
-    "rubyName": "include_content?",
-    "digest": "3b165b60e919dcd1",
     "ref": "v8.0.2"
   },
   {

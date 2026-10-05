@@ -1,40 +1,6 @@
 import { Concern, Module, classAttribute, extend, include } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
-import {
-  ConditionalGet,
-  combineEtags as _combineEtags,
-  httpCacheForever as _httpCacheForever,
-  includeContent as _includeContent,
-  noStore as _noStore,
-  type ConditionalGetHost,
-  type Etagger,
-} from "./conditional-get.js";
-
-/** @internal */
-export function includeContent(status: number): boolean {
-  return _includeContent(status);
-}
-
-export function httpCacheForever(
-  this: ConditionalGetHost,
-  options: { public?: boolean } = {},
-  block?: () => void,
-): void {
-  return _httpCacheForever.call(this, options, block);
-}
-
-export function noStore(this: ConditionalGetHost): void {
-  return _noStore.call(this);
-}
-
-/** @internal */
-export function combineEtags(
-  this: { etaggers: Etagger[] },
-  validator: unknown,
-  options: Record<string, unknown> = {},
-): unknown[] {
-  return _combineEtags.call(this, validator, options);
-}
+import { ConditionalGet, type Etagger } from "./conditional-get.js";
 
 export function templateDigest(template: string): string {
   return getCrypto().createHash("md5").update(template).digest("hex");

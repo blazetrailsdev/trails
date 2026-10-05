@@ -120,6 +120,7 @@ export const ClassMethods = {
   },
 };
 
+/** @missingRailsCall include — CONVERGEABLE head-is-a-module-included-by-conditional-get-not-a-metal-method */
 export const ConditionalGet = new Module((mod) => {
   extend(mod, Concern);
 
@@ -130,8 +131,14 @@ export const ConditionalGet = new Module((mod) => {
     },
   );
 
+  mod.defineMethod("httpCacheForever", httpCacheForever);
+  mod.defineMethod("noStore", noStore);
   mod.defineMethod("combineEtags", combineEtags);
-}) as Module<{ combineEtags: typeof combineEtags }> & { ClassMethods: typeof ClassMethods };
+}) as Module<{
+  httpCacheForever: typeof httpCacheForever;
+  noStore: typeof noStore;
+  combineEtags: typeof combineEtags;
+}> & { ClassMethods: typeof ClassMethods };
 ConditionalGet.ClassMethods = ClassMethods;
 
 /** @internal */
