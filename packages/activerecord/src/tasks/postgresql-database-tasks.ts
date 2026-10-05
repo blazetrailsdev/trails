@@ -151,6 +151,7 @@ export class PostgreSQLDatabaseTasks {
     return env;
   }
 
+  /** @inventedArm write — CONVERGEABLE tasks-run-cmd-through-kernel-system-inherited-stdio */
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     const childProcess = await getChildProcessAsync();
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {

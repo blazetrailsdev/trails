@@ -4874,11 +4874,6 @@ function isInstanceOfTest(expression: ts.Expression): boolean {
   );
 }
 
-/**
- * `error.code === "ENOENT"`: the class test of Ruby's `rescue Errno::ENOENT`.
- * A system-call failure reaches JS as an error carrying its errno name in
- * `code`, with no class per errno to test with `instanceof`.
- */
 function isErrnoCodeTest(expression: ts.BinaryExpression): boolean {
   if (expression.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken) return false;
   const left = unparenthesized(expression.left);

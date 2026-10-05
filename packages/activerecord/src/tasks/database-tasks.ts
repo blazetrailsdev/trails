@@ -266,24 +266,18 @@ export class DatabaseTasks {
           if (isBlank(version)) {
             return isBlank(scope) || scope === migration.scope;
           } else {
-            return String(BigInt(migration.version)) === String(BigInt(version as string | number));
+            return migration.version === version;
           }
         },
       );
-      if (isPresent(scope) && migrationsRan.length === 0 && Migration.verbose) {
-        stdout.write(`No migrations ran. (using ${scope} scope)\n`);
+      if (isPresent(scope) && migrationsRan.length === 0) {
+        Migration.methodMissing("write", `No migrations ran. (using ${scope} scope)`);
       }
 
       this.migrationConnectionPool().schemaCache.clearBang();
     } finally {
       Migration.verbose = verboseWas;
     }
-  }
-
-  private static async _migrationAdapter(): Promise<
-    import("../connection-adapters/abstract-adapter.js").AbstractAdapter
-  > {
-    return this.migrationClass().connectionPool().leaseConnection();
   }
 
   static async purge(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
@@ -586,25 +580,12 @@ export class DatabaseTasks {
           throw new ArgumentError(`unknown format :${format as string}`);
       }
 
-      await this._stampSchemaSha1(dbConfig, file);
+      await this.migrationConnectionPool().internalMetadata.createTableAndSetFlags(
+        dbConfig.envName,
+        await this.schemaSha1(file),
+      );
     } finally {
       Migration.verbose = verboseWas;
-    }
-  }
-
-  private static async _stampSchemaSha1(dbConfig: HashConfig, filename: string): Promise<void> {
-    if (!dbConfig.useMetadataTable) return;
-    try {
-      const adapter = await this._migrationAdapter();
-      const { InternalMetadata } = await import("../internal-metadata.js");
-      const metadata = new InternalMetadata(adapter.pool);
-      const sha1 = await this.schemaSha1(filename);
-      await metadata.createTableAndSetFlags(dbConfig.envName, sha1);
-    } catch (error) {
-      console.debug?.(
-        `[trails] _stampSchemaSha1 failed for ${dbConfig.envName} (${filename})`,
-        error,
-      );
     }
   }
 

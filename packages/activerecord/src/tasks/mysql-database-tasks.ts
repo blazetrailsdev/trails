@@ -131,6 +131,7 @@ export class MySQLDatabaseTasks {
     return (await Base.connectionPool().leaseConnection()) as Mysql2Adapter;
   }
 
+  /** @inventedArm write — CONVERGEABLE tasks-run-cmd-through-kernel-system-inherited-stdio */
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     const childProcess = await getChildProcessAsync();
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
