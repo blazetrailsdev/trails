@@ -4,9 +4,12 @@
  * (`vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
  * and Rails calls the function, so both ship here.
  */
+import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { FrozenError } from "./frozen-error.js";
+import { rbMarshalDefineCompat } from "./marshal-compat.js";
 import { rbIntegerTypeP } from "./numeric.js";
-import { rbObjClassname } from "./object.js";
+import { rbInspect, rbObjClassname, rbObjIvarGet, rbObjIvarSet } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 
@@ -57,6 +60,25 @@ function floatToR(x: number | bigint): { numerator: bigint; denominator: bigint 
     e *= 2n;
   }
   return { numerator: BigInt(f), denominator: e };
+}
+
+/** `nurat_int_check` (`vendor/ruby/v3.3.11/rational.c:438`). No Numeric here but an
+ * Integer answers `integer?` true. */
+function nuratIntCheck(num: unknown): asserts num is number | bigint {
+  if (!rbIntegerTypeP(num)) {
+    throw new TypeError("not an integer");
+  }
+}
+
+/** `nurat_canonicalize` (`vendor/ruby/v3.3.11/rational.c:456`). */
+function nuratCanonicalize(num: bigint, den: bigint): [num: bigint, den: bigint] {
+  if (den < 0n) {
+    num = -num;
+    den = -den;
+  } else if (den === 0n) {
+    throw new ZeroDivisionError("divided by 0");
+  }
+  return [num, den];
 }
 
 /**
@@ -110,17 +132,16 @@ export class Rational {
   constructor(num: number | bigint, den: number | bigint) {
     const a = floatToR(num);
     const b = floatToR(den);
-    let n = a.numerator * b.denominator;
-    let d = a.denominator * b.numerator;
-    if (d < 0n) {
-      n = -n;
-      d = -d;
-    } else if (d === 0n) {
-      throw new ZeroDivisionError("divided by 0");
-    }
+    const [n, d] = nuratCanonicalize(a.numerator * b.denominator, a.denominator * b.numerator);
     const g = iGcd(n, d);
     this.numerator = n / g;
     this.denominator = d / g;
+  }
+
+  /** `vendor/ruby/v3.3.11/rational.c:1857` `nurat_marshal_dump`, private at `:2804`.
+   * @internal */
+  protected marshalDump(): [bigint, bigint] {
+    return [this.numerator, this.denominator];
   }
 
   /** `vendor/ruby/v3.3.11/rational.c:1075` `rb_rational_cmp` (`Rational#<=>`), which
@@ -272,6 +293,58 @@ export class Rational {
     return `(${this.toString()})`;
   }
 }
+
+/** `nurat_dumper` (`vendor/ruby/v3.3.11/rational.c:1830`). */
+function nuratDumper(self: object): object {
+  return self;
+}
+
+/** `nurat_loader` (`vendor/ruby/v3.3.11/rational.c:1837`). */
+function nuratLoader(self: object, a: object): object {
+  const dat = self as { numerator: bigint; denominator: bigint };
+  let num = rbObjIvarGet(a, "@numerator");
+  let den = rbObjIvarGet(a, "@denominator");
+  nuratIntCheck(num);
+  nuratIntCheck(den);
+  [num, den] = nuratCanonicalize(BigInt(num), BigInt(den));
+  dat.numerator = num as bigint;
+  dat.denominator = den as bigint;
+  Object.freeze(self);
+
+  return self;
+}
+
+/** `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), the class a
+ * marshalled Rational is loaded through. */
+const compat = class compatible {
+  /** `nurat_marshal_load` (`vendor/ruby/v3.3.11/rational.c:1869`), private at `:2807`.
+   * @internal */
+  protected marshalLoad(a: unknown): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`);
+    }
+
+    if (!Array.isArray(a)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(a)} (expected Array)`);
+    }
+    if (a.length !== 2) {
+      throw new ArgumentError(
+        `marshaled rational must have an array whose length is 2 but ${a.length}`,
+      );
+    }
+
+    let num: unknown = a[0];
+    let den: unknown = a[1];
+    nuratIntCheck(num);
+    nuratIntCheck(den);
+    [num, den] = nuratCanonicalize(BigInt(num), BigInt(den));
+    rbObjIvarSet(this, "@numerator", num);
+    rbObjIvarSet(this, "@denominator", den);
+
+    return this;
+  }
+};
+rbMarshalDefineCompat(Rational, compat, nuratDumper, nuratLoader);
 
 /**
  * `Kernel#Rational()` — `vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`, whose

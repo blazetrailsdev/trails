@@ -3,6 +3,7 @@ import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
 import { Module } from "./include.js";
 import { warn } from "./kernel-warn.js";
+import { compatAllocatorTable } from "./marshal-compat.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import {
   FL_SINGLETON,
@@ -72,6 +73,7 @@ interface DumpArg {
   symbols: Map<string, number>;
   data: Map<unknown, number>;
   numEntries: number;
+  compatTbl: Map<object, object> | null;
 }
 
 /** `struct load_arg` (`vendor/ruby/v3.3.11/marshal.c:1267`). */
@@ -80,6 +82,7 @@ interface LoadArg {
   offset: number;
   symbols: string[];
   data: Map<number, unknown>;
+  compatTbl: Map<object, object> | null;
 }
 
 /** `RB_TYPE_P(obj, T_OBJECT)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:96`). */
@@ -332,6 +335,10 @@ function wExtended(klass: object | null, arg: DumpArg, check: boolean): void {
 
 /** `w_class` (`vendor/ruby/v3.3.11/marshal.c:572`). */
 function wClass(type: number, obj: object, arg: DumpArg, check: boolean): void {
+  const realObj = arg.compatTbl?.get(obj);
+  if (realObj !== undefined) {
+    obj = realObj;
+  }
   const klass = obj.constructor as AnyClass;
   wExtended(Object.getPrototypeOf(obj) as object | null, arg, check);
   wByte(type, arg);
@@ -496,6 +503,18 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
     wRemember(key, arg);
 
     hasiv = hasIvars((encname = encodingName(obj)));
+    {
+      const compat = compatAllocatorTable().get((obj as object).constructor as AnyClass);
+      if (compat !== undefined) {
+        const realObj = obj as object;
+        obj = compat.dumper(realObj);
+        if (!arg.compatTbl) {
+          arg.compatTbl = new Map();
+        }
+        arg.compatTbl.set(obj as object, realObj);
+        if (obj !== realObj) hasiv = 0;
+      }
+    }
     if (hasiv) wByte(TYPE_IVAR, arg);
 
     if (typeof obj === "function" && rbObjClassname(obj) === "Class") {
@@ -582,7 +601,13 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
 
 /** `rb_marshal_dump_limited` (`vendor/ruby/v3.3.11/marshal.c:1228`). */
 function rbMarshalDumpLimited(obj: unknown, limit: number): string {
-  const arg: DumpArg = { str: [], symbols: new Map(), data: new Map(), numEntries: 0 };
+  const arg: DumpArg = {
+    str: [],
+    symbols: new Map(),
+    data: new Map(),
+    numEntries: 0,
+    compatTbl: null,
+  };
 
   wByte(MARSHAL_MAJOR, arg);
   wByte(MARSHAL_MINOR, arg);
@@ -777,7 +802,25 @@ function rString(arg: LoadArg): string {
 
 /** `r_entry0` (`vendor/ruby/v3.3.11/marshal.c:1654`). */
 function rEntry0<T>(v: T, num: number, arg: LoadArg): T {
-  arg.data.set(num, v);
+  let realObj: unknown = v;
+  if (arg.compatTbl) {
+    realObj = arg.compatTbl.get(v as object) ?? v;
+  }
+  arg.data.set(num, realObj);
+  return v;
+}
+
+/** `r_fixup_compat` (`vendor/ruby/v3.3.11/marshal.c:1666`). */
+function rFixupCompat(v: unknown, arg: LoadArg): unknown {
+  const realObj = arg.compatTbl?.get(v as object);
+  if (realObj !== undefined) {
+    arg.compatTbl!.delete(v as object);
+    const compat = compatAllocatorTable().get(realObj.constructor as AnyClass);
+    if (compat !== undefined) {
+      compat.loader(realObj, v as object);
+    }
+    v = realObj;
+  }
   return v;
 }
 
@@ -886,13 +929,25 @@ function mustBeModule(v: unknown, path: string): Module {
  * `obj_alloc_by_klass` (`vendor/ruby/v3.3.11/marshal.c:1812`). `rb_obj_alloc`
  * runs the class's allocator and never `initialize`.
  */
-function objAllocByKlass(klass: AnyClass): object {
+function objAllocByKlass(klass: AnyClass, arg: LoadArg): object {
+  const compat = compatAllocatorTable().get(klass);
+  if (compat !== undefined) {
+    const realObj = Object.create(klass.prototype as object) as object;
+    const obj = Object.create(compat.oldclass.prototype as object) as object;
+
+    if (!arg.compatTbl) {
+      arg.compatTbl = new Map();
+    }
+    arg.compatTbl.set(obj, realObj);
+    return obj;
+  }
+
   return Object.create(klass.prototype as object) as object;
 }
 
 /** `obj_alloc_by_path` (`vendor/ruby/v3.3.11/marshal.c:1835`). */
-function objAllocByPath(path: string): object {
-  return objAllocByKlass(path2class(path));
+function objAllocByPath(path: string, arg: LoadArg): object {
+  return objAllocByKlass(path2class(path), arg);
 }
 
 /** `prohibit_ivar` (`vendor/ruby/v3.3.11/marshal.c:1852`). */
@@ -910,7 +965,8 @@ function rObject0(arg: LoadArg, ivp: { value: boolean } | null): unknown {
 /**
  * `r_object_for` (`vendor/ruby/v3.3.11/marshal.c:1868`). The loop stands in
  * for `goto type_hash`. `Marshal.load`'s `proc` and `freeze:` are not ported,
- * which leaves `r_leave` (`marshal.c:1693`) nothing to do. `load_mantissa`
+ * which leaves `r_leave` (`marshal.c:1693`) its `r_fixup_compat`, called at
+ * `TYPE_OBJECT`, the one arm that allocates through a compat class. `load_mantissa`
  * (`marshal.c:386`) reads the mantissa bytes format 4.8 no longer writes, and
  * `rb_integer_unpack` and `ULONG2NUM` are the BigInt shifts. `TYPE_IVAR`
  * re-enters at its `arg->data` index the String `r_ivar` re-read, where
@@ -966,7 +1022,7 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         const klass = rbObjClass(v) as AnyClass;
         const proto = c.prototype as object;
         if (v instanceof Module || !(c === klass || proto instanceof klass)) {
-          const tmp = objAllocByKlass(c);
+          const tmp = Object.create(proto) as object;
 
           if (
             v instanceof Module ||
@@ -1075,25 +1131,27 @@ function rObjectFor(arg: LoadArg, ivp: { value: boolean } | null, type: number):
         const name = rUnique(arg);
         const klass = path2class(name);
 
-        v = objAllocByKlass(klass);
+        v = objAllocByKlass(klass, arg);
         if (!rbObjRespondTo(v, "marshalLoad", true)) {
           throw new TypeError(`instance of ${name} needs to have method \`marshal_load'`);
         }
         v = rEntry(v, arg);
         const data = rObject(arg);
         rbFSend(v, "marshalLoad", data);
+        v = rFixupCompat(v, arg);
         v = rCopyIvar(v as object, data);
         break;
       }
 
       case TYPE_OBJECT: {
         const idx = rPrepare(arg);
-        v = objAllocByPath(rUnique(arg));
+        v = objAllocByPath(rUnique(arg), arg);
         if (!tObjectP(v)) {
           throw new ArgumentError("dump format error");
         }
         v = rEntry0(v, idx, arg);
         rIvar(v, null, arg);
+        v = rFixupCompat(v, arg);
         break;
       }
 
@@ -1155,7 +1213,7 @@ function rbMarshalLoadWithProc(port: unknown): unknown {
   if (v === null) {
     throw new TypeError("instance of IO needed");
   }
-  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map() };
+  const arg: LoadArg = { src: v, offset: 0, symbols: [], data: new Map(), compatTbl: null };
 
   const major = rByte(arg);
   const minor = rByte(arg);

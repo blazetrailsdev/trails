@@ -11,7 +11,7 @@ import {
   type DateParts,
 } from "./date.js";
 import { Time as RubyTime } from "./time.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Marshal, Rational } from "@blazetrails/ruby-compat";
 
 const gemDate = (str: string, comp?: boolean) => dNewByFrags(RubyDate._parse(str, comp));
 const gemDateTime = (str: string, comp?: boolean) => dtNewByFrags(RubyDate._parse(str, comp));
@@ -1859,6 +1859,45 @@ describe("the instance formatters", () => {
     expect(d2.iso8601(3)).toBe("2001-02-03T04:05:06.123+00:00");
     expect(d2.iso8601(9)).toBe("2001-02-03T04:05:06.123456000+00:00");
     expect(d2.xmlschema(3)).toBe("2001-02-03T04:05:06.123+00:00");
+  });
+});
+
+describe("Marshal over Date", () => {
+  const hex = (str: string): string =>
+    Array.from(str, (c) => c.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+
+  it("dumps an Integer sf, and the bytes ruby dumps", () => {
+    const d = new RubyDate(2016, 1, 1);
+    expect(d.marshalDump().slice(0, 5)).toEqual([0n, 2457389, 0, 0, 0]);
+    expect(hex(Marshal.dump(d))).toBe(
+      "0408553a09446174655b0b690069032d7f25690069006900660c32323939313631",
+    );
+    const dt = new RubyDateTime(2016, 1, 1, 1, 2, new Rational(7, 2));
+    expect(dt.marshalDump()[3]).toBe(500000000);
+    expect(hex(Marshal.dump(dt))).toBe(
+      "0408553a0d4461746554696d655b0b690069032d7f2569028b0e69040065cd1d6900660c32323939313631",
+    );
+  });
+
+  it("dumps a sub-nanosecond sf as a Rational", () => {
+    const dt = new RubyDateTime(2016, 1, 1, 1, 2, new Rational(7, 3));
+    expect(hex(Marshal.dump(dt))).toBe(
+      "0408553a0d4461746554696d655b0b690069032d7f2569028a0e553a0d526174696f6e616c5b07690400ca9a3b69086900660c32323939313631",
+    );
+  });
+
+  it("loads the array ruby's dump holds, whose nth and sf are Integers", () => {
+    for (const d of [
+      new RubyDate(2016, 1, 1),
+      new RubyDateTime(2016, 1, 1, 1, 2, new Rational(7, 2)),
+      new RubyDateTime(2016, 1, 1, 1, 2, new Rational(7, 3)),
+    ]) {
+      const a = Marshal.load(Marshal.dump(d.marshalDump())) as unknown[];
+      const d2 = new (d.constructor as new () => RubyDate)().marshalLoad(a);
+      expect(d2.equals(d)).toBe(true);
+      expect(d2.start).toBe(d.start);
+      expect(d2.toS()).toBe(d.toS());
+    }
   });
 });
 

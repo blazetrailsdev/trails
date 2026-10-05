@@ -6,6 +6,7 @@ import { Hash } from "./hash.js";
 import { Module, extend, rbModConstSet } from "./include.js";
 import { Marshal } from "./marshal.js";
 import { rbObjSingletonClass, rbSetClassPathString } from "./object.js";
+import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
 import { registerConstant, unregisterConstant } from "./variable.js";
@@ -400,5 +401,41 @@ describe("Marshal.load", () => {
     for (const data of ["\x04\bC:\x08Ary{\x00", "\x04\bC:\x08Aryi\x06", "\x04\bC:\x08Aryf\x061"]) {
       expect(() => Marshal.load(data)).toThrow(new ArgumentError("dump format error (user class)"));
     }
+  });
+});
+
+describe("Marshal over Rational", () => {
+  it("dumps the bytes ruby dumps", () => {
+    expect(hex(Marshal.dump(new Rational(1, 2)))).toBe("0408553a0d526174696f6e616c5b0769066907");
+    expect(hex(Marshal.dump(new Rational(-3, 4)))).toBe("0408553a0d526174696f6e616c5b0769f86909");
+  });
+
+  it("round-trips through Rational::compatible, frozen, and links a repeated one", () => {
+    const r = new Rational(1, 2);
+    const [a, b] = Marshal.load(Marshal.dump([r, r])) as Rational[];
+    expect(a).toBeInstanceOf(Rational);
+    expect(a.equals(r)).toBe(true);
+    expect(Object.isFrozen(a)).toBe(true);
+    expect(b).toBe(a);
+  });
+
+  it("canonicalizes the sign and does not reduce, as nurat_loader does", () => {
+    expect((Marshal.load("\x04\bU:\rRational[\x07i\x09i\x0b") as Rational).inspect()).toBe("(4/6)");
+    expect((Marshal.load("\x04\bU:\rRational[\x07i\x09i\xfa") as Rational).inspect()).toBe(
+      "(-4/1)",
+    );
+  });
+
+  it("raises what nurat_marshal_load raises", () => {
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07i\x06i\x00")).toThrow(ZeroDivisionError);
+    expect(() => Marshal.load("\x04\bU:\rRational[\x08i\x06i\x07i\x08")).toThrow(
+      new ArgumentError("marshaled rational must have an array whose length is 2 but 3"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07f\x061i\x0b")).toThrow(
+      new TypeError("not an integer"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRationali\x06")).toThrow(
+      new TypeError("wrong argument type Integer (expected Array)"),
+    );
   });
 });

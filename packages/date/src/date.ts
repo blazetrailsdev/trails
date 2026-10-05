@@ -2,6 +2,8 @@ import {
   FloatDomainError,
   FrozenError,
   NoMethodError,
+  rational,
+  rbDbl2num,
   registerConstant,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@js-temporal/polyfill";
@@ -820,6 +822,18 @@ function shrinkSpace(s: string, l: number): string {
     }
   }
   return d;
+}
+
+/**
+ * `canon` (`vendor/ruby/v3.3.11/ext/date/date_core.c:323`).
+ * @internal
+ */
+function canon(x: number | bigint | Rational): number | bigint | Rational {
+  if (x instanceof Rational) {
+    const den = x.denominator;
+    if (den === 1n) return bigNorm(x.numerator);
+  }
+  return x;
 }
 
 /** @internal */
@@ -5717,8 +5731,13 @@ export class Date extends rbCDate {
     return deconstructKeys(this, keys, false);
   }
 
-  marshalDump(): [bigint, number, number, Rational, number, number] {
-    return [this.nth, this.mJd(), this.mDf(), this.mSf(), this.mOf(), this.sg];
+  /**
+   * `d_lite_marshal_dump` (`vendor/ruby/v3.3.11/ext/date/date_core.c:7547`). `m_sf`
+   * (`:1547`) answers an `sf` that `set_to_complex` (`:363`) stored through
+   * `canon`; `mSf` holds it uncanonicalized, so `canon` runs here.
+   */
+  marshalDump(): [bigint, number, number, number | bigint | Rational, number, number] {
+    return [this.nth, this.mJd(), this.mDf(), canon(this.mSf()), this.mOf(), rbDbl2num(this.sg)];
   }
 
   marshalLoad(a: unknown[]): this {
@@ -5758,10 +5777,10 @@ export class Date extends rbCDate {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
@@ -6597,10 +6616,10 @@ export class DateTime extends DateWithoutParseStatics {
         break;
       case 6:
         {
-          nth = a[0] as bigint;
+          nth = BigInt(a[0] as number | bigint);
           jd = Number(a[1]);
           df = Number(a[2]);
-          sf = a[3] as Rational;
+          sf = rational(a[3] as number | bigint | Rational);
           of = Number(a[4]);
           sg = Number(a[5]);
         }
