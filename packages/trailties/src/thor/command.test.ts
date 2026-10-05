@@ -94,7 +94,7 @@ describe("Thor::Command", () => {
         bar: ":required",
       } as unknown as Record<string, Option>);
       hashDelete(rbObjDup(command).options, "foo");
-      expect(command.options.foo).toBe(true);
+      expect(command.options.foo).toBeTruthy();
     });
   });
 

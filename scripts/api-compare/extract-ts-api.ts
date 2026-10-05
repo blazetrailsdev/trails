@@ -3402,6 +3402,9 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
  *   chained on the construction is handed.
  * - `new Module((mod) => { mod.defineMethod("m", fn) })` — every `defineMethod`
  *   the block calls on its own parameter with a literal name.
+ * - `new Module((mod) => { mod[initialize] = function () {} })` — the module's
+ *   `def initialize` (`Thor::Shell#initialize`, thor/shell.rb:44-48), recorded
+ *   as `[initialize]`, the name a class's `static [initialize]` is recorded by.
  */
 export function harvestModuleInstanceMethods(
   init: ts.Expression,
@@ -3430,6 +3433,25 @@ export function harvestModuleInstanceMethods(
   const visit = (node: ts.Node): void => {
     if (ts.isFunctionLike(node) && node !== block) return;
     ts.forEachChild(node, visit);
+    const hook = moduleInitializeHook(node, mod.text);
+    if (hook !== undefined) {
+      const calls = extractCalls(hook.body);
+      const callSeq = extractCallSeq(hook.body);
+      const callArgs = extractCallArgs(hook.body);
+      const skeleton = extractSkeleton(hook.body);
+      out.push({
+        name: "[initialize]",
+        visibility: "public",
+        params: extractParameters(hook.parameters),
+        line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+        file,
+        ...(calls !== undefined ? { calls } : {}),
+        ...(callSeq !== undefined ? { callSeq } : {}),
+        ...(callArgs !== undefined ? { callArgs } : {}),
+        ...(skeleton !== undefined ? { skeleton } : {}),
+      });
+      return;
+    }
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
     const receiver = node.expression.expression;
     if (!ts.isIdentifier(receiver) || receiver.text !== mod.text) return;
@@ -3462,6 +3484,22 @@ export function harvestModuleInstanceMethods(
   };
   visit(block.body);
   return out;
+}
+
+function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression | undefined {
+  if (!ts.isBinaryExpression(node) || node.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+    return undefined;
+  }
+  if (!ts.isElementAccessExpression(node.left) || !ts.isFunctionExpression(node.right)) {
+    return undefined;
+  }
+  let receiver: ts.Expression = node.left.expression;
+  while (ts.isParenthesizedExpression(receiver) || ts.isAsExpression(receiver)) {
+    receiver = receiver.expression;
+  }
+  if (!ts.isIdentifier(receiver) || receiver.text !== mod) return undefined;
+  const key = node.left.argumentExpression;
+  return ts.isIdentifier(key) && key.text === "initialize" ? node.right : undefined;
 }
 
 export function harvestObjectLiteralMethods(
@@ -5491,6 +5529,55 @@ function isBlockCapture(conditional: ts.ConditionalExpression): boolean {
 }
 
 /**
+ * `...(block !== undefined ? [block] : [])` (or `...(block ? [block] : [])`):
+ * the forward of a `&block` bound by {@link isBlockCapture} in the same body
+ * (`set_callback(:validate, *args, options, &block)`,
+ * `activemodel/lib/active_model/validations.rb:184`). Ruby passes an absent
+ * block as nothing at all; the port's block rides as the last argument, so
+ * forwarding it has to leave the slot out. That is the `&block` itself, which
+ * Ruby emits no token for.
+ */
+function isBlockForward(conditional: ts.ConditionalExpression): boolean {
+  let spread: ts.Node = conditional.parent;
+  while (ts.isParenthesizedExpression(spread)) spread = spread.parent;
+  if (!ts.isSpreadElement(spread)) return false;
+  const { whenTrue, whenFalse } = conditional;
+  if (!ts.isArrayLiteralExpression(whenFalse) || whenFalse.elements.length !== 0) return false;
+  if (!ts.isArrayLiteralExpression(whenTrue) || whenTrue.elements.length !== 1) return false;
+  let forwarded = whenTrue.elements[0];
+  while (ts.isAsExpression(forwarded) || ts.isParenthesizedExpression(forwarded)) {
+    forwarded = forwarded.expression;
+  }
+  if (!ts.isIdentifier(forwarded)) return false;
+  const block = forwarded.text;
+  const test = conditional.condition;
+  const given =
+    test.getText() === block ||
+    (ts.isBinaryExpression(test) &&
+      test.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken &&
+      test.left.getText() === block &&
+      test.right.getText() === "undefined");
+  if (!given) return false;
+  const fn = ts.findAncestor(conditional, ts.isFunctionLike) as
+    | ts.FunctionLikeDeclaration
+    | undefined;
+  const body = fn?.body;
+  if (!body || !ts.isBlock(body)) return false;
+  return body.statements.some(
+    (statement) =>
+      ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((declaration) => {
+        if (declaration.name.getText() !== block || !declaration.initializer) return false;
+        let init = declaration.initializer;
+        while (ts.isAsExpression(init) || ts.isParenthesizedExpression(init)) {
+          init = init.expression;
+        }
+        return ts.isConditionalExpression(init) && isBlockCapture(init);
+      }),
+  );
+}
+
+/**
  * `Object.hasOwn(klass, "_x") ? klass._x : undefined` (or its
  * `Object.prototype.hasOwnProperty.call` spelling): the read of a Ruby
  * class-level ivar, `@x` in a `def self.` body
@@ -5526,6 +5613,10 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
     switch (n.kind) {
       case ts.SyntaxKind.ConditionalExpression: {
         if (isBlockCapture(n as ts.ConditionalExpression)) return;
+        if (isBlockForward(n as ts.ConditionalExpression)) {
+          visit((n as ts.ConditionalExpression).whenTrue);
+          return;
+        }
         if (isOwnIvarRead(n as ts.ConditionalExpression)) return;
         const fallback = rtestFallback(n as ts.ConditionalExpression);
         if (fallback !== undefined) {

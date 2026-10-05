@@ -97,6 +97,8 @@ describe("normalizeRailsKind", () => {
       expect_to_respond_to: "respondTo",
       expect_not_to_respond_to: "notRespondTo",
     });
+    expect(normalizeRailsKind("expect_to_be_truthy")).toBe("truthy");
+    expect(normalizeRailsKind("expect_not_to_be_truthy")).toBe("falsy");
     expect(normalizeRailsKind("expect_to_be_entered")).toBe("truthy");
     expect(normalizeRailsKind("expect_not_to_be_entered")).toBe("falsy");
     expect(normalizeRailsKind("expect_to_be_available")).toBe("truthy");

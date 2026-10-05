@@ -1974,6 +1974,7 @@ class TestExtractor
     return nil unless matcher.is_a?(Array) && %i[fcall vcall command].include?(matcher[0])
     name = ident_name(matcher[1])
     name = "be_nil" if name == "be" && literal_token(positional_args(args)&.first) == "x:nil"
+    name = "be_truthy" if name == "be" && matcher[0] == :vcall
     name ? ["expect_#{to}_#{name}", recv, args] : nil
   end
 

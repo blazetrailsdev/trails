@@ -245,7 +245,6 @@ export const ClassMethods = {
     );
   },
 
-  /** @inventedArm if — CONVERGEABLE arms-extractor-reads-a-block-re-forward-guard */
   validate<T extends ValidatableRecord = ValidatableRecord>(
     this: ValidationsClassHost,
     ...args: ValidateArgs<T>

@@ -1102,6 +1102,46 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
   });
 
+  it("reads the spread-forward of a captured `&block` as the block itself, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        validate(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.setCallback("validate", ...args, ...(block !== undefined ? [block as Block] : []));
+        }
+        permit(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.build(...args, ...(block ? [block] : []));
+        }
+        other(options: unknown, ...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          this.build(...(options !== undefined ? [options] : []), block);
+        }
+        uncaptured(block: unknown, ...args: unknown[]) {
+          this.build(...args, ...(block !== undefined ? [block] : []));
+        }
+        shadowed(block: unknown, ...args: unknown[]) {
+          for (const klass of args) {
+            const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+            this.build(klass, block);
+          }
+          this.build(...(block !== undefined ? [block] : []));
+        }
+        nested(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          return () => this.build(...(block !== undefined ? [block] : []));
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("validate")).toEqual(["ref:setCallback"]);
+    expect(skeleton("permit")).toEqual(["ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("uncaptured")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("shadowed")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("nested")!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
   it("reads an own-property conditional as a class-level ivar read, not as an arm", () => {
     const cls = extractFromSource(
       `class Foo {
@@ -2801,6 +2841,36 @@ describe("extractFromProgram — include() detection", () => {
       ["exists", false],
     ]);
     expect(info.modules["core-queries.ts:Other"]).toBeUndefined();
+  });
+
+  it("records the [initialize] hook a Module's block assigns as the module's initialize", () => {
+    const info = extractFromFiles("/p", {
+      "shell.ts": `
+        declare const initialize: unique symbol;
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+        }
+        export const Shell = new Module((mod) => {
+          (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+            this: { shell: unknown },
+            args: unknown[] = [],
+            options: unknown = {},
+            config: { shell?: unknown } = {},
+          ) {
+            this.shell = config.shell;
+          };
+        });
+        export const Other = new Module((mod) => {
+          const other = {} as Record<symbol, unknown>;
+          other[initialize] = function () {};
+        });
+      `,
+    });
+    const methods = info.modules["shell.ts:Shell"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.params.map((p) => p.name)])).toEqual([
+      ["[initialize]", ["this", "args", "options", "config"]],
+    ]);
+    expect(info.modules["shell.ts:Other"]).toBeUndefined();
   });
 
   it("does not record a SCREAMING_SNAKE method-table constant as a module", () => {
