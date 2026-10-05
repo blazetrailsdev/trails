@@ -139,6 +139,7 @@ export class Rational {
   }
 
   /** `vendor/ruby/v3.3.11/rational.c:1857` `nurat_marshal_dump`, private at `:2804`.
+   * `rb_copy_generic_ivar` has nothing to copy: a Rational holds no ivars.
    * @internal */
   protected marshalDump(): [bigint, bigint] {
     return [this.numerator, this.denominator];
@@ -315,7 +316,9 @@ function nuratLoader(self: object, a: object): object {
 }
 
 /** `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), the class a
- * marshalled Rational is loaded through. */
+ * marshalled Rational is loaded through. `rb_define_class_under` paths it; here
+ * the class expression's name stands in, since `classpaths` (object.ts) is in
+ * TDZ whenever object.ts is the entry of its import cycle with this module. */
 const compat = class compatible {
   /** `nurat_marshal_load` (`vendor/ruby/v3.3.11/rational.c:1869`), private at `:2807`.
    * @internal */
