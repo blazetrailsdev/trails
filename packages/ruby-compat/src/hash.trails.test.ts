@@ -12,6 +12,7 @@ import {
   inspect,
   except,
   fetch,
+  rbBlockGivenP,
   hasKey,
   hashAref,
   hashAset,
@@ -1046,5 +1047,30 @@ describe("block (a marked `&block`)", () => {
     });
     expect(blk.length).toBe(1);
     expect(blk.call(receiver, "hello")).toBe("hello david");
+  });
+
+  it("reports the block's arity at every arity and passes every argument through", () => {
+    const fns = [
+      (...args: number[]) => args,
+      (a: number, ...args: number[]) => [a, ...args],
+      (a: number, b: number, ...args: number[]) => [a, b, ...args],
+      (a: number, b: number, c: number, ...args: number[]) => [a, b, c, ...args],
+    ];
+    fns.forEach((fn, arity) => {
+      const blk = block(fn);
+      expect(blk.length).toBe(arity);
+      expect(blk(1, 2, 3, 4)).toEqual([1, 2, 3, 4]);
+      expect(rbBlockGivenP(blk)).toBe(true);
+      expect(rbBlockGivenP(fn)).toBe(false);
+    });
+  });
+
+  it("is not called by a fetch that finds the key, on a plain hash or a Map", () => {
+    const blk = block(() => {
+      throw new Error("yielded");
+    });
+    expect(fetch({ id: null }, "id", blk)).toBeNull();
+    expect(fetch(new Map([["id", 1]]), "id", blk)).toBe(1);
+    expect(() => fetch({}, "toString")).toThrow(KeyError);
   });
 });

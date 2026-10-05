@@ -136,9 +136,6 @@ export function fetch(
   key: unknown,
   ...rest: unknown[]
 ): unknown {
-  /* A hit returns the stored value whatever else was passed
-     (`vendor/ruby/v3.3.11/hash.c:2190-2192`), and a plain-object hash has no
-     `fetch` of its own to dispatch to, so its hit is answered ahead of the arms. */
   if (
     Object.getPrototypeOf(receiver) === Object.prototype &&
     Object.hasOwn(receiver, key as PropertyKey)
