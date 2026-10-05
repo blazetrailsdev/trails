@@ -1,4 +1,5 @@
 import {
+  abort,
   aryDelete,
   extend,
   fetch,
@@ -7,11 +8,16 @@ import {
   getFs,
   getPath,
   Hash,
+  hasKey,
   hashDelete,
   included,
   initialize,
+  last,
+  merge,
   mergeBang,
   Module,
+  Open3,
+  rbFSystem,
   rbInspect,
   rbObjIsKindOf,
   rbObjIvarGet,
@@ -31,7 +37,9 @@ import {
 } from "./actions/file-manipulation.js";
 import { TEMPLATE_EXTNAME, fromSuperclass } from "./base.js";
 import { Error } from "./error.js";
+import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
+import { rubyCommand } from "./util.js";
 
 export interface ActionsClassHost {
   name: string;
@@ -61,7 +69,17 @@ export interface ActionsHost {
   sourcePaths(): Promise<string[]>;
   findInSourcePaths(file: string): Promise<string>;
   relativeToOriginalDestinationRoot(path: string, removeDot?: boolean): string;
+  run: typeof run;
 }
+
+type RunConfig = {
+  with?: unknown;
+  verbose?: unknown;
+  pretend?: unknown;
+  env?: Record<string, string | null> | null;
+  capture?: unknown;
+  abortOnFailure?: unknown;
+};
 
 type ActionsClass = ActionsClassHost & { sourcePathsForSearch(): Promise<string[]> };
 
@@ -254,6 +272,88 @@ export async function apply(
   if (rtest(verbose)) this.shell.padding -= 1;
 }
 
+export async function run(
+  this: Pick<
+    ActionsHost,
+    "behavior" | "destinationRoot" | "options" | "relativeToOriginalDestinationRoot" | "sayStatus"
+  >,
+  command: unknown,
+  config: RunConfig = {},
+): Promise<string | boolean | null | undefined> {
+  if (this.behavior !== "invoke") return;
+
+  const destination = this.relativeToOriginalDestinationRoot(this.destinationRoot, false);
+  let desc = `${toS(command)} from ${rbInspect(destination)}`;
+
+  if (rtest(config.with)) {
+    desc = `${File.basename(toS(config.with))} ${desc}`;
+    command = `${toS(config.with)} ${toS(command)}`;
+  }
+
+  this.sayStatus("run", desc, fetch(config, "verbose", true));
+
+  if (rtest(this.options["pretend"])) return;
+
+  let envSplat: [Record<string, string | null>] | undefined;
+  if (rtest(config.env)) envSplat = [config.env!];
+
+  let result: string | boolean | null;
+  let success: boolean | null;
+  if (rtest(config.capture)) {
+    const [out, status] = await Open3.capture2e(
+      ...([...(envSplat ?? []), toS(command)] as Parameters<typeof Open3.capture2e>),
+    );
+    result = out;
+    success = status.isSuccess();
+  } else {
+    result = await rbFSystem(
+      ...([...(envSplat ?? []), toS(command)] as Parameters<typeof rbFSystem>),
+    );
+    success = result;
+  }
+
+  if (
+    !rtest(success) &&
+    rtest(
+      fetch(
+        config,
+        "abortOnFailure",
+        (this.constructor as unknown as { isExitOnFailure(): boolean }).isExitOnFailure(),
+      ),
+    )
+  ) {
+    abort();
+  }
+
+  return result;
+}
+
+export async function runRubyScript(
+  this: ActionsHost,
+  command: unknown,
+  config: RunConfig = {},
+): Promise<string | boolean | null | undefined> {
+  if (this.behavior !== "invoke") return;
+  return this.run(command, merge(config, { with: rubyCommand() }));
+}
+
+export function thor(
+  this: ActionsHost,
+  command: unknown,
+  ...args: unknown[]
+): Promise<string | boolean | null | undefined> {
+  const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
+  const verbose = hasKey(config, "verbose") ? hashDelete(config, "verbose") : true;
+  const pretend = hasKey(config, "pretend") ? hashDelete(config, "pretend") : false;
+  const capture = hasKey(config, "capture") ? hashDelete(config, "capture") : false;
+
+  args.unshift(command);
+  args.push(Options.toSwitches(config));
+  command = args.join(" ").trim();
+
+  return this.run(command, { with: "thor", verbose, pretend, capture });
+}
+
 /** @internal */
 function _sharedConfiguration(this: ActionsHost): Record<string, unknown> {
   return mergeBang(
@@ -321,6 +421,9 @@ export const Actions = new Module((mod) => {
       inside,
       inRoot,
       apply,
+      run,
+      runRubyScript,
+      thor,
       emptyDirectory,
       createFile,
       addFile,
