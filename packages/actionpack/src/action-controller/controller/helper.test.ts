@@ -1,5 +1,11 @@
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { isAnonymous, NameError, type InheritableOptions } from "@blazetrails/activesupport";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import {
+  include,
+  included,
+  isAnonymous,
+  NameError,
+  type InheritableOptions,
+} from "@blazetrails/activesupport";
 import {
   excBacktraceLocations,
   File,
@@ -61,20 +67,27 @@ for (const [name, klass] of Object.entries(Fun)) {
 
 let AllHelpersController: typeof Base;
 
-const ImpressiveLibrary = {
-  usefulFunction(): void {},
-};
-
-class JustMeController extends Base {
-  // @ts-expect-error Rails' action is named after the `flash` reader it overrides.
-  async flash() {
-    await this.render({ inline: "<h1><%= notice %></h1>" });
+class ImpressiveLibrary {
+  static [included](base: typeof Base): void {
+    base.helperMethod("usefulFunction");
   }
 
+  usefulFunction(): void {}
+}
+
+class JustMeController extends Base {
   async lib() {
     await this.render({ inline: "<%= usefulFunction() %>" });
   }
 }
+
+Object.defineProperty(JustMeController.prototype, "flash", {
+  async value(this: JustMeController) {
+    await this.render({ inline: "<h1><%= notice %></h1>" });
+  },
+  configurable: true,
+  writable: true,
+});
 
 class MeTooController extends JustMeController {}
 
@@ -82,11 +95,11 @@ let HelpersPathsController: typeof Base;
 
 let HelpersTypoController: typeof Base;
 
-const LocalAbcHelper = {
+const LocalAbcHelper: HelperMethodsModule = {
   a(): void {},
   b(): void {},
   c(): void {},
-} as unknown as HelperMethodsModule;
+};
 
 let helpersPathWas: string[];
 let helperMethodsWas: string[];
@@ -105,8 +118,7 @@ beforeAll(async () => {
   };
 
   helperMethodsWas = Base._helperMethods;
-  Object.assign(Base.prototype, ImpressiveLibrary);
-  Base.helperMethod("usefulFunction");
+  include(Base, ImpressiveLibrary);
 
   JustMeController.clearHelpers();
 
@@ -288,15 +300,11 @@ describe("HelperTest", () => {
   });
 
   it("base helper methods after clear helpers", async () => {
-    await expect(
-      callController(JustMeController as unknown as typeof Base, "flash"),
-    ).resolves.not.toThrow();
+    await expect(callController(JustMeController, "flash")).resolves.not.toThrow();
   });
 
   it("lib helper methods after clear helpers", async () => {
-    await expect(
-      callController(JustMeController as unknown as typeof Base, "lib"),
-    ).resolves.not.toThrow();
+    await expect(callController(JustMeController, "lib")).resolves.not.toThrow();
   });
 
   it("all helpers", () => {
@@ -449,11 +457,6 @@ describe("IsolatedHelpersTest", () => {
     await tc.beforeSetup();
     tc.setup();
   });
-  afterEach(() => {
-    tc.assertions = 1;
-    tc.afterTeardown();
-  });
-
   it("helper in a", async () => {
     await expect(callController(A, "index")).rejects.toThrow(TemplateError);
   });
