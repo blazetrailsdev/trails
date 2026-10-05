@@ -4,9 +4,12 @@ import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
   extend,
+  hashDelete,
   isModuleIncluded,
   type Module,
   Range,
+  rbEnsure,
+  rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -29,6 +32,8 @@ import {
   extractOptionsBang,
   groupBy,
   indexBy,
+  many,
+  mergeBang,
 } from "@blazetrails/activesupport";
 
 export { Range };
@@ -572,14 +577,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (predicate !== undefined) {
-      let count = 0;
-      for (const record of await this.toArray()) {
-        if (predicate(record) && ++count === 2) break;
-      }
-      return count > 1;
-    }
-    if (this.isLoaded) return (await this.records()).length > 1;
+
+    if (predicate !== undefined) return many(await this.toArray(), predicate);
+    if (this.isLoaded) return many(await this.records());
     return (await this.limitedCount()) > 1;
   }
 
@@ -1321,18 +1321,15 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (arguments.length === 0) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
     }
-    if (arguments.length === 1) {
-      attributes = id as Record<string, unknown>;
-      id = ":all";
-    }
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
     if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.update(attributes!);
+        await record.update(attributes);
       }
       return records;
     } else {
-      return (await this.model.update(id, attributes!)) as T;
+      return (await this.model.update(id, attributes)) as T;
     }
   }
 
@@ -1343,18 +1340,15 @@ export class Relation<T extends Base, G extends boolean = false> {
     if (arguments.length === 0) {
       throw new ArgumentError("wrong number of arguments (given 0, expected 1..2)");
     }
-    if (arguments.length === 1) {
-      attributes = id as Record<string, unknown>;
-      id = ":all";
-    }
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
     if (id === ":all") {
       const records = await this.toArray();
       for (const record of records) {
-        await record.updateBang(attributes!);
+        await record.updateBang(attributes);
       }
       return records;
     } else {
-      return (await this.model.updateBang(id, attributes!)) as T;
+      return (await this.model.updateBang(id, attributes)) as T;
     }
   }
 
@@ -1396,48 +1390,30 @@ export class Relation<T extends Base, G extends boolean = false> {
       number | { time?: Temporal.Instant } | CounterCacheTouchOption | undefined
     >,
   ): Promise<number> {
-    const touchFromCounters = (counters as Record<string, unknown>).touch;
-    const normalCounters: Record<string, number> = {};
-    for (const [k, v] of Object.entries(counters)) {
-      if (k !== "touch") normalCounters[k] = v as number;
-    }
+    const touch = hashDelete(counters, "touch") as CounterCacheTouchOption | null;
 
     const updates: Record<string, unknown> = {};
-
-    for (const [counterName, value] of Object.entries(normalCounters)) {
+    for (const [counterName, value] of Object.entries(counters)) {
       const attr = this.table.get(counterName);
-      updates[String(attr.name)] = this._incrementAttribute(attr, value);
+      updates[String(attr.name)] = this._incrementAttribute(attr, value as number);
     }
 
-    const touch = touchFromCounters as CounterCacheTouchOption | undefined;
-    if (touch) {
-      const names = wrap(touch !== true ? touch : undefined) as Array<string | { time?: RubyTime }>;
+    if (rtest(touch)) {
+      let names: CounterCacheTouchOption | undefined;
+      if (touch !== true) names = touch as CounterCacheTouchOption;
+      names = wrap(names) as Array<string | { time?: RubyTime }>;
       const options = extractOptionsBang(names) as TouchAllOptions;
       const touchUpdates = this.model.touchAttributesWithTime(...(names as string[]), options.time);
-      for (const [col, t] of Object.entries(touchUpdates)) {
-        updates[col] = new Nodes.Quoted(t);
-      }
+      if (!isEmpty(touchUpdates)) mergeBang(updates, touchUpdates);
     }
 
     return this.updateAll(updates);
   }
 
   async delete(idOrArray: unknown): Promise<number> {
-    if (idOrArray == null) return 0;
-    if (Array.isArray(idOrArray) && idOrArray.length === 0) return 0;
+    if (idOrArray == null || (Array.isArray(idOrArray) && idOrArray.length === 0)) return 0;
 
-    const primaryKey = this.model.primaryKey;
-    if (Array.isArray(primaryKey)) {
-      const idArr = Array.isArray(idOrArray) ? idOrArray : [idOrArray];
-      if (idArr.length !== primaryKey.length) return 0;
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < primaryKey.length; i++) {
-        conditions[primaryKey[i]] = idArr[i];
-      }
-      return this.where(conditions).deleteAll();
-    }
-
-    return this.where({ [primaryKey]: idOrArray }).deleteAll();
+    return this.where(new Map([[this.model.primaryKey, idOrArray]])).deleteAll();
   }
 
   async destroy(id: unknown): Promise<T | T[]> {
@@ -1600,16 +1576,12 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   scoping<R>(callback: () => R): R;
   scoping<R>(options: { allQueries?: boolean | null }, callback: () => R): R;
-  scoping<R>(
-    optionsOrCallback: { allQueries?: boolean | null } | (() => R),
-    maybeCallback?: () => R,
-  ): R {
-    const callback = (
-      typeof optionsOrCallback === "function" ? optionsOrCallback : maybeCallback
-    ) as () => R;
-    const allQueries =
-      typeof optionsOrCallback === "function" ? null : (optionsOrCallback.allQueries ?? null);
-
+  scoping<R>(options: { allQueries?: boolean | null } | (() => R) = {}, block?: () => R): R {
+    if (typeof options === "function") {
+      block = options;
+      options = {};
+    }
+    const { allQueries = null } = options;
     const registry = this.model.scopeRegistry();
 
     if (this.isGlobalScope(registry) && allQueries === false) {
@@ -1617,9 +1589,9 @@ export class Relation<T extends Base, G extends boolean = false> {
         "Scoping is set to apply to all queries and cannot be unset in a nested block.",
       );
     } else if (this.isAlreadyInScope(registry)) {
-      return callback();
+      return block!();
     } else {
-      return this._scoping(this as any, registry, allQueries, callback);
+      return this._scoping(this as any, registry, allQueries, block!);
     }
   }
 
@@ -1633,15 +1605,15 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _shouldEagerLoad: boolean | undefined;
 
-  private _cacheKeys: Map<string, Promise<string>> | undefined;
-  private _cacheVersions: Map<string, Promise<string | null>> | undefined;
+  private _cacheKeys: Record<string, Promise<string>> | undefined;
+  private _cacheVersions: Record<string, Promise<string>> | undefined;
 
   async cacheKey(timestampColumn = "updated_at"): Promise<string> {
-    this._cacheKeys ??= new Map();
-    if (!this._cacheKeys.has(timestampColumn)) {
-      this._cacheKeys.set(timestampColumn, this.model.collectionCacheKey(this, timestampColumn));
-    }
-    return this._cacheKeys.get(timestampColumn)!;
+    this._cacheKeys ||= {};
+    return (this._cacheKeys[timestampColumn] ||= this.model.collectionCacheKey(
+      this,
+      timestampColumn,
+    ));
   }
 
   /** @internal */
@@ -1657,15 +1629,11 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async cacheVersion(timestampColumn = "updated_at"): Promise<string | null> {
-    if (!this.model.collectionCacheVersioning) return null;
-    this._cacheVersions ??= new Map();
-    if (!this._cacheVersions.has(timestampColumn)) {
-      this._cacheVersions.set(
-        timestampColumn,
-        this.computeCacheVersion(timestampColumn) as Promise<string | null>,
-      );
+    if (this.model.collectionCacheVersioning) {
+      this._cacheVersions ||= {};
+      return (this._cacheVersions[timestampColumn] ||= this.computeCacheVersion(timestampColumn));
     }
-    return this._cacheVersions.get(timestampColumn)!;
+    return null;
   }
 
   /** @internal */
@@ -1811,41 +1779,32 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (this.model as any).createBang(attributes, block);
   }
 
-  private _scoping<R>(scope: any, registry: any, allQueries: boolean | null, fn: () => R): R {
-    const previous = registry.currentScope(this.model, true);
-    registry.setCurrentScope(this.model, scope);
+  private _scoping<R>(
+    scope: any,
+    registry: any,
+    allQueries: boolean | null = false,
+    block: () => R,
+  ): R {
+    let previous: any;
     let previousGlobal: any;
-    if (allQueries) {
-      previousGlobal = registry.globalCurrentScope(this.model, true);
-      registry.setGlobalCurrentScope(this.model, scope);
-    }
-    const ensure = () => {
-      registry.setCurrentScope(this.model, previous);
-      if (allQueries) {
-        registry.setGlobalCurrentScope(this.model, previousGlobal);
-      }
-    };
-    let result: R;
-    try {
-      result = fn();
-    } catch (error) {
-      ensure();
-      throw error;
-    }
-    if (result instanceof Promise) {
-      return result.then(
-        (value: unknown) => {
-          ensure();
-          return value;
-        },
-        (error: unknown) => {
-          ensure();
-          throw error;
-        },
-      ) as R;
-    }
-    ensure();
-    return result;
+    return rbEnsure(
+      () => {
+        previous = registry.currentScope(this.model, true);
+        registry.setCurrentScope(this.model, scope);
+
+        if (allQueries) {
+          previousGlobal = registry.globalCurrentScope(this.model, true);
+          registry.setGlobalCurrentScope(this.model, scope);
+        }
+        return block();
+      },
+      () => {
+        registry.setCurrentScope(this.model, previous);
+        if (allQueries) {
+          registry.setGlobalCurrentScope(this.model, previousGlobal);
+        }
+      },
+    );
   }
 
   private _substituteValues(values: [string, unknown][]): [any, any][] {

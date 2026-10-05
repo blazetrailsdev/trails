@@ -1,6 +1,13 @@
 import { Nodes, arelNode, sql as arelSql, type ArelNode } from "@blazetrails/arel";
 import { actsLike, isBlank } from "@blazetrails/activesupport";
-import { format, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  first,
+  format,
+  isSymbol,
+  rbInspect,
+  rbObjAsString,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import type { Quoting } from "./connection-adapters/abstract/quoting.js";
 import { PreparedStatementInvalid, UnknownAttributeReference } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
@@ -13,35 +20,35 @@ export type Quoter = Pick<
 
 export function disallowRawSqlBang(
   this: { adapterClass(): unknown },
-  args: (string | symbol | ArelNode)[],
-  { permit }: { permit?: RegExp } = {},
+  args: unknown[],
+  {
+    permit = (this.adapterClass() as { columnNameMatcher(): RegExp }).columnNameMatcher(),
+  }: { permit?: RegExp } = {},
 ): void {
-  const columnMatcher =
-    permit ?? (this.adapterClass() as { columnNameMatcher(): RegExp }).columnNameMatcher();
-  const unexpected: string[] = [];
+  let unexpected: unknown[] | null = null;
   for (const arg of args) {
-    if (typeof arg === "symbol" || (typeof arg === "string" && arg.startsWith(":"))) continue;
-    if (arelNode(arg)) continue;
-    const str = arg == null ? "" : arg.toString();
-    if (!columnMatcher.test(str.trim())) {
-      unexpected.push(str);
-    }
+    if (isSymbol(arg) || arelNode(arg) || permit.test(rbObjAsString(arg).trim())) continue;
+    (unexpected ||= []).push(arg);
   }
-  if (unexpected.length > 0) {
+
+  if (unexpected) {
     throw new UnknownAttributeReference(
-      `Dangerous query method (method whose arguments are used as raw SQL) ` +
-        `called with non-attribute argument(s): ${unexpected.map((a) => `"${a}"`).join(", ")}`,
+      "Dangerous query method (method whose arguments are used as raw " +
+        "SQL) called with non-attribute argument(s): " +
+        `${unexpected.map((arg) => rbInspect(arg)).join(", ")}.` +
+        "This method should not be called with user-provided values, such as request " +
+        "parameters or model attributes. Known-safe values can be passed " +
+        "by wrapping them in Arel.sql().",
     );
   }
 }
 
 export function sanitizeSqlLike(string: string, escapeCharacter: string = "\\"): string {
-  if (escapeCharacter === "") return string;
-  const escapedEsc = escapeCharacter.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  if (escapeCharacter !== "%" && escapeCharacter !== "_") {
-    return string.replace(new RegExp(`${escapedEsc}|[%_]`, "g"), (c) => escapeCharacter + c);
+  if (string.includes(escapeCharacter) && escapeCharacter !== "%" && escapeCharacter !== "_") {
+    string = string.replaceAll(escapeCharacter, () => escapeCharacter + escapeCharacter);
   }
-  return string.replace(/[%_]/g, (c) => escapeCharacter + c);
+
+  return string.replace(/(?=[%_])/g, () => escapeCharacter);
 }
 
 /** @internal */
@@ -104,26 +111,26 @@ export function sanitizeSqlForAssignment(
 export function sanitizeSqlForOrder(
   this: QuoterHost & {
     adapterClass(): unknown;
-    disallowRawSqlBang(args: (string | symbol | ArelNode)[], options?: { permit?: RegExp }): void;
+    disallowRawSqlBang(args: unknown[], options?: { permit?: RegExp }): void;
     sanitizeSqlArray(ary: [string, ...unknown[]]): string;
   },
   condition: string | ArelNode | [string | ArelNode, ...unknown[]],
 ): string | ArelNode | [string | ArelNode, ...unknown[]] {
-  if (Array.isArray(condition)) {
-    const first: unknown = condition[0];
-    const firstText = first instanceof Nodes.SqlLiteral ? first.toString() : String(first);
-    if (firstText.includes("?")) {
-      const adapterClass = this.adapterClass() as {
-        columnNameWithOrderMatcher(): RegExp;
-      };
-      this.disallowRawSqlBang([first as string | symbol | ArelNode], {
-        permit: adapterClass.columnNameWithOrderMatcher(),
-      });
-      const sanitized = this.sanitizeSqlArray([firstText, ...condition.slice(1)]);
-      return arelSql(sanitized);
+  if (Array.isArray(condition) && rbObjAsString(first(condition)).includes("?")) {
+    this.disallowRawSqlBang([first(condition)], {
+      permit: (
+        this.adapterClass() as { columnNameWithOrderMatcher(): RegExp }
+      ).columnNameWithOrderMatcher(),
+    });
+
+    if (first(condition) instanceof Nodes.SqlLiteral) {
+      condition = [String(first(condition)), ...condition.slice(1)];
     }
+
+    return arelSql(this.sanitizeSqlArray(condition as [string, ...unknown[]]));
+  } else {
+    return condition;
   }
-  return condition;
 }
 
 export function sanitizeSqlHashForAssignment(
