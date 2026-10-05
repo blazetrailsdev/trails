@@ -1194,6 +1194,12 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
     if (str instanceof Uint8Array) return str;
     return rbCheckStringType(str) ?? rbAnyToS(value as object);
   }
+  if (
+    typeof value === "function" &&
+    Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
+  ) {
+    return rbModToS(value as abstract new (...args: never) => unknown);
+  }
   if (typeof value === "object") {
     const str: unknown = value.toString();
     if (typeof str === "string" || str instanceof Uint8Array) return str;

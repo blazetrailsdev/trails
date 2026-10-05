@@ -152,8 +152,7 @@ describe("Thor::Util", () => {
   });
 
   describe("#find_class_and_command_by_namespace", () => {
-    // BLOCKED: port-thor-group
-    it.skip("returns a Thor::Group class if full namespace matches", () => {
+    it("returns a Thor::Group class if full namespace matches", () => {
       class MyCounter extends Thor.Group {
         static {
           (this as unknown as ThorClass).methodAdded("one");

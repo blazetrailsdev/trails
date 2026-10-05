@@ -146,6 +146,20 @@ describe("Object#to_s", () => {
     expect(toS([{ a: 1 }])).toBe('[{"a"=>1}]');
   });
 
+  it("is the class name for a class", () => {
+    class Named {
+      perform() {}
+    }
+    expect(toS(Named)).toBe("Named");
+    expect(toSSend(Named)).toBe("Named");
+    class Custom {
+      static toS() {
+        return "custom";
+      }
+    }
+    expect(toS(Custom)).toBe("custom");
+  });
+
   it("sends to_s to a receiver defining it", () => {
     expect(toS(new Range(1, 3))).toBe("1..3");
     class Ported {

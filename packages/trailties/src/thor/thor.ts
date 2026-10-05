@@ -29,6 +29,7 @@ import {
 import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, thorRunner } from "./base.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
 import { AmbiguousTaskError } from "./error.js";
+import { Group, type GroupClass } from "./group.js";
 import { Arguments } from "./parser/arguments.js";
 import type { Option, OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
@@ -54,8 +55,7 @@ type Instance = Base & {
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
 export class Thor {
-  /** @noRailsEquivalent CONVERGEABLE port-thor-group */
-  declare static Group: abstract new (...args: never[]) => object;
+  static Group = Group;
 
   /** @internal */
   static _packageName?: string | null;
@@ -106,7 +106,7 @@ export class Thor {
 
   static register(
     this: ThorClass,
-    klass: ThorClass,
+    klass: ThorClass | GroupClass,
     subcommandName: string,
     usage: string,
     description: string,
@@ -124,7 +124,7 @@ export class Thor {
       this.methodAdded(subcommandName);
     } else {
       this.desc(usage, description, options);
-      this.subcommand(subcommandName, klass);
+      this.subcommand(subcommandName, klass as ThorClass);
     }
   }
 
