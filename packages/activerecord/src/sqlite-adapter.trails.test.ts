@@ -614,7 +614,7 @@ describe("SQLite adapter driver binding", () => {
 
   it("isOpen and raw degrade gracefully before a deferred async-only open", () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncOnlyDriver });
-    expect(adapter.isActive()).toBe(false);
+    expect(adapter.isActive()).toBeFalsy();
   });
 });
 

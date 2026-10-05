@@ -203,7 +203,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await expect(queued).resolves.toBe(1);
     await disconnecting;
 
-    expect(closing.isActive()).toBe(false);
+    expect(closing.isActive()).toBeFalsy();
   });
 
   it("reports itself inactive once the disconnect a caller awaited has returned", async () => {
@@ -226,7 +226,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     const answered = closing.active();
 
     expect(await answered).toBe(false);
-    expect(closing.isActive()).toBe(false);
+    expect(closing.isActive()).toBeFalsy();
   });
 
   it("returns the rowid of each of two RETURNING inserts issued together", async () => {

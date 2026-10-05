@@ -173,7 +173,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     const args: string[] = [];
     if (rtest(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");
-    args.push(File.expandPath(config.database!, trailsRoot() ?? undefined));
+    const root = trailsRoot();
+    args.push(File.expandPath(config.database!, root != null ? root : undefined));
     return this.findCmdAndExec(databaseCli()["sqlite"], ...args);
   }
 
@@ -200,7 +201,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._memoryDatabase = true;
     } else if (/^file:/.test(filename)) {
     } else {
-      filename = File.expandPath(filename, trailsRoot() ?? undefined);
+      if (trailsRoot() != null) filename = File.expandPath(filename, trailsRoot()!);
       const dirname = File.dirname(filename);
       if (!File.isDirectory(dirname)) {
         try {
@@ -243,7 +244,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   async supportsExpressionIndex(): Promise<boolean> {
     return (await this.databaseVersion).compare("3.9.0") >= 0;
   }
-  private _closingDriver: Promise<void> | null = null;
   isRequiresReloading(): boolean {
     return false;
   }
@@ -346,22 +346,27 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this._rawConnection?.isOpen() ?? false;
   }
 
-  isActive(): boolean {
-    return this._rawConnection?.isOpen() ?? false;
+  isActive(): boolean | undefined {
+    if (this.isConnected()) {
+      this.verifiedBang();
+      return true;
+    }
+    return undefined;
   }
 
   override async active(): Promise<boolean> {
-    await this._closingDriver;
-    return this._rawConnection?.isOpen() ?? false;
+    return this.isActive() ?? false;
   }
 
   override async disconnectBang(): Promise<void> {
     await super.disconnectBang();
 
-    await this.lock.synchronize(() => {
-      void this._disconnect();
+    await this.lock.synchronize(async () => {
+      try {
+        await this._rawConnection?.close();
+      } catch {}
+      this._rawConnection = null;
     });
-    await this._closingDriver;
   }
 
   override async supportsIndexSortOrder(): Promise<boolean> {
@@ -743,28 +748,27 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     options: { rename?: Record<string, string> } = {},
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
-    const rename = options.rename ?? {};
-
     const alteredTableName = `a${tableName}`;
 
     const fks = foreignKeys ?? (await this.foreignKeys(tableName));
     const checks = checkConstraints ?? (await this.checkConstraints(tableName));
 
     const caller = (definition: SQLite3TableDefinition): void => {
+      const rename = options.rename ?? {};
       for (const fk of fks) {
-        const column = typeof fk.column === "string" ? (rename[fk.column] ?? fk.column) : fk.column;
+        const column = rename[fk.options.column as string];
+        if (column != null) {
+          fk.options.column = column;
+        }
         const toTable = this.stripTableNamePrefixAndSuffix(fk.toTable);
-        definition.foreignKey(toTable, {
-          column,
-          primaryKey: fk.primaryKey,
-          onDelete: fk.onDelete,
-          onUpdate: fk.onUpdate,
-          deferrable: fk.deferrable,
-          validate: "validate" in fk.options ? fk.options.validate : undefined,
-        });
+        definition.foreignKey(toTable, fk.options);
       }
-      definition.checkConstraints.push(...checks);
-      block?.(definition);
+
+      for (const chk of checks) {
+        definition.checkConstraint(chk.expression, chk.options);
+      }
+
+      if (block) block(definition);
     };
 
     await this.transaction(async () => {
@@ -800,7 +804,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     block?: (definition: SQLite3TableDefinition) => void,
   ): Promise<void> {
     const fromPrimaryKey = await this.primaryKey(from);
-    const rename = options.rename ?? {};
 
     let definition!: SQLite3TableDefinition;
     await this.createTable(to, { ...options, id: false }, async (td) => {
@@ -808,7 +811,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       if (Array.isArray(fromPrimaryKey)) definition.primaryKeys(fromPrimaryKey);
 
       for (const column of (await this.columns(from)) as Sqlite3Column[]) {
-        const columnName = rename[column.name] ?? column.name;
+        const columnName = options.rename
+          ? (options.rename[column.name] ?? column.name)
+          : column.name;
 
         const columnOptions: Record<string, unknown> = {
           limit: column.limit,
@@ -841,15 +846,14 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         definition.column(columnName, columnType as ColumnType, columnOptions);
       }
 
-      block?.(definition);
+      if (block) block(definition);
     });
-
-    await this.copyTableIndexes(from, to, rename);
+    await this.copyTableIndexes(from, to, options.rename ?? {});
 
     const columnsToCopy = definition.columns
       .filter((col) => !hasKey(col.options as Record<string, unknown>, "as"))
       .map((col) => col.name);
-    await this.copyTableContents(from, to, columnsToCopy, rename);
+    await this.copyTableContents(from, to, columnsToCopy, options.rename ?? {});
   }
 
   /** @internal */
@@ -1263,24 +1267,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   /** @internal */
   castResult(result: Result): Result {
     return sqliteCastResult(result);
-  }
-
-  /** @internal */
-  private _disconnect(): Promise<void> | void {
-    const conn = this._rawConnection;
-    let closing: Promise<void> | void = undefined;
-    if (conn?.isOpen()) {
-      closing = conn.close();
-      if (closing) this._chainClose(closing);
-    }
-    this._rawConnection = null;
-    return closing;
-  }
-
-  /** @internal */
-  private _chainClose(closing: Promise<void>): void {
-    const settled = closing.catch(() => {});
-    this._closingDriver = this._closingDriver ? this._closingDriver.then(() => settled) : settled;
   }
 
   /** @internal */

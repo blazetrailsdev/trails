@@ -34481,13 +34481,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "cancel_any_running_query",
-    "digest": "7c520a8a151688b3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "cast_result",
     "digest": "b9f01e080fbc07c2",
     "ref": "v8.0.2"

@@ -1242,9 +1242,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
         const quotedSequence = this.quoteTableName(sequence);
         await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
       } else {
-        (this.logger as { warn?(message: string): void } | null)?.warn?.(
-          `${table} has primary key ${pk} with no default sequence.`,
-        );
+        if (this.logger != null) {
+          (this.logger as { warn(message: string): void }).warn(
+            `${table} has primary key ${pk} with no default sequence.`,
+          );
+        }
       }
     }
   }
@@ -1334,7 +1336,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override quotedScope(
     name?: string | null,
     options: { type?: string } = {},
-  ): { schema: string; name: string | null; type: string | null } {
+  ): { schema: string; name?: string; type?: string } {
     let schema: string | null;
     [schema, name] = this.extractSchemaQualifiedName(name ?? "");
     let type: string | null = null;
@@ -1349,11 +1351,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
         type = "'f'";
         break;
     }
-    return {
-      schema: schema ? this.quote(schema) : "ANY (current_schemas(false))",
-      name: name ? this.quote(name) : null,
-      type,
-    };
+    const scope = {} as { schema: string; name?: string; type?: string };
+    scope.schema = schema ? this.quote(schema) : "ANY (current_schemas(false))";
+    if (name) scope.name = this.quote(name);
+    if (type) scope.type = type;
+    return scope;
   }
 
   /** @internal */
