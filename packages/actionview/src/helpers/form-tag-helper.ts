@@ -47,10 +47,10 @@ export function formTag(
   this: FormTagHelperHost,
   urlForOptions: unknown = {},
   options: Record<string, unknown> = {},
-  block?: (...args: unknown[]) => unknown,
+  block?: ((...args: unknown[]) => unknown) | null,
 ): SafeBuffer {
   const htmlOptions = htmlOptionsForForm.call(this, urlForOptions, options);
-  if (block !== undefined) {
+  if (block != null) {
     return formTagWithBody.call(this, htmlOptions, this.capture(block));
   } else {
     return formTagHtml.call(this, htmlOptions);

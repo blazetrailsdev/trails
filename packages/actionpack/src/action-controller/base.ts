@@ -38,7 +38,7 @@ import {
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
-import { defaultRender, methodForAction } from "./metal/implicit-render.js";
+import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
   AroundCallback,
@@ -473,12 +473,7 @@ export class Base extends Metal {
 
   isAnyTemplates = isAnyTemplates;
 
-  defaultRender = defaultRender;
-
-  /** @internal */
-  override methodForAction(actionName: string): string | undefined {
-    return methodForAction.call(this as never, actionName);
-  }
+  declare defaultRender: typeof defaultRender;
 
   /** @internal */
   override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
@@ -938,6 +933,7 @@ Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, Flash);
 Base.prototype.redirectTo = _instrumentRedirectTo;
+include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;

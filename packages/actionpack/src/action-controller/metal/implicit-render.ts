@@ -1,6 +1,5 @@
-import { rbInspect as inspect } from "@blazetrails/ruby-compat";
+import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
-import { AbstractController } from "../../abstract-controller/base.js";
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
 import {
@@ -79,7 +78,9 @@ function variantsFor(variant: unknown): readonly (string | symbol)[] {
 
 /** @internal */
 export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
-  const sup = AbstractController.prototype.methodForAction.call(this as never, actionName);
+  const sup = ImplicitRender.superMethod(this, "methodForAction")!(actionName) as
+    | string
+    | undefined;
   if (sup) return sup;
   if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
   return undefined;
@@ -91,3 +92,9 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
   if (!req) return false;
   return req.isGet?.() === true && req.format?.symbol === ":html" && req.xhr !== true;
 }
+
+export const ImplicitRender = new Module((mod) => {
+  mod.moduleEval((m) => {
+    Object.assign(m, { defaultRender, methodForAction, isInteractiveBrowserRequest });
+  });
+});

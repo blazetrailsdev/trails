@@ -1030,7 +1030,7 @@ function inspectValue(value: unknown, recursing: Set<object>): string {
 
 /** `exc_inspect` (`vendor/ruby/v3.3.11/error.c:1677-1703`), `Exception#inspect`. */
 function excInspect(exc: Error): string {
-  const klass = exc.constructor.name;
+  const klass = rbObjClassname(exc);
   const str = exc.message;
   if (str.length === 0) return klass;
   if (str.includes("\n")) return `#<${klass}:${stringInspect(str)}>`;

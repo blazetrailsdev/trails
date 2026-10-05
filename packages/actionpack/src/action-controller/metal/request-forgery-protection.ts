@@ -435,13 +435,14 @@ export function isVerifiedRequest(this: CsrfController): boolean {
   );
 }
 
-const AUTHENTICITY_TOKEN_LENGTH = RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH;
 const CSRF_TOKEN_ENV_KEY = "action_controller.csrf_token";
 const GLOBAL_CSRF_TOKEN_IDENTIFIER = "!real_csrf_token";
 
 /** @internal */
 export function generateCsrfToken(): string {
-  return encodeCsrfToken(SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH));
+  return encodeCsrfToken(
+    SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
+  );
 }
 
 /** @internal */
@@ -479,7 +480,7 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Bytes {
 export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Bytes {
   return OpenSSL.HMAC.digest("SHA256", realCsrfToken.call(this, session), identifier).subarray(
     0,
-    AUTHENTICITY_TOKEN_LENGTH,
+    RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH,
   ) as Bytes;
 }
 
@@ -500,15 +501,15 @@ export function perFormCsrfToken(
 
 /** @internal */
 export function maskToken(rawToken: Bytes): string {
-  const otp = SecureRandom.randomBytes(AUTHENTICITY_TOKEN_LENGTH);
+  const otp = SecureRandom.randomBytes(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH);
   return encodeCsrfToken(Buffer.concat([otp, xorByteStrings(otp, rawToken)]));
 }
 
 /** @internal */
 export function unmaskToken(maskedToken: Bytes): Bytes {
   return xorByteStrings(
-    maskedToken.subarray(0, AUTHENTICITY_TOKEN_LENGTH),
-    maskedToken.subarray(AUTHENTICITY_TOKEN_LENGTH),
+    maskedToken.subarray(0, RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
+    maskedToken.subarray(RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH),
   );
 }
 
@@ -593,8 +594,9 @@ export function isValidAuthenticityToken(
   } catch {
     return false;
   }
-  if (masked.length === AUTHENTICITY_TOKEN_LENGTH) return compareWithRealToken.call(this, masked);
-  if (masked.length === AUTHENTICITY_TOKEN_LENGTH * 2) {
+  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
+    return compareWithRealToken.call(this, masked);
+  if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH * 2) {
     const csrfToken = unmaskToken(masked);
     return (
       compareWithGlobalToken.call(this, csrfToken) ||

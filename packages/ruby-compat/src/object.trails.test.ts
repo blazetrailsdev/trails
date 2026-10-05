@@ -50,6 +50,7 @@ import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
+import { rbModConstSet } from "./include.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -859,5 +860,30 @@ describe("toSym", () => {
     expect(() => toSym(1)).toThrow(NoMethodError);
     expect(() => toSym(1)).toThrow("undefined method 'to_sym' for an instance of Integer");
     expect(() => toSym(null)).toThrow("undefined method 'to_sym' for nil");
+  });
+});
+
+describe("Exception#inspect", () => {
+  class Loud extends Error {}
+
+  it("answers the class name for an empty message", () => {
+    expect(inspect(new Loud(""))).toBe("Loud");
+  });
+
+  it("wraps the class name and message", () => {
+    expect(inspect(new Loud("Something made the bad noise."))).toBe(
+      "#<Loud: Something made the bad noise.>",
+    );
+  });
+
+  it("inspects a message carrying a newline", () => {
+    expect(inspect(new Loud("a\nb"))).toBe('#<Loud:"a\\nb">');
+  });
+
+  it("names a namespaced class by its path", () => {
+    class Outer {}
+    class Inner extends Error {}
+    rbModConstSet(Outer, "Inner", Inner);
+    expect(inspect(new Inner("boom"))).toBe("#<Outer::Inner: boom>");
   });
 });
