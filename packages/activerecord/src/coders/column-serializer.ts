@@ -60,7 +60,13 @@ export class ColumnSerializer {
   }
 
   assertValidValue(object: unknown, { action }: { action: string }): void {
-    if (!(object == null || Object(object) instanceof this._objectClass)) {
+    if (
+      !(
+        object == null ||
+        this._objectClass === (Object as unknown) ||
+        object instanceof this._objectClass
+      )
+    ) {
       throw new SerializationTypeMismatch(
         `can't ${action} \`${this._attrName}\`: was supposed to be a ${this._objectClass.name}, ` +
           `but was a ${rbObjClassname(object)}. -- ${rbInspect(object)}`,
