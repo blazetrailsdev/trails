@@ -5447,11 +5447,6 @@ function isParameterRebinding(statement: ts.IfStatement): boolean {
   return onlyPositional && statement.expression.getText().includes(positional);
 }
 
-/**
- * The parameters a test asks the KIND of, when that is all it asks:
- * `typeof p === "…"`, `p === null` and `Array.isArray(p)`, joined by `&&` /
- * `||` / `!`. `undefined` for a test that reads anything else.
- */
 function parameterKindTest(
   test: ts.Expression,
   parameters: readonly string[],
@@ -5498,24 +5493,6 @@ function parameterKindTest(
   return kind(test) ? tested : undefined;
 }
 
-/**
- * `if (!(typeof columnName === "string" || Array.isArray(columnName))) { options
- * = { ...columnName, ...options }; columnName = null; }`: the binding of Ruby's
- * keywords, or block, past an optional positional
- * (`def remove_index(table_name, column_name = nil, **options)`,
- * `activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:966`).
- * Ruby binds those at the call; a TS caller hands the hash in the positional's
- * slot, so the body moves it. The shape is exactly that: the first statement of
- * the body, a test that only asks what kind of value a parameter holds, guarded
- * statements that each assign a parameter, and one of them handing the tested
- * parameter, or a spread of it, to the LAST parameter. Any other parameter is
- * cleared as {@link isParameterRebinding} clears one, or read back off the last
- * (`toTable = options.toTable`). The move onto the last parameter keeps a
- * coercion an arm (`error = RuntimeError.new(error) if error.is_a?(String)`,
- * `activesupport/lib/active_support/error_reporter.rb:146`). Wider than
- * {@link isParameterRebinding} in what the guard may assign, and narrower in
- * where it may sit.
- */
 function isKwargsRebindingGuard(statement: ts.IfStatement): boolean {
   const body = statement.parent;
   if (!ts.isBlock(body) || !ts.isFunctionLike(body.parent)) return false;
@@ -5686,14 +5663,6 @@ function isBlockForward(conditional: ts.ConditionalExpression): boolean {
   );
 }
 
-/**
- * `typeof last === "object" ? prefixes.pop() : {}`, `last` being
- * `prefixes[prefixes.length - 1]`: the capture of Ruby's keywords after a splat
- * (`def attribute_method_prefix(*prefixes, parameters: nil)`,
- * `activemodel/lib/active_model/attribute_methods.rb:106`). A TS rest parameter
- * comes last, so the keywords ride in the splat and are popped off it. That
- * binds parameters, as {@link isBlockCapture}'s pop does, and is not an arm.
- */
 function isKwargsCapture(conditional: ts.ConditionalExpression): boolean {
   let popped = conditional.whenTrue;
   while (ts.isAsExpression(popped) || ts.isParenthesizedExpression(popped)) {
