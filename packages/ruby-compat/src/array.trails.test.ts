@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { IndexError } from "./index-error.js";
+import { block } from "./hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
@@ -8,6 +10,7 @@ import {
   zip,
   aryDelete,
   aryDeleteIf,
+  aryFetch,
   aryIncludes,
   aryPop,
   arySlice,
@@ -435,6 +438,31 @@ describe("aryIncludes", () => {
     expect(aryIncludes([[1, 2], 3], [1, 2])).toBe(true);
     expect(aryIncludes([[1, 2], 3], [2, 1])).toBe(false);
     expect(aryIncludes([], 1)).toBe(false);
+  });
+});
+
+describe("aryFetch", () => {
+  it("answers the element, the block's value, the default, or raises IndexError", () => {
+    const ary = ["foo", "bar", 2];
+    expect([aryFetch(ary, 1), aryFetch(ary, -1), aryFetch(ary, 1, null)]).toEqual([
+      "bar",
+      2,
+      "bar",
+    ]);
+    expect(
+      aryFetch(
+        ary,
+        50,
+        block((index: number) => `Value for ${index}`),
+      ),
+    ).toBe("Value for 50");
+    expect(aryFetch(ary, 50, null)).toBeNull();
+    expect(() => aryFetch(ary, 50)).toThrow(
+      new IndexError("index 50 outside of array bounds: -3...3"),
+    );
+    expect(() => aryFetch(ary, -4)).toThrow(
+      new IndexError("index -4 outside of array bounds: -3...3"),
+    );
   });
 });
 

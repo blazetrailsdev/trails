@@ -2,7 +2,8 @@ import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
-import { Hash } from "./hash.js";
+import { Hash, rbBlockGivenP } from "./hash.js";
+import { IndexError } from "./index-error.js";
 import { conversionMismatch, rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { num2long } from "./string/support.js";
@@ -433,6 +434,35 @@ export function aryDeleteIf<T>(ary: T[], block: (item: T) => unknown): T[] {
     }
   }
   return ary;
+}
+
+/**
+ * Ruby `Array#fetch` (`vendor/ruby/v3.3.11/array.c:1962` `rb_ary_fetch`): the
+ * element at `pos`, counted from the end when negative. Out of range it
+ * answers the block's value for `pos`, else the default, else raises
+ * `IndexError`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryFetch(ary: readonly unknown[], pos: number, ...argv: unknown[]): unknown {
+  const blockGiven = rbBlockGivenP(argv[argv.length - 1]);
+  const block = blockGiven ? (argv.pop() as (pos: number) => unknown) : undefined;
+  const ifnone = argv[0];
+  let idx = num2long(pos);
+
+  if (idx < 0) {
+    idx += ary.length;
+  }
+  if (idx < 0 || ary.length <= idx) {
+    if (blockGiven) return block!(pos);
+    if (argv.length === 0) {
+      throw new IndexError(
+        `index ${idx - (idx < 0 ? ary.length : 0)} outside of array bounds: ${-ary.length}...${ary.length}`,
+      );
+    }
+    return ifnone;
+  }
+  return ary[idx];
 }
 
 /**

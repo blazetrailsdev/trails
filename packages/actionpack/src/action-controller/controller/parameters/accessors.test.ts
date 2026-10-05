@@ -1,8 +1,19 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import { Parameters } from "../../metal/strong-parameters.js";
 import { assertNil } from "@blazetrails/activesupport";
 
 describe("ParametersAccessorsTest", () => {
+  let params: Parameters;
+  beforeEach(() => {
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: { first: "David", last: "Heinemeier Hansson" },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+  });
+
   it("each returns self", () => {
     const params = new Parameters({ a: "1", b: "2" });
     const result = params.each(() => {});
@@ -181,26 +192,12 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("fetch retains permitted status", () => {
-    const params = new Parameters({
-      person: {
-        age: "32",
-        name: { first: "David", last: "Heinemeier Hansson" },
-        addresses: [{ city: "Chicago", state: "Illinois" }],
-      },
-    });
     params.permitBang();
     expect((params.fetch("person") as Parameters).permitted).toBe(true);
     expect(((params.get("person") as Parameters).fetch("name") as Parameters).permitted).toBe(true);
   });
 
   it("fetch retains unpermitted status", () => {
-    const params = new Parameters({
-      person: {
-        age: "32",
-        name: { first: "David", last: "Heinemeier Hansson" },
-        addresses: [{ city: "Chicago", state: "Illinois" }],
-      },
-    });
     expect((params.fetch("person") as Parameters).permitted).toBe(false);
     expect(((params.get("person") as Parameters).fetch("name") as Parameters).permitted).toBe(
       false,

@@ -155,6 +155,7 @@ export {
   aryCount,
   aryDelete,
   aryDeleteIf,
+  aryFetch,
   aryIncludes,
   aryPop,
   arySlice,

@@ -7,6 +7,8 @@ import {
   IO,
   Rational,
   StringIO,
+  KeyError,
+  aryFetch,
   block,
   type ConflictBlock,
   eachPair,
@@ -32,7 +34,7 @@ import {
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 import { ActionController } from "../../namespaces.js";
 
-export class ParameterMissing extends Error {
+export class ParameterMissing extends KeyError {
   readonly param: string;
   readonly keys: string[] | null;
   #cachedCorrections?: string[];
@@ -525,7 +527,6 @@ export class Parameters {
     return this;
   }
 
-  /** @inventedArm if — CONVERGEABLE strong-parameters-fetch-default-reads-through-array-fetch */
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
     return this._convertValueToParameters(
@@ -536,8 +537,13 @@ export class Parameters {
           if (blockGiven) {
             return blockGiven();
           } else {
-            if (args.length > 0) return args[0];
-            throw new ParameterMissing(key, Object.keys(this._data));
+            return aryFetch(
+              args,
+              0,
+              block(() => {
+                throw new ParameterMissing(key, Object.keys(this._data));
+              }),
+            );
           }
         }),
       ),

@@ -188,18 +188,11 @@ describe("Thor", () => {
     });
 
     it("still passes everything after -- to command, complex", async () => {
-      expect(
-        await myScript.start([
-          "exec",
-          "command",
-          "--mode",
-          "z",
-          "again",
-          "--",
-          "--verbose",
-          "more",
-        ]),
-      ).toEqual([hash({}), ["command", "--mode", "z", "again", "--", "--verbose", "more"]]);
+      const args = ["exec", "command", "--mode", "z", "again", "--", "--verbose", "more"];
+      expect(await myScript.start(args)).toEqual([
+        hash({}),
+        ["command", "--mode", "z", "again", "--", "--verbose", "more"],
+      ]);
     });
 
     it("does not affect ordinary commands", async () => {
@@ -314,18 +307,11 @@ describe("Thor", () => {
       });
 
       it("still passes everything after -- to command, complex", async () => {
-        expect(
-          await myScript2.start([
-            "exec",
-            "command",
-            "--mode",
-            "z",
-            "again",
-            "--",
-            "--verbose",
-            "more",
-          ]),
-        ).toEqual([hash({}), ["command", "--mode", "z", "again", "--", "--verbose", "more"]]);
+        const args = ["exec", "command", "--mode", "z", "again", "--", "--verbose", "more"];
+        expect(await myScript2.start(args)).toEqual([
+          hash({}),
+          ["command", "--mode", "z", "again", "--", "--verbose", "more"],
+        ]);
       });
     });
   });
@@ -410,18 +396,11 @@ describe("Thor", () => {
     });
 
     it("still passes everything after -- to command, complex", async () => {
-      expect(
-        await myScript.start([
-          "checked",
-          "command",
-          "--mode",
-          "z",
-          "again",
-          "--",
-          "--verbose",
-          "more",
-        ]),
-      ).toEqual([hash({ mode: "z" }), ["command", "again", "--verbose", "more"]]);
+      const args = ["checked", "command", "--mode", "z", "again", "--", "--verbose", "more"];
+      expect(await myScript.start(args)).toEqual([
+        hash({ mode: "z" }),
+        ["command", "again", "--verbose", "more"],
+      ]);
     });
   });
 
