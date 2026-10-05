@@ -4,6 +4,7 @@ import { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import { registry } from "../type.js";
 import { ValueType } from "../type/value.js";
+import { Marshal } from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -84,10 +85,29 @@ describe("LazyAttributeHash defaultAttributes", () => {
     const original = new LazyAttributeHash(types, { score: "42" }, additional, defaults);
     original.get("score");
 
-    const restored = LazyAttributeHash.marshalLoad(original.marshalDump());
+    const restored = Object.create(LazyAttributeHash.prototype) as LazyAttributeHash;
+    restored.marshalLoad(original.marshalDump());
     expect(restored.delegateHash()["score"].value()).toBe(42);
-    const fresh = LazyAttributeHash.marshalLoad([types, {}, additional, defaults]);
+    const fresh = Object.create(LazyAttributeHash.prototype) as LazyAttributeHash;
+    fresh.marshalLoad([types, {}, additional, defaults]);
     expect(fresh.get("status")!.value()).toBe("active");
+  });
+
+  it("Marshal.load(Marshal.dump(hash)) answers an equal hash (builder.rb:142-148)", () => {
+    const types = { status: strType, score: intType };
+    const defaults = { status: Attribute.withCastValue("status", "active", strType) };
+    const original = new LazyAttributeHash(types, { score: "42" }, {}, defaults);
+    original.get("score");
+
+    const loaded = Marshal.load(Marshal.dump(original)) as LazyAttributeHash;
+    expect(loaded).toBeInstanceOf(LazyAttributeHash);
+    expect(loaded.equals(Marshal.load(Marshal.dump(original)))).toBe(true);
+    expect(loaded.eachKey()).toEqual(original.eachKey());
+    for (const key of original.eachKey()) {
+      expect(loaded.get(key)!.equals(original.get(key)!)).toBe(true);
+    }
+    expect(loaded.get("score")!.value()).toBe(42);
+    expect(loaded.get("status")!.value()).toBe("active");
   });
 
   it("materialized default is detached from the prototype — mutation does not bleed across AttributeSets", () => {

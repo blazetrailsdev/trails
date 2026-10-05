@@ -155,12 +155,12 @@ export class LazyAttributeSet extends AttributeSet {
 }
 
 export class LazyAttributeHash {
-  private _delegateHash: Record<string, Attribute>;
-  private types: Record<string, ValueType>;
-  private values: Record<string, unknown>;
-  private additionalTypes: Record<string, ValueType>;
-  private defaultAttributes: Record<string, Attribute>;
-  private materialized: boolean;
+  declare private _delegateHash: Record<string, Attribute>;
+  declare private types: Record<string, ValueType>;
+  declare private values: Record<string, unknown>;
+  declare private additionalTypes: Record<string, ValueType>;
+  declare private defaultAttributes: Record<string, Attribute>;
+  declare private materialized: boolean;
 
   transformValues<T>(fn: (attr: Attribute) => T): Record<string, T> {
     return transformValues(this.materialize(), fn);
@@ -185,12 +185,7 @@ export class LazyAttributeHash {
     defaultAttributes: Record<string, Attribute> = {},
     delegateHash: Record<string, Attribute> = {},
   ) {
-    this.types = types;
-    this.values = values;
-    this.additionalTypes = additionalTypes;
-    this.materialized = false;
-    this.defaultAttributes = defaultAttributes;
-    this._delegateHash = Object.setPrototypeOf(delegateHash, null) as Record<string, Attribute>;
+    this.initialize(types, values, additionalTypes, defaultAttributes, delegateHash);
   }
 
   isKey(key: string): boolean {
@@ -198,11 +193,11 @@ export class LazyAttributeHash {
   }
 
   get(key: string): Attribute | undefined {
-    return this._delegateHash[key] ?? this.assignDefaultValue(key);
+    return (hashAref(this.delegateHash(), key) as Attribute | null) ?? this.assignDefaultValue(key);
   }
 
   set(key: string, value: Attribute): void {
-    this._delegateHash[key] = value;
+    hashAset(this.delegateHash(), key, value);
   }
 
   deepDup(): LazyAttributeHash {
@@ -250,16 +245,9 @@ export class LazyAttributeHash {
     ];
   }
 
-  static marshalLoad(
-    values: [
-      Record<string, ValueType>,
-      Record<string, unknown>,
-      (Record<string, ValueType> | undefined)?,
-      (Record<string, Attribute> | undefined)?,
-      (Record<string, Attribute> | undefined)?,
-    ],
-  ): LazyAttributeHash {
-    return new LazyAttributeHash(values[0], values[1], values[2], values[3], values[4]);
+  /** @missingRailsCall initialize — PERMANENT */
+  marshalLoad(values: unknown[]): void {
+    this.initialize(...(values as Parameters<LazyAttributeHash["initialize"]>));
   }
 
   /** @internal */
@@ -297,14 +285,29 @@ export class LazyAttributeHash {
 
     if (valuePresent) {
       const attr = Attribute.fromDatabase(name, value, type);
-      this._delegateHash[name] = attr;
+      hashAset(this.delegateHash(), name, attr);
       return attr;
     } else if (hasKey(this.types, name)) {
       const attr = hashAref(this.defaultAttributes, name) as Attribute | null;
       const built = attr ? attr.dup() : Attribute.uninitialized(name, type);
-      this._delegateHash[name] = built;
+      hashAset(this.delegateHash(), name, built);
       return built;
     }
+  }
+
+  private initialize(
+    types: Record<string, ValueType>,
+    values: Record<string, unknown>,
+    additionalTypes: Record<string, ValueType> = {},
+    defaultAttributes: Record<string, Attribute> = {},
+    delegateHash: Record<string, Attribute> = {},
+  ): void {
+    this.types = types;
+    this.values = values;
+    this.additionalTypes = additionalTypes;
+    this.materialized = false;
+    this._delegateHash = delegateHash;
+    this.defaultAttributes = defaultAttributes;
   }
 
   dup(): LazyAttributeHash {

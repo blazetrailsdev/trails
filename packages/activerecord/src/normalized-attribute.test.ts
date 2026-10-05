@@ -62,10 +62,8 @@ describe("NormalizedAttributeTest", () => {
   it("normalizes changed-in-place value before validation", async () => {
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
-      _hasValue: boolean;
     };
     nameAttr._value = "fly high";
-    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     await aircraft.isValid();
@@ -75,10 +73,8 @@ describe("NormalizedAttributeTest", () => {
   it("normalizes value on demand", () => {
     const nameAttr = aircraft._attributes.getAttribute("name") as unknown as {
       _value: unknown;
-      _hasValue: boolean;
     };
     nameAttr._value = "fly high";
-    nameAttr._hasValue = true;
     expect(aircraft.name).toBe("fly high");
 
     aircraft.normalizeAttribute("name");

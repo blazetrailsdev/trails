@@ -1,8 +1,51 @@
 import { ArgumentError } from "./argument-error.js";
-import { getProcessAdapter } from "./process-adapter.js";
+import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
+import type { WaitStatus } from "./child-process-adapter.js";
 
 interface SystemCallError extends Error {
   code?: string;
+}
+
+/**
+ * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`) for the
+ * `[env, ] command_line` form: `rb_exec_getargs` (`process.c:2511`) takes a
+ * leading Hash as the environment, and `rb_execarg_addopt`'s env arm lays it
+ * over `ENV`, a `nil` value unsetting the name.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
+ * (`vendor/ruby/v3.3.11/process.c:2767`).
+ */
+export function rbExecargNew(
+  argv: readonly unknown[],
+): [command: string, env: Record<string, string | undefined>] {
+  const env: Record<string, string | undefined> = { ...processEnv };
+  if (argv.length > 1) {
+    for (const [name, value] of Object.entries(argv[0] as Record<string, string | null>)) {
+      if (value == null) delete env[name];
+      else env[name] = value;
+    }
+  }
+  return [argv[argv.length - 1] as string, env];
+}
+
+/**
+ * `Process::Status` (`vendor/ruby/v3.3.11/process.c:9169` `rb_cProcessStatus`),
+ * built from what the child was waited with (`rb_process_status_new`,
+ * `process.c:645`).
+ */
+class Status {
+  readonly pid: number | null;
+  readonly #status: number | null;
+
+  constructor(status: WaitStatus) {
+    this.pid = status.pid;
+    this.#status = status.error === undefined ? status.status : null;
+  }
+
+  isSuccess(): boolean | null {
+    if (this.#status === null) return null;
+    return this.#status === 0;
+  }
 }
 
 /**
@@ -23,6 +66,16 @@ interface SystemCallError extends Error {
  * Rails or gem file declares the module this file's export lives in.
  */
 export class Process {
+  /**
+   * `vendor/ruby/v3.3.11/process.c:9169` — what `Open3.capture2e` answers as
+   * its second value, which `Thor::Actions#run` asks `success?`
+   * (`vendor/thor/v1.3.2/lib/thor/actions.rb:265-266`).
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Process::Status`
+   * (`vendor/ruby/v3.3.11/process.c:9169`).
+   */
+  static readonly Status = Status;
+
   /**
    * `vendor/ruby/v3.3.11/process.c:9404` — the clock that cannot go backwards, which is
    * every Rails elapsed-time measurement's clock id.

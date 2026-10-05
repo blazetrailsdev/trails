@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { deepDup } from "@blazetrails/activesupport";
 import { Time } from "@blazetrails/date";
-import { rbHash, rbObjDup } from "@blazetrails/ruby-compat";
+import { Marshal, rbHash, rbObjDup, rbObjInstanceVariables } from "@blazetrails/ruby-compat";
 import { Attribute, FromUser, UNINITIALIZED_ORIGINAL_VALUE } from "./attribute.js";
 import { UNINITIALIZED_ORIGINAL_VALUE as UNINITIALIZED_FROM_INDEX } from "./index.js";
 import { registry } from "./type.js";
 import { ValueType } from "./type/value.js";
-import "./attribute/user-provided-default.js";
+import { UserProvidedDefault } from "./attribute/user-provided-default.js";
 
 const typeRegistry = registry();
 
@@ -306,6 +306,68 @@ describe("Attribute — trails-only coverage", () => {
         expect(duped.value()).toBeInstanceOf(cast.constructor);
         expect(duped.value()).toEqual(attr.value());
       }
+    });
+  });
+
+  describe("instance variables (attribute.rb:33-48)", () => {
+    const names = ["@name", "@value_before_type_cast", "@type", "@original_attribute"];
+
+    it("answers Rails' ivar names, and @value only once the value has been read", () => {
+      const attr = Attribute.fromUser("age", "42", typeRegistry.lookup("integer"));
+      expect(rbObjInstanceVariables(attr)).toEqual(names);
+      expect(attr.hasBeenRead()).toBe(false);
+
+      expect(attr.value()).toBe(42);
+      expect(rbObjInstanceVariables(attr)).toEqual([...names, "@value"]);
+      expect(attr.hasBeenRead()).toBe(true);
+    });
+
+    it("a value given to from_database is @value from the start, a nil one is not", () => {
+      const type = typeRegistry.lookup("integer");
+      expect(rbObjInstanceVariables(Attribute.fromDatabase("age", "42", type, 42))).toEqual([
+        ...names,
+        "@value",
+      ]);
+      expect(rbObjInstanceVariables(Attribute.fromDatabase("age", "42", type, null))).toEqual(
+        names,
+      );
+    });
+
+    it("dup of an unread attribute leaves @value undefined", () => {
+      const duped = rbObjDup(Attribute.fromUser("age", "42", typeRegistry.lookup("integer")));
+      expect(rbObjInstanceVariables(duped)).toEqual(names);
+      expect(duped.hasBeenRead()).toBe(false);
+    });
+
+    it("a marshal-loaded UserProvidedDefault holds the ivars a constructed one does", () => {
+      const type = typeRegistry.lookup("integer");
+      const attr = Attribute.fromUser("age", "1", type).withUserDefault(
+        "42",
+      ) as UserProvidedDefault;
+      const loaded = Object.create(Object.getPrototypeOf(attr)) as typeof attr;
+      loaded.marshalLoad(attr.marshalDump());
+      expect(rbObjInstanceVariables(loaded)).toEqual([
+        "@name",
+        "@user_provided_value",
+        "@type",
+        "@original_attribute",
+      ]);
+    });
+
+    it("Marshal.dump writes Rails' ivar names", () => {
+      const attr = Attribute.fromUser("age", "42", new ValueType());
+      const unread = Marshal.dump(attr);
+      expect(unread).toContain("@value_before_type_cast");
+      expect(unread).not.toMatch(/@_value|@_has_value|@value[^_]/);
+
+      attr.value();
+      const read = Marshal.dump(attr);
+      expect(read).toMatch(/@value[^_]/);
+      expect(read).not.toMatch(/@_value|@_has_value/);
+
+      const loaded = Marshal.load(Marshal.dump(attr)) as typeof attr;
+      expect(loaded.equals(attr)).toBe(true);
+      expect(loaded.value()).toBe("42");
     });
   });
 });
