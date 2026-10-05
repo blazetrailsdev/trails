@@ -14,7 +14,7 @@ export class TypeMap {
     return this.fetch(lookupKey, () => new ValueType());
   }
 
-  fetch(lookupKey: string | null, block: (key: string) => ValueType): ValueType {
+  fetch(lookupKey: string | null, block?: (key: string) => ValueType): ValueType {
     return this._cache.fetchOrStore(
       lookupKey,
       blockPass(() => this.performFetch(lookupKey, block)),
@@ -43,7 +43,7 @@ export class TypeMap {
   }
 
   /** @missingRailsCall call — PERMANENT */
-  protected performFetch(lookupKey: string | null, block: (key: string) => ValueType): ValueType {
+  protected performFetch(lookupKey: string | null, block?: (key: string) => ValueType): ValueType {
     const matchingPair = [...this._mapping].reverse().find(([key]) => rbEqq(key, lookupKey));
 
     if (matchingPair) {
@@ -51,7 +51,7 @@ export class TypeMap {
     } else if (this._parent) {
       return this._parent.performFetch(lookupKey, block);
     } else {
-      return block(lookupKey as string);
+      return block!(lookupKey as string);
     }
   }
 }
