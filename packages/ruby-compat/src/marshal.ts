@@ -446,7 +446,11 @@ function wRemember(obj: unknown, arg: DumpArg): void {
   arg.data.set(obj, arg.numEntries++);
 }
 
-/** `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). */
+/**
+ * `w_object` (`vendor/ruby/v3.3.11/marshal.c:846`). The compat arm's
+ * `UNDEF_P(ivobj)` (`marshal.c:970`) always holds: `hasIvars` has no `ivobj`
+ * out-param.
+ */
 function wObject(obj: unknown, arg: DumpArg, limit: number): void {
   let hasiv = 0;
   let encname: Encname = null;
