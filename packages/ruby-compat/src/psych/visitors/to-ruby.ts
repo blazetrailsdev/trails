@@ -70,10 +70,8 @@ export class ToRuby {
   }
 
   private deserialize(o: Scalar): unknown {
-    if (!o.tag) {
-      const quoted = o.type === yaml.Scalar.QUOTE_SINGLE || o.type === yaml.Scalar.QUOTE_DOUBLE;
-      return quoted ? o.value : this.ss.tokenize(o.value);
-    }
+    if (!o.tag && o.type !== yaml.Scalar.PLAIN) return o.value;
+    if (!o.tag) return this.ss.tokenize(o.source as string);
 
     const value = String(o.value);
     switch (o.tag) {
@@ -96,7 +94,7 @@ export class ToRuby {
       }
       default:
         if (/^!ruby\/sym(bol)?:?(.*)?$/.test(o.tag)) return this.classLoader.symbolize(value);
-        return this.ss.tokenize(o.value);
+        return this.ss.tokenize(o.source as string);
     }
   }
 
