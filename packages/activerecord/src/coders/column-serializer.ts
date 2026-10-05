@@ -64,7 +64,7 @@ export class ColumnSerializer {
       !(
         object == null ||
         this._objectClass === (Object as unknown) ||
-        object instanceof this._objectClass
+        Object(object) instanceof this._objectClass
       )
     ) {
       throw new SerializationTypeMismatch(
