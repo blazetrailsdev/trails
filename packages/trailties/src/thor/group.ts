@@ -83,6 +83,10 @@ export class Group {
     return this._invocationBlocks!;
   }
 
+  /**
+   * @inventedArm isModuleIncluded — PERMANENT
+   * @inventedArm camelCase — PERMANENT
+   */
   static invoke(this: GroupClass, ...names: unknown[]): void {
     const block = (
       typeof last(names) === "function" && !isModuleIncluded(last(names) as BaseClass, Base)
@@ -118,6 +122,7 @@ export class Group {
     });
   }
 
+  /** @inventedArm camelCase — PERMANENT */
   static invokeFromOption(this: GroupClass, ...names: unknown[]): void {
     const block = (typeof last(names) === "function" ? names.pop() : undefined) as
       | InvocationBlock
