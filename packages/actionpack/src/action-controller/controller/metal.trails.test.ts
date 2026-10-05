@@ -52,6 +52,47 @@ describe("Metal#response_body=", () => {
   });
 });
 
+describe("Metal#response_body= / #status=", () => {
+  it("joins an Array body", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.responseBody = ["a", "b"];
+    expect(c.responseBody).toBe("ab");
+  });
+
+  it("a nil body resets the response's", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    c.responseBody = "hi";
+    c.responseBody = null;
+    expect(c.response.body).toBe("");
+  });
+
+  it("status= and head raise on an unknown status symbol", () => {
+    const c = new (class extends Metal {})();
+    c.setResponseBang(makeResponse());
+    expect(() => {
+      c.status = "bogus";
+    }).toThrow("Unrecognized status code :bogus");
+    expect(() => c.head("bogus")).toThrow("Unrecognized status code :bogus");
+  });
+});
+
+describe("Metal#dispatch", () => {
+  it("seats the controller on the request's action_controller.instance", async () => {
+    class TestController extends Metal {
+      index(): void {
+        this.responseBody = "ok";
+      }
+    }
+    const c = new TestController();
+    const req = makeRequest();
+    await c.dispatch("index", req, makeResponse());
+    expect(req.controllerInstance).toBe(c);
+    expect(req.env["action_controller.instance"]).toBe(c);
+  });
+});
+
 describe("Metal.middlewareStack", () => {
   it("a subclass reads a copy of its superclass's stack, and writes stay local", () => {
     const middleware = (app: unknown) => app;

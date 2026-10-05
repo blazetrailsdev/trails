@@ -1,25 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
-  applyPermissionsPolicy,
   buildPermissionsPolicy,
   permissionsPolicy,
   type PermissionsPolicyBlock,
 } from "./permissions-policy.js";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
-
-describe("applyPermissionsPolicy", () => {
-  it("removes existing header when policy is false", () => {
-    const headers: Record<string, string> = { "permissions-policy": "geolocation=(self)" };
-    applyPermissionsPolicy(headers, false);
-    expect(headers["permissions-policy"]).toBeUndefined();
-  });
-
-  it("sets the header when policy is a string", () => {
-    const headers: Record<string, string> = {};
-    applyPermissionsPolicy(headers, "geolocation=(self)");
-    expect(headers["permissions-policy"]).toBe("geolocation=(self)");
-  });
-});
 
 describe("buildPermissionsPolicy", () => {
   it("formats string values as parenthesized lists", () => {

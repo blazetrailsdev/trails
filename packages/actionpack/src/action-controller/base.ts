@@ -310,7 +310,8 @@ export interface Base
   extends
     Included<typeof HttpAuthentication.Basic.ControllerMethods>,
     Included<typeof HttpAuthentication.Digest.ControllerMethods>,
-    Included<typeof HttpAuthentication.Token.ControllerMethods> {
+    Included<typeof HttpAuthentication.Token.ControllerMethods>,
+    Instrumentation {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   helpers(): ActionViewBase;
@@ -446,8 +447,6 @@ export class Base extends Metal {
   _protectedIvars(): readonly string[] {
     return PROTECTED_IVARS;
   }
-
-  viewRuntime: number | null = null;
 
   render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void> {
     let renderOutput: void | Promise<void>;
