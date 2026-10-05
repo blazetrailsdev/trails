@@ -247,8 +247,8 @@ describe("ActionView::Rendering#_process_format", () => {
   }
   NegotiatedFormatController.prependViewPath(
     new FixtureResolver({
-      "negotiated_format/jsonOrHtml.html.tse": "HTML",
-      "negotiated_format/jsonOrHtml.json.tse": "JSON",
+      "negotiated_format/json_or_html.html.tse": "HTML",
+      "negotiated_format/json_or_html.json.tse": "JSON",
     }),
   );
   NegotiatedFormatController.layout(false);

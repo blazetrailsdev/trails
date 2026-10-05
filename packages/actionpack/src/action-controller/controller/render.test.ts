@@ -50,7 +50,7 @@ class TestControllerWithExtraEtags extends Base {
   static {
     this.viewPaths([
       new FixtureResolver({
-        "test/withImplicitTemplate.tse": "Hello explicitly!",
+        "test/with_implicit_template.tse": "Hello explicitly!",
         "test/hello_world.tse": "Hello world!",
       }),
     ]);
@@ -99,8 +99,8 @@ class ImplicitRenderTestController extends Base {
   static {
     this.viewPaths([
       new FixtureResolver({
-        "implicit_render_test/helloWorld.tse": "Hello world!",
-        "implicit_render_test/emptyActionWithTemplate.html.tse":
+        "implicit_render_test/hello_world.tse": "Hello world!",
+        "implicit_render_test/empty_action_with_template.html.tse":
           "<h1>Empty action rendered this implicitly.</h1>\n",
       }),
     ]);
@@ -120,7 +120,7 @@ rbModConstSet(
     static {
       this.viewPaths([
         new FixtureResolver({
-          "namespaced/implicit_render_test/helloWorld.tse": "Hello world!",
+          "namespaced/implicit_render_test/hello_world.tse": "Hello world!",
         }),
       ]);
     }
@@ -896,7 +896,7 @@ describe("EtagRenderTest", () => {
     await tc.get("withImplicitTemplate");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "test/withImplicitTemplate", async () => {
+    await modifyTemplate(tc, "test/with_implicit_template", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("withImplicitTemplate");
       assertResponse("ok");
@@ -925,7 +925,7 @@ describe("NamespacedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "namespaced/implicit_render_test/helloWorld", async () => {
+    await modifyTemplate(tc, "namespaced/implicit_render_test/hello_world", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");
@@ -954,7 +954,7 @@ describe("InheritedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "implicit_render_test/helloWorld", async () => {
+    await modifyTemplate(tc, "implicit_render_test/hello_world", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");
