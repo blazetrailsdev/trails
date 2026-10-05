@@ -1,4 +1,5 @@
 import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
+import { Enumerable, include, rtest } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { FormatError } from "../fixtures.js";
@@ -6,6 +7,7 @@ import { RenderContext } from "./render-context.js";
 
 const fixtureModules = new Map<string, Record<string, unknown>>();
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (fixture_set/file.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class File {
   /** @noRailsEquivalent CONVERGEABLE fixture-set-file-ts-fixture-module-registry-has-no-rails-counterpart */
   static registerModule(file: string, rows: Record<string, unknown>): void {
@@ -33,10 +35,7 @@ export class File {
     this.file = file;
   }
 
-  each(): IterableIterator<[string, unknown]>;
-  each(block: (row: [string, unknown]) => void): void;
-  each(block?: (row: [string, unknown]) => void): IterableIterator<[string, unknown]> | void {
-    if (block === undefined) return this.rows()[Symbol.iterator]();
+  each(block: (row: [string, unknown]) => void): void {
     this.rows().forEach(block);
   }
 
@@ -53,15 +52,18 @@ export class File {
   }
 
   private configRow(): Record<string, unknown> {
-    if (this.#configRow === undefined) {
+    return (this.#configRow ??= (() => {
       const row = this.rawRows().find(([fixtureName]) => fixtureName === "_fixture");
-      this.#configRow = row ? this.validateConfigRow(row[1]) : { model_class: null, ignore: null };
-    }
-    return this.#configRow;
+      if (row) {
+        return this.validateConfigRow(row[1]);
+      } else {
+        return { model_class: null, ignore: null };
+      }
+    })());
   }
 
   private rawRows(): [string, unknown][] {
-    if (this.#rawRows === undefined) {
+    return (this.#rawRows ??= (() => {
       let data: unknown;
       const rows = fixtureModules.get(this.file);
       if (rows !== undefined) {
@@ -78,9 +80,8 @@ export class File {
           throw new FormatError(error.message);
         }
       }
-      this.#rawRows = data != null && data !== false ? toA(this.validate(data)) : [];
-    }
-    return this.#rawRows;
+      return rtest(data) ? toA(this.validate(data)) : [];
+    })());
   }
 
   private validateConfigRow(data: unknown): Record<string, unknown> {
@@ -116,6 +117,13 @@ export class File {
     return data;
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (fixture_set/file.rb:8); the class/interface merge is how `include()` surfaces on the type side.
+export interface File {
+  [Symbol.iterator](): IterableIterator<[string, unknown]>;
+}
+
+include(File, Enumerable);
 
 function toA(hash: Record<string, unknown> | Map<unknown, unknown>): [string, unknown][] {
   return hash instanceof Map

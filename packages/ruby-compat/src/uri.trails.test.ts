@@ -216,3 +216,27 @@ describe("URI::Generic with the default parser", () => {
     expect(u.fragment).toBe("x");
   });
 });
+
+describe("URI::Generic opaque, user, password and hostname", () => {
+  it("reads and replaces the opaque part", () => {
+    const uri = RFC2396_PARSER.parse("sqlite3:foo.db?pool=5");
+    expect(uri.opaque).toBe("foo.db?pool=5");
+    uri.opaque = "foo.db";
+    expect(uri.opaque).toBe("foo.db");
+    expect(uri.toString()).toBe("sqlite3:foo.db");
+  });
+
+  it("refuses an opaque part on a hierarchical URI", () => {
+    const uri = RFC2396_PARSER.parse("postgres://a:b@[::1]:5/db");
+    expect(() => (uri.opaque = "x")).toThrow(InvalidURIError);
+    expect(() => (uri.opaque = "x")).toThrow(
+      "can not set opaque with host, port, userinfo or path",
+    );
+  });
+
+  it("splits userinfo and unwraps a bracketed host", () => {
+    const uri = RFC2396_PARSER.parse("postgres://a:b@[::1]:5/db");
+    expect([uri.user, uri.password, uri.host, uri.hostname]).toEqual(["a", "b", "[::1]", "::1"]);
+    expect(RFC2396_PARSER.parse("postgres://localhost/db").hostname).toBe("localhost");
+  });
+});

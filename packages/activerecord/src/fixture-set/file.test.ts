@@ -22,21 +22,21 @@ describe("FixtureSet", () => {
   describe("FileTest", () => {
     it("open", () => {
       const fh = File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"));
-      expect([...fh.each()].length).toBe(6);
+      expect([...fh].length).toBe(6);
     });
 
     it("open with block", () => {
       let called = false;
       File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
         called = true;
-        expect([...fh.each()].length).toBe(6);
+        expect([...fh].length).toBe(6);
       });
       expect(called, "block called").toBeTruthy();
     });
 
     it("names", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
-        expect([...fh.each()].map(([name]) => name).sort()).toEqual(
+        expect([...fh].map(([name]) => name).sort()).toEqual(
           [
             "signals37",
             "unknown",
@@ -51,35 +51,35 @@ describe("FixtureSet", () => {
 
     it("values", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "accounts.yml"), (fh) => {
-        expect(
-          [...fh.each()].map(([, row]) => (row as Record<string, unknown>)["id"]).sort(),
-        ).toEqual([1, 2, 3, 4, 5, 6]);
+        expect([...fh].map(([, row]) => (row as Record<string, unknown>)["id"]).sort()).toEqual([
+          1, 2, 3, 4, 5, 6,
+        ]);
       });
     });
 
     it("tse processing", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "developers.yml"), (fh) => {
         const devs = Array.from({ length: 8 }, (_, i) => `dev_${i + 3}`);
-        const names = [...fh.each()].map(([name]) => name);
+        const names = [...fh].map(([name]) => name);
         expect(devs.filter((dev) => !names.includes(dev))).toEqual([]);
       });
     });
 
     it("empty file", () => {
       tmpYaml(["empty", "yml"], "", (t) => {
-        expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual([]);
+        expect(File.open(t.path()!, (fh) => [...fh])).toEqual([]);
       });
     });
 
     it("wrong fixture format string", () => {
       tmpYaml(["empty", "yml"], "qwerty", (t) => {
-        expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(FormatError);
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(FormatError);
       });
     });
 
     it("wrong fixture format nested", () => {
       tmpYaml(["empty", "yml"], "one: two", (t) => {
-        expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(FormatError);
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(FormatError);
       });
     });
 
@@ -108,7 +108,7 @@ describe("FixtureSet", () => {
       const yaml = "one:\n  name: <%= fixtureHelper() %>\n";
       tmpYaml(["curious", "yml"], yaml, (t) => {
         const golden = [["one", { name: "Fixture helper" }]];
-        expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual(golden);
+        expect(File.open(t.path()!, (fh) => [...fh])).toEqual(golden);
       });
       delete (FixtureSet.contextClass.prototype as Record<string, unknown>)["fixtureHelper"];
     });
@@ -118,15 +118,15 @@ describe("FixtureSet", () => {
       const yaml2 = "one:\n  name: <%= leakedMethod() %>\n";
       tmpYaml(["leaky", "yml"], yaml1, (t1) => {
         tmpYaml(["curious", "yml"], yaml2, (t2) => {
-          File.open(t1.path()!, (fh) => [...fh.each()]);
-          expect(() => File.open(t2.path()!, (fh) => [...fh.each()])).toThrow(ReferenceError);
+          File.open(t1.path()!, (fh) => [...fh]);
+          expect(() => File.open(t2.path()!, (fh) => [...fh])).toThrow(ReferenceError);
         });
       });
     });
 
     it("removes fixture config row", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
-        expect([...fh.each()].map(([name]) => name)).toEqual(["second_welcome"]);
+        expect([...fh].map(([name]) => name)).toEqual(["second_welcome"]);
       });
     });
 

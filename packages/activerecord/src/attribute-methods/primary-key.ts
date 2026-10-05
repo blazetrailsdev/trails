@@ -1,12 +1,13 @@
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { foreignKey } from "@blazetrails/activesupport";
+import { foreignKey, kernelArray } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isInstanceMethodAlreadyImplemented as attributeMethodsIsInstanceMethodAlreadyImplemented,
 } from "../attribute-methods.js";
 import { baseClass, isBaseClass } from "../inheritance.js";
 import type { Base } from "../base.js";
-import { AttributeMethods } from "../namespaces.js";
+import { ActiveRecord, AttributeMethods } from "../namespaces.js";
 
 /** @internal */
 export interface PrimaryKeyRecord {
@@ -22,8 +23,7 @@ export interface PrimaryKeyRecord {
 
 export function toKey(this: PrimaryKeyRecord): unknown[] | null {
   const key = this.id;
-  if (key == null || key === false) return null;
-  return Array.isArray(key) ? key : [key];
+  return rtest(key) ? kernelArray(key) : null;
 }
 
 function columnForDatabase(record: PrimaryKeyRecord, key: string): unknown {
@@ -279,19 +279,20 @@ export function getPrimaryKey(
   this: PrimaryKeyHost & { primaryKeyPrefixType?: string | null },
   baseName?: string | null,
 ): string | string[] | null {
+  let primaryKeys: string | string[] | null | undefined;
   if (baseName != null && this.primaryKeyPrefixType === "table_name") {
     return foreignKey(baseName, false);
   } else if (baseName != null && this.primaryKeyPrefixType === "table_name_with_underscore") {
     return foreignKey(baseName);
+  } else if (
+    ActiveRecord.Base !== (this as unknown) &&
+    (primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(this.tableName!)) !==
+      undefined
+  ) {
+    return primaryKeys;
+  } else {
+    return "id";
   }
-  try {
-    const tableName = this.tableName;
-    if (tableName != null) {
-      const primaryKeys = cachedSchemaCacheFor(this)?.getCachedPrimaryKeys?.(tableName);
-      if (primaryKeys !== undefined) return primaryKeys;
-    }
-  } catch {}
-  return "id";
 }
 
 /** @internal */

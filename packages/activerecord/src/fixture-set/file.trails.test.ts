@@ -21,7 +21,7 @@ describe("FixtureSet::File ordered maps (trails)", () => {
   it("accepts a !!omap document and keeps its entry order", () => {
     const yaml = "--- !!omap\n- two:\n    name: b\n- one:\n    name: a\n";
     tmpYaml(["omap", "yml"], yaml, (t) => {
-      expect(File.open(t.path()!, (fh) => [...fh.each()])).toEqual([
+      expect(File.open(t.path()!, (fh) => [...fh])).toEqual([
         ["two", { name: "b" }],
         ["one", { name: "a" }],
       ]);
@@ -30,9 +30,7 @@ describe("FixtureSet::File ordered maps (trails)", () => {
 
   it("still rejects a !!omap whose row is not a hash", () => {
     tmpYaml(["omap", "yml"], "--- !!omap\n- one: two\n", (t) => {
-      expect(() => File.open(t.path()!, (fh) => [...fh.each()])).toThrow(
-        /fixture key is not a hash/,
-      );
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(/fixture key is not a hash/);
     });
   });
 });
@@ -41,9 +39,9 @@ describe("FixtureSet::File#each (trails)", () => {
   it("answers a fresh iterator that does not expose the backing rows", () => {
     const path = RubyFile.join(new URL(".", import.meta.url).pathname, "test-data/accounts.yml");
     const fh = File.open(path);
-    expect([...fh.each()]).toHaveLength(6);
-    expect([...fh.each()]).toHaveLength(6);
-    expect(Array.isArray(fh.each())).toBe(false);
+    expect([...fh]).toHaveLength(6);
+    expect([...fh]).toHaveLength(6);
+    expect(Array.isArray(fh[Symbol.iterator]())).toBe(false);
   });
 });
 
