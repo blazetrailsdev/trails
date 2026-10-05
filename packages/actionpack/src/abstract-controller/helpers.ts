@@ -140,29 +140,23 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
 
   for (const method of flat) {
     const mod = this._helpersForModification();
+    const attr = method.endsWith("=") ? method.slice(0, -1) : method;
+    const writer = this._helperMethods.includes(`${attr}=`);
     let proto = (this as { prototype?: object }).prototype ?? null;
     let descriptor: PropertyDescriptor | undefined;
-    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, method))) {
+    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, attr))) {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
-    if (method.endsWith("=")) {
-      const attr = method.slice(0, -1);
+    if (descriptor?.get || writer) {
       Object.defineProperty(mod, attr, {
-        get: Object.getOwnPropertyDescriptor(mod, attr)?.get,
-        set(this: { controller: Record<string, unknown> }, value: unknown) {
-          this.controller[attr] = value;
-        },
-        configurable: true,
-        enumerable: true,
-      });
-      continue;
-    }
-    if (descriptor?.get) {
-      Object.defineProperty(mod, method, {
         get(this: { controller: Record<string, unknown> }) {
-          return this.controller[method];
+          return this.controller[attr];
         },
-        set: Object.getOwnPropertyDescriptor(mod, method)?.set,
+        set: writer
+          ? function (this: { controller: Record<string, unknown> }, value: unknown) {
+              this.controller[attr] = value;
+            }
+          : undefined,
         configurable: true,
         enumerable: true,
       });

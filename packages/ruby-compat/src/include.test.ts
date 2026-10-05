@@ -724,6 +724,11 @@ describe("extend", () => {
     expect((obj as typeof parent).shadowed()).toBe("own");
   });
 
+  it("returns the receiver", () => {
+    const obj = {};
+    expect(extend(obj, { hello() {} })).toBe(obj);
+  });
+
   it("works without an extended callback", () => {
     class User {}
     extend(User, {

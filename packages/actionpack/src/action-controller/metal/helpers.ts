@@ -43,22 +43,6 @@ export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[])
 
 type ConfigReceiver = { config(): InheritableOptions };
 
-export const ClassMethods = {
-  helpers(this: { _helpers?: HelperMethodsModule }): ActionViewBase {
-    return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
-      rbObjIvarSet(
-        this,
-        "@helper_proxy",
-        (() => {
-          const proxy = ActionViewBase.empty();
-          proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
-          extend(proxy, this._helpers!);
-          return proxy;
-        })(),
-      )) as ActionViewBase;
-  },
-};
-
 /** @internal */
 function allApplicationHelpers(): string[] {
   return _applicationHelpers;
@@ -71,6 +55,25 @@ export function modulesForHelpers(
   const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
   return Resolution.modulesForHelpers(argsWithAll as Array<HelperMethodsModule | string>);
 }
+
+export const ClassMethods = {
+  helperAttr,
+
+  helpers(this: { _helpers?: HelperMethodsModule }): ActionViewBase {
+    return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
+      rbObjIvarSet(
+        this,
+        "@helper_proxy",
+        (() => {
+          const proxy = ActionViewBase.empty();
+          proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
+          return extend(proxy, this._helpers!);
+        })(),
+      )) as ActionViewBase;
+  },
+
+  modulesForHelpers,
+};
 
 export function helpers(this: {
   _helperProxy?: ActionViewBase | null;

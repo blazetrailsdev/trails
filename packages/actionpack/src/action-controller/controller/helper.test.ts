@@ -32,15 +32,7 @@ afterAll(() => {
 
 describe("HelperTest", () => {
   class TestController extends Base {
-    private _delegateAttr: unknown;
-
-    get delegateAttr(): unknown {
-      return this._delegateAttr;
-    }
-
-    set delegateAttr(value: unknown) {
-      this._delegateAttr = value;
-    }
+    declare delegateAttr: unknown;
   }
 
   let controllerClass: typeof TestController;
