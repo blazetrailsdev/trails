@@ -182,6 +182,7 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
   /* `vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
      chain, so `"toString" in {}` is an answer Ruby never gives. */
+  if (Object.getPrototypeOf(hash) === Object.prototype) return Object.hasOwn(hash, key);
   const own = ownMethod(hash, "isKey");
   if (own) return own.call(hash, key) as boolean;
   if (hash instanceof Map) return hash.has(key);
@@ -376,14 +377,18 @@ export function hashDelete(hash: object, key: unknown, block?: (key: never) => u
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#[]` (`vendor/ruby/v3.3.11/hash.c:2121`).
  */
 export function hashAref(hash: object, key: unknown): unknown {
-  const own = ownMethod(hash, "get");
-  if (own) return own.call(hash, key);
-  if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
-  const val = (hash as Record<string, unknown>)[key as string];
-  if (hasKey(hash, key as string)) return val;
   const proto: unknown = Object.getPrototypeOf(hash);
-  if (proto === null) return val === undefined ? null : val;
-  if (proto !== Object.prototype) return null;
+  if (proto !== Object.prototype) {
+    const own = ownMethod(hash, "get");
+    if (own) return own.call(hash, key);
+    if (hash instanceof Map) return hash.has(key) ? hash.get(key) : null;
+    const val = (hash as Record<string, unknown>)[key as string];
+    if (hasKey(hash, key as string)) return val;
+    if (proto === null) return val === undefined ? null : val;
+    return null;
+  }
+  const val = (hash as Record<string, unknown>)[key as string];
+  if (Object.hasOwn(hash, key as PropertyKey)) return val;
   return val === undefined || val === Reflect.get(Object.prototype, key as string, hash)
     ? null
     : val;
