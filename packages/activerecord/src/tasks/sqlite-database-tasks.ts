@@ -28,13 +28,13 @@ export class SQLiteDatabaseTasks {
   }
 
   async drop(): Promise<void> {
-    const dbPath = this.dbConfig.database as string;
-    const file = File.isAbsolutePath(dbPath) ? dbPath : File.join(this.root, dbPath);
     try {
+      const dbPath = this.dbConfig.database as string;
+      const file = File.isAbsolutePath(dbPath) ? dbPath : File.join(this.root, dbPath);
       FileUtils.rm(file);
       FileUtils.rmF([`${file}-shm`, `${file}-wal`]);
     } catch (error: unknown) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      if ((error as { code?: string }).code === "ENOENT") {
         throw new NoDatabaseError((error as Error).message);
       }
       throw error;

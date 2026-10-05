@@ -162,6 +162,13 @@ describe("File", () => {
     });
   });
 
+  it("NULL is the null device of the path backend's platform", () => {
+    expect(File.NULL).toBe("/dev/null");
+    withWindowsPath(() => {
+      expect(File.NULL).toBe("NUL");
+    });
+  });
+
   it("join treats ALT_SEPARATOR as a boundary separator where one is defined", () => {
     expect(File.join("a\\", "b")).toBe("a\\/b");
     expect(File.join("a", "\\b")).toBe("a/\\b");

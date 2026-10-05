@@ -1,4 +1,11 @@
-import { getChildProcessAsync, rbEqq, type SpawnSyncResult } from "@blazetrails/ruby-compat";
+import {
+  getChildProcessAsync,
+  rbEqq,
+  RuntimeError,
+  stderr,
+  stdout,
+  type SpawnSyncResult,
+} from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -82,9 +89,8 @@ export class MySQLDatabaseTasks {
       `SET FOREIGN_KEY_CHECKS = 0; SOURCE ${filename}; SET FOREIGN_KEY_CHECKS = 1`,
     );
     args.push("--database", this.dbConfig.database as string);
-    if (extraFlags) {
-      args.unshift(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    if (extraFlags != null) args.unshift(...kernelArray(extraFlags));
+
     await this.runCmd("mysql", args, "loading");
   }
 
@@ -130,21 +136,9 @@ export class MySQLDatabaseTasks {
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       encoding: "utf8",
     });
-    if (result.error || result.status !== 0 || result.signal) {
-      const details: string[] = [];
-      if (result.error) details.push(`Error: ${result.error.message}`);
-      if (result.status !== null && result.status !== 0) {
-        details.push(`Exit status: ${result.status}`);
-      }
-      if (result.signal) details.push(`Signal: ${result.signal}`);
-      if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
-      if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      throw new Error(
-        runCmdError(cmd, args, action) +
-          `${cmd} ${args.join(" ")}\n\n` +
-          (details.length ? `${details.join("\n\n")}\n` : ""),
-      );
-    }
+    stdout.write(result.stdout ?? "");
+    stderr.write(result.stderr ?? "");
+    if (result.status !== 0) throw new RuntimeError(runCmdError(cmd, args, action));
   }
 
   /** @internal */

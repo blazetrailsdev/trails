@@ -1123,6 +1123,42 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("reads a catch's errno `code` test as the rescue of that Errno class", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        drop() {
+          try {
+            this.rm();
+          } catch (error) {
+            if ((error as { code?: string }).code === "ENOENT") {
+              throw new NoDatabaseError((error as Error).message);
+            }
+            throw error;
+          }
+        }
+        other() {
+          try {
+            this.rm();
+          } catch (error) {
+            if ((error as { code?: string }).code === "busy") return this.busy();
+            throw error;
+          }
+        }
+      }`,
+    );
+    const drop = cls.instanceMethods.find((m) => m.name === "drop")!;
+    expect(drop.skeleton).toEqual([
+      "try",
+      "ref:rm",
+      "rescue",
+      "throw:NoDatabaseError",
+      "new:NoDatabaseError",
+      "ref:message",
+    ]);
+    const other = cls.instanceMethods.find((m) => m.name === "other")!;
+    expect(other.skeleton!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
   it("emits one rescue for an `||` of instanceof tests, as Ruby's `rescue A, B` is one clause", () => {
     const cls = extractFromSource(
       `export class Foo {
