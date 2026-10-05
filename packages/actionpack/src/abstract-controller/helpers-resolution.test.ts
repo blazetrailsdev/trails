@@ -132,10 +132,16 @@ describe("allHelpersFromPath", () => {
     mkdirSync(join(r, "nested"), { recursive: true });
     writeFileSync(join(r, "application-helper.ts"), "export const x = 1;");
     writeFileSync(join(r, "markdown-helper.js"), "export const x = 1;");
+    writeFileSync(join(r, "just-me-helper.ts"), "export const x = 1;");
     writeFileSync(join(r, "nested", "admin-helper.ts"), "export const x = 1;");
     writeFileSync(join(r, "application-controller.ts"), "export const x = 1;");
     try {
-      expect(await allHelpersFromPath(r)).toEqual(["application", "markdown", "nested/admin"]);
+      expect(await allHelpersFromPath(r)).toEqual([
+        "application",
+        "just_me",
+        "markdown",
+        "nested/admin",
+      ]);
     } finally {
       rmSync(r, { recursive: true, force: true });
     }

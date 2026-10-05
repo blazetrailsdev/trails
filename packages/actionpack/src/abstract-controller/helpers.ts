@@ -116,7 +116,7 @@ export const Resolution = {
     const helpers: string[] = [];
     for (const _path of typeof path === "string" ? [path] : path) {
       const names = (await glob("**/*{-,_}helper.{ts,js,rb}", { cwd: _path })).map((file) =>
-        file.replace(/[-_]helper\.(ts|js|rb)$/, ""),
+        file.replace(/[-_]helper\.(ts|js|rb)$/, "").replaceAll("-", "_"),
       );
       helpers.push(...names.sort());
     }

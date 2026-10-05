@@ -181,7 +181,10 @@ async function helperConstants(
       }
       if (!/[-_]helper\.[cm]?[tj]s$/.test(entry) || /\.(test|d)\./.test(entry)) continue;
 
-      const stem = entry.replace(/\.[cm]?[tj]s$/, "").replace(/[-_]helper$/, "");
+      const stem = entry
+        .replace(/\.[cm]?[tj]s$/, "")
+        .replace(/[-_]helper$/, "")
+        .replaceAll("-", "_");
       const name = `${camelize([...namespace, stem].join("/"))}Helper`;
       const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
 
