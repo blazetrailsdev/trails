@@ -175,10 +175,6 @@ export class Metal extends AbstractController {
     return this.request.session;
   }
 
-  static controllerPath(): string {
-    return underscore(this.name.replace(/Controller$/, ""));
-  }
-
   /** @internal */
   static _controllerName?: string | null;
 

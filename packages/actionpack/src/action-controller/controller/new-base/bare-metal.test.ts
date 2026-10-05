@@ -4,19 +4,37 @@ import {
   assertEqual,
   assertKindOf,
   assertNil,
+  assertPredicate,
 } from "@blazetrails/activesupport";
-import { MockRequest } from "@blazetrails/rack";
+import { MockRequest, Response as RackResponseObject } from "@blazetrails/rack";
 import type { RackResponse as RackTriplet } from "@blazetrails/rack";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { Metal } from "../../metal.js";
 import { TestCase } from "../../test-case.js";
 import { Request } from "../../../action-dispatch/request.js";
+import type { Response } from "../../../action-dispatch/response.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class BareController extends Metal {
   index(): void {
     this.responseBody = "Hello world";
+  }
+
+  assignResponseArray(): void {
+    this.response = [200, { "content-type": "text/html" }, ["Hello world"]] as unknown as Response;
+  }
+
+  assignResponseObject(): void {
+    this.response = new RackResponseObject("Hello world", 200, {
+      "content-type": "text/html",
+    }) as unknown as Response;
+  }
+
+  assignResponseBodyProc(): void {
+    this.responseBody = ((stream: { close(): void }) => {
+      stream.close();
+    }) as unknown as string;
   }
 }
 Object.defineProperty(BareController, "name", { value: "BareMetalTest::BareController" });
@@ -40,16 +58,55 @@ describe("BareTest", () => {
   });
 
   // BLOCKED: metal-response-body-setter-flattens-instead-of-wrapping
-  it.skip("response_body value is wrapped in an array when the value is a String", () => {});
+  it.skip("response_body value is wrapped in an array when the value is a String", () => {
+    const controller = new BareController();
+    controller.setRequestBang(Request.empty());
+    controller.setResponseBang(BareController.makeResponseBang(controller.request));
+    controller.index();
+
+    assertPredicate(controller, (c) => c.performed);
+    assertEqual(["Hello world"], controller.responseBody);
+  });
 
   // BLOCKED: metal-response-setter-stores-true-in-response-body
-  it.skip("can assign response array as part of the controller execution", () => {});
+  it.skip("can assign response array as part of the controller execution", () => {
+    const controller = new BareController();
+    controller.setRequestBang(Request.empty());
+    controller.assignResponseArray();
+
+    assertPredicate(controller, (c) => c.performed);
+    assertEqual(true, controller.responseBody);
+    assertEqual(200, (controller.response as unknown as RackTriplet)[0]);
+    assertEqual("text/html", (controller.response as unknown as RackTriplet)[1]["content-type"]);
+  });
 
   // BLOCKED: metal-response-setter-stores-true-in-response-body
-  it.skip("can assign response object as part of the controller execution", () => {});
+  it.skip("can assign response object as part of the controller execution", () => {
+    const controller = new BareController();
+    controller.setRequestBang(Request.empty());
+    controller.assignResponseObject();
+
+    assertPredicate(controller, (c) => c.performed);
+    assertEqual(true, controller.responseBody);
+    assertEqual(200, controller.response.status);
+    assertEqual(
+      "text/html",
+      (controller.response as unknown as RackResponseObject).headers["content-type"],
+    );
+  });
 
   // BLOCKED: metal-response-body-setter-flattens-instead-of-wrapping
-  it.skip("can assign response body streamable object as part of the controller execution", () => {});
+  it.skip("can assign response body streamable object as part of the controller execution", () => {
+    const controller = new BareController();
+    controller.setRequestBang(Request.empty());
+    controller.setResponseBang(BareController.makeResponseBang(controller.request));
+    controller.assignResponseBodyProc();
+
+    assertPredicate(controller, (c) => c.performed);
+    assert(typeof controller.responseBody === "function");
+    assertEqual(200, controller.response.status);
+    assertPredicate(controller.response.headers, (h) => h.empty);
+  });
 
   it("connect a request to controller instance without dispatch", () => {
     const env = {};
@@ -75,6 +132,7 @@ describe("BareEmptyTest", () => {
   });
 });
 
+// BLOCKED: head-is-a-module-included-by-conditional-get-not-a-metal-method
 class HeadController extends Metal {
   index(): void {
     this.head("not_found");

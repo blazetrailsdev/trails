@@ -13,18 +13,18 @@ class SimpleController extends Base {
     await this.render({ body: "success" });
   }
 
-  modify_response_body(): void {
+  modifyResponseBody(): void {
     this.responseBody = "success";
   }
 
-  modify_response_body_twice(): void {
+  modifyResponseBodyTwice(): void {
     const ret = (this.responseBody = "success");
     this.responseBody = `${ret}!`;
   }
 
-  modify_response_headers(): void {}
+  modifyResponseHeaders(): void {}
 
-  async show_actions(): Promise<void> {
+  async showActions(): Promise<void> {
     await this.render({ body: `actions: ${[...this.actionMethods()].sort().join(", ")}` });
   }
 
@@ -79,14 +79,14 @@ describe("BaseTest", () => {
 
   it("directly modifying response body", async ({ task }) => {
     const t = new BaseTest(task.name);
-    await t.get("/dispatching/simple/modify_response_body");
+    await t.get("/dispatching/simple/modifyResponseBody");
 
     t.assertBody("success");
   });
 
   it("directly modifying response body twice", async ({ task }) => {
     const t = new BaseTest(task.name);
-    await t.get("/dispatching/simple/modify_response_body_twice");
+    await t.get("/dispatching/simple/modifyResponseBodyTwice");
 
     t.assertBody("success!");
   });
@@ -161,5 +161,25 @@ describe("BaseTest", () => {
   });
 
   // BLOCKED: action-methods-does-not-subtract-internal-methods
-  it.skip("action methods", () => {});
+  it.skip("action methods", async ({ task }) => {
+    assertEqual(
+      new Set([
+        "index",
+        "modifyResponseHeaders",
+        "modifyResponseBodyTwice",
+        "modifyResponseBody",
+        "showActions",
+      ]),
+      SimpleController.actionMethods(),
+    );
+
+    assertEqual(new Set(), EmptyController.actionMethods());
+    assertEqual(new Set(), Submodule.ContainedEmptyController.actionMethods());
+
+    const t = new BaseTest(task.name);
+    await t.get("/dispatching/simple/showActions");
+    t.assertBody(
+      "actions: index, modifyResponseBody, modifyResponseBodyTwice, modifyResponseHeaders, showActions",
+    );
+  });
 });
