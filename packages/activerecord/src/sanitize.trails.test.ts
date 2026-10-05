@@ -125,6 +125,23 @@ describe("sanitizeSql", () => {
     expect(() => Post.disallowRawSqlBang(["DROP TABLE users"])).toThrow(/Dangerous query method/);
   });
 
+  it("disallow_raw_sql! inspects each offending argument and keeps Rails' guidance", () => {
+    expect(() =>
+      Post.disallowRawSqlBang(["title", "DROP TABLE users", arelSql("1"), "a; b"]),
+    ).toThrow(
+      'called with non-attribute argument(s): "DROP TABLE users", "a; b".' +
+        "This method should not be called with user-provided values",
+    );
+    expect(() => Post.disallowRawSqlBang(["a; b"], { permit: /^a; b$/ })).not.toThrow();
+  });
+
+  it("sanitize_sql_like doubles the escape character before escaping the wildcards", () => {
+    expect(Post.sanitizeSqlLike("100%\\_", "\\")).toBe("100\\%\\\\\\_");
+    expect(Post.sanitizeSqlLike("a!b%", "!")).toBe("a!!b!%");
+    expect(Post.sanitizeSqlLike("a$b_", "$")).toBe("a$$b$_");
+    expect(Post.sanitizeSqlLike("50%_off", "%")).toBe("50%%%_off");
+  });
+
   describe("private helpers (replace_bind_variables, quote_bound_value, etc)", () => {
     it("sanitize sql array handles %s format string", async () => {
       const connection = await Post.leaseConnection();
