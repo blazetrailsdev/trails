@@ -320,9 +320,14 @@ export function resetSequenceName(this: SchemaHost): Promise<string | null> {
       }
     ).defaultSequenceName(this.tableName, this.primaryKey),
   );
-  sequenceName.then(undefined, () => {
-    if (this._sequenceName === sequenceName) this._sequenceName = null;
-  });
+  sequenceName.then(
+    (value) => {
+      if (this._sequenceName === sequenceName) this._sequenceName = value;
+    },
+    () => {
+      if (this._sequenceName === sequenceName) this._sequenceName = null;
+    },
+  );
   return (this._sequenceName = sequenceName);
 }
 

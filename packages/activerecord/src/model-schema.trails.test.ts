@@ -83,6 +83,30 @@ describe("a sequence lookup in flight does not overwrite a later writer", () => 
     expect(await Post.sequenceName).toBe("posts_nonstd_seq");
   });
 
+  it("asks the adapter again after a lookup that answered nil", async () => {
+    class Post extends Base {}
+    const withConnection = vi.spyOn(Post, "withConnection").mockResolvedValue(null);
+    try {
+      expect(await Post.sequenceName).toBeNull();
+      expect(await Post.sequenceName).toBeNull();
+      expect(withConnection).toHaveBeenCalledTimes(2);
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
+  it("memoizes the name a lookup answered", async () => {
+    class Post extends Base {}
+    const withConnection = vi.spyOn(Post, "withConnection").mockResolvedValue("posts_id_seq");
+    try {
+      expect(await Post.sequenceName).toBe("posts_id_seq");
+      expect(await Post.sequenceName).toBe("posts_id_seq");
+      expect(withConnection).toHaveBeenCalledTimes(1);
+    } finally {
+      withConnection.mockRestore();
+    }
+  });
+
   it("retries after a lookup that rejected", async () => {
     class Post extends Base {}
     const withConnection = vi
