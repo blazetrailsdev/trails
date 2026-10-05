@@ -1189,16 +1189,16 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
   if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (rbObjRespondTo(value, "toS")) {
+    const str = (value as { toS(): unknown }).toS();
+    if (str instanceof Uint8Array) return str;
+    return rbCheckStringType(str) ?? rbAnyToS(value as object);
+  }
   if (
     typeof value === "function" &&
     Object.getOwnPropertyDescriptor(value, "prototype")?.writable === false
   ) {
     return rbModToS(value as abstract new (...args: never) => unknown);
-  }
-  if (rbObjRespondTo(value, "toS")) {
-    const str = (value as { toS(): unknown }).toS();
-    if (str instanceof Uint8Array) return str;
-    return rbCheckStringType(str) ?? rbAnyToS(value as object);
   }
   if (typeof value === "object") {
     const str: unknown = value.toString();

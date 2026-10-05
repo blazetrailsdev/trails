@@ -152,6 +152,12 @@ describe("Object#to_s", () => {
     }
     expect(toS(Named)).toBe("Named");
     expect(toSSend(Named)).toBe("Named");
+    class Custom {
+      static toS() {
+        return "custom";
+      }
+    }
+    expect(toS(Custom)).toBe("custom");
   });
 
   it("sends to_s to a receiver defining it", () => {

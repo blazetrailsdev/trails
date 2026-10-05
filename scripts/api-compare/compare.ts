@@ -3482,8 +3482,8 @@ export function mixinMethodCreditedToOwnFile(
  *
  * Narrow by construction: the method must arrive from a mixin defined in
  * another Ruby file, and every constructor of that name in the TS file must
- * call `initializeIncludedModules`. A constructor that inlines the module's
- * body instead is still held to its call set.
+ * call `initializeIncludedModules` and nothing else. A constructor that makes
+ * any other call is still held to the module body's call set.
  */
 export function includerConstructorIsInitializeSeat(
   rm: { rubyName: string; mixinFile?: string },
@@ -3494,7 +3494,11 @@ export function includerConstructorIsInitializeSeat(
   if (rm.rubyName !== "initialize" || tsName !== "constructor") return false;
   if (rm.mixinFile === undefined || rm.mixinFile === hostRubyFile) return false;
   if (tsCallSets === undefined || tsCallSets.length === 0) return false;
-  return tsCallSets.every((calls) => calls.includes("initializeIncludedModules"));
+  return tsCallSets.every(
+    (calls) =>
+      calls.length > 0 &&
+      calls.every((call) => call.replace(/^@invoked:/, "") === "initializeIncludedModules"),
+  );
 }
 
 /**

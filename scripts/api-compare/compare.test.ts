@@ -3400,6 +3400,14 @@ describe("includerConstructorIsInitializeSeat", () => {
         { rubyName: "initialize", mixinFile: "base.rb" },
         "group.rb",
         "constructor",
+        [["initializeIncludedModules", "classOptions", "merge"]],
+      ),
+    ).toBe(false);
+    expect(
+      includerConstructorIsInitializeSeat(
+        { rubyName: "initialize", mixinFile: "base.rb" },
+        "group.rb",
+        "constructor",
         undefined,
       ),
     ).toBe(false);
