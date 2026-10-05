@@ -458,14 +458,19 @@ describe("main cross-package and parked-stub credit", () => {
     description,
     pending,
   });
-  async function compare(rubyFile: string, tsPackages: Record<string, unknown>, rubyCases: object) {
+  async function compare(
+    rubyFile: string,
+    tsPackages: Record<string, unknown>,
+    rubyCases: object,
+    pkg = "activemodel",
+  ) {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "compare-"));
     const ruby = {
-      packages: { activemodel: { files: [{ file: rubyFile, testCases: rubyCases }] } },
+      packages: { [pkg]: { files: [{ file: rubyFile, testCases: rubyCases }] } },
     };
     await fs.writeFile(path.join(dir, "rails-tests.json"), JSON.stringify(ruby));
     await fs.writeFile(path.join(dir, "ts-tests.json"), JSON.stringify({ packages: tsPackages }));
-    main(["--package", "activemodel", "--json"], dir);
+    main(["--package", pkg, "--json"], dir);
     const { results } = JSON.parse(
       await fs.readFile(path.join(dir, "convention-comparison.json"), "utf-8"),
     ) as { results: { files: ConventionFileResult[] }[] };
@@ -501,16 +506,19 @@ describe("main cross-package and parked-stub credit", () => {
   });
 
   it("does not count a pending stub for an unported case as extra", async () => {
-    const name = "attributes with proc defaults can be marshalled";
-    const stubs = [tc(["AttributesTest"], name, true), tc(["OtherTest"], name, true)];
+    const name = "load async instrumentation is thread safe";
+    const stubs = [tc(["LoadAsyncTest"], name, true), tc(["OtherTest"], name, true)];
     const result = await compare(
-      "attributes_test.rb",
+      "relation/load_async_test.rb",
       {
-        activemodel: {
-          files: [{ file: `${PKG_SRC_DIRS.activemodel}attributes.test.ts`, testCases: stubs }],
+        activerecord: {
+          files: [
+            { file: `${PKG_SRC_DIRS.activerecord}relation/load-async.test.ts`, testCases: stubs },
+          ],
         },
       },
-      [tc(["AttributesTest"], name)],
+      [tc(["LoadAsyncTest"], name)],
+      "activerecord",
     );
     expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
   });

@@ -12,7 +12,15 @@ import {
   assertNil,
 } from "@blazetrails/activesupport";
 import { Date as RubyDate, Temporal } from "@blazetrails/date";
-import { ArgumentError, FrozenError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  FrozenError,
+  Marshal,
+  Module,
+  rbModConstSet,
+  rbObjIvarGet,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { Model } from "./index.js";
 import { UnknownAttributeError } from "./errors.js";
 import {
@@ -23,6 +31,9 @@ import {
 import { AttributeMethods } from "./attribute-methods.js";
 import { StringType } from "./type/string.js";
 
+const AttributesTest = new Module();
+registerConstant("ActiveModel::AttributesTest", AttributesTest);
+
 describe("AttributesTest", () => {
   class ModelForAttributesTest extends Model {
     declare static aliasAttribute: AttributesClassHalf["aliasAttribute"];
@@ -32,6 +43,7 @@ describe("AttributesTest", () => {
     declare static typeForAttribute: AttributesClassHalf["typeForAttribute"];
 
     static {
+      rbModConstSet(AttributesTest, "ModelForAttributesTest", this);
       include(this, Attributes);
       this.attribute("integer_field", "integer");
       this.attribute("string_field", "string");
@@ -185,8 +197,14 @@ describe("AttributesTest", () => {
     expect(data.string_field).toEqual("default string");
   });
 
+  // BLOCKED: attributes-marshal-round-trip-needs-usrmarshal-arm
   it.skip("attributes with proc defaults can be marshalled", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/parity/unported-files/unscoped.ts) — marshal
+    const data = new ModelForAttributesTest();
+    const attributes = rbObjIvarGet(data, "@attributes");
+    const roundTripped = Marshal.load(Marshal.dump(data)) as ModelForAttributesTest;
+    const newAttributes = rbObjIvarGet(roundTripped, "@attributes");
+
+    expect(newAttributes).toEqual(attributes);
   });
 
   it("attributes can be dup-ed", () => {

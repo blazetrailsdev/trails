@@ -42,18 +42,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "JS cache/session layers use JSON or structured clone.",
   },
   {
-    testFile: "attributes_test.rb",
-    className: "AttributesTest",
-    tests: ["attributes with proc defaults can be marshalled"],
-    reason:
-      "Round-trips a model through Marshal.load(Marshal.dump(data)) " +
-      "(activemodel/test/cases/attributes_test.rb:136-143). The proc default is a " +
-      "UserProvidedDefault, which Ruby dumps through its marshal_dump " +
-      "(activemodel/lib/active_model/attribute/user_provided_default.rb:29-38), and " +
-      "ruby-compat's Marshal has no marshal_dump / TYPE_USRMARSHAL arm yet, so the dump raises " +
-      "TypeError on the Proc. Tracked by attributes-marshal-round-trip-needs-usrmarshal-arm.",
-  },
-  {
     pattern: "message_pack.rb",
     testFile: "message_pack_test.rb",
     reason:
