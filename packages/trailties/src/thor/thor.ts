@@ -55,6 +55,7 @@ type Instance = {
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
 export class Thor {
+  /** @noRailsEquivalent CONVERGEABLE port-thor-group */
   declare static Group: abstract new (...args: never[]) => object;
 
   /** @internal */
