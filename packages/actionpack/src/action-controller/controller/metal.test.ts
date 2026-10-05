@@ -211,14 +211,14 @@ describe("MetalControllerInstanceTests", () => {
     expect(c.receivedParams).toEqual({ id: "42" });
   });
 
-  it("toRackResponse returns [status, headers, body]", () => {
+  it("toA returns [status, headers, body]", () => {
     const c = new (class extends Metal {})();
     c.setResponseBang(makeResponse());
     c.status = 200;
     c.headers.set("x-test", "val");
     c.contentType = "text/plain";
     c.responseBody = "hello";
-    const [status, headers] = c.toRackResponse();
+    const [status, headers] = c.toA();
     expect(status).toBe(200);
     expect(headers["x-test"]).toBe("val");
     expect(headers["content-type"]).toBe("text/plain; charset=utf-8");

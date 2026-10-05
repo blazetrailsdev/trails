@@ -3,7 +3,6 @@ import {
   determineTemplateEtag,
   lookupAndDigestTemplate,
   pickTemplateForEtag,
-  templateEtagger,
 } from "./etag-with-template-digest.js";
 
 describe("pickTemplateForEtag", () => {
@@ -65,23 +64,5 @@ describe("determineTemplateEtag", () => {
   it("returns undefined when no template and no actionName", () => {
     const ctx = { digestFor: () => "x" };
     expect(determineTemplateEtag.call({ lookupContext: ctx }, undefined)).toBeUndefined();
-  });
-});
-
-describe("templateEtagger", () => {
-  it("returns undefined when no lookupContext", () => {
-    expect(templateEtagger({ actionName: "show" }, undefined)).toBeUndefined();
-  });
-
-  it("returns template digest via lookupContext", () => {
-    const ctx = { digestFor: (t: string) => `d-${t}` };
-    expect(templateEtagger({ actionName: "show" }, ctx)).toBe("d-show");
-  });
-
-  it("uses options.template over actionName", () => {
-    const ctx = { digestFor: (t: string) => `d-${t}` };
-    expect(templateEtagger({ actionName: "show" }, ctx, { template: "posts/show" })).toBe(
-      "d-posts/show",
-    );
   });
 });

@@ -1,44 +1,24 @@
-import {
-  combineEtags as _combineEtags,
-  httpCacheForever as _httpCacheForever,
-  includeContent as _includeContent,
-  noStore as _noStore,
-  type ConditionalGetHost,
-} from "./conditional-get.js";
+import { Concern, Module, extend, include } from "@blazetrails/activesupport";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
+import { ConditionalGet, type Etagger } from "./conditional-get.js";
 
-/** @internal */
-export function includeContent(status: number): boolean {
-  return _includeContent(status);
-}
+export const EtagWithFlash = new Module((mod) => {
+  extend(mod, Concern);
 
-export function httpCacheForever(
-  this: ConditionalGetHost,
-  options: { public?: boolean } = {},
-  block?: () => void,
-): void {
-  return _httpCacheForever.call(this, options, block);
-}
+  include(mod, ConditionalGet);
 
-export function noStore(this: ConditionalGetHost): void {
-  return _noStore.call(this);
-}
-
-/** @internal */
-export function combineEtags(
-  this: unknown,
-  validator: unknown,
-  options: Record<string, unknown> = {},
-): unknown[] {
-  return _combineEtags.call(this, validator, options);
-}
-
-export function flashEtagger(request: {
-  flash?: {
-    isEmpty(): boolean;
-    toHash?(): unknown;
-  };
-}): unknown | undefined {
-  const flash = request.flash;
-  if (!flash || flash.isEmpty()) return undefined;
-  return flash.toHash ? flash.toHash() : flash;
-}
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      (this as typeof ConditionalGet.ClassMethods & { etaggers: Etagger[] }).etag(function (
+        this: unknown,
+      ) {
+        const controller = this as { request: object; flash: FlashHash };
+        if (rbObjRespondTo(controller.request, "flash") && !controller.flash.isEmpty()) {
+          return controller.flash;
+        }
+      });
+    },
+  );
+});

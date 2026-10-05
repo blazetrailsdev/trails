@@ -1,6 +1,5 @@
 import {
   Benchmark,
-  Notifications,
   SafeBuffer,
   classAttribute,
   mattrAccessor,
@@ -24,6 +23,13 @@ import {
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
+import {
+  ConditionalGet,
+  type ClassMethods as ConditionalGetClassMethods,
+  type Etagger,
+} from "./metal/conditional-get.js";
+import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
+import { EtagWithFlash } from "./metal/etag-with-flash.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
 import {
   type addFlashTypes,
@@ -87,7 +93,10 @@ import type {
   ViewContextHost,
   ViewContextRoutes,
 } from "@blazetrails/actionview";
-import { BrowserBlocker, type BrowserVersions } from "./metal/allow-browser.js";
+import {
+  AllowBrowser,
+  type ClassMethods as AllowBrowserClassMethods,
+} from "./metal/allow-browser.js";
 import { permissionsPolicy } from "./metal/permissions-policy.js";
 import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
@@ -360,6 +369,16 @@ export class Base extends Metal {
 
   static _routes: ViewContextRoutes | null = null;
 
+  declare static etaggers: Etagger[];
+  declare static isEtaggers: boolean;
+  declare etaggers: Etagger[];
+  declare isEtaggers: boolean;
+  declare static etagWithTemplateDigest: boolean;
+  declare static isEtagWithTemplateDigest: boolean;
+  declare etagWithTemplateDigest: boolean;
+  declare isEtagWithTemplateDigest: boolean;
+  declare static etag: OmitThisParameter<(typeof ConditionalGetClassMethods)["etag"]>;
+
   declare static helpersPath: string[];
   declare static isHelpersPath: boolean;
   declare static includeAllHelpers: boolean;
@@ -476,9 +495,10 @@ export class Base extends Metal {
   defaultRender = defaultRender;
 
   /** @internal */
-  override async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    await super._dispatchAction(action, ...args);
+  override async sendAction(method: string, ...args: unknown[]): Promise<unknown> {
+    const ret = await super.sendAction(method, ...args);
     if (!this.performed) await this.defaultRender();
+    return ret;
   }
 
   /** @internal */
@@ -531,43 +551,7 @@ export class Base extends Metal {
   static protectFromForgery = protectFromForgery;
   static skipForgeryProtection = skipForgeryProtection;
 
-  static allowBrowser(options: {
-    versions: BrowserVersions;
-    block?: ((this: Base) => void | Promise<void>) | string;
-    only?: string[];
-    except?: string[];
-  }): void {
-    const { versions, block } = options;
-    const callbackOptions: CallbackOptions = {};
-    if (options.only) callbackOptions.only = options.only;
-    if (options.except) callbackOptions.except = options.except;
-
-    this.beforeAction(async function (controller): Promise<boolean> {
-      const base = controller as Base;
-      const blocker = new BrowserBlocker(base.request, versions);
-      if (!blocker.blocked) return true;
-
-      await Notifications.instrument(
-        "browser_block.action_controller",
-        {
-          user_agent: base.request?.userAgent ?? "",
-          method: base.request?.method ?? "GET",
-          path: base.request?.path ?? "/",
-          versions,
-        },
-        async () => {
-          if (typeof block === "function") {
-            await block.call(base);
-          } else if (typeof block === "string" && typeof (base as any)[block] === "function") {
-            await (base as any)[block].call(base);
-          } else {
-            base.head(406);
-          }
-        },
-      );
-      return false;
-    }, callbackOptions);
-  }
+  declare static allowBrowser: OmitThisParameter<(typeof AllowBrowserClassMethods)["allowBrowser"]>;
 
   static permissionsPolicy = permissionsPolicy;
 
@@ -931,7 +915,11 @@ include(Base, Cookies);
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
+include(Base, ConditionalGet);
+include(Base, EtagWithTemplateDigest);
+include(Base, EtagWithFlash);
 include(Base, Flash);
+include(Base, AllowBrowser);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;

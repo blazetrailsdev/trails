@@ -6,6 +6,7 @@ import {
   type Extended,
 } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
+import { rbFSend, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
 function ownPublicMethodNames(proto: object | null | undefined): string[] {
   if (!proto) return [];
@@ -121,7 +122,7 @@ export class AbstractController {
     "head",
     "setHeader",
     "getHeader",
-    "toRackResponse",
+    "toA",
     "render",
     "renderToString",
     "redirectTo",
@@ -264,20 +265,14 @@ export class AbstractController {
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
     this._performed = false;
-    await _runProcessActionCallbacks(this, action, () => this._dispatchAction(action, ...args));
+    await _runProcessActionCallbacks(this, action, async () => {
+      await this.sendAction(action, ...args);
+    });
   }
 
   /** @internal */
-  async _dispatchAction(action: string, ...args: unknown[]): Promise<void> {
-    const method = (this as any)[action];
-    if (typeof method !== "function") {
-      throw new ActionNotFound(
-        `The action '${action}' could not be found for ${this.constructor.name}`,
-        this,
-        action,
-      );
-    }
-    await method.apply(this, args);
+  sendAction(method: string, ...args: unknown[]): unknown {
+    return rbFSend(this, method, ...args);
   }
 
   async process(action: string, ...args: unknown[]): Promise<void> {
@@ -297,8 +292,20 @@ export class AbstractController {
     await this.processAction(actionName, ...args);
   }
 
+  controllerPath(): string {
+    return (this.constructor as typeof AbstractController).controllerPath();
+  }
+
+  actionMethods(): string[] {
+    return (this.constructor as typeof AbstractController).actionMethods();
+  }
+
   isAvailableAction(actionName: string): boolean {
     return this._findActionName(actionName) !== undefined;
+  }
+
+  inspect(): string {
+    return `#<${this.constructor.name}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 
   /** @internal */

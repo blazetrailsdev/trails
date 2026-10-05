@@ -1,8 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { clearEtaggers, combineEtags, etag } from "./conditional-get.js";
+import { classAttribute } from "@blazetrails/activesupport";
+import { ClassMethods, combineEtags as _combineEtags, type Etagger } from "./conditional-get.js";
+
+class Host {
+  declare static etaggers: Etagger[];
+  declare etaggers: Etagger[];
+  static etag = ClassMethods.etag;
+  combineEtags = _combineEtags;
+}
+
+let klass: typeof Host;
+let controller: Host;
+const etag = (etagger: Etagger): void => klass.etag(etagger);
+const combineEtags = (validator: unknown, options?: Record<string, unknown>): unknown[] =>
+  controller.combineEtags(validator, options);
 
 beforeEach(() => {
-  clearEtaggers();
+  klass = class extends Host {};
+  classAttribute.call(klass, "etaggers", { default: [] });
+  controller = new klass();
 });
 
 describe("combineEtags", () => {
@@ -50,12 +66,19 @@ describe("combineEtags", () => {
   });
 
   it("binds the controller as `this` when invoking each etagger (mirrors Rails instance_exec)", () => {
-    const controller = { name: "PostsController" };
     const etagger = vi.fn(function () {
       return "etag-from-controller";
     });
     etag(etagger);
-    expect(combineEtags.call(controller, "v")).toEqual(["v", "etag-from-controller"]);
+    expect(combineEtags("v")).toEqual(["v", "etag-from-controller"]);
     expect(etagger.mock.contexts[0]).toBe(controller);
+  });
+
+  it("etag writes are local to the class that writes", () => {
+    etag(() => "parent");
+    const child = class extends klass {};
+    child.etag(() => "child");
+    expect(new child().combineEtags("v")).toEqual(["v", "parent", "child"]);
+    expect(combineEtags("v")).toEqual(["v", "parent"]);
   });
 });

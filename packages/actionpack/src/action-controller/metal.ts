@@ -4,8 +4,13 @@ import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
-import { initializeIncludedModules, SafeBuffer, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect } from "@blazetrails/ruby-compat";
+import {
+  classAttribute,
+  initializeIncludedModules,
+  SafeBuffer,
+  underscore,
+} from "@blazetrails/activesupport";
+import { ArgumentError, rbInspect, rbModSingletonP } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -101,11 +106,35 @@ const INCLUDE: Strategy = (list, action) => (list ?? []).includes(action);
 const EXCLUDE: Strategy = (list, action) => !(list ?? []).includes(action);
 const NULL: Strategy = () => true;
 
-const _middlewareStacks = new WeakMap<object, MiddlewareStack>();
+function inherited(this: typeof Metal, subclass: typeof Metal): void {
+  subclass.middlewareStack = this.middlewareStack.dup();
+}
 
 export class Metal extends AbstractController {
   static {
     this.abstractBang();
+  }
+
+  declare static middlewareStack: MiddlewareStack;
+  declare static isMiddlewareStack: boolean;
+  declare middlewareStack: MiddlewareStack;
+  declare isMiddlewareStack: boolean;
+
+  static {
+    classAttribute.call(this, "middlewareStack", { default: new MiddlewareStack() });
+    const reader = Object.getOwnPropertyDescriptor(this, "middlewareStack")!;
+    Object.defineProperty(this, "middlewareStack", {
+      ...reader,
+      get(this: typeof Metal) {
+        if (
+          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
+          !rbModSingletonP(this)
+        ) {
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return reader.get!.call(this);
+      },
+    });
   }
 
   _request!: Request;
@@ -165,20 +194,11 @@ export class Metal extends AbstractController {
   }
 
   static middleware(): MiddlewareStack {
-    let stack = _middlewareStacks.get(this);
-    if (!stack) {
-      const superclass = Object.getPrototypeOf(this) as typeof Metal | null;
-      stack =
-        superclass && typeof superclass.middleware === "function"
-          ? superclass.middleware().dup()
-          : new MiddlewareStack();
-      _middlewareStacks.set(this, stack);
-    }
-    return stack;
+    return this.middlewareStack;
   }
 
   static use(...args: unknown[]): void {
-    this.middleware().use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
+    this.middlewareStack.use(args[0] as MiddlewareFactory, ...(args.slice(1) as any));
   }
 
   static action(this: typeof Metal, name: string): RackApp {
@@ -187,11 +207,11 @@ export class Metal extends AbstractController {
       const res = this.makeResponseBang(req);
       const controller = new this();
       await controller.dispatch(name, req, res);
-      return controller.toRackResponse();
+      return controller.toA();
     };
 
-    if (this.middleware().isAny()) {
-      return this.middleware().build(name, app);
+    if (this.middlewareStack.isAny()) {
+      return this.middlewareStack.build(name, app);
     } else {
       return app;
     }
@@ -203,29 +223,21 @@ export class Metal extends AbstractController {
     req: Request,
     res: Response,
   ): Promise<RackResponse> {
-    if (this.middleware().isAny()) {
-      return await this.middleware().build(name, async () => {
+    if (this.middlewareStack.isAny()) {
+      return await this.middlewareStack.build(name, async () => {
         const controller = new this();
         await controller.dispatch(name, req, res);
-        return controller.toRackResponse();
+        return controller.toA();
       })(req.env);
     } else {
       const controller = new this();
       await controller.dispatch(name, req, res);
-      return controller.toRackResponse();
+      return controller.toA();
     }
-  }
-
-  controllerPath(): string {
-    return (this.constructor as typeof Metal).controllerPath();
   }
 
   controllerName(): string {
     return (this.constructor as typeof Metal).controllerName();
-  }
-
-  inspect(): string {
-    return `#<${this.constructor.name}>`;
   }
 
   urlFor(string: string): string {
@@ -237,7 +249,7 @@ export class Metal extends AbstractController {
     this.setResponseBang(response);
     await this.process(name);
     request.commitFlash();
-    return this.toRackResponse();
+    return this.toA();
   }
 
   setRequestBang(request: Request): void {
@@ -261,6 +273,10 @@ export class Metal extends AbstractController {
 
   get status(): number {
     return this.response.status;
+  }
+
+  get responseCode(): number {
+    return this.status;
   }
 
   get headers(): Response["headers"] {
@@ -348,7 +364,7 @@ export class Metal extends AbstractController {
     return super.performed || (this.response?.committed ?? false);
   }
 
-  toRackResponse(): RackResponse {
+  toA(): RackResponse {
     return this.response.toRack() as RackResponse;
   }
 

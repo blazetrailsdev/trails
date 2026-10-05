@@ -8,6 +8,7 @@
  *   strings via JS `Date.parse` semantics for the freshness comparison.
  */
 
+import { Concern, Module, classAttribute, extend } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
 
 import { includeContent as _includeContent } from "./head.js";
@@ -111,29 +112,42 @@ export function noStore(this: ConditionalGetHost): void {
   this.response.setHeader("cache-control", buildCacheControl({ noStore: true }));
 }
 
-type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
+export type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
 
-const _etaggers: Etagger[] = [];
+export const ClassMethods = {
+  etag(this: { etaggers: Etagger[] }, etagger: Etagger): void {
+    this.etaggers = [...this.etaggers, etagger];
+  },
+};
 
-export function etag(block: Etagger): void {
-  _etaggers.push(block);
-}
+/** @missingRailsCall include — CONVERGEABLE head-is-a-module-included-by-conditional-get-not-a-metal-method */
+export const ConditionalGet = new Module((mod) => {
+  extend(mod, Concern);
 
-export function getEtaggers(): ReadonlyArray<Etagger> {
-  return _etaggers;
-}
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "etaggers", { default: [] });
+    },
+  );
 
-export function clearEtaggers(): void {
-  _etaggers.length = 0;
-}
+  mod.defineMethod("httpCacheForever", httpCacheForever);
+  mod.defineMethod("noStore", noStore);
+  mod.defineMethod("combineEtags", combineEtags);
+}) as Module<{
+  httpCacheForever: typeof httpCacheForever;
+  noStore: typeof noStore;
+  combineEtags: typeof combineEtags;
+}> & { ClassMethods: typeof ClassMethods };
+ConditionalGet.ClassMethods = ClassMethods;
 
 /** @internal */
 export function combineEtags(
-  this: unknown,
+  this: { etaggers: Etagger[] },
   validator: unknown,
   options: Record<string, unknown> = {},
 ): unknown[] {
-  return [validator, ..._etaggers.map((etagger) => etagger.call(this, options))].filter(
+  return [validator, ...this.etaggers.map((etagger) => etagger.call(this, options))].filter(
     (e) => e !== null && e !== undefined,
   );
 }
