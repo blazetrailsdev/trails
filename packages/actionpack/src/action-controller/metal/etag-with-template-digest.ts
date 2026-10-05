@@ -1,44 +1,44 @@
 import { Concern, Module, classAttribute, extend, include } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
+import { Digestor, type LookupContext, type Template } from "@blazetrails/actionview";
 import { ConditionalGet, type Etagger } from "./conditional-get.js";
-
-export function templateDigest(template: string): string {
-  return getCrypto().createHash("md5").update(template).digest("hex");
-}
-
-export type TemplateLookupContext = { digestFor?(template: string): string | null };
 
 /** @internal */
 export interface EtagWithTemplateDigestHost {
-  actionName?: string;
-  lookupContext?: TemplateLookupContext;
+  actionName: string;
+  lookupContext: LookupContext;
+  _prefixes(): string[];
+}
+
+/** @internal */
+export function determineTemplateEtag(
+  this: EtagWithTemplateDigestHost,
+  options: { template?: string | false | null },
+): ReturnType<typeof Digestor.digest> | undefined {
+  const template = pickTemplateForEtag.call(this, options);
+  if (template != null) {
+    return lookupAndDigestTemplate.call(this, template);
+  }
 }
 
 /** @internal */
 export function pickTemplateForEtag(
   this: EtagWithTemplateDigestHost,
-  options: { template?: string | false } | undefined,
-): string | undefined {
-  if (options?.template === false) return undefined;
-  return options?.template ?? this.actionName;
+  options: { template?: string | false | null },
+): string | null | undefined {
+  if (!(options.template === false)) {
+    return options.template != null
+      ? options.template
+      : (this.lookupContext.findAll(this.actionName, this._prefixes())[0] as Template | undefined)
+          ?.virtualPath;
+  }
 }
 
 /** @internal */
 export function lookupAndDigestTemplate(
   this: EtagWithTemplateDigestHost,
   template: string,
-): string | undefined {
-  return this.lookupContext?.digestFor?.(template) ?? undefined;
-}
-
-/** @internal */
-export function determineTemplateEtag(
-  this: EtagWithTemplateDigestHost,
-  options: { template?: string | false } | undefined,
-): string | undefined {
-  const template = pickTemplateForEtag.call(this, options);
-  if (template === undefined) return undefined;
-  return lookupAndDigestTemplate.call(this, template);
+): ReturnType<typeof Digestor.digest> {
+  return Digestor.digest({ name: template, format: null, finder: this.lookupContext });
 }
 
 export const EtagWithTemplateDigest = new Module((mod) => {
