@@ -25,6 +25,18 @@ class Person extends Model {
 }
 
 describe("Errors — trails-only coverage", () => {
+  it("a String and a Symbol attribute argument name the same attribute", () => {
+    const e = new Errors(new Person());
+    e.add(":name", ":blank");
+    expect(e.where("name").length).toBe(1);
+    expect(e.where(":name").length).toBe(1);
+    expect(e.added(":name", ":blank")).toBe(true);
+    expect(e.ofKind(":name", ":blank")).toBe(true);
+    expect(e.include(":name")).toBe(true);
+    expect(e.delete(":name")).toEqual(["can't be blank"]);
+    expect(e.include("name")).toBe(false);
+  });
+
   it("add creates an error object and returns it", () => {
     const e = new Errors(new Person());
     e.add("name", ":blank");
