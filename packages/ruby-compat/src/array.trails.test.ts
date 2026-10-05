@@ -3,6 +3,7 @@ import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
   aryCount,
+  rbArray,
   toH,
   zip,
   aryDelete,
@@ -528,5 +529,21 @@ describe("Array#intersect?", () => {
   it("answers false when either array is empty", () => {
     expect(isIntersect([], [1])).toBe(false);
     expect(isIntersect([1], [])).toBe(false);
+  });
+});
+
+describe("rbArray", () => {
+  it("answers an Array, a to_ary or a to_a, else wraps the argument", () => {
+    const ary = [0, 1, 2];
+    expect(rbArray(ary)).toBe(ary);
+    expect(rbArray(null)).toEqual([]);
+    expect(rbArray({ a: 1, b: 2 })).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    expect(rbArray(new Set([1, 2]))).toEqual([1, 2]);
+    expect(rbArray({ toAry: () => [1] })).toEqual([1]);
+    expect(rbArray("json")).toEqual(["json"]);
+    expect(rbArray(false)).toEqual([false]);
   });
 });

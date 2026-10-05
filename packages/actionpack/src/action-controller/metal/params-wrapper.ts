@@ -5,6 +5,7 @@ import {
   last,
   merge,
   mergeBang,
+  rbArray,
   rbObjDup,
   rbObjRespondTo,
   rbStrSend,
@@ -21,7 +22,6 @@ import {
   safeConstantize,
   singularize,
   underscore,
-  wrap,
 } from "@blazetrails/activesupport";
 
 import { ParseError } from "../../action-dispatch/http/parameters.js";
@@ -41,14 +41,14 @@ export class Options {
 
   static fromHash(hash: Record<string, unknown>): Options {
     const name = (hash.name ?? null) as string | null;
-    const format = wrap(hash.format) as string[];
+    const format = rbArray(hash.format) as string[];
     const include =
       hash.include != null && hash.include !== false
-        ? wrap(hash.include).map((attr) => toS(attr))
+        ? rbArray(hash.include).map((attr) => toS(attr))
         : null;
     const exclude =
       hash.exclude != null && hash.exclude !== false
-        ? wrap(hash.exclude).map((attr) => toS(attr))
+        ? rbArray(hash.exclude).map((attr) => toS(attr))
         : null;
     return new Options(name, format, include, exclude, null, null);
   }

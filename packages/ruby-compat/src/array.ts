@@ -722,6 +722,43 @@ export function rbCheckArrayType(ary: unknown): unknown[] | null {
   return v;
 }
 
+/** `rb_check_to_array` (`vendor/ruby/v3.3.11/array.c:981`): the receiver's `to_a`, or nil. */
+function rbCheckToArray(ary: unknown): unknown[] | null {
+  if (ary == null) return [];
+  if (ary instanceof Map) return [...ary.entries()];
+  if (ary instanceof Set) return [...ary.values()];
+  if (typeof ary !== "object") return null;
+  const toA = (ary as { toA?: unknown }).toA;
+  if (typeof toA === "function") {
+    const v: unknown = toA.call(ary);
+    if (v == null) return null;
+    if (!Array.isArray(v)) conversionMismatch(ary, "Array", "to_a", v);
+    return v;
+  }
+  const proto: unknown = Object.getPrototypeOf(ary);
+  if (proto === Object.prototype || proto === null) return Object.entries(ary);
+  return null;
+}
+
+/**
+ * `Kernel#Array` (`rb_Array`, `vendor/ruby/v3.3.11/object.c:3791`): the
+ * argument's `to_ary`, else its `to_a`, else the argument in a one-element
+ * Array.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbArray(val: unknown): unknown[] {
+  let tmp = rbCheckArrayType(val);
+
+  if (tmp === null) {
+    tmp = rbCheckToArray(val);
+    if (tmp === null) {
+      return [val];
+    }
+  }
+  return tmp;
+}
+
 /**
  * Ruby `Array#flatten` with no level (`vendor/ruby/v3.3.11/array.c:6476`
  * `rb_ary_flatten`, over `flatten`, `array.c:6305`): every element that
