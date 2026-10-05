@@ -498,6 +498,16 @@ export function eachValue<T, R = never>(
  */
 export function eachValue<T>(hash: Record<string, T>, block?: undefined): Enumerator<T>;
 /**
+ * The Map arm: `rb_hash_foreach` walks whichever hash it is given.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
+ */
+export function eachValue<K, T>(hash: Map<K, T>, block: (value: T) => unknown): Map<K, T>;
+/**
+ * The Map arm, blockless.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
+ */
+export function eachValue<K, T>(hash: Map<K, T>, block?: undefined): Enumerator<T>;
+/**
  * A forwarded `&block`, which may be either arm.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
  */
@@ -510,18 +520,27 @@ export function eachValue<T>(
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#each_value` (`vendor/ruby/v3.3.11/hash.c:3060`).
  */
 export function eachValue<T>(
-  receiver: Record<string, T> | { eachValue(block: (value: T) => unknown): unknown },
+  receiver:
+    | Record<string, T>
+    | Map<unknown, T>
+    | { eachValue(block: (value: T) => unknown): unknown },
   block?: (value: T) => unknown,
 ): unknown {
   const own = ownMethod(receiver, "eachValue");
   if (own) return block ? own.call(receiver, block) : own.call(receiver);
-  const hash = receiver as Record<string, T>;
+  const hash = receiver as Record<string, T> | Map<unknown, T>;
   if (!block) {
     return new Enumerator<T>(
-      { eachValue: (block: (value: T) => unknown) => eachValue(hash, block) },
+      {
+        eachValue: (block: (value: T) => unknown) => eachValue(hash as Record<string, T>, block),
+      },
       "eachValue",
       [],
     );
+  }
+  if (hash instanceof Map) {
+    for (const value of hash.values()) block(value);
+    return hash;
   }
   for (const key of Object.keys(hash)) {
     block(hash[key]);
@@ -645,15 +664,42 @@ export function slice(
 export function except<T>(
   receiver: Record<string, T> | { except(...keys: string[]): Record<string, T> },
   ...keys: string[]
-): Record<string, T> {
+): Record<string, T>;
+/**
+ * The Map arm: `hash_dup_with_compare_by_id` (`vendor/ruby/v3.3.11/hash.c:1563`)
+ * answers a bare `Hash` whatever the receiver's class, keeping only its
+ * `compare_by_identity` table type.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`).
+ */
+export function except<K, V>(hash: Map<K, V>, ...keys: K[]): Hash<K, V>;
+/** @noRailsEquivalent PERMANENT — Ruby core `Hash#except` (`vendor/ruby/v3.3.11/hash.c:2683`). */
+export function except(
+  receiver:
+    | Record<string, unknown>
+    | Map<unknown, unknown>
+    | { except(...keys: string[]): Record<string, unknown> },
+  ...keys: unknown[]
+): Record<string, unknown> | Hash<unknown, unknown> {
   const own = ownMethod(receiver, "except");
-  if (own) return own.call(receiver, ...keys) as Record<string, T>;
-  const hash = receiver as Record<string, T>;
+  if (own) return own.call(receiver, ...keys) as Record<string, unknown>;
+  if (receiver instanceof Map) {
+    const result = new Hash<unknown, unknown>();
+    if (receiver instanceof Hash && receiver.isCompareByIdentity()) result.compareByIdentity();
+    for (const [key, value] of receiver) result.set(key, value);
+    for (const key of keys) {
+      hashDelete(result, key);
+    }
+    return result;
+  }
+  const hash = receiver as Record<string, unknown>;
   /* `rb_hash_except` (`vendor/ruby/v3.3.11/hash.c:2683`) deletes from a
      `hash_dup_with_compare_by_id`, so the result is an ancestor-less Hash in
      which `__proto__` stays an ordinary key. */
-  const result: Record<string, T> = Object.assign(Object.create(null) as Record<string, T>, hash);
-  for (const key of keys) {
+  const result: Record<string, unknown> = Object.assign(
+    Object.create(null) as Record<string, unknown>,
+    hash,
+  );
+  for (const key of keys as string[]) {
     delete result[key];
   }
   return result;

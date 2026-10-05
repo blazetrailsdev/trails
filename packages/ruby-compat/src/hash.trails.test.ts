@@ -503,6 +503,57 @@ describe("Hash#except", () => {
   });
 });
 
+describe("Hash#except on a Map-backed Hash", () => {
+  it("returns a new bare Hash excluding the given keys", () => {
+    class Sub<K, V> extends Hash<K, V> {}
+    const hash = new Sub<string, number>();
+    hash.set("a", 100).set("b", 200).set("c", 300);
+    const result = except(hash, "a", "nope");
+    expect(result.constructor).toBe(Hash);
+    expect([...result]).toEqual([
+      ["b", 200],
+      ["c", 300],
+    ]);
+    expect(hash.size).toBe(3);
+  });
+
+  it("keeps the receiver's compare_by_identity table", () => {
+    const hash = new Hash<unknown, number>().compareByIdentity();
+    const key = ["a"];
+    hash.set(key, 1);
+    expect(except(hash, ["a"]).size).toBe(1);
+    expect(except(hash, key).size).toBe(0);
+  });
+});
+
+describe("Hash#dup on a Map-backed Hash", () => {
+  it("copies the receiver's own table into a new hash of its class", () => {
+    class Sub<K, V> extends Hash<K, V> {}
+    const hash = new Sub<string, number>();
+    hash.set("a", 1).set("b", 2);
+    const copy = dup(hash);
+    expect(copy).not.toBe(hash);
+    expect(copy).toBeInstanceOf(Sub);
+    expect([...copy]).toEqual([...hash]);
+  });
+});
+
+describe("Hash#each_value on a Map-backed Hash", () => {
+  it("yields each value alone and returns the receiver", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1).set("b", 2);
+    const seen: number[] = [];
+    expect(eachValue(hash, (v) => seen.push(v))).toBe(hash);
+    expect(seen).toEqual([1, 2]);
+  });
+
+  it("enumerates the values when no block is given", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1).set("b", 2);
+    expect([...eachValue(hash)]).toEqual([1, 2]);
+  });
+});
+
 describe("Hash#default", () => {
   it("returns the default value for every miss", () => {
     const hash = new Hash<string, number>(0);
