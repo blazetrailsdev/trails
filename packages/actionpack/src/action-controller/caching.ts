@@ -1,5 +1,5 @@
 interface CachingInstrumentHost {
-  controllerName(): string;
+  controllerName(): string | null;
   actionName: string;
 }
 
@@ -7,7 +7,7 @@ interface CachingInstrumentHost {
 export function instrumentPayload(
   this: CachingInstrumentHost,
   key: unknown,
-): { controller: string; action: string; key: unknown } {
+): { controller: string | null; action: string; key: unknown } {
   return { controller: this.controllerName(), action: this.actionName, key };
 }
 

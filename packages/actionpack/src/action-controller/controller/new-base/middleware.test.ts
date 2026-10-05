@@ -2,7 +2,7 @@ import { describe, expect, it, beforeEach } from "vitest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import { MockRequest } from "@blazetrails/rack";
 import { block } from "@blazetrails/ruby-compat";
-import { Metal } from "../metal.js";
+import { Metal } from "../../metal.js";
 
 type RackApp = (env: RackEnv) => Promise<RackResponse>;
 

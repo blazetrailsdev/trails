@@ -6,7 +6,9 @@ import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import {
   classAttribute,
+  demodulize,
   initializeIncludedModules,
+  isAnonymous,
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
@@ -177,10 +179,16 @@ export class Metal extends AbstractController {
     return underscore(this.name.replace(/Controller$/, ""));
   }
 
-  static controllerName(): string {
-    const path = this.controllerPath();
-    const lastSlash = path.lastIndexOf("/");
-    return lastSlash >= 0 ? path.slice(lastSlash + 1) : path;
+  /** @internal */
+  static _controllerName?: string | null;
+
+  static controllerName(): string | null {
+    if (Object.hasOwn(this, "_controllerName") && this._controllerName != null) {
+      return this._controllerName;
+    }
+    return (this._controllerName = isAnonymous(this)
+      ? null
+      : underscore(demodulize(this.name).replace(/Controller$/, "")));
   }
 
   static makeResponseBang(request: Request): Response {
@@ -236,7 +244,7 @@ export class Metal extends AbstractController {
     }
   }
 
-  controllerName(): string {
+  controllerName(): string | null {
     return (this.constructor as typeof Metal).controllerName();
   }
 
