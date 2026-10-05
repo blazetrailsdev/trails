@@ -1,4 +1,13 @@
-import { block, fetch, rbInspect, rbModName } from "@blazetrails/ruby-compat";
+import {
+  block,
+  fetch,
+  first,
+  rbEqual,
+  rbInspect,
+  rbModName,
+  rbModToS,
+  zip,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
@@ -17,6 +26,7 @@ import {
   DelegationError,
   classAttribute,
   included,
+  kernelArray,
 } from "@blazetrails/activesupport";
 import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -180,37 +190,31 @@ export class AbstractReflection {
       new TableMetadata(this.klass, table),
     );
     const scopeChainItems = this.joinScopes(table, predicateBuilder);
-    let scope = this.klassJoinScope(table, predicateBuilder);
+    const klassScope = this.klassJoinScope(table, predicateBuilder);
 
-    const typeCol = this._concrete().type;
-    if (typeCol) {
-      scope = scope.where({ [typeCol]: polymorphicName(foreignKlass) });
+    const type = this._concrete().type;
+    if (type) {
+      klassScope.whereBang({ [type]: polymorphicName(foreignKlass) });
     }
 
-    for (const chainScope of scopeChainItems) {
-      scope = scope.merge(chainScope);
-    }
+    scopeChainItems.reduce((scope, item) => scope.mergeBang(item), klassScope);
 
-    const primaryKeys = this._arrayWrap(this._concrete().joinPrimaryKey!());
-    const foreignKeys = this._arrayWrap(this._concrete().joinForeignKey);
+    const primaryKeyColumnNames = kernelArray(this._concrete().joinPrimaryKey!());
+    const foreignKeyColumnNames = kernelArray(this._concrete().joinForeignKey);
 
-    if (primaryKeys.length !== foreignKeys.length) {
-      throw new ArgumentError(
-        `joinScope: joinPrimaryKey and joinForeignKey must have the same number of columns ` +
-          `(got ${primaryKeys.length} primary key column(s) and ${foreignKeys.length} foreign key column(s))`,
+    const primaryForeignKeyPairs = zip(primaryKeyColumnNames, foreignKeyColumnNames);
+
+    for (const [primaryKeyColumnName, foreignKeyColumnName] of primaryForeignKeyPairs) {
+      klassScope.whereBang(
+        table.get(primaryKeyColumnName!).eq(foreignTable.get(foreignKeyColumnName!)),
       );
     }
 
-    for (let i = 0; i < primaryKeys.length; i++) {
-      scope = scope.where(table.get(primaryKeys[i]).eq(foreignTable.get(foreignKeys[i])));
+    if ((this.klass as any).isFinderNeedsTypeCondition()) {
+      klassScope.whereBang(typeCondition(this.klass as any, table));
     }
 
-    const targetKlass = this.klass as any;
-    if (targetKlass.isFinderNeedsTypeCondition()) {
-      scope = scope.where(typeCondition(targetKlass, table));
-    }
-
-    return scope;
+    return klassScope;
   }
 
   joinScopes(
@@ -227,8 +231,7 @@ export class AbstractReflection {
 
   klassJoinScope(table?: Table | Nodes.TableAlias, predicateBuilder?: any): any {
     const relation = this.buildScope(table, predicateBuilder);
-    const klass = this.klass as any;
-    return klass.scopeForAssociation ? klass.scopeForAssociation(relation) : relation;
+    return (this.klass as any).scopeForAssociation(relation);
   }
 
   constraints(): Array<(...args: any[]) => any> {
@@ -236,23 +239,23 @@ export class AbstractReflection {
   }
 
   counterCacheColumn(): string | null {
-    if (this._counterCacheColumn == null) {
+    return (this._counterCacheColumn ??= (() => {
       const counterCache = this._concrete().options.counterCache as
         | { column: string | null }
         | undefined;
 
       if (this.belongsTo()) {
         if (counterCache) {
-          this._counterCacheColumn =
+          return (
             counterCache.column ??
-            `${pluralize(underscore(demodulize(this._concrete().activeRecord.modelName.name)))}_count`;
+            `${pluralize(underscore(demodulize(this._concrete().activeRecord.modelName.name)))}_count`
+          );
         }
+        return null;
       } else {
-        this._counterCacheColumn =
-          (counterCache && counterCache.column) ?? `${this._concrete().name}_count`;
+        return (counterCache && counterCache.column) ?? `${this._concrete().name}_count`;
       }
-    }
-    return this._counterCacheColumn ?? null;
+    })());
   }
 
   checkValidityOfInverseBang(): void {
@@ -304,25 +307,24 @@ export class AbstractReflection {
   }
 
   hasCachedCounter(): boolean {
-    const opts = this._concrete().options ?? {};
-    if (opts.counterCache) return true;
-    const iwucc = this.inverseWhichUpdatesCounterCache();
-    if (iwucc && asConcrete(iwucc).options?.counterCache) {
-      const counterCacheColumn = this.counterCacheColumn();
-      const owner = this._concrete().activeRecord as any;
-      if (counterCacheColumn && owner?.hasAttribute?.(counterCacheColumn)) return true;
-    }
-    return false;
+    return !!(
+      this._concrete().options.counterCache ||
+      (this.inverseWhichUpdatesCounterCache() &&
+        asConcrete(this.inverseWhichUpdatesCounterCache()!).options.counterCache &&
+        (this._concrete().activeRecord as any).hasAttribute(this.counterCacheColumn()))
+    );
   }
 
   hasActiveCachedCounter(): boolean {
     if (!this.hasCachedCounter()) return false;
-    const opts = this._concrete().options ?? {};
-    const iwucc = this.inverseWhichUpdatesCounterCache();
-    const counterCache =
-      opts.counterCache || (iwucc ? asConcrete(iwucc).options?.counterCache : undefined);
-    if (counterCache && (counterCache as { active?: unknown }).active === false) return false;
-    return true;
+
+    const counterCache = (this._concrete().options.counterCache ||
+      (this.inverseWhichUpdatesCounterCache() &&
+        asConcrete(this.inverseWhichUpdatesCounterCache()!).options.counterCache)) as {
+      active?: unknown;
+    };
+
+    return counterCache.active !== false;
   }
 
   isCounterMustBeUpdatedByHasMany(): boolean {
@@ -334,9 +336,7 @@ export class AbstractReflection {
   }
 
   strictLoadingViolationMessage(owner: unknown): string {
-    const ownerName =
-      typeof owner === "string" ? owner : ((owner as { name?: string })?.name ?? "Record");
-    let message = `\`${ownerName}\` is marked for strict_loading.`;
+    let message = `\`${rbModToS(owner as typeof Base)}\` is marked for strict_loading.`;
     message += ` The ${this.isPolymorphic() ? "polymorphic association" : `${this.klass.name} association`}`;
     message += ` named \`:${this._concrete().name}\` cannot be lazily loaded.`;
     return message;
@@ -353,12 +353,6 @@ export class AbstractReflection {
   /** @internal */
   inverseName(): string | false | null {
     return null;
-  }
-
-  private _arrayWrap(value: unknown): string[] {
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") return [value];
-    return [];
   }
 
   /** @internal */
@@ -400,10 +394,13 @@ export class MacroReflection extends AbstractReflection {
   }
 
   equals(other: unknown): boolean {
-    if (this === other) return true;
-    if (!(other instanceof (this.constructor as typeof MacroReflection))) return false;
-    const o = other;
-    return this.name === o.name && o.options != null && this.activeRecord === o.activeRecord;
+    return (
+      this === other ||
+      (other instanceof (this.constructor as typeof MacroReflection) &&
+        this.name === other.name &&
+        other.options != null &&
+        this.activeRecord === other.activeRecord)
+    );
   }
 
   set autosave(value: boolean) {
@@ -457,9 +454,7 @@ export class MacroReflection extends AbstractReflection {
     if (demodulize(arName) === className) {
       try {
         return this.computeClass(`::${className}`);
-      } catch (e) {
-        if (e instanceof ArgumentError) throw e;
-      }
+      } catch {}
     }
     return this.computeClass(className);
   }
@@ -479,9 +474,6 @@ export class MacroReflection extends AbstractReflection {
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
-    if (typeof options.className === "symbol") {
-      options = { ...options, className: options.className.description ?? "" };
-    }
     const counterCache = options.counterCache;
     if (counterCache) {
       let active = true;
@@ -491,7 +483,7 @@ export class MacroReflection extends AbstractReflection {
         column = counterCache;
       } else if (typeof counterCache === "object" && counterCache !== null) {
         const cc = counterCache as Record<string, unknown>;
-        active = cc.active !== undefined ? !!cc.active : true;
+        active = fetch(cc, "active", true);
         column = cc.column != null ? String(cc.column) : null;
       }
 
@@ -516,14 +508,8 @@ export class AggregateReflection extends MacroReflection {
   }
 
   mapping(): [string, string][] {
-    const m = this.options.mapping;
-    if (!m) return [[this.name, this.name]];
-    if (Array.isArray(m)) {
-      if (m.length === 0) return [];
-      if (Array.isArray(m[0])) return m as [string, string][];
-      return [m as unknown as [string, string]];
-    }
-    return [[this.name, this.name]];
+    const mapping = (this.options.mapping as unknown[]) || [this.name, this.name];
+    return (Array.isArray(first(mapping)) ? mapping : [mapping]) as [string, string][];
   }
 }
 
@@ -595,18 +581,15 @@ export class AssociationReflection extends MacroReflection {
     if (this.belongsTo()) return `${underscore(this.nameString)}_id`;
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
     if (this.options.inverseOf && inferFromInverseOf) {
-      const inv = this.inverseOf();
-      if (inv) return String(inv.foreignKey({ inferFromInverseOf: false }));
+      return this.inverseOf()!.foreignKey({ inferFromInverseOf: false }) as string;
     }
     const baseName = rbModName(this.activeRecord)!;
     return `${underscore(demodulize(baseName))}_id`;
   }
 
   private deriveFkQueryConstraints(foreignKey: string): string | string[] {
-    const primaryQueryConstraints = queryConstraintsList.call(this.activeRecord as any);
-    if (!primaryQueryConstraints) return foreignKey;
-
-    const ownerPk = this.activeRecord.primaryKey;
+    const primaryQueryConstraints = queryConstraintsList.call(this.activeRecord as any)!;
+    const ownerPk = this.activeRecord.primaryKey as string;
 
     if (primaryQueryConstraints.length > 2) {
       throw new ArgumentError(
@@ -617,8 +600,7 @@ export class AssociationReflection extends MacroReflection {
       );
     }
 
-    const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
-    if (!ownerPkStr || !primaryQueryConstraints.includes(ownerPkStr)) {
+    if (!primaryQueryConstraints.includes(ownerPk)) {
       throw new ArgumentError(
         `The query constraints on the \`${this.activeRecord.name}\` model does not include the primary ` +
           `key so Active Record is unable to derive the foreign key constraints for ` +
@@ -631,9 +613,9 @@ export class AssociationReflection extends MacroReflection {
 
     const [firstKey, lastKey] = primaryQueryConstraints;
 
-    if (firstKey === ownerPkStr) {
+    if (firstKey === ownerPk) {
       return [foreignKey, lastKey];
-    } else if (lastKey === ownerPkStr) {
+    } else if (lastKey === ownerPk) {
       return [firstKey, foreignKey];
     }
 
@@ -702,41 +684,30 @@ export class AssociationReflection extends MacroReflection {
   }
 
   private automaticInverseOf(): string | null {
-    if (!this.canFindInverseOfAutomatically(this)) return null;
+    if (this.canFindInverseOfAutomatically(this)) {
+      const inverseName = camelize(
+        underscore((this.options.as as string) || demodulize(rbModName(this.activeRecord)!)),
+        false,
+      );
 
-    const modelBaseName = rbModName(this.activeRecord)!;
-    const snakeInverseName = this.options.as
-      ? underscore(this.options.as as string)
-      : underscore(demodulize(modelBaseName));
-    const camelInverseName = camelize(snakeInverseName, false);
-    const candidateNames =
-      camelInverseName === snakeInverseName
-        ? [snakeInverseName]
-        : [camelInverseName, snakeInverseName];
-
-    let reflection: AssociationReflection | ThroughReflection | null | false = null;
-    try {
-      const lookupNames: string[] = [...candidateNames];
-      if (this.activeRecord.automaticallyInvertPluralAssociations) {
-        for (const inverseName of candidateNames) lookupNames.push(pluralize(inverseName));
-      }
-      for (const n of lookupNames) {
-        const r = this.klass._reflectOnAssociation(n);
-        if (r && this.validInverseReflection(r)) {
-          reflection = r;
-          break;
+      let reflection: AssociationReflection | ThroughReflection | null | false;
+      try {
+        reflection = this.klass._reflectOnAssociation(inverseName);
+        if (!reflection && this.activeRecord.automaticallyInvertPluralAssociations) {
+          const pluralInverseName = pluralize(inverseName);
+          reflection = this.klass._reflectOnAssociation(pluralInverseName);
+        }
+      } catch (error: unknown) {
+        if (error instanceof NameError && error.constantName === this.className) {
+          reflection = false;
+        } else {
+          throw error;
         }
       }
-    } catch (e: unknown) {
-      if (e instanceof NameError && e.constantName === this.className) {
-        reflection = false;
-      } else {
-        throw e;
-      }
-    }
 
-    if (this.validInverseReflection(reflection)) {
-      return asConcrete(reflection as AbstractReflection).name;
+      if (this.validInverseReflection(reflection)) {
+        return (reflection as AssociationReflection | ThroughReflection).name;
+      }
     }
     return null;
   }
@@ -744,28 +715,14 @@ export class AssociationReflection extends MacroReflection {
   private validInverseReflection(
     reflection: AssociationReflection | ThroughReflection | null | false,
   ): boolean {
-    if (!reflection) return false;
-    if ((reflection as AbstractReflection) === this) return false;
-
-    const reflFk = asConcrete(reflection).foreignKey?.();
-    const thisFk = this.foreignKey();
-    if (JSON.stringify(reflFk) !== JSON.stringify(thisFk)) return false;
-
-    const reflActiveRecord = asConcrete(reflection).activeRecord;
-    if (this.klass !== reflActiveRecord) {
-      let proto = Object.getPrototypeOf(this.klass);
-      let isSubclass = false;
-      while (proto) {
-        if (proto === reflActiveRecord) {
-          isSubclass = true;
-          break;
-        }
-        proto = Object.getPrototypeOf(proto);
-      }
-      if (!isSubclass) return false;
-    }
-
-    return this.canFindInverseOfAutomatically(reflection as AssociationReflection, true);
+    return !!(
+      reflection &&
+      (reflection as AbstractReflection) !== this &&
+      rbEqual(this.foreignKey(), reflection.foreignKey()) &&
+      (this.klass === reflection.activeRecord ||
+        this.klass.prototype instanceof reflection.activeRecord) &&
+      this.canFindInverseOfAutomatically(reflection, true)
+    );
   }
 
   protected canFindInverseOfAutomatically(
@@ -784,13 +741,9 @@ export class AssociationReflection extends MacroReflection {
     inverseReflection: boolean,
   ): boolean {
     if (inverseReflection) {
-      return !asConcrete(reflection).scope;
-    }
-    if (!asConcrete(reflection).scope) return true;
-    try {
-      return !!(asConcrete(reflection).klass as any)?.automaticScopeInversing;
-    } catch {
-      return false;
+      return !reflection.scope;
+    } else {
+      return !reflection.scope || !!reflection.klass.automaticScopeInversing;
     }
   }
 
@@ -1153,12 +1106,13 @@ export class ThroughReflection extends AbstractReflection {
   get delegateReflection(): AssociationReflection {
     return this._delegate;
   }
-  private _sourceReflectionNameCache: string | null | undefined = undefined;
+  private _sourceReflectionName: string | null | undefined;
   private _klassCache: typeof Base | null = null;
 
   constructor(delegate: AssociationReflection) {
     super();
     this._delegate = delegate;
+    this._sourceReflectionName = delegate.options.source as string | undefined;
     this.ensureOptionNotGivenAsClassBang("sourceType");
   }
 
@@ -1411,29 +1365,19 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   sourceReflectionName(): string | null {
-    if (this._sourceReflectionNameCache) return this._sourceReflectionNameCache;
+    return (this._sourceReflectionName ||= (() => {
+      let names = [...new Set([singularize(this.nameString), this.name])];
+      names = names.filter((n) => this.throughReflection!.klass._reflectOnAssociation(n) != null);
 
-    if (this.options.source) {
-      this._sourceReflectionNameCache = this.options.source as string;
-      return this._sourceReflectionNameCache;
-    }
-
-    const throughRef = this.throughReflection;
-    if (!throughRef) return null;
-
-    const singular = singularize(this.nameString);
-    let names = [...new Set([singular, this.name])];
-    names = names.filter((n) => throughRef.klass._reflectOnAssociation(n) != null);
-
-    if (names.length > 1) {
-      throw new AmbiguousSourceReflectionForThroughAssociation(
-        this.activeRecord.name,
-        this.name,
-        this.sourceReflectionNames(),
-      );
-    }
-    this._sourceReflectionNameCache = names[0] ?? null;
-    return this._sourceReflectionNameCache ?? null;
+      if (names.length > 1) {
+        throw new AmbiguousSourceReflectionForThroughAssociation(
+          this.activeRecord.name,
+          this.name,
+          this.sourceReflectionNames(),
+        );
+      }
+      return first(names) ?? null;
+    })());
   }
 
   sourceOptions(): Record<string, unknown> {
@@ -1544,15 +1488,12 @@ export class ThroughReflection extends AbstractReflection {
 
   /** @internal */
   private collectJoinReflections(seed: AbstractReflection[]): AbstractReflection[] {
-    const src = this.sourceReflection;
-    if (!src) return seed;
-    const a = src.addAsSource(seed);
+    const a = this.sourceReflection!.addAsSource(seed);
     if (this.options.sourceType) {
-      const through = this.throughReflection;
-      return through ? through.addAsPolymorphicThrough(this, a) : a;
+      return this.throughReflection!.addAsPolymorphicThrough(this, a);
+    } else {
+      return this.throughReflection!.addAsThrough(a);
     }
-    const through = this.throughReflection;
-    return through ? through.addAsThrough(a) : a;
   }
 }
 

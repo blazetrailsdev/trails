@@ -6,6 +6,7 @@ import {
   isPresent,
   threadMattrAccessor,
 } from "@blazetrails/activesupport";
+import { cmp } from "@blazetrails/ruby-compat";
 import { LegacyFormatter, SQLCommenter } from "./query-logs-formatter.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import type { TagValue, QueryLogsFormatter } from "./query-logs-formatter.js";
@@ -143,7 +144,7 @@ export class QueryLogs {
         handlers.push([i, this.buildHandler(i)]);
       }
     }
-    return handlers.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return handlers.sort(([a], [b]) => cmp(a, b)!);
   }
 
   private static buildHandler(name: string, handler?: TagValue | TagHandler): Handler {
@@ -187,12 +188,13 @@ export class QueryLogs {
     return comment;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   static tagContent(connection?: unknown): string {
     const context = ExecutionContext.toH() as Record<string, TagValue>;
-    if (context.connection == null || (context.connection as unknown) === false) {
-      (context as Record<string, unknown>).connection = connection;
-    }
+    context.connection ||= connection as TagValue;
 
     const pairs = this.#handlers.flatMap(([key, handler]) => {
       const val = typeof handler === "function" ? handler(context) : handler.call(context);

@@ -348,8 +348,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _joinDependency: JoinDependency | null = null;
 
-  private _table: Table | null = null;
+  private _table: Table;
 
+  /** @inventedArm if — PERMANENT */
   constructor(
     model: typeof Base,
     table?: Table | Nodes.TableAlias,
@@ -357,16 +358,16 @@ export class Relation<T extends Base, G extends boolean = false> {
     values: ValuesHash = {},
   ) {
     if (table) {
-      predicateBuilder ??= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+      predicateBuilder ||= model.predicateBuilder.with(new TableMetadata(model, table as Table));
+    } else {
+      table = model.arelTable;
+      predicateBuilder ||= model.predicateBuilder;
     }
+
     this._model = model;
-    if (table) {
-      this._table = table as Table;
-    }
+    this._table = table as Table;
     this._values = values;
-    if (predicateBuilder) {
-      this._predicateBuilder = predicateBuilder;
-    }
+    this._predicateBuilder = predicateBuilder;
     if (isModuleIncluded(new.target, ClassSpecificRelation)) {
       return new Proxy(this, {
         get(target: any, prop: string | symbol, receiver: any) {
@@ -1461,7 +1462,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   get table(): Table {
-    return this._table ?? this._model.arelTable;
+    return this._table;
   }
 
   get model(): typeof Base {
@@ -1492,24 +1493,10 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.isEmpty();
   }
 
-  private _predicateBuilder: PredicateBuilder | null = null;
+  private _predicateBuilder: PredicateBuilder;
 
   get predicateBuilder(): PredicateBuilder {
-    if (this._predicateBuilder) {
-      return this._predicateBuilder;
-    }
-    let pb: PredicateBuilder;
-    const modelPbAccessor = (this.model as any).predicateBuilder;
-    const modelPb =
-      typeof modelPbAccessor === "function" ? modelPbAccessor.call(this.model) : modelPbAccessor;
-    const metadata = new TableMetadata(this.model, this.table);
-    if (modelPb && typeof modelPb.with === "function") {
-      pb = modelPb.with(metadata);
-    } else {
-      pb = new PredicateBuilder(metadata);
-    }
-    this._predicateBuilder = pb;
-    return pb;
+    return this._predicateBuilder;
   }
 
   get isScheduled(): boolean {
@@ -1714,8 +1701,10 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.cacheKey();
   }
 
+  /** @inventedArm loop — CONVERGEABLE relation-subclasses-inherit-clone-without-overrides */
   initializeCopy(other: Relation<T, G>): void {
     this._table = other._table;
+    this._predicateBuilder = other._predicateBuilder;
     this._values = { ...other._values };
     this._withIsRecursive = other._withIsRecursive;
     this._isNone = other._isNone;

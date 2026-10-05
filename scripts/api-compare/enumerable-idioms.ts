@@ -344,6 +344,11 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   ["each_with_index", [["loop"]]],
   ["each_with_object", [["loop"]]],
   ["reverse_each", [["loop"]]],
+  // `Thread.each_caller_location do |location| … end`
+  // (activerecord/lib/active_record/query_logs.rb:156-159) — it yields each
+  // frame and takes no blockless form, so the port walks `callerLocations()`
+  // with `for … of`, the only spelling its block's `return` survives.
+  ["each_caller_location", [["loop"]]],
   // `parent_classes.filter_map { |k| … }`
   // (activerecord/lib/active_record/associations/preloader/branch.rb:55) — no
   // JS method both filters and maps, so the port is a loop whose `if` decides

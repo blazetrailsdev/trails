@@ -266,6 +266,16 @@ describe("sameFileHelperSkeletons", () => {
     expect(foldSkeletonTokens(["ref:each_slice"], "ruby", ["ref:eachSlice"])).toEqual([]);
   });
 
+  it("folds `Thread.each_caller_location` onto the `for … of callerLocations()` loop its port spells", () => {
+    expect(
+      foldSkeletonTokens(
+        ["ref:each_caller_location", "ref:backtrace_cleaner", "ref:clean_frame", "if"],
+        "ruby",
+        ["loop", "ref:callerLocations", "ref:backtraceCleaner", "ref:cleanFrame", "if"],
+      ),
+    ).toEqual(["loop", "ref:backtrace_cleaner", "ref:clean_frame", "if"]);
+  });
+
   it("spends a single-lowering idiom once, leaving the loops later idioms are owed", () => {
     expect(
       foldSkeletonTokens(["ref:each_with_index", "ref:save", "ref:scan", "ref:scan"], "ruby", [
