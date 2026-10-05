@@ -1065,6 +1065,30 @@ describe("block (a marked `&block`)", () => {
     });
   });
 
+  it("passes exactly the arguments it was called with, at every arity", () => {
+    const counts = [
+      function () {
+        return arguments.length;
+      },
+      function (_a: unknown) {
+        return arguments.length;
+      },
+      function (_a: unknown, _b: unknown) {
+        return arguments.length;
+      },
+      function (_a: unknown, _b: unknown, _c: unknown) {
+        return arguments.length;
+      },
+    ] as ((...args: unknown[]) => number)[];
+    for (const fn of counts) {
+      const blk = block(fn) as unknown as (...args: unknown[]) => number;
+      expect(blk()).toBe(0);
+      expect(blk(1)).toBe(1);
+      expect(blk(1, 2)).toBe(2);
+      expect(blk(1, 2, 3, 4)).toBe(4);
+    }
+  });
+
   it("is not called by a fetch that finds the key, on a plain hash or a Map", () => {
     const blk = block(() => {
       throw new Error("yielded");

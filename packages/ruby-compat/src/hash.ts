@@ -30,13 +30,15 @@ export function block(fn: (...args: never[]) => unknown): unknown {
       };
       break;
     case 1:
-      blk = function (this: unknown, a: never, ...args: never[]): unknown {
-        return fn.call(this, a, ...args);
+      blk = function (this: unknown, _a: never): unknown {
+        // eslint-disable-next-line prefer-rest-params
+        return fn.apply(this, arguments as unknown as never[]);
       };
       break;
     case 2:
-      blk = function (this: unknown, a: never, b: never, ...args: never[]): unknown {
-        return fn.call(this, a, b, ...args);
+      blk = function (this: unknown, _a: never, _b: never): unknown {
+        // eslint-disable-next-line prefer-rest-params
+        return fn.apply(this, arguments as unknown as never[]);
       };
       break;
     default:
@@ -136,17 +138,21 @@ export function fetch(
   key: unknown,
   ...rest: unknown[]
 ): unknown {
-  if (
-    Object.getPrototypeOf(receiver) === Object.prototype &&
-    Object.hasOwn(receiver, key as PropertyKey)
-  ) {
-    return (receiver as Record<string, unknown>)[key as string];
+  const plain = Object.getPrototypeOf(receiver) === Object.prototype;
+  if (!plain) {
+    const own = ownMethod(receiver, "fetch");
+    if (own) return own.call(receiver, key, ...rest);
   }
-  const own = ownMethod(receiver, "fetch");
-  if (own) return own.call(receiver, key, ...rest);
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
   const blockGiven = rbBlockGivenP(rest[0]);
-  if (!(hash instanceof Map ? hash.has(key) : hasKey(hash, key as string))) {
+  const isMap = !plain && hash instanceof Map;
+  if (
+    !(isMap
+      ? hash.has(key)
+      : plain
+        ? Object.hasOwn(hash, key as PropertyKey)
+        : hasKey(hash, key as string))
+  ) {
     if (blockGiven) {
       return (rest[0] as (key: unknown) => unknown)(key);
     } else if (rest.length === 0) {
@@ -158,7 +164,7 @@ export function fetch(
       return rest[0];
     }
   }
-  return hash instanceof Map ? hash.get(key) : hash[key as string];
+  return isMap ? hash.get(key) : (hash as Record<string, unknown>)[key as string];
 }
 
 /**
