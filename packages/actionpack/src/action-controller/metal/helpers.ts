@@ -1,6 +1,6 @@
 import { extend, type InheritableOptions } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { rbObjIvarGet, rbObjIvarSet, registerConstant } from "@blazetrails/ruby-compat";
 import {
   Resolution,
   type HelperMethodNameList,
@@ -41,22 +41,21 @@ export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[])
   );
 }
 
-export interface HelperProxyClass {
-  _helperProxy?: ActionViewBase;
-  _helpers?: HelperMethodsModule;
-}
-
 type ConfigReceiver = { config(): InheritableOptions };
 
 export const ClassMethods = {
-  helpers(this: HelperProxyClass): ActionViewBase {
-    if (!Object.hasOwn(this, "_helperProxy") || this._helperProxy == null) {
-      const proxy = ActionViewBase.empty();
-      proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
-      extend(proxy, this._helpers!);
-      this._helperProxy = proxy;
-    }
-    return this._helperProxy;
+  helpers(this: { _helpers?: HelperMethodsModule }): ActionViewBase {
+    return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
+      rbObjIvarSet(
+        this,
+        "@helper_proxy",
+        (() => {
+          const proxy = ActionViewBase.empty();
+          proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
+          extend(proxy, this._helpers!);
+          return proxy;
+        })(),
+      )) as ActionViewBase;
   },
 };
 

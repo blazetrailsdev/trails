@@ -704,6 +704,26 @@ describe("extend", () => {
     expect((User as unknown as DynSymbols)[extended]).toBeUndefined();
   });
 
+  it("carries the methods a plain-object module inherits from its ancestors", () => {
+    const parent = {
+      inherited() {
+        return "parent";
+      },
+      shadowed() {
+        return "parent";
+      },
+    };
+    const mod = Object.assign(Object.create(parent) as typeof parent, {
+      shadowed() {
+        return "own";
+      },
+    });
+    const obj = {};
+    extend(obj, mod);
+    expect((obj as typeof parent).inherited()).toBe("parent");
+    expect((obj as typeof parent).shadowed()).toBe("own");
+  });
+
   it("works without an extended callback", () => {
     class User {}
     extend(User, {

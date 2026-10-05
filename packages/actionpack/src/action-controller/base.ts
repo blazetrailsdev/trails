@@ -400,8 +400,6 @@ export class Base extends Metal {
   declare static helperModulesFromPaths: (typeof AbstractHelpers.ClassMethods)["helperModulesFromPaths"];
   static helperAttr = helperAttr;
   static helpers = HelpersClassMethods.helpers;
-  /** @internal */
-  static _helperProxy?: ActionViewBase;
   static modulesForHelpers = modulesForHelpers;
   helpers = helpers;
   /** @internal */
