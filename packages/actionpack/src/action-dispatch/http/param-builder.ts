@@ -166,7 +166,9 @@ export class ParamBuilder {
       let designatedEncoding: Encoding | string | undefined;
       let validEncoding: boolean;
       if (encodingTemplate && (designatedEncoding = encodingTemplate.get(k))) {
-        v = String.fromCharCode(...bytes(v));
+        v = bytes(v)
+          .map((b) => String.fromCharCode(b))
+          .join("");
         validEncoding = isValidEncoding(v, designatedEncoding);
         v = forceEncoding(v, designatedEncoding);
       } else {

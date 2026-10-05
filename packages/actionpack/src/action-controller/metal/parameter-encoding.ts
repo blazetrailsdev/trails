@@ -3,7 +3,6 @@ import type { EncodingTemplate } from "../../action-dispatch/http/param-builder.
 
 export interface ParameterEncodingHost {
   _parameterEncodings: Hash<string, EncodingTemplate>;
-  setupParamEncode(): void;
 }
 
 export const ParameterEncoding = {
