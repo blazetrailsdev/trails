@@ -90,7 +90,7 @@ describe("Thor::Group", () => {
   it("registers every public method as a command, in declaration order", () => {
     expect(Object.keys(counter.allCommands())).toEqual([
       "one",
-      "_invokeFromOptionTestFramework",
+      "_invokeFromOption_test_framework",
       "two",
     ]);
     expect(counter.commands().one).toBeInstanceOf(Command);
@@ -138,11 +138,29 @@ describe("Thor::Group", () => {
       }
     }
     const klass = Invoker as unknown as GroupClass;
-    expect(Object.keys(klass.commands())).toEqual(["_invokeInvoked", "_invokeNowhere"]);
+    expect(Object.keys(klass.commands())).toEqual(["_invoke_invoked", "_invoke_nowhere"]);
     expect(klass.invocations().get("invoked")).toBe(false);
     const shell = await start(Invoker, []);
     expect(log).toEqual(["invoked"]);
     expect(shell.out).toEqual(["invoke invoked true @0", 'error "nowhere" [not found] :red @0']);
+  });
+
+  it("invoke and invoke_from_option keep names apart that differ only in case", () => {
+    class Cased extends Group {
+      static {
+        const klass = this as unknown as GroupClass;
+        klass.classOption("Foo", { type: "string" });
+        klass.classOption("foo", { type: "string" });
+        klass.invoke("Foo", "foo");
+        klass.invokeFromOption("Foo", "foo");
+      }
+    }
+    expect(Object.keys((Cased as unknown as GroupClass).commands())).toEqual([
+      "_invoke_Foo",
+      "_invoke_foo",
+      "_invokeFromOption_Foo",
+      "_invokeFromOption_foo",
+    ]);
   });
 
   it("invoke names the command after a class, and yields nil for its command", async () => {
@@ -158,7 +176,7 @@ describe("Thor::Group", () => {
       }
     }
     const klass = ByClass as unknown as GroupClass;
-    expect(Object.keys(klass.commands())).toEqual(["_invokeInvoked"]);
+    expect(Object.keys(klass.commands())).toEqual(["_invoke_Invoked"]);
     expect(klass.invocations().get(Invoked)).toBe(false);
     const shell = await start(ByClass, []);
     expect(shell.out).toEqual(["invoke Invoked true @0"]);
@@ -173,7 +191,7 @@ describe("Thor::Group", () => {
       }
     }
     const klass = ByPlain as unknown as GroupClass;
-    expect(Object.keys(klass.commands())).toEqual(["_invokePlain"]);
+    expect(Object.keys(klass.commands())).toEqual(["_invoke_Plain"]);
     expect(klass.invocationBlocks().size).toBe(0);
     await expect(start(ByPlain, [])).rejects.toThrow("Expected Thor class, got Plain");
   });

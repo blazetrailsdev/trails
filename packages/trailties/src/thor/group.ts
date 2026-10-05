@@ -24,7 +24,6 @@ import type { Option } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Shell } from "./shell.js";
 import type { Basic } from "./shell/basic.js";
-import { camelCase } from "./util.js";
 
 type InvokeOptions = Record<string, unknown>;
 
@@ -83,7 +82,6 @@ export class Group {
     return this._invocationBlocks!;
   }
 
-  /** @inventedArm camelCase — PERMANENT */
   static invoke(this: GroupClass, ...names: unknown[]): void {
     const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
       | InvocationBlock
@@ -95,7 +93,7 @@ export class Group {
       this.invocations().set(name, false);
       if (block !== undefined) this.invocationBlocks().set(name, block);
 
-      const meth = `_invoke${camelCase(rbObjAsString(name).replace(/\W/g, "_"))}`;
+      const meth = `_invoke_${rbObjAsString(name).replace(/\W/g, "_")}`;
       Object.defineProperty(this.prototype, meth, {
         value: async function (this: Instance) {
           const self = this.constructor as GroupClass;
@@ -117,7 +115,6 @@ export class Group {
     });
   }
 
-  /** @inventedArm camelCase — PERMANENT */
   static invokeFromOption(this: GroupClass, ...names: unknown[]): void {
     const block = (rbObjClassname(last(names)) === "Proc" ? names.pop() : undefined) as
       | InvocationBlock
@@ -136,7 +133,7 @@ export class Group {
       this.invocations().set(name, true);
       if (block !== undefined) this.invocationBlocks().set(name, block);
 
-      const meth = `_invokeFromOption${camelCase(rbObjAsString(name).replace(/\W/g, "_"))}`;
+      const meth = `_invokeFromOption_${rbObjAsString(name).replace(/\W/g, "_")}`;
       Object.defineProperty(this.prototype, meth, {
         value: async function (this: Instance) {
           if (!rtest(this.options[name])) return;
