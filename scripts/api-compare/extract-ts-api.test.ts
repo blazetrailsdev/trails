@@ -1234,7 +1234,6 @@ describe("body call capture", () => {
   });
 
   it("reads a plain function popped off a splat as the `&block` binding too", () => {
-    // def with_lock(*args) … yield (activerecord/lib/active_record/locking/pessimistic.rb:92-99).
     const cls = extractFromSource(
       `class Foo {
         withLock(...args: unknown[]) {
