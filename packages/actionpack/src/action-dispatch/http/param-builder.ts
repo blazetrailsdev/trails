@@ -8,7 +8,12 @@ import {
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
-import { RequestUtils, type ParamHash, type ParamValue } from "../request/utils.js";
+import {
+  CustomParamEncoder,
+  RequestUtils,
+  type ParamHash,
+  type ParamValue,
+} from "../request/utils.js";
 import { InvalidParameterError, ParameterTypeError, ParamsTooDeepError } from "./param-error.js";
 
 export type EncodingTemplate = Hash<string, Encoding | string>;
@@ -93,9 +98,15 @@ export class ParamBuilder {
 
   fromHash(
     hash: ParamHash,
-    _options: { encodingTemplate?: EncodingTemplate | false | null } = {},
+    options: { encodingTemplate?: EncodingTemplate | false | null } = {},
   ): ParamHash {
-    return RequestUtils.normalizeEncodeParams(hash) as ParamHash;
+    hash = CustomParamEncoder.encodeForTemplate(hash, options.encodingTemplate);
+
+    RequestUtils.checkParamEncoding(hash);
+
+    hash = RequestUtils.normalizeEncodeParams(hash) as ParamHash;
+
+    return hash;
   }
 
   /** @internal */

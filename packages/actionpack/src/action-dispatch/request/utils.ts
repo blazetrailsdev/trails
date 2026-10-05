@@ -1,3 +1,5 @@
+import { bytes, forceEncoding, toS } from "@blazetrails/ruby-compat";
+import { InvalidParameterError } from "../http/param-error.js";
 import { MissingController } from "../http/request.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
 
@@ -13,22 +15,36 @@ export type ParamHash = { [key: string]: ParamValue };
 export class RequestUtils {
   static performDeepMunge = true;
 
-  static *eachParamValue(params: ParamValue): Generator<string> {
+  static eachParamValue(params: ParamValue, block: (param: string) => string | void): ParamValue {
     if (Array.isArray(params)) {
-      for (const el of params) yield* RequestUtils.eachParamValue(el);
+      params.forEach((element, i) => (params[i] = RequestUtils.eachParamValue(element, block)));
     } else if (params !== null && typeof params === "object") {
-      for (const val of Object.values(params)) yield* RequestUtils.eachParamValue(val);
+      for (const [key, value] of Object.entries(params)) {
+        params[key] = RequestUtils.eachParamValue(value, block);
+      }
     } else if (typeof params === "string") {
-      yield params;
+      return block(params) ?? params;
     }
+    return params;
   }
 
   static normalizeEncodeParams(params: ParamValue): ParamValue {
     return normalize(params, this.performDeepMunge);
   }
 
-  /** @internal */
-  static checkParamEncoding(_params: ParamValue): void {}
+  static checkParamEncoding(params: ParamValue): void {
+    if (Array.isArray(params)) {
+      params.forEach((element) => RequestUtils.checkParamEncoding(element));
+    } else if (params !== null && typeof params === "object") {
+      Object.values(params).forEach((value) => RequestUtils.checkParamEncoding(value));
+    } else if (typeof params === "string") {
+      if (/\p{Cs}/u.test(params)) {
+        throw new InvalidParameterError(
+          `Invalid encoding for parameter: ${params.replace(/\p{Cs}/gu, "\uFFFD")}`,
+        );
+      }
+    }
+  }
 
   /** @internal */
   static setBinaryEncoding<P extends ParamValue>(
@@ -46,6 +62,23 @@ export class RequestUtils {
 }
 
 export class CustomParamEncoder {
+  static encodeForTemplate(
+    params: ParamHash,
+    encodingTemplate: EncodingTemplate | false | null | undefined,
+  ): ParamHash {
+    if (!encodingTemplate) return params;
+    for (const [key, value] of Object.entries(params)) {
+      if (key === "controller" || key === "action") continue;
+      params[key] = RequestUtils.eachParamValue(value, (param) => {
+        if (encodingTemplate.get(toS(key))) {
+          const b = bytes(param).map((byte) => String.fromCharCode(byte));
+          return forceEncoding(b.join(""), encodingTemplate.get(toS(key))!);
+        }
+      });
+    }
+    return params;
+  }
+
   static actionEncodingTemplate(
     request: { controllerClassFor(name: string): unknown },
     controller: string | null | undefined,

@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
 import { Encoding } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
+import { ParamBuilder } from "../http/param-builder.js";
+import { InvalidParameterError } from "../http/param-error.js";
 import { Request, controllerConstants } from "../request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 
@@ -122,6 +124,15 @@ describe("Request", () => {
     it("GET leaves every parameter of a skip_parameter_encoding action as bytes", () => {
       expect(get("raw", "bar=bar%E2baz")).toEqual({ bar: "bar\u00e2baz" });
       expect(() => get("index", "bar=bar%E2baz")).toThrow();
+    });
+
+    it("from_hash forces a template's encoding and rejects an invalid string", () => {
+      const encodingTemplate = ReposController.actionEncodingTemplate("show");
+      expect(ParamBuilder.fromHash({ baz: ["\udc83n"], qux: "ハ" }, { encodingTemplate })).toEqual({
+        baz: ["ハ"],
+        qux: "ハ",
+      });
+      expect(() => ParamBuilder.fromHash({ qux: "\udc83n" })).toThrow(InvalidParameterError);
     });
 
     it("action_encoding_template answers only a declared action, per class", () => {
