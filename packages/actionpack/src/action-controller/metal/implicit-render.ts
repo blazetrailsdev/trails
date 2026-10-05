@@ -1,5 +1,6 @@
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 
+import { AbstractController } from "../../abstract-controller/base.js";
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
 import {
@@ -77,11 +78,8 @@ function variantsFor(variant: unknown): readonly (string | symbol)[] {
 }
 
 /** @internal */
-export function methodForAction(
-  this: ImplicitRenderHost & { _superMethodForAction?(name: string): string | undefined },
-  actionName: string,
-): string | undefined {
-  const sup = this._superMethodForAction?.(actionName);
+export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
+  const sup = AbstractController.prototype.methodForAction.call(this as never, actionName);
   if (sup) return sup;
   if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
   return undefined;

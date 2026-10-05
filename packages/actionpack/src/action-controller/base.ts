@@ -38,7 +38,7 @@ import {
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { MissingFile } from "./metal/exceptions.js";
-import { defaultRender } from "./metal/implicit-render.js";
+import { defaultRender, methodForAction } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
   AroundCallback,
@@ -477,12 +477,7 @@ export class Base extends Metal {
 
   /** @internal */
   override methodForAction(actionName: string): string | undefined {
-    return (
-      super.methodForAction(actionName) ??
-      (templateExists.call(this as never, String(actionName), _prefixes.call(this as never))
-        ? "defaultRender"
-        : undefined)
-    );
+    return methodForAction.call(this as never, actionName);
   }
 
   /** @internal */
