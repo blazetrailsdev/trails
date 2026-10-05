@@ -17,6 +17,7 @@ import {
   mergeBang,
   Module,
   Open3,
+  type Process,
   rbFSystem,
   rbInspect,
   rbObjIsKindOf,
@@ -300,10 +301,10 @@ export async function run(
   let result: string | boolean | null;
   let success: boolean | null;
   if (rtest(config.capture)) {
-    const [out, status] = await Open3.capture2e(
+    let status: InstanceType<typeof Process.Status>;
+    [result, status] = await Open3.capture2e(
       ...([...(envSplat ?? []), toS(command)] as Parameters<typeof Open3.capture2e>),
     );
-    result = out;
     success = status.isSuccess();
   } else {
     result = await rbFSystem(

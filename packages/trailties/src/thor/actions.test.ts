@@ -1,5 +1,5 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { assertRaises, capture } from "@blazetrails/activesupport";
+import { assertEmpty, assertRaises, capture } from "@blazetrails/activesupport";
 import {
   Dir,
   File,
@@ -380,7 +380,7 @@ describe("Thor::Actions", () => {
         system = receiveSystem();
       });
       afterEach(() => {
-        expect(system.mock.calls.map((call) => call[0])).toEqual(["ls"]);
+        expect(system).toHaveBeenCalledWith("ls", expect.anything());
       });
 
       it("executes the command given", async () => {
@@ -392,7 +392,7 @@ describe("Thor::Actions", () => {
       });
 
       it("does not log status if required", async () => {
-        expect(await action(counter(), "ls", { verbose: false })).toBe("");
+        assertEmpty(await action(counter(), "ls", { verbose: false }));
       });
 
       it("accepts a color as status", async () => {
@@ -426,9 +426,9 @@ describe("Thor::Actions", () => {
       });
 
       it("supports env option", async () => {
-        const out = File.join(destinationRoot, "bar");
-        await action(counter(), `echo $BAR > ${out}`, { env: { BAR: "foo" } });
-        expect(File.read(out)).toBe("foo\n");
+        const system = vi.spyOn(getChildProcess() as Adapter, "system");
+        await action(counter(), "echo $BAR", { env: { BAR: "foo" } });
+        expect(system).toHaveBeenCalledWith("echo $BAR", expect.objectContaining({ BAR: "foo" }));
       });
     });
 
@@ -482,7 +482,7 @@ describe("Thor::Actions", () => {
       system = receiveSystem();
     });
     afterEach(() => {
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["/opt/jruby script.rb"]);
+      expect(system).toHaveBeenCalledWith("/opt/jruby script.rb", expect.anything());
       vi.restoreAllMocks();
     });
 
@@ -495,7 +495,7 @@ describe("Thor::Actions", () => {
     });
 
     it("does not log status if required", async () => {
-      expect(await action(counter(), "script.rb", { verbose: false })).toBe("");
+      assertEmpty(await action(counter(), "script.rb", { verbose: false }));
     });
   });
 
@@ -510,35 +510,35 @@ describe("Thor::Actions", () => {
     it("executes the thor command", async () => {
       const system = receiveSystem();
       await action(counter(), "list", { verbose: true });
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list"]);
+      expect(system).toHaveBeenCalledWith("thor list", expect.anything());
     });
 
     it("converts extra arguments to command arguments", async () => {
       const system = receiveSystem();
       await action(counter(), "list", "foo", "bar");
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list foo bar"]);
+      expect(system).toHaveBeenCalledWith("thor list foo bar", expect.anything());
     });
 
     it("converts options hash to switches", async () => {
       const system = receiveSystem();
       await action(counter(), "list", "foo", "bar", { foo: true });
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list foo bar --foo"]);
+      expect(system).toHaveBeenCalledWith("thor list foo bar --foo", expect.anything());
 
       system.mockClear();
       await action(counter(), "list", { foo: [1, 2, 3] });
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list --foo 1 2 3"]);
+      expect(system).toHaveBeenCalledWith("thor list --foo 1 2 3", expect.anything());
     });
 
     it("logs status", async () => {
       const system = receiveSystem();
       expect(await action(counter(), "list")).toBe('         run  thor list from "."\n');
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list"]);
+      expect(system).toHaveBeenCalledWith("thor list", expect.anything());
     });
 
     it("does not log status if required", async () => {
       const system = receiveSystem();
-      expect(await action(counter(), "list", { foo: [1, 2, 3], verbose: false })).toBe("");
-      expect(system.mock.calls.map((call) => call[0])).toEqual(["thor list --foo 1 2 3"]);
+      assertEmpty(await action(counter(), "list", { foo: [1, 2, 3], verbose: false }));
+      expect(system).toHaveBeenCalledWith("thor list --foo 1 2 3", expect.anything());
     });
 
     it("captures the output when :capture is given", async () => {
