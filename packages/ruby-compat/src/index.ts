@@ -88,6 +88,7 @@ export {
   hashAref,
   hashAset,
   hashDelete,
+  hashReplace,
   inspect,
   isInclude,
   keys,

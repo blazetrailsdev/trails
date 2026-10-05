@@ -230,3 +230,82 @@ describe("ActionView::Helpers::ControllerHelper#assign_controller", () => {
     );
   });
 });
+
+describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)", () => {
+  it("expiresIn merges into the response cache-control hash and renders it on commit", async () => {
+    class ExpiresController extends Base {
+      async index() {
+        this.noStore();
+        this.expiresIn(3600, { staleWhileRevalidate: 60, immutable: true, "s-maxage": 10 });
+        await this.render({ plain: "ok" });
+      }
+    }
+    const c = new ExpiresController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.headers.get("cache-control")).toBe(
+      "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
+    );
+    expect(c.headers.get("date")).toMatch(/ GMT$/);
+  });
+
+  it("freshWhen merges the cacheControl option", async () => {
+    class CcController extends Base {
+      async index() {
+        this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
+        if (!this.performed) await this.render({ plain: "ok" });
+      }
+    }
+    const c = new CcController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.headers.get("cache-control")).toBe("public, no-cache");
+  });
+});
+
+describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.rb:316-322)", () => {
+  class ForeverController extends Base {
+    yielded = false;
+    async index() {
+      this.httpCacheForever({ public: true }, () => (this.yielded = true));
+      if (!this.performed) await this.render({ plain: "ok" });
+    }
+  }
+
+  it("renders a hundred-year public immutable max-age and yields when stale", async () => {
+    const c = new ForeverController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.yielded).toBe(true);
+    expect(c.headers.get("cache-control")).toBe("max-age=3155695200, public, immutable");
+    expect(c.headers.get("etag")).toMatch(/^W\//);
+  });
+
+  it("answers 304 without yielding when the request is fresh", async () => {
+    const first = new ForeverController();
+    await first.dispatch("index", makeRequest(), new Response());
+    const request = new Request({
+      REQUEST_METHOD: "GET",
+      PATH_INFO: "/",
+      HTTP_HOST: "localhost",
+      HTTP_IF_NONE_MATCH: first.headers.get("etag")!,
+      HTTP_IF_MODIFIED_SINCE: first.headers.get("last-modified")!,
+    });
+    const c = new ForeverController();
+    await c.dispatch("index", request, new Response());
+    expect(c.yielded).toBe(false);
+    expect(c.status).toBe(304);
+  });
+});
+
+describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
+  it("process_action records show_detailed_exceptions? on the request env when rescuing", async () => {
+    class BoomController extends Base {
+      async index() {
+        throw new RangeError("boom");
+      }
+    }
+    BoomController.rescueFrom(RangeError, () => {});
+    const c = new BoomController();
+    const request = makeRequest();
+    await c.dispatch("index", request, new Response());
+    expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
+  });
+});

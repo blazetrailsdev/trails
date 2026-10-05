@@ -1276,13 +1276,6 @@
   {
     "package": "actioncontroller",
     "rubyFile": "metal/conditional_get.rb",
-    "rubyName": "include_content?",
-    "digest": "3b165b60e919dcd1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "metal/conditional_get.rb",
     "rubyName": "no_store",
     "digest": "c31900ba4149689c",
     "ref": "v8.0.2"
@@ -5939,20 +5932,6 @@
   {
     "package": "actiondispatch",
     "rubyFile": "http/response.rb",
-    "rubyName": "date",
-    "digest": "41b96f6a7e09cda8",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/response.rb",
-    "rubyName": "date=",
-    "digest": "5e7afce119c1d58b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/response.rb",
     "rubyName": "date?",
     "digest": "009a3f1edcdcd5fd",
     "ref": "v8.0.2"
@@ -6039,20 +6018,6 @@
     "rubyFile": "http/response.rb",
     "rubyName": "initialize",
     "digest": "219764ced65d7001",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/response.rb",
-    "rubyName": "last_modified",
-    "digest": "1f2ce1bebc76c0bb",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actiondispatch",
-    "rubyFile": "http/response.rb",
-    "rubyName": "last_modified=",
-    "digest": "c43306119fae0911",
     "ref": "v8.0.2"
   },
   {

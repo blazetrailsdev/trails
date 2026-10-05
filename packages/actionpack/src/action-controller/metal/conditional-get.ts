@@ -1,115 +1,133 @@
-/**
- * ActionController::ConditionalGet
- *
- * Provides fresh_when, stale?, expires_in, expires_now, http_cache_forever, no_store.
- * @see https://api.rubyonrails.org/classes/ActionController/ConditionalGet.html
- *
- * @boundary-file: parses RFC 7231 `If-Modified-Since` / `Last-Modified` header
- *   strings via JS `Date.parse` semantics for the freshness comparison.
- */
+import {
+  Concern,
+  Duration,
+  Module,
+  classAttribute,
+  extend,
+  tryCall,
+} from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat";
+import type { Metal } from "../metal.js";
+import type { CacheControlHash } from "../../action-dispatch/http/cache.js";
 
-import { Concern, Module, classAttribute, extend } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
+export type ConditionalGetHost = Pick<Metal, "request" | "response" | "head"> & {
+  etaggers: Etagger[];
+  freshWhen: typeof freshWhen;
+  isStale: typeof isStale;
+  expiresIn: typeof expiresIn;
+  combineEtags: typeof combineEtags;
+};
 
-import { includeContent as _includeContent } from "./head.js";
-
-/** @internal */
-export function includeContent(status: number): boolean {
-  return _includeContent(status);
-}
-
-export function generateWeakEtag(seed: string): string {
-  const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
-  return `W/"${hash}"`;
-}
-
-export function generateStrongEtag(seed: string): string {
-  const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
-  return `"${hash}"`;
-}
-
-export function isFresh(
-  request: {
-    getHeader(name: string): string | undefined;
-  },
-  response: {
-    getHeader(name: string): string | undefined;
-  },
-): boolean {
-  const ifNoneMatch = request.getHeader("if-none-match");
-  const ifModifiedSince = request.getHeader("if-modified-since");
-  const etag = response.getHeader("etag");
-  const lastModified = response.getHeader("last-modified");
-
-  if (ifNoneMatch && etag) {
-    if (ifNoneMatch === "*") return true;
-    const clientTags = ifNoneMatch.split(",").map((t) => t.trim());
-    const normalizedEtag = etag.replace(/^W\//, "");
-    return clientTags.some((t) => t === etag || t.replace(/^W\//, "") === normalizedEtag);
-  }
-  if (ifModifiedSince && lastModified) {
-    return new Date(ifModifiedSince) >= new Date(lastModified);
-  }
-  return false;
-}
-
-export function buildCacheControl(options: {
-  maxAge?: number;
+export interface FreshWhenOptions {
+  etag?: unknown;
+  weakEtag?: unknown;
+  strongEtag?: unknown;
+  lastModified?: Date | Time | { epochMilliseconds: number } | false | null | undefined;
   public?: boolean;
-  mustRevalidate?: boolean;
-  staleWhileRevalidate?: number;
-  staleIfError?: number;
-  immutable?: boolean;
-  noCache?: boolean;
-  noStore?: boolean;
-}): string {
-  const parts: string[] = [];
-
-  if (options.noStore) {
-    parts.push("no-store");
-    return parts.join(", ");
-  }
-
-  if (options.noCache) {
-    parts.push("no-cache");
-    return parts.join(", ");
-  }
-
-  if (options.maxAge !== undefined) parts.push(`max-age=${options.maxAge}`);
-  if (options.public) parts.push("public");
-  else parts.push("private");
-  if (options.mustRevalidate) parts.push("must-revalidate");
-  if (options.staleWhileRevalidate !== undefined)
-    parts.push(`stale-while-revalidate=${options.staleWhileRevalidate}`);
-  if (options.staleIfError !== undefined) parts.push(`stale-if-error=${options.staleIfError}`);
-  if (options.immutable) parts.push("immutable");
-
-  return parts.join(", ");
+  cacheControl?: CacheControlHash;
+  template?: string | false | null;
 }
 
-export interface ConditionalGetHost {
-  response: {
-    setHeader(name: string, value: string): void;
-    getHeader(name: string): string | undefined;
-  };
+export function freshWhen(
+  this: ConditionalGetHost,
+  object: unknown = null,
+  {
+    etag = null,
+    weakEtag = null,
+    strongEtag = null,
+    lastModified = null,
+    public: public_ = false,
+    cacheControl = {},
+    template = null,
+  }: FreshWhenOptions = {},
+): void {
+  hashDelete(this.response.cacheControl, "noStore");
+  if (strongEtag == null || strongEtag === false) {
+    if (weakEtag == null || weakEtag === false) {
+      weakEtag = etag != null && etag !== false ? etag : object;
+    }
+  }
+  if (lastModified == null || lastModified === false) {
+    const updatedAt = tryCall(object as object, "updatedAt");
+    lastModified = (
+      updatedAt != null && updatedAt !== false
+        ? updatedAt
+        : tryCall(object as object, "maximum", "updatedAt")
+    ) as Date | null;
+  }
+
+  if (strongEtag != null && strongEtag !== false) {
+    this.response.strongEtag(
+      this.combineEtags(strongEtag, { lastModified, public: public_, template }),
+    );
+  } else if ((weakEtag != null && weakEtag !== false) || (template != null && template !== false)) {
+    this.response.weakEtag(
+      this.combineEtags(weakEtag, { lastModified, public: public_, template }),
+    );
+  }
+
+  if (lastModified != null) this.response.lastModified = lastModified;
+  if (public_) this.response.cacheControl.public = true;
+  mergeBang(this.response.cacheControl, cacheControl);
+
+  if (this.request.fresh(this.response)) this.head("not_modified");
 }
 
+export function isStale(
+  this: ConditionalGetHost,
+  object: unknown = null,
+  freshnessKwargs: FreshWhenOptions = {},
+): boolean {
+  this.freshWhen(object, freshnessKwargs);
+  return !this.request.fresh(this.response);
+}
+
+export function expiresIn(
+  this: ConditionalGetHost,
+  seconds: number | Duration,
+  options: Record<string, unknown> = {},
+): void {
+  hashDelete(this.response.cacheControl, "noStore");
+  mergeBang(this.response.cacheControl, {
+    maxAge: seconds,
+    public: hashDelete(options, "public"),
+    mustRevalidate: hashDelete(options, "mustRevalidate"),
+    staleWhileRevalidate: hashDelete(options, "staleWhileRevalidate"),
+    staleIfError: hashDelete(options, "staleIfError"),
+    immutable: hashDelete(options, "immutable"),
+  });
+  hashDelete(options, "private");
+
+  this.response.cacheControl.extras = Object.entries(options).map(([k, v]) => `${k}=${v}`);
+  if (!this.response.isDate) this.response.date = Time.now();
+}
+
+export function expiresNow(this: ConditionalGetHost): void {
+  hashReplace(this.response.cacheControl, { noCache: true });
+}
+
+/** @missingRailsArgs stale? — PERMANENT */
 export function httpCacheForever(
   this: ConditionalGetHost,
-  options: { public?: boolean } = {},
+  { public: public_ = false }: { public?: boolean } = {},
   block?: () => void,
 ): void {
-  const cc = buildCacheControl({
-    maxAge: 100 * 365.25 * 24 * 60 * 60,
-    public: options.public ?? false,
-    immutable: true,
-  });
-  this.response.setHeader("cache-control", cc);
-  block?.();
+  this.expiresIn(Duration.years(100), { public: public_, immutable: true });
+
+  if (
+    this.isStale(null, {
+      etag: this.request.fullpath,
+      lastModified: Time.new(2011, 1, 1).utc(),
+      public: public_,
+    })
+  ) {
+    block?.();
+  }
 }
 
 export function noStore(this: ConditionalGetHost): void {
-  this.response.setHeader("cache-control", buildCacheControl({ noStore: true }));
+  hashReplace(this.response.cacheControl, { noStore: true });
 }
 
 export type Etagger = (this: unknown, options: Record<string, unknown>) => unknown;
@@ -131,10 +149,18 @@ export const ConditionalGet = new Module((mod) => {
     },
   );
 
+  mod.defineMethod("freshWhen", freshWhen);
+  mod.defineMethod("isStale", isStale);
+  mod.defineMethod("expiresIn", expiresIn);
+  mod.defineMethod("expiresNow", expiresNow);
   mod.defineMethod("httpCacheForever", httpCacheForever);
   mod.defineMethod("noStore", noStore);
   mod.defineMethod("combineEtags", combineEtags);
 }) as Module<{
+  freshWhen: typeof freshWhen;
+  isStale: typeof isStale;
+  expiresIn: typeof expiresIn;
+  expiresNow: typeof expiresNow;
   httpCacheForever: typeof httpCacheForever;
   noStore: typeof noStore;
   combineEtags: typeof combineEtags;

@@ -12,6 +12,14 @@ import {
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
+import { merge } from "@blazetrails/ruby-compat";
+import {
+  sendData as _sendData,
+  sendFile as _sendFile,
+  type DataStreamingHost,
+  type SendDataOptions,
+  type SendFileOptions,
+} from "./data-streaming.js";
 import { Flash } from "./flash.js";
 
 export class Instrumentation {
@@ -63,6 +71,28 @@ export async function processAction(
         this.appendInfoToPayload(payload as Record<string, unknown>);
       }
     },
+  );
+}
+
+export function sendFile(
+  this: DataStreamingHost,
+  path: string,
+  options: SendFileOptions = {},
+): void {
+  return Notifications.instrument("send_file.action_controller", merge(options, { path }), () =>
+    _sendFile.call(this, path, options),
+  );
+}
+
+export function sendData(
+  this: DataStreamingHost,
+  data: string | Buffer,
+  options: SendDataOptions = {},
+): void | Promise<void> {
+  return Notifications.instrument(
+    "send_data.action_controller",
+    options as Record<string, unknown>,
+    () => _sendData.call(this, data, options),
   );
 }
 

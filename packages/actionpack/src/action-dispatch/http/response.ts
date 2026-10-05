@@ -1,3 +1,4 @@
+import type { Time } from "@blazetrails/date";
 import { include, presence } from "@blazetrails/activesupport";
 import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
 import {
@@ -12,7 +13,6 @@ import type { CookieExpires, SetCookieOptions } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
 import {
   type CacheControlHash,
-  cacheControl as _cacheControl,
   cacheControlHeaders as _cacheControlHeaders,
   cacheControlSegments as _cacheControlSegments,
   generateStrongEtag as _generateStrongEtag,
@@ -222,6 +222,7 @@ export class Response {
       this._headers.set(key, value);
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject([...body]));
+    this.prepareCacheControlBang();
   }
 
   get status(): number {
@@ -397,8 +398,6 @@ export class Response {
     }
   }
 
-  declare lastModified: Date | undefined;
-  declare date: Date | undefined;
   declare etag: string | undefined;
   declare readonly isLastModified: boolean;
   declare readonly isDate: boolean;
@@ -411,6 +410,8 @@ export class Response {
   declare handleConditionalGetBang: () => void;
   /** @internal */
   declare mergeAndNormalizeCacheControlBang: (cacheControl: CacheControlHash) => void;
+  /** @internal */
+  declare _cacheControlHash: CacheControlHash;
   declare readonly cacheControl: CacheControlHash;
   /** @internal */
   declare cacheControlSegments: () => string[] | undefined;
@@ -666,12 +667,6 @@ Object.defineProperty(Response.prototype, "isEtag", {
   },
   configurable: true,
 });
-Object.defineProperty(Response.prototype, "cacheControl", {
-  get(this: Response) {
-    return _cacheControl.call(this);
-  },
-  configurable: true,
-});
 Response.prototype.weakEtag = function (this: Response, v: unknown) {
   _weakEtag.call(this, v);
 };
@@ -710,11 +705,21 @@ Response.prototype.parameterFilteredLocation = function (this: Response) {
 };
 
 include(Response, RackResponseHelpers);
-/* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
+Object.defineProperty(Response.prototype, "cacheControl", {
+  ...Object.getOwnPropertyDescriptor(RackResponseHelpers.prototype, "cacheControl"),
+  get: Object.getOwnPropertyDescriptor(CacheResponse.prototype, "cacheControl")!.get,
+  configurable: true,
+});
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Response extends Omit<
   RackResponseHelpers,
   "status" | "headers" | "mediaType" | "contentLength" | "cacheControl"
-> {}
+> {
+  get lastModified(): Date | undefined;
+  set lastModified(t: Date | Time | { epochMilliseconds: number });
+  get date(): Date | undefined;
+  set date(t: Date | Time);
+}
 export interface CookieOptions {
   value: string;
   path?: string;
