@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Model, ValueType } from "./index.js";
 import { Attributes, type AttributesClassHalf } from "./attributes.js";
 import { include } from "@blazetrails/activesupport";
-import { FrozenError } from "@blazetrails/ruby-compat";
+import { FrozenError, rbObjInstanceVariables, rbObjIvarGet } from "@blazetrails/ruby-compat";
 
 describe("Attributes#attribute_names", () => {
   class User extends Model {
@@ -24,6 +24,12 @@ describe("Attributes#attribute_names", () => {
 
   it("is the instance's @attributes keys, virtual attributes included", () => {
     expect(new User().attributeNames()).toEqual(["name", "token"]);
+  });
+
+  it("holds the set in the @attributes ivar (attributes.rb:107)", () => {
+    const user = new User();
+    expect(rbObjIvarGet(user, "@attributes")).toBe(user._attributes);
+    expect(rbObjInstanceVariables(user)).toContain("@attributes");
   });
 
   it("the class-level reader is attribute_types.keys, virtual attributes included", () => {

@@ -6,7 +6,7 @@ import {
   type Included,
   included,
 } from "@blazetrails/activesupport";
-import { type Hash, Module, rbObjClone } from "@blazetrails/ruby-compat";
+import { type Hash, Module, rbDeclareIvar, rbObjClone } from "@blazetrails/ruby-compat";
 import { ValueType } from "./type/value.js";
 import { AttributeSet } from "./attribute-set.js";
 import {
@@ -161,6 +161,7 @@ export class Attributes {
     extend(base, { defineMethodAttribute });
 
     include(base, SuperMethods);
+    rbDeclareIvar(base, "@attributes", "_attributes");
 
     base.attributeMethodSuffix("=", { parameters: "value" });
   }

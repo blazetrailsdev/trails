@@ -37,18 +37,23 @@ export class UserProvidedDefault extends FromUser {
     return result;
   }
 
-  static marshalLoad(
-    values:
-      | [string | null, unknown, ValueType | null, Attribute | null]
-      | [string | null, unknown, ValueType | null, Attribute | null, unknown],
-  ): UserProvidedDefault {
+  marshalLoad(values: unknown[]): unknown {
     const [name, userProvidedValue, type, originalAttribute, value] = values;
-    const attribute = new UserProvidedDefault(name, userProvidedValue, type, originalAttribute);
+    const self = this as {
+      name: string | null;
+      userProvidedValue: unknown;
+      type: ValueType | null;
+    };
+    self.name = name as string | null;
+    self.userProvidedValue = userProvidedValue;
+    self.type = type as ValueType | null;
+    this.originalAttribute = originalAttribute as Attribute | null;
     if (values.length === 5) {
-      attribute._value = value;
-      attribute._hasValue = true;
+      this._value = value;
+      this._hasValue = true;
+      return value;
     }
-    return attribute;
+    return null;
   }
 }
 
