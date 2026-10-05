@@ -1,10 +1,5 @@
 import { Concern, Module, classAttribute, extend, include } from "@blazetrails/activesupport";
-import { getCrypto } from "@blazetrails/ruby-compat";
 import { ConditionalGet, type Etagger } from "./conditional-get.js";
-
-export function templateDigest(template: string): string {
-  return getCrypto().createHash("md5").update(template).digest("hex");
-}
 
 export type TemplateLookupContext = { digestFor?(template: string): string | null };
 
