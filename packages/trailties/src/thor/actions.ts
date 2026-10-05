@@ -354,7 +354,7 @@ export async function thor(
   args.push(Options.toSwitches(config));
   command = strip(args.flat(Infinity).join(" "));
 
-  return this.run(command, { with: "thor", verbose, pretend, capture });
+  return this.run(command, { with: ":thor", verbose, pretend, capture });
 }
 
 /** @internal */
