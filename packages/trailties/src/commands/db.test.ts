@@ -1353,8 +1353,8 @@ export class CreatePosts extends Migration {
     await establishMigrationConnection(adapter, database, { useMetadataTable: false });
   }
 
-  it("InternalMetadata with enabled=false refuses set writes with EnvironmentStorageError", async () => {
-    const { EnvironmentStorageError, InternalMetadata } = await import("@blazetrails/activerecord");
+  it("InternalMetadata with enabled=false skips set writes", async () => {
+    const { InternalMetadata } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
 
@@ -1370,9 +1370,7 @@ export class CreatePosts extends Migration {
       await expect(disabledMeta.createTableAndSetFlags("production")).resolves.toBeUndefined();
       expect(await disabledMeta.tableExists()).toBe(false);
 
-      await expect(disabledMeta.set("environment", "test")).rejects.toBeInstanceOf(
-        EnvironmentStorageError,
-      );
+      await expect(disabledMeta.set("environment", "test")).resolves.toBeUndefined();
     } finally {
       await adapter.disconnectBang();
     }

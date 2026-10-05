@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
-import { Client } from "./test-helpers/models/company.js";
+import { Client, Company } from "./test-helpers/models/company.js";
+import { ProtectedParams } from "./support/stubs/strong-parameters.js";
 import { initializeClone, isFinderNeedsTypeCondition } from "./inheritance.js";
 import { Author } from "./test-helpers/models/author.js";
 
@@ -124,5 +125,19 @@ describe("Inheritance::ClassMethods#initialize_clone", () => {
     initializeClone.call(copy, (other) => calls.push(other), Client);
 
     expect(calls).toEqual([Client]);
+  });
+});
+
+describe("subclass_from_attributes with permitted parameters", () => {
+  fixtures([]);
+
+  it("converts parameters with to_h before reading the inheritance column", () => {
+    const params = new ProtectedParams({ type: "Client" }).permitBang();
+
+    expect(Company.subclassFromAttributes(params as never)).toBe(Client);
+  });
+
+  it("reads the inheritance column from a Map", () => {
+    expect(Company.subclassFromAttributes(new Map([["type", "Client"]]) as never)).toBe(Client);
   });
 });

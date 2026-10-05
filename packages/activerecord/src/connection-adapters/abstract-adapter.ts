@@ -617,7 +617,7 @@ export interface AbstractAdapter {
     tablesToDelete?: string[],
   ): Promise<void>;
   emptyInsertStatementValue(pk?: string | null): string;
-  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral | string;
+  highPrecisionCurrentTimestamp(): Nodes.SqlLiteral;
   cacheableQuery(
     klass: {
       query(sql: string): unknown;

@@ -1,4 +1,3 @@
-import { Time as RubyTime } from "@blazetrails/date";
 import * as Arel from "@blazetrails/arel";
 import { Nodes } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue, type ValueType } from "@blazetrails/activemodel";
@@ -9,8 +8,18 @@ import type { Base } from "./base.js";
 import { isFinderNeedsTypeCondition } from "./inheritance.js";
 import type { Relation } from "./relation.js";
 import { Result } from "./result.js";
-import { isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
-import { filterMap, isPresent, many, reverseMerge } from "@blazetrails/activesupport";
+import { type Hash, isEmpty, isSymbol, symbolToS } from "@blazetrails/ruby-compat";
+import {
+  filterMap,
+  indexWith,
+  isPresent,
+  many,
+  mergeBang,
+  reverseMerge,
+  reverseMergeBang,
+  stringifyKeys,
+  transformKeys,
+} from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
 import { first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
@@ -192,18 +201,15 @@ export class InsertAll {
     return this.onDuplicate === ":update";
   }
 
-  mapKeyWithValue<T>(fn: (key: string, value: unknown) => T): T[][] {
-    const timestamps = this.recordTimestamps() ? this.timestampsForCreate() : undefined;
-    const keysList = [...this.keysIncludingTimestamps()];
-    return this.inserts.map((row) => {
-      const attributes = { ...row, ...this.scopeAttributes };
-      if (timestamps) {
-        for (const [col, val] of Object.entries(timestamps)) {
-          if (!(col in attributes)) attributes[col] = val;
-        }
-      }
+  mapKeyWithValue<T>(block: (key: string, value: unknown) => T): T[][] {
+    return this.inserts.map((attributes) => {
+      attributes = stringifyKeys(attributes);
+      mergeBang(attributes, this.scopeAttributes);
+      if (this.recordTimestamps()) reverseMergeBang(attributes, this.timestampsForCreate());
+
       this.verifyAttributes(attributes);
-      return keysList.map((key) => fn(key, attributes[key]));
+
+      return [...this.keysIncludingTimestamps()].map((key) => block(key, attributes[key]));
     });
   }
 
@@ -241,14 +247,6 @@ export class InsertAll {
       throw new ArgumentError(
         "You can't set :update_only and provide custom update SQL via :on_duplicate at the same time",
       );
-    }
-    if (
-      onDuplicate !== undefined &&
-      onDuplicate !== ":update" &&
-      !this.isCustomUpdateSqlProvided() &&
-      isPresent(this.updateOnly)
-    ) {
-      throw new Error("Cannot use both onDuplicate and updateOnly");
     }
 
     if (isPresent(this.updateOnly)) {
@@ -304,9 +302,7 @@ export class InsertAll {
 
   /** @internal */
   private hasAttributeAliases(attributes: Record<string, unknown>): boolean {
-    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
-    if (!aliases) return false;
-    return Object.keys(attributes).some((attr) => attr in aliases);
+    return Object.keys(attributes).some((attribute) => this.model.isAttributeAlias(attribute));
   }
 
   /** @internal */
@@ -321,13 +317,9 @@ export class InsertAll {
   /** @internal */
   private resolveAttributeAliases(): void {
     if (!this.hasAttributeAliases(first(this.inserts) ?? {})) return;
-    this.inserts = this.inserts.map((insert) => {
-      const resolved: Record<string, unknown> = {};
-      for (const [attribute, val] of Object.entries(insert)) {
-        resolved[this.resolveAttributeAlias(attribute)] = val;
-      }
-      return resolved;
-    });
+    this.inserts = this.inserts.map((insert) =>
+      transformKeys(insert, (attribute) => this.resolveAttributeAlias(attribute)),
+    );
     if (this.updateOnly !== undefined) {
       const cols = Array.isArray(this.updateOnly) ? this.updateOnly : [this.updateOnly];
       this.updateOnly = cols.map((attribute) => this.resolveAttributeAlias(attribute));
@@ -341,8 +333,7 @@ export class InsertAll {
 
   /** @internal */
   private resolveAttributeAlias(attribute: string): string {
-    const aliases = (this.model as any).attributeAliases as Record<string, string> | undefined;
-    return aliases?.[attribute] ?? attribute;
+    return this.model.attributeAlias(attribute) || attribute;
   }
 
   /** @internal */
@@ -411,7 +402,7 @@ export class InsertAll {
 
   /** @internal */
   private timestampsForCreate(): Record<string, unknown> {
-    const now = RubyTime.now();
+    const now = this.connection.highPrecisionCurrentTimestamp();
     const result: Record<string, unknown> = {};
     for (const col of this.model.allTimestampAttributesInModel()) {
       result[col] = now;
@@ -454,7 +445,7 @@ export class Builder implements InsertBuilder {
   private async extractTypesFromColumnsOn(
     tableName: string,
     keys: string[],
-  ): Promise<Record<string, ValueType | null>> {
+  ): Promise<Hash<string, ValueType | null>> {
     const columns = (await this.model.schemaCache().columnsHash(tableName)) ?? {};
 
     const unknownColumn = keys.find((key) => !(key in columns));
@@ -462,9 +453,7 @@ export class Builder implements InsertBuilder {
       throw new UnknownAttributeError({ constructor: this.model }, unknownColumn);
     }
 
-    const types: Record<string, ValueType | null> = {};
-    for (const key of keys) types[key] = this.model.typeForAttribute(key);
-    return types;
+    return indexWith(keys, (key) => this.model.typeForAttribute(key));
   }
 
   /** @internal */
@@ -523,7 +512,7 @@ export class Builder implements InsertBuilder {
 
     const valuesList = this._insertAll.mapKeyWithValue<unknown>((key, value) => {
       if (value instanceof Nodes.SqlLiteral) return value;
-      const type = types[key];
+      const type = types.get(key);
       value = SerializeCastValue.serialize(type!, type!.cast(value));
       return value;
     });

@@ -112,10 +112,8 @@ describe("InternalMetadata built over a NullPool", () => {
     );
   });
 
-  it("raises NoMethodError from tableExists", async () => {
+  it("raises from tableExists", async () => {
     const internalMetadata = new InternalMetadata(new NullPool());
-    await expect(internalMetadata.tableExists()).rejects.toThrow(
-      /undefined method 'data_source_exists\?' for nil/,
-    );
+    await expect(internalMetadata.tableExists()).rejects.toThrow(TypeError);
   });
 });

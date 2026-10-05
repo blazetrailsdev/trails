@@ -16,7 +16,7 @@ import {
   type Extended,
   wrap,
 } from "@blazetrails/activesupport";
-import { format, stdout, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { format, max, stdout, rbInspect, rbObjRespondTo, toI } from "@blazetrails/ruby-compat";
 import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
@@ -172,8 +172,8 @@ export class PendingMigrationError extends MigrationError {
     if (env !== "development" && env !== "test") message += ` RAILS_ENV=${env}`;
     message += "\n\n";
     message += `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}\n\n`;
-    for (const m of pendingMigrations) {
-      if (m.filename) message += `${m.filename}\n`;
+    for (const pendingMigration of pendingMigrations) {
+      message += `${pendingMigration.filename}\n`;
     }
     return message;
   }
@@ -1013,18 +1013,12 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     );
   }
 
-  static nextMigrationNumber(number?: number | bigint | string): string {
-    const raw =
-      number == null
-        ? 0n
-        : typeof number === "bigint"
-          ? number
-          : BigInt(typeof number === "number" ? Math.max(0, Math.trunc(number)) : number);
-    const n = raw < 0n ? 0n : raw;
-    if (!timestampedMigrations()) return n.toString().padStart(3, "0");
-    const stamp = Time.now().utc().strftime("%Y%m%d%H%M%S");
-    if (number == null) return stamp;
-    return n > BigInt(stamp) ? n.toString().padStart(14, "0") : stamp;
+  static nextMigrationNumber(number: number | bigint | string): string {
+    if (timestampedMigrations()) {
+      return max([Time.now().utc().strftime("%Y%m%d%H%M%S"), format("%.14d", number)])!;
+    } else {
+      return format("%.3d", toI(number));
+    }
   }
 
   static properTableName(

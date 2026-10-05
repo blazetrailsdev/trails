@@ -8,7 +8,7 @@ import {
   NotificationEvent as Event,
   type Logger,
 } from "@blazetrails/activesupport";
-import { rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { first, rbObjAsString, rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
 import { verboseQueryLogs } from "./active-record.js";
 import { ActiveRecord } from "./namespaces.js";
 
@@ -130,8 +130,7 @@ export class LogSubscriber extends BaseLogSubscriber {
   private logQuerySource(): void {
     const source = this.querySourceLocation();
     if (source) {
-      const l = this.logger;
-      if (l) l.debug(`  ↳ ${source}`);
+      this.logger!.debug(`  ↳ ${source}`);
     }
   }
 
@@ -148,49 +147,18 @@ export class LogSubscriber extends BaseLogSubscriber {
     return (castedBinds as any[]) ?? [];
   }
 
-  private resolveBindAttribute(attr: unknown): {
-    name?: string;
-    type?: { isBinary?: () => boolean; binary?: () => boolean };
-    value?: () => unknown;
-    valueForDatabase?: unknown;
-  } | null {
-    if (attr instanceof Attribute) return attr as never;
-    if (attr && typeof attr === "object" && "type" in attr && "value" in attr) {
-      return attr as never;
-    }
-    return null;
-  }
-
   private renderBind(attr: unknown, value: unknown): [string | null, unknown] {
-    const resolved = this.resolveBindAttribute(attr);
-    if (resolved) {
-      const isBinary = resolved.type?.isBinary?.() ?? resolved.type?.binary?.() ?? false;
-      if (isBinary && resolved.value?.() != null) {
-        const raw = resolved.valueForDatabase;
-        const bytes = byteLength(raw ?? resolved.value?.());
-        value = `<${bytes} bytes of binary data>`;
+    if (attr instanceof Attribute) {
+      if (attr.type!.isBinary() && rtest(attr.value())) {
+        value = `<${byteLength(rbObjAsString(attr.valueForDatabase))} bytes of binary data>`;
       }
-      return [resolved.name ?? null, value];
+    } else if (Array.isArray(attr)) {
+      attr = first(attr);
+    } else {
+      attr = null;
     }
 
-    if (Array.isArray(attr)) {
-      const [head] = attr;
-      const headName =
-        head instanceof Attribute
-          ? head.name
-          : head &&
-              typeof head === "object" &&
-              typeof (head as { name?: unknown }).name === "string"
-            ? (head as { name: string }).name
-            : null;
-      return [headName, value];
-    }
-
-    if (attr && typeof attr === "object" && typeof (attr as { name?: unknown }).name === "string") {
-      return [(attr as { name: string }).name, value];
-    }
-
-    return [null, value];
+    return [(attr as { name?: string } | null)?.name ?? null, value];
   }
 
   private colorizePayloadName(name: string, payloadName: string | null | undefined): string {
