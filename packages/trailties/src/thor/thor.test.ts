@@ -131,7 +131,6 @@ describe("Thor", () => {
   describe("#stop_on_unknown_option!", () => {
     const myScript = class extends Thor {
       declare options: Base["options"];
-
       static {
         const klass = this as unknown as ThorClass;
         klass.classOption("verbose", { type: "boolean" });
@@ -236,7 +235,6 @@ describe("Thor", () => {
     describe("along with check_unknown_options!", () => {
       const myScript2 = class extends Thor {
         declare options: Base["options"];
-
         static {
           const klass = this as unknown as ThorClass;
           klass.classOption("verbose", { type: "boolean" });
@@ -319,7 +317,6 @@ describe("Thor", () => {
   describe("#check_unknown_options!", () => {
     const myScript = class extends Thor {
       declare options: Base["options"];
-
       static {
         const klass = this as unknown as ThorClass;
         klass.classOption("verbose", { type: "boolean" });
@@ -407,7 +404,6 @@ describe("Thor", () => {
   describe("#disable_required_check!", () => {
     const myScript = class extends Thor {
       declare options: Base["options"];
-
       static {
         const klass = this as unknown as ThorClass;
         klass.classOption("foo", { required: true });

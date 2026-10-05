@@ -4,9 +4,10 @@ import { ArgumentError } from "./argument-error.js";
 import { cmp, rbCmpint } from "./comparable.js";
 import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
+import { warn } from "./kernel-warn.js";
 import { conversionMismatch, rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
-import { num2long } from "./string/support.js";
+import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
 
 /** `toofew` (`vendor/ruby/v3.3.11/pack.c:120`). */
@@ -437,17 +438,20 @@ export function aryDeleteIf<T>(ary: T[], block: (item: T) => unknown): T[] {
 }
 
 /**
- * Ruby `Array#fetch` (`vendor/ruby/v3.3.11/array.c:1962` `rb_ary_fetch`): the
- * element at `pos`, counted from the end when negative. Out of range it
- * answers the block's value for `pos`, else the default, else raises
- * `IndexError`.
+ * Ruby `Array#fetch` (`vendor/ruby/v3.3.11/array.c:1962` `rb_ary_fetch`): the element at
+ * `pos`, or out of range the block's value, else the default, else an `IndexError`.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function aryFetch(ary: readonly unknown[], pos: number, ...argv: unknown[]): unknown {
+export function aryFetch(ary: readonly unknown[], ...argv: unknown[]): unknown {
   const blockGiven = rbBlockGivenP(argv[argv.length - 1]);
-  const block = blockGiven ? (argv.pop() as (pos: number) => unknown) : undefined;
-  const ifnone = argv[0];
+  const block = blockGiven ? (argv.pop() as (pos: unknown) => unknown) : undefined;
+  const argc = argv.length;
+  checkArity(argc, 1, 2);
+  const [pos, ifnone] = argv;
+  if (blockGiven && argc === 2) {
+    warn("warning: block supersedes default value argument");
+  }
   let idx = num2long(pos);
 
   if (idx < 0) {
@@ -455,7 +459,7 @@ export function aryFetch(ary: readonly unknown[], pos: number, ...argv: unknown[
   }
   if (idx < 0 || ary.length <= idx) {
     if (blockGiven) return block!(pos);
-    if (argv.length === 0) {
+    if (argc === 1) {
       throw new IndexError(
         `index ${idx - (idx < 0 ? ary.length : 0)} outside of array bounds: ${-ary.length}...${ary.length}`,
       );

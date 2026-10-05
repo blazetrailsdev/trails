@@ -460,9 +460,8 @@ describe("aryFetch", () => {
     expect(() => aryFetch(ary, 50)).toThrow(
       new IndexError("index 50 outside of array bounds: -3...3"),
     );
-    expect(() => aryFetch(ary, -4)).toThrow(
-      new IndexError("index -4 outside of array bounds: -3...3"),
-    );
+    expect(() => aryFetch(ary, -4)).toThrow("index -4 outside of array bounds: -3...3");
+    expect(() => aryFetch(ary, 1, 2, 3)).toThrow(/\(given 3, expected 1\.\.2\)/);
   });
 });
 
