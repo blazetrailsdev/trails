@@ -163,6 +163,7 @@ import {
   _processVariant,
   _normalizeOptions,
   processAction as _processAction,
+  Rendering,
   renderToString,
 } from "./metal/rendering.js";
 import { _renderToBodyWithRenderer } from "./metal/renderers.js";
@@ -787,6 +788,7 @@ export class Base extends Metal {
 include(Base, AbstractHelpers);
 include(Base, AbstractControllerRendering);
 include(Base, ActionViewRendering);
+include(Base, Rendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
 include(Base, Cookies);
@@ -803,14 +805,7 @@ Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype._processVariant = _processVariant;
-Base.prototype._normalizeOptions = _normalizeOptions;
-Base.prototype.renderToString = renderToString;
-Base.prototype._setHtmlContentType = _setHtmlContentType;
-Base.prototype._setRenderedContentType = _setRenderedContentType;
-Base.prototype._setVaryHeader = _setVaryHeader;
 Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;

@@ -9,7 +9,6 @@ import {
   cleanUpThreadLocals,
   liveThreadPoolExecutor,
   logError,
-  makeResponseBang,
   newControllerThread,
   sendStream,
   type LiveControllerHost,
@@ -413,7 +412,9 @@ describe("ActionController::Live private helpers", () => {
       order.push("inside");
     });
     order.push("after-call");
+    expect(order).toEqual(["after-call"]);
     await p;
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect(order).toEqual(["after-call", "inside"]);
   });
 
@@ -438,20 +439,29 @@ describe("ActionController::Live private helpers", () => {
 });
 
 describe("ActionController::Live::ClassMethods#make_response!", () => {
-  type Req = Parameters<typeof makeResponseBang>[0];
-  function mkReq(protocol: string): Req {
-    return { getHeader: (n: string) => (n === "SERVER_PROTOCOL" ? protocol : undefined) } as Req;
+  const sentinel = new Response();
+  class Parent {
+    static makeResponseBang(_request: Request): unknown {
+      return sentinel;
+    }
+  }
+  class LiveController extends Parent {}
+  include(LiveController, Live);
+
+  function mkReq(protocol: string): Request {
+    return {
+      getHeader: (n: string) => (n === "SERVER_PROTOCOL" ? protocol : undefined),
+    } as unknown as Request;
   }
 
   it("returns a Live::Response for HTTP/1.1+ requests", () => {
-    const res = makeResponseBang(mkReq("HTTP/1.1"), () => new Response());
+    const res = LiveController.makeResponseBang(mkReq("HTTP/1.1"));
     expect(res).toBeInstanceOf(Response);
     expect((res as Response).stream).toBeInstanceOf(Buffer);
+    expect(res).not.toBe(sentinel);
   });
 
   it("defers to the parent factory for HTTP/1.0 requests", () => {
-    const sentinel = new Response();
-    const res = makeResponseBang(mkReq("HTTP/1.0"), () => sentinel);
-    expect(res).toBe(sentinel);
+    expect(LiveController.makeResponseBang(mkReq("HTTP/1.0"))).toBe(sentinel);
   });
 });

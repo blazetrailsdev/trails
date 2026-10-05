@@ -8,6 +8,8 @@ import {
 } from "../../action-dispatch/http/response.js";
 import { Queue, RuntimeError, SizedQueue, merge } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
+import { Concern, extend } from "@blazetrails/activesupport";
+import { Base as ActionViewBase } from "@blazetrails/actionview";
 
 export class ClientDisconnected extends RuntimeError {}
 
@@ -195,18 +197,17 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
       await Live.superMethod(this, "process")!(name);
     } catch (e) {
       const resp = this.response;
-      if (resp?.committed) {
+      if (resp.committed) {
         try {
+          if ((this.request.format as { symbol?: string } | undefined)?.symbol === ":html") {
+            resp.stream.write(ActionViewBase.streamingCompletionOnException);
+          }
           resp.stream.callOnError();
         } catch (exception) {
           this.logError(exception);
         } finally {
           this.logError(e);
-          try {
-            resp.stream.close();
-          } catch {
-            /** @empty */
-          }
+          resp.stream.close();
         }
       } else {
         error = e;
@@ -222,6 +223,11 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
   await this.response.awaitCommit();
 
   if (errorSet) throw error;
+}
+
+export function responseBody(this: LiveControllerHost, body: unknown): void {
+  Live.superMethod(this, "responseBody=")!(body);
+  if (this.response) this.response.close();
 }
 
 export interface SendStreamOptions {
@@ -269,7 +275,7 @@ export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
 ): Promise<void> {
-  await liveThreadPoolExecutor().post(block);
+  void liveThreadPoolExecutor().post(block);
 }
 
 /** @internal */
@@ -294,16 +300,19 @@ export function liveThreadPoolExecutor(): LiveExecutor {
   });
 }
 
-export function makeResponseBang(
-  request: Request,
-  superFactory: () => DispatchResponse,
-): DispatchResponse {
-  const protocol = request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION");
-  if (protocol === "HTTP/1.0") return superFactory();
-  const res = new Response();
-  res.request = request;
-  return res;
+export function makeResponseBang(this: object, request: Request): DispatchResponse {
+  if ((request.getHeader("SERVER_PROTOCOL") ?? request.getHeader("HTTP_VERSION")) === "HTTP/1.0") {
+    return ClassMethods.superMethod(this, "makeResponseBang")!(request) as DispatchResponse;
+  } else {
+    const res = new Response();
+    res.request = request;
+    return res;
+  }
 }
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("makeResponseBang", makeResponseBang);
+});
 
 /** @internal */
 export function logError(this: { logger?: LoggerLike }, exception: unknown): void {
@@ -316,7 +325,9 @@ export function logError(this: { logger?: LoggerLike }, exception: unknown): voi
   logger.fatal(() => `\n${name} (${message}):\n  ${stack}\n\n`);
 }
 
-export const Live: Module = new Module((mod) => {
+export const Live = new Module((mod) => {
+  extend(mod, Concern);
+
   mod.defineMethod("process", process);
   mod.moduleEval((m) => {
     Object.defineProperty(m, "responseBody", {
@@ -324,14 +335,12 @@ export const Live: Module = new Module((mod) => {
       get(this: LiveControllerHost) {
         return mod.superMethod(this, "responseBody")!();
       },
-      set(this: LiveControllerHost, body: unknown) {
-        mod.superMethod(this, "responseBody=")!(body);
-        if (this.response) this.response.close();
-      },
+      set: responseBody,
     });
   });
   mod.defineMethod("sendStream", sendStream);
   mod.defineMethod("newControllerThread", newControllerThread);
   mod.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
   mod.defineMethod("logError", logError);
-});
+}) as Module & { ClassMethods: Module };
+Live.ClassMethods = ClassMethods;
