@@ -3,9 +3,16 @@ import { readFileSync } from "node:fs";
 import { ArgumentError } from "./argument-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { Hash } from "./hash.js";
-import { Module, extend, rbModConstSet } from "./include.js";
-import { Marshal } from "./marshal.js";
-import { rbObjSingletonClass, rbSetClassPathString } from "./object.js";
+import { Module, extend, rbDefineAllocFunc, rbModConstSet } from "./include.js";
+import { Marshal, rbMarshalDefineCompat } from "./marshal.js";
+import {
+  rbModName,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rbObjSingletonClass,
+  rbSetClassPathString,
+} from "./object.js";
+import { Rational, ZeroDivisionError } from "./rational.js";
 import { RuntimeError } from "./runtime-error.js";
 import { TypeError } from "./type-error.js";
 import { registerConstant, unregisterConstant } from "./variable.js";
@@ -49,12 +56,30 @@ class Cache {
   }
 }
 
+class Point {
+  constructor(public x: unknown) {}
+}
+class PointCompat {}
+rbDefineAllocFunc(Point, (klass) => new klass(0));
+rbMarshalDefineCompat(
+  Point,
+  PointCompat,
+  (point) => {
+    const compat = new PointCompat();
+    rbObjIvarSet(compat, "@v", point.x);
+    return compat;
+  },
+  (point, compat) => {
+    point.x = rbObjIvarGet(compat, "@v");
+  },
+);
+
 function hash<H extends Hash<unknown, unknown>>(pairs: [unknown, unknown][], h: H): H {
   for (const [key, value] of pairs) h.set(key, value);
   return h;
 }
 
-const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Hash };
+const CONSTANTS: Record<string, unknown> = { Ary, Hsh, Column, Cache, Geo, Hash, Point };
 
 beforeAll(() => {
   for (const [name, value] of Object.entries(CONSTANTS)) registerConstant(name, value);
@@ -75,6 +100,7 @@ const shared = new Column("a", ":string");
 const cycle: unknown[] = [];
 cycle.push(cycle);
 const cache = new Cache(1, new Map([["posts", [shared]]]));
+const half = new Rational(1, 2);
 
 const VALUES: Record<string, unknown> = {
   nil: null,
@@ -115,6 +141,7 @@ const VALUES: Record<string, unknown> = {
   "object nested path": new Shape(":circle"),
   "object link": [shared, shared],
   "user marshal": [cache, cache],
+  rational: [half, half, new Rational(-3, 4), new Rational(2n ** 70n, 3)],
   "schema cache": [
     20240101000000,
     new Map([["posts", [new Column("id", ":integer")]]]),
@@ -214,6 +241,10 @@ describe("Marshal.dump", () => {
     const obj = new Cache(1, new Map([["posts", [shared]]]));
     Object.assign(rbObjSingletonClass(obj).prototype, { area: () => 1 });
     expect(hex(Marshal.dump([obj, obj]))).toBe(fixtures["user marshal"]);
+  });
+
+  it("dumps an object of a class with a compat entry as its dumper's, under its own class", () => {
+    expect(Marshal.dump(new Point(3))).toBe("\x04\bo:\nPoint\x06:\x07@vi\x08");
   });
 
   it("raises RuntimeError for a marshal_dump that returns an instance of the same class", () => {
@@ -323,6 +354,69 @@ describe("Marshal.load", () => {
     expect(() => Marshal.load("\x04\bU:\vColumn0")).toThrow(
       new TypeError("instance of Column needs to have method `marshal_load'"),
     );
+  });
+
+  it("loads a Rational through its compat class, linked as one frozen object", () => {
+    const [a, b, c, d] = Marshal.load(bytes("rational")) as Rational[];
+    expect(a).toBeInstanceOf(Rational);
+    expect(b).toBe(a);
+    expect(Object.isFrozen(a)).toBe(true);
+    expect([a.inspect(), c.inspect(), d.inspect()]).toEqual([
+      "(1/2)",
+      "(-3/4)",
+      "(1180591620717411303424/3)",
+    ]);
+  });
+
+  it("paths the compat class under Rational", () => {
+    expect(rbModName(Rational.compatible)).toBe("Rational::compatible");
+  });
+
+  it("loads a Rational canonical and not reduced", () => {
+    const load = (s: string) => (Marshal.load(s) as Rational).inspect();
+    expect(load("\x04\bU:\rRational[\x07i\x06i\xfa")).toBe("(-1/1)");
+    expect(load("\x04\bU:\rRational[\x07i\x09i\x0b")).toBe("(4/6)");
+  });
+
+  it("loads a TYPE_OBJECT of a class with a compat entry through its loader", () => {
+    const r = Marshal.load(
+      "\x04\bo:\rRational\x07:\x0f@numeratori\x06:\x11@denominatori\x07",
+    ) as Rational;
+    expect(r).toBeInstanceOf(Rational);
+    expect(r.inspect()).toBe("(1/2)");
+    const [point, link] = Marshal.load("\x04\b[\x07o:\nPoint\x06:\x07@vi\x08@\x06") as Point[];
+    expect(point).toBeInstanceOf(Point);
+    expect(point.x).toBe(3);
+    expect(link).toBe(point);
+  });
+
+  it("raises for a marshalled Rational that is not a pair of Integers", () => {
+    expect(() => Marshal.load("\x04\bU:\rRational[\x06i\x06")).toThrow(
+      new ArgumentError("marshaled rational must have an array whose length is 2 but 1"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07i\x06f\x061")).toThrow(
+      new TypeError("not an integer"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07U:\rRational[\x07i\x06i\x07i\x06")).toThrow(
+      new TypeError("not an integer"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRational[\x07i\x06i\x00")).toThrow(
+      new ZeroDivisionError("divided by 0"),
+    );
+    expect(() => Marshal.load("\x04\bU:\rRational0")).toThrow(
+      new TypeError("wrong argument type nil (expected Array)"),
+    );
+  });
+
+  it("raises TypeError defining a compat entry for a class with no allocator", () => {
+    expect(() =>
+      rbMarshalDefineCompat(
+        Column,
+        PointCompat,
+        (c) => c,
+        () => null,
+      ),
+    ).toThrow(new TypeError("no allocator"));
   });
 
   it("loads a Class and a Module as the constants their paths name", () => {

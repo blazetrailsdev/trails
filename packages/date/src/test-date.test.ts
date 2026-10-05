@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@js-temporal/polyfill";
 import { Date as RubyDate, DateTime as RubyDateTime, dNewByFrags, dtNewByFrags } from "./date.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Marshal, Rational, registerConstant } from "@blazetrails/ruby-compat";
 
 function floCmp(a: number, b: unknown): number | null {
   if (Number.isNaN(a)) return null;
@@ -57,18 +57,12 @@ class RubyHash {
   }
 }
 
-const Marshal = {
-  dump(d: RubyDate): { klass: new () => RubyDate; a: unknown[] } {
-    return { klass: d.constructor as new () => RubyDate, a: d.marshalDump() };
-  },
-  load(s: { klass: new () => RubyDate; a: unknown[] }): RubyDate {
-    return new s.klass().marshalLoad(s.a);
-  },
-};
-
 class DateSub extends RubyDate {}
 
 class DateTimeSub extends RubyDateTime {}
+
+registerConstant("DateSub", DateSub);
+registerConstant("DateTimeSub", DateTimeSub);
 
 describe("TestDate", () => {
   it("sub", () => {

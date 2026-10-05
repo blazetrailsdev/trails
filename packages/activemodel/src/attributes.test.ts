@@ -18,6 +18,7 @@ import {
   Marshal,
   Module,
   rbModConstSet,
+  rbEqual,
   rbObjIvarGet,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -29,7 +30,15 @@ import {
   type AttributesClassHalf,
 } from "./attributes.js";
 import { AttributeMethods } from "./attribute-methods.js";
+import { AttributeSet } from "./attribute-set.js";
 import { StringType } from "./type/string.js";
+
+expect.addEqualityTesters([
+  function attributeSetEquals(a: unknown, b: unknown): boolean | undefined {
+    if (!(a instanceof AttributeSet) || !(b instanceof AttributeSet)) return undefined;
+    return rbEqual(a, b);
+  },
+]);
 
 const AttributesTest = new Module();
 registerConstant("ActiveModel::AttributesTest", AttributesTest);
@@ -197,8 +206,7 @@ describe("AttributesTest", () => {
     expect(data.string_field).toEqual("default string");
   });
 
-  // BLOCKED: attributes-marshal-round-trip-needs-usrmarshal-arm
-  it.skip("attributes with proc defaults can be marshalled", () => {
+  it("attributes with proc defaults can be marshalled", () => {
     const data = new ModelForAttributesTest();
     const attributes = rbObjIvarGet(data, "@attributes");
     const roundTripped = Marshal.load(Marshal.dump(data)) as ModelForAttributesTest;

@@ -4,6 +4,7 @@ import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
 import { classpaths, rbCSymbol } from "./object.js";
 import { Range } from "./range.js";
+import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
 
 const _constants = new Map<string, unknown>();
@@ -255,3 +256,5 @@ registerConstant("Exception", Exception);
 registerConstant("Range", Range);
 registerConstant("Regexp", RegExp);
 registerConstant("Symbol", rbCSymbol);
+
+registerConstant("Rational", Rational);

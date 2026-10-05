@@ -4,9 +4,20 @@
  * (`vendor/ruby/v3.3.11/rational.c:2691` `nurat_s_convert`). Ruby has both spellings
  * and Rails calls the function, so both ship here.
  */
+import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { FrozenError } from "./frozen-error.js";
 import { rbIntegerTypeP } from "./numeric.js";
-import { rbObjClassname } from "./object.js";
+import {
+  rbBuiltinClassName,
+  rbCNumeric,
+  rbFSend,
+  rbInspect,
+  rbObjClassname,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  rtest,
+} from "./object.js";
 import { rbEqual } from "./rb-equal.js";
 import { TypeError } from "./type-error.js";
 
@@ -91,6 +102,11 @@ export class Rational {
   /** `vendor/ruby/v3.3.11/rational.c:598` `nurat_denominator` (`Rational#denominator`).
    * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
   readonly denominator: bigint;
+
+  /** `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), pathed at
+   * the foot of include.ts.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  declare static compatible: abstract new () => { marshalLoad(a: unknown): unknown };
 
   /**
    * `vendor/ruby/v3.3.11/rational.c:481` `nurat_s_canonicalize_internal`, the C
@@ -271,6 +287,102 @@ export class Rational {
   inspect(): string {
     return `(${this.toString()})`;
   }
+
+  /** `vendor/ruby/v3.3.11/rational.c:1857` `nurat_marshal_dump` (`Rational#marshal_dump`).
+   * Its `rb_copy_generic_ivar(a, self)` has no ivar table to write: a JS Array
+   * holds no ivars, which is why `has_ivars` (`vendor/ruby/v3.3.11/marshal.c:713`)
+   * counts none on one.
+   * @noRailsEquivalent PERMANENT — Ruby core, part of the Rational above. */
+  marshalDump(): [bigint, bigint] {
+    const a: [bigint, bigint] = [this.numerator, this.denominator];
+    return a;
+  }
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:439` `nurat_int_check`. It admits a
+ * Numeric answering `integer?`, which `nurat_canonicalize` then `assert`s is
+ * an Integer (`vendor/ruby/v3.3.11/rational.c:459-460`); the narrowing is that
+ * assertion, and `BigInt()` raises for a value that fails it. */
+function nuratIntCheck(num: unknown): asserts num is number | bigint {
+  if (!rbIntegerTypeP(num)) {
+    if (!(num instanceof rbCNumeric) || !rtest(rbFSend(num, "isInteger"))) {
+      throw new TypeError("not an integer");
+    }
+  }
+}
+
+/** @internal `vendor/ruby/v3.3.11/rational.c:457` `nurat_canonicalize`, answering
+ * the pair its two out-parameters hold. */
+function nuratCanonicalize(num: bigint, den: bigint): [num: bigint, den: bigint] {
+  if (den < 0n) {
+    num = -num;
+    den = -den;
+  } else if (den === 0n) {
+    throw new ZeroDivisionError("divided by 0");
+  }
+  return [num, den];
+}
+
+/** @internal `Rational::compatible` (`vendor/ruby/v3.3.11/rational.c:2806`), the
+ * class `Marshal.load` allocates in a Rational's place and sends `marshal_load`. */
+class compatible {
+  /** `vendor/ruby/v3.3.11/rational.c:1869` `nurat_marshal_load`.
+   * @noRailsEquivalent PERMANENT */
+  marshalLoad(a: unknown): this {
+    if (Object.isFrozen(this)) {
+      throw new FrozenError(`can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`);
+    }
+
+    if (!Array.isArray(a)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(a)} (expected Array)`);
+    }
+    if (a.length !== 2) {
+      throw new ArgumentError(
+        `marshaled rational must have an array whose length is 2 but ${a.length}`,
+      );
+    }
+
+    let num: unknown = a[0];
+    let den: unknown = a[1];
+    nuratIntCheck(num);
+    nuratIntCheck(den);
+    [num, den] = nuratCanonicalize(BigInt(num), BigInt(den));
+    rbObjIvarSet(this, "@numerator", num);
+    rbObjIvarSet(this, "@denominator", den);
+
+    return this;
+  }
+}
+
+Rational.compatible = compatible;
+
+/**
+ * `vendor/ruby/v3.3.11/rational.c:1831` `nurat_dumper`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function nuratDumper(self: Rational): Rational {
+  return self;
+}
+
+/**
+ * `vendor/ruby/v3.3.11/rational.c:1838` `nurat_loader`. `nurat_marshal_load`
+ * leaves the pair canonical and not reduced, and so does this.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function nuratLoader(self: Rational, a: object): Rational {
+  let num: unknown = rbObjIvarGet(a, "@numerator");
+  let den: unknown = rbObjIvarGet(a, "@denominator");
+  nuratIntCheck(num);
+  nuratIntCheck(den);
+  [num, den] = nuratCanonicalize(BigInt(num), BigInt(den));
+  const dat = self as { numerator: bigint; denominator: bigint };
+  dat.numerator = num as bigint;
+  dat.denominator = den as bigint;
+  Object.freeze(self);
+
+  return self;
 }
 
 /**
