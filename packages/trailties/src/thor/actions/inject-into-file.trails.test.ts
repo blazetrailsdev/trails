@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { Dir, File, FileUtils, include, stdout } from "@blazetrails/ruby-compat";
+import { Dir, File, FileUtils, include, NoMethodError, stdout } from "@blazetrails/ruby-compat";
 import { Actions, type ActionsHost } from "../actions.js";
 import { Shell } from "../shell.js";
 import { Thor } from "../thor.js";
@@ -92,6 +92,23 @@ describe("Thor::Actions insert_into_file and its wrappers (trails)", () => {
       host().injectIntoFile("README", { before: "__end__" }, async () => "$& $1\n"),
     );
     expect(File.read(file("README"))).toBe("__start__\nREADME\n$& $1\n__end__\n");
+  });
+
+  it("takes a plain config object as the wrappers' trailing hash", async () => {
+    const out = await capture(":stdout", () =>
+      host().injectIntoClass("post.ts", "Post", "  title = 1;\n", { verbose: false }),
+    );
+    expect(out).toBe("");
+    expect(File.read(file("post.ts"))).toBe("export class Post extends Base {\n  title = 1;\n}\n");
+  });
+
+  it("raises for a nil replacement, as String#+ and nil + do", async () => {
+    await expect(host().injectIntoFile("README", null, { after: "__start__" })).rejects.toThrow(
+      "no implicit conversion of nil into String",
+    );
+    await expect(host().injectIntoFile("README", null, { before: "__end__" })).rejects.toThrow(
+      NoMethodError,
+    );
   });
 
   it("says nothing when verbose is false", async () => {

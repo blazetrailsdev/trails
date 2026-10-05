@@ -7,6 +7,7 @@ import {
   last,
   merge,
   rbEqual,
+  rbFSend,
   rbStrSend,
   regexpEscape,
   rtest,
@@ -65,10 +66,11 @@ export class InjectIntoFile extends EmptyDirectory {
   }
 
   override async invokeBang(): Promise<void> {
-    const content =
+    const content = (
       this.behavior === "after"
-        ? "\\0" + (await this.replacement)
-        : (await this.replacement) + "\\0";
+        ? rbFSend("\\0", "plus", await this.replacement)
+        : rbFSend(await this.replacement, "plus", "\\0")
+    ) as string;
 
     if (await this.isExists()) {
       if (
@@ -117,15 +119,15 @@ export class InjectIntoFile extends EmptyDirectory {
       } else {
         status = "insert";
       }
-    } else if (warning != null) {
-      status = warning;
+    } else if (rtest(warning)) {
+      status = warning!;
     } else if (behavior === "unchanged") {
       status = "unchanged";
     } else {
       status = "subtract";
     }
 
-    super.sayStatus(status, color || this.config["verbose"]);
+    super.sayStatus(status, rtest(color) ? color : this.config["verbose"]);
   }
 
   /** @internal */
@@ -135,7 +137,7 @@ export class InjectIntoFile extends EmptyDirectory {
 
   /** @internal */
   protected async isReplacementPresent(): Promise<boolean> {
-    return (await this.content()).includes(await this.replacement);
+    return rbStrSend(await this.content(), "isInclude", await this.replacement)[0] as boolean;
   }
 
   /** @internal */

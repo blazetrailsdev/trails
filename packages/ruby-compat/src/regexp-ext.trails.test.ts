@@ -46,6 +46,8 @@ describe("rbRegEqual", () => {
     expect(rbRegEqual(/^/, /^/m)).toBe(false);
     expect(rbRegEqual(/^/, /$/)).toBe(false);
     expect(rbRegEqual(/^/, "^")).toBe(false);
+    expect(rbRegEqual(/a/g, /a/u)).toBe(true);
+    expect(rbRegEqual(/a/gi, /a/)).toBe(false);
     expect(rbEqual(/a/, /a/)).toBe(true);
     expect(rbEqual("a", /a/)).toBe(false);
   });
