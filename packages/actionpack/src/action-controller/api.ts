@@ -42,6 +42,7 @@ export class API extends Metal {
   }
 
   declare static _wrapperOptions: ParamsWrapperOptions;
+  /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
   declare static is_wrapperOptions: boolean;
   declare _wrapperOptions: ParamsWrapperOptions;
 
@@ -53,6 +54,7 @@ export class API extends Metal {
 
   static _setWrapperOptions = _setWrapperOptions;
 
+  /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
   static wrapParameters = wrapParameters;
 
   /** @internal */
