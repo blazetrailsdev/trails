@@ -1,3 +1,4 @@
+import { underscore } from "@blazetrails/activesupport";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 
 export abstract class Collector {
@@ -15,7 +16,7 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
     if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
     if (RESERVED_KEYS.has(prop)) return undefined;
     if (typeof prop !== "string") return undefined;
-    const mimeConstant = Mime.get(prop);
+    const mimeConstant = Mime.get(underscore(prop));
     if (!mimeConstant) {
       return (): never => {
         throw new TypeError(
@@ -33,7 +34,7 @@ const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
   has(target, prop) {
     if (Reflect.has(target, prop)) return true;
     if (RESERVED_KEYS.has(prop)) return false;
-    return typeof prop === "string" && Mime.get(prop) !== undefined;
+    return typeof prop === "string" && Mime.get(underscore(prop)) !== undefined;
   },
 };
 

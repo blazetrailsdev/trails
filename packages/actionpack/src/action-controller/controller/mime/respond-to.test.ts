@@ -1,9 +1,7 @@
 import "../../../test-helpers/abstract-unit.js";
-import { afterEach, beforeAll, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DetailsKey } from "@blazetrails/actionview";
 import { MimeType } from "../../../action-dispatch/http/mime-type.js";
-import { Request } from "../../../action-dispatch/http/request.js";
-import { Response } from "../../../action-dispatch/http/response.js";
 import { Base } from "../../base.js";
 import {
   MissingExactTemplate,
@@ -11,11 +9,22 @@ import {
   UnknownFormat,
 } from "../../metal/exceptions.js";
 import type { VariantCollector } from "../../metal/mime-responds.js";
+import { Logger } from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { TestCase } from "../../test-case.js";
 
 type Variants = VariantCollector & Record<string, (block?: () => unknown) => void>;
 
 class RespondToController extends Base {
+  declare type: string;
+  declare action: string | undefined;
+
+  async myHtmlFragment(): Promise<void> {
+    await this.respondTo((type) => {
+      type.htmlFragment(() => this.render({ body: "neat" }));
+    });
+  }
+
   async htmlXmlOrRss(): Promise<void> {
     await this.respondTo((type) => {
       type.html(() => this.render({ body: "HTML" }));
@@ -56,6 +65,15 @@ class RespondToController extends Base {
     });
   }
 
+  async forcedXml(): Promise<void> {
+    this.request.setFormat("xml");
+
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.xml(() => this.render({ body: "XML" }));
+    });
+  }
+
   async justXml(): Promise<void> {
     await this.respondTo((type) => {
       type.xml(() => this.render({ body: "XML" }));
@@ -69,8 +87,22 @@ class RespondToController extends Base {
     });
   }
 
+  async missingTemplates(): Promise<void> {
+    await this.respondTo((type) => {
+      type.json(() => {});
+      type.xml();
+    });
+  }
+
   async usingDefaultsWithTypeList(): Promise<void> {
     await this.respondTo("html", "xml");
+  }
+
+  async usingDefaultsWithAll(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html();
+      type.all(() => this.render({ body: "ALL" }));
+    });
   }
 
   async madeForContentType(): Promise<void> {
@@ -101,6 +133,14 @@ class RespondToController extends Base {
     });
   }
 
+  async customTypeHandling(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.custom("application/fancy-xml", () => this.render({ body: "Fancy XML" }));
+      type.all(() => this.render({ body: "Nothing" }));
+    });
+  }
+
   async customConstantHandling(): Promise<void> {
     await this.respondTo((type) => {
       type.html(() => this.render({ body: "HTML" }));
@@ -122,10 +162,63 @@ class RespondToController extends Base {
     });
   }
 
+  async handleAnyDoesntSetRequestContentType(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html(() => this.render({ body: "HTML" }));
+      type.any(() => this.render({ json: { foo: "bar" } }));
+    });
+  }
+
   async handleAnyAny(): Promise<void> {
     await this.respondTo((type) => {
       type.html(() => this.render({ body: "HTML" }));
       type.any(() => this.render({ body: "Whatever you ask for, I got it" }));
+    });
+  }
+
+  async handleAnyWithTemplate(): Promise<void> {
+    await this.respondTo((type) => {
+      type.any(() => this.render("test/hello_world"));
+    });
+  }
+
+  async allTypesWithLayout(): Promise<void> {
+    await this.respondTo((type) => {
+      type.html();
+    });
+  }
+
+  async jsonWithCallback(): Promise<void> {
+    await this.respondTo((type) => {
+      type.json(() => this.render({ json: "JS", callback: "alert" }));
+    });
+  }
+
+  async iphoneWithHtmlResponseType(): Promise<void> {
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+
+    await this.respondTo((type) => {
+      type.html(() => {
+        this.type = "Firefox";
+      });
+      type.iphone(() => {
+        this.type = "iPhone";
+      });
+    });
+  }
+
+  async iphoneWithHtmlResponseTypeWithoutLayout(): Promise<void> {
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+
+    await this.respondTo((type) => {
+      type.html(() => {
+        this.type = "Firefox";
+        return this.render({ action: "iphoneWithHtmlResponseType" });
+      });
+      type.iphone(() => {
+        this.type = "iPhone";
+        return this.render({ action: "iphoneWithHtmlResponseType" });
+      });
     });
   }
 
@@ -166,6 +259,14 @@ class RespondToController extends Base {
     });
   }
 
+  async variantInlineSyntaxWithoutBlock(): Promise<void> {
+    await this.respondTo((format) => {
+      format.js();
+      (format.html() as Variants).none();
+      (format.html() as Variants).phone();
+    });
+  }
+
   async variantAny(): Promise<void> {
     await this.respondTo((format) => {
       format.html((variant: VariantCollector) => {
@@ -198,6 +299,13 @@ class RespondToController extends Base {
     });
   }
 
+  async variantAnyImplicitRender(): Promise<void> {
+    await this.respondTo((format) => {
+      (format.html() as Variants).phone();
+      (format.html() as Variants).any(":tablet", ":phablet");
+    });
+  }
+
   async variantAnyWithNone(): Promise<void> {
     await this.respondTo((format) => {
       (format.html() as Variants).any(":none", ":phone", () =>
@@ -215,6 +323,16 @@ class RespondToController extends Base {
       });
     });
   }
+
+  private setLayout(): string | undefined {
+    switch (this.actionName) {
+      case "allTypesWithLayout":
+      case "iphoneWithHtmlResponseType":
+        return "respond_to/layouts/standard";
+      case "iphoneWithHtmlResponseTypeWithoutLayout":
+        return "respond_to/layouts/missing";
+    }
+  }
 }
 RespondToController.beforeAction((c) => {
   const controller = c as RespondToController;
@@ -223,41 +341,37 @@ RespondToController.beforeAction((c) => {
   else if (Array.isArray(v)) controller.request.variant = v.map((x) => `:${x}`);
 });
 
-async function get(action: string, v: string): Promise<RespondToController> {
-  const controller = new RespondToController();
-  const request = new Request({
-    REQUEST_METHOD: "GET",
-    PATH_INFO: "/",
-    HTTP_HOST: "localhost",
-    QUERY_STRING: `v=${v}`,
-  });
-  await controller.dispatch(action, request, new Response());
-  return controller;
+class MockLogger extends Logger {
+  private _logged: string[] = [];
+
+  constructor() {
+    super(null);
+  }
+
+  logged(level: string): string[] {
+    return level === "info" ? this._logged : [];
+  }
+
+  override info(message?: string | (() => string)): boolean {
+    this._logged.push(typeof message === "function" ? message() : (message ?? ""));
+    return true;
+  }
 }
 
-beforeAll(() => {
-  RespondToController.layout(false);
-});
+RespondToController.layout(":setLayout");
+
+const NO_CONTENT_WARNING =
+  "No template found for RespondToController#variantWithoutImplicitTemplateRendering, rendering head :no_content";
 
 describe("RespondToControllerTest", () => {
-  it("variant with implicit template rendering", async () => {
-    const controller = await get("variantWithImplicitTemplateRendering", "mobile");
-    expect(controller.response.mediaType).toBe("text/html");
-    expect(controller.responseBody).toBe("mobile");
-  });
-
-  it("variant without implicit rendering from browser", async () => {
-    await expect(get("variantWithoutImplicitTemplateRendering", "does_not_matter")).rejects.toThrow(
-      MissingExactTemplate,
-    );
-  });
-
   let tc: TestCase;
 
   beforeEach(async ({ task }) => {
     tc = new TestCase(task.name);
     tc.controller = new RespondToController();
     await tc.beforeSetup();
+    tc.request.host = "www.example.com";
+    MimeType.registerAlias("text/html", ":iphone");
     MimeType.register("text/x-mobile", ":mobile");
     MimeType.register("application/fancy-xml", ":fancy_xml");
     MimeType.register("text/html; fragment", ":html_fragment");
@@ -265,10 +379,77 @@ describe("RespondToControllerTest", () => {
   });
 
   afterEach(() => {
+    MimeType.unregister(":iphone");
     MimeType.unregister(":mobile");
     MimeType.unregister(":fancy_xml");
     MimeType.unregister(":html_fragment");
     DetailsKey.clear();
+  });
+
+  it("variant with implicit template rendering", async () => {
+    await tc.get("variantWithImplicitTemplateRendering", { params: { v: "mobile" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("mobile");
+  });
+
+  it("variant without implicit rendering from browser", async () => {
+    await expect(
+      tc.get("variantWithoutImplicitTemplateRendering", { params: { v: "does_not_matter" } }),
+    ).rejects.toThrow(MissingExactTemplate);
+  });
+
+  it("variant variant not set and without implicit rendering from browser", async () => {
+    await expect(tc.get("variantWithoutImplicitTemplateRendering")).rejects.toThrow(
+      MissingExactTemplate,
+    );
+  });
+
+  it("variant without implicit rendering from xhr", async () => {
+    const logger = new MockLogger();
+    const oldLogger = Base.logger;
+    Base.logger = logger;
+    try {
+      await tc.get("variantWithoutImplicitTemplateRendering", {
+        xhr: true,
+        params: { v: "does_not_matter" },
+      });
+      tc.assertResponse("no_content");
+
+      expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+
+  it("variant without implicit rendering from api", async () => {
+    const logger = new MockLogger();
+    const oldLogger = Base.logger;
+    Base.logger = logger;
+    try {
+      await tc.get("variantWithoutImplicitTemplateRendering", {
+        format: "json",
+        params: { v: "does_not_matter" },
+      });
+      tc.assertResponse("no_content");
+
+      expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  });
+
+  it("variant variant not set and without implicit rendering from xhr", async () => {
+    const logger = new MockLogger();
+    const oldLogger = Base.logger;
+    Base.logger = logger;
+    try {
+      await tc.get("variantWithoutImplicitTemplateRendering", { xhr: true });
+      tc.assertResponse("no_content");
+
+      expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
+    } finally {
+      Base.logger = oldLogger;
+    }
   });
 
   it("variant with format and custom render", async () => {
@@ -303,6 +484,12 @@ describe("RespondToControllerTest", () => {
     await tc.get("variantInlineSyntax", { format: "js" });
     expect(tc.response.mediaType).toBe("text/javascript");
     expect(tc.response.body).toBe("js");
+  });
+
+  it("variant inline syntax without block", async () => {
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: "phone" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("phone");
   });
 
   it("variant any", async () => {
@@ -357,6 +544,16 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("any");
   });
 
+  it("variant any implicit render", async () => {
+    await tc.get("variantAnyImplicitRender", { params: { v: "tablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("tablet");
+
+    await tc.get("variantAnyImplicitRender", { params: { v: "phablet" } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("phablet");
+  });
+
   it("variant any with none", async () => {
     await tc.get("variantAnyWithNone");
     expect(tc.response.mediaType).toBe("text/html");
@@ -373,6 +570,24 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("tablet");
   });
 
+  it("variant negotiation inline syntax", async () => {
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: ["tablet", "phone"] } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("phone");
+  });
+
+  it("variant negotiation block syntax", async () => {
+    await tc.get("variantPlusNoneForFormat", { params: { v: ["tablet", "phone"] } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("phone");
+  });
+
+  it("variant negotiation without block", async () => {
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: ["tablet", "phone"] } });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("phone");
+  });
+
   it("custom constant", async () => {
     await tc.get("customConstantHandling", { params: { format: "mobile" } });
     expect(tc.response.mediaType).toBe("text/x-mobile");
@@ -383,6 +598,13 @@ describe("RespondToControllerTest", () => {
     await tc.get("customConstantHandlingWithoutBlock", { params: { format: "mobile" } });
     expect(tc.response.mediaType).toBe("text/x-mobile");
     expect(tc.response.body).toBe("Mobile");
+  });
+
+  it("html fragment", async () => {
+    tc.request.accept = "text/html; fragment";
+    await tc.get("myHtmlFragment");
+    expect(tc.response.headers.get("Content-Type")).toBe("text/html; fragment; charset=utf-8");
+    expect(tc.response.body).toBe("neat");
   });
 
   it("html", async () => {
@@ -484,6 +706,20 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("<p>Hello world!</p>\n");
   });
 
+  it("using defaults with all", async () => {
+    tc.request.accept = "*/*";
+    await tc.get("usingDefaultsWithAll");
+    expect(tc.response.body.trim()).toBe("HTML!");
+
+    tc.request.accept = "text/html";
+    await tc.get("usingDefaultsWithAll");
+    expect(tc.response.body.trim()).toBe("HTML!");
+
+    tc.request.accept = "application/json";
+    await tc.get("usingDefaultsWithAll");
+    expect(tc.response.body).toBe("ALL");
+  });
+
   it("using defaults with type list", async () => {
     tc.request.accept = "*/*";
     await tc.get("usingDefaultsWithTypeList");
@@ -534,6 +770,18 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("XML");
   });
 
+  it("custom types", async () => {
+    tc.request.accept = "application/fancy-xml";
+    await tc.get("customTypeHandling");
+    expect(tc.response.mediaType).toBe("application/fancy-xml");
+    expect(tc.response.body).toBe("Fancy XML");
+
+    tc.request.accept = "text/html";
+    await tc.get("customTypeHandling");
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe("HTML");
+  });
+
   it("xhtml alias", async () => {
     tc.request.accept = "application/xhtml+xml,application/xml";
     await tc.get("htmlOrXml");
@@ -559,6 +807,12 @@ describe("RespondToControllerTest", () => {
     tc.request.accept = "text/xml";
     await tc.get("handleAny");
     expect(tc.response.body).toBe("Either JS or XML");
+  });
+
+  it("handle any doesnt set request content type", async () => {
+    tc.request.accept = "text/csv";
+    await tc.get("handleAnyDoesntSetRequestContentType");
+    expect(tc.response.mediaType).toBe("application/json");
   });
 
   it("handle any any", async () => {
@@ -595,6 +849,43 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("Whatever you ask for, I got it");
   });
 
+  it("browser check with any any", async () => {
+    tc.request.accept = "application/json, application/xml";
+    await tc.get("jsonXmlOrHtml");
+    expect(tc.response.body).toBe("JSON");
+
+    tc.request.accept = "application/json, application/xml, */*";
+    await tc.get("jsonXmlOrHtml");
+    expect(tc.response.body).toBe("HTML");
+  });
+
+  it("handle any with template", async () => {
+    tc.request.accept = "*/*";
+
+    await tc.get("handleAnyWithTemplate");
+    expect(tc.response.body).toBe("Hello world!");
+  });
+
+  it("html type with layout", async () => {
+    tc.request.accept = "text/html";
+    await tc.get("allTypesWithLayout");
+    expect(tc.response.body).toBe(
+      '<html><div id="html">HTML for all_types_with_layout</div></html>',
+    );
+  });
+
+  it("json with callback sets javascript content type", async () => {
+    tc.request.accept = "application/json";
+    await tc.get("jsonWithCallback");
+    expect(tc.response.body).toBe("/**/alert(JS)");
+    expect(tc.response.mediaType).toBe("text/javascript");
+  });
+
+  it("xhr", async () => {
+    await tc.get("jsOrHtml", { xhr: true });
+    expect(tc.response.body).toBe("JS");
+  });
+
   it("forced format", async () => {
     await tc.get("htmlXmlOrRss");
     expect(tc.response.body).toBe("HTML");
@@ -609,14 +900,75 @@ describe("RespondToControllerTest", () => {
     expect(tc.response.body).toBe("RSS");
   });
 
+  it("internally forced format", async () => {
+    await tc.get("forcedXml");
+    expect(tc.response.body).toBe("XML");
+
+    await tc.get("forcedXml", { format: "html" });
+    expect(tc.response.body).toBe("XML");
+  });
+
   it("extension synonyms", async () => {
     await tc.get("htmlXmlOrRss", { params: { format: "xhtml" } });
     expect(tc.response.body).toBe("HTML");
+  });
+
+  it("render action for html", async () => {
+    const controller = tc.controller as RespondToController;
+    controller.render = async function (this: RespondToController, ...args: unknown[]) {
+      if (args.length > 0) this.action = (args[0] as { action?: string }).action;
+      this.action ??= this.actionName;
+
+      this.response.body = `${this.action} - ${rbInspect(this.formats)}`;
+    };
+
+    await tc.get("usingDefaults");
+    expect(tc.response.body).toBe(`usingDefaults - ${rbInspect([":html"])}`);
+
+    await tc.get("usingDefaults", { format: "xml" });
+    expect(tc.response.body).toBe(`usingDefaults - ${rbInspect([":xml"])}`);
+  });
+
+  it("format with custom response type", async () => {
+    await tc.get("iphoneWithHtmlResponseType");
+    expect(tc.response.body).toBe('<html><div id="html">Hello future from Firefox!</div></html>');
+
+    await tc.get("iphoneWithHtmlResponseType", { format: "iphone" });
+    expect(tc.response.mediaType).toBe("text/html");
+    expect(tc.response.body).toBe(
+      '<html><div id="iphone">Hello iPhone future from iPhone!</div></html>',
+    );
+  });
+
+  it("format with custom response type and request headers", async () => {
+    tc.request.accept = "text/iphone";
+    await tc.get("iphoneWithHtmlResponseType");
+    expect(tc.response.body).toBe(
+      '<html><div id="iphone">Hello iPhone future from iPhone!</div></html>',
+    );
+    expect(tc.response.mediaType).toBe("text/html");
   });
 
   it("invalid format", async () => {
     await expect(tc.get("usingDefaults", { params: { format: "invalidformat" } })).rejects.toThrow(
       UnknownFormat,
     );
+  });
+
+  it("missing templates", async () => {
+    await tc.get("missingTemplates", { format: "json" });
+    tc.assertResponse("no_content");
+    await tc.get("missingTemplates", { format: "xml" });
+    tc.assertResponse("no_content");
+  });
+
+  it("invalid variant", async () => {
+    await expect(
+      tc.get("variantWithImplicitTemplateRendering", { params: { v: "invalid" } }),
+    ).rejects.toThrow(UnknownFormat);
+  });
+
+  it("variant not set regular unknown format", async () => {
+    await expect(tc.get("variantWithImplicitTemplateRendering")).rejects.toThrow(UnknownFormat);
   });
 });
