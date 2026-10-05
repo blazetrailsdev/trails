@@ -175,8 +175,7 @@ export class Metal extends AbstractController {
     return this.request.session;
   }
 
-  /** @internal */
-  static _controllerName?: string | null;
+  protected static _controllerName?: string | null;
 
   static controllerName(): string | null {
     if (Object.hasOwn(this, "_controllerName") && this._controllerName != null) {
