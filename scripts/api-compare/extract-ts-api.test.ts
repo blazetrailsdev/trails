@@ -1120,6 +1120,17 @@ describe("body call capture", () => {
         uncaptured(block: unknown, ...args: unknown[]) {
           this.build(...args, ...(block !== undefined ? [block] : []));
         }
+        shadowed(block: unknown, ...args: unknown[]) {
+          for (const klass of args) {
+            const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+            this.build(klass, block);
+          }
+          this.build(...(block !== undefined ? [block] : []));
+        }
+        nested(...args: unknown[]) {
+          const block = rbBlockGivenP(args[args.length - 1]) ? args.pop() : undefined;
+          return () => this.build(...(block !== undefined ? [block] : []));
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
@@ -1127,6 +1138,8 @@ describe("body call capture", () => {
     expect(skeleton("permit")).toEqual(["ref:build"]);
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if"]);
     expect(skeleton("uncaptured")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("shadowed")!.filter((t) => t === "if")).toEqual(["if"]);
+    expect(skeleton("nested")!.filter((t) => t === "if")).toEqual(["if"]);
   });
 
   it("reads an own-property conditional as a class-level ivar read, not as an arm", () => {

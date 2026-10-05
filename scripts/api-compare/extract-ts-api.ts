@@ -5562,20 +5562,19 @@ function isBlockForward(conditional: ts.ConditionalExpression): boolean {
     | ts.FunctionLikeDeclaration
     | undefined;
   const body = fn?.body;
-  if (!body) return false;
-  let captured = false;
-  const find = (n: ts.Node): void => {
-    if (captured || (n !== body && ts.isFunctionLike(n))) return;
-    if (ts.isVariableDeclaration(n) && n.name.getText() === block && n.initializer) {
-      let init = n.initializer;
-      while (ts.isAsExpression(init) || ts.isParenthesizedExpression(init)) init = init.expression;
-      captured = ts.isConditionalExpression(init) && isBlockCapture(init);
-      return;
-    }
-    ts.forEachChild(n, find);
-  };
-  find(body);
-  return captured;
+  if (!body || !ts.isBlock(body)) return false;
+  return body.statements.some(
+    (statement) =>
+      ts.isVariableStatement(statement) &&
+      statement.declarationList.declarations.some((declaration) => {
+        if (declaration.name.getText() !== block || !declaration.initializer) return false;
+        let init = declaration.initializer;
+        while (ts.isAsExpression(init) || ts.isParenthesizedExpression(init)) {
+          init = init.expression;
+        }
+        return ts.isConditionalExpression(init) && isBlockCapture(init);
+      }),
+  );
 }
 
 /**
