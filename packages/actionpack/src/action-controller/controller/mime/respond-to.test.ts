@@ -206,6 +206,21 @@ class RespondToController extends Base {
     });
   }
 
+  async iphoneWithHtmlResponseTypeWithoutLayout(): Promise<void> {
+    if (this.request.env["HTTP_ACCEPT"] === "text/iphone") this.request.setFormat("iphone");
+
+    await this.respondTo((type) => {
+      type.html(() => {
+        this.type = "Firefox";
+        return this.render({ action: "iphoneWithHtmlResponseType" });
+      });
+      type.iphone(() => {
+        this.type = "iPhone";
+        return this.render({ action: "iphoneWithHtmlResponseType" });
+      });
+    });
+  }
+
   async variantWithImplicitTemplateRendering(): Promise<void> {}
   async variantWithoutImplicitTemplateRendering(): Promise<void> {}
 
