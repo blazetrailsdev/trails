@@ -1,7 +1,7 @@
 import { File, merge, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
-import type { RenderOptions } from "../base.js";
+import type { Base, RenderOptions } from "../base.js";
 import { MissingFile } from "./exceptions.js";
 
 export const DEFAULT_SEND_FILE_TYPE = "application/octet-stream";
@@ -30,12 +30,11 @@ export interface SendFileHeadersOptions {
 }
 
 /** @internal */
-export interface DataStreamingHost extends SendFileHeadersHost {
-  status: number | string;
-  response: { sendingFile: boolean; sendFile(path: string): void };
-  sendFileHeadersBang(options: SendFileHeadersOptions): void;
-  render(options: RenderOptions): void | Promise<void>;
-}
+export type DataStreamingHost = SendFileHeadersHost &
+  Pick<Base, "render" | "sendFileHeadersBang"> & {
+    status: number | string;
+    response: { sendingFile: boolean; sendFile(path: string): void };
+  };
 
 /** @internal */
 export function sendFile(
