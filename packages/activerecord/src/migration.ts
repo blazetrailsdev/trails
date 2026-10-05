@@ -20,6 +20,7 @@ import {
   format,
   max,
   stdout,
+  excToS,
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
@@ -1644,14 +1645,14 @@ export class MigrationContext<
       this.schemaMigration,
       this.internalMetadata,
     );
-    const currentVersion = await this.currentVersion();
-    const currentMigration = await migrator.currentMigration();
-
-    if (currentVersion !== 0 && !currentMigration) {
-      throw new UnknownMigrationVersionError(currentVersion!);
+    if ((await this.currentVersion()) !== 0 && !(await migrator.currentMigration())) {
+      throw new UnknownMigrationVersionError((await this.currentVersion())!);
     }
 
-    const startIndex = currentVersion === 0 ? 0 : migrator.migrations.indexOf(currentMigration!);
+    const startIndex =
+      (await this.currentVersion()) === 0
+        ? 0
+        : migrator.migrations.indexOf((await migrator.currentMigration())!);
 
     const finish = migrator.migrations[startIndex + steps];
     const version = finish ? finish.version : 0;
@@ -1705,7 +1706,7 @@ export class Migrator {
       return await fn();
     } finally {
       if (gotLock && !(await (await this.connection).releaseAdvisoryLock(lockId))) {
-        // eslint-disable-next-line no-unsafe-finally
+        // eslint-disable-next-line no-unsafe-finally -- Ruby's `ensure` raises over the block's exception (migration.rb:1608-1612).
         throw new ConcurrentMigrationError(ConcurrentMigrationError.RELEASE_LOCK_FAILED_MESSAGE);
       }
     }
@@ -1804,7 +1805,7 @@ export class Migrator {
     } catch (e) {
       let msg = "An error has occurred, ";
       if (await this.isUseTransaction(migration)) msg += "this and ";
-      msg += `all later migrations canceled:\n\n${(e as Error).message}`;
+      msg += `all later migrations canceled:\n\n${excToS(e)}`;
       throw Object.assign(new StandardError(msg), { cause: e });
     }
   }

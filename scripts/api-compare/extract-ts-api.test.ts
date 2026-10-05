@@ -1577,6 +1577,10 @@ describe("body call capture", () => {
           for (const m of runnable) if (await this.isRan(m)) kept.push(this.wrap(m));
           return kept;
         }
+        async external(runnable: unknown[], seen: unknown[]) {
+          for (const m of runnable) if (await this.isRan(m)) seen.push(m);
+          for (const m of runnable) if (await this.isRan(m)) this.ran.push(m);
+        }
         async alternate(runnable: unknown[]) {
           const kept: unknown[] = [];
           for (const m of runnable) {
@@ -1593,6 +1597,17 @@ describe("body call capture", () => {
     expect(skeleton("sync")).toEqual(["loop", "if", "ref:isRan", "ref:push"]);
     expect(skeleton("mapped")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:wrap"]);
     expect(skeleton("alternate")).toEqual(["loop", "if", "ref:isRan", "ref:push", "ref:skip"]);
+    expect(skeleton("external")).toEqual([
+      "loop",
+      "if",
+      "ref:isRan",
+      "ref:push",
+      "loop",
+      "if",
+      "ref:isRan",
+      "ref:ran",
+      "ref:push",
+    ]);
   });
 
   it("marks a call made in a negated position with the ! prefix", () => {

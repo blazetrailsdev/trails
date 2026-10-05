@@ -204,6 +204,8 @@ export interface SchemaHost {
   tableNamePrefix: string;
   tableNameSuffix: string;
   _sequenceName: string | null;
+  /** @internal */
+  _explicitSequenceName?: boolean;
   _inheritanceColumn?: string | null;
   _abstractClass?: boolean;
   _ignoredColumns?: string[];
@@ -306,6 +308,7 @@ export async function _returningColumnsForInsert(
 }
 
 export function resetSequenceName(this: SchemaHost): void {
+  this._explicitSequenceName = false;
   this._sequenceName = null;
 }
 
@@ -335,7 +338,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
 export function columns(this: SchemaHost): any[] {
   return (
     ownSchemaMemo(this, "_columns") ??
-    (this._columns = Object.values(columnsHash.call(this as unknown as typeof Base)))
+    (this._columns = Object.freeze(
+      Object.values(columnsHash.call(this as unknown as typeof Base)),
+    ) as any[])
   );
 }
 
@@ -425,6 +430,8 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._returningColumnsForInsertCache = undefined;
   this._columnNames = undefined;
+  this._symbolColumnToStringNameHash = undefined;
+  this._contentColumns = undefined;
   this._attributesBuilder = undefined;
   this._columns = undefined;
   this._columnsHash = undefined;
@@ -649,6 +656,7 @@ export function setTableName(this: SchemaHost, value: string | null): void {
   }
 
   this._tableName = value;
+  if (!ownSchemaMemo(this, "_explicitSequenceName")) this._sequenceName = null;
   (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
   (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
 }
@@ -675,6 +683,7 @@ export function sequenceName(this: SchemaHost): string | null {
 
 export function setSequenceName(this: SchemaHost, value: string | null): void {
   this._sequenceName = rbObjAsString(value);
+  this._explicitSequenceName = true;
 }
 
 export function ignoredColumns(this: SchemaHost): string[] {
@@ -683,7 +692,7 @@ export function ignoredColumns(this: SchemaHost): string[] {
 
 export function setIgnoredColumns(this: SchemaHost, columns: string[]): void {
   this.reloadSchemaFromCache();
-  this._ignoredColumns = columns.map(String);
+  this._ignoredColumns = Object.freeze(columns.map(String)) as string[];
 }
 
 export function columnDefaults(this: SchemaHost): Record<string, unknown> {
