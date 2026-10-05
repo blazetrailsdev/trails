@@ -17,8 +17,6 @@ import {
 import type { Metal } from "../metal.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 
-const md5Hex = (data: string) => OpenSSL.Digest.MD5.hexdigest(data);
-
 type BasicController = Metal & Included<typeof HttpAuthentication.Basic.ControllerMethods>;
 type DigestController = Metal & Included<typeof HttpAuthentication.Digest.ControllerMethods>;
 type TokenController = Metal & Included<typeof HttpAuthentication.Token.ControllerMethods>;
@@ -238,8 +236,10 @@ export namespace HttpAuthentication {
       passwordIsHa1 = true,
     ): string {
       const ha1 = passwordIsHa1 ? password : Digest.ha1(credentials, password);
-      const ha2 = md5Hex([String(httpMethod ?? "").toUpperCase(), uri].join(":"));
-      return md5Hex(
+      const ha2 = OpenSSL.Digest.MD5.hexdigest(
+        [String(httpMethod ?? "").toUpperCase(), uri].join(":"),
+      );
+      return OpenSSL.Digest.MD5.hexdigest(
         [
           ha1,
           credentials.get("nonce"),
@@ -252,7 +252,9 @@ export namespace HttpAuthentication {
     }
 
     export function ha1(credentials: DigestCredentials, password: string): string {
-      return md5Hex([credentials.get("username"), credentials.get("realm"), password].join(":"));
+      return OpenSSL.Digest.MD5.hexdigest(
+        [credentials.get("username"), credentials.get("realm"), password].join(":"),
+      );
     }
 
     export function encodeCredentials(
@@ -331,7 +333,7 @@ export namespace HttpAuthentication {
     export function nonce(secretKey: string, time: number = Math.floor(Date.now() / 1000)): string {
       const t = time;
       const hashed = [t, secretKey];
-      const digest = md5Hex(hashed.join(":"));
+      const digest = OpenSSL.Digest.MD5.hexdigest(hashed.join(":"));
       return Buffer.from(`${t}:${digest}`).toString("base64");
     }
 
@@ -350,7 +352,7 @@ export namespace HttpAuthentication {
     }
 
     export function opaque(secretKey: string): string {
-      return md5Hex(secretKey);
+      return OpenSSL.Digest.MD5.hexdigest(secretKey);
     }
   }
 
