@@ -398,8 +398,8 @@ describe("Thor::Actions", () => {
       it("accepts a color as status", async () => {
         const r = counter();
         const sayStatus = vi.spyOn(r.shell, "sayStatus").mockImplementation(() => {});
-        await action(r, "ls", { verbose: "yellow" });
-        expect(sayStatus).toHaveBeenCalledWith("run", 'ls from "."', "yellow");
+        await action(r, "ls", { verbose: ":yellow" });
+        expect(sayStatus).toHaveBeenCalledWith("run", 'ls from "."', ":yellow");
       });
     });
 

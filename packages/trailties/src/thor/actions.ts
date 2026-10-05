@@ -23,6 +23,7 @@ import {
   rbObjIsKindOf,
   rbObjIvarGet,
   rtest,
+  strip,
   toS,
 } from "@blazetrails/ruby-compat";
 import { addFile, createFile } from "./actions/create-file.js";
@@ -338,7 +339,8 @@ export async function runRubyScript(
   return this.run(command, merge(config, { with: rubyCommand() }));
 }
 
-export function thor(
+/** @missingRailsArgs strip — PERMANENT */
+export async function thor(
   this: ActionsHost,
   command: unknown,
   ...args: unknown[]
@@ -350,7 +352,7 @@ export function thor(
 
   args.unshift(command);
   args.push(Options.toSwitches(config));
-  command = args.join(" ").trim();
+  command = strip(args.flat(Infinity).join(" "));
 
   return this.run(command, { with: "thor", verbose, pretend, capture });
 }
