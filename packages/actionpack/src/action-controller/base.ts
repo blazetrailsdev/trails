@@ -8,11 +8,9 @@ import {
   type Included,
   runLoadHooks,
 } from "@blazetrails/activesupport";
-import { File, getCrypto } from "@blazetrails/ruby-compat";
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
-import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
 import {
@@ -28,6 +26,12 @@ import {
   ConditionalGet,
   type ClassMethods as ConditionalGetClassMethods,
   type Etagger,
+  type expiresIn,
+  type expiresNow,
+  type freshWhen,
+  type httpCacheForever,
+  type isStale,
+  type noStore,
 } from "./metal/conditional-get.js";
 import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
 import { EtagWithFlash } from "./metal/etag-with-flash.js";
@@ -44,7 +48,7 @@ import {
   type RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import { MissingFile } from "./metal/exceptions.js";
+import { isShowDetailedExceptions, processAction as _rescueProcessAction } from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -138,11 +142,7 @@ import {
   type FragmentsClassMethods,
 } from "../abstract-controller/caching/fragments.js";
 import { HttpAuthentication } from "./metal/http-authentication.js";
-import {
-  sendFileHeadersBang,
-  type SendDataOptions,
-  type SendFileOptions,
-} from "./metal/data-streaming.js";
+import { sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
   _defaultWrapModel,
@@ -175,6 +175,8 @@ import {
   haltedCallbackHook,
   processAction as _instrumentProcessAction,
   redirectTo as _instrumentRedirectTo,
+  sendData,
+  sendFile,
 } from "./metal/instrumentation.js";
 import {
   Parameters as StrongParameters,
@@ -443,7 +445,7 @@ export class Base extends Metal {
     let renderOutput: void | Promise<void>;
     const viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
-        if (this.performed) throw new DoubleRenderError();
+        if (this.responseBody != null) throw new DoubleRenderError();
         return (renderOutput = abstractRender.call(this, ...args));
       }),
     ) as number | Promise<number>;
@@ -671,8 +673,8 @@ export class Base extends Metal {
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    await _instrumentProcessAction.call(this as never, async () => {
-      try {
+    await _instrumentProcessAction.call(this as never, () =>
+      _rescueProcessAction.call(this, async () => {
         _processAction.call(this as never, action, ...args);
         if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
           _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
@@ -682,65 +684,16 @@ export class Base extends Metal {
           });
         }
         await super.processAction(action, ...args);
-      } catch (error) {
-        if (error instanceof Error) {
-          const match = this._findRescueHandler(error);
-          if (match) {
-            await match.handler.call(this, match.error);
-            return;
-          }
-        }
-        throw error;
-      }
-    });
+      }),
+    );
   }
 
-  freshWhen(options: {
-    etag?: string;
-    lastModified?: Date | Temporal.Instant;
-    public?: boolean;
-  }): void {
-    if (options.etag) {
-      const etag = this._generateEtag(options.etag);
-      this.headers.set("etag", etag);
-    }
-    if (options.lastModified) {
-      // boundary: Realm-safe Date check (instanceof breaks across vm/iframe
-      const isDate = Object.prototype.toString.call(options.lastModified) === "[object Date]";
-      // boundary: bridge Temporal.Instant input → Date for toUTCString rendering.
-      const lm = isDate
-        ? (options.lastModified as Date)
-        : new Date((options.lastModified as Temporal.Instant).epochMilliseconds);
-      this.headers.set("last-modified", lm.toUTCString());
-    }
-    if (options.public) {
-      this.headers.set("cache-control", "public");
-    }
-
-    if (this._isFresh()) {
-      this.head(304);
-    }
-  }
-
-  stale(options: {
-    etag?: string;
-    lastModified?: Date | Temporal.Instant;
-    public?: boolean;
-  }): boolean {
-    this.freshWhen(options);
-    return !this.performed;
-  }
-
-  expiresIn(seconds: number, options: { public?: boolean; mustRevalidate?: boolean } = {}): void {
-    const parts = [`max-age=${seconds}`];
-    if (options.public) parts.push("public");
-    if (options.mustRevalidate) parts.push("must-revalidate");
-    this.headers.set("cache-control", parts.join(", "));
-  }
-
-  expiresNow(): void {
-    this.headers.set("cache-control", "no-cache");
-  }
+  declare freshWhen: typeof freshWhen;
+  declare isStale: typeof isStale;
+  declare expiresIn: typeof expiresIn;
+  declare expiresNow: typeof expiresNow;
+  declare httpCacheForever: typeof httpCacheForever;
+  declare noStore: typeof noStore;
 
   /** @internal */
   _actionHasLayout?: boolean;
@@ -813,27 +766,16 @@ export class Base extends Metal {
   /** @internal */
   declare haltedCallbackHook: typeof haltedCallbackHook;
 
-  sendFile(path: string, options: SendFileOptions = {}): void {
-    if (!(File.isFile(path) && File.isReadable(path))) {
-      throw new MissingFile(`Cannot read file ${path}`);
-    }
+  declare sendFile: typeof sendFile;
+  declare sendData: typeof sendData;
+  declare isShowDetailedExceptions: typeof isShowDetailedExceptions;
 
-    if (!options.urlBasedFilename) options.filename ??= File.basename(path);
-    this.sendFileHeadersBang(options);
-
-    this.status = options.status ?? 200;
-    if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
-    this.response.sendFile(path);
-  }
-
-  /** @missingRailsCall merge — PERMANENT */
-  sendData(data: string | Buffer, options: SendDataOptions = {}): void | Promise<void> {
-    this.sendFileHeadersBang(options);
-    return this.render({
-      status: options.status,
-      contentType: options.contentType,
-      body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
-    });
+  async rescueWithHandler(exception: unknown): Promise<boolean> {
+    if (!(exception instanceof Error)) return false;
+    const match = this._findRescueHandler(exception);
+    if (!match) return false;
+    await match.handler.call(this, match.error);
+    return true;
   }
 
   private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {
@@ -871,28 +813,6 @@ export class Base extends Metal {
     }
 
     return null;
-  }
-
-  private _generateEtag(seed: string): string {
-    const hash = getCrypto().createHash("sha256").update(seed).digest("hex").slice(0, 32);
-    return `W/"${hash}"`;
-  }
-
-  private _isFresh(): boolean {
-    if (!this.request) return false;
-    const ifNoneMatch = this.request.getHeader("if-none-match");
-    const ifModifiedSince = this.request.getHeader("if-modified-since");
-    const etag = this.headers.get("etag");
-    const lastModified = this.headers.get("last-modified");
-
-    if (ifNoneMatch && etag) {
-      return ifNoneMatch === etag;
-    }
-    if (ifModifiedSince && lastModified) {
-      // boundary: HTTP If-Modified-Since / Last-Modified are RFC 7231 date
-      return new Date(ifModifiedSince) >= new Date(lastModified);
-    }
-    return false;
   }
 }
 
@@ -971,7 +891,10 @@ runLoadHooks("action_controller", Base);
 include(Base, UrlFor);
 Base.prototype.urlOptions = urlOptions;
 
+Base.prototype.sendFile = sendFile;
+Base.prototype.sendData = sendData;
 Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
+Base.prototype.isShowDetailedExceptions = isShowDetailedExceptions;
 
 Base.prototype.appendInfoToPayload = appendInfoToPayload;
 Base.prototype.cleanupViewRuntime = cleanupViewRuntime;

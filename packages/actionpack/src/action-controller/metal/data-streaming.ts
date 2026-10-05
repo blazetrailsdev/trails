@@ -1,7 +1,8 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, merge, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { RenderOptions } from "../base.js";
+import { MissingFile } from "./exceptions.js";
 
 export const DEFAULT_SEND_FILE_TYPE = "application/octet-stream";
 export const DEFAULT_SEND_FILE_DISPOSITION = "attachment";
@@ -26,6 +27,46 @@ export interface SendFileHeadersOptions {
   type?: string | null;
   filename?: string | null;
   disposition?: string | false | null;
+}
+
+/** @internal */
+export interface DataStreamingHost extends SendFileHeadersHost {
+  status: number | string;
+  response: { sendingFile: boolean; sendFile(path: string): void };
+  sendFileHeadersBang(options: SendFileHeadersOptions): void;
+  render(options: RenderOptions): void | Promise<void>;
+}
+
+/** @internal */
+export function sendFile(
+  this: DataStreamingHost,
+  path: string,
+  options: SendFileOptions = {},
+): void {
+  if (!(File.isFile(path) && File.isReadable(path))) {
+    throw new MissingFile(`Cannot read file ${path}`);
+  }
+
+  if (!options.urlBasedFilename) options.filename ||= File.basename(path);
+  this.sendFileHeadersBang(options);
+
+  this.status = options.status || 200;
+  if (Object.hasOwn(options, "contentType")) this.contentType = options.contentType!;
+  this.response.sendFile(path);
+}
+
+/** @internal */
+export function sendData(
+  this: DataStreamingHost,
+  data: string | Buffer,
+  options: SendDataOptions = {},
+): void | Promise<void> {
+  this.sendFileHeadersBang(options);
+  return this.render(
+    merge(slice(options as Record<string, unknown>, "status", "contentType"), {
+      body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
+    }),
+  );
 }
 
 /** @internal */

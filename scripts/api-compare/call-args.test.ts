@@ -182,6 +182,16 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     ).toBe("match");
   });
 
+  // metal/conditional_get.rb:294 `merge!(public: options.delete(:public))`.
+  it("reads a nested Ruby call as its receiver-keyed ruby-compat export", () => {
+    expect(
+      compareCallArgs(site("fetch", ["call:delete"]), site("fetch", ["call:hashDelete"])).verdict,
+    ).toBe("match");
+    expect(
+      compareCallArgs(site("fetch", ["call:delete"]), site("fetch", ["call:remove"])).verdict,
+    ).not.toBe("match");
+  });
+
   // connection_handling.rb:51 `config_or_env ||= DEFAULT_ENV.call.to_sym`.
   it("reads a Ruby to_sym argument as a TS value already held as a string", () => {
     expect(

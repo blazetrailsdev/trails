@@ -311,7 +311,7 @@ describe("ActionController::Base conditional GET", () => {
   it("freshWhen sets etag header", async () => {
     class FreshController extends Base {
       async index() {
-        this.freshWhen({ etag: "test-data" });
+        this.freshWhen(null, { etag: "test-data" });
         if (!this.performed) {
           await this.render({ plain: "fresh" });
         }
@@ -326,7 +326,7 @@ describe("ActionController::Base conditional GET", () => {
     const date = new Date("2024-01-01T00:00:00Z");
     class LmController extends Base {
       async index() {
-        this.freshWhen({ lastModified: date });
+        this.freshWhen(null, { lastModified: date });
         if (!this.performed) {
           await this.render({ plain: "ok" });
         }
@@ -340,7 +340,7 @@ describe("ActionController::Base conditional GET", () => {
   it("freshWhen returns 304 when etag matches", async () => {
     class Match304Controller extends Base {
       async index() {
-        this.freshWhen({ etag: "match-me" });
+        this.freshWhen(null, { etag: "match-me" });
         if (!this.performed) {
           await this.render({ plain: "content" });
         }
@@ -365,7 +365,7 @@ describe("ActionController::Base conditional GET", () => {
     let staleResult: boolean | undefined;
     class StaleController extends Base {
       async index() {
-        staleResult = this.stale({ etag: "stale-test" });
+        staleResult = this.isStale(null, { etag: "stale-test" });
         if (staleResult) {
           await this.render({ plain: "rendered" });
         }
@@ -380,14 +380,59 @@ describe("ActionController::Base conditional GET", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.expiresIn(3600, { public: true, mustRevalidate: true });
-    expect(c.headers.get("cache-control")).toBe("max-age=3600, public, must-revalidate");
+    expect(c.response.cacheControl).toMatchObject({
+      maxAge: 3600,
+      public: true,
+      mustRevalidate: true,
+    });
+  });
+
+  it("expiresIn merges into the response cache-control hash and renders it on commit", async () => {
+    class ExpiresController extends Base {
+      async index() {
+        this.noStore();
+        this.expiresIn(3600, { staleWhileRevalidate: 60, immutable: true, "s-maxage": 10 });
+        await this.render({ plain: "ok" });
+      }
+    }
+    const c = new ExpiresController();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.headers.get("cache-control")).toBe(
+      "max-age=3600, private, stale-while-revalidate=60, immutable, s-maxage=10",
+    );
+    expect(c.headers.get("date")).toBeDefined();
+  });
+
+  it("freshWhen merges the cacheControl option", async () => {
+    class CcController extends Base {
+      async index() {
+        this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
+        if (!this.performed) await this.render({ plain: "ok" });
+      }
+    }
+    const c = new CcController();
+    await c.dispatch("index", makeRequest(), makeResponse());
+    expect(c.headers.get("cache-control")).toBe("public, no-cache");
+  });
+
+  it("process_action records show_detailed_exceptions? on the request env when rescuing", async () => {
+    class BoomController extends Base {
+      async index() {
+        throw new RangeError("boom");
+      }
+    }
+    BoomController.rescueFrom(RangeError, () => {});
+    const c = new BoomController();
+    const request = makeRequest();
+    await c.dispatch("index", request, makeResponse());
+    expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
   });
 
   it("expiresNow sets no-cache", () => {
     const c = new (class extends Base {})();
     c.setResponseBang(makeResponse());
     c.expiresNow();
-    expect(c.headers.get("cache-control")).toBe("no-cache");
+    expect(c.response.cacheControl).toEqual({ noCache: true });
   });
 });
 

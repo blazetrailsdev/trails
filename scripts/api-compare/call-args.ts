@@ -19,7 +19,11 @@ import { normalizeRubyKey } from "./options-keys.js";
 import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
-import { RECEIVER_KEYED_RUBY_COMPAT_EXPORTS, rubyCallName } from "../parity/ruby-compat.js";
+import {
+  RECEIVER_KEYED_RUBY_COMPAT_EXPORTS,
+  rubyCallName,
+  rubyCompatAliases,
+} from "../parity/ruby-compat.js";
 
 /** An identifier-shaped string camelizes; anything else compares byte-for-byte.
  *  LOAD-BEARING: camelizing a SQL fragment (`" GROUP BY "`) would erase the
@@ -240,6 +244,13 @@ function normalizeRef(rawName: string): string {
  *   identifiers, so the port spells them `default_` / `null_` and
  *   {@link snakeToCamel} does not fold the trailing underscore back. Only the
  *   reserved words qualify, so an unrelated `foo_` local still reports.
+ *
+ * A third is a nested call ported through a receiver-keyed ruby-compat export:
+ * `public: options.delete(:public)` (metal/conditional_get.rb:294) records
+ * `ref:delete` with its receiver dropped, and the port's
+ * `hashDelete(options, "public")` records `ref:hashDelete`. The receiver is
+ * unproven on the Ruby side, so every export {@link rubyCompatAliases} names
+ * for an `expr` receiver is the same call.
  */
 function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey === tsKey) return true;
@@ -247,6 +258,7 @@ function refKeysEqual(rubyKey: string, tsKey: string): boolean {
   const tsName = tsKey.slice("ref:".length);
   if (RECEIVER_DROPPING_CONVERSIONS.has(rubyName)) return IDENTIFIER_STRING.test(tsName);
   if (JS_RESERVED_WORDS.has(rubyName) && tsName === `${rubyName}_`) return true;
+  if (rubyCompatAliases(rubyName, ["expr"]).includes(tsName)) return true;
   if (!/[?!=]$/.test(rubyName)) return false;
   return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsName);
 }
