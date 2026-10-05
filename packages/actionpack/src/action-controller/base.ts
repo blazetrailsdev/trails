@@ -589,7 +589,7 @@ export class Base extends Metal {
   }
 
   /** @internal */
-  instrumentPayload(key: unknown): { controller: string; action: string; key: unknown } {
+  instrumentPayload(key: unknown): { controller: string | null; action: string; key: unknown } {
     return instrumentPayload.call(this, key);
   }
 
