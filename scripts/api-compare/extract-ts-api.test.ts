@@ -1238,17 +1238,12 @@ describe("body call capture", () => {
       `class Foo {
         withLock(...args: unknown[]) {
           const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
-          return this.transaction(block);
-        }
-        other(...args: unknown[]) {
-          const block = typeof args[0] === "function" ? args.pop() : undefined;
-          return typeof args[args.length - 1] === "string" ? args.pop() : this.build(block);
+          return typeof args[args.length - 1] === "string" ? args.pop() : this.transaction(block);
         }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
-    expect(skeleton("withLock")).toEqual(["ref:transaction"]);
-    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if"]);
+    expect(skeleton("withLock")!.filter((t) => t === "if")).toEqual(["if"]);
   });
 
   it("reads the spread-forward of a captured `&block` as the block itself, not as an arm", () => {

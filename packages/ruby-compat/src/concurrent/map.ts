@@ -40,7 +40,6 @@ export class Map<K, V> {
    * `Concurrent::Map#[]`: the stored value (`vendor/ruby/v3.3.11/hash.c:2121`
    * `rb_hash_aref`), else the `default_proc` given to `new`, called with the
    * map and the missing key.
-   *
    * @noRailsEquivalent PERMANENT
    */
   get(key: K): V | undefined {
@@ -57,7 +56,6 @@ export class Map<K, V> {
    * `Concurrent::Map#fetch_or_store`: the stored value when the key is present
    * (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`), else the block's value, or
    * the default value, stored under it (`vendor/ruby/v3.3.11/hash.c:2941` `rb_hash_aset`).
-   *
    * @noRailsEquivalent PERMANENT
    */
   fetchOrStore(key: K, defaultValue: V | Block<V>): V {

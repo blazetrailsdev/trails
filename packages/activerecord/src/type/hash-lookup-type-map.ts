@@ -1,11 +1,11 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { Concurrent, block as blockPass, compact } from "@blazetrails/ruby-compat";
+import { Concurrent, block as blockPass, compact, fetch } from "@blazetrails/ruby-compat";
 
 type Key = string | number;
 type Callable = (lookupKey: Key, ...args: unknown[]) => ValueType;
 
 export class HashLookupTypeMap {
-  private _mapping: Map<Key, Callable> = new Map();
+  private mapping: Map<Key, Callable> = new Map();
   private _cache = new Concurrent.Map<
     Key,
     InstanceType<typeof Concurrent.Map<unknown[], ValueType>>
@@ -35,15 +35,15 @@ export class HashLookupTypeMap {
       throw new ArgumentError("registerType requires a value or block");
     }
     if (block) {
-      this._mapping.set(key, block);
+      this.mapping.set(key, block);
     } else {
-      this._mapping.set(key, () => value!);
+      this.mapping.set(key, () => value!);
     }
     this._cache.clear();
   }
 
   clear(): void {
-    this._mapping.clear();
+    this.mapping.clear();
     this._cache.clear();
   }
 
@@ -54,21 +54,17 @@ export class HashLookupTypeMap {
   }
 
   isKey(key: string | number): boolean {
-    return this._mapping.has(key);
+    return this.mapping.has(key);
   }
 
   keys(): Array<string | number> {
-    return [...this._mapping.keys()];
+    return [...this.mapping.keys()];
   }
 
-  /**
-   * @missingRailsCall fetch — PERMANENT
-   * @missingRailsCall call — PERMANENT
-   */
   private performFetch(type: Key, block?: Callable): ValueType;
   private performFetch(type: Key, ...args: unknown[]): ValueType;
   private performFetch(type: Key, ...args: unknown[]): ValueType {
     const block = typeof args[args.length - 1] === "function" ? args.pop() : undefined;
-    return (this._mapping.get(type) ?? (block as Callable))(type, ...args);
+    return (fetch(this.mapping, type, block) as Callable)(type, ...args);
   }
 }

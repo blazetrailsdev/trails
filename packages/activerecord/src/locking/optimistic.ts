@@ -1,4 +1,4 @@
-import { DelegateClass, merge, union } from "@blazetrails/ruby-compat";
+import { DelegateClass, merge } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -144,7 +144,8 @@ export function _createRecord(
 ): unknown {
   const ctor = this.constructor;
   if (ctor.lockingEnabled) {
-    attributeNames = union(attributeNames, [ctor.lockingColumn]);
+    const col = ctor.lockingColumn;
+    if (!attributeNames.includes(col)) attributeNames = [...attributeNames, col];
   }
   return superFn(attributeNames);
 }

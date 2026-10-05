@@ -86,14 +86,13 @@ export function defaultScoped(
 ): any;
 export function defaultScoped(
   this: NamedHost,
-  scope?: any,
+  scope: any = this.relation!(),
   options: { allQueries?: boolean | null } = {},
 ): any {
   if (isPlainObject(scope)) {
     options = scope;
-    scope = undefined;
+    scope = this.relation!();
   }
-  scope ??= this.relation!();
   return Default.buildDefaultScope.call(this, scope, { allQueries: options.allQueries }) || scope;
 }
 

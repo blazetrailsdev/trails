@@ -15,8 +15,7 @@ describe("Concurrent::Map", () => {
 
   it("[] runs the default proc for a missing key only", () => {
     const map = new Concurrent.Map<string, string>(null, (h, key) => h.fetchOrStore(key, "A"));
-    expect(map.get("a")).toBe("A");
-    expect(map.size()).toBe(1);
+    expect([map.get("a"), map.size()]).toEqual(["A", 1]);
     expect(new Concurrent.Map<string, string>().get("a")).toBeUndefined();
   });
 });
