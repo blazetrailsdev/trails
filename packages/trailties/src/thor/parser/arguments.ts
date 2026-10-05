@@ -1,12 +1,12 @@
 import {
   aryDelete,
   arySlice,
-  capitalize,
   first,
   format,
   Hash,
   isEmpty,
   isInclude,
+  lastMatchGetter,
   matchOperator,
   Range,
   rbFSend,
@@ -76,9 +76,7 @@ export class Arguments {
       aryDelete(this.nonAssignedRequired, argument);
       this.assigns[argument.humanName] = rbFSend(
         this,
-        `parse${stringSplit(argument.type, "_")
-          .map((s) => capitalize(s, []))
-          .join("")}`,
+        `parse_${argument.type}`.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase()),
         argument.humanName,
       );
     }
@@ -133,7 +131,7 @@ export class Arguments {
     if (rbObjClassname(this.peek()) === "Hash") return this.shift();
     const hash = Object.create(null) as Record<string, string>;
 
-    while (this.isCurrentIsValue() && (this.peek() as string).includes(":")) {
+    while (rtest(this.isCurrentIsValue()) && (this.peek() as string).includes(":")) {
       const [key, value] = stringSplit(this.shift() as string, ":", 2);
       if (isInclude(hash, key)) {
         throw new MalformattedArgumentError(
@@ -151,7 +149,7 @@ export class Arguments {
 
     const array: unknown[] = [];
 
-    while (this.isCurrentIsValue()) {
+    while (rtest(this.isCurrentIsValue())) {
       const value = this.shift() as string;
 
       if (!isEmpty(value)) {
@@ -171,12 +169,8 @@ export class Arguments {
   protected parseNumeric(name: string): unknown {
     if (typeof this.peek() === "number" || typeof this.peek() === "bigint") return this.shift();
 
-    let match: RegExpExecArray | null = null;
     if (
-      !(
-        rtest(matchOperator(this.peek(), Arguments.NUMERIC)) &&
-        (match = Arguments.NUMERIC.exec(this.peek() as string))![0] === this.peek()
-      )
+      !(rtest(matchOperator(this.peek(), Arguments.NUMERIC)) && lastMatchGetter() === this.peek())
     ) {
       throw new MalformattedArgumentError(
         `Expected numeric value for '${name}'; got ${rbInspect(this.peek())}`,
@@ -184,7 +178,7 @@ export class Arguments {
     }
 
     const value =
-      match![0].indexOf(".") !== -1 ? rbStrToF(this.shift() as string) : toI(this.shift());
+      lastMatchGetter()!.indexOf(".") !== -1 ? rbStrToF(this.shift() as string) : toI(this.shift());
 
     this.validateEnumValueBang(name, value, "Expected '%s' to be one of %s; got %s");
 

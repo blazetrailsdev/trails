@@ -321,6 +321,7 @@ export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export { strCount } from "./string/tr.js";
 export {
+  lastMatchGetter,
   matchOperator,
   rbDefineMethod,
   rbObjNotMatch,

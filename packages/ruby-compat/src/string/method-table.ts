@@ -337,9 +337,26 @@ export function rbStrMatch(x: string, y: unknown): unknown {
   if (typeof y === "string") throw new TypeError("type mismatch: String given");
   if (y instanceof RegExp) {
     const match = rbRegSearch(y, x, 0, false);
+    backref = match;
     return match ? rbStrSublen(x, match.index) : null;
   }
   return (y as { matchOperator(x: string): unknown }).matchOperator(x);
+}
+
+let backref: RegExpExecArray | null = null;
+
+/**
+ * `$&` (`last_match_getter`, `vendor/ruby/v3.3.11/re.c:1989`, over
+ * `rb_reg_last_match` at `vendor/ruby/v3.3.11/re.c:1882`): the text of the last
+ * match, `nil` when it failed. `$~` is the one `String#=~` ({@link rbStrMatch})
+ * sets, as `rb_reg_search_set_match` does (`vendor/ruby/v3.3.11/re.c:1750,1783`).
+ * MRI keeps `$~` per frame; JS has no frame-local seat, so this is the last
+ * `=~` of the whole program and is read straight after it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function lastMatchGetter(): string | null {
+  return backref ? backref[0] : null;
 }
 
 /**
