@@ -1,5 +1,5 @@
 import { Attribute } from "../attribute.js";
-import type { Block } from "@blazetrails/ruby-compat";
+import type { Block, Hash } from "@blazetrails/ruby-compat";
 import {
   hashAref,
   hashAset,
@@ -23,9 +23,12 @@ import { AttributeSet } from "../attribute-set.js";
 
 export class Builder {
   readonly types: Record<string, ValueType>;
-  readonly defaultAttributes: Record<string, Attribute>;
+  readonly defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>;
 
-  constructor(types: Record<string, ValueType>, defaultAttributes: Record<string, Attribute> = {}) {
+  constructor(
+    types: Record<string, ValueType>,
+    defaultAttributes: Record<string, Attribute> | Hash<string, Attribute> = {},
+  ) {
     this.types = types;
     this.defaultAttributes = defaultAttributes;
   }
@@ -43,7 +46,7 @@ export class LazyAttributeSet extends AttributeSet {
   private values: Record<string, unknown>;
   private types: Record<string, ValueType>;
   private additionalTypes: Record<string, ValueType>;
-  private defaultAttributes: Record<string, Attribute>;
+  private defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>;
   private castedValues: Record<string, unknown>;
   private materialized: boolean;
 
@@ -51,7 +54,7 @@ export class LazyAttributeSet extends AttributeSet {
     values: Record<string, unknown>,
     types: Record<string, ValueType>,
     additionalTypes: Record<string, ValueType>,
-    defaultAttributes: Record<string, Attribute>,
+    defaultAttributes: Record<string, Attribute> | Hash<string, Attribute>,
     attributes: Record<string, Attribute> = {},
   ) {
     super(attributes);
@@ -174,7 +177,7 @@ export class LazyAttributeHash {
     return fetch(this.materialize(), name, ...rest);
   }
 
-  except(...names: string[]): Record<string, Attribute> {
+  except(...names: string[]): Record<string, Attribute> | Hash<string, Attribute> {
     return except(this.materialize(), ...names);
   }
 

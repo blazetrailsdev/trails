@@ -4,6 +4,7 @@ import type { LazyAttributeHash } from "./attribute-set/builder.js";
 import {
   FrozenError,
   type Block,
+  type Hash,
   eachKey,
   eachValue,
   except,
@@ -33,7 +34,7 @@ export class AttributeSet {
     return fetch<Attribute | T>(this.attributes(), name, ...rest);
   }
 
-  except(...names: string[]): Record<string, Attribute> {
+  except(...names: string[]): Record<string, Attribute> | Hash<string, Attribute> {
     return except(this.attributes(), ...names);
   }
 

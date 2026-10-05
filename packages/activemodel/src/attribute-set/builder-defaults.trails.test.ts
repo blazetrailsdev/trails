@@ -4,7 +4,7 @@ import { Attribute } from "../attribute.js";
 import { AttributeSet } from "../attribute-set.js";
 import { registry } from "../type.js";
 import { ValueType } from "../type/value.js";
-import { Marshal } from "@blazetrails/ruby-compat";
+import { Hash, Marshal, keys, rbEqual, rbObjDup } from "@blazetrails/ruby-compat";
 
 const typeRegistry = registry();
 
@@ -108,6 +108,36 @@ describe("LazyAttributeHash defaultAttributes", () => {
     }
     expect(loaded.get("score")!.value()).toBe(42);
     expect(loaded.get("status")!.value()).toBe("active");
+  });
+
+  it("a Marshal-loaded hash equals the original, and dups, walks and excepts as it does (builder.rb:95,124-140)", () => {
+    const types = { status: strType, score: intType };
+    const defaults = { status: Attribute.withCastValue("status", "active", strType) };
+    const original = new LazyAttributeHash(types, { score: "42" }, {}, defaults);
+    original.get("score");
+
+    const loaded = Marshal.load(Marshal.dump(original)) as LazyAttributeHash;
+    expect(loaded.equals(original)).toBe(true);
+    expect(original.equals(loaded)).toBe(true);
+
+    const names = (hash: LazyAttributeHash) => {
+      const seen: string[] = [];
+      hash.eachValue((attr) => seen.push(`${attr.name}=${String(attr.value())}`));
+      return seen;
+    };
+    expect(names(loaded)).toEqual(names(original));
+    expect(names(loaded)).toHaveLength(2);
+
+    const excepted = loaded.except("score");
+    expect(excepted).toBeInstanceOf(Hash);
+    expect(keys(excepted)).toEqual(["status"]);
+    expect(rbEqual(excepted, original.except("score"))).toBe(true);
+
+    const copy = rbObjDup(loaded);
+    expect(copy.delegateHash()).not.toBe(loaded.delegateHash());
+    expect(copy.equals(original)).toBe(true);
+    copy.set("extra", Attribute.withCastValue("extra", 1, intType));
+    expect(loaded.isKey("extra")).toBe(false);
   });
 
   it("materialized default is detached from the prototype — mutation does not bleed across AttributeSets", () => {
