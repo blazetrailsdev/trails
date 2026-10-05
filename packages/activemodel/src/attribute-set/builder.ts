@@ -92,7 +92,7 @@ export class LazyAttributeSet extends AttributeSet {
     }
 
     if (hasKey(this.castedValues, name)) {
-      return this.castedValues[name];
+      return hashAref(this.castedValues, name);
     }
 
     return fetch<unknown>(
