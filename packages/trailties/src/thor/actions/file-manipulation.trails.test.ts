@@ -82,6 +82,34 @@ describe("Thor::Actions chmod, gsub_file, comment_lines and remove_file (trails)
     expect(File.read(file("doc/README"))).toBe("__start__\nx\n__end__\n");
   });
 
+  it("rewrites the file unchanged when nothing matches", async () => {
+    await host().gsubFile("doc/README", /absent/, "x", { verbose: false });
+    expect(File.read(file("doc/README"))).toBe("__start__\nREADME\n__end__\n");
+  });
+
+  it("keeps bytes that are not valid UTF-8", async () => {
+    await File.writeAsync(
+      file("doc/README"),
+      Uint8Array.from([0xff, 0x72, 0x61, 0x6b, 0x65, 0xe9]),
+    );
+    await host().gsubFile("doc/README", "rake", "thoré", { verbose: false });
+    expect(Array.from(getFs().readFileSync(file("doc/README")))).toEqual([
+      0xff, 0x74, 0x68, 0x6f, 0x72, 0xc3, 0xa9, 0xe9,
+    ]);
+  });
+
+  it("uncomments matching lines given a string flag", async () => {
+    await host().uncommentLines("doc/COMMENTER", "orange", { verbose: false });
+    expect(File.read(file("doc/COMMENTER"))).toMatch(/^orange$/m);
+    expect(File.read(file("doc/COMMENTER"))).toMatch(/^ # greenblue$/m);
+  });
+
+  it("comments matching lines given a regexp flag", async () => {
+    await host().commentLines("doc/COMMENTER", /purple|ind#igo/, { verbose: false });
+    expect(File.read(file("doc/COMMENTER"))).toMatch(/^ {4}# purple$/m);
+    expect(File.read(file("doc/COMMENTER"))).toMatch(/^ {2}# ind#igo$/m);
+  });
+
   it("uncomments matching lines, keeping the indentation", async () => {
     await host().uncommentLines("doc/COMMENTER", /greenblue|orange/, { verbose: false });
     expect(File.read(file("doc/COMMENTER"))).toBe(

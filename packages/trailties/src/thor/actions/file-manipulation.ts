@@ -1,4 +1,5 @@
 import {
+  bytes,
   fetch,
   File,
   FileUtils,
@@ -9,6 +10,7 @@ import {
   rbObjRespondTo,
   rbStrSend,
   rtest,
+  strNew,
 } from "@blazetrails/ruby-compat";
 import type { ActionsHost } from "../actions.js";
 
@@ -51,9 +53,9 @@ export async function gsubFile(
   );
 
   if (!rtest(this.options["pretend"])) {
-    let content = await getFs().readFile(path, "utf-8");
+    let content = strNew(Array.from(await getFs().readFile(path)));
     [, content] = rbStrSend(content, "gsubBang", flag, ...args, ...(block ? [block] : []));
-    await File.writeAsync(path, content);
+    await File.writeAsync(path, Uint8Array.from(bytes(content)));
   }
 }
 
@@ -94,7 +96,7 @@ export async function removeFile(
   );
   if (
     !rtest(this.options["pretend"]) &&
-    ((await getFs().exists(path)) || (await File.isSymlinkAsync(path)))
+    ((await File.isExistAsync(path)) || (await File.isSymlinkAsync(path)))
   ) {
     await FileUtils.rmRfAsync(path);
   }

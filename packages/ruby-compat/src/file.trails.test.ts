@@ -237,6 +237,15 @@ describe("File", () => {
     await expect(File.symlinkAsync(source, join(root, "soft"))).rejects.toThrow(/EEXIST/);
   });
 
+  it("exist? follows a symlink, and write takes a String held as its bytes", async () => {
+    const root = fixture();
+    expect(await File.isExistAsync(join(root, "a.rb"))).toBe(true);
+    expect(await File.isExistAsync(join(root, "broken"))).toBe(false);
+
+    expect(await File.writeAsync(join(root, "raw"), Uint8Array.from([0xff, 0x61]))).toBe(2);
+    expect(Array.from(readFileSync(join(root, "raw")))).toEqual([0xff, 0x61]);
+  });
+
   it("symlink and link raise NotImplementedError on a backend with neither", async () => {
     const previous = fsAdapterConfig.adapter;
     registerFsAdapter("linkless", {} as unknown as FsAdapter, posixPath);
