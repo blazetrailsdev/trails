@@ -194,7 +194,9 @@ export class QueryLogs {
    */
   static tagContent(connection?: unknown): string {
     const context = ExecutionContext.toH() as Record<string, TagValue>;
-    context.connection ||= connection as TagValue;
+    if (context.connection == null || context.connection === false) {
+      context.connection = connection as TagValue;
+    }
 
     const pairs = this.#handlers.flatMap(([key, handler]) => {
       const val = typeof handler === "function" ? handler(context) : handler.call(context);

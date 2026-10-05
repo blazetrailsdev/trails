@@ -337,7 +337,7 @@ export class AbstractReflection {
 
   strictLoadingViolationMessage(owner: unknown): string {
     let message = `\`${rbModToS(owner as typeof Base)}\` is marked for strict_loading.`;
-    message += ` The ${this.isPolymorphic() ? "polymorphic association" : `${this.klass.name} association`}`;
+    message += ` The ${this.isPolymorphic() ? "polymorphic association" : `${rbModToS(this.klass)} association`}`;
     message += ` named \`:${this._concrete().name}\` cannot be lazily loaded.`;
     return message;
   }

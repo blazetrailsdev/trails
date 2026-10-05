@@ -3,7 +3,6 @@ import { eachCons, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
-  extend,
   hashDelete,
   isModuleIncluded,
   type Module,
@@ -12,7 +11,7 @@ import {
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { isEmpty } from "@blazetrails/ruby-compat";
+import { isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
@@ -49,7 +48,6 @@ import {
 import * as _qm from "./relation/query-methods.js";
 import { Batches } from "./relation/batches.js";
 import {
-  relationClassFor,
   ClassSpecificRelation,
   create as _delegationCreate,
   Delegation,
@@ -274,6 +272,35 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
+const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
+  get(target: any, prop: string | symbol, receiver: any) {
+    const value = Reflect.get(target, prop, receiver);
+    if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
+      return value;
+    }
+    if (/^(0|[1-9]\d*)$/.test(prop)) {
+      return (target.target ?? target._records)[Number(prop)];
+    }
+    const enumerable = ENUMERABLE_METHODS[prop];
+    if (enumerable) {
+      return (...args: any[]) =>
+        target.isLoaded && !target.isScheduled && !target._loadResult
+          ? enumerable([...(target.target ?? target._records)], args)
+          : target.records().then((records: any[]) => enumerable([...records], args));
+    }
+    if (target.respondToMissing(prop, false)) {
+      return (...args: any[]) => target.methodMissing(prop, ...args);
+    }
+    return value;
+  },
+  has(target: any, prop: string | symbol) {
+    if (Reflect.has(target, prop)) return true;
+    if (typeof prop === "symbol") return false;
+    if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
+    return target.respondToMissing(prop, false);
+  },
+};
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base, G extends boolean = false> {
   /** @internal */
@@ -369,34 +396,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     this._values = values;
     this._predicateBuilder = predicateBuilder;
     if (isModuleIncluded(new.target, ClassSpecificRelation)) {
-      return new Proxy(this, {
-        get(target: any, prop: string | symbol, receiver: any) {
-          const value = Reflect.get(target, prop, receiver);
-          if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
-            return value;
-          }
-          if (/^(0|[1-9]\d*)$/.test(prop)) {
-            return (target.target ?? target._records)[Number(prop)];
-          }
-          const enumerable = ENUMERABLE_METHODS[prop];
-          if (enumerable) {
-            return (...args: any[]) =>
-              target.isLoaded && !target.isScheduled && !target._loadResult
-                ? enumerable([...(target.target ?? target._records)], args)
-                : target.records().then((records: T[]) => enumerable([...records], args));
-          }
-          if (target.respondToMissing(prop, false)) {
-            return (...args: any[]) => target.methodMissing(prop, ...args);
-          }
-          return value;
-        },
-        has(target: any, prop: string | symbol) {
-          if (Reflect.has(target, prop)) return true;
-          if (typeof prop === "symbol") return false;
-          if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
-          return target.respondToMissing(prop, false);
-        },
-      });
+      return new Proxy(this, CLASS_SPECIFIC_RELATION_HANDLER);
     }
   }
 
@@ -1701,22 +1701,13 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.cacheKey();
   }
 
-  /** @inventedArm loop — CONVERGEABLE relation-subclasses-inherit-clone-without-overrides */
-  initializeCopy(other: Relation<T, G>): void {
-    this._table = other._table;
-    this._predicateBuilder = other._predicateBuilder;
-    this._values = { ...other._values };
-    this._withIsRecursive = other._withIsRecursive;
-    this._isNone = other._isNone;
-    for (const mod of [...other.extendingValues].reverse()) extend(this, mod);
-    this.skipPreloadingValue = other.skipPreloadingValue;
+  initializeCopy(_other: Relation<T, G>): void {
+    this._values = { ...this._values };
+    this.reset();
   }
 
   clone(): Relation<T, G> {
-    const ctor = relationClassFor.call(Relation, this._model as unknown as typeof Base);
-    const rel = new ctor(this._model) as Relation<T, G>;
-    rel.initializeCopy(this);
-    return rel;
+    return rbObjClone(this);
   }
 
   _execScope(...args: unknown[]): unknown {
@@ -2190,3 +2181,10 @@ async function computeCacheVersion(
 ): Promise<string> {
   return rel.computeCacheVersion(timestampColumn);
 }
+
+rbDefineAllocFunc(Relation, (klass) => {
+  const relation = Object.create(klass.prototype);
+  return isModuleIncluded(klass, ClassSpecificRelation)
+    ? new Proxy(relation, CLASS_SPECIFIC_RELATION_HANDLER)
+    : relation;
+});

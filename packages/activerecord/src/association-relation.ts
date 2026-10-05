@@ -3,7 +3,6 @@ import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
-import { relationClassFor } from "./relation/delegation.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { rbEqual } from "@blazetrails/ruby-compat";
 
@@ -24,17 +23,6 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
       proxyAssociation?: Association;
     };
     return association.proxyAssociation ?? (this._association as Association);
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE relation-subclasses-inherit-clone-without-overrides
-   */
-  override clone(): Relation<T, boolean> {
-    const Ctor = relationClassFor.call(AssociationRelation, this.model);
-    const rel = new Ctor(this.model, this._association) as Relation<T, boolean>;
-    rel.initializeCopy(this);
-    return rel;
   }
 
   protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
