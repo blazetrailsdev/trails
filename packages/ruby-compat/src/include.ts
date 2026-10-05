@@ -1447,7 +1447,11 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  * getter (`key`) and a setter (`key=`) as two methods where TypeScript shares
  * one property name between them.
  *
- * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`.
+ * Mirrors: Ruby's Object#extend — vendor/ruby/v3.3.11/eval.c:1778 `rb_obj_extend`,
+ * which returns the receiver (:1800). `rb_extend_object` (:1713-1716) is
+ * `rb_include_module` on the receiver's singleton class, so the module's
+ * ancestors come with it: a plain-object module's prototype chain is walked,
+ * nearest first, as `include()` walks it.
  *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
@@ -1456,18 +1460,40 @@ export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module):
  *   extend(Base, ConnectionHandlingMethods);
  *   // Now Base.connectedTo(...) works
  */
-export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | Module): void {
+export function extend<T extends AnyClass | object>(
+  klass: T,
+  mod: ModuleObject | AnyClass | Module,
+): T {
   const extendedHook = featureHook(mod, "extended");
-  if (extendedHook) return extendedHook(klass);
-  if (mod instanceof Module) return mod.extendObject(klass);
+  if (extendedHook) {
+    extendedHook(klass);
+    return klass;
+  }
+  if (mod instanceof Module) {
+    mod.extendObject(klass);
+    return klass;
+  }
   const isClassModule = typeof mod === "function" && (mod as AnyClass).prototype;
-  const keys = isClassModule
-    ? Object.getOwnPropertyNames(mod).filter((k) => !STATIC_CLASS_KEYS.has(k))
-    : Object.keys(mod);
+  const owners = new Map<string, object>();
+  if (isClassModule) {
+    for (const key of Object.getOwnPropertyNames(mod)) {
+      if (!STATIC_CLASS_KEYS.has(key)) owners.set(key, mod);
+    }
+  } else {
+    for (
+      let ancestor: object | null = mod;
+      ancestor && ancestor !== Object.prototype;
+      ancestor = Object.getPrototypeOf(ancestor) as object | null
+    ) {
+      for (const key of Object.keys(ancestor)) {
+        if (!owners.has(key)) owners.set(key, ancestor);
+      }
+    }
+  }
   const installed = trackedKeys(klass, extendedKeys);
 
-  for (const key of keys) {
-    const modDesc = Object.getOwnPropertyDescriptor(mod, key);
+  for (const [key, owner] of owners) {
+    const modDesc = Object.getOwnPropertyDescriptor(owner, key);
     if (!modDesc || /^[A-Z]/.test(key)) continue;
     if (!modDesc.get && !modDesc.set && typeof modDesc.value !== "function") continue;
     const existing = Object.getOwnPropertyDescriptor(klass, key);
@@ -1506,6 +1532,7 @@ export function extend(klass: AnyClass | object, mod: ModuleObject | AnyClass | 
   if (typeof (mod as ModuleHooks)[extended] === "function") {
     (mod as ModuleHooks)[extended]!(klass);
   }
+  return klass;
 }
 
 /**

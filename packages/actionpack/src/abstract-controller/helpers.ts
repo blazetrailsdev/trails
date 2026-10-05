@@ -140,16 +140,23 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
 
   for (const method of flat) {
     const mod = this._helpersForModification();
+    const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
+    const writer = this._helperMethods.includes(`${attr}=`);
     let proto = (this as { prototype?: object }).prototype ?? null;
     let descriptor: PropertyDescriptor | undefined;
-    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, method))) {
+    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, attr))) {
       proto = Object.getPrototypeOf(proto) as object | null;
     }
-    if (descriptor?.get) {
-      Object.defineProperty(mod, method, {
+    if (descriptor?.get || writer) {
+      Object.defineProperty(mod, attr, {
         get(this: { controller: Record<string, unknown> }) {
-          return this.controller[method];
+          return this.controller[attr];
         },
+        set: writer
+          ? function (this: { controller: Record<string, unknown> }, value: unknown) {
+              this.controller[attr] = value;
+            }
+          : undefined,
         configurable: true,
         enumerable: true,
       });

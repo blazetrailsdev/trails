@@ -34,6 +34,56 @@ describe("helperMethod", () => {
     expect(cls._helpers!.loggedIn.call(proxy)).toBe(true);
   });
 
+  it.each([
+    ["reader then writer", ["name", "name="]],
+    ["writer then reader", ["name=", "name"]],
+  ])("a name= entry reads and writes a field-backed attribute (%s)", (_order, names) => {
+    const cls = makeBase();
+    helperMethod.call(cls, ...names);
+
+    const controller: { name?: string } = { name: "david" };
+    const view = Object.create(cls._helpers!) as { controller: object; name: string };
+    view.controller = controller;
+    expect(view.name).toBe("david");
+    view.name = "jamis";
+    expect(controller.name).toBe("jamis");
+    expect(Object.hasOwn(view, "name")).toBe(false);
+  });
+
+  it("a lone name= entry defines the attribute with both halves", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "name=");
+
+    const controller: { name?: string } = {};
+    const view = Object.create(cls._helpers!) as { controller: object; name?: string };
+    view.controller = controller;
+    view.name = "jamis";
+    expect(controller.name).toBe("jamis");
+    expect(view.name).toBe("jamis");
+  });
+
+  it("an operator name ending in = is forwarded as a method, not read as a writer", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "==");
+
+    const proxy = { controller: { "==": (other: unknown) => other === 1 } };
+    expect(cls._helpers!["=="].call(proxy, 1)).toBe(true);
+    expect(Object.hasOwn(cls._helpers!, "=")).toBe(false);
+  });
+
+  it("a name= entry survives clearHelpers' replay", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "name", "name=");
+    cls.clearHelpers();
+
+    const controller: { name?: string } = { name: "david" };
+    const view = Object.create(cls._helpers!) as { controller: object; name: string };
+    view.controller = controller;
+    view.name = "jamis";
+    expect(view.name).toBe("jamis");
+    expect(controller.name).toBe("jamis");
+  });
+
   it("flattens nested name arrays (Rails `methods.flatten!`)", () => {
     const cls = makeBase();
     helperMethod.call(cls, "a", ["b", "c"]);

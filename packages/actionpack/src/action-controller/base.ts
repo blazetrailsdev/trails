@@ -122,7 +122,7 @@ import {
   type HelperMethodsModule,
   type HelpersClass,
 } from "../abstract-controller/helpers.js";
-import { modulesForHelpers } from "./metal/helpers.js";
+import { ClassMethods as HelpersClassMethods, helpers } from "./metal/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
@@ -311,6 +311,7 @@ export interface Base
     Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
   routeFor(name: string, ...args: unknown[]): string;
@@ -393,7 +394,11 @@ export class Base extends Metal {
   declare static defaultHelperModuleBang: HelpersClass["defaultHelperModuleBang"];
   declare static allHelpersFromPath: (typeof AbstractHelpers.ClassMethods)["allHelpersFromPath"];
   declare static helperModulesFromPaths: (typeof AbstractHelpers.ClassMethods)["helperModulesFromPaths"];
-  static modulesForHelpers = modulesForHelpers;
+  static helperAttr = HelpersClassMethods.helperAttr;
+  static helpers = HelpersClassMethods.helpers;
+  static modulesForHelpers = HelpersClassMethods.modulesForHelpers;
+  /** @internal */
+  declare _helperProxy?: ActionViewBase | null;
 
   constructor(...args: unknown[]) {
     super(...(args as []));
@@ -825,6 +830,7 @@ include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
 include(Base, Cookies);
+Base.prototype.helpers = helpers;
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
