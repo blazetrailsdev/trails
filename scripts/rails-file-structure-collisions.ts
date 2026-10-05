@@ -26,13 +26,33 @@ const depth = (fqn: string): number => fqn.split("::").length;
  * this builder used to, silently disabled the rule for the entire file.
  *
  * A tie at the shallowest depth (`Foo::Builder` vs `Bar::Builder`, siblings in
- * one file) has no principled winner, so the caller fails the build rather than
- * warning: a dropped bucket enforces nothing and reports nothing afterwards,
- * which is exactly the failure mode this replaces.
+ * one file) has no winner for the bare name; see {@link qualifyByParent}.
  */
 export const resolveLastSegmentCollision = (fqns: Iterable<string>): string | null => {
   const byDepth = [...fqns].sort((a, b) => depth(a) - depth(b));
   if (byDepth.length === 0) return null;
   if (byDepth.length === 1 || depth(byDepth[0]) < depth(byDepth[1])) return byDepth[0];
   return null;
+};
+
+/**
+ * Keys each fqn of a tied collision by its enclosing class as well as its
+ * name: `Thor::UndefinedCommandError::SpellChecker` and
+ * `Thor::UnknownArgumentError::SpellChecker`
+ * (vendor/thor/v1.3.2/lib/thor/error.rb:25-39,66-81) become
+ * `UndefinedCommandError.SpellChecker` and `UnknownArgumentError.SpellChecker`,
+ * the spelling of a class declared in a namespace merged onto its parent.
+ *
+ * Returns `null` when an fqn has no parent or two of them share one, so the
+ * caller fails the build rather than warning: a dropped bucket enforces
+ * nothing and reports nothing afterwards.
+ */
+export const qualifyByParent = (fqns: Iterable<string>): Map<string, string> | null => {
+  const keys = new Map<string, string>();
+  for (const fqn of fqns) {
+    const segments = fqn.split("::");
+    if (segments.length < 2) return null;
+    keys.set(fqn, segments.slice(-2).join("."));
+  }
+  return new Set(keys.values()).size === keys.size ? keys : null;
 };

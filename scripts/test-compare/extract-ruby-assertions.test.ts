@@ -699,6 +699,9 @@ describe("Ruby extractor mocha expectation collection", () => {
             expect(File.exist?(file)).to be true
             expect(paths).to be_empty
             expect(runner.shell.base).to be nil
+            expect(command.options[:foo]).to be
+            expect(defined?(Blat)).not_to be
+            expect(task).to be(other)
           end
 
           it "blocks" do
@@ -727,6 +730,9 @@ describe("Ruby extractor mocha expectation collection", () => {
       "expect_to_be",
       "expect_to_be_empty",
       "expect_to_be_nil",
+      "expect_to_be_truthy",
+      "expect_not_to_be_truthy",
+      "expect_to_be",
     ]);
     expect(k["blocks"]).toEqual(["expect_to_raise_error", "expect_not_to_raise_error"]);
     expect(k["operators"]).toEqual(["expect_to_be_>", "expect_to_be_kind_of"]);

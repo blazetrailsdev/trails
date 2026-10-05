@@ -3,6 +3,10 @@ import { capture } from "@blazetrails/activesupport";
 import { chomp, env, setEnv, stdout as $stdout } from "@blazetrails/ruby-compat";
 import { Color } from "./color.js";
 
+const { readline } = vi.hoisted(() => ({ readline: vi.fn() }));
+
+vi.mock("../line-editor.js", () => ({ readline }));
+
 describe("Thor::Shell::Color", () => {
   let _shell: Color | undefined;
   const shell = () => (_shell ??= new Color());
@@ -21,6 +25,90 @@ describe("Thor::Shell::Color", () => {
     tty.mockRestore();
     setEnv("TERM", origEnv["TERM"]);
     setEnv("NO_COLOR", origEnv["NO_COLOR"]);
+  });
+
+  describe("#ask", () => {
+    it("sets the color if specified and tty?", async () => {
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this green?", ":green");
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? \x1b[0m",
+        expect.anything(),
+      );
+
+      readline.mockReturnValueOnce("Yes");
+      await shell().ask("Is this green?", ":green", { limitedTo: ["Yes", "No", "Maybe"] });
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? [Yes, No, Maybe] \x1b[0m",
+        expect.anything(),
+      );
+    });
+
+    it("does not set the color if specified and NO_COLOR is set to a non-empty value", async () => {
+      setEnv("NO_COLOR", "non-empty value");
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this green?", ":green");
+      expect(readline).toHaveBeenLastCalledWith("Is this green? ", expect.anything());
+
+      readline.mockReturnValueOnce("Yes");
+      await shell().ask("Is this green?", ":green", { limitedTo: ["Yes", "No", "Maybe"] });
+      expect(readline).toHaveBeenLastCalledWith(
+        "Is this green? [Yes, No, Maybe] ",
+        expect.anything(),
+      );
+    });
+
+    it("sets the color when NO_COLOR is ignored because the environment variable is nil", async () => {
+      setEnv("NO_COLOR", undefined);
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this green?", ":green");
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? \x1b[0m",
+        expect.anything(),
+      );
+
+      readline.mockReturnValueOnce("Yes");
+      await shell().ask("Is this green?", ":green", { limitedTo: ["Yes", "No", "Maybe"] });
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? [Yes, No, Maybe] \x1b[0m",
+        expect.anything(),
+      );
+    });
+
+    it("sets the color when NO_COLOR is ignored because the environment variable is an empty-string", async () => {
+      setEnv("NO_COLOR", "");
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this green?", ":green");
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? \x1b[0m",
+        expect.anything(),
+      );
+
+      readline.mockReturnValueOnce("Yes");
+      await shell().ask("Is this green?", ":green", { limitedTo: ["Yes", "No", "Maybe"] });
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32mIs this green? [Yes, No, Maybe] \x1b[0m",
+        expect.anything(),
+      );
+    });
+
+    it("handles an Array of colors", async () => {
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this green on white?", [":green", ":on_white", ":bold"]);
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[32m\x1b[47m\x1b[1mIs this green on white? \x1b[0m",
+        expect.anything(),
+      );
+    });
+
+    it("supports the legacy color syntax", async () => {
+      readline.mockReturnValueOnce("yes");
+      await shell().ask("Is this legacy blue?", [":blue", true]);
+      expect(readline).toHaveBeenLastCalledWith(
+        "\x1b[1m\x1b[34mIs this legacy blue? \x1b[0m",
+        expect.anything(),
+      );
+    });
   });
 
   describe("#say", () => {

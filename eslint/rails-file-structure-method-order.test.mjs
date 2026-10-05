@@ -57,6 +57,12 @@ const fixture = {
       classes: { Casted: ["before", "database"], Quoted: ["database", "before"] },
       functions: [],
     },
+    // Two same-named classes nested in sibling classes, keyed by their
+    // enclosing class (thor/error.rb's two `SpellChecker`s), in OPPOSITE orders.
+    "packages/arel/src/fixture-nested.ts": {
+      classes: { "A.Checker": ["before", "database"], "B.Checker": ["database", "before"] },
+      functions: [],
+    },
     // Bucket key `Integer` (the Rails constant) has no class named `Integer`;
     // the 1:1 rename fallback pairs it with the sole class body (`IntegerType`).
     "packages/arel/src/fixture-rename.ts": {
@@ -134,6 +140,7 @@ const mixinFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin.ts");
 const mixinClassFile = path.join(REPO_ROOT, "packages/arel/src/fixture-mixinclass.ts");
 const mixin2File = path.join(REPO_ROOT, "packages/arel/src/fixture-mixin2.ts");
 const multiFile = path.join(REPO_ROOT, "packages/arel/src/fixture-multi.ts");
+const nestedFile = path.join(REPO_ROOT, "packages/arel/src/fixture-nested.ts");
 const renameFile = path.join(REPO_ROOT, "packages/arel/src/fixture-rename.ts");
 const ambiguousFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ambiguous.ts");
 const noEvidenceFile = path.join(REPO_ROOT, "packages/arel/src/fixture-noevidence.ts");
@@ -261,6 +268,12 @@ try {
         code:
           `class Casted {\n  before() {}\n  database() {}\n}\n` +
           `class Quoted {\n  database() {}\n  before() {}\n}\n`,
+      },
+      {
+        filename: nestedFile,
+        code:
+          `export namespace A {\n  export class Checker {\n    before() {}\n    database() {}\n  }\n}\n` +
+          `export namespace B {\n  export class Checker {\n    database() {}\n    before() {}\n  }\n}\n`,
       },
       // Ambiguity guard: two manifest buckets, neither matching a class
       // name by exact spelling. The 1:1 rename fallback only fires when
@@ -596,6 +609,17 @@ try {
         output:
           `class Casted {\n  before() {}\n  database() {}\n}\n` +
           `class Quoted {\n  database() {}\n  before() {}\n}\n`,
+      },
+      // A class in a namespace takes the bucket keyed by its enclosing class.
+      {
+        filename: nestedFile,
+        code:
+          `export namespace A {\n  export class Checker {\n    before() {}\n    database() {}\n  }\n}\n` +
+          `export namespace B {\n  export class Checker {\n    before() {}\n    database() {}\n  }\n}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `export namespace A {\n  export class Checker {\n    before() {}\n    database() {}\n  }\n}\n` +
+          `export namespace B {\n  export class Checker {\n    database() {}\n    before() {}\n  }\n}\n`,
       },
       // Rename fallback: the manifest bucket is keyed `Integer` (the Rails
       // constant) but trails named the class `IntegerType`. With one bucket

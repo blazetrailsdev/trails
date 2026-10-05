@@ -36,7 +36,11 @@ import {
   unusedOperatorSpellings,
 } from "./api-compare/operator-order-spelling.js";
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
-import { lastSegment, resolveLastSegmentCollision } from "./rails-file-structure-collisions.js";
+import {
+  lastSegment,
+  qualifyByParent,
+  resolveLastSegmentCollision,
+} from "./rails-file-structure-collisions.js";
 import { railsApiAvailable } from "./api-compare/require-rails-api.js";
 import { PACKAGE_DIRS } from "./api-compare/config.js";
 
@@ -177,24 +181,28 @@ interface Bucket {
   seen: Set<string>;
 }
 
-// Reviewed `<pkg>/<file>::<Segment>` rows for collisions resolveLastSegmentCollision
-// cannot decide; without a row such a collision fails the build below.
-const EXPECTED_UNRESOLVED_COLLISIONS: string[] = ["thor/error.rb::SpellChecker"];
+// Reviewed `<pkg>/<file>::<Segment>` rows for collisions neither
+// resolveLastSegmentCollision nor qualifyByParent can decide; without a row
+// such a collision fails the build below.
+const EXPECTED_UNRESOLVED_COLLISIONS: string[] = [];
 
 const unresolvedCollisions: string[] = [];
 const usedExpectedCollisions = new Set<string>();
 
-const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): string | undefined => {
+// fqn → the manifest class key it owns; empty for a collision with no owner.
+const resolveCollision = (pkg: string, collKey: string, fqns: Set<string>): Map<string, string> => {
   const winner = resolveLastSegmentCollision(fqns);
-  if (winner) return winner;
+  if (winner) return new Map([[winner, lastSegment(winner)]]);
+  const qualified = qualifyByParent(fqns);
+  if (qualified) return qualified;
   const [file, seg] = collKey.split("\0");
   const row = `${pkg}/${file}::${seg}`;
   if (EXPECTED_UNRESOLVED_COLLISIONS.includes(row)) {
     usedExpectedCollisions.add(row);
-    return undefined;
+    return new Map();
   }
   unresolvedCollisions.push(`${row} shared by ${[...fqns].join(", ")}`);
-  return undefined;
+  return new Map();
 };
 
 for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
@@ -328,14 +336,16 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
   visitClasses(rubyPkg.classes ?? {});
   visitModules(rubyPkg.modules ?? {});
 
-  // (bucketFile\0className) → the one fqn that owns that manifest key.
-  const winnerByKey = new Map<string, string>();
+  // (bucketFile\0fqn) → the manifest class key that fqn owns.
+  const keyByFqn = new Map<string, string>();
   for (const [collKey, fqns] of classFqnsByKey) {
-    const winner = resolveCollision(pkg, collKey, fqns);
-    if (winner) winnerByKey.set(collKey, winner);
+    const [bucketFile] = collKey.split("\0");
+    for (const [fqn, key] of resolveCollision(pkg, collKey, fqns)) {
+      keyByFqn.set(`${bucketFile}\0${fqn}`, key);
+    }
   }
-  const owns = (rubyFile: string, fqn: string): boolean =>
-    winnerByKey.get(`${rubyFile}\0${lastSegment(fqn)}`) === fqn;
+  const keyOf = (rubyFile: string, fqn: string): string | undefined =>
+    keyByFqn.get(`${rubyFile}\0${fqn}`);
 
   const orderFor = (rubyFile: string): FileOrder => {
     const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyFile, pkg).split(path.sep).join("/"));
@@ -351,9 +361,9 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     const have = new Set(order.declarations);
     for (const fqn of fqns) {
-      if (!owns(rubyFile, fqn)) continue;
-      const n = lastSegment(fqn);
-      if (have.has(n)) continue;
+      // A parent-qualified class is nested, and only top-level declarations order.
+      const n = keyOf(rubyFile, fqn);
+      if (n === undefined || n.includes(".") || have.has(n)) continue;
       have.add(n);
       order.declarations.push(n);
     }
@@ -363,13 +373,11 @@ for (const [pkg, rubyPkg] of Object.entries<RubyPackage>(railsApi.packages)) {
     const order = orderFor(rubyFile);
     for (const [key, bucket] of byKey) {
       // A losing fqn is dropped rather than blended into the winner's order.
-      if (key !== FUNCTIONS_KEY && !owns(rubyFile, key as string)) continue;
+      const classKey = key === FUNCTIONS_KEY ? undefined : keyOf(rubyFile, key as string);
+      if (key !== FUNCTIONS_KEY && classKey === undefined) continue;
       // Multiple Ruby files may map to the same TS file (rare); append novel
       // names in encounter order, existing order wins for dupes.
-      const target =
-        key === FUNCTIONS_KEY
-          ? order.functions
-          : (order.classes[lastSegment(key as string)] ??= []);
+      const target = classKey === undefined ? order.functions : (order.classes[classKey] ??= []);
       const have = new Set(target);
       for (const n of bucket.names) if (!have.has(n)) target.push(n);
     }
