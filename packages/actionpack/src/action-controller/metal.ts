@@ -306,11 +306,11 @@ export class Metal extends AbstractController {
     return this.response.mediaType;
   }
 
-  head(status: number | string | null, options?: Record<string, unknown>): true {
+  head(status: number | string | null | false, options?: Record<string, unknown>): true {
     if (status !== null && typeof status === "object") {
       throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
     }
-    const resolvedStatus = status == null || (status as unknown) === false ? "ok" : status;
+    const resolvedStatus = status == null || status === false ? "ok" : status;
     let location: unknown;
     let contentType: unknown;
     if (options) {
