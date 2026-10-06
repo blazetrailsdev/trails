@@ -9,7 +9,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { rbObjRespondTo, rtest } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -472,7 +472,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       return this._connectingPromise;
     }
-    if (this._isFakeConnection) throw new Error("Mysql2Adapter: fake connection has no client");
+    if (this._isFakeConnection)
+      throw new RuntimeError("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
     this._connectingPromise = Mysql2Adapter.newClient({

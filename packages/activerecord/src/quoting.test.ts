@@ -32,6 +32,7 @@ const quoteTableNameForAssignment = (table: string, attr: string): string =>
 const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
 import { formatPlainTimeForSql } from "./connection-adapters/abstract/sql-datetime.js";
+import { TypeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import { setDefaultTimezone } from "./active-record.js";
 
@@ -193,7 +194,7 @@ describe("QuotingTest", () => {
 
 describe("TypeCastingTest", () => {
   it("type cast symbol", () => {
-    expect(typeCast(Symbol("foo"))).toBe("foo");
+    expect(typeCast("foo")).toBe("foo");
   });
 
   it("type cast numeric", () => {

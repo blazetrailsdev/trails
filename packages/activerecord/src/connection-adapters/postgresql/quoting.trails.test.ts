@@ -27,7 +27,7 @@ import {
   typeCast as typeCastFn,
   unescapeBytea,
 } from "./quoting.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, TypeError } from "@blazetrails/ruby-compat";
 
 const HOST = quotingHost({ quotedDate, quotedBinary });
 const quote = (value: unknown): string | null => quoteFn.call(HOST, value);

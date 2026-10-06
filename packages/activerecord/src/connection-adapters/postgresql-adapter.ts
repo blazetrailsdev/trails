@@ -7,7 +7,7 @@ import { block, excSetupMessage, fetch, setEnv, valuesAt } from "@blazetrails/ru
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -597,9 +597,6 @@ export class PostgreSQLAdapter
       "insertReturning" in this._config
         ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
         : true;
-    if (minMessages !== undefined && typeof minMessages !== "string") {
-      throw new TypeError(`minMessages must be a string, got ${typeof minMessages}`);
-    }
     this._minMessages = minMessages ?? "warning";
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
@@ -1038,7 +1035,7 @@ export class PostgreSQLAdapter
   }
   override async checkVersion(): Promise<void> {
     if ((await this.databaseVersion) < 9_03_00) {
-      throw new Error(
+      throw new RuntimeError(
         `Your version of PostgreSQL (${await this.databaseVersion}) is too old. Active Record supports PostgreSQL >= 9.3.`,
       );
     }
@@ -1548,7 +1545,7 @@ export class PostgreSQLAdapter
 
   private async _acquireFreshClient(): Promise<pg.Client> {
     if (this._closed || this._pgClientOptions == null) {
-      throw new Error("PostgreSQLAdapter: connection is closed");
+      throw new ConnectionNotEstablished("connection is closed");
     }
     if (this._rawConnection) {
       return this._rawConnection;
@@ -1588,7 +1585,7 @@ export class PostgreSQLAdapter
       ) {
         this._teardownRacedClient(newClient, acquireGen);
         if (this._closed || this._pgClientOptions == null || racedDiscard || staleGeneration) {
-          throw new Error("PostgreSQLAdapter: connection is closed");
+          throw new ConnectionNotEstablished("connection is closed");
         }
         client = this._rawConnection!;
       } else {

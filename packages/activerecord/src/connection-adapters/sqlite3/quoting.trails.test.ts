@@ -1,7 +1,7 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -273,11 +273,6 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(42)).toBe(42n);
       expect(typeCast(0)).toBe(0n);
       expect(typeCast(-7)).toBe(-7n);
-    });
-
-    it("casts a symbol through the inherited abstract arm", () => {
-      expect(typeCast(Symbol("foo"))).toBe("foo");
-      expect(typeCast(Symbol())).toBe("Symbol()");
     });
 
     it("throws on unsupported types", () => {

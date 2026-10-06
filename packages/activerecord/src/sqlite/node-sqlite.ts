@@ -1,6 +1,6 @@
 /** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem MOVED-BY-SHORT-NAME: databaseExists, open. */
 import { createRequire } from "node:module";
-import { File } from "@blazetrails/ruby-compat";
+import { File, LoadError } from "@blazetrails/ruby-compat";
 import {
   type ColumnInfo,
   type RunResult,
@@ -224,7 +224,7 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
 /** @internal */
 function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseSync {
   if (!nodeSqlite) {
-    throw new Error(
+    throw new LoadError(
       "node:sqlite is not available. Node 22.5+ is required. " +
         "On Node 22.5–22.9 you may also need --experimental-sqlite.",
     );
@@ -287,7 +287,7 @@ export const nodeSqliteDriver: SqliteDriver = {
 
   async restoreFromPath(sourcePath: string, destination: string): Promise<void> {
     if (!nodeSqlite) {
-      throw new Error(
+      throw new LoadError(
         "node:sqlite is not available. Node 22.5+ is required. " +
           "On Node 22.5–22.9 you may also need --experimental-sqlite.",
       );
