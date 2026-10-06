@@ -5,22 +5,14 @@ import type {
 import pg from "pg";
 import { block, excSetupMessage, fetch, setEnv, valuesAt } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
-import {
-  any,
-  classAttribute,
-  include,
-  isPresent,
-  runLoadHooks,
-  singularize,
-  filterMap,
-} from "@blazetrails/activesupport";
+import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { rtest } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import type { TypeMap } from "../type/type-map.js";
-import { Name, Utils } from "./postgresql/utils.js";
+import { Name } from "./postgresql/utils.js";
 import {
   checkAllForeignKeysValidBang,
   disableReferentialIntegrity,
@@ -186,7 +178,6 @@ import {
   type ColumnOptions,
   type ColumnType,
   type ForeignKeyLookupOptions,
-  type AddForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
@@ -1828,151 +1819,6 @@ export class PostgreSQLAdapter
     return pgQuoteDefaultExpression.call(this, value, column as DefaultExpressionColumn) as string;
   }
 
-  async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
-    this.validateIndexLengthBang(tableName, newName);
-    const [schema] = this.extractSchemaQualifiedName(tableName);
-    const qualifier = schema ? `${this.quoteTableName(schema)}.` : "";
-    await this.execute(
-      `ALTER INDEX ${qualifier}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
-    );
-  }
-
-  async foreignTables(): Promise<string[]> {
-    const names = await this.queryValues(this.dataSourceSql({ type: "FOREIGN TABLE" }), "SCHEMA");
-    return names as string[];
-  }
-
-  async foreignTableExists(tableName: string): Promise<boolean | undefined> {
-    if (isPresent(tableName)) {
-      return any(
-        await this.queryValues(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }), "SCHEMA"),
-      );
-    }
-  }
-
-  /** @internal */
-  referenceNameForTable(tableName: string): string {
-    const [, table] = this.extractSchemaQualifiedName(tableName);
-    return singularize(table);
-  }
-
-  async renameTable(
-    tableName: string,
-    newName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
-      this.validateTableLengthBang(newName);
-    }
-    await this.clearCacheBang();
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
-    await this.schemaCache.clearDataSourceCacheBang(newName);
-    await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
-    );
-    const maxIdentifierLength = await this.warmMaxIdentifierLength();
-    const result = await this.pkAndSequenceFor(newName);
-    if (result) {
-      const [pk, seq] = result;
-      const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
-      const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
-      const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
-      await this.execute(
-        `ALTER INDEX ${this.quoteTableName(idx)} RENAME TO ${this.quoteTableName(newIdx)}`,
-      );
-
-      const maxSeqPrefix = maxIdentifierLength - `_${pk}_seq`.length;
-      if (seq && seq.identifier === `${tableName.slice(0, maxSeqPrefix)}_${pk}_seq`) {
-        const newSeq = `${newName.slice(0, maxSeqPrefix)}_${pk}_seq`;
-        await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
-      }
-    }
-    await this.renameTableIndexes(tableName, newName, options);
-  }
-
-  async addIndex(
-    tableName: string,
-    columnName: string | string[],
-    options: {
-      name?: string;
-      unique?: boolean;
-      using?: string;
-      where?: string;
-      algorithm?: string;
-      order?: Record<string, string> | string;
-      opclass?: Record<string, string>;
-      ifNotExists?: boolean;
-      nullsNotDistinct?: boolean;
-      include?: string | string[];
-      comment?: string;
-    } = {},
-  ): Promise<unknown> {
-    const createIndex = (await this.buildCreateIndexDefinition(tableName, columnName, options))!;
-    const result = await this.execute(await this.schemaCreation.accept(createIndex));
-
-    const index = createIndex.index;
-    if (index.comment) {
-      await this.execute(
-        `COMMENT ON INDEX ${this.quoteColumnName(index.name)} IS ${this.quote(index.comment)}`,
-      );
-    }
-    return result;
-  }
-
-  async removeIndex(
-    tableName: string,
-    columnName?:
-      | string
-      | string[]
-      | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
-    options: {
-      name?: string;
-      column?: string | string[];
-      algorithm?: string;
-      ifExists?: boolean;
-    } = {},
-  ): Promise<unknown> {
-    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
-      options = { ...columnName, ...options };
-      columnName = undefined;
-    }
-
-    let table = Utils.extractSchemaQualifiedName(tableName);
-    if (options.name != null) {
-      const providedIndex = Utils.extractSchemaQualifiedName(options.name);
-      options = { ...options, name: providedIndex.identifier };
-      const tableSchema = table.schema;
-      if (!tableSchema) table = new Name(providedIndex.schema, table.identifier);
-      if (providedIndex.schema && tableSchema && tableSchema !== providedIndex.schema) {
-        throw new ArgumentError(
-          `Index schema '${providedIndex.schema}' does not match table schema '${tableSchema}'`,
-        );
-      }
-    }
-
-    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) {
-      return;
-    }
-
-    const indexToRemove = new Name(
-      table.schema,
-      await this.indexNameForRemove(table.toString(), columnName, options),
-    ).toString();
-
-    return this.execute(
-      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove)}`,
-    );
-  }
-
-  async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
-  ): Promise<void> {
-    this.assertValidDeferrable(options.deferrable);
-    await super.addForeignKey(fromTable, toTable, options);
-  }
-
   override disableReferentialIntegrity(fn: () => Promise<void>): Promise<void> {
     return disableReferentialIntegrity.call(this, fn);
   }
@@ -2015,106 +1861,6 @@ export class PostgreSQLAdapter
     if (typeof value === "number") return String(value);
     if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
     return `'${pgQuoteString(String(value))}'`;
-  }
-
-  indexName(
-    tableName: string,
-    options:
-      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
-      | string
-      | string[],
-  ): string {
-    const [, table] = this.extractSchemaQualifiedName(String(tableName));
-    return super.indexName(table, options);
-  }
-
-  async addIndexOptions(
-    tableName: string,
-    columnName: string | string[],
-    options: Parameters<AbstractAdapter["addIndexOptions"]>[2] = {},
-  ): Promise<[AbstractIndexDefinition, string | undefined, boolean]> {
-    options = { ...options };
-    const where = options.where;
-    if (
-      typeof where === "string" &&
-      (await this.tableExists(tableName)) &&
-      (await this.columnExists(tableName, where))
-    ) {
-      options.where = this.quoteColumnName(where);
-    }
-    return super.addIndexOptions(tableName, columnName, options);
-  }
-
-  get schemaCreation(): PgSchemaCreation {
-    return new PgSchemaCreation(this);
-  }
-
-  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
-    return PgSchemaDumper.create(this, options);
-  }
-
-  /** @internal */
-  createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    return new PgTableDefinition(this, name, options);
-  }
-
-  /** @internal */
-  createAlterTable(name: string): PgAlterTable {
-    return new PgAlterTable(this.createTableDefinition(name));
-  }
-
-  /** @internal */
-  async addColumnForAlter(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions = {},
-  ): Promise<string | [string, () => Promise<void>]> {
-    if (!("comment" in options)) {
-      return super.addColumnForAlter(tableName, columnName, type, options);
-    }
-    return [
-      (await super.addColumnForAlter(tableName, columnName, type, options)) as string,
-      () => this.changeColumnComment(tableName, columnName, options.comment ?? null),
-    ];
-  }
-
-  /** @internal */
-  changeColumnNullForAlter(
-    tableName: string,
-    columnName: string,
-    null_: boolean,
-    default_?: unknown,
-  ): unknown {
-    if (default_ == null)
-      return `ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`;
-    return () => this.changeColumnNull(tableName, columnName, null_, default_);
-  }
-
-  /** @internal */
-  addIndexOpclass(
-    quotedColumns: Map<string, string>,
-    options: { opclass?: string | Record<string, string> } = {},
-  ): Map<string, string> {
-    const opclasses = this.optionsForIndexColumns(options.opclass);
-    for (const [name] of quotedColumns) {
-      const opclass = opclasses(name);
-      if (opclass) quotedColumns.set(name, `${quotedColumns.get(name)} ${opclass}`);
-    }
-    return quotedColumns;
-  }
-
-  /** @internal */
-  async addOptionsForIndexColumns(
-    quotedColumns: Map<string, string>,
-    options: {
-      order?: string | Record<string, string>;
-      opclass?: string | Record<string, string>;
-      length?: number | Record<string, number>;
-    } = {},
-  ): Promise<Map<string, string>> {
-    quotedColumns = this.addIndexOpclass(quotedColumns, options);
-    return super.addOptionsForIndexColumns(quotedColumns, options);
   }
 
   private deferrable(deferrable: "immediate" | "deferred" | undefined): string {
@@ -2173,6 +1919,87 @@ export interface PostgreSQLAdapter {
     ...constraints: (string | undefined)[]
   ): Promise<void>;
 
+  renameTable(tableName: string, newName: string, options?: Record<string, unknown>): Promise<void>;
+  addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options?: {
+      name?: string;
+      unique?: boolean;
+      using?: string;
+      where?: string;
+      algorithm?: string;
+      order?: Record<string, string> | string;
+      opclass?: Record<string, string>;
+      ifNotExists?: boolean;
+      nullsNotDistinct?: boolean;
+      include?: string | string[];
+      comment?: string;
+    },
+  ): Promise<unknown>;
+  removeIndex(
+    tableName: string,
+    columnName?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
+    options?: {
+      name?: string;
+      column?: string | string[];
+      algorithm?: string;
+      ifExists?: boolean;
+    },
+  ): Promise<unknown>;
+  indexName(
+    tableName: string,
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
+  ): string;
+  foreignTables(): Promise<string[]>;
+  foreignTableExists(tableName: string): Promise<boolean | undefined>;
+  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper;
+  addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options?: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2],
+  ): Promise<[IndexDefinition, string | undefined, boolean]>;
+  get schemaCreation(): PgSchemaCreation;
+  /** @internal */
+  createTableDefinition(name: string, options?: Record<string, unknown>): PgTableDefinition;
+  /** @internal */
+  createAlterTable(name: string): PgAlterTable;
+  /** @internal */
+  referenceNameForTable(tableName: string): string;
+  /** @internal */
+  addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options?: ColumnOptions,
+  ): Promise<string | [string, () => Promise<void>]>;
+  /** @internal */
+  changeColumnNullForAlter(
+    tableName: string,
+    columnName: string,
+    null_: boolean,
+    default_?: unknown,
+  ): unknown;
+  /** @internal */
+  addIndexOpclass(
+    quotedColumns: Map<string, string>,
+    options?: { opclass?: string | Record<string, string> },
+  ): Map<string, string>;
+  /** @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options?: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    },
+  ): Promise<Map<string, string>>;
   schemaNames(): Promise<string[]>;
 
   createSchema(

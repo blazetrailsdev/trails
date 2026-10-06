@@ -113,6 +113,18 @@ describe("harvestObjectLiteralMethods", () => {
     ]);
   });
 
+  it("records a plain-object module's [initialize] hook", () => {
+    const methods = objectLiteralMethods(
+      `declare const initialize: unique symbol;
+      declare const other: unique symbol;
+      export const DatabaseStatements = {
+        [initialize](this: { resetTransaction(): void }): void { this.resetTransaction(); },
+        [other](): void {},
+      };`,
+    );
+    expect(methods.map((m) => m.name)).toEqual(["[initialize]"]);
+  });
+
   it("reads @internal off the declaration a mixin entry references", () => {
     const methods = objectLiteralMethods(
       `/** @internal */

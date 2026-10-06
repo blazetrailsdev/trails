@@ -8,7 +8,12 @@ import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
 } from "./schema-definitions.js";
-import type { ColumnType, ColumnOptions } from "../abstract/schema-definitions.js";
+import type {
+  ColumnType,
+  ColumnOptions,
+  RemoveForeignKeyOptions,
+} from "../abstract/schema-definitions.js";
+import type { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { Column } from "./column.js";
 import type { ValueType } from "@blazetrails/activemodel";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
@@ -212,6 +217,36 @@ export class SchemaStatements extends BaseSchemaStatements {
     return super.removeColumn(tableName, columnName, type, options);
   }
 
+  override async removeForeignKey(
+    fromTable: string,
+    toTable?: string | RemoveForeignKeyOptions,
+    options: RemoveForeignKeyOptions = {},
+  ): Promise<void> {
+    if (typeof toTable === "object" && toTable !== null) {
+      options = toTable;
+      toTable = options.toTable;
+    }
+    options = { ...options };
+    if (options.onUpdate === "restrict") delete options.onUpdate;
+    if (options.onDelete === "restrict") delete options.onDelete;
+    return super.removeForeignKey(fromTable, toTable, options);
+  }
+
+  override async internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>> {
+    const options = await super.internalStringOptionsForPrimaryKey();
+    if (
+      !(await isRowFormatDynamicByDefault.call(this as unknown as RowFormatHost)) &&
+      CHARSETS_OF_4BYTES_MAXLEN.includes(
+        (await (this as unknown as AbstractMysqlAdapter).charset()) as string,
+      )
+    ) {
+      options.collation = (
+        (await (this as unknown as AbstractMysqlAdapter).collation()) as string
+      ).replace(/^[^_]+/, "utf8");
+    }
+    return options;
+  }
+
   /** @internal */
   override validPrimaryKeyOptions(): string[] {
     return [...super.validPrimaryKeyOptions(), "unsigned", "autoIncrement"];
@@ -254,6 +289,8 @@ export class SchemaStatements extends BaseSchemaStatements {
 interface QuotedScopeHost {
   quote(value: unknown): string;
 }
+
+const CHARSETS_OF_4BYTES_MAXLEN = ["utf8mb4", "utf16", "utf16le", "utf32"];
 
 /** @internal */
 export interface RowFormatHost {

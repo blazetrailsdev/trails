@@ -39,6 +39,7 @@ import {
   env,
   excSetupMessage,
   fetch,
+  initializeIncludedModules,
   isEmpty,
   isNil,
   last,
@@ -401,7 +402,7 @@ export interface AbstractAdapter {
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
   tableExists(tableName: string): Promise<boolean | null>;
   typeToSql(type: ColumnType, options?: ColumnOptions): string;
-  internalStringOptionsForPrimaryKey(): Record<string, unknown>;
+  internalStringOptionsForPrimaryKey(): Record<string, unknown> | Promise<Record<string, unknown>>;
   columnExists(
     tableName: string,
     columnName: string,
@@ -909,7 +910,7 @@ export class AbstractAdapter implements Quoting {
     deprecatedConnectionOptions: unknown = null,
     deprecatedConfig: unknown = null,
   ) {
-    this.resetTransaction();
+    initializeIncludedModules(this);
 
     this._connection = null;
     this._unconfiguredConnection = null;

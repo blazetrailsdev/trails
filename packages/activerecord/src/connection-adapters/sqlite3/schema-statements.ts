@@ -14,12 +14,13 @@ import type {
   RemoveForeignKeyOptions,
 } from "../abstract/schema-definitions.js";
 import { CheckConstraintDefinition } from "../abstract/schema-definitions.js";
-import type { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
+import { TableDefinition as SQLite3TableDefinition } from "./schema-definitions.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { ActiveRecord } from "../../namespaces.js";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaDumper as AbstractSchemaDumper } from "../abstract/schema-dumper.js";
+import { SchemaCreation } from "./schema-creation.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { quoteTableName } from "./quoting.js";
@@ -260,9 +261,22 @@ export function createSchemaDumper(
   return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
 }
 
+export function schemaCreation(this: DatabaseAdapter): SchemaCreation {
+  return new SchemaCreation(this);
+}
+
 /** @internal */
 export function validTableDefinitionOptions(this: DatabaseAdapter): string[] {
   return [...AbstractSchemaStatements.prototype.validTableDefinitionOptions.call(this), "rename"];
+}
+
+/** @internal */
+export function createTableDefinition(
+  this: DatabaseAdapter,
+  name: string,
+  options: Record<string, unknown> = {},
+): SQLite3TableDefinition {
+  return new SQLite3TableDefinition(this, name, options);
 }
 
 /** @internal */

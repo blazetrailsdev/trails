@@ -59,8 +59,8 @@ export class InternalMetadata {
     if (!this.enabled) return;
     return await this._pool.withConnection(async (connection) => {
       if (!(await connection.tableExists(this.tableName))) {
-        return await connection.createTable(this.tableName, { id: false }, (t) => {
-          t.string("key", connection.internalStringOptionsForPrimaryKey());
+        return await connection.createTable(this.tableName, { id: false }, async (t) => {
+          t.string("key", await connection.internalStringOptionsForPrimaryKey());
           t.string("value");
           t.timestamps();
         });

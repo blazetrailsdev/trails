@@ -24,9 +24,9 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import { Concurrent, Errno, SystemCallError, groupBy, rtest } from "@blazetrails/ruby-compat";
-import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
+import { type SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
-import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
+import { type TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
 import {
   dataSourceSql as sqliteDataSourceSql,
   indexes as sqliteIndexes,
@@ -39,6 +39,8 @@ import {
   addCheckConstraint as sqliteAddCheckConstraint,
   removeCheckConstraint as sqliteRemoveCheckConstraint,
   virtualTableExists as sqliteVirtualTableExists,
+  schemaCreation as sqliteSchemaCreation,
+  createTableDefinition as sqliteCreateTableDefinition,
 } from "./sqlite3/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1080,18 +1082,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
 
-  get schemaCreation(): SQLite3SchemaCreation {
-    return new SQLite3SchemaCreation(this);
-  }
-
-  /** @internal */
-  createTableDefinition(
-    name: string,
-    options: Record<string, unknown> = {},
-  ): SQLite3TableDefinition {
-    return new SQLite3TableDefinition(this, name, options);
-  }
-
   static columnNameMatcher(): RegExp {
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
     const col = String.raw`(?:${id}\.)?${id}`;
@@ -1476,6 +1466,11 @@ SQLite3Adapter.prototype.commitDbTransaction = sqliteCommitDbTransaction;
 SQLite3Adapter.prototype.execRollbackDbTransaction = sqliteExecRollbackDbTransaction;
 SQLite3Adapter.prototype.resetIsolationLevel = sqliteResetIsolationLevel;
 SQLite3Adapter.prototype.execute = sqliteExecute;
+Object.defineProperty(SQLite3Adapter.prototype, "schemaCreation", {
+  get: sqliteSchemaCreation,
+  configurable: true,
+});
+SQLite3Adapter.prototype.createTableDefinition = sqliteCreateTableDefinition;
 SQLite3Adapter.prototype.defaultInsertValue = sqliteDefaultInsertValue;
 SQLite3Adapter.prototype.explain = sqliteExplain;
 SQLite3Adapter.prototype.isWriteQuery = sqliteIsWriteQuery;
@@ -1486,6 +1481,9 @@ SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurr
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export interface SQLite3Adapter {
+  get schemaCreation(): SQLite3SchemaCreation;
+  /** @internal */
+  createTableDefinition(name: string, options?: Record<string, unknown>): SQLite3TableDefinition;
   get databaseVersion(): Version | Promise<Version>;
   beginDbTransaction: typeof sqliteBeginDbTransaction;
   beginDeferredTransaction: typeof sqliteBeginDeferredTransaction;

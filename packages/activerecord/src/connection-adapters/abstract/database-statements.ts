@@ -19,7 +19,7 @@ import {
 } from "@blazetrails/arel";
 import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { kernelInteger, rbInspect, rtest } from "@blazetrails/ruby-compat";
+import { initialize, kernelInteger, rbInspect, rtest } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -817,6 +817,9 @@ export function castResult(rawResult: any): never {
 export const create = insert;
 
 export const DatabaseStatements = {
+  [initialize](this: DatabaseStatementsHost & { resetTransaction(): void }): void {
+    this.resetTransaction();
+  },
   resetTransaction,
   selectAll(
     this: DatabaseStatementsDefaultsHost,

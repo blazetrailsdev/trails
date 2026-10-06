@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { type ArelNode } from "@blazetrails/arel";
 import {
+  any,
   compact,
   compactBlank,
   first,
@@ -27,6 +28,7 @@ import type { CommentOrChanges } from "../abstract/schema-statements.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
+  CreateIndexDefinition,
   CheckConstraintDefinition,
   ForeignKeyDefinition,
   type AddForeignKeyOptions,
@@ -37,14 +39,17 @@ import {
 import { StatementInvalid } from "../../errors.js";
 import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import { Column } from "./column.js";
+import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
+import { SchemaDumper as PgSchemaDumper } from "./schema-dumper.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { quoteColumnName as pgQuoteColumnName } from "./quoting.js";
 import { Name, Utils } from "./utils.js";
 import { IndexDefinition } from "../abstract/schema-definitions.js";
 import {
-  type AlterTable as PgAlterTable,
+  AlterTable as PgAlterTable,
   Table as PgTable,
+  TableDefinition as PgTableDefinition,
   type SchemaStatementsConstraintLike,
   ExclusionConstraintDefinition,
   type ExclusionConstraintOptions,
@@ -96,6 +101,7 @@ export interface SchemaStatements
       | "supportsVirtualColumns"
       | "typeMap"
       | "visitor"
+      | "warmMaxIdentifierLength"
     > {}
 
 export class SchemaStatements extends AbstractSchemaStatements {
@@ -224,16 +230,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       "SCHEMA",
     );
     return Number(count) > 0;
-  }
-
-  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
-    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
-
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
-    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
@@ -528,6 +524,39 @@ export class SchemaStatements extends AbstractSchemaStatements {
     for (const proc of procs) await proc();
   }
 
+  async renameTable(
+    tableName: string,
+    newName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
+      this.validateTableLengthBang(newName);
+    }
+    await this.clearCacheBang();
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
+    await this.schemaCache.clearDataSourceCacheBang(newName);
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
+    );
+    const maxIdentifierLength = await this.warmMaxIdentifierLength();
+    const [pk, seq] = (await this.pkAndSequenceFor(newName)) ?? [];
+    if (pk != null) {
+      const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
+      const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
+      const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
+      await this.execute(
+        `ALTER INDEX ${this.quoteTableName(idx)} RENAME TO ${this.quoteTableName(newIdx)}`,
+      );
+
+      const maxSeqPrefix = maxIdentifierLength - `_${pk}_seq`.length;
+      if (seq && seq.identifier === `${tableName.slice(0, maxSeqPrefix)}_${pk}_seq`) {
+        const newSeq = `${newName.slice(0, maxSeqPrefix)}_${pk}_seq`;
+        await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
+      }
+    }
+    await this.renameTableIndexes(tableName, newName, options);
+  }
+
   override async addColumn(
     tableName: string,
     columnName: string,
@@ -556,6 +585,93 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
   }
 
+  async addIndex(
+    tableName: string,
+    columnName: string | string[],
+    options: {
+      name?: string;
+      unique?: boolean;
+      using?: string;
+      where?: string;
+      algorithm?: string;
+      order?: Record<string, string> | string;
+      opclass?: Record<string, string>;
+      ifNotExists?: boolean;
+      nullsNotDistinct?: boolean;
+      include?: string | string[];
+      comment?: string;
+    } = {},
+  ): Promise<unknown> {
+    const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
+    const result = await this.execute(await this.schemaCreation.accept(createIndex));
+
+    const index = createIndex.index;
+    if (index.comment) {
+      await this.execute(
+        `COMMENT ON INDEX ${this.quoteColumnName(index.name)} IS ${this.quote(index.comment)}`,
+      );
+    }
+    return result;
+  }
+
+  override async buildCreateIndexDefinition(
+    tableName: string,
+    columnName: string | string[],
+    options: Parameters<AbstractSchemaStatements["buildCreateIndexDefinition"]>[2] = {},
+  ): Promise<CreateIndexDefinition> {
+    const [index, algorithm, ifNotExists] = await this.addIndexOptions(
+      tableName,
+      columnName,
+      options,
+    );
+    return new CreateIndexDefinition(index, algorithm, ifNotExists);
+  }
+
+  async removeIndex(
+    tableName: string,
+    columnName?:
+      | string
+      | string[]
+      | { name?: string; column?: string | string[]; algorithm?: string; ifExists?: boolean },
+    options: {
+      name?: string;
+      column?: string | string[];
+      algorithm?: string;
+      ifExists?: boolean;
+    } = {},
+  ): Promise<unknown> {
+    if (!(typeof columnName === "string" || Array.isArray(columnName))) {
+      options = { ...columnName, ...options };
+      columnName = undefined;
+    }
+
+    let table = Utils.extractSchemaQualifiedName(tableName);
+    if (options.name != null) {
+      const providedIndex = Utils.extractSchemaQualifiedName(options.name);
+      options = { ...options, name: providedIndex.identifier };
+      if (!isPresent(table.schema)) table = new Name(providedIndex.schema, table.identifier);
+
+      if (isPresent(providedIndex.schema) && table.schema !== providedIndex.schema) {
+        throw new ArgumentError(
+          `Index schema '${providedIndex.schema}' does not match table schema '${table.schema}'`,
+        );
+      }
+    }
+
+    if (options.ifExists && !(await this.indexExists(tableName, columnName, options))) {
+      return;
+    }
+
+    const indexToRemove = new Name(
+      table.schema,
+      await this.indexNameForRemove(table.toString(), columnName, options),
+    ).toString();
+
+    return this.execute(
+      `DROP INDEX ${this.indexAlgorithm(options.algorithm) ?? ""} ${this.quoteTableName(indexToRemove)}`,
+    );
+  }
+
   override async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.validateIndexLengthBang(tableName, newName);
 
@@ -563,6 +679,17 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(
       `ALTER INDEX ${schema ? `${this.quoteTableName(schema)}.` : ""}${this.quoteColumnName(oldName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
+  }
+
+  indexName(
+    tableName: string,
+    options:
+      | { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean }
+      | string
+      | string[],
+  ): string {
+    const [, table] = this.extractSchemaQualifiedName(String(tableName));
+    return super.indexName(table, options);
   }
 
   override async changeColumnDefault(
@@ -642,8 +769,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
+  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
+    return PgSchemaDumper.create(
+      this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
+      options,
+    );
+  }
+
   async validateConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
-    const at = this.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName);
     at.validateConstraint(constraintName);
     await this.execute(await this.schemaCreation.accept(at));
   }
@@ -671,6 +805,39 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
     const [, table] = this.extractSchemaQualifiedName(tableName);
     return `${singularize(table)}_${columnName}`;
+  }
+
+  async addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2] = {},
+  ): Promise<[IndexDefinition, string | undefined, boolean]> {
+    options = { ...options };
+    const where = options.where;
+    if (
+      typeof where === "string" &&
+      (await this.tableExists(tableName)) &&
+      (await this.columnExists(tableName, where))
+    ) {
+      options.where = this.quoteColumnName(where);
+    }
+    return super.addIndexOptions(tableName, columnName, options);
+  }
+
+  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
+    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
+
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
+    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
+  }
+
+  get schemaCreation(): PgSchemaCreation {
+    return new PgSchemaCreation(
+      this as unknown as ConstructorParameters<typeof PgSchemaCreation>[0],
+    );
   }
 
   /** @internal */
@@ -769,6 +936,19 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return foreignKeys;
   }
 
+  async foreignTables(): Promise<string[]> {
+    const names = await this.queryValues(this.dataSourceSql({ type: "FOREIGN TABLE" }), "SCHEMA");
+    return names as string[];
+  }
+
+  async foreignTableExists(tableName: string): Promise<boolean | undefined> {
+    if (isPresent(tableName)) {
+      return any(
+        await this.queryValues(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }), "SCHEMA"),
+      );
+    }
+  }
+
   override async addForeignKey(
     fromTable: string,
     toTable: string,
@@ -822,7 +1002,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: ExclusionConstraintOptions = {},
   ): Promise<void> {
     options = this.exclusionConstraintOptions(tableName, expression, options);
-    const at = this.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName);
     at.addExclusionConstraint(expression, options);
     await this.execute(await this.schemaCreation.accept(at));
   }
@@ -941,7 +1121,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     options: UniqueConstraintOptions = {},
   ): Promise<void> {
     options = this.uniqueConstraintOptions(tableName, columnName, options);
-    const at = this.createAlterTable(tableName) as PgAlterTable;
+    const at = this.createAlterTable(tableName);
     at.addUniqueConstraint(columnName as string | string[], options);
     await this.execute(await this.schemaCreation.accept(at));
   }
@@ -1150,6 +1330,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
+    return new PgTableDefinition(this, name, options);
+  }
+
+  /** @internal */
+  createAlterTable(name: string): PgAlterTable {
+    return new PgAlterTable(this.createTableDefinition(name));
+  }
+
+  /** @internal */
   async newColumnFromField(
     tableName: string,
     field: unknown[],
@@ -1294,6 +1484,28 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
+  referenceNameForTable(tableName: string): string {
+    const [, table] = this.extractSchemaQualifiedName(tableName);
+    return singularize(table);
+  }
+
+  /** @internal */
+  async addColumnForAlter(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions = {},
+  ): Promise<string | [string, () => Promise<void>]> {
+    if (!("comment" in options)) {
+      return super.addColumnForAlter(tableName, columnName, type, options);
+    }
+    return [
+      (await super.addColumnForAlter(tableName, columnName, type, options)) as string,
+      () => this.changeColumnComment(tableName, columnName, options.comment ?? null),
+    ];
+  }
+
+  /** @internal */
   async changeColumnForAlter(
     tableName: string,
     columnName: string,
@@ -1307,6 +1519,44 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if ("comment" in options)
       sqls.push(() => this.changeColumnComment(tableName, columnName, options.comment ?? null));
     return sqls;
+  }
+
+  /** @internal */
+  changeColumnNullForAlter(
+    tableName: string,
+    columnName: string,
+    null_: boolean,
+    default_?: unknown,
+  ): unknown {
+    if (default_ == null)
+      return `ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`;
+    return () => this.changeColumnNull(tableName, columnName, null_, default_);
+  }
+
+  /** @internal */
+  addIndexOpclass(
+    quotedColumns: Map<string, string>,
+    options: { opclass?: string | Record<string, string> } = {},
+  ): Map<string, string> {
+    const opclasses = this.optionsForIndexColumns(options.opclass);
+    for (const [name] of quotedColumns) {
+      const opclass = opclasses(name);
+      if (isPresent(opclass)) quotedColumns.set(name, `${quotedColumns.get(name)} ${opclass}`);
+    }
+    return quotedColumns;
+  }
+
+  /** @internal */
+  async addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    } = {},
+  ): Promise<Map<string, string>> {
+    quotedColumns = this.addIndexOpclass(quotedColumns, options);
+    return super.addOptionsForIndexColumns(quotedColumns, options);
   }
 
   /** @internal */

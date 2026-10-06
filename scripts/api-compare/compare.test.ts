@@ -3799,6 +3799,20 @@ describe("moduleInitializeCandidates", () => {
     ]);
   });
 
+  it("offers a module's new its own new member first", () => {
+    const withNew = new Set(["new", "registry"]);
+    expect(moduleInitializeCandidates("new", true, withNew, ["constructor"])).toEqual([
+      "new",
+      "constructor",
+    ]);
+    expect(moduleInitializeCandidates("new", false, withNew, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+    expect(moduleInitializeCandidates("new", true, withHook, ["constructor"])).toEqual([
+      "constructor",
+    ]);
+  });
+
   it("leaves every other name alone", () => {
     expect(moduleInitializeCandidates("serialize", true, withHook, ["serialize"])).toEqual([
       "serialize",

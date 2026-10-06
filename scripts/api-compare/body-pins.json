@@ -30666,13 +30666,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_mysql_adapter.rb",
-    "rubyName": "internal_string_options_for_primary_key",
-    "digest": "5d5b553ada19394f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_mysql_adapter.rb",
     "rubyName": "mariadb?",
     "digest": "b7483d3d0a9621fa",
     "ref": "v8.0.2"
@@ -30759,13 +30752,6 @@
     "rubyFile": "connection_adapters/abstract_mysql_adapter.rb",
     "rubyName": "release_advisory_lock",
     "digest": "7584676437388e41",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_mysql_adapter.rb",
-    "rubyName": "remove_foreign_key",
-    "digest": "d8168597d461e090",
     "ref": "v8.0.2"
   },
   {
@@ -34362,13 +34348,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "add_column_for_alter",
-    "digest": "f6c264754c4e0cc7",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "add_enum_value",
     "digest": "3461f43f34210dcf",
     "ref": "v8.0.2"
@@ -34378,34 +34357,6 @@
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "add_foreign_key",
     "digest": "fe9a2a4193ebaeba",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "add_index",
-    "digest": "cf1e384862c99097",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "add_index_opclass",
-    "digest": "449e47a2b1f5fa5e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "add_index_options",
-    "digest": "b68eb76895398d84",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "add_options_for_index_columns",
-    "digest": "d3dc5eba35f70c1e",
     "ref": "v8.0.2"
   },
   {
@@ -34481,13 +34432,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "change_column_null_for_alter",
-    "digest": "ed586ee7c8a27ff4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "check_all_foreign_keys_valid!",
     "digest": "54b1a3792569a6c9",
     "ref": "v8.0.2"
@@ -34537,29 +34481,8 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "create_alter_table",
-    "digest": "9fbd565a240e2346",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "create_enum",
     "digest": "8745dd43e2b4bdde",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "create_schema_dumper",
-    "digest": "fcc3e7913eb62e68",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "create_table_definition",
-    "digest": "ac5d4f741bc404c1",
     "ref": "v8.0.2"
   },
   {
@@ -34684,20 +34607,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "foreign_table_exists?",
-    "digest": "9aafb4f761c45691",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "foreign_tables",
-    "digest": "f728e19224d86846",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "get_advisory_lock",
     "digest": "bcc96eac94987e93",
     "ref": "v8.0.2"
@@ -34742,13 +34651,6 @@
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "index_algorithms",
     "digest": "dc1114e6b73c5b8f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "index_name",
-    "digest": "0c78135f19341d7f",
     "ref": "v8.0.2"
   },
   {
@@ -34922,13 +34824,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "reference_name_for_table",
-    "digest": "b7ea82f80b380463",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "release_advisory_lock",
     "digest": "e3c202f5f1078470",
     "ref": "v8.0.2"
@@ -34938,13 +34833,6 @@
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "reload_type_map",
     "digest": "22551b6c2d3af8a3",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "remove_index",
-    "digest": "aff6c2b2195ccaee",
     "ref": "v8.0.2"
   },
   {
@@ -34966,13 +34854,6 @@
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "rename_index",
     "digest": "64184e71c5f41f21",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "rename_table",
-    "digest": "939c1ec118610497",
     "ref": "v8.0.2"
   },
   {
@@ -36261,13 +36142,6 @@
     "rubyFile": "connection_adapters/sqlite3_adapter.rb",
     "rubyName": "create_schema_dumper",
     "digest": "460d33ba6439d86e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/sqlite3_adapter.rb",
-    "rubyName": "create_table_definition",
-    "digest": "de0c097021b4c105",
     "ref": "v8.0.2"
   },
   {
