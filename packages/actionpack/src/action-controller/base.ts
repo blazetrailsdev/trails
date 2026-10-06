@@ -646,16 +646,16 @@ export class Base extends Metal {
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
+    if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
+      _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
+      this.params = new StrongParameters({
+        ...this.request.params,
+        ...this.request.pathParameters,
+      });
+    }
     await _instrumentProcessAction.call(this as never, () =>
       _rescueProcessAction.call(this, async () => {
         _processAction.call(this as never, action, ...args);
-        if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
-          _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-          this.params = new StrongParameters({
-            ...this.request.params,
-            ...this.request.pathParameters,
-          });
-        }
         await super.processAction(action, ...args);
       }),
     );

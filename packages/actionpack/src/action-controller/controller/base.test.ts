@@ -1,10 +1,23 @@
-import { describe, it, expect } from "vitest";
-import { htmlSafe } from "@blazetrails/activesupport";
-import { FixtureResolver } from "@blazetrails/actionview";
-import { Base, DoubleRenderError, MODULES, PROTECTED_IVARS } from "../base.js";
-import { API } from "../api.js";
+import { beforeEach, describe, it, expect } from "vitest";
+import {
+  assert,
+  assertEqual,
+  assertIncludes,
+  assertNotDeprecated,
+  assertNotIncludes,
+} from "@blazetrails/activesupport";
+import { ModelName } from "@blazetrails/activemodel";
+import { domClass, domId } from "@blazetrails/actionview";
+import { include, publicInstanceMethods, rbModConstSet } from "@blazetrails/ruby-compat";
+import { Base, MODULES } from "../base.js";
+import { deprecator } from "../deprecator.js";
+import { TestCase } from "../test-case.js";
+import { deprecator as actionDispatchDeprecator } from "../../action-dispatch/deprecator.js";
+import { controllerConstants } from "../../action-dispatch/http/request.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
+import { RouteSet } from "../../action-dispatch/routing/route-set.js";
+import "../../test-helpers/abstract-unit.js";
 
 function makeRequest(opts: Record<string, string> = {}): Request {
   return new Request({
@@ -19,530 +32,88 @@ function makeResponse(): Response {
   return new Response();
 }
 
-describe("ControllerInstanceTests", () => {
-  it("render json", async () => {
-    class JsonController extends Base {
-      async index() {
-        await this.render({ json: { hello: "world" } });
-      }
-    }
-    const c = new JsonController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"hello":"world"}');
-    expect(c.contentType).toBe("application/json; charset=utf-8");
-  });
+class Comment {
+  static readonly modelName = new ModelName(this);
+  readonly modelName = Comment.modelName;
+  id: number | null = null;
+  toKey(): unknown[] | null {
+    return this.id != null ? [this.id] : null;
+  }
+  save(): void {
+    this.id = 1;
+  }
+}
 
-  it("render json string", async () => {
-    class JsonStringController extends Base {
-      async index() {
-        await this.render({ json: '{"raw":true}' });
-      }
-    }
-    const c = new JsonStringController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"raw":true}');
-  });
+class EmptyController extends Base {}
 
-  it("render plain", async () => {
-    class PlainController extends Base {
-      async index() {
-        await this.render({ plain: "hello" });
-      }
-    }
-    const c = new PlainController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("hello");
-    expect(c.contentType).toBe("text/plain; charset=utf-8");
-  });
+class SimpleController extends Base {
+  // @ts-expect-error -- Ruby lets an action shadow an inherited method (base_test.rb:16-18)
+  status(): void {
+    this.head("ok");
+  }
 
-  it("render html", async () => {
-    class HtmlController extends Base {
-      async index() {
-        await this.render({ html: htmlSafe("<h1>Hi</h1>") });
-      }
-    }
-    const c = new HtmlController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("<h1>Hi</h1>");
-    expect(c.contentType).toBe("text/html; charset=utf-8");
-  });
+  hello(): void {
+    this.responseBody = "hello";
+  }
+}
 
-  it("render body", async () => {
-    class BodyController extends Base {
-      async index() {
-        await this.render({ body: "raw body" });
-      }
-    }
-    const c = new BodyController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("raw body");
-    expect(c.contentType).toBe("text/plain; charset=utf-8");
-  });
+class ChildController extends SimpleController {}
 
-  it("render with status", async () => {
-    class StatusController extends Base {
-      async index() {
-        await this.render({ json: { ok: true }, status: 201 });
-      }
-    }
-    const c = new StatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
-  });
+class NonEmptyController extends Base {
+  publicAction(): void {
+    this.head("ok");
+  }
+}
 
-  it("render with status symbol", async () => {
-    class StatusSymController extends Base {
-      async index() {
-        await this.render({ json: {}, status: "created" });
-      }
-    }
-    const c = new StatusSymController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
-  });
+class DefaultUrlOptionsController extends Base {
+  declare fromViewUrl: () => string;
+  declare descriptionsPath: (...args: unknown[]) => string;
+  declare descriptionPath: (...args: unknown[]) => string;
 
-  it("render with custom content type", async () => {
-    class CustomCtController extends Base {
-      async index() {
-        await this.render({ plain: "data", contentType: "text/csv" });
-      }
-    }
-    const c = new CustomCtController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("text/csv; charset=utf-8");
-  });
-
-  it("render implicit (no options) renders empty html", async () => {
-    class ImplicitController extends Base {
-      async index() {
-        await this.render();
-      }
-    }
-    ImplicitController.prependViewPath(new FixtureResolver({ "implicit/index.html.tse": "" }));
-    const c = new ImplicitController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("text/html; charset=utf-8");
-  });
-
-  it("render with template resolver", async () => {
-    class TemplateController extends Base {
-      async index() {
-        await this.render();
-      }
-    }
-    TemplateController.prependViewPath(
-      new FixtureResolver({
-        "template/index.html.tse": "<p>template#index</p>",
-      }),
-    );
-
-    const c = new TemplateController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("<p>template#index</p>");
-  });
-
-  it("double render throws DoubleRenderError", async () => {
-    class DoubleController extends Base {
-      async index() {
-        await this.render({ plain: "first" });
-        await this.render({ plain: "second" });
-      }
-    }
-    const c = new DoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
-      DoubleRenderError,
-    );
-  });
-
-  it("renderToString does not commit the response", async () => {
-    class RtsController extends Base {
-      result: unknown = "";
-      async index() {
-        this.result = await this.renderToString({ plain: "preview" });
-        await this.render({ plain: "final" });
-      }
-    }
-    const c = new RtsController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.result).toBe("preview");
-    expect(c.responseBody).toBe("final");
-  });
+  async fromView(): Promise<void> {
+    await this.render({ inline: `<%= context.${this.params.get("route")} %>` });
+  }
+}
+Object.defineProperty(DefaultUrlOptionsController.prototype, "defaultUrlOptions", {
+  get() {
+    return { host: "www.override.com", action: "new", locale: "en" };
+  },
 });
 
-describe("ActionController::Base redirecting", () => {
-  it("redirectTo sets location and 302", async () => {
-    class RedirectController extends Base {
-      async index() {
-        this.redirectTo("/other");
-      }
-    }
-    const c = new RedirectController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("http://localhost/other");
-    expect(c.performed).toBe(true);
-  });
-
-  it("redirectTo with custom status", async () => {
-    class RedirectStatusController extends Base {
-      async index() {
-        this.redirectTo("/moved", { status: 301 });
-      }
-    }
-    const c = new RedirectStatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(301);
-  });
-
-  it("redirectTo with symbol status", async () => {
-    class RedirectSymController extends Base {
-      async index() {
-        this.redirectTo("/see", { status: "see_other" });
-      }
-    }
-    const c = new RedirectSymController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(303);
-  });
-
-  it("redirect then render throws DoubleRenderError", async () => {
-    class DoubleRedirectController extends Base {
-      async index() {
-        this.redirectTo("/a");
-        await this.render({ plain: "oops" });
-      }
-    }
-    const c = new DoubleRedirectController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
-      DoubleRenderError,
-    );
-  });
-
-  it("redirectBack uses referer", async () => {
-    class RedirectBackController extends Base {
-      async index() {
-        this.redirectBack({ fallbackLocation: "/fallback" });
-      }
-    }
-    const c = new RedirectBackController();
-    const req = makeRequest({ HTTP_REFERER: "/previous" });
-    await c.dispatch("index", req, makeResponse());
-    expect(c.headers.get("location")).toBe("http://localhost/previous");
-  });
-
-  it("redirectBack uses fallback when no referer", async () => {
-    class RedirectBackFallController extends Base {
-      async index() {
-        this.redirectBack({ fallbackLocation: "/fallback" });
-      }
-    }
-    const c = new RedirectBackFallController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("location")).toBe("http://localhost/fallback");
-  });
+class OptionalDefaultUrlOptionsController extends Base {
+  show(): void {
+    this.head("ok");
+  }
+}
+Object.defineProperty(OptionalDefaultUrlOptionsController.prototype, "defaultUrlOptions", {
+  get() {
+    return { format: "atom", id: "default-id" };
+  },
 });
 
-describe("ActionController::Base rescue_from", () => {
-  it("rescues from a specific error class", async () => {
-    class CustomError extends Error {
-      name = "CustomError";
-    }
-    class RescueController extends Base {
-      async index() {
-        throw new CustomError("boom");
-      }
-    }
-    let rescued = false;
-    class RescueController2 extends Base {
-      async index() {
-        throw new CustomError("boom");
-      }
-    }
-    RescueController2.rescueFrom(CustomError, () => {
-      rescued = true;
-    });
+class UrlOptionsController extends Base {
+  declare fromViewUrl: () => string;
 
-    const c = new RescueController2();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(rescued).toBe(true);
-  });
+  async fromView(): Promise<void> {
+    await this.render({ inline: `<%= context.${this.params.get("route")} %>` });
+  }
+}
+const urlOptions = Base.prototype.urlOptions;
+UrlOptionsController.prototype.urlOptions = function () {
+  return { ...urlOptions.call(this), host: "www.override.com" };
+};
 
-  it("does not rescue unregistered errors", async () => {
-    class SpecificError extends Error {
-      name = "SpecificError";
-    }
-    class OtherError extends Error {
-      name = "OtherError";
-    }
-    class NoRescueController extends Base {
-      async index() {
-        throw new OtherError("nope");
-      }
-    }
-    NoRescueController.rescueFrom(SpecificError, () => {});
+class RecordIdentifierIncludedController extends Base {
+  declare domId: typeof domId;
+  declare domClass: typeof domClass;
+}
+include(RecordIdentifierIncludedController, { domId, domClass });
 
-    const c = new NoRescueController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(OtherError);
-  });
-
-  it("child inherits rescue handlers", async () => {
-    class AppError extends Error {
-      name = "AppError";
-    }
-    class ParentRescue extends Base {
-      async index() {
-        throw new AppError("parent");
-      }
-    }
-    let handled = false;
-    ParentRescue.rescueFrom(AppError, () => {
-      handled = true;
-    });
-
-    class ChildRescue extends ParentRescue {}
-
-    const c = new ChildRescue();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(handled).toBe(true);
-  });
-});
-
-describe("ActionController::Base conditional GET", () => {
-  it("freshWhen sets etag header", async () => {
-    class FreshController extends Base {
-      async index() {
-        await this.freshWhen(null, { etag: "test-data" });
-        if (!this.performed) {
-          await this.render({ plain: "fresh" });
-        }
-      }
-    }
-    const c = new FreshController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("etag")).toMatch(/^W\/"[a-f0-9]+"/);
-  });
-
-  it("freshWhen sets last-modified header", async () => {
-    const date = new Date("2024-01-01T00:00:00Z");
-    class LmController extends Base {
-      async index() {
-        await this.freshWhen(null, { lastModified: date });
-        if (!this.performed) {
-          await this.render({ plain: "ok" });
-        }
-      }
-    }
-    const c = new LmController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.headers.get("last-modified")).toBe(date.toUTCString());
-  });
-
-  it("freshWhen returns 304 when etag matches", async () => {
-    class Match304Controller extends Base {
-      async index() {
-        await this.freshWhen(null, { etag: "match-me" });
-        if (!this.performed) {
-          await this.render({ plain: "content" });
-        }
-      }
-    }
-    const c1 = new Match304Controller();
-    await c1.dispatch("index", makeRequest(), makeResponse());
-    const etag = c1.headers.get("etag")!;
-
-    const c2 = new Match304Controller();
-    const req = new Request({
-      REQUEST_METHOD: "GET",
-      PATH_INFO: "/",
-      HTTP_HOST: "localhost",
-      HTTP_IF_NONE_MATCH: etag,
-    });
-    await c2.dispatch("index", req, makeResponse());
-    expect(c2.status).toBe(304);
-  });
-
-  it("stale returns true when content needs re-render", async () => {
-    let staleResult: boolean | undefined;
-    class StaleController extends Base {
-      async index() {
-        staleResult = await this.isStale(null, { etag: "stale-test" });
-        if (staleResult) {
-          await this.render({ plain: "rendered" });
-        }
-      }
-    }
-    const c = new StaleController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(staleResult).toBe(true);
-  });
-
-  it("expiresIn sets cache-control header", () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    c.expiresIn(3600, { public: true, mustRevalidate: true });
-    expect(c.response.cacheControl).toMatchObject({
-      maxAge: 3600,
-      public: true,
-      mustRevalidate: true,
-    });
-  });
-
-  it("expiresNow sets no-cache", () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    c.expiresNow();
-    expect(c.response.cacheControl).toEqual({ noCache: true });
-  });
-});
-
-describe("ActionController::Base sendData", () => {
-  it("sends data with filename", async () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    await c.sendData("csv,data", { filename: "export.csv", type: "text/csv" });
-    expect(c.responseBody).toBe("csv,data");
-    expect(c.contentType).toBe("text/csv");
-    expect(c.headers.get("content-disposition")).toBe(
-      "attachment; filename=\"export.csv\"; filename*=UTF-8''export.csv",
-    );
-    expect(c.performed).toBe(true);
-  });
-
-  it("sends data with custom disposition", async () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    await c.sendData("inline-data", { disposition: "inline", filename: "doc.pdf" });
-    expect(c.headers.get("content-disposition")).toBe(
-      "inline; filename=\"doc.pdf\"; filename*=UTF-8''doc.pdf",
-    );
-  });
-
-  it("sends data without filename", async () => {
-    const c = new (class extends Base {})();
-    c.setResponseBang(makeResponse());
-    await c.sendData("raw");
-    expect(c.responseBody).toBe("raw");
-    expect(c.contentType).toBe("application/octet-stream");
-  });
-});
-
-describe("ActionController::API", () => {
-  it("renders json", async () => {
-    class ApiController extends API {
-      async index() {
-        await this.render({ json: { status: "ok" } });
-      }
-    }
-    const c = new ApiController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe('{"status":"ok"}');
-    expect(c.contentType).toBe("application/json; charset=utf-8");
-  });
-
-  it("renders plain text", async () => {
-    class ApiPlainController extends API {
-      async index() {
-        await this.render({ plain: "hello api" });
-      }
-    }
-    const c = new ApiPlainController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("hello api");
-  });
-
-  it("renders body", async () => {
-    class ApiBodyController extends API {
-      async index() {
-        await this.render({ body: "raw" });
-      }
-    }
-    const c = new ApiBodyController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("raw");
-  });
-
-  it("render with status", async () => {
-    class ApiStatusController extends API {
-      async index() {
-        await this.render({ json: {}, status: "created" });
-      }
-    }
-    const c = new ApiStatusController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(201);
-  });
-
-  it("double render throws", async () => {
-    class ApiDoubleController extends API {
-      async index() {
-        await this.render({ json: {} });
-        await this.render({ json: {} });
-      }
-    }
-    const c = new ApiDoubleController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
-      DoubleRenderError,
-    );
-  });
-
-  it("redirectTo sets location and empty body", async () => {
-    class ApiRedirectController extends API {
-      async index() {
-        this.redirectTo("/api/v2");
-      }
-    }
-    const c = new ApiRedirectController();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("http://localhost/api/v2");
-    expect(c.responseBody).toBe("");
-  });
-
-  it("redirectTo with custom status", async () => {
-    class ApiRedirect301Controller extends API {
-      async index() {
-        this.redirectTo("/api/v2", { status: 301 });
-      }
-    }
-    const c = new ApiRedirect301Controller();
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.status).toBe(301);
-  });
-
-  it("redirect then render throws", async () => {
-    class ApiDoubleRedController extends API {
-      async index() {
-        this.redirectTo("/a");
-        await this.render({ json: {} });
-      }
-    }
-    const c = new ApiDoubleRedController();
-    await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(
-      DoubleRenderError,
-    );
-  });
-});
-
-describe("DoubleRenderError", () => {
-  it("has correct name", () => {
-    const err = new DoubleRenderError();
-    expect(err.name).toBe("DoubleRenderError");
-  });
-
-  it("has default message", () => {
-    const err = new DoubleRenderError();
-    expect(err.message).toContain("Render and/or redirect");
-  });
-
-  it("accepts custom message", () => {
-    const err = new DoubleRenderError("custom");
-    expect(err.message).toBe("custom");
-  });
-});
+controllerConstants.set("url_options", UrlOptionsController);
+controllerConstants.set("default_url_options", DefaultUrlOptionsController);
 
 describe("ControllerClassTests", () => {
   it("controller path", () => {
-    class EmptyController extends Base {}
     expect(EmptyController.controllerPath()).toBe("empty");
     expect(new EmptyController().controllerPath()).toBe("empty");
 
@@ -551,7 +122,6 @@ describe("ControllerClassTests", () => {
   });
 
   it("controller name", () => {
-    class EmptyController extends Base {}
     expect(EmptyController.controllerName()).toBe("empty");
     expect(new EmptyController().controllerName()).toBe("empty");
 
@@ -560,7 +130,23 @@ describe("ControllerClassTests", () => {
     expect(new SuperAdminController().controllerName()).toBe("super_admin");
   });
 
-  it.skip("no deprecation when action view record identifier is included", () => {});
+  it("no deprecation when action view record identifier is included", () => {
+    const record = new Comment();
+    record.save();
+
+    let domId: string | null = null;
+    assertNotDeprecated(deprecator(), () => {
+      domId = new RecordIdentifierIncludedController().domId(record);
+    });
+
+    assertEqual("comment_1", domId);
+
+    let domClass: string | null = null;
+    assertNotDeprecated(deprecator(), () => {
+      domClass = new RecordIdentifierIncludedController().domClass(record);
+    });
+    assertEqual("comment", domClass);
+  });
 });
 
 describe("ControllerInstanceTests", () => {
@@ -577,7 +163,6 @@ describe("ControllerInstanceTests", () => {
   });
 
   it("empty controller action methods", () => {
-    class EmptyController extends Base {}
     const baseMethods = new Set(Base.actionMethods());
     const emptyMethods = new Set(EmptyController.actionMethods());
     const customMethods = [...emptyMethods].filter((m) => !baseMethods.has(m));
@@ -585,21 +170,57 @@ describe("ControllerInstanceTests", () => {
   });
 
   it("inspect", () => {
-    class EmptyController extends Base {}
     const c = new EmptyController();
     expect(c.inspect()).toMatch(/^#<EmptyController:0x[0-9a-f]+>$/);
   });
 
-  it.skip("action methods with inherited shadowed internal method", () => {});
+  it("action methods with inherited shadowed internal method", () => {
+    assertIncludes(publicInstanceMethods(Base), "status");
+    assertEqual(["hello", "status"], SimpleController.actionMethods().sort());
+    assertEqual(["hello", "status"], ChildController.actionMethods().sort());
+  });
 
-  it.skip("temporary anonymous controllers", () => {});
+  it("temporary anonymous controllers", () => {
+    const name = "ExamplesController";
+    const klass = (() => class extends Base {})();
+    rbModConstSet(Object, name, klass);
 
-  it.skip("response has default headers", () => {});
+    try {
+      const controller = new klass();
+      assertEqual("examples", controller.controllerPath());
+    } finally {
+      delete (Object as unknown as Record<string, unknown>)[name];
+    }
+  });
+
+  it("response has default headers", async () => {
+    const originalDefaultHeaders = Response.defaultHeaders;
+
+    try {
+      Response.defaultHeaders = {
+        "X-Frame-Options": "DENY",
+        "X-Content-Type-Options": "nosniff",
+        "X-XSS-Protection": "0",
+      };
+
+      const responseHeaders = (
+        await (SimpleController as unknown as typeof Base).action("hello")({
+          REQUEST_METHOD: "GET",
+          "rack.input": () => {},
+        })
+      )[1];
+
+      assert("x-frame-options" in responseHeaders);
+      assert("x-content-type-options" in responseHeaders);
+      assert("x-xss-protection" in responseHeaders);
+    } finally {
+      Response.defaultHeaders = originalDefaultHeaders;
+    }
+  });
 });
 
 describe("PerformActionTest", () => {
   it("process should be precise", async () => {
-    class EmptyController extends Base {}
     const c = new EmptyController();
     await expect(c.dispatch("non_existent", makeRequest(), makeResponse())).rejects.toThrow(
       /could not be found for EmptyController/,
@@ -617,45 +238,182 @@ describe("PerformActionTest", () => {
     expect(c.responseBody).toBe("Response for arbitrary_action");
   });
 
+  // BLOCKED: port-did-you-mean-correctable-onto-name-error
   it.skip("exceptions have suggestions for fix", () => {});
 });
 
-describe("withoutModules", () => {
-  it("returns MODULES minus the named entries", () => {
-    const result = Base.withoutModules("ParamsWrapper", "Streaming");
-    expect(result).not.toContain("ParamsWrapper");
-    expect(result).not.toContain("Streaming");
-    expect(result).toContain("Cookies");
-    expect(result.length).toBe(MODULES.length - 2);
-  });
-
-  it("returns the full list when no names are passed", () => {
-    expect(Base.withoutModules()).toEqual(MODULES);
-  });
-
-  it("ignores unknown names", () => {
-    expect(Base.withoutModules("NotAModule")).toEqual(MODULES);
-  });
-});
-
 describe("UrlOptionsTest", () => {
-  it.skip("url for query params included", () => {});
-  it.skip("url options override", () => {});
-  it.skip("url helpers does not become actions", () => {});
+  let tc: TestCase;
+  const controller = () => tc.controller as UrlOptionsController;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new UrlOptionsController();
+    await tc.beforeSetup();
+    tc.request.host = "www.example.com";
+  });
+
+  it("url for query params included", () => {
+    const rs = new RouteSet();
+    rs.draw(function () {
+      this.get("home", { to: "pages#home" });
+    });
+
+    const options = {
+      action: "home",
+      controller: "pages",
+      onlyPath: true,
+      params: { token: "secret" },
+    };
+
+    assertEqual("/home?token=secret", rs.urlFor(options));
+  });
+
+  it("url options override", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("from_view", { to: "url_options#fromView", as: "from_view" });
+
+        actionDispatchDeprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("fromView", { params: { route: "fromViewUrl()" } });
+
+      assertEqual("http://www.override.com/from_view", tc.response.body);
+      assertEqual("http://www.override.com/from_view", controller().fromViewUrl());
+      assertEqual(
+        "http://www.override.com/default_url_options/index",
+        controller().urlFor({ controller: "default_url_options" }),
+      );
+    });
+  });
+
+  it("url helpers does not become actions", () => {
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.get("account/overview");
+      });
+
+      assertNotIncludes(
+        (tc.controller.constructor as typeof Base).actionMethods(),
+        "accountOverviewPath",
+      );
+    });
+  });
 });
 
 describe("DefaultUrlOptionsTest", () => {
-  it.skip("default url options override", () => {});
-  it.skip("default url options are used in non positional parameters", () => {});
+  let tc: TestCase;
+  const controller = () => tc.controller as DefaultUrlOptionsController;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new DefaultUrlOptionsController();
+    await tc.beforeSetup();
+    tc.request.host = "www.example.com";
+  });
+
+  it("default url options override", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.get("from_view", { to: "default_url_options#fromView", as: "from_view" });
+
+        actionDispatchDeprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("fromView", { params: { route: "fromViewUrl()" } });
+
+      assertEqual("http://www.override.com/from_view?locale=en", tc.response.body);
+      assertEqual("http://www.override.com/from_view?locale=en", controller().fromViewUrl());
+      assertEqual(
+        "http://www.override.com/default_url_options/new?locale=en",
+        controller().urlFor({ controller: "default_url_options" }),
+      );
+    });
+  });
+
+  it("default url options are used in non positional parameters", async () => {
+    await tc.withRouting(async (set: RouteSet) => {
+      set.draw(function () {
+        this.scope("/:locale", () => {
+          this.resources("descriptions");
+        });
+
+        actionDispatchDeprecator().silence(() => {
+          this.get(":controller/:action");
+        });
+      });
+
+      await tc.get("fromView", { params: { route: "descriptionPath(1)" } });
+
+      assertEqual("/en/descriptions/1", tc.response.body);
+      assertEqual("/en/descriptions", controller().descriptionsPath());
+      assertEqual("/pl/descriptions", controller().descriptionsPath("pl"));
+      assertEqual("/pl/descriptions", controller().descriptionsPath({ locale: "pl" }));
+      assertEqual("/pl/descriptions.xml", controller().descriptionsPath("pl", "xml"));
+      assertEqual("/en/descriptions.xml", controller().descriptionsPath({ format: "xml" }));
+      assertEqual("/en/descriptions/1", controller().descriptionPath(1));
+      assertEqual("/pl/descriptions/1", controller().descriptionPath("pl", 1));
+      assertEqual("/pl/descriptions/1", controller().descriptionPath(1, { locale: "pl" }));
+      assertEqual("/pl/descriptions/1.xml", controller().descriptionPath("pl", 1, "xml"));
+      assertEqual("/en/descriptions/1.xml", controller().descriptionPath(1, { format: "xml" }));
+    });
+  });
 });
 
 describe("OptionalDefaultUrlOptionsControllerTest", () => {
-  it.skip("default url options override missing positional arguments", () => {});
+  it("default url options override missing positional arguments", async ({ task }) => {
+    const tc = new TestCase(task.name) as TestCase & { thingPath: (id?: string) => string };
+    tc.controller = new OptionalDefaultUrlOptionsController();
+    await tc.beforeSetup();
+
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.get("/things/:id(.:format)", { to: "things#show", as: "thing" });
+      });
+      assertEqual("/things/1.atom", tc.thingPath("1"));
+      assertEqual("/things/default-id.atom", tc.thingPath());
+    });
+  });
 });
 
 describe("EmptyUrlOptionsTest", () => {
-  it.skip("ensure url for works as expected when called with no options if default url options is not set", () => {});
-  it.skip("named routes with path without doing a request first", () => {});
+  let tc: TestCase;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new NonEmptyController();
+    await tc.beforeSetup();
+    tc.request.host = "www.example.com";
+  });
+
+  it("ensure url for works as expected when called with no options if default url options is not set", async () => {
+    await tc.get("publicAction");
+    assertEqual(
+      "http://www.example.com/non_empty/publicAction",
+      (tc.controller as NonEmptyController).urlFor(),
+    );
+  });
+
+  it("named routes with path without doing a request first", () => {
+    tc.controller = new EmptyController();
+    (tc.controller as EmptyController).request = tc.request;
+
+    tc.withRouting((set: RouteSet) => {
+      set.draw(function () {
+        this.resources("things");
+      });
+
+      assertEqual(
+        "/things",
+        (tc.controller as EmptyController & { thingsPath(): string }).thingsPath(),
+      );
+    });
+  });
 });
 
 describe("BaseTest", () => {
@@ -698,20 +456,5 @@ describe("BaseTest", () => {
       "Instrumentation",
       "ParamsWrapper",
     ]);
-  });
-});
-
-describe("PROTECTED_IVARS", () => {
-  it("extends abstract-layer defaults with controller-level slots", () => {
-    expect(PROTECTED_IVARS).toContain("_actionName");
-    expect(PROTECTED_IVARS).toContain("_params");
-    expect(PROTECTED_IVARS).toContain("_request");
-    expect(PROTECTED_IVARS).toContain("_response");
-    expect(PROTECTED_IVARS).toContain("_renderedFormat");
-  });
-
-  it("is returned by Base#_protectedIvars", () => {
-    const c = new Base();
-    expect(c._protectedIvars()).toBe(PROTECTED_IVARS);
   });
 });

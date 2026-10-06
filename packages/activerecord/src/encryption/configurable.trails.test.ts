@@ -5,7 +5,11 @@ import { KeyGenerator } from "./key-generator.js";
 import { Encryption } from "../encryption.js";
 
 describe("ActiveRecord::Encryption::Configurable (trails)", () => {
-  let saved: { primaryKey?: string | string[]; deterministicKey?: string; salt?: string };
+  let saved: {
+    primaryKey?: string | string[] | null;
+    deterministicKey?: string | null;
+    salt?: string | null;
+  };
 
   beforeEach(() => {
     const c = Configurable.config;
@@ -33,7 +37,7 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
 
     Configurable.configure({ primaryKey: "another primary key", keyDerivationSalt: "the salt" });
     expect(Configurable.config.hasPrimaryKey()).toBe("another primary key");
-    expect(Configurable.config.hasDeterministicKey()).toBeUndefined();
+    expect(Configurable.config.hasDeterministicKey()).toBeNull();
     expect(Configurable.config.hasKeyDerivationSalt()).toBe("the salt");
   });
 

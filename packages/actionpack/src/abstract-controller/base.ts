@@ -223,19 +223,11 @@ export class AbstractController {
       !Object.prototype.hasOwnProperty.call(this, "_actionMethodCache") ||
       !this._actionMethodCache
     ) {
-      const internal = AbstractController._internalMethods;
-      const methods: string[] = [];
-      let current: object | null = this.prototype;
-      while (current && current !== AbstractController.prototype && current !== Object.prototype) {
-        for (const name of Object.getOwnPropertyNames(current)) {
-          if (name.startsWith("_") || internal.has(name)) continue;
-          const descriptor = Object.getOwnPropertyDescriptor(current, name);
-          if (descriptor && typeof descriptor.value === "function") {
-            methods.push(name);
-          }
-        }
-        current = Object.getPrototypeOf(current);
-      }
+      const internalMethods = new Set(this.internalMethods());
+      const methods = allPublicMethodNames(this.prototype).filter(
+        (name) => !internalMethods.has(name),
+      );
+      methods.push(...ownPublicMethodNames(this.prototype));
       this._actionMethodCache = new Set(methods);
     }
     return [...this._actionMethodCache];

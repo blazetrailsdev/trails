@@ -58,7 +58,7 @@ describe("BlankTest", () => {
 
   it("presence", () => {
     for (const v of BLANK)
-      expect(presence(v), `${String(v)}.presence should return nil`).toBeUndefined();
+      expect(presence(v), `${String(v)}.presence should return nil`).toBeNull();
     for (const v of NOT) expect(presence(v), `${String(v)}.presence should return self`).toEqual(v);
   });
 });

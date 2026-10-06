@@ -33,9 +33,9 @@ import {
 } from "../cases/helper.js";
 
 interface ConfigSnapshot {
-  primaryKey: string | string[] | undefined;
-  deterministicKey: string | undefined;
-  keyDerivationSalt: string | undefined;
+  primaryKey: string | string[] | null | undefined;
+  deterministicKey: string | null | undefined;
+  keyDerivationSalt: string | null | undefined;
   supportUnencryptedData: boolean;
   encryptFixtures: boolean;
   previousSchemes: typeof Configurable.config.previousSchemes;

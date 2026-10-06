@@ -353,7 +353,7 @@ export interface AddIndexOptions {
   ifNotExists?: boolean;
   length?: number | null | Record<string, number>;
   opclass?: Record<string, string>;
-  include?: string | string[];
+  include?: string | string[] | null;
   nullsNotDistinct?: boolean;
   algorithm?: string;
 }
@@ -385,7 +385,7 @@ export class IndexDefinition {
   readonly opclasses: Record<string, string> | string;
   readonly type?: string;
   readonly using?: string;
-  readonly include?: string | string[];
+  readonly include?: string | string[] | null;
   readonly nullsNotDistinct?: boolean;
   readonly comment?: string;
   readonly valid: boolean;
@@ -404,7 +404,7 @@ export class IndexDefinition {
       opclasses?: Record<string, string> | string;
       type?: string;
       using?: string;
-      include?: string | string[];
+      include?: string | string[] | null;
       algorithm?: string;
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
@@ -452,7 +452,7 @@ export class IndexDefinition {
       name?: string;
       unique?: boolean;
       valid?: boolean;
-      include?: string | string[];
+      include?: string | string[] | null;
       nullsNotDistinct?: boolean;
     } = {},
   ): boolean {

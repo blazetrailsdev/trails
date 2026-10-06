@@ -76,7 +76,7 @@ describe("ResponseTest", () => {
 
   it("empty content type returns nil", () => {
     const res = new Response();
-    expect(res.contentType).toBeUndefined();
+    expect(res.contentType).toBeNull();
   });
 
   it("setting content type header impacts content type method", () => {
