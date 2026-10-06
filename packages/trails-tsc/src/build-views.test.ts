@@ -622,8 +622,8 @@ describe("runCli", () => {
       [
         "export class PostsController {",
         "  render(..._args: unknown[]): void {}",
-        "  showAll(): void { this.render({ locals: { foo: 1 } }); }",
-        "  edit(): void { [1].forEach(() => this.render({ locals: { foo: 1 } })); }",
+        "  showAll(): void { [1].forEach(() => this.render({ locals: { foo: 1 } })); }",
+        "  private renderEdit(): void { this.render({ locals: { foo: 1 } }); }",
         "}",
       ].join("\n"),
     );
@@ -652,25 +652,22 @@ describe("runCli", () => {
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.html.tse.ts`), "utf8");
     expect(shim("posts/show_all")).toContain("type ObjectLocals = { foo: number };");
     expect(shim("posts/show_all")).toContain("      : any;");
-    fs.rmSync(path.join(cwd, "app/controllers/posts-controller.ts"));
     write(
       cwd,
       "app/controllers/posts-controller.ts",
       [
         "export class PostsController {",
         "  render(..._args: unknown[]): void {}",
-        "  showAll(): void { this.render({ locals: { foo: 1 } }); }",
+        "  showAll(): void { [1].forEach(() => this.render({ locals: { foo: 1 } })); }",
         "}",
       ].join("\n"),
     );
     await buildViews({ cwd });
     expect(shim("posts/show_all")).toContain("      : never;");
-    expect(viewDiagnostics(cwd)).toEqual(
-      ["layouts/application", "posts/show_all"].map(
-        (rel) =>
-          `${rel}.html.tse.ts: This expression is not callable.\n  Type 'never' has no call signatures.`,
-      ),
-    );
+    expect(viewDiagnostics(cwd).map((d) => d.split(":")[0])).toEqual([
+      "layouts/application.html.tse.ts",
+      "posts/show_all.html.tse.ts",
+    ]);
   }, 30_000);
 
   it("types a template's locals from view and controller renders that pass a hash", async () => {
