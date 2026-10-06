@@ -67,6 +67,18 @@ describe("ScheduledTask", () => {
     expect(run.cancel()).toBe(false);
   });
 
+  it("cancels an unscheduled task: compare_and_set_state(:cancelled, :pending, :unscheduled), scheduled_task.rb:236", async () => {
+    let ran = false;
+    const task = new ScheduledTask(0.02, { executor: new ImmediateExecutor() }, () => {
+      ran = true;
+    });
+    expect(task.cancel()).toBe(true);
+    task.execute();
+    await sleep(40);
+    expect(ran).toBe(false);
+    expect(task.cancel()).toBe(false);
+  });
+
   it("raises on a negative delay", () => {
     expect(() => new ScheduledTask(-1, { executor: new ImmediateExecutor() }, () => {})).toThrow(
       new ArgumentError("seconds must be greater than zero"),
