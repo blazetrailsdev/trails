@@ -166,7 +166,6 @@ export class StatementCache {
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 
-  /** @missingRailsCall wrap — PERMANENT */
   async execute(
     params: unknown[],
     connection: unknown,

@@ -933,6 +933,29 @@ describe(
       expect(c["Raiser#f"].calls).toEqual(["ok?", "raise", "build", "new"]);
     });
 
+    it("drops new and wrap at an ActiveRecord::Promise receiver, keeping any other new", () => {
+      const c = rubyWeakCalls({
+        "promised.rb": `
+        class Promised
+          def f
+            return Promise::Complete.new(build) if done?
+            Wrapper.new(result)
+          end
+
+          def g
+            async ? Promise.wrap([]) : ActiveRecord::Promise.new(future, nil)
+          end
+        end
+      `,
+      });
+      // The native JS promise is the port of ActiveRecord::Promise (CLAUDE.md
+      // § "\`ActiveRecord::Promise\` is the native promise"), so the port writes
+      // the value and names no callee. \`Wrapper.new\` still records.
+      expect(c["Promised#f"].calls).toEqual(["done?", "build", "result", "new"]);
+      expect(c["Promised#g"].calls ?? []).not.toContain("new");
+      expect(c["Promised#g"].calls ?? []).not.toContain("wrap");
+    });
+
     it("drops new entirely when Proc is the only receiver", () => {
       const c = rubyWeakCalls({
         "quux.rb": `
@@ -1000,6 +1023,27 @@ describe(
       });
       expect(c["Qux#d"].filter((n) => n === "new")).toEqual(["new"]);
       expect(c["Qux#d"]).toContain("run");
+    });
+
+    it("drops the Promise.new / Promise::Complete.new / Promise.wrap sites", () => {
+      const c = rubyCallSiteNames({
+        "promised.rb": `
+        class Promised
+          def f
+            return Promise::Complete.new(build) if done?
+            Wrapper.new(result)
+          end
+
+          def g
+            async ? Promise.wrap([]) : ActiveRecord::Promise.new(future, nil)
+          end
+        end
+      `,
+      });
+      expect(c["Promised#f"].filter((n) => n === "new")).toEqual(["new"]);
+      expect(c["Promised#f"]).toContain("build");
+      expect(c["Promised#g"]).not.toContain("new");
+      expect(c["Promised#g"]).not.toContain("wrap");
     });
 
     it("drops the new site entirely when Proc is the only receiver", () => {
