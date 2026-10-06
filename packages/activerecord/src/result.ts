@@ -1,5 +1,6 @@
 import { isPlainObject } from "@blazetrails/activesupport";
 import {
+  ArgumentError,
   block,
   fetch,
   first,
@@ -159,7 +160,7 @@ export class Result {
   first(n?: number): Record<string, unknown> | Record<string, unknown>[] | undefined {
     const rows = this.hashRows();
     if (n === undefined) return rows[0];
-    if (n < 0) throw new Error("negative array size");
+    if (n < 0) throw new ArgumentError("attempt to take negative size");
     return rows.slice(0, n);
   }
 

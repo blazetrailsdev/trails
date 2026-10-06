@@ -1,4 +1,5 @@
 import {
+  TypeError,
   compact,
   groupBy,
   hasKey,

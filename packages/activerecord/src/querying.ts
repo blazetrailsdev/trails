@@ -415,16 +415,10 @@ export async function updateAll<T extends typeof Base>(
   this: T,
   updates: Record<string, unknown> | string | [string, ...unknown[]],
 ): Promise<number> {
-  if (this.abstractClass) {
-    throw new Error(`Cannot call updateAll on abstract class ${this.name}`);
-  }
   return this.all().updateAll(updates);
 }
 
 export async function deleteAll<T extends typeof Base>(this: T): Promise<number> {
-  if (this.abstractClass) {
-    throw new Error(`Cannot call deleteAll on abstract class ${this.name}`);
-  }
   return this.all().deleteAll();
 }
 

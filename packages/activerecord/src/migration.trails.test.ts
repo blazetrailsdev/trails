@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { excBacktraceLocations, StandardError } from "@blazetrails/ruby-compat";
+import { excBacktraceLocations, NoMethodError, StandardError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "./index.js";
@@ -275,7 +275,7 @@ describe("Migration#createTable id option type", () => {
       expect(await strategy.respondToMissing("createTable")).toBe(true);
       expect(await strategy.respondToMissing("nopeNotHere")).toBe(false);
       expect(await strategy.methodMissing("createTable")).toBe("hi mom!");
-      await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(TypeError);
+      await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(NoMethodError);
     });
 
     class RecordingMigration extends Migration {

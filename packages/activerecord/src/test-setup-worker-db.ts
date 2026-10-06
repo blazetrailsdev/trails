@@ -1,5 +1,6 @@
 import pg from "pg";
 import mysql from "mysql2/promise";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./support/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./support/ar-db-slots.js";
@@ -62,7 +63,7 @@ async function acquireAdvisorySlotPg(): Promise<number> {
   }
 
   await client.end();
-  throw new Error(slotExhaustionMessage("acquireAdvisorySlotPg", "advisory lock", slots));
+  throw new RuntimeError(slotExhaustionMessage("acquireAdvisorySlotPg", "advisory lock", slots));
 }
 
 async function acquireAdvisorySlotMysql(): Promise<number> {
@@ -98,7 +99,7 @@ async function acquireAdvisorySlotMysql(): Promise<number> {
   }
 
   await conn.end();
-  throw new Error(slotExhaustionMessage("acquireAdvisorySlotMysql", "GET_LOCK", slots));
+  throw new RuntimeError(slotExhaustionMessage("acquireAdvisorySlotMysql", "GET_LOCK", slots));
 }
 
 const lane = activeLane();

@@ -28,7 +28,7 @@ import {
   included,
   kernelArray,
 } from "@blazetrails/activesupport";
-import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
+import { NotImplementedError, RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
@@ -93,7 +93,7 @@ function arrayLen(value: string | string[]): number {
   return Array.isArray(value) ? value.length : 1;
 }
 
-export class AbstractReflection {
+export abstract class AbstractReflection {
   /** @internal */
   private _counterCacheColumn?: string | null;
   private _inverseWhichUpdatesCounterCacheDefined?: boolean;
@@ -125,13 +125,9 @@ export class AbstractReflection {
     return new (this.klass as any)(attributes, block);
   }
 
-  get className(): string {
-    throw new Error("Subclass must implement className");
-  }
+  abstract get className(): string;
 
-  get klass(): typeof Base {
-    throw new Error("Subclass must implement klass");
-  }
+  abstract get klass(): typeof Base;
 
   get scopes(): Array<(...args: any[]) => any> {
     return this.scope ? [this.scope] : [];
@@ -546,7 +542,8 @@ export class AssociationReflection extends MacroReflection {
   }
 
   get macro(): MacroType {
-    throw new Error("Subclass must implement macro");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/reflection.rb:691
+    throw new NotImplementedError();
   }
 
   foreignKey({ inferFromInverseOf = true }: { inferFromInverseOf?: boolean } = {}):
@@ -890,7 +887,8 @@ export class AssociationReflection extends MacroReflection {
     | typeof BelongsToAssociation
     | typeof HasManyAssociation
     | typeof HasOneAssociation {
-    throw new Error("Subclass must implement associationClass");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/reflection.rb:719
+    throw new NotImplementedError();
   }
 
   polymorphicName(): string {
