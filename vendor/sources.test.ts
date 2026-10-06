@@ -193,6 +193,7 @@ describe("vendor/sources.ts", () => {
       "activerecord",
       "activejob",
       "rack-test",
+      "msgpack",
       "thor",
       "i18n",
     ]);

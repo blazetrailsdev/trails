@@ -282,6 +282,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "msgpack",
         libPath: "lib/msgpack",
+        libEntryFile: "lib/msgpack.rb",
         testPath: "spec",
       },
     ],

@@ -49,5 +49,7 @@ Each is tracked by a story in RFC 0184.
   buffers are not wired, a map never unpacks as a `Hash`, and `Buffer#to_s` and
   the other C methods listed there are absent. Story:
   `msgpack-packer-unpacker-remaining-c-surface`.
-- **`Factory`, `Factory::Pool` and `DefaultFactory`** are
-  `msgpack-factory-pool-and-default-factory`.
+- **`Factory#register_type` has no Symbol or `oversized_integer_extension`
+  arm** (`ext/msgpack/factory_class.c:232-249`). Story:
+  `msgpack-bigint-ext-and-oversized-integer`. The `factory_spec.rb` tests
+  still unported are `msgpack-factory-spec-remaining-tests`.
