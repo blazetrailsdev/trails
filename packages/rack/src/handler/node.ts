@@ -27,9 +27,6 @@ export interface Options {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export const RACK_HIJACK_IO = "rack.hijack_io";
-
-/** @noRailsEquivalent PERMANENT */
 const unhijacked = new Set<HttpSocket>();
 
 export class Node {
@@ -93,6 +90,11 @@ export class Node {
       const discard = (): void => {
         socket.destroy();
       };
+      const release = (): void => {
+        hijacked = true;
+        unhijacked.delete(socket);
+        socket.removeListener("error", discard);
+      };
       socket.on("error", discard);
       unhijacked.add(socket);
       socket.on("close", () => {
@@ -100,26 +102,39 @@ export class Node {
       });
       if (head.length > 0) socket.unshift(head);
 
-      const env = await this.requestEnv(req, new StringIO(""));
-      env[RACK_IS_HIJACK] = true;
-      env[RACK_HIJACK] = (): HttpSocket => {
-        hijacked = true;
-        unhijacked.delete(socket);
-        socket.removeListener("error", discard);
-        env[RACK_HIJACK_IO] = socket;
-        return socket;
-      };
-
-      const [status, headers, body] = await this.app(env);
       try {
-        if (hijacked) return;
-        socket.write(responseHead(status, sentHeaders(headers)));
-        for await (const chunk of body) {
-          socket.write(chunk);
+        const env = await this.requestEnv(req, new StringIO(""));
+        env[RACK_IS_HIJACK] = true;
+        env[RACK_HIJACK] = (): HttpSocket => {
+          release();
+          return socket;
+        };
+
+        const [status, headers, body] = await this.app(env);
+        try {
+          if (hijacked) return;
+          const partial = headers[RACK_HIJACK] as unknown;
+          if (typeof partial === "function") {
+            socket.write(responseHead(status, sentHeaders(headers)));
+            release();
+            await (partial as (stream: HttpSocket) => unknown)(socket);
+            return;
+          }
+          socket.write(responseHead(status, sentHeaders(headers)));
+          for await (const chunk of body) {
+            if (hijacked) return;
+            socket.write(chunk);
+          }
+          socket.end();
+        } finally {
+          await closeBody(body);
         }
-        socket.end();
-      } finally {
-        await closeBody(body);
+      } catch (error) {
+        if (hijacked) throw error;
+        stderr.write(
+          `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
+        );
+        socket.end(responseHead(500, { "content-length": "0" }));
       }
     }).value();
   }
@@ -181,6 +196,7 @@ export class Node {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
 function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
   const sent: Record<string, string | string[]> = {};
   const setCookie = headers[SET_COOKIE];
@@ -196,6 +212,7 @@ function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]
   return sent;
 }
 
+/** @noRailsEquivalent PERMANENT */
 async function closeBody(body: RackResponse[2]): Promise<void> {
   const { close, return: finish } = body as {
     close?: () => void;
@@ -208,11 +225,12 @@ async function closeBody(body: RackResponse[2]): Promise<void> {
 /** @noRailsEquivalent PERMANENT */
 function responseHead(status: number, headers: Record<string, string | string[]>): string {
   const lines = [`HTTP/1.1 ${status} ${HTTP_STATUS_CODES[status] ?? ""}`.trimEnd()];
+  let connection = false;
   for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === "connection") continue;
+    if (key.toLowerCase() === "connection") connection = true;
     for (const each of Array.isArray(value) ? value : [value]) lines.push(`${key}: ${each}`);
   }
-  lines.push("connection: close");
+  if (!connection) lines.push("connection: close");
   return `${lines.join("\r\n")}\r\n\r\n`;
 }
 

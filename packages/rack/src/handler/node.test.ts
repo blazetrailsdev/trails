@@ -5,7 +5,7 @@ import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
 import { Lint } from "../lint.js";
-import { Node, RACK_HIJACK_IO } from "./node.js";
+import { Node } from "./node.js";
 
 async function serving(app: RackApp, body: (url: string) => Promise<void>): Promise<void> {
   const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
@@ -250,15 +250,11 @@ describe("Rack::Handler::Node", () => {
       expect(lintError).toBeNull();
     });
 
-    it("hands over the socket, sets rack.hijack_io, and writes nothing itself", async () => {
-      let hijackIo: unknown;
-      let returned: unknown;
+    it("hands over the socket and writes nothing itself", async () => {
       const reply = await new Promise<string>((resolve, reject) => {
         serving(
           async (env) => {
             const io = (env[RACK_HIJACK] as () => HttpSocket)();
-            returned = io;
-            hijackIo = env[RACK_HIJACK_IO];
             io.on("data", (chunk) => {
               io.write(`echo:${Buffer.from(chunk).toString()}`);
               io.end();
@@ -272,7 +268,6 @@ describe("Rack::Handler::Node", () => {
         ).catch(reject);
       });
 
-      expect(returned).toBe(hijackIo);
       expect(reply).toBe("echo:after-handshake");
     });
 
@@ -312,6 +307,93 @@ describe("Rack::Handler::Node", () => {
       expect(text).toContain("connection: close\r\n");
       expect(text.endsWith("\r\n\r\nPage not found")).toBe(true);
       expect(closed).toBe(true);
+    });
+
+    it("writes the status and headers, then hands the stream to a rack.hijack response header", async () => {
+      let bodyRead = false;
+      const ignored: RackBody = {
+        async *[Symbol.asyncIterator]() {
+          bodyRead = true;
+          yield "never written";
+        },
+      };
+      let text = "";
+      await serving(
+        async () => [
+          200,
+          {
+            "content-type": "text/event-stream",
+            "rack.hijack": ((stream: HttpSocket) => {
+              stream.write("data: one\n\n");
+              stream.end();
+            }) as unknown as string,
+          },
+          ignored,
+        ],
+        async (url) => {
+          ({ text } = await upgradeRequest(url, "/stream"));
+        },
+      );
+
+      expect(text.startsWith("HTTP/1.1 200 OK\r\n")).toBe(true);
+      expect(text).toContain("content-type: text/event-stream\r\n");
+      expect(text).not.toContain("rack.hijack");
+      expect(text.endsWith("\r\n\r\ndata: one\n\n")).toBe(true);
+      expect(bodyRead).toBe(false);
+    });
+
+    it("keeps the app's own connection header on an upgrade it answers", async () => {
+      let text = "";
+      await serving(
+        async () => [101, { connection: "Upgrade", upgrade: "websocket" }, bodyFromString("")],
+        async (url) => {
+          ({ text } = await upgradeRequest(url, "/cable"));
+        },
+      );
+
+      expect(text.startsWith("HTTP/1.1 101 Switching Protocols\r\n")).toBe(true);
+      expect(text).toContain("connection: Upgrade\r\n");
+      expect(text).not.toContain("connection: close");
+    });
+
+    it("answers 500 and closes the socket when the app raises before hijacking", async () => {
+      let text = "";
+      let closed = false;
+      await serving(
+        async () => {
+          throw new Error("boom");
+        },
+        async (url) => {
+          ({ text, closed } = await upgradeRequest(url, "/cable"));
+        },
+      );
+
+      expect(text.startsWith("HTTP/1.1 500 Internal Server Error\r\n")).toBe(true);
+      expect(closed).toBe(true);
+    });
+
+    it("stops writing the response once the app hijacks from inside the body", async () => {
+      let text = "";
+      await serving(
+        async (env) => [
+          200,
+          {},
+          {
+            async *[Symbol.asyncIterator]() {
+              yield "first";
+              const io = (env[RACK_HIJACK] as () => HttpSocket)();
+              io.end();
+              yield "second";
+            },
+          },
+        ],
+        async (url) => {
+          ({ text } = await upgradeRequest(url, "/cable"));
+        },
+      );
+
+      expect(text.endsWith("first")).toBe(true);
+      expect(text).not.toContain("second");
     });
 
     it("leaves rack.hijack? false and rack.hijack unset on an ordinary request", async () => {
