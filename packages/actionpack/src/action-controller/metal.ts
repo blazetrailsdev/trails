@@ -310,14 +310,15 @@ export class Metal extends AbstractController {
     if (status !== null && typeof status === "object") {
       throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
     }
-    const resolvedStatus = status ?? "ok";
+    const resolvedStatus = status == null || (status as unknown) === false ? "ok" : status;
     let location: unknown;
     let contentType: unknown;
     if (options) {
       location = options.location;
+      delete options.location;
       contentType = options.contentType;
+      delete options.contentType;
       for (const [key, value] of Object.entries(options)) {
-        if (key === "location" || key === "contentType") continue;
         this.headers.set(
           key
             .split(/[-_]/)
@@ -328,7 +329,7 @@ export class Metal extends AbstractController {
       }
     }
     this.status = resolvedStatus;
-    if (location !== undefined && location !== null) {
+    if (location != null && location !== false) {
       this.location = this.urlFor(location as string);
     }
     if (includeContent(this.status)) {

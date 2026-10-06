@@ -452,6 +452,7 @@ export class Base extends Metal {
     let renderOutput: void | Promise<void>;
     const viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
+        if (this.responseBody != null) throw new DoubleRenderError();
         return (renderOutput = (
           super["render" as never] as (...args: unknown[]) => void | Promise<void>
         ).call(this, ...args));

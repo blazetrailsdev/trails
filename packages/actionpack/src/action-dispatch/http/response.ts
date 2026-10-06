@@ -210,7 +210,7 @@ export class Response {
   private _status: number;
   private _headers: Headers;
   private _committed = false;
-  private _cv: Array<() => void> = [];
+  private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
   stream: unknown = null;
@@ -481,7 +481,7 @@ export class Response {
     if (this._committed) return;
     this.beforeCommitted();
     this._committed = true;
-    for (const broadcast of this._cv.splice(0)) broadcast();
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sendingBang(): void {
@@ -503,7 +503,7 @@ export class Response {
   }
 
   async awaitCommit(): Promise<void> {
-    while (!this._committed) await new Promise<void>((broadcast) => this._cv.push(broadcast));
+    while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
   }
   async awaitSent(): Promise<void> {}
 
