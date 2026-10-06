@@ -332,6 +332,7 @@ export class LoaderQuery {
 
     for (const loader of loaders) {
       await loader.loadRecords(rawRecords);
+      await loader.run();
     }
   }
 }

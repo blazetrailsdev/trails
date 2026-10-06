@@ -56,9 +56,16 @@ describe("HttpAuthentication::Basic", () => {
   });
 
   it("authenticate invokes login_procedure with decoded user+pass, else returns undefined", () => {
-    const verify = vi.fn((u: string, p: string) => `${u}/${p}`);
+    const verify = vi.fn((u: string | undefined, p: string | undefined) => `${u}/${p}`);
     expect(authenticate(req(encodeCredentials("dhh", "secret")), verify)).toBe("dhh/secret");
     expect(authenticate(req(), verify)).toBeUndefined();
+  });
+
+  it("authenticate hands login_procedure nil for a credential with no colon", () => {
+    const noColon = req(`Basic ${Buffer.from("George").toString("base64")}`);
+    expect(authenticate(noColon, (u, p) => [u, p])).toEqual(["George", undefined]);
+    // @ts-expect-error password is nil for a credential with no colon
+    expect(() => authenticate(noColon, (_u, p) => p.length)).toThrow(TypeError);
   });
 
   it("authenticationRequest writes 401 + WWW-Authenticate and strips realm quotes", () => {

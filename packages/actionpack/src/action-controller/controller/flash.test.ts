@@ -122,12 +122,12 @@ describe("FlashTest", () => {
   });
 
   it("redirect to with alert", async () => {
-    const controller = await get("redirectWithAlert");
+    const controller = await get("redirect_with_alert");
     expect(controller.flash.get("alert")).toBe("Beware the nowheres!");
   });
 
   it("redirect to with notice", async () => {
-    const controller = await get("redirectWithNotice");
+    const controller = await get("redirect_with_notice");
     expect(controller.flash.get("notice")).toBe("Good luck in the somewheres!");
   });
 
@@ -144,7 +144,7 @@ describe("FlashTest", () => {
   });
 
   it("redirect to with other flashes", async () => {
-    const controller = await get("redirectWithOtherFlashes");
+    const controller = await get("redirect_with_other_flashes");
     expect(controller.flash.get("joyride")).toBe("Horses!");
   });
 
@@ -172,7 +172,7 @@ describe("FlashTest", () => {
   it("redirect to with adding flash types", async () => {
     const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
-    const controller = await get("redirectWithFooFlash", testControllerWithFlashTypeFoo);
+    const controller = await get("redirect_with_foo_flash", testControllerWithFlashTypeFoo);
     expect(controller.flash.get("foo")).toBe("for great justice");
   });
 
@@ -244,10 +244,10 @@ class FlashIntegrationTestSession extends IntegrationTest {
 async function withTestRouteSet(block: (t: IntegrationTest) => Promise<void>): Promise<void> {
   const t = new FlashIntegrationTestSession(expect.getState().currentTestName!);
   t.routes.draw(function () {
-    this.get("/set_flash", { to: "flash_integration_test#setFlash" });
-    this.get("/use_flash", { to: "flash_integration_test#useFlash" });
-    this.get("/set_bar", { to: "flash_integration_test#setBar" });
-    this.get("/set_flash_optionally", { to: "flash_integration_test#setFlashOptionally" });
+    this.get("/set_flash", { to: "flash_integration_test#set_flash" });
+    this.get("/use_flash", { to: "flash_integration_test#use_flash" });
+    this.get("/set_bar", { to: "flash_integration_test#set_bar" });
+    this.get("/set_flash_optionally", { to: "flash_integration_test#set_flash_optionally" });
   });
   t.app = IntegrationTest.buildApp(t.routes, (middleware) => {
     middleware.use(CookieStore as MiddlewareFactory, { key: SessionKey });

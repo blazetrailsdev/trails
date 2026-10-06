@@ -366,7 +366,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache", async () => {
-    await controller.get("withFragmentCache");
+    await controller.get("with_fragment_cache");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -375,18 +375,18 @@ describe("ACLogSubscriberTest", () => {
 
   it("with fragment cache when log disabled", async () => {
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = false;
-    await controller.get("withFragmentCache");
+    await controller.get("with_fragment_cache");
 
     expect(logs.length).toBe(2);
     expect(logs[0]).toBe(
-      "Processing by Another::LogSubscribersController#withFragmentCache as HTML",
+      "Processing by Another::LogSubscribersController#with_fragment_cache as HTML",
     );
     expect(logs[1]).toMatch(/Completed 200 OK in \d+ms/);
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = true;
   });
 
   it("with fragment cache if with true", async () => {
-    await controller.get("withFragmentCacheIfWithTrueCondition");
+    await controller.get("with_fragment_cache_if_with_true_condition");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -394,7 +394,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache if with false", async () => {
-    await controller.get("withFragmentCacheIfWithFalseCondition");
+    await controller.get("with_fragment_cache_if_with_false_condition");
 
     expect(logs.length).toBe(2);
     expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
@@ -402,7 +402,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache unless with true", async () => {
-    await controller.get("withFragmentCacheUnlessWithTrueCondition");
+    await controller.get("with_fragment_cache_unless_with_true_condition");
 
     expect(logs.length).toBe(2);
     expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
@@ -410,7 +410,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache unless with false", async () => {
-    await controller.get("withFragmentCacheUnlessWithFalseCondition");
+    await controller.get("with_fragment_cache_unless_with_false_condition");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -418,7 +418,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache and percent in key", async () => {
-    await controller.get("withFragmentCacheAndPercentInKey");
+    await controller.get("with_fragment_cache_and_percent_in_key");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);

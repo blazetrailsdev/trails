@@ -351,19 +351,19 @@ describe("TestCase over a PostsController", () => {
     });
 
     it("accepts 'redirect' for 3xx", async () => {
-      await tc.get("redirectAction");
+      await tc.get("redirect_action");
       tc.assertResponse("redirect");
     });
 
     it("rejects 'success' for non-2xx", async () => {
-      await tc.get("renderWithStatus");
+      await tc.get("render_with_status");
       expect(() => tc.assertResponse("success")).toThrow(
         /Expected response to be a <2XX: success>, but was a <404: Not Found>/,
       );
     });
 
     it("accepts status symbols like 'not_found'", async () => {
-      await tc.get("renderWithStatus");
+      await tc.get("render_with_status");
       tc.assertResponse("not_found");
     });
 
@@ -383,19 +383,19 @@ describe("TestCase over a PostsController", () => {
     });
 
     it("accepts 'missing' for 4xx", async () => {
-      await tc.get("renderWithStatus");
+      await tc.get("render_with_status");
       tc.assertResponse("missing");
     });
   });
 
   describe("assertRedirectedTo", () => {
     it("passes on correct redirect URL", async () => {
-      await tc.get("redirectAction");
+      await tc.get("redirect_action");
       tc.assertRedirectedTo("/posts");
     });
 
     it("throws on wrong redirect URL", async () => {
-      await tc.get("redirectAction");
+      await tc.get("redirect_action");
       expect(() => tc.assertRedirectedTo("/wrong")).toThrow(
         /Expected response to be a redirect to <http:\/\/test.host\/wrong>/,
       );
@@ -409,7 +409,7 @@ describe("TestCase over a PostsController", () => {
     });
 
     it("accepts regex", async () => {
-      await tc.get("redirectAction");
+      await tc.get("redirect_action");
       tc.assertRedirectedTo(/\/posts/);
     });
   });
@@ -421,19 +421,19 @@ describe("TestCase over a PostsController", () => {
     });
 
     it("matches plain text content type", async () => {
-      await tc.get("renderPlain");
+      await tc.get("render_plain");
       expect(tc.response.mediaType).toBe("text/plain");
     });
 
     it("matches HTML content type", async () => {
-      await tc.get("renderHtml");
+      await tc.get("render_html");
       expect(tc.response.mediaType).toBe("text/html");
     });
   });
 
   describe("assertHeader", () => {
     it("checks header value", async () => {
-      await tc.get("setCustomHeader");
+      await tc.get("set_custom_header");
       expect(tc.response.getHeader("x-custom")).toBe("test-value");
     });
 

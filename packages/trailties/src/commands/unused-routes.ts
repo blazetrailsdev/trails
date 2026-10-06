@@ -6,7 +6,7 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { underscore } from "@blazetrails/activesupport";
+import { camelize, underscore } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
@@ -77,7 +77,7 @@ export class RouteInfo {
   /** @internal */
   private actionMissing(): boolean {
     if (this.controllerClass == null) return false;
-    return !(String(this.actionName) in this.controllerClass.prototype);
+    return !(camelize(String(this.actionName), false) in this.controllerClass.prototype);
   }
 }
 

@@ -322,7 +322,7 @@ class TestController extends Base {
     await this.render({ action: "hello_world" });
   }
   static {
-    this.beforeAction("handleLastModifiedAndEtags", { only: "conditionalHelloWithBangs" });
+    this.beforeAction("handleLastModifiedAndEtags", { only: "conditional_hello_with_bangs" });
   }
 
   async handleLastModifiedAndEtags(): Promise<void> {
@@ -509,7 +509,9 @@ describe("ExpiresInRenderTest", () => {
       ),
     ).toBeTruthy();
     await expect(
-      tc.get("dynamicRenderWithFile", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+      tc.get("dynamic_render_with_file", {
+        params: { id: "../\\../test-helpers/abstract-unit.ts" },
+      }),
     ).rejects.toThrow(ArgumentError);
   });
 
@@ -518,7 +520,7 @@ describe("ExpiresInRenderTest", () => {
     try {
       file.write("secrets!");
       file.flush();
-      await expect(tc.get("dynamicRender", { params: { id: file.path() } })).rejects.toThrow(
+      await expect(tc.get("dynamic_render", { params: { id: file.path() } })).rejects.toThrow(
         MissingTemplate,
       );
     } finally {
@@ -534,7 +536,7 @@ describe("ExpiresInRenderTest", () => {
       ),
     ).toBeTruthy();
     await expect(
-      tc.get("dynamicRender", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
+      tc.get("dynamic_render", { params: { id: "../\\../test-helpers/abstract-unit.ts" } }),
     ).rejects.toThrow(MissingTemplate);
   });
 
@@ -546,7 +548,7 @@ describe("ExpiresInRenderTest", () => {
       ),
     ).toBeTruthy();
     await expect(
-      tc.get("dynamicRenderPermit", {
+      tc.get("dynamic_render_permit", {
         params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
       }),
     ).rejects.toThrow(ArgumentError);
@@ -554,82 +556,82 @@ describe("ExpiresInRenderTest", () => {
 
   it("dynamic render file hash", async () => {
     await expect(
-      tc.get("dynamicRender", {
+      tc.get("dynamic_render", {
         params: { id: { file: "../\\../test-helpers/abstract-unit.ts" } },
       }),
     ).rejects.toThrow(ArgumentError);
   });
 
   it("expires in header", async () => {
-    await tc.get("conditionalHelloWithExpiresIn");
+    await tc.get("conditional_hello_with_expires_in");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, private");
   });
 
   it("expires in header with public", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithPublic");
+    await tc.get("conditional_hello_with_expires_in_with_public");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public");
   });
 
   it("expires in header with must revalidate", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithMustRevalidate");
+    await tc.get("conditional_hello_with_expires_in_with_must_revalidate");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, private, must-revalidate");
   });
 
   it("expires in header with public and must revalidate", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithPublicAndMustRevalidate");
+    await tc.get("conditional_hello_with_expires_in_with_public_and_must_revalidate");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public, must-revalidate");
   });
 
   it("expires in header with stale while revalidate", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithStaleWhileRevalidate");
+    await tc.get("conditional_hello_with_expires_in_with_stale_while_revalidate");
     expect(tc.response.headers.get("Cache-Control")).toBe(
       "max-age=60, public, stale-while-revalidate=300",
     );
   });
 
   it("expires in header with stale if error", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithStaleIfError");
+    await tc.get("conditional_hello_with_expires_in_with_stale_if_error");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public, stale-if-error=300");
   });
 
   it("expires in header with immutable", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithImmutable");
+    await tc.get("conditional_hello_with_expires_in_with_immutable");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public, immutable");
   });
 
   it("expires in header with additional headers", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithPublicWithMoreKeys");
+    await tc.get("conditional_hello_with_expires_in_with_public_with_more_keys");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public, s-maxage=18000");
   });
 
   it("expires in old syntax", async () => {
-    await tc.get("conditionalHelloWithExpiresInWithPublicWithMoreKeysOldSyntax");
+    await tc.get("conditional_hello_with_expires_in_with_public_with_more_keys_old_syntax");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public, s-maxage=18000");
   });
 
   it("expires now", async () => {
-    await tc.get("conditionalHelloWithExpiresNow");
+    await tc.get("conditional_hello_with_expires_now");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("expires now with cache control headers", async () => {
-    await tc.get("conditionalHelloWithCacheControlHeaders");
+    await tc.get("conditional_hello_with_cache_control_headers");
     expect(tc.response.headers.get("Cache-Control")).toMatch(/no-cache/);
     expect(tc.response.headers.get("Cache-Control")).toMatch(/no-transform/);
   });
 
   it("expires now with conflicting cache control headers", async () => {
-    await tc.get("conditionalHelloWithExpiresAndConflicitingCacheControlHeaders");
+    await tc.get("conditional_hello_with_expires_and_confliciting_cache_control_headers");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("no expires now with conflicting cache control headers", async () => {
-    await tc.get("conditionalHelloWithoutExpiresAndConflicitingCacheControlHeaders");
+    await tc.get("conditional_hello_without_expires_and_confliciting_cache_control_headers");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("no expires now with public", async () => {
-    await tc.get("conditionalHelloWithoutExpiresAndPublicHeader");
+    await tc.get("conditional_hello_without_expires_and_public_header");
     expect(tc.response.headers.get("Cache-Control")).toBe("public, no-cache");
   });
 
@@ -637,7 +639,7 @@ describe("ExpiresInRenderTest", () => {
     const time = Time.mktime(2011, 10, 30);
     const now = vi.spyOn(Time, "now").mockReturnValue(time);
     try {
-      await tc.get("conditionalHelloWithExpiresIn");
+      await tc.get("conditional_hello_with_expires_in");
       expect(tc.response.headers.get("Date")).toBe(Time.now().httpdate());
     } finally {
       now.mockRestore();
@@ -645,19 +647,19 @@ describe("ExpiresInRenderTest", () => {
   });
 
   it("cache control default header with extras partially overridden by expires in", async () => {
-    await tc.get("cacheControlDefaultHeaderWithExtrasPartiallyOverriddenByExpiresIn");
+    await tc.get("cache_control_default_header_with_extras_partially_overridden_by_expires_in");
     expect(tc.response.headers.get("Cache-Control")).toBe(
       "max-age=300, public, s-maxage=60, proxy-revalidate",
     );
   });
 
   it("cache control no store overridden by expires in", async () => {
-    await tc.get("cacheControlNoStoreOverriddenByExpiresIn");
+    await tc.get("cache_control_no_store_overridden_by_expires_in");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=60, public");
   });
 
   it("cache control no store overridden by expires now", async () => {
-    await tc.get("cacheControlNoStoreOverriddenByExpiresNow");
+    await tc.get("cache_control_no_store_overridden_by_expires_now");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 });
@@ -675,13 +677,13 @@ describe("LastModifiedRenderTest", () => {
   });
 
   it("responds with last modified", async () => {
-    await tc.get("conditionalHello");
+    await tc.get("conditional_hello");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("request not modified", async () => {
     tc.request.setIfModifiedSince(lastModified);
-    await tc.get("conditionalHello");
+    await tc.get("conditional_hello");
     expect(toI(tc.response.status)).toBe(304);
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
@@ -690,31 +692,31 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified but etag differs", async () => {
     tc.request.setIfModifiedSince(lastModified);
     tc.request.setIfNoneMatch('"234"');
-    await tc.get("conditionalHello");
+    await tc.get("conditional_hello");
     assertResponse("success");
   });
 
   it("request modified", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
-    await tc.get("conditionalHello");
+    await tc.get("conditional_hello");
     expect(toI(tc.response.status)).toBe(200);
     expect(isPresent(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("responds with custom cache control headers", async () => {
-    await tc.get("conditionalHello");
+    await tc.get("conditional_hello");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("responds with last modified with record", async () => {
-    await tc.get("conditionalHelloWithRecord");
+    await tc.get("conditional_hello_with_record");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("request not modified with record", async () => {
     tc.request.setIfModifiedSince(lastModified);
-    await tc.get("conditionalHelloWithRecord");
+    await tc.get("conditional_hello_with_record");
     expect(toI(tc.response.status)).toBe(304);
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.etag).not.toBeNull();
@@ -724,26 +726,26 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified but etag differs with record", async () => {
     tc.request.setIfModifiedSince(lastModified);
     tc.request.setIfNoneMatch('"234"');
-    await tc.get("conditionalHelloWithRecord");
+    await tc.get("conditional_hello_with_record");
     assertResponse("success");
   });
 
   it("request modified with record", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
-    await tc.get("conditionalHelloWithRecord");
+    await tc.get("conditional_hello_with_record");
     expect(toI(tc.response.status)).toBe(200);
     expect(isPresent(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("responds with last modified with array of records", async () => {
-    await tc.get("conditionalHelloWithArrayOfRecords");
+    await tc.get("conditional_hello_with_array_of_records");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("request not modified with array of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
-    await tc.get("conditionalHelloWithArrayOfRecords");
+    await tc.get("conditional_hello_with_array_of_records");
     expect(toI(tc.response.status)).toBe(304);
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
@@ -752,26 +754,26 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified but etag differs with array of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
     tc.request.setIfNoneMatch('"234"');
-    await tc.get("conditionalHelloWithArrayOfRecords");
+    await tc.get("conditional_hello_with_array_of_records");
     assertResponse("success");
   });
 
   it("request modified with array of records", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
-    await tc.get("conditionalHelloWithArrayOfRecords");
+    await tc.get("conditional_hello_with_array_of_records");
     expect(toI(tc.response.status)).toBe(200);
     expect(isPresent(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("responds with last modified with collection of records", async () => {
-    await tc.get("conditionalHelloWithCollectionOfRecords");
+    await tc.get("conditional_hello_with_collection_of_records");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("request not modified with collection of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
-    await tc.get("conditionalHelloWithCollectionOfRecords");
+    await tc.get("conditional_hello_with_collection_of_records");
     expect(toI(tc.response.status)).toBe(304);
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
@@ -780,38 +782,38 @@ describe("LastModifiedRenderTest", () => {
   it("request not modified but etag differs with collection of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
     tc.request.setIfNoneMatch('"234"');
-    await tc.get("conditionalHelloWithCollectionOfRecords");
+    await tc.get("conditional_hello_with_collection_of_records");
     assertResponse("success");
   });
 
   it("request modified with collection of records", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
-    await tc.get("conditionalHelloWithCollectionOfRecords");
+    await tc.get("conditional_hello_with_collection_of_records");
     expect(toI(tc.response.status)).toBe(200);
     expect(isPresent(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
   it("request with bang gets last modified", async () => {
-    await tc.get("conditionalHelloWithBangs");
+    await tc.get("conditional_hello_with_bangs");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
     assertResponse("success");
   });
 
   it("request with bang obeys last modified", async () => {
     tc.request.setIfModifiedSince(lastModified);
-    await tc.get("conditionalHelloWithBangs");
+    await tc.get("conditional_hello_with_bangs");
     assertResponse("not_modified");
   });
 
   it("last modified works with less than too", async () => {
     tc.request.setIfModifiedSince((Duration.years(5).ago() as Time).httpdate());
-    await tc.get("conditionalHelloWithBangs");
+    await tc.get("conditional_hello_with_bangs");
     assertResponse("success");
   });
 
   it("last modified with custom cache control headers", async () => {
-    await tc.get("conditionalHelloWithBangs");
+    await tc.get("conditional_hello_with_bangs");
     expect(tc.response.headers.get("Cache-Control")).toBe("public, no-cache");
     assertResponse("success");
   });
@@ -867,36 +869,36 @@ describe("EtagRenderTest", () => {
   });
 
   it("etag reflects template digest", async () => {
-    await tc.get("withTemplate");
+    await tc.get("with_template");
     assertResponse("ok");
     const etag = tc.response.etag;
     expect(etag).not.toBeNull();
 
     tc.request.setIfNoneMatch(etag!);
-    await tc.get("withTemplate");
+    await tc.get("with_template");
     assertResponse("not_modified");
 
     await modifyTemplate(tc, "test/hello_world", async () => {
       tc.request.setIfNoneMatch(etag!);
-      await tc.get("withTemplate");
+      await tc.get("with_template");
       assertResponse("ok");
       expect(tc.response.etag).not.toBe(etag);
     });
   });
 
   it("etag reflects implicit template digest", async () => {
-    await tc.get("withImplicitTemplate");
+    await tc.get("with_implicit_template");
     assertResponse("ok");
     const etag = tc.response.etag;
     expect(etag).not.toBeNull();
 
     tc.request.setIfNoneMatch(etag!);
-    await tc.get("withImplicitTemplate");
+    await tc.get("with_implicit_template");
     assertResponse("not_modified");
 
     await modifyTemplate(tc, "test/with_implicit_template", async () => {
       tc.request.setIfNoneMatch(etag!);
-      await tc.get("withImplicitTemplate");
+      await tc.get("with_implicit_template");
       assertResponse("ok");
       expect(tc.response.etag).not.toBe(etag);
     });
@@ -914,18 +916,18 @@ describe("NamespacedEtagRenderTest", () => {
   });
 
   it("etag reflects template digest", async () => {
-    await tc.get("helloWorld");
+    await tc.get("hello_world");
     assertResponse("ok");
     const etag = tc.response.etag;
     expect(etag).not.toBeNull();
 
     tc.request.setIfNoneMatch(etag!);
-    await tc.get("helloWorld");
+    await tc.get("hello_world");
     assertResponse("not_modified");
 
     await modifyTemplate(tc, "namespaced/implicit_render_test/hello_world", async () => {
       tc.request.setIfNoneMatch(etag!);
-      await tc.get("helloWorld");
+      await tc.get("hello_world");
       assertResponse("ok");
       expect(tc.response.etag).not.toBe(etag);
     });
@@ -943,18 +945,18 @@ describe("InheritedEtagRenderTest", () => {
   });
 
   it("etag reflects template digest", async () => {
-    await tc.get("helloWorld");
+    await tc.get("hello_world");
     assertResponse("ok");
     const etag = tc.response.etag;
     expect(etag).not.toBeNull();
 
     tc.request.setIfNoneMatch(etag!);
-    await tc.get("helloWorld");
+    await tc.get("hello_world");
     assertResponse("not_modified");
 
     await modifyTemplate(tc, "implicit_render_test/hello_world", async () => {
       tc.request.setIfNoneMatch(etag!);
-      await tc.get("helloWorld");
+      await tc.get("hello_world");
       assertResponse("ok");
       expect(tc.response.etag).not.toBe(etag);
     });
@@ -971,7 +973,7 @@ describe("MetalRenderTest", () => {
   });
 
   it("access to logger in view", async () => {
-    await tc.get("accessingLoggerInTemplate");
+    await tc.get("accessing_logger_in_template");
     expect(tc.response.body).toBe("NilClass");
   });
 });
@@ -1010,22 +1012,22 @@ describe("ImplicitRenderTest", () => {
   });
 
   it("implicit no content response as browser", async () => {
-    await expect(tc.get("emptyAction")).rejects.toThrow(MissingExactTemplate);
+    await expect(tc.get("empty_action")).rejects.toThrow(MissingExactTemplate);
   });
 
   it("implicit no content response as xhr", async () => {
-    await tc.get("emptyAction", { xhr: true });
+    await tc.get("empty_action", { xhr: true });
     assertResponse("no_content");
   });
 
   it("implicit success response with right format", async () => {
-    await tc.get("emptyActionWithTemplate");
+    await tc.get("empty_action_with_template");
     expect(tc.response.body).toBe("<h1>Empty action rendered this implicitly.</h1>\n");
     assertResponse("success");
   });
 
   it("implicit unknown format response", async () => {
-    await expect(tc.get("emptyActionWithTemplate", { format: "json" })).rejects.toThrow(
+    await expect(tc.get("empty_action_with_template", { format: "json" })).rejects.toThrow(
       UnknownFormat,
     );
   });
@@ -1043,32 +1045,32 @@ describe("HeadRenderTest", () => {
   });
 
   it("head created", async () => {
-    await tc.post("headCreated");
+    await tc.post("head_created");
     expect(isBlank(tc.response.body)).toBe(true);
     assertResponse("created");
   });
 
   it("head created with application json content type", async () => {
-    await tc.post("headCreatedWithApplicationJsonContentType");
+    await tc.post("head_created_with_application_json_content_type");
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Content-Type")).toBe("application/json");
     assertResponse("created");
   });
 
   it("head ok with image png content type", async () => {
-    await tc.post("headOkWithImagePngContentType");
+    await tc.post("head_ok_with_image_png_content_type");
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Content-Type")).toBe("image/png");
     assertResponse("ok");
   });
 
   it("head respect string content type", async () => {
-    await tc.get("headOkWithStringKeyContentType");
+    await tc.get("head_ok_with_string_key_content_type");
     expect(tc.response.headers.get("Content-Type")).toBe("application/pdf");
   });
 
   it("head with location header", async () => {
-    await tc.get("headWithLocationHeader");
+    await tc.get("head_with_location_header");
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("Location")).toBe("/foo");
     assertResponse("ok");
@@ -1084,7 +1086,7 @@ describe("HeadRenderTest", () => {
         });
       });
 
-      await tc.get("headWithLocationObject");
+      await tc.get("head_with_location_object");
       expect(isBlank(tc.response.body)).toBe(true);
       expect(tc.response.headers.get("Location")).toBe("http://www.nextangle.com/customers/1");
       assertResponse("ok");
@@ -1092,35 +1094,35 @@ describe("HeadRenderTest", () => {
   });
 
   it("head with custom header", async () => {
-    await tc.get("headWithCustomHeader");
+    await tc.get("head_with_custom_header");
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("X-Custom-Header")).toBe("something");
     assertResponse("ok");
   });
 
   it("head with www authenticate header", async () => {
-    await tc.get("headWithWwwAuthenticateHeader");
+    await tc.get("head_with_www_authenticate_header");
     expect(isBlank(tc.response.body)).toBe(true);
     expect(tc.response.headers.get("WWW-Authenticate")).toBe("something");
     assertResponse("ok");
   });
 
   it("head with symbolic status", async () => {
-    await tc.get("headWithSymbolicStatus", { params: { status: "ok" } });
+    await tc.get("head_with_symbolic_status", { params: { status: "ok" } });
     expect(tc.response.status).toBe(200);
     assertResponse("ok");
 
-    await tc.get("headWithSymbolicStatus", { params: { status: "not_found" } });
+    await tc.get("head_with_symbolic_status", { params: { status: "not_found" } });
     expect(tc.response.status).toBe(404);
     assertResponse("not_found");
 
-    await tc.get("headWithSymbolicStatus", { params: { status: "no_content" } });
+    await tc.get("head_with_symbolic_status", { params: { status: "no_content" } });
     expect(tc.response.status).toBe(204);
     assertNotIncludes(tc.response.headers, "Content-Length");
     assertResponse("no_content");
 
     for (const [status, code] of Object.entries(Utils.SYMBOL_TO_STATUS_CODE)) {
-      await tc.get("headWithSymbolicStatus", { params: { status: String(status) } });
+      await tc.get("head_with_symbolic_status", { params: { status: String(status) } });
       expect(tc.response.responseCode).toBe(code);
       assertResponse(status);
     }
@@ -1128,13 +1130,13 @@ describe("HeadRenderTest", () => {
 
   it("head with integer status", async () => {
     for (const [code, message] of Object.entries(Utils.HTTP_STATUS_CODES)) {
-      await tc.get("headWithIntegerStatus", { params: { status: String(code) } });
+      await tc.get("head_with_integer_status", { params: { status: String(code) } });
       expect(tc.response.message).toBe(message);
     }
   });
 
   it("head with no content", async () => {
-    await tc.get("headWithNoContent");
+    await tc.get("head_with_no_content");
 
     expect(tc.response.status).toBe(204);
     assertNil(tc.response.headers.get("Content-Type"));
@@ -1142,14 +1144,14 @@ describe("HeadRenderTest", () => {
   });
 
   it("head with string status", async () => {
-    await tc.get("headWithStringStatus", { params: { status: "404 Eat Dirt" } });
+    await tc.get("head_with_string_status", { params: { status: "404 Eat Dirt" } });
     expect(tc.response.responseCode).toBe(404);
     expect(tc.response.message).toBe("Not Found");
     assertResponse("not_found");
   });
 
   it("head with status code first", async () => {
-    await tc.get("headWithStatusCodeFirst");
+    await tc.get("head_with_status_code_first");
     expect(tc.response.responseCode).toBe(403);
     expect(tc.response.message).toBe("Forbidden");
     expect(tc.response.headers.get("X-Custom-Header")).toBe("something");
@@ -1158,12 +1160,12 @@ describe("HeadRenderTest", () => {
 
   it("head returns truthy value", async () => {
     await assertNothingRaised(async () => {
-      await tc.get("headAndReturn");
+      await tc.get("head_and_return");
     });
   });
 
   it("head default content type", async () => {
-    await tc.post("headDefaultContentType");
+    await tc.post("head_default_content_type");
     expect(tc.response.headers.get("Content-Type")).toBe("text/html");
   });
 });
@@ -1207,7 +1209,7 @@ describe("LiveHeadRenderTest", () => {
   });
 
   it("live head ok", async () => {
-    await tc.get("testAction", { format: "json" });
+    await tc.get("test_action", { format: "json" });
 
     (tc.response.stream as LiveBuffer).onError(() => {
       expect.fail("action should not raise any errors");
@@ -1237,7 +1239,7 @@ describe("HttpCacheForeverTest", () => {
   });
 
   it("cache with public", async () => {
-    await tc.get("cacheMeForever", { params: { public: true } });
+    await tc.get("cache_me_forever", { params: { public: true } });
     assertResponse("ok");
     expect(tc.response.headers.get("Cache-Control")).toBe(
       `max-age=${Duration.years(100)}, public, immutable`,
@@ -1247,7 +1249,7 @@ describe("HttpCacheForeverTest", () => {
   });
 
   it("cache with private", async () => {
-    await tc.get("cacheMeForever");
+    await tc.get("cache_me_forever");
     assertResponse("ok");
     expect(tc.response.headers.get("Cache-Control")).toBe(
       `max-age=${Duration.years(100)}, private, immutable`,
@@ -1257,20 +1259,20 @@ describe("HttpCacheForeverTest", () => {
   });
 
   it("cache response code with if modified since", async () => {
-    await tc.get("cacheMeForever");
+    await tc.get("cache_me_forever");
     assertResponse("ok");
 
     tc.request.setIfModifiedSince(tc.response.headers.get("Last-Modified") as string);
-    await tc.get("cacheMeForever");
+    await tc.get("cache_me_forever");
     assertResponse("not_modified");
   });
 
   it("cache response code with etag", async () => {
-    await tc.get("cacheMeForever");
+    await tc.get("cache_me_forever");
     assertResponse("ok");
 
     tc.request.setIfNoneMatch(tc.response.etag!);
-    await tc.get("cacheMeForever");
+    await tc.get("cache_me_forever");
     assertResponse("not_modified");
   });
 });
@@ -1284,7 +1286,7 @@ describe("HttpCacheNoStoreTest", () => {
 
     static {
       this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
-        only: "noStoreOverriddenByExpiresIn",
+        only: "no_store_overridden_by_expires_in",
       });
     }
     async noStoreOverriddenByExpiresIn(): Promise<void> {
@@ -1294,7 +1296,7 @@ describe("HttpCacheNoStoreTest", () => {
 
     static {
       this.beforeAction((c) => (c as HttpCacheNoStoreController).expiresIn(Duration.seconds(30)), {
-        only: "expiresInOverriddenByNoStore",
+        only: "expires_in_overridden_by_no_store",
       });
     }
     async expiresInOverriddenByNoStore(): Promise<void> {
@@ -1304,7 +1306,7 @@ describe("HttpCacheNoStoreTest", () => {
 
     static {
       this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
-        only: "noStoreOverriddenByFreshWhen",
+        only: "no_store_overridden_by_fresh_when",
       });
     }
     async noStoreOverriddenByFreshWhen(): Promise<void> {
@@ -1315,7 +1317,7 @@ describe("HttpCacheNoStoreTest", () => {
     static {
       this.beforeAction(
         (c) => (c as HttpCacheNoStoreController).freshWhen(null, { etag: "abc123" }),
-        { only: "freshWhenOverriddenByNoStore" },
+        { only: "fresh_when_overridden_by_no_store" },
       );
     }
     async freshWhenOverriddenByNoStore(): Promise<void> {
@@ -1325,7 +1327,7 @@ describe("HttpCacheNoStoreTest", () => {
 
     static {
       this.beforeAction((c) => (c as HttpCacheNoStoreController).expiresNow(), {
-        only: "expiresNowOverriddenByNoStore",
+        only: "expires_now_overridden_by_no_store",
       });
     }
     async expiresNowOverriddenByNoStore(): Promise<void> {
@@ -1335,7 +1337,7 @@ describe("HttpCacheNoStoreTest", () => {
 
     static {
       this.beforeAction((c) => (c as HttpCacheNoStoreController).noStore(), {
-        only: "noStoreOverriddenByExpiresNow",
+        only: "no_store_overridden_by_expires_now",
       });
     }
     async noStoreOverriddenByExpiresNow(): Promise<void> {
@@ -1365,47 +1367,47 @@ describe("HttpCacheNoStoreTest", () => {
   });
 
   it("standalone no store call", async () => {
-    await tc.get("standaloneNoStoreCall");
+    await tc.get("standalone_no_store_call");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("no store overridden by expires in", async () => {
-    await tc.get("noStoreOverriddenByExpiresIn");
+    await tc.get("no_store_overridden_by_expires_in");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=30, private");
   });
 
   it("expires in overridden by no store", async () => {
-    await tc.get("expiresInOverriddenByNoStore");
+    await tc.get("expires_in_overridden_by_no_store");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("no store overridden by fresh when", async () => {
-    await tc.get("noStoreOverriddenByFreshWhen");
+    await tc.get("no_store_overridden_by_fresh_when");
     expect(tc.response.headers.get("Cache-Control")).toBe("max-age=0, private, must-revalidate");
   });
 
   it("fresh when overridden by no store", async () => {
-    await tc.get("freshWhenOverriddenByNoStore");
+    await tc.get("fresh_when_overridden_by_no_store");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("expires now overridden by no store", async () => {
-    await tc.get("expiresNowOverriddenByNoStore");
+    await tc.get("expires_now_overridden_by_no_store");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("no store overridden by expires now", async () => {
-    await tc.get("noStoreOverriddenByExpiresNow");
+    await tc.get("no_store_overridden_by_expires_now");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-cache");
   });
 
   it("cache control no cache header can be overridden by no store", async () => {
-    await tc.get("cacheControlNoCacheOverriddenByNoStore");
+    await tc.get("cache_control_no_cache_overridden_by_no_store");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 
   it("cache control public with expiration header can be overridden by no store", async () => {
-    await tc.get("cacheControlPublicWithMaxAgeOverriddenByNoStore");
+    await tc.get("cache_control_public_with_max_age_overridden_by_no_store");
     expect(tc.response.headers.get("Cache-Control")).toBe("no-store");
   });
 });

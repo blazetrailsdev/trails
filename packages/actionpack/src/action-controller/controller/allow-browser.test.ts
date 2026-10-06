@@ -92,10 +92,10 @@ describe("AllowBrowserTest", () => {
 
   it("blocked browser below version limit with method name", async () => {
     const C = createController(SPECIFIC_VERSIONS, "headUpgradeRequired", {
-      only: ["helloMethodName"],
+      only: ["hello_method_name"],
     });
     const c = new C();
-    await c.dispatch("helloMethodName", makeRequest(FIREFOX_114), makeResponse());
+    await c.dispatch("hello_method_name", makeRequest(FIREFOX_114), makeResponse());
     expect(c.status).toBe(426);
   });
 
