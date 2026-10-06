@@ -573,6 +573,9 @@ describe("rbFArray", () => {
     expect(() => rbFArray(new Range(1, null))).toThrow(
       new RangeError("cannot convert endless range to an array"),
     );
+    expect(() => rbFArray(new Range(null, 3))).toThrow(
+      new globalThis.TypeError("can't iterate from NilClass"),
+    );
     expect(rbFArray({ toAry: () => [1] })).toEqual([1]);
     expect(rbFArray("json")).toEqual(["json"]);
     expect(rbFArray(false)).toEqual([false]);

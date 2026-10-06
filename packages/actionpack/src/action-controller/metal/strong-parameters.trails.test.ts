@@ -1,4 +1,6 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
+import { rbObjDup } from "@blazetrails/ruby-compat";
+import { Psych } from "@blazetrails/ruby-compat/psych";
 import { Parameters, UnpermittedParameters } from "./strong-parameters.js";
 
 describe("Parameters#unpermitted_parameters!", () => {
@@ -55,5 +57,62 @@ describe("Parameters#expect types", () => {
     const id = params.expect("id");
     expectTypeOf(id).toBeUnknown();
     expect(id).toBe("1");
+  });
+});
+
+describe("ActionController::Parameters", () => {
+  it("hashes by class, content and permitted flag, whatever the insertion order", () => {
+    const left = new Parameters({ a: "1", b: "2" });
+    const right = new Parameters({ b: "2", a: "1" });
+    expect(left.eql(right)).toBe(true);
+    expect(left.hash()).toBe(right.hash());
+    expect(left.hash()).not.toBe(new Parameters({ a: "1", b: "3" }).hash());
+    expect(left.hash()).not.toBe(new Parameters({ a: "1", b: "2" }).permitBang().hash());
+  });
+
+  it("aliases required to require", () => {
+    const params = new Parameters({ person: { name: "Francesco" } });
+    expect(Parameters.prototype.required).toBe(Parameters.prototype.require);
+    expect((params.required("person") as Parameters).get("name")).toBe("Francesco");
+    expect(() => params.required("missing")).toThrow(
+      "param is missing or the value is empty or invalid: missing",
+    );
+  });
+
+  it("dups through initialize_copy, sharing nested values but not the top-level hash", () => {
+    const params = new Parameters({ person: { name: "Francesco" }, tags: ["a"] });
+    const person = params.get("person");
+    for (const dupped of [rbObjDup(params), params.stringifyKeys()]) {
+      expect(dupped.get("person")).toBe(person);
+      dupped.set("extra", "1");
+      expect(params.hasKey("extra")).toBe(false);
+    }
+  });
+
+  it("initializes from each coder tag and encodes parameters and permitted", () => {
+    const allocate = (tag: string, map: Record<string, unknown>) => {
+      const params = Object.create(Parameters.prototype) as Parameters;
+      params.initWith(Object.assign(new Psych.Coder(tag), map));
+      return params;
+    };
+
+    const legacy = allocate("!ruby/hash:ActionController::Parameters", { key: ":value" });
+    expect([legacy.get("key"), legacy.permitted]).toEqual([":value", false]);
+
+    const withIvars = allocate("!ruby/hash-with-ivars:ActionController::Parameters", {
+      elements: { key: ":value" },
+      ivars: { ":@permitted": true },
+    });
+    expect([withIvars.get("key"), withIvars.permitted]).toEqual([":value", true]);
+
+    const object = allocate("!ruby/object:ActionController::Parameters", {
+      parameters: { key: ":value" },
+      permitted: true,
+    });
+    expect([object.get("key"), object.permitted]).toEqual([":value", true]);
+
+    const coder = new Psych.Coder(null);
+    object.encodeWith(coder);
+    expect({ ...coder }).toEqual({ parameters: { key: ":value" }, permitted: true });
   });
 });

@@ -205,11 +205,7 @@ export class Parameters {
     throw new ParameterMissing(key, Object.keys(this._data));
   }
 
-  required(key: string[]): unknown[];
-  required(key: string): unknown;
-  required(key: string | string[]): unknown {
-    return this.require(key as string);
-  }
+  declare required: Parameters["require"];
 
   expect<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
   expect(key: string): unknown;
@@ -1088,6 +1084,8 @@ export class Parameters {
     this._data = rbObjDup(this._data);
   }
 }
+
+Parameters.prototype.required = Parameters.prototype.require;
 
 include(Parameters, ToJsonWithActiveSupportEncoder);
 

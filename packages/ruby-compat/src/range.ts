@@ -244,6 +244,7 @@ export class Range<T = unknown> {
 
   /** `vendor/ruby/v3.3.11/range.c:934` `range_each`. */
   *each(): Generator<T> {
+    if (this.begin === null) throw new TypeError("can't iterate from NilClass");
     yield* this.step(1);
   }
 

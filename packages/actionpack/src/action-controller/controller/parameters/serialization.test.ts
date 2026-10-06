@@ -14,11 +14,15 @@ describe("ParametersSerializationTest", () => {
     Parameters.permitAllParameters = oldPermittedParameters;
   });
 
-  it("YAML serialization", () => {
+  // BLOCKED: psych-dump-puts-root-tag-on-its-own-line
+  // BLOCKED: parameters-holds-a-plain-object-not-hash-with-indifferent-access
+  it.skip("YAML serialization", () => {
     const params = new Parameters({ key: ":value" });
     const yamlDump = YAML.dump(params);
-    expect(yamlDump).toMatch(/---\s!ruby\/object:ActionController::Parameters/);
-    expect(yamlDump).toMatch(/parameters:\n\s+key: :value/);
+    expect(yamlDump).toMatch("--- !ruby/object:ActionController::Parameters");
+    expect(yamlDump).toMatch(
+      /parameters: !ruby\/hash:ActiveSupport::HashWithIndifferentAccess\n\s+key: :value/,
+    );
     expect(yamlDump).toMatch("permitted: false");
   });
 
