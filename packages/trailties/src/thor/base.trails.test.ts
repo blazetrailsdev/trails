@@ -413,7 +413,7 @@ describe("Thor::Base", () => {
         "rebuilt app",
       );
       child.publicCommand("nope");
-      expect(() => (new child() as Instance & { nope(): void }).nope()).toThrow(NoMethodError);
+      expect(() => (new child() as Instance & { nope(): void }).nope()).toThrow(TypeError);
     });
   });
 

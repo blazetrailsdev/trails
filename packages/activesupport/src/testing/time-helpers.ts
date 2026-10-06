@@ -1,5 +1,5 @@
 import { Date, DateTime, Temporal, Time } from "@blazetrails/date";
-import { Rational, rational, RuntimeError } from "@blazetrails/ruby-compat";
+import { Rational, rational, rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Duration } from "../duration.js";
 import { clock, currentTimeInstant } from "../time-travel.js";
@@ -77,9 +77,9 @@ export function afterTeardown(): void {
 export function travel(
   duration: Duration | number,
   { withUsec = false }: { withUsec?: boolean } = {},
-  block?: () => void,
-): void {
-  travelTo(plusWithDuration.call(Time.now(), duration), { withUsec }, block);
+  block?: () => unknown,
+): unknown {
+  return travelTo(plusWithDuration.call(Time.now(), duration), { withUsec }, block);
 }
 
 export function travelTo(
@@ -92,8 +92,8 @@ export function travelTo(
     | Time
     | string,
   { withUsec = false }: { withUsec?: boolean } = {},
-  block?: () => void,
-): void {
+  block?: () => unknown,
+): unknown {
   if (block && inBlock()) {
     const travelToNestedBlockCall = `
       Calling \`travel_to\` with a block, when we have previously already made a call to \`travel_to\`, can lead to confusing time stubbing.
@@ -179,17 +179,20 @@ export function travelTo(
   stubs.stubObject(clock, "now", () => now.toZonedDateTime().toInstant());
 
   if (block) {
-    try {
-      setInBlock(true);
-      block();
-    } finally {
-      if (stubbedTime) {
-        travelTo(stubbedTime);
-      } else {
-        travelBack();
-      }
-      setInBlock(false);
-    }
+    return rbEnsure(
+      () => {
+        setInBlock(true);
+        return block();
+      },
+      () => {
+        if (stubbedTime) {
+          travelTo(stubbedTime);
+        } else {
+          travelBack();
+        }
+        setInBlock(false);
+      },
+    );
   }
 }
 

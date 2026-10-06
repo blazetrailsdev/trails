@@ -494,7 +494,7 @@ describe("ActionController::API", () => {
     const c = new ApiRedirectController();
     await c.dispatch("index", makeRequest(), makeResponse());
     expect(c.status).toBe(302);
-    expect(c.headers.get("location")).toBe("/api/v2");
+    expect(c.headers.get("location")).toBe("http://localhost/api/v2");
     expect(c.responseBody).toBe("");
   });
 

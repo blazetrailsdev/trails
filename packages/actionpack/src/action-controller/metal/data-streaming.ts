@@ -1,3 +1,4 @@
+import { Concern, Module, extend } from "@blazetrails/activesupport";
 import { File, merge, slice } from "@blazetrails/ruby-compat";
 import { ContentDisposition } from "../../action-dispatch/http/content-disposition.js";
 import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
@@ -112,3 +113,15 @@ export function sendFileHeadersBang(
 
   this.headers.set("Content-Transfer-Encoding", "binary");
 }
+
+export const DataStreaming: Module<{
+  sendFile: OmitThisParameter<typeof sendFile>;
+  sendData: OmitThisParameter<typeof sendData>;
+  sendFileHeadersBang: OmitThisParameter<typeof sendFileHeadersBang>;
+}> = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod("sendFile", sendFile);
+  mod.defineMethod("sendData", sendData);
+  mod.defineMethod("sendFileHeadersBang", sendFileHeadersBang);
+});

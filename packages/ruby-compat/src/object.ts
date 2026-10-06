@@ -385,7 +385,9 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * `string.c:12215`, `lib/set.rb:393`), and `toSym` for every JS string
  * (`string.c:12212`), which spells both a Ruby String and a Ruby Symbol
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
- * (`array.c:8619`), whose prototype carries no such member. `isInfinite` and
+ * (`array.c:8619`), whose prototype carries no such member. `each` is bound
+ * for a JS array, a `Set`, and a `Map` or plain hash (`array.c:8642`,
+ * `lib/set.rb:499`, `hash.c:7219`). `isInfinite` and
  * `isFinite` are bound for a JS number and bigint, which spell Float
  * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
  * {@link TEMPORAL_METHOD_TABLE} binds on it.
@@ -422,6 +424,12 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     return true;
   }
   if (temporalMethod(obj, mid) !== undefined) return true;
+  if (
+    mid === "each" &&
+    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+  ) {
+    return true;
+  }
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
@@ -803,6 +811,17 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     }
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
     if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
+  }
+  if (mid === "each" && typeof args[0] === "function") {
+    const block = args[0] as AnyFunction;
+    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map) {
+      for (const i of recv) block(i);
+      return recv;
+    }
+    if (isPlainHash(recv)) {
+      for (const key of Object.keys(recv)) block([key, recv[key]]);
+      return recv;
+    }
   }
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);

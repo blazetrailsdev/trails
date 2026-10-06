@@ -1,5 +1,4 @@
 import { Metal } from "./metal.js";
-import { statusCode } from "@blazetrails/rack";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
 import {
@@ -7,7 +6,12 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
-import { classAttribute, include } from "@blazetrails/activesupport";
+import { classAttribute, include, type Included } from "@blazetrails/activesupport";
+import { Caching } from "../abstract-controller/caching.js";
+import { ConditionalGet } from "./metal/conditional-get.js";
+import { DataStreaming } from "./metal/data-streaming.js";
+import { Redirecting, redirectTo } from "./metal/redirecting.js";
+import { UrlFor } from "./metal/url-for.js";
 import {
   Options as ParamsWrapperOptions,
   _performParameterWrapping,
@@ -20,7 +24,9 @@ import {
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface API {
+export interface API
+  extends Included<typeof UrlFor>, Included<typeof ConditionalGet>, Included<typeof DataStreaming> {
+  redirectTo: OmitThisParameter<typeof redirectTo>;
   get params(): Params;
   set params(value: Params | Record<string, unknown>);
 }
@@ -80,19 +86,13 @@ export class API extends Metal {
     this.responseBody = result.body;
     this.markPerformed();
   }
-
-  redirectTo(url: string, options: { status?: number | string } = {}): void {
-    if (this.performed) {
-      throw new DoubleRenderError();
-    }
-
-    const status = options.status ? statusCode(options.status) : 302;
-    this.status = status;
-    this.headers.set("location", url);
-    this.responseBody = "";
-    this.markPerformed();
-  }
 }
 
-include(API, RateLimiting);
+include(API, UrlFor);
+include(API, Redirecting);
+API.prototype.redirectTo = redirectTo;
+include(API, ConditionalGet);
 include(API, StrongParameters);
+include(API, RateLimiting);
+include(API, Caching);
+include(API, DataStreaming);

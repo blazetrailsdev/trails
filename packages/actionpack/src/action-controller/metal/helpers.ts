@@ -1,7 +1,15 @@
-import { extend, type InheritableOptions } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  Concern,
+  extend,
+  include,
+  Module,
+  type InheritableOptions,
+} from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 import { rbObjIvarGet, rbObjIvarSet, registerConstant } from "@blazetrails/ruby-compat";
 import {
+  Helpers as AbstractHelpers,
   Resolution,
   type HelperMethodNameList,
   type HelperMethodsModule,
@@ -81,3 +89,19 @@ export function helpers(this: {
 }): ActionViewBase {
   return (this._helperProxy ??= this.viewContext());
 }
+
+export const Helpers = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      include(this as HelpersClass, AbstractHelpers);
+      classAttribute.call(this, "helpersPath", { default: [] });
+      classAttribute.call(this, "includeAllHelpers", { default: true });
+    },
+  );
+
+  mod.defineMethod("helpers", helpers);
+}) as Module<{ helpers: typeof helpers }> & { ClassMethods: typeof ClassMethods };
+Helpers.ClassMethods = ClassMethods;

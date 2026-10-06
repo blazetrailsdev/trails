@@ -1,3 +1,4 @@
+import { Time } from "@blazetrails/date";
 import { Entry } from "./entry.js";
 import type { Duration } from "../duration.js";
 import {
@@ -545,7 +546,7 @@ export abstract class Store {
 
     const expiresAt = call.expiresAt as number | undefined;
     if (expiresAt != null) {
-      call.expiresIn = (expiresAt - Date.now()) / 1000;
+      call.expiresIn = (expiresAt - Time.now().toF() * 1000) / 1000;
       delete call.expiresAt;
     }
 
@@ -695,8 +696,8 @@ export abstract class Store {
   ): Entry | null {
     if (entry && entry.isExpired()) {
       const raceTtl = typeof options.raceConditionTtl === "number" ? options.raceConditionTtl : 0;
-      if (raceTtl > 0 && Date.now() - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
-        entry.expiresAt = Date.now() + raceTtl * 1000;
+      if (raceTtl > 0 && Time.now().toF() * 1000 - (entry.expiresAt ?? 0) <= raceTtl * 1000) {
+        entry.expiresAt = Time.now().toF() * 1000 + raceTtl * 1000;
         this.writeEntry(key, entry, { ...options, expiresIn: raceTtl * 2 });
       } else {
         this.deleteEntry(key, options);
