@@ -1,3 +1,5 @@
+import { ViewPaths } from "@blazetrails/actionview";
+import { Concern, extend, include } from "@blazetrails/activesupport";
 import { ArgumentError, Module } from "@blazetrails/ruby-compat";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { AbstractControllerError } from "./error.js";
@@ -71,9 +73,7 @@ export function renderToString<T extends RenderingHost>(this: T, ...args: unknow
   return this.renderToBody(options);
 }
 
-export function renderToBody(_options: RenderOptions = {}): unknown {
-  return undefined;
-}
+export function renderToBody(options: RenderOptions = {}): void {}
 
 export function renderedFormat(): unknown {
   return Mime.get("text");
@@ -133,6 +133,9 @@ export function _protectedIvars(): readonly string[] {
 }
 
 export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
+  include(mod, ViewPaths);
+
   mod.defineMethod("render", render);
   mod.defineMethod("renderToString", renderToString);
   mod.defineMethod("renderToBody", renderToBody);
