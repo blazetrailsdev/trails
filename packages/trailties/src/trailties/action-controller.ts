@@ -16,7 +16,9 @@ import {
   except,
   File,
   getPath,
+  Module,
   rbFSend,
+  rbObjIsKindOf,
   rbObjRespondTo,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -189,8 +191,10 @@ async function helperConstants(
       const mod = (await import(path.pathToFileURL!(full).href)) as Record<string, unknown>;
 
       const exported = mod[demodulize(name)];
-      if (exported && typeof exported === "object") {
-        constants.set(name, exported as AbstractController.HelperMethodsModule);
+      if (rbObjIsKindOf(exported, Module)) {
+        constants.set(name, exported as Module);
+      } else if (exported && typeof exported === "object") {
+        constants.set(name, new Module().include(exported));
       }
     }
   };

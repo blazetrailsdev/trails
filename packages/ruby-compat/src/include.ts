@@ -229,6 +229,10 @@ export class Module<I extends object = Record<never, never>> {
    * included is skipped (`include_modules_at`, class.c:1281,1291,1296). A
    * module defining `appendFeatures` gets that call instead, then `included`,
    * as `rb_mod_include` sends both (vendor/ruby/v3.3.11/eval.c:1159-1160).
+   * `ensure_includable` (class.c:1168-1176) rejects a Ruby `Class`; a TS class
+   * passed here is a class module, the spelling {@link include} already takes
+   * for a Ruby module that carries accessors, so its prototype methods are
+   * the module's method table.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -253,8 +257,14 @@ export class Module<I extends object = Record<never, never>> {
         return this;
       }
       const installed = trackedKeys(carrier);
-      const members = mod as Record<string, unknown>;
-      for (const key of Object.keys(members)) {
+      const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+        string,
+        unknown
+      >;
+      for (const key of typeof mod === "function"
+        ? Object.getOwnPropertyNames(members)
+        : Object.keys(members)) {
+        if (key === "constructor") continue;
         if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);
@@ -270,6 +280,18 @@ export class Module<I extends object = Record<never, never>> {
       (mod as ModuleHooks)[included]!(this);
     }
     return this;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
+   * `rb_mod_include_p`, which walks the module's ancestry, so a module
+   * included by an included module answers true.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  isInclude(mod2: object): boolean {
+    if (isModuleMethodTablePresent({ prototype: carrierOf(this) }, mod2)) return true;
+    return (nestedModules.get(this) ?? []).some((nested) => nested.isInclude(mod2));
   }
 
   /**

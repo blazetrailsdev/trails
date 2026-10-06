@@ -9,17 +9,14 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  Hash,
   isSymbol,
   Module,
-  rbObjClass,
+  rbFSend,
   rbObjIsKindOf,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
-/** @internal */
-
-export type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
+export type HelperMethodsModule = Module;
 
 export interface HelpersClassMethods {
   _helpers?: HelperMethodsModule;
@@ -42,14 +39,12 @@ type HelperArgument = HelperMethodsModule | string | HelperArgument[];
 
 export type HelperMethodNameList = string | HelperMethodNameList[];
 
-const includedHelperModules = new WeakMap<HelperMethodsModule, WeakSet<object>>();
-
 export interface HelpersHost {
   constructor: HelpersClassMethods;
 }
 
 export function _helpersInstance(this: HelpersHost): HelperMethodsModule {
-  return this.constructor._helpers ?? (Object.create(null) as HelperMethodsModule);
+  return this.constructor._helpers ?? new Module();
 }
 
 export function _helpers(this: HelpersHost): HelperMethodsModule;
@@ -69,7 +64,7 @@ export function _helpers(
     return;
   }
   if (clsOrValue) {
-    return clsOrValue._helpers ?? (Object.create(null) as HelperMethodsModule);
+    return clsOrValue._helpers ?? new Module();
   }
   return _helpersInstance.call(this as HelpersHost);
 }
@@ -83,8 +78,9 @@ export function defineHelpersModule(
 ): HelperMethodsModule {
   const existing = helperMethodsByClass.get(klass);
   if (existing) return existing;
-  const mod = Object.create(helpers ?? null) as HelperMethodsModule;
+  const mod = new Module();
   helperMethodsByClass.set(klass, mod);
+  if (helpers) mod.include(helpers);
   return mod;
 }
 
@@ -93,10 +89,7 @@ export const Resolution = {
     return (modulesOrHelperPrefixes as readonly unknown[])
       .flat(Infinity)
       .map((moduleOrHelperPrefix) => {
-        if (
-          rbObjIsKindOf(moduleOrHelperPrefix, Module) ||
-          rbObjClass(moduleOrHelperPrefix) === Hash
-        ) {
+        if (rbObjIsKindOf(moduleOrHelperPrefix, Module)) {
           return moduleOrHelperPrefix as HelperMethodsModule;
         } else if (typeof moduleOrHelperPrefix === "string") {
           let helperPrefix = isSymbol(moduleOrHelperPrefix)
@@ -134,112 +127,54 @@ export const Resolution = {
   },
 };
 
+/** @inventedArm if — PERMANENT */
 export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameList[]): void {
   const flat = (methods as readonly unknown[]).flat(Infinity) as string[];
   this._helperMethods = [...this._helperMethods, ...flat];
 
   for (const method of flat) {
-    const mod = this._helpersForModification();
     const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
     const writer = this._helperMethods.includes(`${attr}=`);
-    let proto = (this as { prototype?: object }).prototype ?? null;
-    let descriptor: PropertyDescriptor | undefined;
-    while (proto && !(descriptor = Object.getOwnPropertyDescriptor(proto, attr))) {
-      proto = Object.getPrototypeOf(proto) as object | null;
-    }
-    if (descriptor?.get || writer) {
+    this._helpersForModification().moduleEval((mod) => {
       Object.defineProperty(mod, attr, {
         get(this: { controller: Record<string, unknown> }) {
-          return this.controller[attr];
+          const controller = this.controller;
+          if (attr in controller && typeof controller[attr] !== "function") {
+            return rbFSend(controller, attr);
+          }
+          return (...args: unknown[]) => rbFSend(controller, attr, ...args);
         },
         set: writer
-          ? function (this: { controller: Record<string, unknown> }, value: unknown) {
-              this.controller[attr] = value;
+          ? function (this: { controller: object }, value: unknown) {
+              rbFSend(this.controller, `${attr}=`, value);
             }
           : undefined,
         configurable: true,
-        enumerable: true,
       });
-      continue;
-    }
-    mod[method] = function (this: { controller: Record<string, unknown> }, ...args: unknown[]) {
-      const fn = this.controller[method];
-      if (typeof fn !== "function") {
-        throw new TypeError(`helper_method: controller does not respond to '${method}'`);
-      }
-      return (fn as (...a: unknown[]) => unknown).apply(this.controller, args);
-    };
+    });
   }
 }
 
 export function helper(
   this: HelpersClass,
-  ...args: Array<HelperArgument | ((mod: HelperMethodsModule) => void)>
+  ...args: Array<HelperArgument | ((mod: Record<string, unknown>) => void)>
 ): void {
   const last = args.at(-1);
   const block =
     typeof last === "function" && !rbObjIsKindOf(last, Module)
-      ? (args.pop() as (mod: HelperMethodsModule) => void)
+      ? (args.pop() as (mod: Record<string, unknown>) => void)
       : null;
   for (const mod of this.modulesForHelpers(args as HelperArgument[])) {
-    if (isHelperIncluded(this._helpers, mod)) continue;
-    const head = this._helpersForModification();
-    Object.setPrototypeOf(head, makeIncludeLink(mod, Object.getPrototypeOf(head) as object | null));
-    recordHelperIncluded(head, mod);
+    if (this._helpers!.isInclude(mod)) continue;
+    this._helpersForModification().include(mod);
   }
 
-  if (block) block(this._helpersForModification());
-}
-
-function isHelperIncluded(helpers: HelperMethodsModule | undefined, mod: object): boolean {
-  let current: object | null = helpers ?? null;
-  while (current) {
-    if (includedHelperModules.get(current as HelperMethodsModule)?.has(mod)) {
-      return true;
-    }
-    current = Object.getPrototypeOf(current);
-  }
-  return false;
-}
-
-function makeIncludeLink(
-  mod: HelperMethodsModule,
-  currentTail: object | null,
-): HelperMethodsModule {
-  const target = Object.create(currentTail) as HelperMethodsModule;
-  return new Proxy(target, {
-    get(t, prop, receiver) {
-      if (Object.prototype.hasOwnProperty.call(mod, prop)) {
-        return (mod as Record<PropertyKey, unknown>)[prop as PropertyKey];
-      }
-      return Reflect.get(t, prop, receiver);
-    },
-    has(t, prop) {
-      return Object.prototype.hasOwnProperty.call(mod, prop) || Reflect.has(t, prop);
-    },
-    ownKeys(t) {
-      return [...new Set([...Reflect.ownKeys(mod), ...Reflect.ownKeys(t)])];
-    },
-    getOwnPropertyDescriptor(t, prop) {
-      const own = Object.getOwnPropertyDescriptor(mod, prop);
-      if (own) return { ...own, configurable: true };
-      return Reflect.getOwnPropertyDescriptor(t, prop);
-    },
-  });
-}
-
-function recordHelperIncluded(helpers: HelperMethodsModule, mod: object): void {
-  let set = includedHelperModules.get(helpers);
-  if (!set) {
-    set = new WeakSet<object>();
-    includedHelperModules.set(helpers, set);
-  }
-  set.add(mod);
+  if (block) this._helpersForModification().moduleEval(block);
 }
 
 export function clearHelpers(this: HelpersClass): void {
   const inheritedHelperMethods = this._helperMethods;
-  this._helpers = Object.create(null) as HelperMethodsModule;
+  this._helpers = new Module();
   this._helperMethods = [];
 
   inheritedHelperMethods.forEach((meth) => this.helperMethod(meth));

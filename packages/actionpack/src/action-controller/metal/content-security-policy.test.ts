@@ -1,3 +1,4 @@
+import { extend } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   contentSecurityPolicy,
@@ -177,18 +178,15 @@ describe("helper_method registration on Base", () => {
 
   it("helper proxies forward to the controller instance", async () => {
     const { Base } = await import("../base.js");
-    const cls = Base as unknown as {
-      _helpers?: Record<
-        string,
-        (this: { controller: Record<string, unknown> }, ...args: unknown[]) => unknown
-      >;
-    };
     const controller = {
       isContentSecurityPolicy: () => true,
       contentSecurityPolicyNonce: () => "abc123",
     };
-    const proxy = { controller };
-    expect(cls._helpers!.isContentSecurityPolicy.call(proxy)).toBe(true);
-    expect(cls._helpers!.contentSecurityPolicyNonce.call(proxy)).toBe("abc123");
+    const proxy = extend(
+      { controller } as unknown as Record<string, () => unknown>,
+      Base._helpers!,
+    );
+    expect(proxy.isContentSecurityPolicy()).toBe(true);
+    expect(proxy.contentSecurityPolicyNonce()).toBe("abc123");
   });
 });

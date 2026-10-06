@@ -8,7 +8,9 @@ import {
 } from "@blazetrails/activesupport";
 import {
   excBacktraceLocations,
+  extend,
   File,
+  Module,
   rbModConstSet,
   rbObjMethods,
   registerConstant,
@@ -95,11 +97,11 @@ let HelpersPathsController: typeof Base;
 
 let HelpersTypoController: typeof Base;
 
-const LocalAbcHelper: HelperMethodsModule = {
+const LocalAbcHelper = new Module().include({
   a(): void {},
   b(): void {},
   c(): void {},
-};
+});
 
 let helpersPathWas: string[];
 let helperMethodsWas: string[];
@@ -287,7 +289,6 @@ describe("HelperTest", () => {
     expect(body(await callController(Fun.PdfController, "test"))).toBe("test: baz");
   });
 
-  // BLOCKED: helper-modules-are-modules-not-hashes
   // BLOCKED: abstract-controller-helpers-inherited-runs-default-helper-module
   it.skip("default helpers only", () => {
     expect(ancestors(JustMeController._helpers!)).toEqual(["JustMeHelper"]);
@@ -321,7 +322,7 @@ describe("HelperTest", () => {
     controllerClass.helpersPath = [File.expandPath("alternate-helpers", fixtures)];
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
-    controllerClass._helpers = Object.create(null) as HelperMethodsModule;
+    controllerClass._helpers = new Module();
     controllerClass.helper(":all");
 
     expect(masterHelperMethods()).not.toContain("bareA");
@@ -369,7 +370,7 @@ describe("HelperTest", () => {
   function instanceMethods(helpers: HelperMethodsModule): string[] {
     const methods: string[] = [];
     for (
-      let mod: object | null = helpers;
+      let mod: object | null = Object.getPrototypeOf(extend({}, helpers));
       mod && mod !== Object.prototype;
       mod = Object.getPrototypeOf(mod)
     ) {
@@ -415,7 +416,7 @@ describe("IsolatedHelpersTest", () => {
 
   class B extends A {
     static {
-      this.helper((mod: HelperMethodsModule) => {
+      this.helper((mod) => {
         mod.shout = () => "B";
       });
     }
@@ -427,7 +428,7 @@ describe("IsolatedHelpersTest", () => {
 
   class C extends A {
     static {
-      this.helper((mod: HelperMethodsModule) => {
+      this.helper((mod) => {
         mod.shout = () => "C";
       });
     }

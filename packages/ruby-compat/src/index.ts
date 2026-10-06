@@ -36,6 +36,7 @@ export {
   rbAnyToS,
   rbObjId,
   rbObjAsString,
+  ENUMERABLE_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   TEMPORAL_METHOD_TABLE,
   rbDeclareIvar,
