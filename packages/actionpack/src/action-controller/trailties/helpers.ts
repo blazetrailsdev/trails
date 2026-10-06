@@ -10,7 +10,10 @@ export interface HelpersPathControllerClass extends HelpersClassMethods {
 
 const fired = new WeakSet<object>();
 
-/** @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook */
+/**
+ * @missingRailsCall _helpers= — CONVERGEABLE helpers-inherited-resets-helpers-and-includes-default-module-first
+ * @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook
+ */
 export function fireInherited(
   klass: HelpersPathControllerClass,
   base: HelpersPathControllerClass,
