@@ -1495,8 +1495,6 @@ export function extractFromProgram(
 
       const pushMethods = (methods: MethodInfo[]): void => {
         for (const m of methods) {
-          // A module's `def initialize` runs through `initializeIncludedModules`;
-          // `include` never flattens it onto the includer.
           if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
           hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });

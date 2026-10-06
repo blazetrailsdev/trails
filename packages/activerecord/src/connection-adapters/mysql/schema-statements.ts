@@ -234,12 +234,15 @@ export class SchemaStatements extends BaseSchemaStatements {
 
   override async internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>> {
     const options = await super.internalStringOptionsForPrimaryKey();
-    const adapter = this as unknown as AbstractMysqlAdapter;
     if (
       !(await isRowFormatDynamicByDefault.call(this as unknown as RowFormatHost)) &&
-      CHARSETS_OF_4BYTES_MAXLEN.includes((await adapter.charset()) as string)
+      CHARSETS_OF_4BYTES_MAXLEN.includes(
+        (await (this as unknown as AbstractMysqlAdapter).charset()) as string,
+      )
     ) {
-      options.collation = ((await adapter.collation()) as string).replace(/^[^_]+/, "utf8");
+      options.collation = (
+        (await (this as unknown as AbstractMysqlAdapter).collation()) as string
+      ).replace(/^[^_]+/, "utf8");
     }
     return options;
   }

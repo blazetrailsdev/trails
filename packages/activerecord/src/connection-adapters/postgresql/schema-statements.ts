@@ -589,9 +589,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
       `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
     );
     const maxIdentifierLength = await this.warmMaxIdentifierLength();
-    const result = await this.pkAndSequenceFor(newName);
-    if (result) {
-      const [pk, seq] = result;
+    const [pk, seq] = (await this.pkAndSequenceFor(newName)) ?? [];
+    if (pk != null) {
       const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
       const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
       const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
@@ -700,11 +699,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     if (options.name != null) {
       const providedIndex = Utils.extractSchemaQualifiedName(options.name);
       options = { ...options, name: providedIndex.identifier };
-      const tableSchema = table.schema;
-      if (!tableSchema) table = new Name(providedIndex.schema, table.identifier);
-      if (providedIndex.schema && tableSchema && tableSchema !== providedIndex.schema) {
+      if (!isPresent(table.schema)) table = new Name(providedIndex.schema, table.identifier);
+
+      if (isPresent(providedIndex.schema) && table.schema !== providedIndex.schema) {
         throw new ArgumentError(
-          `Index schema '${providedIndex.schema}' does not match table schema '${tableSchema}'`,
+          `Index schema '${providedIndex.schema}' does not match table schema '${table.schema}'`,
         );
       }
     }
@@ -1542,7 +1541,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const opclasses = this.optionsForIndexColumns(options.opclass);
     for (const [name] of quotedColumns) {
       const opclass = opclasses(name);
-      if (opclass) quotedColumns.set(name, `${quotedColumns.get(name)} ${opclass}`);
+      if (isPresent(opclass)) quotedColumns.set(name, `${quotedColumns.get(name)} ${opclass}`);
     }
     return quotedColumns;
   }
