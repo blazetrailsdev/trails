@@ -5,6 +5,7 @@
   "type": "module",
   "description": "Type-checks TypeScript code blocks in the website guides.",
   "dependencies": {
+    "@blazetrails/activejob": "workspace:*",
     "@blazetrails/activemodel": "workspace:*",
     "@blazetrails/activerecord": "workspace:*",
     "@blazetrails/activerecord-cli": "workspace:*",
