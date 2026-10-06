@@ -57,7 +57,7 @@ export const EncryptedFixtures: PrependModule = {
   ): void {
     for (const attributeName of modelClass?.encryptedAttributes ?? []) {
       const sourceAttributeName = modelClass!.sourceAttributeFromPreservedAttribute(attributeName);
-      if (sourceAttributeName !== undefined) {
+      if (sourceAttributeName != null) {
         const cleanValue = this.cleanValues[sourceAttributeName];
         const type = modelClass!.typeForAttribute(attributeName);
         const encryptedValue = type.serialize(cleanValue);
