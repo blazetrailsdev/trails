@@ -1079,7 +1079,7 @@ export function internalExecute(
     allowRetry?: boolean;
     materializeTransactions?: boolean;
   } = {},
-  _block?: (result: unknown) => unknown,
+  block?: (result: unknown) => unknown,
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
   return (this as any).rawExecute(

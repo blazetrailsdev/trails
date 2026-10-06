@@ -4241,8 +4241,6 @@ export function extractClass(
         (member.type && ts.isTypeQueryNode(member.type) ? member.type.exprName : undefined);
       const refParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
       const valueAdmitsBoolean = refParams ? undefined : memberAdmitsBoolean(member, checker);
-      // A `declare`d field types a method a mixin supplies, so its function type
-      // is that method's signature. A field with storage is an attr holding a callable.
       const declared = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
       const declaredParams = declared && !refParams ? propertySignatureParams(member, checker) : [];
       const aliasParams = refParams ?? (declaredParams.length > 0 ? declaredParams : null);
