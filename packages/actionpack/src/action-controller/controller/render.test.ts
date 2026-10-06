@@ -1204,7 +1204,6 @@ describe("LiveHeadRenderTest", () => {
       get: responseBody.get,
       set(this: LiveTestController, body: string) {
         Live.instanceMethod("responseBody")!.set!.call(this, body);
-        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
       },
     });
   });
