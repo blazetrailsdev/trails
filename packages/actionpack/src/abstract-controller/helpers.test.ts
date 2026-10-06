@@ -1,17 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { extend, include, Module, NoMethodError } from "@blazetrails/ruby-compat";
 
-import {
-  _helpers,
-  _helpersInstance,
-  defineHelpersModule,
-  helperMethod,
-  Helpers,
-  type HelperMethodsModule,
-  type HelpersClass,
-  type HelpersClassMethods,
-  type HelpersHost,
-} from "./helpers.js";
+import { helperMethod, Helpers, type HelpersClass } from "./helpers.js";
 
 function makeBase(): HelpersClass {
   const Base = class Base {};
@@ -38,7 +28,7 @@ class Named {
 type View = Record<string, (...args: unknown[]) => unknown>;
 
 function view(cls: HelpersClass, controller: object = {}): View {
-  return extend({ controller } as unknown as View, cls._helpers!);
+  return extend({ controller } as unknown as View, cls._helpers);
 }
 
 describe("helperMethod", () => {
@@ -59,7 +49,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name");
 
-    const proxy = extend({ controller: { name: "david" } } as { name?: string }, cls._helpers!);
+    const proxy = extend({ controller: { name: "david" } } as { name?: string }, cls._helpers);
     expect(proxy.name).toBe("david");
     expect(() => (proxy.name = "jamis")).toThrow(TypeError);
   });
@@ -72,7 +62,7 @@ describe("helperMethod", () => {
     helperMethod.call(cls, ...names);
 
     const controller = new Named("david");
-    const view = extend({ controller } as { controller: object; name: string }, cls._helpers!);
+    const view = extend({ controller } as { controller: object; name: string }, cls._helpers);
     expect(view.name).toBe("david");
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
@@ -84,7 +74,7 @@ describe("helperMethod", () => {
     helperMethod.call(cls, "name=");
 
     const controller = new Named();
-    const view = extend({ controller } as { controller: object; name?: string }, cls._helpers!);
+    const view = extend({ controller } as { controller: object; name?: string }, cls._helpers);
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
     expect(view.name).toBe("jamis");
@@ -100,7 +90,7 @@ describe("helperMethod", () => {
         this.written = value;
       },
     };
-    extend({ controller } as { name?: string }, cls._helpers!).name = "jamis";
+    extend({ controller } as { name?: string }, cls._helpers).name = "jamis";
     expect(controller.written).toBe("jamis");
   });
 
@@ -108,7 +98,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name=");
 
-    const proxy = extend({ controller: {} } as { name?: string }, cls._helpers!);
+    const proxy = extend({ controller: {} } as { name?: string }, cls._helpers);
     expect(() => (proxy.name = "jamis")).toThrow(NoMethodError);
   });
 
@@ -118,7 +108,7 @@ describe("helperMethod", () => {
 
     const controller = { equals: (other: unknown) => other === 1 };
     expect(view(cls, controller)["=="](1)).toBe(true);
-    expect(cls._helpers!.instanceMethods()).toEqual(["=="]);
+    expect(cls._helpers.instanceMethods()).toEqual(["=="]);
   });
 
   it("a name= entry survives clearHelpers' replay", () => {
@@ -127,7 +117,7 @@ describe("helperMethod", () => {
     cls.clearHelpers();
 
     const controller = new Named("david");
-    const view = extend({ controller } as { controller: object; name: string }, cls._helpers!);
+    const view = extend({ controller } as { controller: object; name: string }, cls._helpers);
     view.name = "jamis";
     expect(view.name).toBe("jamis");
     expect(controller.name).toBe("jamis");
@@ -137,7 +127,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "a", ["b", "c"]);
     expect(cls._helperMethods).toEqual(["a", "b", "c"]);
-    expect(cls._helpers!.instanceMethods().sort()).toEqual(["a", "b", "c"]);
+    expect(cls._helpers.instanceMethods().sort()).toEqual(["a", "b", "c"]);
   });
 
   it("throws when controller does not respond to the named method", () => {
@@ -153,9 +143,9 @@ describe("helperMethod", () => {
     const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "fromChild");
 
-    expect(child._helpers!.instanceMethods()).toEqual(["fromChild"]);
+    expect(child._helpers.instanceMethods()).toEqual(["fromChild"]);
     expect("fromParent" in view(child)).toBe(true);
-    expect(parent._helpers!.instanceMethods()).toEqual(["fromParent"]);
+    expect(parent._helpers.instanceMethods()).toEqual(["fromParent"]);
     expect(parent._helperMethods).toEqual(["fromParent"]);
     expect(child._helperMethods).toEqual(["fromParent", "fromChild"]);
   });
@@ -256,7 +246,7 @@ describe("helper", () => {
     cls.helper(FooHelper);
 
     class ViewContext {}
-    include(ViewContext, cls._helpers!);
+    include(ViewContext, cls._helpers);
 
     expect(typeof (ViewContext.prototype as unknown as { foo: () => string }).foo).toBe("function");
     expect((ViewContext.prototype as unknown as { foo: () => string }).foo()).toBe("FOO");
@@ -269,7 +259,7 @@ describe("helper", () => {
     helperMethod.call(cls, "currentUser");
 
     class ViewContext {}
-    include(ViewContext, cls._helpers!);
+    include(ViewContext, cls._helpers);
 
     const proto = ViewContext.prototype as unknown as Record<string, () => string>;
     expect(typeof proto.fromA).toBe("function");
@@ -316,24 +306,9 @@ describe("clearHelpers", () => {
     cls.clearHelpers();
 
     expect(cls._helperMethods).toEqual(["keep"]);
-    expect(cls._helpers!.instanceMethods()).toEqual(["keep"]);
+    expect(cls._helpers.instanceMethods()).toEqual(["keep"]);
     expect("keep" in view(cls)).toBe(true);
     expect(view(cls).extra).toBeUndefined();
-  });
-});
-
-describe("_helpersInstance", () => {
-  it("returns this.class._helpers", () => {
-    const cls = makeBase();
-    helperMethod.call(cls, "x");
-    const host = { constructor: cls } as unknown as HelpersHost;
-    expect(_helpersInstance.call(host)).toBe(cls._helpers);
-  });
-
-  it("falls back to an empty module when no _helpers is set", () => {
-    const cls = makeBase();
-    const host = { constructor: cls } as unknown as HelpersHost;
-    expect(_helpersInstance.call(host).instanceMethods()).toEqual([]);
   });
 });
 
@@ -344,9 +319,8 @@ describe("_helpersForModification", () => {
     const child = Object.create(parent) as HelpersClass;
 
     const mod = child._helpersForModification();
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(true);
     expect(mod).not.toBe(parent._helpers);
-    expect(mod.isInclude(parent._helpers!)).toBe(true);
+    expect(mod.isInclude(parent._helpers)).toBe(true);
     expect(mod.instanceMethods()).toEqual([]);
     expect("fromParent" in view(child)).toBe(true);
 
@@ -360,66 +334,41 @@ describe("_helpersForModification", () => {
   });
 });
 
-describe("_helpers (class-level reader/writer)", () => {
-  it("reads from the class, falling through to the parent via prototype", () => {
-    const parent = makeBase();
-    helperMethod.call(parent, "fromParent");
-    const child = Object.create(parent) as HelpersClass;
-
-    expect(_helpers(child)).toBe(parent._helpers);
-  });
-
-  it("writer assigns the slot; subsequent reads return that value", () => {
+describe("_helpers", () => {
+  it("the instance reader is self.class._helpers", () => {
     const cls = makeBase();
-    const mod = { hello: () => "world" } as unknown as HelperMethodsModule;
-    _helpers(cls, mod);
-    expect(cls._helpers).toBe(mod);
-    expect(_helpers(cls)).toBe(mod);
+    const host = new (cls as unknown as new () => { _helpers: Module })();
+    expect(host._helpers).toBe(cls._helpers);
   });
 
-  it("writer with null deletes the own slot to restore parent fallback", () => {
+  it("the singleton reader falls back to the superclass until the class has its own", () => {
     const parent = makeBase();
-    helperMethod.call(parent, "fromParent");
-    const child = Object.create(parent) as HelpersClass;
-    const ownMod = {} as HelperMethodsModule;
-    _helpers(child, ownMod);
-    expect(child._helpers).toBe(ownMod);
-
-    _helpers(child, null);
-    expect(Object.prototype.hasOwnProperty.call(child, "_helpers")).toBe(false);
+    const child = (() =>
+      class extends (parent as unknown as new () => object) {})() as unknown as HelpersClass;
     expect(child._helpers).toBe(parent._helpers);
-  });
 
-  it("instance form delegates to _helpersInstance (class._helpers)", () => {
-    const cls = makeBase();
-    helperMethod.call(cls, "shown");
-    const host = { constructor: cls } as HelpersHost;
-    const instanceReader = _helpers as (this: HelpersHost) => HelperMethodsModule;
-    expect(instanceReader.call(host)).toBe(cls._helpers);
+    const mod = new Module();
+    child._helpers = mod;
+    expect(child._helpers).toBe(mod);
+    expect(parent._helpers).not.toBe(mod);
+
+    (child as { _helpers: Module | null })._helpers = null;
+    expect(child._helpers).toBe(parent._helpers);
   });
 });
 
 describe("defineHelpersModule", () => {
   it("is idempotent per class — same class returns the same module", () => {
-    const cls: HelpersClassMethods = { name: "Base" };
-    const first = defineHelpersModule(cls);
-    const second = defineHelpersModule(cls);
-    expect(second).toBe(first);
+    const cls = makeBase();
+    expect(cls.defineHelpersModule(cls)).toBe(cls._helpers);
+    expect((cls as unknown as { HelperMethods: Module }).HelperMethods).toBe(cls._helpers);
   });
 
-  it("does NOT write cls._helpers (caller is responsible, per Rails)", () => {
-    const cls: HelpersClassMethods = { name: "Base" };
-    defineHelpersModule(cls);
-    expect(Object.prototype.hasOwnProperty.call(cls, "_helpers")).toBe(false);
-  });
-
-  it("splices the parent helpers module into the prototype chain", () => {
-    const parent = makeBase();
-    helperMethod.call(parent, "fromParent");
-    const child: HelpersClassMethods = { name: "Child" };
-    const mod = defineHelpersModule(child, parent._helpers);
-    expect(mod.isInclude(parent._helpers!)).toBe(true);
-    helperMethod.call(parent, "addedLater");
-    expect("addedLater" in extend({}, mod)).toBe(true);
+  it("names the module after the class it is seated on", () => {
+    class WidgetsController {}
+    include(WidgetsController, Helpers);
+    expect((WidgetsController as unknown as HelpersClass)._helpers.name).toBe(
+      "WidgetsController::HelperMethods",
+    );
   });
 });

@@ -13,6 +13,7 @@ import {
   rbObjId,
   rbObjAsString as toS,
   rbObjRespondTo,
+  CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
   rbFPublicSend,
   rbModAttrReader,
@@ -542,6 +543,21 @@ describe("rbFSend", () => {
       delete OBJECT_METHOD_TABLE.isProbe;
     }
     expect(() => rbFPublicSend(3, ":probe?", 4)).toThrow(NoMethodError);
+  });
+});
+
+describe("CLASS_METHOD_TABLE", () => {
+  it("makes a class, and not a module or an instance, respond to a method a package defines on Class", () => {
+    class Probe {}
+    CLASS_METHOD_TABLE.classProbe = () => undefined;
+    try {
+      expect(rbObjRespondTo(Probe, "classProbe")).toBe(true);
+      expect(rbObjRespondTo(new Probe(), "classProbe")).toBe(false);
+      expect(rbObjRespondTo({}, "classProbe")).toBe(false);
+    } finally {
+      delete CLASS_METHOD_TABLE.classProbe;
+    }
+    expect(rbObjRespondTo(Probe, "classProbe")).toBe(false);
   });
 });
 

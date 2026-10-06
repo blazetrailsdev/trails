@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
 import { Base } from "../base.js";
-import { modulesForHelpers, setApplicationHelpers, setHelpersPath } from "./helpers.js";
+import { setApplicationHelpers, setHelpersPath } from "./helpers.js";
 
 const AbcHelper = new Module().include({ bareA: () => "a" });
 const FooHelper = new Module().include({ foo: () => "FOO" });
@@ -22,7 +22,7 @@ describe("ActionController::Helpers.modulesForHelpers", () => {
   it("expands :all to every application helper", () => {
     setApplicationHelpers(["abc"], constants);
 
-    expect(modulesForHelpers([":all"])).toEqual([AbcHelper]);
+    expect(Base.modulesForHelpers([":all"])).toEqual([AbcHelper]);
   });
 
   it("reaches the ActionController override through Base.helper", () => {
@@ -31,19 +31,19 @@ describe("ActionController::Helpers.modulesForHelpers", () => {
 
     AllHelpersController.helper(":all");
 
-    expect(AllHelpersController._helpers!.isInclude(AbcHelper)).toBe(true);
+    expect(AllHelpersController._helpers.isInclude(AbcHelper)).toBe(true);
   });
 
   it("appends the application helpers after the arguments that stay", () => {
     setApplicationHelpers(["abc"], constants);
 
-    expect(modulesForHelpers(["foo", ":all"])).toEqual([FooHelper, AbcHelper]);
+    expect(Base.modulesForHelpers(["foo", ":all"])).toEqual([FooHelper, AbcHelper]);
   });
 
   it("resolves a helper by name when :all is absent", () => {
     setApplicationHelpers(["abc"], constants);
 
-    expect(modulesForHelpers(["foo"])).toEqual([FooHelper]);
+    expect(Base.modulesForHelpers(["foo"])).toEqual([FooHelper]);
   });
 });
 

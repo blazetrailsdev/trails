@@ -1,7 +1,13 @@
 /** @internal */
 
-import { NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { classAttribute, included, mattrWriter, Notifications } from "@blazetrails/activesupport";
+import { Module, NoMethodError, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  classAttribute,
+  Concern,
+  extend,
+  mattrWriter,
+  Notifications,
+} from "@blazetrails/activesupport";
 import type { CacheOptions, CacheStore } from "@blazetrails/activesupport";
 
 export type FragmentCacheKeyBlock = (this: FragmentsHost) => unknown;
@@ -22,36 +28,60 @@ export interface FragmentsHost {
   instrumentPayload(key: unknown): Record<string, unknown>;
 }
 
-export class Fragments {
-  static [included](
-    base: FragmentsClassMethods & { helperMethod?(...methods: string[]): void },
-  ): void {
-    if (typeof base === "function") {
-      classAttribute.call(base, "fragmentCacheKeys");
-    } else {
-      mattrWriter.call(base, "fragmentCacheKeys");
-    }
-
-    base.fragmentCacheKeys = [];
-
-    if (rbObjRespondTo(base, "helperMethod")) {
-      base.helperMethod!("combinedFragmentCacheKey");
-    }
-  }
-}
-
 export function fragmentCacheKey(
   this: FragmentsClassMethods,
-  value?: unknown | FragmentCacheKeyBlock,
+  value: unknown = null,
   key?: FragmentCacheKeyBlock,
 ): void {
-  const entry: FragmentCacheKeyBlock =
-    key ?? (typeof value === "function" ? (value as FragmentCacheKeyBlock) : () => value);
-  this.fragmentCacheKeys = [...(this.fragmentCacheKeys ?? []), entry];
+  this.fragmentCacheKeys = [...this.fragmentCacheKeys!, key || (() => value)];
 }
 
+export const ClassMethods = new Module((mod) => {
+  mod.defineMethod("fragmentCacheKey", fragmentCacheKey);
+});
+
+export const Fragments = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as {
+      included(
+        base: null,
+        block: (this: FragmentsClassMethods & { helperMethod(...methods: string[]): void }) => void,
+      ): void;
+    }
+  ).included(null, function () {
+    if (rbObjRespondTo(this, "classAttribute")) {
+      classAttribute.call(this, "fragmentCacheKeys");
+    } else {
+      mattrWriter.call(this, "fragmentCacheKeys");
+    }
+
+    this.fragmentCacheKeys = [];
+
+    if (rbObjRespondTo(this, "helperMethod")) {
+      this.helperMethod("combinedFragmentCacheKey");
+    }
+  });
+
+  mod.defineMethod("combinedFragmentCacheKey", combinedFragmentCacheKey);
+  mod.defineMethod("writeFragment", writeFragment);
+  mod.defineMethod("readFragment", readFragment);
+  mod.defineMethod("fragmentExist", fragmentExist);
+  mod.defineMethod("expireFragment", expireFragment);
+  mod.defineMethod("instrumentFragmentCache", instrumentFragmentCache);
+}) as Module<{
+  combinedFragmentCacheKey: typeof combinedFragmentCacheKey;
+  writeFragment: typeof writeFragment;
+  readFragment: typeof readFragment;
+  fragmentExist: typeof fragmentExist;
+  expireFragment: typeof expireFragment;
+  instrumentFragmentCache: typeof instrumentFragmentCache;
+}> & { ClassMethods: typeof ClassMethods };
+Fragments.ClassMethods = ClassMethods;
+
 export function combinedFragmentCacheKey(this: FragmentsHost, key: unknown): unknown[] {
-  const heads = (this.constructor.fragmentCacheKeys ?? []).map((k) => k.call(this));
+  const heads = this.constructor.fragmentCacheKeys!.map((k) => k.call(this));
   const env = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process
     ?.env;
   const version = env?.RAILS_CACHE_ID || env?.RAILS_APP_VERSION || null;

@@ -7,6 +7,7 @@ import {
   include,
   type Included,
   type Rescuable,
+  type Module,
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
@@ -132,28 +133,30 @@ import {
 } from "./metal/content-security-policy.js";
 import {
   Helpers as AbstractHelpers,
-  type HelperMethodsModule,
+  type Resolution,
   type HelpersClass,
 } from "../abstract-controller/helpers.js";
-import { ClassMethods as HelpersClassMethods, helpers } from "./metal/helpers.js";
+import {
+  ClassMethods as HelpersClassMethods,
+  helpers,
+  type helperAttr,
+  type modulesForHelpers,
+} from "./metal/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
   Caching,
-  ConfigMethods,
-  cache,
-  viewCacheDependencies,
-  viewCacheDependency,
-  type CachingClassMethods,
+  type cache,
+  type viewCacheDependencies,
+  type viewCacheDependency,
 } from "../abstract-controller/caching.js";
-import {
+import type {
   combinedFragmentCacheKey,
   expireFragment,
   fragmentCacheKey,
   fragmentExist,
   readFragment,
   writeFragment,
-  type FragmentsClassMethods,
 } from "../abstract-controller/caching/fragments.js";
 import { HttpAuthentication } from "./metal/http-authentication.js";
 import { sendFileHeadersBang } from "./metal/data-streaming.js";
@@ -398,19 +401,24 @@ export class Base extends Metal {
   declare static includeAllHelpers: boolean;
   declare static isIncludeAllHelpers: boolean;
 
-  declare static _helpers?: HelperMethodsModule;
+  declare static _helpers: Module;
+  declare readonly _helpers: Module;
   declare static _helperMethods: string[];
   declare static helperMethod: HelpersClass["helperMethod"];
   declare static helper: HelpersClass["helper"];
   declare static clearHelpers: HelpersClass["clearHelpers"];
   declare static _helpersForModification: HelpersClass["_helpersForModification"];
   /** @internal */
+  declare static defineHelpersModule: HelpersClass["defineHelpersModule"];
+  /** @internal */
   declare static defaultHelperModuleBang: HelpersClass["defaultHelperModuleBang"];
-  declare static allHelpersFromPath: (typeof AbstractHelpers.ClassMethods)["allHelpersFromPath"];
-  declare static helperModulesFromPaths: (typeof AbstractHelpers.ClassMethods)["helperModulesFromPaths"];
-  static helperAttr = HelpersClassMethods.helperAttr;
-  static helpers = HelpersClassMethods.helpers;
-  static modulesForHelpers = HelpersClassMethods.modulesForHelpers;
+  declare static allHelpersFromPath: (typeof Resolution)["allHelpersFromPath"];
+  declare static helperModulesFromPaths: (typeof Resolution)["helperModulesFromPaths"];
+  declare static helperAttr: OmitThisParameter<typeof helperAttr>;
+  declare static helpers: () => ActionViewBase;
+  declare static modulesForHelpers: OmitThisParameter<typeof modulesForHelpers>;
+  declare static viewCacheDependency: OmitThisParameter<typeof viewCacheDependency>;
+  declare static fragmentCacheKey: OmitThisParameter<typeof fragmentCacheKey>;
   /** @internal */
   declare _helperProxy?: ActionViewBase | null;
 
@@ -748,6 +756,7 @@ export class Base extends Metal {
 include(Base, AbstractControllerRendering);
 include(Base, AssetPaths);
 include(Base, AbstractHelpers);
+extend(Base, HelpersClassMethods);
 classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
 Base.prototype.helpers = helpers;
@@ -779,20 +788,6 @@ Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
 include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
-include(Base, ConfigMethods);
-Base.prototype.viewCacheDependencies = viewCacheDependencies;
-Base.prototype.cache = cache;
-Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
-Base.prototype.writeFragment = writeFragment;
-Base.prototype.readFragment = readFragment;
-Base.prototype.fragmentExist = fragmentExist;
-Base.prototype.expireFragment = expireFragment;
-(
-  Base as unknown as FragmentsClassMethods & { fragmentCacheKey: typeof fragmentCacheKey }
-).fragmentCacheKey = fragmentCacheKey;
-(
-  Base as unknown as CachingClassMethods & { viewCacheDependency: typeof viewCacheDependency }
-).viewCacheDependency = viewCacheDependency;
 include(Base, Caching);
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);

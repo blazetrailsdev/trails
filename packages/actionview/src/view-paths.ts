@@ -1,4 +1,5 @@
 import { Concern, extend } from "@blazetrails/activesupport";
+import { rbClassSuperclass } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { LookupContext } from "./lookup-context.js";
 import { PathRegistry } from "./path-registry.js";
@@ -47,7 +48,7 @@ export class ClassMethods {
   /** @internal */
   static _prefixes(this: ViewPathsClass): string[] {
     if (Object.prototype.hasOwnProperty.call(this, "_prefixesMemo")) return this._prefixesMemo!;
-    const superclass = Object.getPrototypeOf(this) as ViewPathsClass | null;
+    const superclass = rbClassSuperclass(this);
     const local = this.localPrefixes();
     return (this._prefixesMemo =
       !superclass || typeof superclass.isAbstract !== "function" || superclass.isAbstract()

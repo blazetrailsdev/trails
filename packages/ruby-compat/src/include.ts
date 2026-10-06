@@ -117,18 +117,20 @@ export function rbModConstSet<T>(
  * Mirrors: Ruby's Module#const_defined? — vendor/ruby/v3.3.11/object.c:2596
  * `rb_mod_const_defined`, which raises `NameError` for a name that is not a
  * constant name and otherwise answers `rb_const_defined`: the constant on the
- * module or one of its ancestors. Trails passes one name, never a `::` path.
+ * module or one of its ancestors, or on the module alone when `recur` is
+ * false. Trails passes one name, never a `::` path.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstDefined(
   mod: Module | (abstract new (...args: never) => unknown) | { readonly name: string },
   name: string,
+  recur: boolean = true,
 ): boolean {
   if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(name)) {
     throw new NameError(`wrong constant name ${name}`, name);
   }
-  return name in mod;
+  return recur ? name in mod : Object.prototype.hasOwnProperty.call(mod, name);
 }
 
 /**
@@ -234,6 +236,12 @@ export class Module<I extends object = Record<never, never>> {
    * for a Ruby module that carries accessors, so its prototype methods are
    * the module's method table.
    *
+   * A plain-object module's getter and setter are methods too (`def title` /
+   * `def title=`), so the pair is carried as an accessor, uncalled. An ES
+   * module namespace (`import * as Helper`) is the exception: its exports are
+   * functions a bundler may serve through getters, so each is read and
+   * installed as the method it names.
+   *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
   include(mod: ModuleObject): this {
@@ -261,18 +269,23 @@ export class Module<I extends object = Record<never, never>> {
         string,
         unknown
       >;
+      const namespace = (members as { [Symbol.toStringTag]?: string })[Symbol.toStringTag];
       for (const key of typeof mod === "function"
         ? Object.getOwnPropertyNames(members)
         : Object.keys(members)) {
         if (key === "constructor") continue;
-        if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
+        const descriptor = Object.getOwnPropertyDescriptor(members, key)!;
+        const accessor = !("value" in descriptor) && namespace !== "Module";
+        if (/^[A-Z]/.test(key) || (!accessor && typeof members[key] !== "function")) continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);
-        Object.defineProperty(carrier, key, {
-          value: members[key],
-          writable: true,
-          configurable: true,
-        });
+        Object.defineProperty(
+          carrier,
+          key,
+          accessor
+            ? { get: descriptor.get, set: descriptor.set, configurable: true }
+            : { value: members[key], writable: true, configurable: true },
+        );
       }
       relinkIncluders(this);
     }
