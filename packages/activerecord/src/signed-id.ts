@@ -1,4 +1,5 @@
 import type { Base } from "./base.js";
+import type { Relation } from "./relation.js";
 import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
   JSON,
@@ -69,6 +70,22 @@ export function signedId(
     expiresAt,
     purpose: klass.combineSignedIdPurposes(purpose),
   });
+}
+
+export class RelationMethods<T extends Base = Base> {
+  findSigned(
+    this: Relation<T>,
+    ...args: [signedId: string, options?: { purpose?: string }]
+  ): Promise<T | null> {
+    return this.scoping(() => this.model.findSigned(...args)) as Promise<T | null>;
+  }
+
+  findSignedBang(
+    this: Relation<T>,
+    ...args: [signedId: string, options?: { purpose?: string }]
+  ): Promise<T> {
+    return this.scoping(() => this.model.findSignedBang(...args)) as Promise<T>;
+  }
 }
 
 export async function findSigned<T extends typeof Base>(

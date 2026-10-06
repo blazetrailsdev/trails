@@ -3715,9 +3715,11 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
     `,
   };
 
-  it("credits every generated accessor to the class the generator is called with", () => {
+  it("credits every generated accessor to the file the generator sits in", () => {
     const info = extractFromFiles("/p", relationFiles);
-    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const methods = info.fileFunctions!["query-methods.ts"];
+    expect(methods.every((m) => m.file === "query-methods.ts")).toBe(true);
+    expect(info.classes["relation.ts:Relation"].instanceMethods).toEqual([]);
     const readers = methods.filter((m) => m.writer !== true).map((m) => m.name);
     expect(readers).toEqual(
       expect.arrayContaining([
@@ -3732,7 +3734,7 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
 
   it("credits the writer half of a get/set pair, and only the reader without a set", () => {
     const info = extractFromFiles("/p", relationFiles);
-    const methods = info.classes["relation.ts:Relation"].instanceMethods;
+    const methods = info.fileFunctions!["query-methods.ts"];
     const writers = methods.filter((m) => m.writer === true).map((m) => m.name);
     expect(writers).toEqual(expect.arrayContaining(["includesValues", "limitValue"]));
     // `extensions` is Ruby's `alias extensions extending_values` — a reader alone.
@@ -3858,8 +3860,8 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
         }
       `,
     });
-    const names = info.classes["relation.ts:Relation"].instanceMethods.map((m) => m.name);
-    expect(names).toEqual(["limitValue"]);
+    const names = info.fileFunctions!["query-methods.ts"].map((m) => m.name);
+    expect(names).toEqual(["install", "limitValue"]);
   });
 
   it("credits every class the generator's call sites pass, each exactly once", () => {
@@ -3882,10 +3884,8 @@ describe("extractFromProgram — defineProperty accessor generator", () => {
         }
       `,
     });
-    const namesOf = (cls: string): string[] =>
-      info.classes[`relation.ts:${cls}`].instanceMethods.map((m) => m.name);
-    expect(namesOf("Relation")).toEqual(["limit"]);
-    expect(namesOf("AssociationRelation")).toEqual(["offset"]);
+    const names = info.fileFunctions!["query-methods.ts"].map((m) => m.name);
+    expect(names).toEqual(["defineValueMethods", "limit", "offset"]);
   });
 
   it("credits nothing when the generator function is never called with a class", () => {

@@ -20,6 +20,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { ActiveRecord } from "../namespaces.js";
+import type { JoinDependency } from "../associations/join-dependency.js";
+import { stripThenable } from "./thenable.js";
 
 export const ONE_AS_ONE = "1 AS one";
 
@@ -33,6 +35,7 @@ interface FinderRelation {
     compositePrimaryKey: boolean;
     implicitOrderColumn?: string | null;
     createBang(attrs: any): Promise<any>;
+    connectionPool(): { withConnectionSync<R>(block: (c: DatabaseAdapter) => R): R };
     transaction<R>(
       fn: (tx: any) => Promise<R>,
       options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
@@ -85,6 +88,20 @@ interface FinderRelation {
     options: { eagerLoading?: boolean },
     block: (relation: any) => R | Promise<R>,
   ): Promise<R>;
+  /** @internal */
+  usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
+  readonly hasLimitOrOffset: boolean;
+  groupValues: unknown[];
+  eagerLoadValues: unknown[];
+  includesValues: unknown[];
+  joinsValues: unknown[];
+  leftOuterJoinsValues: unknown[];
+  except(...skips: string[]): FinderRelation;
+  joinsBang(...args: unknown[]): FinderRelation;
+  /** @internal */
+  constructJoinDependency(associations: unknown[], joinType: unknown): JoinDependency;
+  /** @internal */
+  selectAssociationList(associations: unknown[]): unknown[];
   /** @internal */
   _materializeDeferredDistinctPkPredicates(): Promise<void>;
   arel(): { ast: unknown };
@@ -428,6 +445,7 @@ export const FinderMethods = {
   isMember,
   raiseRecordNotFoundExceptionBang,
   constructRelationForExists,
+  applyJoinDependency,
   usingLimitableReflections,
   findWithIds,
   findOne,
@@ -471,6 +489,59 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
     }
   }
   return relation;
+}
+
+/**
+ * @internal
+ * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+ */
+export function applyJoinDependency<R>(
+  this: FinderRelation,
+  { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
+  block?: (relation: any, joinDependency: JoinDependency) => R | Promise<R>,
+): unknown {
+  const yieldRelation = (): unknown => {
+    if (block) {
+      return block(relation, joinDependency);
+    } else {
+      return stripThenable(relation);
+    }
+  };
+  const joinDependency = this.constructJoinDependency(
+    [...new Set([...this.eagerLoadValues, ...this.includesValues])],
+    Nodes.OuterJoin,
+  );
+  const relation = this.except("includes", "eagerLoad", "preload").joinsBang(joinDependency);
+
+  if (
+    eagerLoading &&
+    this.hasLimitOrOffset &&
+    !(
+      this.usingLimitableReflections(joinDependency.reflections as never) &&
+      this.usingLimitableReflections(
+        this.constructJoinDependency(
+          this.selectAssociationList(this.joinsValues).concat(
+            this.selectAssociationList(this.leftOuterJoinsValues),
+          ),
+          null,
+        ).reflections as never,
+      )
+    )
+  ) {
+    return Promise.resolve(
+      this.skipQueryCacheIfNecessary(() =>
+        this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
+          (
+            c as unknown as {
+              distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
+            }
+          ).distinctRelationForPrimaryKey(relation),
+        ),
+      ),
+    ).then(yieldRelation);
+  }
+
+  return yieldRelation();
 }
 
 /** @internal */

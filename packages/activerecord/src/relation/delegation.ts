@@ -447,6 +447,10 @@ export class Delegation {
   sanitizeSqlLike(this: DelegationHost, value: string, escapeChar?: string): string {
     return this.model.sanitizeSqlLike(value, escapeChar);
   }
+
+  unscoped(this: DelegationHost) {
+    return this.model.unscoped();
+  }
 }
 
 Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {

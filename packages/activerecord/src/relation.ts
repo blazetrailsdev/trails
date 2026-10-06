@@ -12,6 +12,7 @@ import {
   uniq,
 } from "@blazetrails/ruby-compat";
 import { isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
+import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
@@ -435,10 +436,6 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   get isLocked(): string | boolean | null {
     return this.lockValue;
-  }
-
-  unscoped(): Relation<T> {
-    return this._model.unscoped() as unknown as Relation<T>;
   }
 
   get isLoaded(): boolean {
@@ -979,74 +976,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.whereClause.toH(relationTableName);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
-   */
-  applyJoinDependency(options?: {
-    eagerLoading?: boolean;
-  }): Omit<Relation<T, G>, "then"> | Promise<Omit<Relation<T, G>, "then">>;
-  /** @internal */
-  applyJoinDependency<R>(
-    options: { eagerLoading?: boolean },
-    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
-  ): R | Promise<R>;
-  /** @internal */
-  applyJoinDependency<R>(
-    { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
-    block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
-  ): unknown {
-    const yieldRelation = (): unknown => {
-      if (block) {
-        return block(relation, joinDependency);
-      } else {
-        return stripThenable(relation);
-      }
-    };
-    const joinDependency = QueryMethods.constructJoinDependency.call(
-      this as any,
-      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
-      Nodes.OuterJoin,
-    ) as unknown as JoinDependency;
-    const relation = this.except("includes", "eagerLoad", "preload");
-    QueryMethods.joinsBang.call(relation as any, joinDependency as any);
-
-    if (
-      eagerLoading &&
-      this.hasLimitOrOffset &&
-      !(
-        this.usingLimitableReflections(joinDependency.reflections as never) &&
-        this.usingLimitableReflections(
-          (
-            QueryMethods.constructJoinDependency.call(
-              this as any,
-              _qm.selectAssociationList
-                .call(this as any, this.joinsValues, null)
-                .concat(
-                  _qm.selectAssociationList.call(this as any, this.leftOuterJoinsValues, null),
-                ) as AssociationSpec[],
-              null,
-            ) as unknown as JoinDependency
-          ).reflections as never,
-        )
-      )
-    ) {
-      return Promise.resolve(
-        this.skipQueryCacheIfNecessary(() =>
-          this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
-            (
-              c as unknown as {
-                distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
-              }
-            ).distinctRelationForPrimaryKey(relation),
-          ),
-        ),
-      ).then(yieldRelation);
-    }
-
-    return yieldRelation();
-  }
-
   /** @internal */
   _isDeferredDistinctPkSubquery(): boolean {
     if (this.groupValues.length > 0) return false;
@@ -1582,14 +1511,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     }
   }
 
-  async findSigned(token: string, options?: { purpose?: string }): Promise<T | null> {
-    return this.scoping(() => (this.model as any).findSigned(token, options)) as Promise<T | null>;
-  }
-
-  async findSignedBang(token: string, options?: { purpose?: string }): Promise<T> {
-    return this.scoping(() => (this.model as any).findSignedBang(token, options)) as Promise<T>;
-  }
-
   private _shouldEagerLoad: boolean | undefined;
 
   private _cacheKeys: Record<string, Promise<string>> | undefined;
@@ -1874,6 +1795,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   extends
     Included<typeof QueryMethods>,
     Included<typeof Explain>,
+    Included<SignedIdRelationMethods<T>>,
     Included<TokenForRelationMethods<T>>,
     CalculationMethods<G> {
   find(block: (record: T) => unknown): Promise<T | null>;
@@ -2024,6 +1946,15 @@ export interface Relation<T extends Base, G extends boolean = false>
   /** @internal */
   constructRelationForExists(conditions: unknown): Relation<T, G>;
   /** @internal */
+  applyJoinDependency(options?: {
+    eagerLoading?: boolean;
+  }): Omit<Relation<T, G>, "then"> | Promise<Omit<Relation<T, G>, "then">>;
+  /** @internal */
+  applyJoinDependency<R>(
+    options: { eagerLoading?: boolean },
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R | Promise<R>,
+  ): R | Promise<R>;
+  /** @internal */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   /** @internal */
   findWithIds(...ids: unknown[]): Promise<T | T[]>;
@@ -2100,6 +2031,7 @@ export interface Relation<T extends Base, G extends boolean = false> {
     options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
   ): Promise<R | undefined>;
   sanitizeSqlLike(value: string, escapeChar?: string): string;
+  unscoped(): Relation<T>;
 }
 
 const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknown> = {
@@ -2148,6 +2080,7 @@ include(Relation, QueryMethods);
 include(Relation, SpawnMethods);
 include(Relation, Calculations);
 include(Relation, FinderMethods);
+include(Relation, SignedIdRelationMethods);
 include(Relation, TokenForRelationMethods);
 
 for (const name of ["updateAll", "deleteAll"] as const) {
