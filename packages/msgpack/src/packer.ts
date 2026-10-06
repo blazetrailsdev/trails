@@ -223,6 +223,7 @@ export class Packer {
     return null;
   }
 
+  /** @missingRailsCall rb_class_of — CONVERGEABLE msgpack-class-inherited-p-singleton-lookup-and-cut-specs */
   private extRegistryLookup(instance: unknown): PackerExtType {
     const lookupClass = rbObjClass(instance);
     const type = this.extRegistryFetch(lookupClass);
