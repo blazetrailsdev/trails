@@ -1,8 +1,15 @@
-import { MessagePackError } from "./factory.js";
 import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { NameError, Rational, rational, rbModConstGet } from "@blazetrails/ruby-compat";
+import {
+  Complex,
+  NameError,
+  Rational,
+  RuntimeError,
+  complex,
+  rational,
+  rbModConstGet,
+} from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
 import { TimeZone, type Timezone } from "../values/time-zone.js";
@@ -99,6 +106,24 @@ export const Extensions = {
     });
 
     registry.registerType({
+      type: 3,
+      klass: "Rational",
+      recursive: true,
+      match: (v) => v instanceof Rational,
+      packer: (v, packer) => Extensions.writeRational(v as Rational, packer),
+      unpacker: (unpacker) => Extensions.readRational(unpacker as Unpacker),
+    });
+
+    registry.registerType({
+      type: 4,
+      klass: "Complex",
+      recursive: true,
+      match: (v) => v instanceof Complex,
+      packer: (v, packer) => Extensions.writeComplex(v as Complex, packer),
+      unpacker: (unpacker) => Extensions.readComplex(unpacker as Unpacker),
+    });
+
+    registry.registerType({
       type: 5,
       klass: "DateTime",
       recursive: true,
@@ -186,13 +211,22 @@ export const Extensions = {
   },
 
   writeRational(rational: Rational, packer: Packer): void {
-    packer.write(Number(rational.numerator));
-    if (rational.numerator !== 0n) packer.write(Number(rational.denominator));
+    packer.write(rational.numerator);
+    if (!(rational.numerator === 0n)) packer.write(rational.denominator);
   },
 
   readRational(unpacker: Unpacker): Rational {
-    const numerator = unpacker.read() as number;
-    return rational(numerator, numerator === 0 ? 1 : (unpacker.read() as number));
+    const numerator = unpacker.read() as number | bigint;
+    return rational(numerator, BigInt(numerator) === 0n ? 1 : (unpacker.read() as number | bigint));
+  },
+
+  writeComplex(complex: Complex, packer: Packer): void {
+    packer.write(complex.real);
+    packer.write(complex.imaginary);
+  },
+
+  readComplex(unpacker: Unpacker): Complex {
+    return complex(unpacker.read(), unpacker.read());
   },
 
   writeDatetime(datetime: Temporal.PlainDateTime, packer: Packer): void {
@@ -299,7 +333,7 @@ export const Extensions = {
   },
 
   raiseInvalidFormat(): never {
-    throw new MessagePackError("Invalid format");
+    throw new RuntimeError("Invalid format");
   },
 
   /** @missingRailsName class — PERMANENT */

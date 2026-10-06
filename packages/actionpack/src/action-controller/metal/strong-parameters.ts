@@ -241,28 +241,20 @@ export class Parameters {
     this._data[key] = value;
   }
 
-  isKey(key: string): boolean {
-    return hasKey(this._data, key);
-  }
-
-  hasKey(key: string): boolean {
-    return hasKey(this._data, key);
-  }
-
   hasValue(value: unknown): boolean {
     return Object.values(this._data).includes(value);
   }
 
   include(key: string): boolean {
-    return key in this._data;
+    return hasKey(this._data, key);
   }
 
-  member(key: string): boolean {
-    return key in this._data;
-  }
+  declare hasKey: Parameters["include"];
+  declare isKey: Parameters["include"];
+  declare member: Parameters["include"];
 
   exclude(key: string): boolean {
-    return !(key in this._data);
+    return !hasKey(this._data, key);
   }
 
   get keys(): string[] {
@@ -285,9 +277,7 @@ export class Parameters {
     return this._newWithInheritedPermitted(result);
   }
 
-  without(...keys: string[]): Parameters {
-    return this.except(...keys);
-  }
+  declare without: Parameters["except"];
 
   slice(...keys: string[]): Parameters {
     const result: Record<string, unknown> = {};
@@ -344,9 +334,7 @@ export class Parameters {
     return this._newWithInheritedPermitted(merge(otherData, this._data));
   }
 
-  withDefaults(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this.reverseMerge(otherHash);
-  }
+  declare withDefaults: Parameters["reverseMerge"];
 
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
@@ -358,9 +346,7 @@ export class Parameters {
     return this;
   }
 
-  withDefaultsBang(otherHash: Parameters | Record<string, unknown>): this {
-    return this.reverseMergeBang(otherHash);
-  }
+  declare withDefaultsBang: Parameters["reverseMergeBang"];
 
   transformKeys(fn: (key: string) => string): Parameters {
     const result: Record<string, unknown> = {};
@@ -429,9 +415,7 @@ export class Parameters {
     return this;
   }
 
-  keepIf(fn: (key: string, value: unknown) => boolean): this {
-    return this.selectBang(fn);
-  }
+  declare keepIf: Parameters["selectBang"];
 
   reject(fn: (key: string, value: unknown) => boolean): Parameters {
     return this.select((k, v) => !fn(k, v));
@@ -444,9 +428,7 @@ export class Parameters {
     return this;
   }
 
-  deleteIf(fn: (key: string, value: unknown) => boolean): this {
-    return this.rejectBang(fn);
-  }
+  declare deleteIf: Parameters["rejectBang"];
 
   compact(): Parameters {
     return this.select((_k, v) => v !== null && v !== undefined);
@@ -478,16 +460,14 @@ export class Parameters {
     return keys.map((k) => this.get(k));
   }
 
-  each(fn: (key: string, value: unknown) => void): this {
+  eachPair(fn: (key: string, value: unknown) => void): this {
     for (const [k, v] of Object.entries(this._data)) {
       fn(k, this._convertHashesToParameters(k, v));
     }
     return this;
   }
 
-  eachPair(fn: (key: string, value: unknown) => void): this {
-    return this.each(fn);
-  }
+  declare each: Parameters["eachPair"];
 
   eachValue(fn: (value: unknown) => void): this {
     eachPair(this._data, (key, value) => {
@@ -593,13 +573,11 @@ export class Parameters {
     return asJson(this._data, options) as Record<string, unknown>;
   }
 
-  toUnsafeHash(): Record<string, unknown> {
-    return this._convertParametersToHashes(this._data, "toUnsafeHash") as Record<string, unknown>;
+  toUnsafeH(): Record<string, unknown> {
+    return this._convertParametersToHashes(this._data, "toUnsafeH") as Record<string, unknown>;
   }
 
-  toUnsafeH(): Record<string, unknown> {
-    return this.toUnsafeHash();
-  }
+  declare toUnsafeHash: Parameters["toUnsafeH"];
 
   stringifyKeys(): Parameters {
     return rbObjDup(this);
@@ -614,9 +592,7 @@ export class Parameters {
     return toQuery(this.toH(), args);
   }
 
-  toParam(): string {
-    return this.toQuery();
-  }
+  declare toParam: Parameters["toQuery"];
 
   equals(other: Parameters): boolean {
     if (!(other instanceof Parameters)) return false;
@@ -719,8 +695,8 @@ export class Parameters {
       return value.map((v) => this._convertParametersToHashes(v, using));
     }
     if (value instanceof Parameters) {
-      if (using === "toUnsafeHash") {
-        return value.toUnsafeHash();
+      if (using === "toUnsafeH") {
+        return value.toUnsafeH();
       }
       return value.toH();
     }
@@ -1084,7 +1060,18 @@ export class Parameters {
   }
 }
 
+Parameters.prototype.hasKey = Parameters.prototype.include;
+Parameters.prototype.isKey = Parameters.prototype.include;
+Parameters.prototype.member = Parameters.prototype.include;
+Parameters.prototype.toParam = Parameters.prototype.toQuery;
+Parameters.prototype.toUnsafeHash = Parameters.prototype.toUnsafeH;
+Parameters.prototype.each = Parameters.prototype.eachPair;
 Parameters.prototype.required = Parameters.prototype.require;
+Parameters.prototype.without = Parameters.prototype.except;
+Parameters.prototype.keepIf = Parameters.prototype.selectBang;
+Parameters.prototype.deleteIf = Parameters.prototype.rejectBang;
+Parameters.prototype.withDefaults = Parameters.prototype.reverseMerge;
+Parameters.prototype.withDefaultsBang = Parameters.prototype.reverseMergeBang;
 
 include(Parameters, ToJsonWithActiveSupportEncoder);
 

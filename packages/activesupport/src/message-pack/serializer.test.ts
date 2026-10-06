@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "./index.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Complex, Rational, RuntimeError, complex, rational } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
@@ -49,6 +49,8 @@ describe("MessagePackSerializerTest", () => {
     expect(actual).toEqual({
       0: "Symbol",
       1: "Integer",
+      3: "Rational",
+      4: "Complex",
       5: "DateTime",
       6: "Date",
       7: "Time",
@@ -64,6 +66,26 @@ describe("MessagePackSerializerTest", () => {
     const value = 2n ** 512n;
     expect(roundtrip(value)).toBe(value);
     expect(roundtrip(-(2n ** 512n))).toBe(-(2n ** 512n));
+  });
+
+  it("roundtrips Rational", () => {
+    const result = roundtrip(rational(1, 3));
+    expect(result).toBeInstanceOf(Rational);
+    expect(result).toEqual(rational(1, 3));
+  });
+
+  it("optimizes Rational zero encoding", () => {
+    expect(roundtrip(rational(0, 1))).toEqual(rational(0, 1));
+
+    const serializedZero = dump(rational(0, 1));
+    const serializedNonzero = dump(rational(1, 1));
+    expect(serializedZero.length).toBeLessThan(serializedNonzero.length);
+  });
+
+  it("roundtrips Complex", () => {
+    const result = roundtrip(complex(1, -1));
+    expect(result).toBeInstanceOf(Complex);
+    expect(result).toEqual(complex(1, -1));
   });
 
   it("roundtrips 64-bit native integers", () => {
@@ -154,6 +176,7 @@ describe("MessagePackSerializerTest", () => {
   });
 
   it("rejects input without the signature", () => {
-    expect(() => load(Buffer.from("hey there"))).toThrow();
+    expect(() => load(Buffer.from("hey there"))).toThrow(RuntimeError);
+    expect(() => load(Buffer.from("hey there"))).toThrow("Invalid serialization format");
   });
 });

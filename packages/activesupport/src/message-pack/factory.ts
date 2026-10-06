@@ -1,6 +1,6 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { EOFError, Hash, StandardError } from "@blazetrails/ruby-compat";
 
-export class MessagePackError extends Error {}
+export class MessagePackError extends StandardError {}
 
 /** @internal */
 function isPlainObject(value: object): boolean {
@@ -226,8 +226,7 @@ export class Unpacker {
 
   /** @internal */
   private readUint(n: number): number {
-    if (this.pos + n > this.buf.length)
-      throw new MessagePackError("Unexpected end of MessagePack data");
+    if (this.pos + n > this.buf.length) throw new EOFError("end of buffer reached");
     let v = 0;
     for (let i = 0; i < n; i++) v = v * 256 + this.buf[this.pos++];
     return v;
@@ -243,14 +242,14 @@ export class Unpacker {
   /** @internal */
   private readBigUint(): number | bigint {
     let v = 0n;
-    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);
+    for (const b of this.readBytes(8)) v = (v << 8n) | BigInt(b);
     return v <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(v) : v;
   }
 
   /** @internal */
   private readBigInt(): number | bigint {
     let v = 0n;
-    for (let i = 0; i < 8; i++) v = (v << 8n) | BigInt(this.buf[this.pos++]);
+    for (const b of this.readBytes(8)) v = (v << 8n) | BigInt(b);
     if (v >= 0x8000000000000000n) v -= 0x10000000000000000n;
     return v >= BigInt(Number.MIN_SAFE_INTEGER) && v <= BigInt(Number.MAX_SAFE_INTEGER)
       ? Number(v)
@@ -259,8 +258,7 @@ export class Unpacker {
 
   /** @internal */
   private readBytes(len: number): Buffer {
-    if (this.pos + len > this.buf.length)
-      throw new MessagePackError("Unexpected end of MessagePack data");
+    if (this.pos + len > this.buf.length) throw new EOFError("end of buffer reached");
     const b = Buffer.from(this.buf.subarray(this.pos, this.pos + len));
     this.pos += len;
     return b;
@@ -293,11 +291,8 @@ export class Unpacker {
         return this.readExt(this.readUint(2));
       case 0xc9:
         return this.readExt(this.readUint(4));
-      case 0xcb: {
-        const v = this.buf.readDoubleBE(this.pos);
-        this.pos += 8;
-        return v;
-      }
+      case 0xcb:
+        return this.readBytes(8).readDoubleBE(0);
       case 0xcc:
         return this.readUint(1);
       case 0xcd:

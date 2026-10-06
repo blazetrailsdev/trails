@@ -30,13 +30,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/strong-parameters.ts",
-    "rubyName": "convert_value_to_parameters",
-    "call": "member?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/strong-parameters.ts",
     "rubyName": "deep_transform_keys",
     "call": "new_instance_with_inherited_permitted_status",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

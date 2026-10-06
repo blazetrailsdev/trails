@@ -1,6 +1,6 @@
-import { MessagePack, MessagePackError } from "@blazetrails/activesupport/message-pack";
+import { MessagePack } from "@blazetrails/activesupport/message-pack";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { hasKey, type Bytes } from "@blazetrails/ruby-compat";
+import { RuntimeError, hasKey, type Bytes } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
@@ -19,7 +19,7 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
       const data = MessagePack.load(serializedContent);
       return this.hashToMessage(data, 1);
     } catch (e) {
-      if (e instanceof MessagePackError) throw new Decryption();
+      if (e instanceof RuntimeError) throw new Decryption();
       throw e;
     }
   }

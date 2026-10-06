@@ -70,6 +70,24 @@ describe("ActionController::Parameters", () => {
     expect(left.hash()).not.toBe(new Parameters({ a: "1", b: "2" }).permitBang().hash());
   });
 
+  it("binds each alias_method name to its original's function", () => {
+    const proto = Parameters.prototype;
+    expect(proto.hasKey).toBe(proto.include);
+    expect(proto.isKey).toBe(proto.include);
+    expect(proto.member).toBe(proto.include);
+    expect(proto.toParam).toBe(proto.toQuery);
+    expect(proto.toUnsafeHash).toBe(proto.toUnsafeH);
+    expect(proto.each).toBe(proto.eachPair);
+    expect(proto.without).toBe(proto.except);
+    expect(proto.keepIf).toBe(proto.selectBang);
+    expect(proto.deleteIf).toBe(proto.rejectBang);
+    expect(proto.withDefaults).toBe(proto.reverseMerge);
+    expect(proto.withDefaultsBang).toBe(proto.reverseMergeBang);
+    expect(new Parameters({ a: 1 }).include("toString")).toBe(false);
+    expect(new Parameters({ a: 1 }).exclude("toString")).toBe(true);
+    expect(new Parameters({ a: 1 }).exclude("a")).toBe(false);
+  });
+
   it("aliases required to require", () => {
     const params = new Parameters({ person: { name: "Francesco" } });
     expect(Parameters.prototype.required).toBe(Parameters.prototype.require);
