@@ -6,6 +6,7 @@ import { Parameters } from "./metal/strong-parameters.js";
 import type { RackResponse } from "@blazetrails/rack";
 import {
   classAttribute,
+  isOwnClassAttribute,
   demodulize,
   initializeIncludedModules,
   isAnonymous,
@@ -129,10 +130,7 @@ export class Metal extends AbstractController {
     Object.defineProperty(this, "middlewareStack", {
       ...reader,
       get(this: typeof Metal) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr_middlewareStack") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!isOwnClassAttribute(this, "middlewareStack") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);

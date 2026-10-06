@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { rescueFrom } from "./rescuable.js";
+import { Rescuable } from "./rescuable.js";
 import { Fanout } from "./notifications/fanout.js";
 import { numberToHuman } from "./number-helper.js";
+
+const { rescueFrom } = Rescuable.ClassMethods;
 
 describe("raise sites Rails has and the port had dropped", () => {
   it("rescue_from raises without a handler", () => {

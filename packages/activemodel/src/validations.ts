@@ -1,5 +1,6 @@
 import {
   classAttribute,
+  isOwnClassAttribute,
   extend,
   extractOptionsBang,
   include,
@@ -109,10 +110,7 @@ export class Validations {
     Object.defineProperty(base, "_validators", {
       ...reader,
       get(this: ValidationsClassHost) {
-        if (
-          !Object.prototype.hasOwnProperty.call(this, "__class_attr__validators") &&
-          !rbModSingletonP(this)
-        ) {
+        if (!isOwnClassAttribute(this, "_validators") && !rbModSingletonP(this)) {
           inherited.call(Object.getPrototypeOf(this), this);
         }
         return reader.get!.call(this);

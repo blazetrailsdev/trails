@@ -8,7 +8,7 @@ export {
 
 export { Metal, MiddlewareStack, Middleware } from "./metal.js";
 
-export { Base, type RenderOptions, type RescueHandler } from "./base.js";
+export { Base, type RenderOptions } from "./base.js";
 export { DoubleRenderError } from "../abstract-controller/rendering.js";
 export { API } from "./api.js";
 

@@ -1,6 +1,6 @@
 import { block, include, kernelThrow, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import type { Extended, Included } from "@blazetrails/ruby-compat/include";
-import { classAttribute } from "./class-attribute.js";
+import { classAttribute, isOwnClassAttribute } from "./class-attribute.js";
 import { describe, it, expect } from "vitest";
 import {
   Value,
@@ -128,7 +128,7 @@ describe("include ActiveSupport::Callbacks (trails)", () => {
 
     expect(Child.__callbacks).toBe(inherited);
     expect(Object.keys(Child.__callbacks)).toEqual(["save"]);
-    expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr___callbacks")).toBe(false);
+    expect(isOwnClassAttribute(Child, "__callbacks")).toBe(false);
   });
 });
 

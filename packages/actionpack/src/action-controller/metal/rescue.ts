@@ -1,8 +1,18 @@
+import { Concern, Module, Rescuable, extend, include } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
+
 interface RescueHost {
   request: { env: Record<string, unknown> };
   isShowDetailedExceptions(): boolean;
-  rescueWithHandler(exception: unknown): Promise<boolean>;
+  rescueWithHandler(exception: unknown): unknown;
 }
+
+export const Rescue = new Module((mod) => {
+  extend(mod, Concern);
+  include(mod, Rescuable);
+
+  mod.defineMethod("isShowDetailedExceptions", isShowDetailedExceptions);
+});
 
 export function isShowDetailedExceptions(): boolean {
   return false;
@@ -15,6 +25,6 @@ export async function processAction(this: RescueHost, block: () => Promise<void>
   } catch (exception) {
     this.request.env["action_dispatch.show_detailed_exceptions"] ||=
       this.isShowDetailedExceptions();
-    if (!(await this.rescueWithHandler(exception))) throw exception;
+    if (!rtest(await this.rescueWithHandler(exception))) throw exception;
   }
 }

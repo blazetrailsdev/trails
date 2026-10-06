@@ -8,6 +8,28 @@ import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
 
 const _constants = new Map<string, unknown>();
+const _globals = new Map<string, unknown>();
+
+/**
+ * `rb_gv_get` (`vendor/ruby/v3.3.11/variable.c:984`): a global variable's
+ * value, `nil` while it has not been assigned.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbGvGet(name: string): unknown {
+  return _globals.has(name) ? _globals.get(name) : null;
+}
+
+/**
+ * `rb_gv_set` (`vendor/ruby/v3.3.11/variable.c:970`): assigns a global
+ * variable and answers the value.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbGvSet<T>(name: string, val: T): T {
+  _globals.set(name, val);
+  return val;
+}
 
 /**
  * `rb_const_set` (`vendor/ruby/v3.3.11/variable.c:3674`) on `rb_cObject`: JS

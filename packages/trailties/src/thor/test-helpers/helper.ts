@@ -10,15 +10,15 @@ import {
   stderr as $stderr,
   stdout as $stdout,
   StringIO,
+  rbGvSet,
   verbose,
 } from "@blazetrails/ruby-compat";
-import { setThorRunner } from "../base.js";
 import { Base } from "../shell.js";
 import { Basic } from "../shell/basic.js";
 
 setEnv("THOR_COLUMNS", "10000");
 setArg0("thor");
-setThorRunner(true);
+rbGvSet("$thor_runner", true);
 rbArgv().length = 0;
 Base.shell = Basic;
 

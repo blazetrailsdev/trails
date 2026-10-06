@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { env, File, puts, rbArgv, rbProgname, stdout as $stdout } from "@blazetrails/ruby-compat";
-import { thorRunner } from "../base.js";
+import {
+  env,
+  File,
+  puts,
+  rbArgv,
+  rbGvGet,
+  rbProgname,
+  stdout as $stdout,
+} from "@blazetrails/ruby-compat";
 import { Base } from "../shell.js";
 import { Basic } from "../shell/basic.js";
 import type { ThorClass } from "../thor.js";
@@ -14,7 +21,7 @@ const ns = (...klasses: unknown[]) => klasses.map((k) => (k as ThorClass).namesp
 describe("Thor spec helper", () => {
   it("applies helper.rb's globals", () => {
     expect(env["THOR_COLUMNS"]).toBe("10000");
-    expect([rbProgname(), thorRunner, rbArgv()]).toEqual(["thor", true, []]);
+    expect([rbProgname(), rbGvGet("$thor_runner"), rbArgv()]).toEqual(["thor", true, []]);
     expect(Base.shell).toBe(Basic);
     expect(File.isExist(File.join(sourceRoot(), "doc", "%file_name%.rb.tt"))).toBe(true);
     expect(File.basename(destinationRoot())).toBe("sandbox");

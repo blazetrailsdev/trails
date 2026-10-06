@@ -38,6 +38,7 @@ import {
   toI,
   TypeError,
   warn,
+  rbGvGet,
 } from "@blazetrails/ruby-compat";
 import type { Command } from "./command.js";
 import { Invocation } from "./invocation.js";
@@ -83,13 +84,6 @@ export function deprecationWarning(message: string): void {
         "You can silence deprecations warning by setting the environment variable THOR_SILENCE_DEPRECATION.",
     );
   }
-}
-
-export let thorRunner: unknown = false;
-
-/** @noRailsEquivalent PERMANENT */
-export function setThorRunner(value: unknown): void {
-  thorRunner = value;
 }
 
 type Relations = { exclusiveOptionNames?: string[][]; atLeastOneOptionNames?: string[][] };
@@ -564,7 +558,7 @@ export const ClassMethods = {
   handleNoCommandError(
     this: BaseClass,
     command: string,
-    hasNamespace: unknown = thorRunner,
+    hasNamespace: unknown = rbGvGet("$thor_runner"),
   ): never {
     throw new UndefinedCommandError(
       command,

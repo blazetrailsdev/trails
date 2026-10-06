@@ -48,6 +48,11 @@ export namespace ClassAttribute {
   }
 }
 
+/** @noRailsEquivalent PERMANENT */
+export function isOwnClassAttribute(klass: object, name: string): boolean {
+  return Object.prototype.hasOwnProperty.call(klass, `__class_attr_${name}`);
+}
+
 /** @missingRailsName default — PERMANENT */
 export function classAttribute(this: any, ...attrs: (string | ClassAttributeOptions)[]): void {
   const last = attrs[attrs.length - 1];
