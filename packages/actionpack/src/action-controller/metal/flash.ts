@@ -87,7 +87,9 @@ export function actionMethods(this: FlashClassHost): string[] {
     const flashTypes = new Set(host._flashTypes.map(String));
     AbstractController.actionMethods.call(host as unknown as typeof AbstractController);
     host._actionMethodCache = new Map(
-      [...host._actionMethodCache!].filter(([, method]) => !flashTypes.has(method)),
+      [...host._actionMethodCache!].filter(
+        ([name, method]) => !flashTypes.has(name) && !flashTypes.has(method),
+      ),
     );
   }
   return [...host._actionMethodCache.keys()];

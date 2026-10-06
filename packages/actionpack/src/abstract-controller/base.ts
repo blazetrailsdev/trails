@@ -229,7 +229,13 @@ export class AbstractController {
         (name) => !internalMethods.has(name),
       );
       methods.push(...ownPublicMethodNames(this.prototype));
-      this._actionMethodCache = new Map(methods.map((name) => [underscore(name), name]));
+      this._actionMethodCache = new Map();
+      for (const name of methods) {
+        const actionName = underscore(name);
+        if (name === actionName || !this._actionMethodCache.has(actionName)) {
+          this._actionMethodCache.set(actionName, name);
+        }
+      }
     }
     return [...this._actionMethodCache.keys()];
   }
@@ -301,10 +307,10 @@ export class AbstractController {
   }
 
   /** @internal */
-  isActionMethod(name: string): boolean {
+  isActionMethod(name: string): string | undefined {
     const cls = this.constructor as typeof AbstractController;
     cls.actionMethods();
-    return cls._actionMethodCache!.has(name);
+    return cls._actionMethodCache!.get(name);
   }
 
   /** @internal */
@@ -319,9 +325,8 @@ export class AbstractController {
 
   /** @internal */
   methodForAction(actionName: string): string | undefined {
-    if (this.isActionMethod(actionName)) {
-      return (this.constructor as typeof AbstractController)._actionMethodCache!.get(actionName);
-    }
+    const method = this.isActionMethod(actionName);
+    if (method != null) return method;
     if (typeof (this as any).actionMissing === "function") return "_handleActionMissing";
     return undefined;
   }
