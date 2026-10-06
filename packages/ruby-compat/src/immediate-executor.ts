@@ -11,8 +11,8 @@ export class ImmediateExecutor {
   private stopped = false;
 
   /**
-   * @noRailsEquivalent PERMANENT
    * @inventedArm if — PERMANENT
+   * @noRailsEquivalent PERMANENT
    */
   post<A extends unknown[]>(
     ...argsAndTask: [...args: A, task: (...args: A) => unknown]
