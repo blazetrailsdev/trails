@@ -213,8 +213,12 @@ export class NoEnvironmentInSchemaError extends MigrationError {
 }
 
 export class ProtectedEnvironmentError extends ActiveRecordError {
-  constructor(env: string) {
-    super(`You are attempting to run a destructive action against your '${env}' database.`);
+  constructor(env = "production") {
+    let msg = `You are attempting to run a destructive action against your '${env}' database.\n`;
+    msg +=
+      "If you are sure you want to continue, run the same command with the environment variable:\n";
+    msg += "DISABLE_DATABASE_ENVIRONMENT_CHECK=1";
+    super(msg);
     this.name = "ActiveRecord::ProtectedEnvironmentError";
   }
 }
@@ -231,8 +235,11 @@ export class EnvironmentMismatchError extends ActiveRecordError {
 }
 
 export class EnvironmentStorageError extends ActiveRecordError {
-  constructor(message = "Cannot store environment data.") {
-    super(message);
+  constructor() {
+    let msg =
+      "You are attempting to store the environment in a database where metadata is disabled.\n";
+    msg += "Check your database configuration to see if this is intended.";
+    super(msg);
     this.name = "ActiveRecord::EnvironmentStorageError";
   }
 }

@@ -278,6 +278,22 @@ describe("Migration#createTable id option type", () => {
       await expect(migration.methodMissing("nopeNotHere")).rejects.toThrow(NoMethodError);
     });
 
+    it("sends a class-level call to the nearest delegate", async () => {
+      await expect(StrategyMigration.methodMissing("nopeNotHere")).rejects.toThrow(NoMethodError);
+    });
+
+    it("raises NoMethodError for nil when there is no delegate", () => {
+      const previous = Migration.delegate;
+      Migration.delegate = null;
+      try {
+        const send = () => StrategyMigration.methodMissing("nopeNotHere");
+        expect(send).toThrow(NoMethodError);
+        expect(send).toThrow("undefined method 'nopeNotHere' for nil");
+      } finally {
+        Migration.delegate = previous;
+      }
+    });
+
     class RecordingMigration extends Migration {
       calls: [string, unknown[]][] = [];
       lines: string[] = [];

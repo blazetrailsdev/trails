@@ -28,7 +28,13 @@ import {
   included,
   kernelArray,
 } from "@blazetrails/activesupport";
-import { NotImplementedError, RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  RuntimeError,
+  except,
+  mergeBang,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
@@ -95,6 +101,7 @@ function arrayLen(value: string | string[]): number {
 
 export abstract class AbstractReflection {
   /** @internal */
+  private _className?: string;
   private _counterCacheColumn?: string | null;
   private _inverseWhichUpdatesCounterCacheDefined?: boolean;
   private _inverseWhichUpdatesCounterCache?: AbstractReflection;
@@ -125,7 +132,12 @@ export abstract class AbstractReflection {
     return new (this.klass as any)(attributes, block);
   }
 
-  abstract get className(): string;
+  get className(): string {
+    return (this._className ??= toS(
+      this._concrete().options.className ??
+        (this as unknown as { deriveClassName(): string }).deriveClassName(),
+    ));
+  }
 
   abstract get klass(): typeof Base;
 
@@ -413,11 +425,6 @@ export class MacroReflection extends AbstractReflection {
 
   get scope(): ((...args: any[]) => any) | null {
     return this._scope;
-  }
-
-  get className(): string {
-    if (this.options.className) return this.options.className as string;
-    return camelize(singularize(this.nameString));
   }
 
   get klass(): typeof Base {
@@ -971,12 +978,11 @@ export class AssociationReflection extends MacroReflection {
     return !!this.options.strictLoading;
   }
 
-  get className(): string {
-    if (this.options.className) return this.options.className as string;
-    if (this.isCollection()) {
-      return camelize(singularize(this.nameString));
-    }
-    return camelize(this.nameString);
+  /** @internal */
+  protected override deriveClassName(): string {
+    let className = this.nameString;
+    if (this.isCollection()) className = singularize(className);
+    return camelize(className);
   }
 
   /** @internal */
@@ -1184,14 +1190,6 @@ export class ThroughReflection extends AbstractReflection {
 
   get scope(): ((...args: any[]) => any) | null {
     return this.delegateReflection.scope;
-  }
-
-  get className(): string {
-    return (
-      (this.options.className as string | undefined) ||
-      this.deriveClassName() ||
-      this.delegateReflection.className
-    );
   }
 
   get klass(): typeof Base {
@@ -1481,7 +1479,7 @@ export class ThroughReflection extends AbstractReflection {
 
   /** @internal */
   protected deriveClassName(): string {
-    return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
+    return (this.options.sourceType as string | undefined) ?? this.sourceReflection!.className;
   }
 
   /** @internal */
