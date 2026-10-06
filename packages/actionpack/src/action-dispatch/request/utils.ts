@@ -1,5 +1,5 @@
-import { bytes, forceEncoding, isValidEncoding, toS } from "@blazetrails/ruby-compat";
-import { InvalidParameterError } from "../http/param-error.js";
+import { bytes, forceEncoding, isValidEncoding, scrub, toS } from "@blazetrails/ruby-compat";
+import { InvalidParameterError } from "@blazetrails/rack";
 import { MissingController } from "../http/request.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
 
@@ -19,12 +19,16 @@ export class RequestUtils {
     if (Array.isArray(params)) {
       params.forEach((element, i) => {
         const replaced = RequestUtils.eachParamValue(element, block);
-        if (replaced !== element) params[i] = replaced;
+        if (replaced === element) return;
+        if (Object.isFrozen(params)) params = [...(params as ParamValue[])];
+        (params as ParamValue[])[i] = replaced;
       });
     } else if (params !== null && typeof params === "object") {
       for (const [key, value] of Object.entries(params)) {
         const replaced = RequestUtils.eachParamValue(value, block);
-        if (replaced !== value) params[key] = replaced;
+        if (replaced === value) continue;
+        if (Object.isFrozen(params)) params = { ...(params as ParamHash) };
+        (params as ParamHash)[key] = replaced;
       }
     } else if (typeof params === "string") {
       return block(params) ?? params;
@@ -43,9 +47,7 @@ export class RequestUtils {
       Object.values(params).forEach((value) => RequestUtils.checkParamEncoding(value));
     } else if (typeof params === "string") {
       if (/\p{Cs}/u.test(params)) {
-        throw new InvalidParameterError(
-          `Invalid encoding for parameter: ${params.replace(/\p{Cs}/gu, "\uFFFD")}`,
-        );
+        throw new InvalidParameterError(`Invalid encoding for parameter: ${scrub(params)}`);
       }
     }
   }
@@ -85,7 +87,9 @@ export class CustomParamEncoder {
           return forceEncoding(forced, encodingTemplate.get(toS(key))!);
         }
       });
-      if (replaced !== value) params[key] = replaced;
+      if (replaced === value) continue;
+      if (Object.isFrozen(params)) params = { ...params };
+      params[key] = replaced;
     }
     return params;
   }

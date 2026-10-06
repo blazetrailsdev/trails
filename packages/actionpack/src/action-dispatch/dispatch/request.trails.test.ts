@@ -3,7 +3,7 @@ import type { RackEnv } from "@blazetrails/rack";
 import { Encoding } from "@blazetrails/ruby-compat";
 import { Base } from "../../action-controller/base.js";
 import { ParamBuilder } from "../http/param-builder.js";
-import { InvalidParameterError } from "../http/param-error.js";
+import { InvalidParameterError } from "@blazetrails/rack";
 import { Request, controllerConstants } from "../request.js";
 import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 
@@ -136,8 +136,11 @@ describe("Request", () => {
       expect(() => ParamBuilder.fromHash({ baz: "\udc83" }, { encodingTemplate })).toThrow(
         InvalidParameterError,
       );
-      const frozen = Object.freeze({ qux: Object.freeze(["ハ"]) }) as never;
-      expect(ParamBuilder.fromHash(frozen, { encodingTemplate })).toEqual({ qux: ["ハ"] });
+      const frozen = Object.freeze({ baz: Object.freeze(["\udc83n"]), qux: "ハ" }) as never;
+      expect(ParamBuilder.fromHash(frozen, { encodingTemplate })).toEqual({
+        baz: ["ハ"],
+        qux: "ハ",
+      });
     });
 
     it("action_encoding_template answers only a declared action, per class", () => {
