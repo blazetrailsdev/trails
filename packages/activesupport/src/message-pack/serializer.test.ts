@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { MessagePack, UnserializableObjectError } from "./index.js";
 import { Temporal, Time } from "@blazetrails/date";
-import { Complex, Rational, RuntimeError, complex, rational } from "@blazetrails/ruby-compat";
+import {
+  BigDecimal,
+  Complex,
+  Rational,
+  RuntimeError,
+  complex,
+  rational,
+} from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
@@ -49,6 +56,7 @@ describe("MessagePackSerializerTest", () => {
     expect(actual).toEqual({
       0: "Symbol",
       1: "Integer",
+      2: "BigDecimal",
       3: "Rational",
       4: "Complex",
       5: "DateTime",
@@ -66,6 +74,16 @@ describe("MessagePackSerializerTest", () => {
     const value = 2n ** 512n;
     expect(roundtrip(value)).toBe(value);
     expect(roundtrip(-(2n ** 512n))).toBe(-(2n ** 512n));
+  });
+
+  it("roundtrips BigDecimal", () => {
+    for (const value of ["9876543210.0123456789", "1", "-1.5", "0.1e-19", "-0", "Infinity"]) {
+      const object = new BigDecimal(value);
+      const deserialized = roundtrip(object) as BigDecimal;
+      expect(deserialized).toBeInstanceOf(BigDecimal);
+      expect(deserialized.toString("E")).toBe(object.toString("E"));
+    }
+    expect((roundtrip(new BigDecimal("NaN")) as BigDecimal).isNan()).toBe(true);
   });
 
   it("roundtrips Rational", () => {

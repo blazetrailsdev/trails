@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { BigDecimal, toD } from "./big-decimal.js";
 
 describe("BigDecimal", () => {
@@ -15,6 +16,49 @@ describe("BigDecimal", () => {
     expect(new BigDecimal("-1.5").toString("E")).toBe("-0.15e1");
     expect(new BigDecimal("0").toString("E")).toBe("0.0");
     expect(new BigDecimal("123456.789").toString("F")).toBe("123456.789");
+  });
+
+  it("_dump prefixes the bare to_s with MaxPrec in digits", () => {
+    expect(
+      [
+        "9876543210.0123456789",
+        "1",
+        "-1.5",
+        "0",
+        "123456789",
+        "1234567890",
+        "NaN",
+        "-Infinity",
+      ].map((v) => new BigDecimal(v)._dump()),
+    ).toEqual([
+      "36:0.98765432100123456789e10",
+      "18:0.1e1",
+      "18:-0.15e1",
+      "18:0.0",
+      "18:0.123456789e9",
+      "27:0.123456789e10",
+      "9:NaN",
+      "9:-Infinity",
+    ]);
+  });
+
+  it("_load reads the value after the precision prefix", () => {
+    expect(BigDecimal._load("18:0.1e1").toString("E")).toBe("0.1e1");
+    expect(BigDecimal._load("9:-Infinity").toString("E")).toBe("-Infinity");
+    expect(BigDecimal._load("36:0.98765432100123456789e10")._dump()).toBe(
+      "36:0.98765432100123456789e10",
+    );
+    expect(
+      ["9:0.1e1", "18:0.1e1", "0:0.1e1", "90:0.1e1", "27:0.123456789e9"].map((v) =>
+        BigDecimal._load(v)._dump(),
+      ),
+    ).toEqual(["18:0.1e1", "18:0.1e1", "18:0.1e1", "81:0.1e1", "27:0.123456789e9"]);
+    expect(() => BigDecimal._load("12")).toThrow(ArgumentError);
+    expect(() => BigDecimal._load("12")).toThrow('invalid value for BigDecimal(): ""');
+    expect(() => BigDecimal._load("0.1e1")).toThrow(TypeError);
+    expect(() => BigDecimal._load("0.1e1")).toThrow(
+      "load failed: invalid character in the marshaled string",
+    );
   });
 
   it("encodes as a JSON string in fixed form", () => {

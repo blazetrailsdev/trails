@@ -1,4 +1,4 @@
-import { EOFError, Hash, StandardError } from "@blazetrails/ruby-compat";
+import { EOFError, FrozenError, Hash, StandardError } from "@blazetrails/ruby-compat";
 
 export class MessagePackError extends StandardError {}
 
@@ -22,6 +22,7 @@ export class Factory {
   private types: RegisteredType[] = [];
 
   registerType(type: RegisteredType): void {
+    if (this.isFrozen()) throw new FrozenError("can't modify frozen MessagePack::Factory");
     this.types.push(type);
   }
 
@@ -45,13 +46,66 @@ export class Factory {
     return new Packer(this);
   }
 
-  unpacker<T>(block: (unpacker: Unpacker) => T): T {
-    const unpacker = new Unpacker(Buffer.alloc(0), this);
+  unpacker(io: Buffer = Buffer.alloc(0)): Unpacker {
+    return new Unpacker(io, this);
+  }
+
+  freeze(): this {
+    Object.freeze(this.types);
+    return Object.freeze(this);
+  }
+
+  isFrozen(): boolean {
+    return Object.isFrozen(this);
+  }
+
+  pool(size = 1): Pool {
+    return new Pool(this.isFrozen() ? this : this.dup().freeze(), size);
+  }
+
+  dup(): Factory {
+    const factory = new Factory();
+    factory.types = [...this.types];
+    return factory;
+  }
+}
+
+class MemberPool<T extends { reset(): void }> {
+  private members: T[] = [];
+
+  constructor(
+    private size: number,
+    private newMember: () => T,
+  ) {}
+
+  with<R>(block: (member: T) => R): R {
+    const member = this.members.pop() ?? this.newMember();
     try {
-      return block(unpacker);
+      return block(member);
     } finally {
-      unpacker.reset();
+      if (this.members.length < this.size) {
+        member.reset();
+        this.members.push(member);
+      }
     }
+  }
+}
+
+export class Pool {
+  private packers: MemberPool<Packer>;
+  private unpackers: MemberPool<Unpacker>;
+
+  constructor(factory: Factory, size: number) {
+    this.packers = new MemberPool(size, () => factory.packer());
+    this.unpackers = new MemberPool(size, () => factory.unpacker());
+  }
+
+  packer<T>(block: (packer: Packer) => T): T {
+    return this.packers.with(block);
+  }
+
+  unpacker<T>(block: (unpacker: Unpacker) => T): T {
+    return this.unpackers.with(block);
   }
 }
 
@@ -62,6 +116,16 @@ export class Packer {
 
   toBuffer(): Buffer {
     return Buffer.from(this.out);
+  }
+
+  fullPack(): Buffer {
+    const dumped = this.toBuffer();
+    this.reset();
+    return dumped;
+  }
+
+  reset(): void {
+    this.out = [];
   }
 
   write(value: unknown): void {

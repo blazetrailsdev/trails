@@ -1,15 +1,21 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
-import { Factory } from "./factory.js";
+import { RuntimeError, rbStrToI } from "@blazetrails/ruby-compat";
+import { getEnv } from "../environment.js";
+import { Factory, type Pool } from "./factory.js";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE_INT = 128;
 
 export class Serializer {
   private factoryInstance: Factory | null = null;
-  private installed = false;
+  private pool: Pool | null = null;
 
   get messagePackFactory(): Factory {
     return (this.factoryInstance ??= new Factory());
+  }
+
+  set messagePackFactory(factory: Factory) {
+    this.pool = null;
+    this.factoryInstance = factory;
   }
 
   registerType(...args: Parameters<Factory["registerType"]>): void {
@@ -21,10 +27,11 @@ export class Serializer {
   }
 
   dump(object: unknown): Buffer {
-    const packer = this.messagePackPool().packer();
-    packer.write(SIGNATURE_INT);
-    packer.write(object);
-    return packer.toBuffer();
+    return this.messagePackPool().packer((packer) => {
+      packer.write(SIGNATURE_INT);
+      packer.write(object);
+      return packer.fullPack();
+    });
   }
 
   load(dumped: Uint8Array | string): unknown {
@@ -44,13 +51,16 @@ export class Serializer {
    * @internal
    * @missingRailsCall fetch — PERMANENT
    */
-  protected messagePackPool(): Factory {
-    if (!this.installed) {
-      Extensions.install(this.messagePackFactory);
-      this.installUnregisteredTypeHandler();
-      this.installed = true;
+  protected messagePackPool(): Pool {
+    if (this.pool === null) {
+      if (!this.messagePackFactory.isFrozen()) {
+        Extensions.install(this.messagePackFactory);
+        this.installUnregisteredTypeHandler();
+        this.messagePackFactory.freeze();
+      }
+      this.pool = this.messagePackFactory.pool(Number(rbStrToI(getEnv("RAILS_MAX_THREADS", "5"))));
     }
-    return this.messagePackFactory;
+    return this.pool;
   }
 
   /** @internal */

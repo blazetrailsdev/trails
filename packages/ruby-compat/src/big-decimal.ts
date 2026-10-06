@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 
 const BASE_FIG = 9;
@@ -19,6 +20,7 @@ type Parsed = {
   digits: string;
   exp: number;
   nonFinite: "NaN" | "Infinity" | null;
+  maxPrec: number;
 };
 
 /**
@@ -31,6 +33,7 @@ export class BigDecimal {
   private digits: string;
   private exp: number;
   private readonly nonFinite: "NaN" | "Infinity" | null;
+  private maxPrec: number;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
@@ -54,6 +57,7 @@ export class BigDecimal {
     this.digits = parsed.digits;
     this.exp = parsed.exp;
     this.nonFinite = parsed.nonFinite;
+    this.maxPrec = parsed.maxPrec;
     if (parsed.nonFinite === null && ndigits > 0 && (isRational || isFloat)) {
       const rounded = this.round(ndigits - this.exponent());
       this._sign = rounded._sign;
@@ -277,6 +281,48 @@ export class BigDecimal {
     return negative ? VP_SIGN_NEGATIVE_FINITE : VP_SIGN_POSITIVE_FINITE;
   }
 
+  /**
+   * Ruby's `BigDecimal#_dump` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:781`
+   * `BigDecimal_dump`): `VpMaxPrec(vp)*VpBaseFig()`, a colon, then the bare
+   * `to_s`.
+   */
+  _dump(_dummy?: unknown): string {
+    return `${this.maxPrec * BASE_FIG}:${this.toString("E")}`;
+  }
+
+  /**
+   * Ruby's `BigDecimal._load` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:805`
+   * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
+   * (`bigdecimal.c:5420-5421`) over the prefix.
+   */
+  static _load(str: string): BigDecimal {
+    let pch = 0;
+    let m = 0;
+    while (pch < str.length) {
+      const ch = str[pch++];
+      if (ch === ":") break;
+      if (!(ch >= "0" && ch <= "9")) {
+        throw new TypeError("load failed: invalid character in the marshaled string");
+      }
+      m = m * 10 + Number(ch);
+    }
+    if (m > BASE_FIG) m -= BASE_FIG;
+    const szVal = str.slice(pch);
+    const parsed = parse(szVal);
+    if (parsed === null) {
+      throw new ArgumentError(`invalid value for BigDecimal(): "${szVal}"`);
+    }
+    const pv = new BigDecimal(szVal);
+    if (pv.nonFinite === null) {
+      pv.maxPrec = Math.max(pv.maxPrec, Math.max(Math.ceil(m / BASE_FIG), 1));
+    }
+    m = Math.floor(m / BASE_FIG);
+    if (m && pv.maxPrec > m) {
+      pv.maxPrec = m + 1;
+    }
+    return pv;
+  }
+
   private unscaled(signum = 1): bigint {
     const magnitude =
       this.digits === ""
@@ -382,7 +428,7 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   const n = value.numerator < 0n ? -value.numerator : value.numerator;
   const d = value.denominator < 0n ? -value.denominator : value.denominator;
   if (d === 0n) return null;
-  if (n === 0n) return { sign: "", digits: "", exp: 0, nonFinite: null };
+  if (n === 0n) return { sign: "", digits: "", exp: 0, nonFinite: null, maxPrec: maxPrec(1, 0) };
 
   let fracNeeded: number;
   const intPartDigits = n / d;
@@ -393,8 +439,9 @@ function parseRational(value: RationalLike, ndigits: number): Parsed | null {
   }
   const scaled = ((n * 10n ** BigInt(fracNeeded)) / d).toString();
   const digits = scaled === "0" ? "" : scaled.replace(/0+$/, "");
-  if (digits === "") return { sign, digits: "", exp: 0, nonFinite: null };
-  return { sign, digits, exp: scaled.length - fracNeeded, nonFinite: null };
+  const prec = maxPrec(Math.max(scaled.length - fracNeeded, 1), fracNeeded);
+  if (digits === "") return { sign, digits: "", exp: 0, nonFinite: null, maxPrec: prec };
+  return { sign, digits, exp: scaled.length - fracNeeded, nonFinite: null, maxPrec: prec };
 }
 
 function leadingZeroCount(n: bigint, d: bigint): number {
@@ -407,6 +454,15 @@ function leadingZeroCount(n: bigint, d: bigint): number {
   return covers ? zeros : zeros + 1;
 }
 
+/**
+ * The `MaxPrec` `VpAlloc` allots a parsed literal
+ * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:5416-5423`); a special
+ * value gets one word (`bigdecimal.c:5185-5186`).
+ */
+function maxPrec(ni: number, nf: number): number {
+  return Math.floor((ni + nf + BASE_FIG - 1) / BASE_FIG) + 1;
+}
+
 function parse(value: string | number | bigint): Parsed | null {
   if (typeof value === "bigint") {
     const negative = value < 0n;
@@ -417,24 +473,26 @@ function parse(value: string | number | bigint): Parsed | null {
       digits,
       exp: digits === "" ? 0 : magnitude.length,
       nonFinite: null,
+      maxPrec: maxPrec(magnitude.length, 0),
     };
   }
   if (typeof value === "number" && !Number.isFinite(value)) {
     return Number.isNaN(value)
-      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN" }
-      : { sign: value < 0 ? "-" : "", digits: "", exp: 0, nonFinite: "Infinity" };
+      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN", maxPrec: 1 }
+      : { sign: value < 0 ? "-" : "", digits: "", exp: 0, nonFinite: "Infinity", maxPrec: 1 };
   }
   const raw = String(value).trim();
   if (raw === "") return null;
   const special = NON_FINITE_REGEX.exec(raw);
   if (special !== null) {
     return special[1] !== undefined
-      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN" }
+      ? { sign: "", digits: "", exp: 0, nonFinite: "NaN", maxPrec: 1 }
       : {
           sign: special[2] === "-" ? "-" : "",
           digits: "",
           exp: 0,
           nonFinite: "Infinity",
+          maxPrec: 1,
         };
   }
   let s = raw;
@@ -453,9 +511,10 @@ function parse(value: string | number | bigint): Parsed | null {
   const all = intPart + fracPart;
   const stripped = all.replace(/^0+/, "");
   const digits = stripped.replace(/0+$/, "");
-  if (digits === "") return { sign, digits: "", exp: 0, nonFinite: null };
+  const prec = maxPrec(intPart.length, fracPart.length);
+  if (digits === "") return { sign, digits: "", exp: 0, nonFinite: null, maxPrec: prec };
   const exp = intPart.length - (all.length - stripped.length) + (m[3] ? Number(m[3]) : 0);
-  return { sign, digits, exp, nonFinite: null };
+  return { sign, digits, exp, nonFinite: null, maxPrec: prec };
 }
 
 const INTERPRET_LOOSELY_REGEX =
