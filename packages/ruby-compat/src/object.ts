@@ -703,10 +703,7 @@ export function toS(obj: unknown): string {
  * holds) reaches those two arms and `OBJECT_METHOD_TABLE` by its `is`-prefixed
  * TS spelling; every other lookup, `method_missing` included, sees the name as
  * sent. An operator is sent by its
- * Ruby name (`">"`), which has no TS method spelling. A writer `name=` that no
- * setter or `setName` method answers is assigned to a data field `name` the
- * receiver holds, the JS spelling of an `attr_accessor` with no accessor pair,
- * as a zero-argument send reads one. `==` is {@link rbEqual},
+ * Ruby name (`">"`), which has no TS method spelling. `==` is {@link rbEqual},
  * which sends the receiver's own `==`, and `!=` its negation
  * (`rb_obj_not_equal`, `vendor/ruby/v3.3.11/object.c:248`). The four ordering
  * operators answer for the receivers that define them in Ruby: between two
@@ -828,9 +825,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
-  }
-  if (attr !== undefined && argc === 1 && attr in obj && typeof obj[attr] !== "function") {
-    return (obj[attr] = args[0]);
   }
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));

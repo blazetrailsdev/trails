@@ -88,6 +88,14 @@ describe("helperMethod", () => {
     expect(controller.written).toBe("jamis");
   });
 
+  it("a writer entry for a name the controller does not hold raises NoMethodError", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "name=");
+
+    const proxy = extend({ controller: {} } as { name?: string }, cls._helpers!);
+    expect(() => (proxy.name = "jamis")).toThrow(NoMethodError);
+  });
+
   it("an operator name ending in = is forwarded as a method, not read as a writer", () => {
     const cls = makeBase();
     helperMethod.call(cls, "==");

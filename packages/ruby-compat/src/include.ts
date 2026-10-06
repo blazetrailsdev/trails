@@ -225,6 +225,10 @@ export class Module<I extends object = Record<never, never>> {
    * included is skipped (`include_modules_at`, class.c:1281,1291,1296). A
    * module defining `appendFeatures` gets that call instead, then `included`,
    * as `rb_mod_include` sends both (vendor/ruby/v3.3.11/eval.c:1159-1160).
+   * `ensure_includable` (class.c:1168-1176) rejects a Ruby `Class`; a TS class
+   * passed here is a class module, the spelling {@link include} already takes
+   * for a Ruby module that carries accessors, so its prototype methods are
+   * the module's method table.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */

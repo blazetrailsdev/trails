@@ -13,6 +13,7 @@ import {
   Module,
   rbFSend,
   rbObjIsKindOf,
+  rbObjRespondTo,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 
@@ -145,8 +146,13 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
           return (...args: unknown[]) => rbFSend(controller, attr, ...args);
         },
         set: writer
-          ? function (this: { controller: object }, value: unknown) {
-              rbFSend(this.controller, `${attr}=`, value);
+          ? function (this: { controller: Record<string, unknown> }, value: unknown) {
+              const controller = this.controller;
+              if (attr in controller && !rbObjRespondTo(controller, `${attr}=`)) {
+                controller[attr] = value;
+              } else {
+                rbFSend(controller, `${attr}=`, value);
+              }
             }
           : undefined,
         configurable: true,
