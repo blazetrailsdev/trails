@@ -2269,30 +2269,50 @@ function findDefinePropertyAccessorCall(call: ts.CallExpression): {
 
 /** Push the reader — and, for a `get`/`set` pair, the writer — of a generated accessor. */
 function pushGeneratedAccessor(
-  classInfo: ClassInfo,
+  members: MethodInfo[],
+  file: string,
   name: string,
   line: number,
   writerParams: ParamInfo[] | null,
 ): void {
-  if (!classInfo.instanceMethods.some((m) => m.name === name && m.writer !== true)) {
-    classInfo.instanceMethods.push({
+  if (!members.some((m) => m.name === name && m.writer !== true)) {
+    members.push({
       name,
       visibility: "public",
       params: [],
       line,
-      file: classInfo.file,
+      file,
     });
   }
   if (writerParams === null) return;
-  if (classInfo.instanceMethods.some((m) => m.name === name && m.writer === true)) return;
-  classInfo.instanceMethods.push({
+  if (members.some((m) => m.name === name && m.writer === true)) return;
+  members.push({
     name,
     visibility: "public",
     params: writerParams,
     line,
-    file: classInfo.file,
+    file,
     writer: true,
   });
+}
+
+/**
+ * Where a generated accessor is credited: the host class when the generator
+ * sits in the host's own file, else the file the generator sits in. Ruby's
+ * `Relation::VALUE_METHODS.each` runs in `module QueryMethods`
+ * (`activerecord/lib/active_record/relation/query_methods.rb:162-183`), so the
+ * accessors are `QueryMethods` members that `Relation` reaches through
+ * `include`, and the trails loop in relation/query-methods.ts is their body.
+ */
+function generatedAccessorMembers(
+  node: ts.Node,
+  host: PrototypeHost,
+  info: PackageInfo,
+  srcDir: string,
+): { members: MethodInfo[]; file: string } {
+  const file = path.relative(srcDir, node.getSourceFile().fileName).replace(/\\/g, "/");
+  if (file === host.classInfo.file) return { members: host.classInfo.instanceMethods, file };
+  return { members: ((info.fileFunctions ??= {})[file] ??= []), file };
 }
 
 /**
@@ -2427,7 +2447,8 @@ function extractDefinePropertyAccessorForOf(
       names.push(name);
     }
     if (names.length !== values.length) continue;
-    for (const name of names) pushGeneratedAccessor(host.classInfo, name, line, writerParams);
+    const { members, file } = generatedAccessorMembers(node, host, info, srcDir);
+    for (const name of names) pushGeneratedAccessor(members, file, name, line, writerParams);
   }
 }
 
@@ -2450,7 +2471,8 @@ function extractDefinePropertyAccessorDirect(
   const writerParams = set === null ? null : setterParams(set);
   const line = expr.getSourceFile().getLineAndCharacterOfPosition(expr.getStart()).line + 1;
   for (const host of resolvePrototypeHosts(call.target, info, checker, srcDir, program)) {
-    pushGeneratedAccessor(host.classInfo, call.nameExpr.text, line, writerParams);
+    const { members, file } = generatedAccessorMembers(expr, host, info, srcDir);
+    pushGeneratedAccessor(members, file, call.nameExpr.text, line, writerParams);
   }
 }
 

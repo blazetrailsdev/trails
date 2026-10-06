@@ -44115,13 +44115,6 @@
   {
     "package": "activerecord",
     "rubyFile": "relation.rb",
-    "rubyName": "apply_join_dependency",
-    "digest": "e0890281dce2452c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
     "rubyName": "average",
     "digest": "7ed93f08a72ef866",
     "ref": "v8.0.2"
@@ -44327,20 +44320,6 @@
     "rubyFile": "relation.rb",
     "rubyName": "find_or_initialize_by",
     "digest": "ddf2450455cf5bcd",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
-    "rubyName": "find_signed",
-    "digest": "c4e93a0f71289ad4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
-    "rubyName": "find_signed!",
-    "digest": "a1b9370e53b8323c",
     "ref": "v8.0.2"
   },
   {
@@ -44586,13 +44565,6 @@
     "rubyFile": "relation.rb",
     "rubyName": "skip_query_cache_if_necessary",
     "digest": "de9271c83b0517cb",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "relation.rb",
-    "rubyName": "strict_loading_value",
-    "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
   },
   {
