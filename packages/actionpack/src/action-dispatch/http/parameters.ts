@@ -1,10 +1,6 @@
 import { Logger } from "@blazetrails/activesupport";
-import { stderr } from "@blazetrails/ruby-compat";
-import {
-  ParameterTypeError as RackParameterTypeError,
-  InvalidParameterError as RackInvalidParameterError,
-  ParamsTooDeepError as RackParamsTooDeepError,
-} from "@blazetrails/rack";
+import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
+
 import { merge, mergeBang } from "@blazetrails/ruby-compat";
 import { MimeType } from "./mime-type.js";
 
@@ -115,14 +111,7 @@ export function parseFormattedParameters(
   try {
     return strategy(this.rawPost);
   } catch (e) {
-    if (e instanceof ParseError) throw e;
-    if (
-      e instanceof RackParameterTypeError ||
-      e instanceof RackInvalidParameterError ||
-      e instanceof RackParamsTooDeepError
-    ) {
-      throw e;
-    }
+    if (e instanceof Exception && !(e instanceof StandardError)) throw e;
     logParseErrorOnce.call(this);
     throw new ParseError("Error occurred while parsing request parameters");
   }

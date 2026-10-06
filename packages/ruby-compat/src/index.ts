@@ -315,6 +315,7 @@ export { RuntimeError } from "./runtime-error.js";
 export { Exception, excSetupMessage } from "./exception.js";
 export { excToS } from "./exc-to-s.js";
 export { StandardError } from "./standard-error.js";
+export { Interrupt, SignalException } from "./signal-exception.js";
 export { ObjectSpace } from "./object-space.js";
 export { SecureRandom } from "./secure-random.js";
 export { Digest, DigestClass, DigestInstance } from "./digest.js";
