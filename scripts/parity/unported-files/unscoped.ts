@@ -11,8 +11,9 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   {
     pattern: "promise.rb",
     reason:
-      "Rails Promise wraps a thread-backed FutureResult with a blocking #value. " +
-      "JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly.",
+      "PERMANENT: the native JS promise is the port of ActiveRecord::Promise, whose " +
+      'blocking #value has no JS counterpart. See CLAUDE.md § "`ActiveRecord::Promise` ' +
+      'is the native promise".',
   },
   {
     testFile: "relation/load_async_test.rb",

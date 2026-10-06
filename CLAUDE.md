@@ -1945,7 +1945,8 @@ no query to wait for: `calculate`'s `none` arms
 is not ported and stays in `scripts/parity/unported-files/unscoped.ts`. Every
 `async_*` reader returns a native promise, and so does the reader it wraps.
 
-A port was written, on #8342, and reverted from it:
+A complete port was written and dropped on the maintainer's decision
+(2026-10-01), for these reasons:
 
 - **`value` cannot be ported.** It blocks until the query completes, and JS has
   no synchronous await. What is left of the class is `then`, `pending?` and
@@ -1966,9 +1967,10 @@ As a consequence:
   omitted, with `@missingRailsCall new — PERMANENT` (`@missingRailsArgs` where
   the body makes another `new`) or `@missingRailsCall wrap — PERMANENT` on the
   declaration. The value is returned as it is.
-- `StatementCache#execute` takes no `async:` kwarg. Its `async` arm
-  (`statement_cache.rb:149-150`) differs from the other only in answering a
-  `Promise`, and `findBySql` is already awaited.
+- Only the promise object is omitted, never the arm around it.
+  `StatementCache#execute` keeps its `async:` kwarg and dispatches to
+  `async_find_by_sql` (`statement_cache.rb:149-153`); its `rescue ::RangeError`
+  answers `[]` on both arms where Rails wraps one (`:155`).
 - `Promise#pending?`, `#value` and `#inspect` have no counterpart. A Rails test
   asserting on one ports the assertions that await the value and drops the
   rest, citing this section.

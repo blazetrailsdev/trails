@@ -166,24 +166,29 @@ export class StatementCache {
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 
-  /**
-   * @missingRailsCall async_find_by_sql — PERMANENT
-   * @missingRailsCall wrap — PERMANENT
-   */
+  /** @missingRailsCall wrap — PERMANENT */
   async execute(
     params: unknown[],
     connection: unknown,
-    opts: { allowRetry?: boolean } = {},
+    opts: { allowRetry?: boolean; async?: boolean } = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): Promise<InstanceType<typeof Base>[]> {
     try {
       const bindValues = this._bindMap.bind(params);
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
       const allowRetry = opts.allowRetry ?? false;
-      if (this._queryBuilder instanceof PartialQuery) {
-        return await this._model.findBySql(sql, [], { allowRetry, preparable: true }, block);
+      const async = opts.async ?? false;
+      const binds = this._queryBuilder instanceof PartialQuery ? [] : bindValues;
+      if (async) {
+        return await this._model.asyncFindBySql(
+          sql,
+          binds,
+          { preparable: true, allowRetry },
+          block,
+        );
+      } else {
+        return await this._model.findBySql(sql, binds, { preparable: true, allowRetry }, block);
       }
-      return await this._model.findBySql(sql, bindValues, { allowRetry, preparable: true }, block);
     } catch (e) {
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
       throw e;
