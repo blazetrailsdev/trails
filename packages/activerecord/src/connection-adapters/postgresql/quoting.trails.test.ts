@@ -276,7 +276,7 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
   it("quote(new Date()) throws — Date is no longer accepted", () => {
     expect(() => quote(new Date())).toThrow(TypeError);
-    expect(() => quote(new Date())).toThrow(/Temporal/);
+    expect(() => quote(new Date())).toThrow("can't quote Time");
   });
 
   it("quoted_date suffixes BC for proleptic years <= 0", () => {
@@ -335,6 +335,6 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
   it("typeCast(new Date()) throws — Date is no longer accepted", () => {
     expect(() => typeCast(new Date())).toThrow(TypeError);
-    expect(() => typeCast(new Date())).toThrow(/Temporal/);
+    expect(() => typeCast(new Date())).toThrow("can't cast Time");
   });
 });
