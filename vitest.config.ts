@@ -511,7 +511,13 @@ export default defineConfig({
       {
         // All non-AR packages + scripts: parallel, no DB concerns.
         resolve: {
-          alias: { ...alias, eslint: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
+          alias: [
+            ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
+            {
+              find: /^eslint$/,
+              replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js"),
+            },
+          ],
         },
         test: {
           name: "other",
