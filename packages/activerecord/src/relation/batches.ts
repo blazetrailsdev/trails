@@ -147,7 +147,7 @@ export class Batches {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
-    const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
+    const run = async (block: (relation: any) => unknown): Promise<null> => {
       await ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
 
       let batchLimit = of;
@@ -159,27 +159,76 @@ export class Batches {
       }
 
       if (self.loaded) {
-        yield* batchOnLoadedRelation({
-          relation: self,
-          start,
-          finish,
-          cursor,
-          order: (order ?? "asc") as any,
-          batchLimit,
-        });
+        return batchOnLoadedRelation(
+          {
+            relation: self,
+            start,
+            finish,
+            cursor,
+            order: (order ?? "asc") as any,
+            batchLimit,
+          },
+          block,
+        );
       } else {
-        yield* batchOnUnloadedRelation.call(self, {
-          relation: self,
-          start,
-          finish,
-          load,
-          cursor,
-          order: (order ?? "asc") as any,
-          useRanges,
-          remaining,
-          batchLimit,
-        });
+        return batchOnUnloadedRelation.call(
+          self,
+          {
+            relation: self,
+            start,
+            finish,
+            load,
+            cursor,
+            order: (order ?? "asc") as any,
+            useRanges,
+            remaining,
+            batchLimit,
+          },
+          block,
+        );
       }
+    };
+
+    const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
+      type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
+      const stopped = {};
+      const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
+        pending: null,
+        finished: false,
+        failure: [],
+      };
+      let wake = (): void => {};
+      let batch: Batch | null = null;
+      void run(
+        (relation) =>
+          new Promise<void>((resume, stop) => {
+            state.pending = { relation, resume, stop };
+            wake();
+          }),
+      )
+        .catch((error: unknown) => {
+          if (error !== stopped) state.failure.push(error);
+        })
+        .then(() => {
+          state.finished = true;
+          wake();
+        });
+      try {
+        while (true) {
+          if (!state.pending && !state.finished) {
+            await new Promise<void>((resolve) => (wake = resolve));
+          }
+          batch = state.pending;
+          if (!batch) break;
+          state.pending = null;
+          yield batch.relation;
+          batch.resume();
+          batch = null;
+        }
+      } finally {
+        batch?.stop(stopped);
+      }
+      if (state.failure.length > 0) throw state.failure[0];
     };
 
     if (!block) {
@@ -196,12 +245,7 @@ export class Batches {
       return enumerator;
     }
 
-    return (async () => {
-      for await (const batchRelation of generator()) {
-        await block(batchRelation);
-      }
-      return null;
-    })();
+    return run(block);
   }
 
   /** @internal */
@@ -332,21 +376,24 @@ export function buildBatchOrders(
 }
 
 /** @internal */
-export async function* batchOnLoadedRelation({
-  relation,
-  start,
-  finish,
-  cursor,
-  order,
-  batchLimit,
-}: {
-  relation: any;
-  start: unknown;
-  finish: unknown;
-  cursor: string[];
-  order: "asc" | "desc" | ("asc" | "desc")[];
-  batchLimit: number;
-}): AsyncGenerator<any> {
+export async function batchOnLoadedRelation(
+  {
+    relation,
+    start,
+    finish,
+    cursor,
+    order,
+    batchLimit,
+  }: {
+    relation: any;
+    start: unknown;
+    finish: unknown;
+    cursor: string[];
+    order: "asc" | "desc" | ("asc" | "desc")[];
+    batchLimit: number;
+  },
+  block: (subrelation: any) => unknown,
+): Promise<null> {
   let records: any[] = await relation.toArray();
   order = buildBatchOrders(cursor, order).map(([, second]) => second);
 
@@ -371,8 +418,10 @@ export async function* batchOnLoadedRelation({
     const subrelation = relation.spawn();
     subrelation.loadRecords(subrecords);
 
-    yield stripThenable(subrelation);
+    await block(stripThenable(subrelation));
   }
+
+  return null;
 }
 
 /** @internal */
@@ -401,7 +450,7 @@ export function compareValuesForOrder(
  * @internal
  * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue
  */
-export async function* batchOnUnloadedRelation(
+export async function batchOnUnloadedRelation(
   this: any,
   opts: {
     relation: any;
@@ -414,7 +463,8 @@ export async function* batchOnUnloadedRelation(
     remaining: number | null;
     batchLimit: number;
   },
-): AsyncGenerator<any> {
+  block: (yieldedRelation: any) => unknown,
+): Promise<null> {
   const { start, load, cursor, order, useRanges, batchLimit } = opts;
   let { relation, finish, remaining } = opts;
   const batchOrders = buildBatchOrders(cursor, order);
@@ -457,7 +507,7 @@ export async function* batchOnUnloadedRelation(
       );
     }
 
-    yield stripThenable(yieldedRelation);
+    await block(stripThenable(yieldedRelation));
 
     if (values.length < batchLimit) break;
 
@@ -481,4 +531,6 @@ export async function* batchOnUnloadedRelation(
     const cursorValue = values[values.length - 1];
     batchRelation = batchCondition(relation, cursor, cursorValue, operators);
   }
+
+  return null;
 }

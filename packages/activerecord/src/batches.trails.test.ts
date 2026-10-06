@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Notifications } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
 import { recordCursorValues } from "./relation/batches.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -56,6 +57,37 @@ describe("BatchEnumerator (trails)", () => {
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
     );
+  });
+
+  it("breaking out of a blockless enumeration stops the batch queries", async () => {
+    const wanted = await Post.count();
+    expect(wanted).toBeGreaterThan(2);
+    const sqls: string[] = [];
+    const subscription = Notifications.subscribe(
+      "sql.active_record",
+      (event: { payload: Record<string, unknown> }) => {
+        if (event.payload.name !== "SCHEMA") sqls.push(String(event.payload.sql));
+      },
+    );
+    try {
+      for await (const relation of Post.inBatches({ of: 1 })) {
+        await relation.toArray();
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    } finally {
+      Notifications.unsubscribe(subscription);
+    }
+    expect(sqls.length).toBeLessThan(wanted);
+  });
+
+  it("an error raised while batching reaches the blockless consumer", async () => {
+    await expect(
+      (async () => {
+        for await (const _ of Post.inBatches({ of: 1, order: "sideways" as "asc" })) {
+        }
+      })(),
+    ).rejects.toThrow(/:order must be :asc or :desc/);
   });
 
   it("recordCursorValues reads the attribute even when it is null", async () => {

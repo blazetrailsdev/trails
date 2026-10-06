@@ -78,15 +78,15 @@ class MockLogger extends Logger {
 }
 
 class TestDebugLogSubscriber extends LogSubscriber {
-  debugs: string[] = [];
+  debugs: (string | null)[] = [];
 
   override get logger(): Logger | null {
     return (this.constructor as typeof LogSubscriber).logger;
   }
 
-  protected override debugSql(message: string): boolean {
-    this.debugs.push(message);
-    return super.debugSql(message);
+  protected override debug(progname: string | null = null, block?: () => string): undefined {
+    this.debugs.push(progname);
+    return super.debug(progname, block);
   }
 }
 

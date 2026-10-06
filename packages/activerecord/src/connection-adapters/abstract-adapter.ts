@@ -682,6 +682,7 @@ export interface AbstractAdapter {
       allowRetry?: boolean;
       materializeTransactions?: boolean;
     },
+    block?: (result: unknown) => unknown,
   ): Promise<unknown>;
   /** @internal */
   internalExecQuery(

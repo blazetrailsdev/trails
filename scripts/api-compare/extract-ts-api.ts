@@ -4239,8 +4239,11 @@ export function extractClass(
       const aliasRef =
         member.initializer ??
         (member.type && ts.isTypeQueryNode(member.type) ? member.type.exprName : undefined);
-      const aliasParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
-      const valueAdmitsBoolean = aliasParams ? undefined : memberAdmitsBoolean(member, checker);
+      const refParams = aliasRef ? paramsOfCallableRef(aliasRef as ts.Expression, checker) : null;
+      const valueAdmitsBoolean = refParams ? undefined : memberAdmitsBoolean(member, checker);
+      const declared = member.modifiers?.some((m) => m.kind === ts.SyntaxKind.DeclareKeyword);
+      const declaredParams = declared && !refParams ? propertySignatureParams(member, checker) : [];
+      const aliasParams = refParams ?? (declaredParams.length > 0 ? declaredParams : null);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -4295,7 +4298,7 @@ export function extractClass(
  * as the method spelling. Non-callable properties have no parameters.
  */
 function propertySignatureParams(
-  member: ts.PropertySignature,
+  member: ts.PropertySignature | ts.PropertyDeclaration,
   checker: ts.TypeChecker,
 ): ParamInfo[] {
   if (!member.type) return [];

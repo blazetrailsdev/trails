@@ -1919,12 +1919,12 @@ export class Base extends Model {
   declare accessedFields: () => string[];
   declare queryAttribute: (attrName: string) => boolean;
   declare _queryAttribute: (attrName: string) => boolean;
-  declare readAttribute: (name: string, block?: (name: string) => unknown) => unknown;
+  declare readAttribute: (attrName: string, block?: (name: string) => unknown) => unknown;
   declare get: (attrName: string) => unknown;
   declare set: (attrName: string, value: unknown) => void;
   /** @internal */
-  declare _readAttribute: (name: string) => unknown;
-  declare _writeAttribute: (name: string, value: unknown) => void;
+  declare _readAttribute: (attrName: string, block?: (name: string) => unknown) => unknown;
+  declare _writeAttribute: (attrName: string, value: unknown) => void;
   declare readStoreAttribute: (storeAttribute: string, key: string) => unknown;
   declare writeStoreAttribute: (storeAttribute: string, key: string, value: unknown) => void;
   /** @internal */
@@ -2078,7 +2078,7 @@ export class Base extends Model {
   declare encodeWith: (coder: Record<string, unknown>) => void;
   declare isAssociationCached: (name: string) => boolean;
 
-  declare eql: (other: unknown) => boolean;
+  declare eql: (comparisonObject: unknown) => boolean;
 
   declare compare: (other: unknown) => number | undefined;
 
