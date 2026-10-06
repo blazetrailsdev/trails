@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Exception, RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";
@@ -554,13 +554,13 @@ export class Author extends Base {
         kernelThrow(":abort");
       },
       afterAdd: (_owner: any, _r: any) => {
-        throw new Error("ensure_not_called");
+        throw new RuntimeError("unhandled exception");
       },
       beforeRemove: (_owner: any, _r: any) => {
         kernelThrow(":abort");
       },
       afterRemove: (_owner: any, _r: any) => {
-        throw new Error("ensure_not_called");
+        throw new RuntimeError("unhandled exception");
       },
     });
     this.hasMany("postsWithProcCallbacks", {
@@ -584,7 +584,7 @@ export class Author extends Base {
     this.hasMany("unchangeablePosts", {
       className: "Post",
       beforeAdd: (_owner: any, _object: any) => {
-        throw new Error("You can't add a post");
+        throw new Exception("You can't add a post");
       },
       afterAdd: (owner: any, r: any) => owner.postLog.push(`after_adding${r.id ?? ""}`),
     });

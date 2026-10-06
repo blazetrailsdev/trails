@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { describe, it, type SuiteFactory, type TestFunction } from "vitest";
 import { adapterType } from "../test-adapter.js";
 import {
@@ -80,7 +81,7 @@ export function adapterSupports(feature: string): boolean {
   }
   const backends = SUPPORTS[feature];
   if (!backends) {
-    throw new Error(
+    throw new RuntimeError(
       `adapterSupports: unknown feature "${feature}". Add it to ` +
         `support/supports.ts (mirror the adapter's supports_${feature}? method). ` +
         `Known: ${Object.keys(SUPPORTS).sort().join(", ")}.`,

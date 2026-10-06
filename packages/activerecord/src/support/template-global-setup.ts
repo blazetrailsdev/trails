@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import mysql from "mysql2/promise";
 import "../sqlite/better-sqlite3.js";
@@ -100,7 +101,7 @@ const sqliteAdapter: DbTemplateAdapter = {
 
   async provision() {
     if (++_sqliteBuilds > 1) {
-      throw new Error(
+      throw new RuntimeError(
         `sqlite template globalSetup ran ${_sqliteBuilds} times; expected exactly once`,
       );
     }

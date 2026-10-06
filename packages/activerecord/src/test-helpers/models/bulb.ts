@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
@@ -67,7 +67,7 @@ export class CustomBulb extends Bulb {
 export class FunkyBulb extends Bulb {
   static {
     this.beforeDestroy(async function () {
-      throw new Error("before_destroy was called");
+      throw new RuntimeError("before_destroy was called");
     });
   }
 }
