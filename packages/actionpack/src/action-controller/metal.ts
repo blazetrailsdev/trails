@@ -23,6 +23,7 @@ import {
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
 import { includeContent } from "./metal/head.js";
+import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
@@ -192,7 +193,7 @@ export class Metal extends AbstractController {
     return res;
   }
 
-  static actionEncodingTemplate(_action: string): false {
+  static actionEncodingTemplate(_action: unknown): EncodingTemplate | false | null {
     return false;
   }
 

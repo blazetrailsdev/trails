@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 import type { RackEnv } from "@blazetrails/rack";
-import { Request } from "../request.js";
+import { Encoding } from "@blazetrails/ruby-compat";
+import { Base } from "../../action-controller/base.js";
+import { ParamBuilder } from "../http/param-builder.js";
+import { InvalidParameterError } from "@blazetrails/rack";
+import { Request, controllerConstants } from "../request.js";
+import type { DispatchableControllerClass } from "../routing/dispatcher.js";
 
 describe("Request", () => {
   it("content_length measures the body when the request is chunked", () => {
@@ -90,5 +95,59 @@ describe("Request", () => {
     const served = new Request({ SERVER_NAME: "example.com", SERVER_PORT: "3000" });
     expect(served.rawHostWithPort).toBe("example.com:3000");
     expect(served.port).toBe(3000);
+  });
+
+  describe("ParameterEncoding", () => {
+    class ReposController extends Base {
+      static {
+        this.paramEncoding("show", "baz", Encoding.find("Shift_JIS")!);
+        this.skipParameterEncoding("raw");
+      }
+    }
+    class ChildReposController extends ReposController {}
+
+    function get(action: string, queryString: string): Record<string, unknown> {
+      controllerConstants.set("repos", ReposController as unknown as DispatchableControllerClass);
+      try {
+        const req = new Request({ QUERY_STRING: queryString });
+        req.pathParameters = { controller: "repos", action };
+        return req.GET();
+      } finally {
+        controllerConstants.delete("repos");
+      }
+    }
+
+    it("GET decodes a param_encoding parameter in its designated encoding", () => {
+      expect(get("show", "baz=%83n&qux=%E3%83%8F")).toEqual({ baz: "ハ", qux: "ハ" });
+    });
+
+    it("GET leaves every parameter of a skip_parameter_encoding action as bytes", () => {
+      expect(get("raw", "bar=bar%E2baz")).toEqual({ bar: "bar\u00e2baz" });
+      expect(() => get("index", "bar=bar%E2baz")).toThrow();
+    });
+
+    it("from_hash forces a template's encoding and rejects an invalid string", () => {
+      const encodingTemplate = ReposController.actionEncodingTemplate("show");
+      expect(ParamBuilder.fromHash({ baz: ["\udc83n"], qux: "ハ" }, { encodingTemplate })).toEqual({
+        baz: ["ハ"],
+        qux: "ハ",
+      });
+      expect(() => ParamBuilder.fromHash({ qux: "\udc83n" })).toThrow(InvalidParameterError);
+      expect(() => ParamBuilder.fromHash({ baz: "\udc83" }, { encodingTemplate })).toThrow(
+        InvalidParameterError,
+      );
+      const frozen = Object.freeze({ baz: Object.freeze(["\udc83n"]), qux: "ハ" }) as never;
+      expect(ParamBuilder.fromHash(frozen, { encodingTemplate })).toEqual({
+        baz: ["ハ"],
+        qux: "ハ",
+      });
+    });
+
+    it("action_encoding_template answers only a declared action, per class", () => {
+      expect(ReposController.actionEncodingTemplate("index")).toBeNull();
+      expect(ReposController.actionEncodingTemplate("show")!.get("qux")).toBeUndefined();
+      expect(ReposController.actionEncodingTemplate("raw")!.get("any")).toBe(Encoding.ASCII_8BIT);
+      expect(ChildReposController.actionEncodingTemplate("show")).toBeNull();
+    });
   });
 });

@@ -37,6 +37,7 @@ import {
 import { EtagWithTemplateDigest } from "./metal/etag-with-template-digest.js";
 import { EtagWithFlash } from "./metal/etag-with-flash.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
+import { ParameterEncoding, type ParameterEncodingHost } from "./metal/parameter-encoding.js";
 import {
   type addFlashTypes,
   Flash,
@@ -603,6 +604,14 @@ export class Base extends Metal {
     return instrumentName.call(this);
   }
 
+  declare static _parameterEncodings: ParameterEncodingHost["_parameterEncodings"];
+  /** @internal */
+  declare static setupParamEncode: typeof ParameterEncoding.ClassMethods.setupParamEncode;
+  /** @internal */
+  declare static actionEncodingTemplate: typeof ParameterEncoding.ClassMethods.actionEncodingTemplate;
+  declare static skipParameterEncoding: typeof ParameterEncoding.ClassMethods.skipParameterEncoding;
+  declare static paramEncoding: typeof ParameterEncoding.ClassMethods.paramEncoding;
+
   declare static _wrapperOptions: ParamsWrapperOptions;
   declare static is_wrapperOptions: boolean;
   declare _wrapperOptions: ParamsWrapperOptions;
@@ -783,7 +792,6 @@ include(Base, AbstractControllerRendering);
 include(Base, ActionViewRendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
-include(Base, Cookies);
 Base.prototype.helpers = helpers;
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
@@ -791,11 +799,13 @@ Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
-include(Base, Flash);
 include(Base, AllowBrowser);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
+extend(Base, ParameterEncoding.ClassMethods);
+include(Base, Cookies);
+include(Base, Flash);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
 Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;

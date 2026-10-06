@@ -76,7 +76,7 @@ export {
   modulesForHelpers,
 } from "./metal/helpers.js";
 export { RescueRegistry } from "./metal/rescue.js";
-export { ParameterEncodingRegistry } from "./metal/parameter-encoding.js";
+export { ParameterEncoding } from "./metal/parameter-encoding.js";
 export {
   MemoryRateLimitStore,
   rateLimit,

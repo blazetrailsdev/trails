@@ -55,12 +55,14 @@ describe("RequestUtils", () => {
 
   describe("eachParamValue", () => {
     it("yields every string leaf", () => {
-      const leaves = Array.from(RequestUtils.eachParamValue({ a: "1", b: ["2", { c: "3" }] }));
+      const leaves: string[] = [];
+      RequestUtils.eachParamValue({ a: "1", b: ["2", { c: "3" }] }, (p) => void leaves.push(p));
       expect(leaves).toEqual(["1", "2", "3"]);
     });
 
     it("skips null leaves", () => {
-      const leaves = Array.from(RequestUtils.eachParamValue({ a: null, b: ["x"] }));
+      const leaves: string[] = [];
+      RequestUtils.eachParamValue({ a: null, b: ["x"] }, (p) => void leaves.push(p));
       expect(leaves).toEqual(["x"]);
     });
   });

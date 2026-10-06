@@ -1,3 +1,5 @@
+import { bytes, forceEncoding, isValidEncoding, scrub, toS } from "@blazetrails/ruby-compat";
+import { InvalidParameterError } from "@blazetrails/rack";
 import { MissingController } from "../http/request.js";
 import type { EncodingTemplate } from "../http/param-builder.js";
 
@@ -13,22 +15,42 @@ export type ParamHash = { [key: string]: ParamValue };
 export class RequestUtils {
   static performDeepMunge = true;
 
-  static *eachParamValue(params: ParamValue): Generator<string> {
+  static eachParamValue(params: ParamValue, block: (param: string) => string | void): ParamValue {
     if (Array.isArray(params)) {
-      for (const el of params) yield* RequestUtils.eachParamValue(el);
+      params.forEach((element, i) => {
+        const replaced = RequestUtils.eachParamValue(element, block);
+        if (replaced === element) return;
+        if (Object.isFrozen(params)) params = [...(params as ParamValue[])];
+        (params as ParamValue[])[i] = replaced;
+      });
     } else if (params !== null && typeof params === "object") {
-      for (const val of Object.values(params)) yield* RequestUtils.eachParamValue(val);
+      for (const [key, value] of Object.entries(params)) {
+        const replaced = RequestUtils.eachParamValue(value, block);
+        if (replaced === value) continue;
+        if (Object.isFrozen(params)) params = { ...(params as ParamHash) };
+        (params as ParamHash)[key] = replaced;
+      }
     } else if (typeof params === "string") {
-      yield params;
+      return block(params) ?? params;
     }
+    return params;
   }
 
   static normalizeEncodeParams(params: ParamValue): ParamValue {
     return normalize(params, this.performDeepMunge);
   }
 
-  /** @internal */
-  static checkParamEncoding(_params: ParamValue): void {}
+  static checkParamEncoding(params: ParamValue): void {
+    if (Array.isArray(params)) {
+      params.forEach((element) => RequestUtils.checkParamEncoding(element));
+    } else if (params !== null && typeof params === "object") {
+      Object.values(params).forEach((value) => RequestUtils.checkParamEncoding(value));
+    } else if (typeof params === "string") {
+      if (/\p{Cs}/u.test(params)) {
+        throw new InvalidParameterError(`Invalid encoding for parameter: ${scrub(params)}`);
+      }
+    }
+  }
 
   /** @internal */
   static setBinaryEncoding<P extends ParamValue>(
@@ -46,6 +68,32 @@ export class RequestUtils {
 }
 
 export class CustomParamEncoder {
+  static encodeForTemplate(
+    params: ParamHash,
+    encodingTemplate: EncodingTemplate | false | null | undefined,
+  ): ParamHash {
+    if (!encodingTemplate) return params;
+    for (const [key, value] of Object.entries(params)) {
+      if (key === "controller" || key === "action") continue;
+      const replaced = RequestUtils.eachParamValue(value, (param) => {
+        if (encodingTemplate.get(toS(key))) {
+          const b = bytes(param);
+          const forced = b.map((byte) => String.fromCharCode(byte)).join("");
+          if (!isValidEncoding(forced, encodingTemplate.get(toS(key))!)) {
+            return b
+              .map((byte) => String.fromCharCode(byte < 0x80 ? byte : 0xdc00 + byte))
+              .join("");
+          }
+          return forceEncoding(forced, encodingTemplate.get(toS(key))!);
+        }
+      });
+      if (replaced === value) continue;
+      if (Object.isFrozen(params)) params = { ...params };
+      params[key] = replaced;
+    }
+    return params;
+  }
+
   static actionEncodingTemplate(
     request: { controllerClassFor(name: string): unknown },
     controller: string | null | undefined,
@@ -57,7 +105,9 @@ export class CustomParamEncoder {
         !/\p{Cs}/u.test(controller) &&
         (
           request.controllerClassFor(controller) as {
-            actionEncodingTemplate(action: string | null | undefined): EncodingTemplate | false;
+            actionEncodingTemplate(
+              action: string | null | undefined,
+            ): EncodingTemplate | false | null;
           }
         ).actionEncodingTemplate(action)
       );
