@@ -93,4 +93,26 @@ describe("rateLimit integration through Base.beforeAction / dispatch", () => {
     await c.dispatch("show", makeRequest(), new Response());
     expect(overrideCalls).toEqual(["method-override"]);
   });
+
+  it("takes the cache store for an absent or undefined store, and passes a null one through", async () => {
+    const cacheStore = new MemoryStore();
+
+    class DefaultStoreController extends Base {
+      async show() {
+        this.head(200);
+      }
+    }
+    (DefaultStoreController as unknown as { cacheStore: MemoryStore }).cacheStore = cacheStore;
+    DefaultStoreController.rateLimit({ to: 5, within: 60, store: undefined, name: undefined });
+
+    await new DefaultStoreController().dispatch("show", makeRequest(), new Response());
+    expect(cacheStore.read("rate-limit:default_store:1.2.3.4")).toBe(1);
+
+    class NullStoreController extends DefaultStoreController {}
+    NullStoreController.rateLimit({ to: 5, within: 60, store: null as never });
+
+    await expect(
+      new NullStoreController().dispatch("show", makeRequest(), new Response()),
+    ).rejects.toThrow(TypeError);
+  });
 });
