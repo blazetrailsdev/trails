@@ -1,5 +1,4 @@
 import { expect } from "vitest";
-import { Temporal } from "@blazetrails/date";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { ensureCanonicalTables } from "../support/canonical-table-rebuild.js";
@@ -14,12 +13,12 @@ import { Encryptor as EncryptorImpl } from "./encryptor.js";
 import type { KeyProviderLike } from "./encryptor.js";
 import { type Scheme } from "./scheme.js";
 import * as Errors from "./errors.js";
-import { BinaryData } from "@blazetrails/activemodel";
+import { assertEqual, assertNotEqual } from "@blazetrails/activesupport";
 import { Encryption } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
 import { Key } from "./key.js";
-import { hashAref, prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Fixture } from "../fixtures.js";
 import { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { Encryption, Errors };
@@ -358,146 +357,36 @@ export function makeEncryptedBookAttribute() {
   } as any;
 }
 
-/** @internal */
-function _isBinaryAttribute(model: any, attrName: string): boolean {
-  let type = model._attributes?.getAttribute?.(attrName)?.type;
-  const seen = new Set<unknown>();
-  while (type != null && !seen.has(type)) {
-    if (type.isBinary?.() === true) return true;
-    seen.add(type);
-    type = type.castType ?? type.subtype;
-  }
-  return false;
-}
-
 export function assertCiphertextDecryptsTo(
   model: any,
   attributeName: string,
   ciphertext: unknown,
 ): void {
-  expect(model[attributeName]).not.toBe(ciphertext);
-  expect(model.readAttribute(attributeName)).not.toBe(ciphertext);
+  assertNotEqual(model[attributeName], ciphertext);
+  assertNotEqual(model.readAttribute(attributeName), ciphertext);
   const cleartext = model.constructor.typeForAttribute(attributeName).deserialize(ciphertext);
-  expect(model.readAttribute(attributeName)).toBe(cleartext);
+  assertEqual(model.readAttribute(attributeName), cleartext);
 }
 
 export async function assertEncryptedAttribute(
   model: any,
-  attrName: string,
+  attributeName: string,
   expectedValue: unknown,
 ): Promise<void> {
-  _assertEncryptedAttributeOnModel(model, attrName, expectedValue);
-
-  if (typeof model.isPersisted === "function" && model.isPersisted()) {
+  assertCiphertextDecryptsTo(
+    model,
+    attributeName,
+    model.readAttributeBeforeTypeCast(attributeName),
+  );
+  assertEqual(expectedValue, model[attributeName]);
+  if (!model.isNewRecord()) {
     await model.reload();
-    _assertEncryptedAttributeOnModel(model, attrName, expectedValue);
-  }
-}
-
-function _valuesEqual(
-  readValue: unknown,
-  expectedValue: unknown,
-  isBinaryAttribute = false,
-): boolean {
-  if (readValue === expectedValue) return true;
-  if (
-    readValue instanceof Temporal.Instant &&
-    expectedValue instanceof Temporal.Instant &&
-    Temporal.Instant.compare(readValue, expectedValue) === 0
-  )
-    return true;
-  if (
-    readValue instanceof Temporal.PlainDate &&
-    expectedValue instanceof Temporal.PlainDate &&
-    Temporal.PlainDate.compare(readValue, expectedValue) === 0
-  )
-    return true;
-  if (
-    readValue instanceof Temporal.PlainDateTime &&
-    expectedValue instanceof Temporal.PlainDateTime &&
-    Temporal.PlainDateTime.compare(readValue, expectedValue) === 0
-  )
-    return true;
-  if (
-    readValue instanceof Uint8Array &&
-    expectedValue instanceof Uint8Array &&
-    readValue.length === expectedValue.length &&
-    readValue.every((b, i) => b === expectedValue[i])
-  )
-    return true;
-  if (isBinaryAttribute && readValue instanceof Uint8Array && typeof expectedValue === "string")
-    return Buffer.from(readValue).toString("latin1") === expectedValue;
-  if (
-    Array.isArray(readValue) &&
-    Array.isArray(expectedValue) &&
-    JSON.stringify(readValue) === JSON.stringify(expectedValue)
-  )
-    return true;
-  if (
-    typeof readValue === "object" &&
-    readValue !== null &&
-    !Array.isArray(readValue) &&
-    typeof expectedValue === "object" &&
-    expectedValue !== null &&
-    !Array.isArray(expectedValue) &&
-    JSON.stringify(readValue) === JSON.stringify(expectedValue)
-  )
-    return true;
-  return false;
-}
-
-function _assertEncryptedAttributeOnModel(
-  model: any,
-  attrName: string,
-  expectedValue: unknown,
-): void {
-  const readValue = model[attrName];
-  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
-    throw new Error(
-      `assertEncryptedAttribute: expected ${attrName} to equal ` +
-        `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
+    assertCiphertextDecryptsTo(
+      model,
+      attributeName,
+      model.readAttributeBeforeTypeCast(attributeName),
     );
-  }
-
-  if (expectedValue !== null && expectedValue !== undefined) {
-    const dbValues = model._attributes.valuesForDatabase();
-    const dbValue = hashAref(dbValues, attrName);
-    const type = model._attributes?.getAttribute?.(attrName)?.type;
-    const rawSerialized =
-      type && typeof type.castType?.serialize === "function"
-        ? type.castType.serialize(expectedValue)
-        : null;
-    const serializedPlaintext =
-      rawSerialized == null || rawSerialized instanceof BinaryData ? null : String(rawSerialized);
-
-    const dbBytes =
-      dbValue instanceof BinaryData
-        ? dbValue.toString()
-        : dbValue instanceof Uint8Array
-          ? dbValue
-          : null;
-    const plaintextBytes =
-      rawSerialized instanceof BinaryData
-        ? rawSerialized.toString()
-        : rawSerialized instanceof Uint8Array
-          ? rawSerialized
-          : null;
-    const binaryPlaintextMatch =
-      dbBytes !== null &&
-      plaintextBytes !== null &&
-      dbBytes.length === plaintextBytes.length &&
-      dbBytes.every((b, i) => b === plaintextBytes[i]);
-
-    if (
-      binaryPlaintextMatch ||
-      dbValue === expectedValue ||
-      (serializedPlaintext != null && dbValue === serializedPlaintext)
-    ) {
-      throw new Error(
-        `assertEncryptedAttribute: expected ${attrName} to be encrypted ` +
-          `(DB value ≠ plaintext), but valuesForDatabase() returned the plaintext unchanged.`,
-      );
-    }
+    assertEqual(expectedValue, model[attributeName]);
   }
 }
 
@@ -546,23 +435,11 @@ async function assertInvalidKeyCantReadAttributeWithCustomKeyProvider(
 
 export function assertNotEncryptedAttribute(
   model: any,
-  attrName: string,
+  attributeName: string,
   expectedValue: unknown,
 ): void {
-  const readValue = model[attrName];
-  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
-    throw new Error(
-      `assertNotEncryptedAttribute: expected ${attrName} to read as ` +
-        `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
-    );
-  }
-  const rawValue = model.readAttributeBeforeTypeCast(attrName);
-  if (!_valuesEqual(rawValue, expectedValue)) {
-    throw new Error(
-      `assertNotEncryptedAttribute: expected before-type-cast ${attrName} to equal ` +
-        `${JSON.stringify(expectedValue)} (stored as plaintext), got ${JSON.stringify(rawValue)}`,
-    );
-  }
+  assertEqual(expectedValue, model[attributeName]);
+  assertEqual(expectedValue, model.readAttributeBeforeTypeCast(attributeName));
 }
 
 export function ciphertextFor(model: any, attrName: string): unknown {

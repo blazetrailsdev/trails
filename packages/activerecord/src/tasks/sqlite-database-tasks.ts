@@ -1,4 +1,11 @@
-import { Errno, getChildProcessAsync, rbEqq, File, FileUtils } from "@blazetrails/ruby-compat";
+import {
+  Errno,
+  RuntimeError,
+  getChildProcessAsync,
+  rbEqq,
+  File,
+  FileUtils,
+} from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
@@ -103,7 +110,7 @@ export class SQLiteDatabaseTasks {
 export async function runCmd(cmd: string, args: string[], out: string): Promise<void> {
   const childProcess = await getChildProcessAsync();
   if (childProcess.spawnSync(cmd, args, { encoding: "utf8", out }).status !== 0) {
-    throw new Error(runCmdError(cmd, args));
+    throw new RuntimeError(runCmdError(cmd, args));
   }
 }
 

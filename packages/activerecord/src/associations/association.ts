@@ -6,6 +6,7 @@ import { ActiveRecord, Associations } from "../namespaces.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
 import {
+  NoMethodError,
   except,
   hasKey,
   rbEnsure,
@@ -331,28 +332,13 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
   }
 
   protected async _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
-    raise = false,
-    block?: (record: Base) => void | Promise<void>,
+    _attributes?: Record<string, unknown> | Record<string, unknown>[],
+    _raise = false,
+    _block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
-    await this.klass.ensureSchemaLoaded();
-    let yielded: unknown;
-    const record = this.buildRecord(
-      attributes as Record<string, unknown> | undefined,
-      block &&
-        ((record: Base) => {
-          yielded = block(record);
-        }),
+    throw new NoMethodError(
+      `undefined method '_create_record' for an instance of ${rbObjClassname(this)}`,
     );
-    if (!record) return null;
-    await yielded;
-    if (typeof (record as any).save === "function") {
-      const saved = await (record as any).save();
-      if (!saved && raise) {
-        throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
-      }
-    }
-    return record;
   }
 
   /** @internal */

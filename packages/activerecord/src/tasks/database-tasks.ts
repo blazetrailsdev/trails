@@ -603,13 +603,15 @@ export class DatabaseTasks {
   }
 
   static async loadSeed(): Promise<void> {
-    if (!this.seedLoader) {
-      throw new Error(
-        "You tried to load seed data, but no seed loader is specified. " +
-          "Set DatabaseTasks.seedLoader = { loadSeed() { ... } }",
+    if (this.seedLoader) {
+      await this.seedLoader.loadSeed();
+    } else {
+      throw new RuntimeError(
+        "You tried to load seed data, but no seed loader is specified. Please specify seed " +
+          "loader with ActiveRecord::Tasks::DatabaseTasks.seed_loader = your_seed_loader\n" +
+          "Seed loader should respond to load_seed method",
       );
     }
-    await this.seedLoader.loadSeed();
   }
 
   static async migrateStatus(): Promise<void> {
@@ -827,7 +829,7 @@ export class DatabaseTasks {
         dbsList.push(`${opts.command}:${db.name}`);
       }
 
-      throw new Error(
+      throw new RuntimeError(
         `You're using a multiple database application. To use \`${opts.command}\` you must ` +
           `run the namespaced task with a VERSION. Available tasks are ${toSentence(dbsList)}.`,
       );

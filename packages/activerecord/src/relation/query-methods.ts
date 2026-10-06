@@ -24,6 +24,7 @@ import {
   transformValues,
   union,
   uniq,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import {
@@ -1790,7 +1791,7 @@ export function arelColumnsFromHash(
     if (Array.isArray(columns)) {
       return columns.map((col) => arelColumnWithTable.call(this, tbl, col));
     }
-    throw new TypeError(`Expected Symbol, String or Array, got: ${typeof columns}`);
+    throw new TypeError(`Expected Symbol, String or Array, got: ${rbObjClassname(columns)}`);
   });
 }
 
