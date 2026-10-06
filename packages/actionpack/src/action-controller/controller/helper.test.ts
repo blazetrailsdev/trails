@@ -291,8 +291,8 @@ describe("HelperTest", () => {
 
   // BLOCKED: abstract-controller-helpers-inherited-runs-default-helper-module
   it.skip("default helpers only", () => {
-    expect(ancestors(JustMeController._helpers!)).toEqual(["JustMeHelper"]);
-    expect(ancestors(MeTooController._helpers!)).toEqual([
+    expect(ancestors(JustMeController._helpers)).toEqual(["JustMeHelper"]);
+    expect(ancestors(MeTooController._helpers)).toEqual([
       "MeTooController::HelperMethods",
       "MeTooHelper",
       "JustMeHelper",
@@ -308,7 +308,7 @@ describe("HelperTest", () => {
   });
 
   it("all helpers", () => {
-    const methods = instanceMethods(AllHelpersController._helpers!);
+    const methods = instanceMethods(AllHelpersController._helpers);
 
     expect(methods).toContain("bareA");
 
@@ -395,7 +395,7 @@ describe("HelperTest", () => {
   }
 
   function masterHelperMethods(): string[] {
-    return instanceMethods(controllerClass._helpers!);
+    return instanceMethods(controllerClass._helpers);
   }
 
   function missingMethods(): string[] {
