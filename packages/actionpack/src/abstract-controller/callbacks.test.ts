@@ -420,8 +420,8 @@ describe("AbstractController::Base — trails-only", () => {
       async index() {}
     }
     const c = new HasActionController();
-    expect(c.isActionMethod("index")).toBe("index");
-    expect(c.isActionMethod("missing")).toBeUndefined();
+    expect(c.isActionMethod("index")).toBe(true);
+    expect(c.isActionMethod("missing")).toBe(false);
   });
 
   it("performed starts false", () => {

@@ -307,10 +307,8 @@ export class AbstractController {
   }
 
   /** @internal */
-  isActionMethod(name: string): string | undefined {
-    const cls = this.constructor as typeof AbstractController;
-    cls.actionMethods();
-    return cls._actionMethodCache!.get(name);
+  isActionMethod(name: string): boolean {
+    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
   }
 
   /** @internal */
@@ -325,8 +323,9 @@ export class AbstractController {
 
   /** @internal */
   methodForAction(actionName: string): string | undefined {
-    const method = this.isActionMethod(actionName);
-    if (method != null) return method;
+    if (this.isActionMethod(actionName)) {
+      return (this.constructor as typeof AbstractController)._actionMethodCache!.get(actionName);
+    }
     if (typeof (this as any).actionMissing === "function") return "_handleActionMissing";
     return undefined;
   }
