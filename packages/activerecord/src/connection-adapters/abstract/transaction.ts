@@ -358,7 +358,7 @@ export class Transaction {
 
   beforeCommit(fn: () => void | Promise<void>): void {
     if (this.state.finalized) {
-      throw new Error("Cannot register callbacks on a finalized transaction");
+      throw new ActiveRecordError("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
     this._callbacks.push(new Callback("before_commit", fn));
@@ -366,7 +366,7 @@ export class Transaction {
 
   afterCommit(fn: () => void | Promise<void>): void {
     if (this.state.finalized) {
-      throw new Error("Cannot register callbacks on a finalized transaction");
+      throw new ActiveRecordError("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
     this._callbacks.push(new Callback("after_commit", fn));
@@ -374,7 +374,7 @@ export class Transaction {
 
   afterRollback(fn: () => void | Promise<void>): void {
     if (this.state.finalized) {
-      throw new Error("Cannot register callbacks on a finalized transaction");
+      throw new ActiveRecordError("Cannot register callbacks on a finalized transaction");
     }
     if (!this._callbacks) this._callbacks = [];
     this._callbacks.push(new Callback("after_rollback", fn));

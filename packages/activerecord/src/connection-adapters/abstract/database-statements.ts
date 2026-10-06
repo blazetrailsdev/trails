@@ -19,7 +19,13 @@ import {
 } from "@blazetrails/arel";
 import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { initialize, kernelInteger, rbInspect, rtest } from "@blazetrails/ruby-compat";
+import {
+  initialize,
+  kernelInteger,
+  rbInspect,
+  rtest,
+  RuntimeError,
+} from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
   NotImplementedError,
@@ -86,7 +92,7 @@ export function toSqlAndBinds(
     !(arelOrSqlString instanceof Nodes.SqlLiteral)
   ) {
     if (binds.length > 0) {
-      throw new Error(
+      throw new RuntimeError(
         "Passing bind parameters with an arel AST is forbidden. " +
           "The values must be stored on the AST directly",
       );

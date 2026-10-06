@@ -1,7 +1,7 @@
 /** @noRailsEquivalent CONVERGEABLE temporal-wire-parsers-fold-into-the-oid-and-type-cast-bodies */
 
 import { Temporal, Time } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { ArgumentError, Rational } from "@blazetrails/ruby-compat";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -54,7 +54,7 @@ export function parsePostgresDate(
   const { iso, bc } = extractBcSuffix(trimmed);
   if (!bc) return Temporal.PlainDate.from(iso);
   const m = /^(\d+)-(\d{2})-(\d{2})$/.exec(iso);
-  if (!m) throw new RangeError(`Cannot parse BC date: ${JSON.stringify(text)}`);
+  if (!m) throw new ArgumentError(`Cannot parse BC date: ${JSON.stringify(text)}`);
   return Temporal.PlainDate.from(
     { year: bcYearToIso(parseInt(m[1], 10)), month: parseInt(m[2], 10), day: parseInt(m[3], 10) },
     { overflow: "reject" },
@@ -104,7 +104,7 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
     /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?([-+]\d{2}(?::\d{2})?)$/.exec(
       withoutBc,
     );
-  if (!match) throw new RangeError(`Cannot parse BC timestamptz: ${JSON.stringify(withoutBc)}`);
+  if (!match) throw new ArgumentError(`Cannot parse BC timestamptz: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac, rawOffset] = match;
   const { millisecond, microsecond, nanosecond } = parseFraction(frac);
   const zdt = Temporal.ZonedDateTime.from(
@@ -127,7 +127,7 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
 
 function parseBcTimestampAsInstant(withoutBc: string): Temporal.Instant {
   const match = /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(withoutBc);
-  if (!match) throw new RangeError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
+  if (!match) throw new ArgumentError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac] = match;
   const { millisecond, microsecond, nanosecond } = parseFraction(frac);
   return Temporal.ZonedDateTime.from(

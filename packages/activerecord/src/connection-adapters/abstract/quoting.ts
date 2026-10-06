@@ -22,7 +22,7 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, rbObjClassname } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
@@ -124,7 +124,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
-  throw new TypeError(`can't cast ${(value as object).constructor?.name ?? typeof value}`);
+  throw new TypeError(`can't cast ${rbObjClassname(value)}`);
 }
 
 export function castBoundValue(value: unknown): unknown {

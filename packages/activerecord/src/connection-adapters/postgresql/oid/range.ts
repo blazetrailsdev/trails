@@ -9,6 +9,7 @@ import {
   rbObjRespondTo,
   registerConstant,
   stringSplit,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 
 export interface RangeSubtype {

@@ -23,7 +23,16 @@ import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { Concurrent, Errno, SystemCallError, groupBy, rtest } from "@blazetrails/ruby-compat";
+import {
+  Concurrent,
+  Errno,
+  LoadError,
+  RuntimeError,
+  SystemCallError,
+  TypeError,
+  groupBy,
+  rtest,
+} from "@blazetrails/ruby-compat";
 import { type SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { type TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -686,7 +695,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
 
   override async checkVersion(): Promise<void> {
     if ((await this.databaseVersion).compare("3.8.0") < 0) {
-      throw new Error(
+      throw new RuntimeError(
         `Your version of SQLite (${await this.databaseVersion}) is too old. Active Record supports SQLite >= 3.8.`,
       );
     }
@@ -1385,7 +1394,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
     const def = this.defaultSqliteDriver();
     if (!def) {
-      throw new Error(
+      throw new LoadError(
         "No SQLite driver configured. Use a concrete adapter subclass " +
           "(e.g. BetterSQLite3Adapter) or pass a `driver` in the adapter config.",
       );

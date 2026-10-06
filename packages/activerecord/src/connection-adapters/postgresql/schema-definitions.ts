@@ -10,7 +10,7 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
-import { fetch, rbEqual, slice, toS } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual, RuntimeError, slice, toS } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -454,7 +454,7 @@ export class AlterTable extends AbstractAlterTable {
   /** @internal */
   protected get _pgTd(): TableDefinition {
     if (this._td == null) {
-      throw new Error(
+      throw new RuntimeError(
         "PostgreSQL AlterTable was constructed without a TableDefinition; use adapter.createAlterTable(name) to obtain one.",
       );
     }

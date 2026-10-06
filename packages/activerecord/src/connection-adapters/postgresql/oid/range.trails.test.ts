@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { TimeZone } from "@blazetrails/activesupport";
 import { RangeType } from "./range.js";
-import { Range } from "@blazetrails/ruby-compat";
+import { Range, TypeError } from "@blazetrails/ruby-compat";
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),

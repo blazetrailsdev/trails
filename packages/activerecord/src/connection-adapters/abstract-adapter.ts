@@ -1,6 +1,6 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { rtest } from "@blazetrails/ruby-compat";
+import { LocalJumpError, rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type * as Arel from "@blazetrails/arel";
@@ -2189,7 +2189,7 @@ export class AbstractAdapter implements Quoting {
       block = fnOrOpts2 as (tx?: unknown) => Promise<T> | T;
     }
     if (typeof block !== "function") {
-      throw new TypeError("transaction requires a function block");
+      throw new LocalJumpError("no block given (yield)");
     }
     return dbStatementsTransaction.call(this as any, block, opts) as Promise<T | undefined>;
   }

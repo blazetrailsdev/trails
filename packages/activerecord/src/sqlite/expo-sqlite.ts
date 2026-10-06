@@ -13,6 +13,7 @@ import {
   type SqliteStatement,
 } from "../sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
@@ -362,7 +363,7 @@ export const expoSqliteDriver: SqliteDriver = {
 
   async open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     if (!expoSqlite) {
-      throw new Error(
+      throw new LoadError(
         "expo-sqlite is not available. This driver requires an Expo / React Native runtime.",
       );
     }

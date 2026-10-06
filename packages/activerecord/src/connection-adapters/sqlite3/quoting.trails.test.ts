@@ -1,7 +1,7 @@
 import { quotingHost } from "../../support/quoting-host.js";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, TypeError } from "@blazetrails/ruby-compat";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-fixtures.js";
