@@ -276,8 +276,6 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/msgpack/msgpack-ruby.git",
-      // vendor/rails/v8.0.2/Gemfile:85 declares `gem "msgpack", ">= 1.7.0"`,
-      // resolved to 1.8.0 by vendor/rails/v8.0.2/Gemfile.lock:374.
       ref: "v1.8.0",
     },
     packages: [

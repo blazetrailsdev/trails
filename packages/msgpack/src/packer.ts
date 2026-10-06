@@ -181,19 +181,18 @@ export class Packer {
     this.buffer.write(bytes);
   }
 
-  private tryWriteWithExtTypeLookup(v: unknown): boolean {
-    const lookupClass = rbObjClass(v);
-    let ary = this.extRegistry.get(lookupClass);
-    if (ary?.[1] == null) {
-      ary = undefined;
-      for (const [key, value] of this.extRegistry) {
-        if (rbObjIsKindOf(v, key)) {
-          ary = value;
-          break;
-        }
-      }
+  private extRegistryLookup(instance: unknown): [number, PackerProc | null, number] {
+    const type = this.extRegistry.get(rbObjClass(instance));
+    if (type?.[1] != null) return type;
+
+    for (const [key, superclassType] of this.extRegistry) {
+      if (rbObjIsKindOf(instance, key)) return superclassType;
     }
-    const [extType, proc, extFlags] = ary ?? [0, null, 0];
+    return [0, null, 0];
+  }
+
+  private tryWriteWithExtTypeLookup(v: unknown): boolean {
+    const [extType, proc, extFlags] = this.extRegistryLookup(v);
 
     if (proc == null) {
       return false;
