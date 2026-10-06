@@ -102,8 +102,11 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
   const flat = (methods as readonly unknown[]).flat(Infinity) as string[];
   this._helperMethods = [...this._helperMethods, ...flat];
 
-  const location = callerLocations(1, 1)[0]?.callSite;
-  const [file, line] = [location?.getScriptNameOrSourceURL(), location?.getLineNumber() ?? 1];
+  const location = callerLocations(1, 1)[0];
+  const [file, line] = [
+    location?.callSite?.getScriptNameOrSourceURL(),
+    location?.callSite?.getLineNumber() ?? 1,
+  ];
 
   for (const method of flat) {
     const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
