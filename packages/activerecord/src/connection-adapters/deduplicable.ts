@@ -13,9 +13,9 @@ extend(Deduplicable, Concern);
 const registries = new WeakMap<object, Hash<object, object>>();
 
 export function deduplicate<T>(this: T): T {
-  const self = this as object & { deduplicated(): object };
-  const registry = (self.constructor as unknown as DeduplicableClass).registry();
-  return (hashAref(registry, self) ?? hashAset(registry, self, self.deduplicated())) as T;
+  const registry = ((this as object).constructor as unknown as DeduplicableClass).registry();
+  return (hashAref(registry, this as object) ??
+    hashAset(registry, this as object, (this as { deduplicated(): object }).deduplicated())) as T;
 }
 export const negate = deduplicate;
 

@@ -136,9 +136,8 @@ export const TestHelper = new Module() as Module<{
   wait: typeof wait;
   setLogger: typeof setLogger;
 }> & { MockLogger: typeof MockLogger };
-TestHelper.MockLogger = MockLogger;
-
 TestHelper.defineMethod("setup", setup);
 TestHelper.defineMethod("teardown", teardown);
+TestHelper.MockLogger = MockLogger;
 TestHelper.defineMethod("wait", wait);
 TestHelper.defineMethod("setLogger", setLogger);

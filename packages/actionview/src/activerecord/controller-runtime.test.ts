@@ -74,14 +74,13 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
     }
 
     teardown(): void {
-      // @ts-expect-error -- `super` is TestHelper#teardown, on the link `include` splices above this class.
-      super.teardown();
+      TestHelper.instanceMethod("teardown")!.value.call(this);
       ActiveSupportLogSubscriber.logSubscribers().length = 0;
       ActionController.Base.logger = this.oldLogger;
     }
 
     setLogger(logger: MockLogger | null): void {
-      ActionController.Base.logger = logger as never;
+      ActionController.Base.logger = logger as unknown as typeof ActionController.Base.logger;
     }
   }
 
