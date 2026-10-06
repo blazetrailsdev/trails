@@ -330,13 +330,17 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     pattern: "adapters/trilogy",
     testFile: "adapters/trilogy/",
     reason:
-      "Trilogy is a C extension for Ruby with no Node.js equivalent. MySQL connections " +
-      "go through Mysql2Adapter instead.",
+      "Trilogy is a C extension for Ruby with no Node.js equivalent, and wrapping the " +
+      "mysql2 npm driver under Rails' TrilogyAdapter name would invent a second " +
+      "Mysql2Adapter. MySQL connections go through Mysql2Adapter instead. PERMANENT: " +
+      'CLAUDE.md § "Trilogy is out of scope".',
   },
   {
     pattern: "trilogy_adapter.rb",
     testFile: "trilogy_adapter_test.rb",
-    reason: "Trilogy adapter implementation; excluded along with adapters/trilogy.",
+    reason:
+      "Trilogy adapter implementation; excluded along with adapters/trilogy. " +
+      'PERMANENT: CLAUDE.md § "Trilogy is out of scope".',
   },
   // --- Permanently not-portable: class reloading ---
   {
