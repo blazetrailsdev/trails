@@ -57,17 +57,17 @@ export class MockLogger {
   declare fatal: (message?: unknown) => void;
   /** @noRailsEquivalent PERMANENT */
   declare unknown: (message?: unknown) => void;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "debug?": boolean;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "info?": boolean;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "warn?": boolean;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "error?": boolean;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "fatal?": boolean;
-  /** @noRailsEquivalent PERMANENT */
+  /** @noRailsEquivalent CONVERGEABLE converge-logger-severity-predicates-onto-is-prefix */
   declare readonly "unknown?": boolean;
 
   constructor(level: number = MockLogger.DEBUG) {
