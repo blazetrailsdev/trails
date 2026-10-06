@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { MemoryStore, Notifications } from "@blazetrails/activesupport";
-import { rateLimiting } from "./rate-limiting.js";
+import { rateLimiting } from "../metal/rate-limiting.js";
 import { Base } from "../base.js";
 import { API } from "../api.js";
 import { Request } from "../../action-dispatch/request.js";
