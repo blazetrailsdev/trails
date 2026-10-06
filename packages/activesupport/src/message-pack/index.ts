@@ -4,6 +4,7 @@ import { CacheSerializer } from "./cache-serializer.js";
 export { Serializer } from "./serializer.js";
 export { CacheSerializer } from "./cache-serializer.js";
 export { Factory, MessagePackError } from "./factory.js";
+export type { Packer, Unpacker } from "./factory.js";
 export { Extensions, UnserializableObjectError, MissingClassError } from "./extensions.js";
 export type { ObjectClass } from "./extensions.js";
 

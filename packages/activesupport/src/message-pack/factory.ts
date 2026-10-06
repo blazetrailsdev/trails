@@ -50,6 +50,16 @@ export class Factory {
     return new Unpacker(io, this);
   }
 
+  dump(v: unknown): Buffer {
+    const packer = this.packer();
+    packer.write(v);
+    return packer.fullPack();
+  }
+
+  load(data: Uint8Array | string): unknown {
+    return this.unpacker().feedReference(data).fullUnpack();
+  }
+
   freeze(): this {
     Object.freeze(this.types);
     return Object.freeze(this);

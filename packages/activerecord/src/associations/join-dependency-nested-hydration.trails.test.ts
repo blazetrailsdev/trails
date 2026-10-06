@@ -70,7 +70,7 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
     expect(comment1.association("author").target).toBeDefined();
-    expect(isAssociationCached(post, "author")).toBe(false);
+    expect(isAssociationCached.call(post, "author")).toBe(false);
   });
 
   it("eager association loading with cascaded two levels and one level", () => {

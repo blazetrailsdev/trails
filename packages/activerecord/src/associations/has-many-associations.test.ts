@@ -2992,11 +2992,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(CachePost);
     const author = await CacheAuthor.create({ name: "Alice" });
 
-    expect(isAssociationCached(author, "cache_posts")).toBe(false);
+    expect(isAssociationCached.call(author, "cache_posts")).toBe(false);
 
     association(author, "cache_posts");
-    expect(isAssociationCached(author, "cache_posts")).toBe(true);
-    expect(isAssociationCached(author, "other")).toBe(false);
+    expect(isAssociationCached.call(author, "cache_posts")).toBe(true);
+    expect(isAssociationCached.call(author, "other")).toBe(false);
   });
 
   it("get ids for association on new record does not try to find records", async () => {

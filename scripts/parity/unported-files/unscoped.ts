@@ -41,14 +41,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "JS cache/session layers use JSON or structured clone.",
   },
   {
-    pattern: "message_pack.rb",
-    testFile: "message_pack_test.rb",
-    reason:
-      "Rails-integrated MessagePack (:nodoc:) registers AR records with " +
-      "ActiveSupport::MessagePack encoder/decoder. Ruby-only coupling; " +
-      "MessagePack-the-format exists in JS but this file is the Marshal bridge, not a reusable impl.",
-  },
-  {
     pattern: "legacy_yaml_adapter.rb", // no test counterpart
     reason:
       "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; " +

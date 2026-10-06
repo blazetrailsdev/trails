@@ -21,7 +21,6 @@ import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { Associations } from "../namespaces.js";
 import { JoinBase } from "./join-dependency/join-base.js";
@@ -399,7 +398,7 @@ export class JoinDependency {
       const isCollection = node.reflection.isCollection();
       if (isCollection) {
         this._markCollectionLoaded(arParent, node);
-      } else if (isAssociationCached(arParent, (node.reflection as any).name)) {
+      } else if (arParent.isAssociationCached((node.reflection as any).name)) {
         const model = arParent.association?.((node.reflection as any).name)?.target;
         this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;
