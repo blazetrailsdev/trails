@@ -454,13 +454,6 @@ export async function save<T extends SaveRecord>(
     return (await withTransactionReturningStatus.call(self, async () => {
       const validationsPassed = await performValidations.call(this, options);
       if (!validationsPassed) return false;
-      if (this._readonly) {
-        throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-      }
-      if (this._destroyed) {
-        return false;
-      }
-
       if (this._newRecord && isStiSubclass(ctor)) {
         const col = getStiBase(ctor).inheritanceColumn;
         if (col && !this._readAttribute(col)) {
@@ -889,6 +882,26 @@ export function _updateRow(
     attributesWithValues.call(this as any, attributeNames),
     (this as any)._queryConstraintsHash(),
   );
+}
+
+/** @internal */
+export async function createOrUpdate(
+  this: PersistenceInstanceChainHost & {
+    isReadonly(): boolean;
+    isDestroyed(): boolean;
+    isNewRecord(): boolean;
+    _raiseReadonlyRecordError(): never;
+    _createRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+    _updateRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+  },
+  block?: (record: any) => void,
+): Promise<boolean> {
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
+  if (this.isDestroyed()) return false;
+  const result = this.isNewRecord()
+    ? await this._createRecord(undefined, block)
+    : await this._updateRecord(undefined, block);
+  return result !== false;
 }
 
 /** @internal */

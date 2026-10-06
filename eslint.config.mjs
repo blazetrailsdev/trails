@@ -499,8 +499,7 @@ export default defineConfig(
   //    `runCallbacks("<event>")` / `runAllCallbacks`. Manifest:
   //    eslint/rails-callback-invocations.json (built by
   //    `pnpm tsx scripts/build-rails-privates-manifest.ts`, refreshed on
-  //    `pnpm parity:api`). Pre-existing violators are grandfathered in
-  //    eslint/rails-callback-invocations-exclude.json and ratcheted down. ──
+  //    `pnpm parity:api`). ──
   {
     files: ["packages/activerecord/src/**/*.ts"],
     ignores: ["**/*.test.ts"],

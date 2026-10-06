@@ -1,5 +1,4 @@
 import { RuleTester } from "eslint";
-import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -7,10 +6,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
 
-// Hermetic fixtures: point the rule at tmp manifest + exclude files via the
-// env overrides it reads lazily, so the test never touches the committed one.
+// Hermetic fixture: point the rule at a tmp manifest via the env override it
+// reads lazily, so the test never touches the committed one.
 const MANIFEST_FIXTURE = path.join(__dirname, ".tmp-rails-callback-invocations.test.json");
-const EXCLUDE_FIXTURE = path.join(__dirname, ".tmp-rails-callback-invocations-exclude.test.json");
 
 // Manifest keys are file-qualified `<repo-rel path>#<method>` so a requirement
 // only lands on the specific ported method whose Rails source fires the
@@ -24,25 +22,18 @@ const manifest = {
   },
 };
 
-const excludedRel = "packages/activerecord/src/grandfathered.ts";
-manifest.methods[`${excludedRel}#destroy`] = ["destroy"];
-
 fs.writeFileSync(MANIFEST_FIXTURE, JSON.stringify(manifest, null, 2));
-fs.writeFileSync(EXCLUDE_FIXTURE, JSON.stringify([`${excludedRel}#destroy`], null, 2));
 process.env.RAILS_CALLBACK_INVOCATIONS_PATH = MANIFEST_FIXTURE;
-process.env.RAILS_CALLBACK_INVOCATIONS_EXCLUDE_PATH = EXCLUDE_FIXTURE;
 
 process.on("exit", () => {
   fs.rmSync(MANIFEST_FIXTURE, { force: true });
-  fs.rmSync(EXCLUDE_FIXTURE, { force: true });
 });
 
-// Imported after the env vars are set; the rule resolves the paths lazily so
+// Imported after the env var is set; the rule resolves the path lazily so
 // ESM hoisting of this import is harmless.
 const { default: rule } = await import("./rails-callback-invocations.mjs");
 
 const srcFile = path.join(REPO_ROOT, "packages/activerecord/src/persistence.ts");
-const excludedFile = path.join(REPO_ROOT, excludedRel);
 const outOfScopeFile = path.join(REPO_ROOT, "packages/activemodel/src/callbacks.ts");
 
 const tester = new RuleTester({
@@ -85,11 +76,6 @@ tester.run("rails-callback-invocations", rule, {
       filename: srcFile,
       code: `export function save(this: any) { return this._createOrUpdate(); }\n`,
     },
-    // Excluded (grandfathered) file+method pair — flagged pair is skipped.
-    {
-      filename: excludedFile,
-      code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
-    },
     // File-scoped lookup: a same-named method in a different in-scope file has
     // no `<rel>#destroy` entry, so it is not constrained despite firing nothing.
     {
@@ -118,40 +104,4 @@ tester.run("rails-callback-invocations", rule, {
       ],
     },
   ],
-});
-
-// Ratchet hygiene: the committed exclude baseline must only grandfather
-// methods the committed manifest actually constrains. A dead/typo'd entry
-// (wrong path or a method name not in the manifest) would silently linger and
-// defeat the "list only shrinks" contract — the entry could never be reached,
-// so removing it could never be forced. This reads the real committed files
-// (not the tmp fixtures) to keep them honest.
-describe("rails-callback-invocations baseline", () => {
-  const manifestKeys = new Set(
-    Object.keys(
-      JSON.parse(fs.readFileSync(path.join(__dirname, "rails-callback-invocations.json"), "utf8"))
-        .methods,
-    ),
-  );
-  const baseline = JSON.parse(
-    fs.readFileSync(path.join(__dirname, "rails-callback-invocations-exclude.json"), "utf8"),
-  );
-
-  it("every entry is a file-qualified `<packages/activerecord/src path>#<manifest method>` key", () => {
-    for (const entry of baseline) {
-      const [rel] = entry.split("#");
-      expect(entry, `entry "${entry}" must be path#method`).toContain("#");
-      expect(rel, `entry "${entry}" path out of scope`).toMatch(
-        /^packages\/activerecord\/src\/.+\.ts$/,
-      );
-      // The manifest is now file-qualified, so the whole entry must be a live
-      // manifest key — a stale `<rel>#<method>` the manifest no longer emits
-      // could never be reached, defeating the shrink-only ratchet.
-      expect(manifestKeys, `entry "${entry}" is not a live manifest key`).toContain(entry);
-    }
-  });
-
-  it("has no duplicate entries", () => {
-    expect(new Set(baseline).size).toBe(baseline.length);
-  });
 });

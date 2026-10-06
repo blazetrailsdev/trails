@@ -1,12 +1,6 @@
 import { singularize } from "@blazetrails/activesupport";
-import { SpellChecker } from "@blazetrails/did-you-mean";
+import { formatter, SpellChecker } from "@blazetrails/did-you-mean";
 import { ActiveRecordError, ConfigurationError } from "../errors.js";
-
-/** @internal */
-function withCorrections(message: string, corrections: string[]): string {
-  if (corrections.length === 0) return message;
-  return `${message}\nDid you mean?  ${corrections.join("\n               ")}`;
-}
 
 export class AssociationNotFoundError extends ConfigurationError {
   readonly record: any;
@@ -40,7 +34,7 @@ export class AssociationNotFoundError extends ConfigurationError {
   }
 
   detailedMessage(): string {
-    return withCorrections(this.message, this.corrections);
+    return this.message + formatter().messageFor(this.corrections);
   }
 }
 
@@ -111,7 +105,7 @@ export class InverseOfAssociationNotFoundError extends ActiveRecordError {
   }
 
   detailedMessage(): string {
-    return withCorrections(this.message, this.corrections);
+    return this.message + formatter().messageFor(this.corrections);
   }
 }
 
@@ -182,7 +176,7 @@ export class HasManyThroughAssociationNotFoundError extends ActiveRecordError {
   }
 
   detailedMessage(): string {
-    return withCorrections(this.message, this.corrections);
+    return this.message + formatter().messageFor(this.corrections);
   }
 }
 

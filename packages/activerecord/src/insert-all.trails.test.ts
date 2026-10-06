@@ -1,5 +1,6 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
+import { UnknownAttributeError } from "@blazetrails/activemodel";
 import { Builder } from "./insert-all.js";
 import { fixtures } from "./test-fixtures.js";
 import "./support/canonical-model-index.js";
@@ -136,5 +137,20 @@ describe("InsertAll disallow_raw_sql!", () => {
     await expect(
       Book.upsertAll([{ name: "Rework", author_id: 1 }], { onDuplicate: ":skip" }),
     ).resolves.toBeDefined();
+  });
+});
+
+describe("InsertAll extract_types_from_columns_on", () => {
+  fixtures([]);
+
+  it("raises UnknownAttributeError carrying a new record of the model", async () => {
+    const error = await Book.insertAllBang([{ unknown_attribute: "Test" }]).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(UnknownAttributeError);
+    const { record, attribute } = error as UnknownAttributeError<Book>;
+    expect(record).toBeInstanceOf(Book);
+    expect(record.isNewRecord()).toBe(true);
+    expect(attribute).toBe("unknown_attribute");
   });
 });

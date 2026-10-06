@@ -26,7 +26,15 @@ import {
   rbObjRespondTo,
   toI,
 } from "@blazetrails/ruby-compat";
-import { Dir, File, FileUtils, StandardError } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  excBacktraceLocations,
+  excSetBacktrace,
+  excSetupMessage,
+  File,
+  FileUtils,
+  StandardError,
+} from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
@@ -1806,7 +1814,9 @@ export class Migrator {
       let msg = "An error has occurred, ";
       if (await this.isUseTransaction(migration)) msg += "this and ";
       msg += `all later migrations canceled:\n\n${excToS(e)}`;
-      throw Object.assign(new StandardError(msg), { cause: e });
+      const error = new StandardError(msg);
+      excSetBacktrace(error, (excBacktraceLocations(e as Error) ?? []).map(String));
+      throw excSetupMessage(error, e);
     }
   }
 

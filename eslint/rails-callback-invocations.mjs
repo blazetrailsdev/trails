@@ -14,9 +14,7 @@
  * collects the string-literal event arguments of every `runCallbacks(...)` /
  * `runAllCallbacks(...)` call in its body (the TS equivalents of Rails'
  * `run_callbacks` family). If a required event is not among them, the method is
- * flagged — unless the pair `<repo-rel-path>#<method>` is grandfathered in the
- * ratchet baseline `eslint/rails-callback-invocations-exclude.json` (it only
- * shrinks).
+ * flagged.
  *
  * Manifest: eslint/rails-callback-invocations.json, built by
  *   pnpm tsx scripts/build-rails-privates-manifest.ts
@@ -28,14 +26,11 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Resolved lazily so the unit test can point at tmp fixtures via env vars
+// Resolved lazily so the unit test can point at a tmp fixture via an env var
 // without import-time ordering games.
 const manifestPath = () =>
   process.env.RAILS_CALLBACK_INVOCATIONS_PATH ??
   path.join(__dirname, "rails-callback-invocations.json");
-const excludePath = () =>
-  process.env.RAILS_CALLBACK_INVOCATIONS_EXCLUDE_PATH ??
-  path.join(__dirname, "rails-callback-invocations-exclude.json");
 
 // Callee names that fire callbacks in the TS port. `runCallbacks("event")` is
 // the direct equivalent of Rails' `run_callbacks(:event)`; `runAllCallbacks`
@@ -56,10 +51,6 @@ function loadJson(p, fallback) {
 
 function loadManifest() {
   return loadJson(manifestPath(), { methods: {} }).methods ?? {};
-}
-
-function loadExclude() {
-  return new Set(loadJson(excludePath(), []));
 }
 
 /** Repo-relative POSIX path when in scope (packages/activerecord/src/**.ts); else null. */
@@ -131,14 +122,12 @@ const rule = {
     const rel = repoRel(filename);
     if (!rel) return {};
     const manifest = loadManifest();
-    const exclude = loadExclude();
     const sourceCode = context.sourceCode ?? context.getSourceCode();
 
     const check = (fnNode, name, reportNode) => {
       if (!name) return;
       const required = manifest[`${rel}#${name}`];
       if (!required || required.length === 0) return;
-      if (exclude.has(`${rel}#${name}`)) return;
       const fired = eventsFired(fnNode, sourceCode);
       for (const event of required) {
         if (!fired.has(event)) {

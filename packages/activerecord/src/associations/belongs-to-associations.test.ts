@@ -646,7 +646,7 @@ describe("BelongsToAssociationsTest", () => {
       new AdminRegionalUser({ region: "wrong value" });
     });
     expect(e.message).toMatch(
-      /^Region expected, got "wrong value" which is an instance of String$/,
+      /^Region\([^)]+\) expected, got "wrong value" which is an instance of String\([^)]+\)$/,
     );
   });
 

@@ -303,7 +303,6 @@ export async function withTransactionReturningStatus<T>(
   const modelClass = this.constructor as typeof Base;
 
   const r = this as any;
-  r._transactionAction = undefined;
 
   let status: T;
 
