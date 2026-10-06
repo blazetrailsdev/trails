@@ -191,6 +191,7 @@ describe("vendor/sources.ts", () => {
     expect(Object.keys(libEntryFilesManifest())).toEqual([
       "arel",
       "activerecord",
+      "activejob",
       "rack-test",
       "thor",
       "i18n",

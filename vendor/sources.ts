@@ -145,6 +145,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "activejob",
         libPath: "activejob/lib/active_job",
+        libEntryFile: "activejob/lib/active_job.rb",
         testPath: "activejob/test",
       },
       {
