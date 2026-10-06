@@ -1,8 +1,9 @@
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { NameError } from "./name-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbBuiltinClassName, rbInspect, rbObjClassname } from "./object.js";
+import { rbBuiltinClassName, rbInspect, rbObjClassname, toS } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToF, rbStrToI } from "./string/convert.js";
@@ -492,24 +493,55 @@ function doCoerce(x: unknown, y: unknown): [unknown, unknown] {
  * Ruby `Integer#^` (`vendor/ruby/v3.3.11/numeric.c:5055` `int_xor`, over
  * `fix_xor`, `numeric.c:5025`, and `rb_big_xor`): the bitwise exclusive OR of
  * two Integers. Any other operand goes through `rb_num_coerce_bit`
- * (`numeric.c:4923`): `y.coerce(x)` supplies the pair that is XORed, and an
- * operand with no `coerce`, or a pair whose first member has no `^`, raises
- * `TypeError` naming the original operands, which is what `1 ^ nil` raises.
+ * (`numeric.c:4923`): `y.coerce(x)` supplies a pair, and `^` is sent to its
+ * first member with the second. An operand with no `coerce`, or a pair whose
+ * first member has no `^`, raises `TypeError` naming the original operands,
+ * which is what `1 ^ nil` raises.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function intXor(x: unknown, y: unknown): number | bigint {
+export function intXor(x: unknown, y: unknown): unknown {
   if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
     if (typeof x === "number" && typeof y === "number" && (x | 0) === x && (y | 0) === y) {
       return x ^ y;
     }
     return rbBigNorm(BigInt(x) ^ BigInt(y));
   }
+  return rbNumCoerceBit(x, y);
+}
+
+const numFuncallBit1Running: [unknown, unknown][] = [];
+
+/**
+ * `num_funcall_bit_1` (`vendor/ruby/v3.3.11/numeric.c:4912`) under the
+ * `rb_exec_recursive_paired` guard `rb_num_coerce_bit` runs it in
+ * (`numeric.c:4931`): sends `^` to `x` with `y`, answering `undefined` when
+ * `x` has no `^`, and raising `NameError` (`num_funcall_op_1_recursion`,
+ * `numeric.c:362`) when the same pair is already being sent.
+ */
+function numFuncallBit1(y: unknown, x: unknown): unknown {
+  if (numFuncallBit1Running.some(([obj, paired]) => obj === y && paired === x)) {
+    throw new NameError(`${toS(x)}^${toS(y)}`, "^");
+  }
+  numFuncallBit1Running.push([y, x]);
+  try {
+    if (rbIntegerTypeP(x)) return intXor(x, y);
+    const func = (x as Record<string, unknown> | null)?.["^"];
+    if (typeof func !== "function") return undefined;
+    return func.call(x, y);
+  } finally {
+    numFuncallBit1Running.pop();
+  }
+}
+
+/** `rb_num_coerce_bit` for `^` (`vendor/ruby/v3.3.11/numeric.c:4923`). */
+function rbNumCoerceBit(x: unknown, y: unknown): unknown {
   const args = doCoerce(x, y);
-  if (!rbIntegerTypeP(args[0])) {
+  const ret = numFuncallBit1(args[1], args[0]);
+  if (ret === undefined) {
     coerceFailed(x, y);
   }
-  return intXor(args[0], args[1]);
+  return ret;
 }
 
 /**

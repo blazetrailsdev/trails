@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
+import { NameError } from "./name-error.js";
 import { TypeError } from "./type-error.js";
 import {
   intXor,
@@ -239,6 +240,30 @@ describe("intXor", () => {
 
   it("XORs the pair an operand's coerce answers", () => {
     expect(intXor(3, { coerce: (x: unknown) => [x, 6] })).toBe(5);
+  });
+
+  it("sends ^ to the first member of the coerced pair", () => {
+    const operand = {
+      coerce(x: unknown): unknown {
+        return [this, x];
+      },
+      "^"(y: unknown): string {
+        return `mine ${String(y)}`;
+      },
+    };
+    expect(intXor(3, operand)).toBe("mine 3");
+  });
+
+  it("raises NameError when the coerced pair recurses", () => {
+    class Operand {
+      coerce(x: unknown): unknown {
+        return [x, this];
+      }
+      toString(): string {
+        return "operand";
+      }
+    }
+    expect(() => intXor(3, new Operand())).toThrow(new NameError("3^operand", "^"));
   });
 
   it("raises when coerce answers a pair whose first member has no ^, or no pair", () => {
