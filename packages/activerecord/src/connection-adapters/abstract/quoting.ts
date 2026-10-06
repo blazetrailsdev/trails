@@ -57,14 +57,10 @@ export type TemporalDateLike =
   | Temporal.PlainDateTime
   | Temporal.PlainDate;
 
+/** @inventedArm if — CONVERGEABLE quoting-js-date-guard-arms-have-no-rails-counterpart */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "string" || value instanceof Chars) {
     return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
-  }
-  if (typeof value === "symbol") {
-    const desc = value.description;
-    if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
-    return `'${this.quoteString(desc)}'`;
   }
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
@@ -98,10 +94,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
+/** @inventedArm if — CONVERGEABLE quoting-js-date-guard-arms-have-no-rails-counterpart */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (typeof value === "symbol" || value instanceof Chars) {
-    return value instanceof Chars ? value.toS() : (value.description ?? String(value));
-  }
+  if (value instanceof Chars) return value.toS();
   if (value instanceof BinaryData) return value.toString();
   if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
   if (value === null || value === undefined) return value;

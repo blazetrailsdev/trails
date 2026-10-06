@@ -194,7 +194,7 @@ describe("QuotingTest", () => {
 
 describe("TypeCastingTest", () => {
   it("type cast symbol", () => {
-    expect(typeCast(Symbol("foo"))).toBe("foo");
+    expect(typeCast("foo")).toBe("foo");
   });
 
   it("type cast numeric", () => {

@@ -275,11 +275,6 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(-7)).toBe(-7n);
     });
 
-    it("casts a symbol through the inherited abstract arm", () => {
-      expect(typeCast(Symbol("foo"))).toBe("foo");
-      expect(typeCast(Symbol())).toBe("Symbol()");
-    });
-
     it("throws on unsupported types", () => {
       expect(() => typeCast({})).toThrow(TypeError);
     });

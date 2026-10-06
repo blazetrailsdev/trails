@@ -1,7 +1,6 @@
 import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
-import { TypeError } from "@blazetrails/ruby-compat";
 import {
   quote as quoteFn,
   quoteDefaultExpression as quoteDefaultExpressionFn,
@@ -55,14 +54,6 @@ describe("quote", () => {
   it("quotes dates as ISO 8601 strings", () => {
     const d = Temporal.Instant.from("2026-04-01T12:00:00Z");
     expect(quote(d)).toBe("'2026-04-01 12:00:00'");
-  });
-
-  it("quotes symbols by description", () => {
-    expect(quote(Symbol("mobile"))).toBe("'mobile'");
-  });
-
-  it("throws for symbols without description", () => {
-    expect(() => quote(Symbol())).toThrow(TypeError);
   });
 });
 
