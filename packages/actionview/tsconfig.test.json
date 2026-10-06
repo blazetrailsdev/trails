@@ -7,14 +7,16 @@
     "paths": {
       "@blazetrails/actionpack": ["../actionpack/src/index.ts"],
       "@blazetrails/activemodel": ["../activemodel/src/index.ts"],
+      "@blazetrails/activerecord": ["../activerecord/src/index.ts"],
       "@blazetrails/rack": ["../rack/src/index.ts"]
     }
   },
-  "include": ["src/**/*.test.ts"],
+  "include": ["src/**/*.test.ts", "src/test-helpers/**/*.ts"],
   "references": [
     { "path": "./tsconfig.json" },
     { "path": "../actionpack" },
     { "path": "../activemodel" },
+    { "path": "../activerecord" },
     { "path": "../rack" }
   ]
 }

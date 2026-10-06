@@ -6,15 +6,16 @@ type DeduplicableClass = { registry(): Hash<object, object> };
 export const Deduplicable = new Module() as Module<{
   deduplicate: typeof deduplicate;
   negate: typeof negate;
-  deduplicated: typeof deduplicated;
+  deduplicated(): object;
 }> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 
 const registries = new WeakMap<object, Hash<object, object>>();
 
-export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
-  const registry = (this.constructor as unknown as DeduplicableClass).registry();
-  return (hashAref(registry, this) ?? hashAset(registry, this, this.deduplicated())) as T;
+export function deduplicate<T>(this: T): T {
+  const self = this as object & { deduplicated(): object };
+  const registry = (self.constructor as unknown as DeduplicableClass).registry();
+  return (hashAref(registry, self) ?? hashAset(registry, self, self.deduplicated())) as T;
 }
 export const negate = deduplicate;
 

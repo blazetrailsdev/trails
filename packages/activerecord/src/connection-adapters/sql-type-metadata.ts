@@ -1,12 +1,14 @@
 import { Deduplicable } from "./deduplicable.js";
-import type { ClassMethods, deduplicate } from "./deduplicable.js";
-import { include, rbHash, registerConstant } from "@blazetrails/ruby-compat";
+import type { ClassMethods } from "./deduplicable.js";
+import { include, type Included, rbHash, registerConstant } from "@blazetrails/ruby-compat";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`sql_type_metadata.rb:7`); the class/interface merge is how a mixin surfaces on the type side.
+export interface SqlTypeMetadata extends Included<typeof Deduplicable> {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
 export class SqlTypeMetadata {
   declare static registry: typeof ClassMethods.registry;
   declare static new: typeof ClassMethods.new;
-  declare deduplicate: typeof deduplicate;
-  declare negate: typeof deduplicate;
 
   readonly sqlType: string | null;
   readonly type: string | undefined;

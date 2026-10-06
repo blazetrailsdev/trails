@@ -191,6 +191,10 @@ const alias = {
     __dirname,
     "packages/activesupport/src/test-case.ts",
   ),
+  "@blazetrails/activesupport/log-subscriber/test-helper": path.resolve(
+    __dirname,
+    "packages/activesupport/src/log-subscriber/test-helper.ts",
+  ),
   "@blazetrails/activesupport/testing/autorun": path.resolve(
     __dirname,
     "packages/activesupport/src/testing/autorun.ts",

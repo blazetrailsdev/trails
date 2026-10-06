@@ -24,7 +24,7 @@ const INTERNAL_PARAMS = ["controller", "action", "format", "_method", "only_path
 export class LogSubscriber extends BaseLogSubscriber {
   /** @internal */
   override get logger() {
-    return LogSubscriber.logger;
+    return Base.logger as BaseLogSubscriber["logger"];
   }
 
   /** @missingRailsArgs each_pair — PERMANENT */

@@ -1,4 +1,4 @@
-import { compact, Hash, strip, toS } from "@blazetrails/ruby-compat";
+import { compact, Hash, Module, strip, toS } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
@@ -130,4 +130,15 @@ export function setLogger(this: TestHelperHost, logger: MockLogger | null): void
   LogSubscriber.logger = logger as unknown as Logger | null;
 }
 
-export const TestHelper = { setup, teardown, MockLogger, wait, setLogger };
+export const TestHelper = new Module() as Module<{
+  setup: typeof setup;
+  teardown: typeof teardown;
+  wait: typeof wait;
+  setLogger: typeof setLogger;
+}> & { MockLogger: typeof MockLogger };
+TestHelper.MockLogger = MockLogger;
+
+TestHelper.defineMethod("setup", setup);
+TestHelper.defineMethod("teardown", teardown);
+TestHelper.defineMethod("wait", wait);
+TestHelper.defineMethod("setLogger", setLogger);

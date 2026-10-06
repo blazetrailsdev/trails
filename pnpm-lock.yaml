@@ -201,6 +201,13 @@ importers:
       '@blazetrails/tse-compiler':
         specifier: workspace:*
         version: link:../tse-compiler
+    devDependencies:
+      '@blazetrails/actionpack':
+        specifier: workspace:*
+        version: link:../actionpack
+      '@blazetrails/activerecord':
+        specifier: workspace:*
+        version: link:../activerecord
 
   packages/activejob:
     dependencies:
