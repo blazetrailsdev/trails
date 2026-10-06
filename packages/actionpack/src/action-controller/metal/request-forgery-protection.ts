@@ -1,5 +1,6 @@
 import {
   ArgumentError,
+  Base64,
   getCrypto,
   chomp,
   OpenSSL,
@@ -494,18 +495,20 @@ export function encodeCsrfToken(csrfToken: Bytes): string {
 
 /** @internal */
 export function decodeCsrfToken(encodedCsrfToken: string): Bytes {
-  if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedCsrfToken)) throw new ArgumentError("invalid base64");
-  const stripped = encodedCsrfToken.replace(/=+$/, "");
-  if (stripped.length % 4 === 1) throw new ArgumentError("invalid base64");
-  return Buffer.from(stripped.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+  return Buffer.from(Base64.urlsafeDecode64(encodedCsrfToken), "latin1");
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ * @inventedArm throw — PERMANENT
+ */
 export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   s2 = Buffer.from(s2);
   const size = s1.length;
   let i = 0;
   while (i < size) {
+    if (i >= s2.length) throw new TypeError("nil can't be coerced into Integer");
     s2[i] = s1[i] ^ s2[i];
     i += 1;
   }
@@ -525,10 +528,7 @@ export function realCsrfToken(this: CsrfController, _session?: unknown): Bytes {
 
 /** @internal */
 export function csrfTokenHmac(this: CsrfController, session: unknown, identifier: string): Bytes {
-  return OpenSSL.HMAC.digest("SHA256", this.realCsrfToken(session), identifier).subarray(
-    0,
-    RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH,
-  ) as Bytes;
+  return OpenSSL.HMAC.digest(OpenSSL.Digest.SHA256.new(), this.realCsrfToken(session), identifier);
 }
 
 /** @internal */

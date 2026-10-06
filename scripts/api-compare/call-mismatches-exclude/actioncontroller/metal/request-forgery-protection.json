@@ -2,19 +2,6 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/request-forgery-protection.ts",
-    "rubyName": "csrf_token_hmac",
-    "call": "digest",
-    "kind": "args",
-    "rubyArgs": [
-      "ref:constructor",
-      "ref:realCsrfToken",
-      "ref:identifier"
-    ],
-    "reason": "request_forgery_protection.rb:588-592 passes the digest, key and data to `OpenSSL::HMAC.digest`; Node's crypto has no such one-shot form — the same three values go to `createHmac(alg, key).update(data)` and `digest()` takes none."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset_csrf_token",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
