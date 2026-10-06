@@ -311,7 +311,7 @@ describe("ResponseTest", () => {
     expect(new Response(400).message).toBe("Bad Request");
     expect(new Response(401).message).toBe("Unauthorized");
     expect(new Response(403).message).toBe("Forbidden");
-    expect(new Response(422).message).toBe("Unprocessable Entity");
+    expect(new Response(422).message).toBe("Unprocessable Content");
     expect(new Response(503).message).toBe("Service Unavailable");
   });
 

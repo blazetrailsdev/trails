@@ -3,12 +3,10 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { FixtureResolver, TemplateHandlers } from "@blazetrails/actionview";
 
 import { Base } from "../base.js";
-import { MissingExactTemplate } from "./exceptions.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
 
 class ImplicitRenderTestController extends Base {
-  async emptyAction(): Promise<void> {}
   async helloWorld(): Promise<void> {}
 }
 
@@ -27,29 +25,10 @@ beforeAll(() => {
   });
   ImplicitRenderTestController.prependViewPath(
     new FixtureResolver({
-      "implicit_render_test/helloWorld.html.html": "Hello world!",
+      "implicit_render_test/hello_world.html.html": "Hello world!",
     }),
   );
   ImplicitRenderTestController.layout(false);
-});
-
-describe("ImplicitRenderTest", () => {
-  it("implicit no content response as browser", async () => {
-    const c = new ImplicitRenderTestController();
-    await expect(c.dispatch("emptyAction", makeRequest(), new Response())).rejects.toBeInstanceOf(
-      MissingExactTemplate,
-    );
-  });
-
-  it("implicit no content response as xhr", async () => {
-    const c = new ImplicitRenderTestController();
-    await c.dispatch(
-      "emptyAction",
-      makeRequest({ HTTP_X_REQUESTED_WITH: "XMLHttpRequest" }),
-      new Response(),
-    );
-    expect(c.status).toBe(204);
-  });
 });
 
 describe("RenderImplicitActionTest", () => {

@@ -5,6 +5,7 @@ import {
   hasKey,
   isEmpty,
   keys,
+  matchOperator,
   mergeBang,
   rbFSend,
   rbInspect,
@@ -12,6 +13,7 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjDup,
+  rbObjNotMatch,
   rbObjRespondTo,
   rbSetClassPathString,
   rtest,
@@ -181,7 +183,7 @@ export class Options extends Arguments {
           break;
         } else if (match) {
           this.extra.push(shifted);
-          while (rtest(this.peek()) && !/(?<![^\n])-/.test(this.peek() as string)) {
+          while (rtest(this.peek()) && rbObjNotMatch(this.peek(), /(?<![^\n])-/)) {
             this.extra.push(this.shift());
           }
         } else {
@@ -242,7 +244,7 @@ export class Options extends Arguments {
         : this.extra;
 
     const unknown = toCheck.filter((str) =>
-      /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/.test(str as string),
+      rtest(matchOperator(str, /(?<![^\n])--?(?:(?!--)[^\n])*(?![^\n])/)),
     );
     if (!isEmpty(unknown)) throw new UnknownArgumentError(keys(this.switches), unknown as string[]);
   }

@@ -1,4 +1,11 @@
-import { Concern, Module, classAttribute, extend, include } from "@blazetrails/activesupport";
+import {
+  Concern,
+  Module,
+  classAttribute,
+  extend,
+  include,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Digestor, type LookupContext, type Template } from "@blazetrails/actionview";
 import { ConditionalGet, type Etagger } from "./conditional-get.js";
 
@@ -28,8 +35,11 @@ export function pickTemplateForEtag(
   if (!(options.template === false)) {
     return options.template != null
       ? options.template
-      : (this.lookupContext.findAll(this.actionName, this._prefixes())[0] as Template | undefined)
-          ?.virtualPath;
+      : (
+          this.lookupContext.findAll(underscore(this.actionName), this._prefixes())[0] as
+            | Template
+            | undefined
+        )?.virtualPath;
   }
 }
 

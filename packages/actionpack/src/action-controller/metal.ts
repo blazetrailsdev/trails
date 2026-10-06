@@ -244,8 +244,8 @@ export class Metal extends AbstractController {
     return (this.constructor as typeof Metal).controllerName();
   }
 
-  urlFor(string: string): string {
-    return string;
+  urlFor(string: unknown): string {
+    return string as string;
   }
 
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
@@ -307,18 +307,19 @@ export class Metal extends AbstractController {
     return this.response.mediaType;
   }
 
-  head(status: number | string | null, options?: Record<string, unknown>): true {
+  head(status: number | string | null | false, options?: Record<string, unknown>): true {
     if (status !== null && typeof status === "object") {
       throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
     }
-    const resolvedStatus = status ?? "ok";
+    const resolvedStatus = status == null || status === false ? "ok" : status;
     let location: unknown;
     let contentType: unknown;
     if (options) {
       location = options.location;
-      contentType = options.content_type;
+      delete options.location;
+      contentType = options.contentType;
+      delete options.contentType;
       for (const [key, value] of Object.entries(options)) {
-        if (key === "location" || key === "content_type") continue;
         this.headers.set(
           key
             .split(/[-_]/)
@@ -329,8 +330,8 @@ export class Metal extends AbstractController {
       }
     }
     this.status = resolvedStatus;
-    if (location !== undefined && location !== null) {
-      this.location = this.urlFor(String(location));
+    if (location != null && location !== false) {
+      this.location = this.urlFor(location);
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {

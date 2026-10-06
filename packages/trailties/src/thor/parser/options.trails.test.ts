@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FrozenError, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { FrozenError, NoMethodError, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import {
   AtLeastOneRequiredArgumentError,
   ExclusiveArgumentError,
@@ -119,6 +119,21 @@ describe("Thor::Options", () => {
     expect(error).toBeInstanceOf(UnknownArgumentError);
     expect(error!.unknown).toEqual(["--bar", "-z"]);
     expect(error!.switches).toEqual(["--foo"]);
+  });
+
+  it("raises NoMethodError matching a non-String element after an unknown switch", () => {
+    for (const element of [-5, ["-a"], true, { a: 1 }]) {
+      expect(() => create({ foo: ":string" }).parse(["--bar", element])).toThrow(NoMethodError);
+    }
+  });
+
+  it("raises NoMethodError checking a non-String extra for an unknown switch", () => {
+    for (const element of [-5, ["-a"], true, { a: 1 }]) {
+      const options = create({ foo: ":string" });
+      options.parse([element]);
+      expect(options.remaining()).toEqual([element]);
+      expect(() => options.checkUnknownBang()).toThrow(NoMethodError);
+    }
   });
 
   it("stops at the first unknown when stop_on_unknown is set", () => {

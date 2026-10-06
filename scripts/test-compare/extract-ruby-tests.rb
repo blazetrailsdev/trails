@@ -192,6 +192,8 @@ class TestExtractor
     # Enclosing class/module names only (the describe_stack also carries block
     # descriptions) — the scope path helper resolution matches against.
     @class_stack = []
+    @in_non_test_class = false
+    @non_test_classes = []
     @test_cases = []
     @source_lines = source.lines
     @quote_styles = build_quote_styles(source)
@@ -381,18 +383,37 @@ class TestExtractor
     node.each { |child| walk(child) if child.is_a?(Array) }
   end
 
+  NON_TEST_SUPERCLASSES = %w[
+    ActionController::Base
+    ActionController::API
+    ActionController::Metal
+    ApplicationController
+  ].freeze
+
   def process_class(node)
     name = const_name(node[1])
     return unless name
 
     @describe_stack.push(name)
     @class_stack.push(name)
+    # A class whose superclass is a controller base, or a class this file
+    # already defined as one, is not a test case: Minitest never runs its
+    # `def test_*`, which are controller actions (`LiveTestController#test_action`,
+    # actionpack/test/controller/render_test.rb:980). Decided by the superclass
+    # the file shows, never by the class name: `TestErrorsInController <
+    # ActionDispatch::IntegrationTest` (dispatch/routing_test.rb) is a test case.
+    superclass = const_name(node[2])
+    prev_non_test = @in_non_test_class
+    @in_non_test_class = !superclass.nil? &&
+      (NON_TEST_SUPERCLASSES.include?(superclass) || @non_test_classes.include?(superclass))
+    @non_test_classes << name << name.split("::").last if @in_non_test_class
     # A class body always emits its `def test_*` directly (even a class nested
     # inside a module is a real test case), so suspend any module collection.
     prev = @module_collect
     @module_collect = nil
     walk_body(node[3] || node[2])
     @module_collect = prev
+    @in_non_test_class = prev_non_test
     @class_stack.pop
     @describe_stack.pop
   end
@@ -735,6 +756,7 @@ class TestExtractor
     name = ident_name(name_node)
     return unless name
     return unless name.start_with?("test_")
+    return if @in_non_test_class
     # Minitest invokes test methods with no arguments, so a `def test_*` that
     # declares a *required* parameter (e.g. the private helper
     # `test_lock_free(lock_name)`) can never be run as a test — skip it so it

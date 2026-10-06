@@ -4,6 +4,7 @@ import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
   Headers,
+  HTTP_STATUS_CODES,
   ResponseHelpers as RackResponseHelpers,
   setCookieHeader,
   statusCode,
@@ -209,6 +210,7 @@ export class Response {
   private _status: number;
   private _headers: Headers;
   private _committed = false;
+  private cv: Array<() => void> = [];
   private _sending = false;
   private _sent = false;
   stream: unknown = null;
@@ -240,7 +242,7 @@ export class Response {
   }
 
   get message(): string {
-    return STATUS_MESSAGES[this._status] || "";
+    return HTTP_STATUS_CODES[this._status];
   }
 
   get successful(): boolean {
@@ -479,6 +481,7 @@ export class Response {
     if (this._committed) return;
     this.beforeCommitted();
     this._committed = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sendingBang(): void {
@@ -499,7 +502,9 @@ export class Response {
     return this._sent;
   }
 
-  async awaitCommit(): Promise<void> {}
+  async awaitCommit(): Promise<void> {
+    while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
+  }
   async awaitSent(): Promise<void> {}
 
   get header(): Headers {
@@ -746,32 +751,3 @@ function rackCookieValue(value: string | Partial<CookieOptions>): Record<string,
     sameSite: opts.sameSite,
   };
 }
-
-const STATUS_MESSAGES: Record<number, string> = {
-  100: "Continue",
-  101: "Switching Protocols",
-  200: "OK",
-  201: "Created",
-  202: "Accepted",
-  204: "No Content",
-  301: "Moved Permanently",
-  302: "Found",
-  303: "See Other",
-  304: "Not Modified",
-  307: "Temporary Redirect",
-  308: "Permanent Redirect",
-  400: "Bad Request",
-  401: "Unauthorized",
-  403: "Forbidden",
-  404: "Not Found",
-  405: "Method Not Allowed",
-  406: "Not Acceptable",
-  409: "Conflict",
-  410: "Gone",
-  415: "Unsupported Media Type",
-  422: "Unprocessable Entity",
-  429: "Too Many Requests",
-  500: "Internal Server Error",
-  502: "Bad Gateway",
-  503: "Service Unavailable",
-};

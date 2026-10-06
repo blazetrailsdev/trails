@@ -80,6 +80,7 @@ import {
   viewPathsLocale,
   viewPathsSetFormats,
   viewPathsSetLocale,
+  viewPathsViewPaths,
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
@@ -88,7 +89,6 @@ import {
   _processFormat,
   buildViewContextClass,
   isInheritViewContextClass,
-  renderToBody as actionViewRenderToBody,
   viewContext,
   viewContextClass,
   viewRenderer,
@@ -156,13 +156,13 @@ import {
 } from "./metal/params-wrapper.js";
 import {
   _processOptions,
-  _renderInPriorities,
   _setHtmlContentType,
   _setRenderedContentType,
   _setVaryHeader,
   _processVariant,
   _normalizeOptions,
   processAction as _processAction,
+  Rendering,
   renderToString,
 } from "./metal/rendering.js";
 import { _renderToBodyWithRenderer } from "./metal/renderers.js";
@@ -190,7 +190,6 @@ import {
   DEFAULT_PROTECTED_INSTANCE_VARIABLES,
   DoubleRenderError,
   Rendering as AbstractControllerRendering,
-  render as abstractRender,
   viewAssigns,
   _normalizeRender,
 } from "../abstract-controller/rendering.js";
@@ -454,7 +453,9 @@ export class Base extends Metal {
     const viewRuntime = this.cleanupViewRuntime(() =>
       Benchmark.realtime(":float_millisecond", () => {
         if (this.responseBody != null) throw new DoubleRenderError();
-        return (renderOutput = abstractRender.call(this, ...args));
+        return (renderOutput = (
+          super["render" as never] as (...args: unknown[]) => void | Promise<void>
+        ).call(this, ...args));
       }),
     ) as number | Promise<number>;
     if (typeof viewRuntime === "number") {
@@ -477,6 +478,10 @@ export class Base extends Metal {
   }
 
   detailsForLookup = detailsForLookup;
+
+  get viewPaths(): PathSet {
+    return viewPathsViewPaths.call(this as never);
+  }
 
   get formats(): ReadonlyArray<string | symbol> {
     return viewPathsFormats.call(this as never);
@@ -509,18 +514,14 @@ export class Base extends Metal {
 
   /** @internal */
   renderToBody(options: Record<string, unknown> = {}): unknown {
-    const truthy = (v: unknown): boolean => v != null && v !== false;
     const renderer = this._renderToBodyWithRenderer(options);
-    if (truthy(renderer)) return renderer;
-    return actionViewRenderToBody
-      .call(this as never, options)
-      .then((body) => this.drainStreamingBody(body))
-      .then((body) => {
-        if (truthy(body)) return body;
-        const priority = _renderInPriorities(options);
-        if (truthy(priority)) return priority;
-        return " ";
-      });
+    if (renderer != null && renderer !== false) return renderer;
+    const body = (
+      super["renderToBody" as never] as (options: Record<string, unknown>) => unknown
+    ).call(this, options);
+    return typeof (body as PromiseLike<unknown> | null)?.then === "function"
+      ? Promise.resolve(body).then((body) => this.drainStreamingBody(body))
+      : body;
   }
 
   /**
@@ -790,6 +791,7 @@ export class Base extends Metal {
 include(Base, AbstractHelpers);
 include(Base, AbstractControllerRendering);
 include(Base, ActionViewRendering);
+include(Base, Rendering);
 include(Base, ConfigMethods);
 include(Base, AssetPaths);
 Base.prototype.helpers = helpers;
@@ -807,14 +809,7 @@ extend(Base, ParameterEncoding.ClassMethods);
 include(Base, Cookies);
 include(Base, Flash);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype._processOptions = _processOptions;
 Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype._processVariant = _processVariant;
-Base.prototype._normalizeOptions = _normalizeOptions;
-Base.prototype.renderToString = renderToString;
-Base.prototype._setHtmlContentType = _setHtmlContentType;
-Base.prototype._setRenderedContentType = _setRenderedContentType;
-Base.prototype._setVaryHeader = _setVaryHeader;
 Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;

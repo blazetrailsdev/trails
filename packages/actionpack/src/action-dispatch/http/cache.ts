@@ -1,5 +1,6 @@
+import { expandCacheKey } from "@blazetrails/activesupport/cache";
+import { Digest } from "@blazetrails/activesupport/digest";
 import { Time } from "@blazetrails/date";
-import { getCrypto } from "@blazetrails/ruby-compat";
 
 const HTTP_IF_MODIFIED_SINCE = "If-Modified-Since";
 const HTTP_IF_NONE_MATCH = "If-None-Match";
@@ -224,18 +225,7 @@ export function generateWeakEtag(validators: unknown): string {
 }
 /** @internal */
 export function generateStrongEtag(validators: unknown): string {
-  return `"${getCrypto().createHash("md5").update(expandCacheKey(validators)).digest("hex").slice(0, 32)}"`;
-}
-
-/** @internal */
-function expandCacheKey(key: unknown): string {
-  if (Array.isArray(key)) return key.map(expandCacheKey).join("/");
-  if (key == null) return "";
-  if (typeof key === "object") {
-    const obj = key as { cacheKey?: () => string };
-    if (typeof obj.cacheKey === "function") return obj.cacheKey();
-  }
-  return String(key);
+  return `"${Digest.hexdigest(expandCacheKey(validators))}"`;
 }
 
 /** @internal */

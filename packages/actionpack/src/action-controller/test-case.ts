@@ -45,7 +45,6 @@ import {
   Utils as RackTestUtils,
 } from "@blazetrails/rack-test";
 import { Mime } from "../action-dispatch/http/mime-type.js";
-import { Response } from "../action-dispatch/http/response.js";
 import { TestResponse } from "../action-dispatch/testing/test-response.js";
 import { Assertions } from "../action-dispatch/testing/assertions.js";
 import type { XmlDocument } from "@blazetrails/nokogiri";
@@ -60,7 +59,12 @@ import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import { TemplateAssertions } from "./template-assertions.js";
 import { Functional } from "./metal/testing.js";
-import { Buffer as LiveBuffer, Live, type LiveControllerHost } from "./metal/live.js";
+import {
+  Buffer as LiveBuffer,
+  Live,
+  type LiveControllerHost,
+  Response as LiveResponse,
+} from "./metal/live.js";
 
 include(Metal, Functional);
 
@@ -69,7 +73,7 @@ declare module "./metal.js" {
   interface Metal extends Included<typeof Functional> {}
 }
 
-export const originalNewControllerThread = Live.newControllerThread;
+Live.aliasMethod("originalNewControllerThread", "newControllerThread");
 
 export async function newControllerThread(
   this: LiveControllerHost,
@@ -78,12 +82,12 @@ export async function newControllerThread(
   await block();
 }
 
-export const originalCleanUpThreadLocals = Live.cleanUpThreadLocals;
+Live.aliasMethod("originalCleanUpThreadLocals", "cleanUpThreadLocals");
 
 export function cleanUpThreadLocals(this: LiveControllerHost, ..._args: unknown[]): void {}
 
-Live.newControllerThread = newControllerThread;
-Live.cleanUpThreadLocals = cleanUpThreadLocals;
+Live.defineMethod("newControllerThread", newControllerThread);
+Live.defineMethod("cleanUpThreadLocals", cleanUpThreadLocals);
 
 LiveBuffer.queueSize = null;
 
@@ -721,7 +725,7 @@ export class TestRequest extends AbstractTestRequest {
 
 rbModConstSet(ActionController, "TestRequest", TestRequest);
 
-export class LiveTestResponse extends Response {
+export class LiveTestResponse extends LiveResponse {
   get isSuccess(): boolean {
     return this.successful;
   }

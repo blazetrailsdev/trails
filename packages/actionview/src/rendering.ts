@@ -1,12 +1,19 @@
 /** @internal */
 
-import { isPlainObject, type SafeBuffer } from "@blazetrails/activesupport";
+import {
+  Concern,
+  extend,
+  isPlainObject,
+  type SafeBuffer,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
 import { DetailsKey, type LookupContext } from "./lookup-context.js";
 import { Renderer } from "./renderer.js";
 import { Template } from "./template.js";
+import { ViewPaths } from "./view-paths.js";
 
 export interface RenderOptions {
   template?: string;
@@ -227,17 +234,29 @@ export function _processRenderTemplateOptions(
   options: Record<string, unknown>,
 ): void {
   if (options["partial"] === true) {
-    options["partial"] = this.actionName;
+    options["partial"] = underscore(this.actionName);
   }
 
   if (!["partial", "file", "template"].some((k) => k in options)) {
     options["prefixes"] ??= this._prefixes();
   }
 
-  options["template"] ??= String(options["action"] ?? this.actionName);
+  options["template"] ??= underscore(String(options["action"] ?? this.actionName));
 }
 
+export const ClassMethods = {
+  isInheritViewContextClass,
+  buildViewContextClass,
+  viewContextClass,
+};
+
 export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(ViewPaths);
+
+  mod.defineMethod("viewContextClass", function (this: ViewContextHost) {
+    return this.constructor.viewContextClass();
+  });
   mod.defineMethod("viewContext", viewContext);
   mod.defineMethod("viewRenderer", viewRenderer);
   mod.defineMethod("renderToBody", renderToBody);
@@ -245,4 +264,5 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_processFormat", _processFormat);
   mod.defineMethod("_normalizeArgs", _normalizeArgs);
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
-});
+}) as Module & { ClassMethods: typeof ClassMethods };
+Rendering.ClassMethods = ClassMethods;
