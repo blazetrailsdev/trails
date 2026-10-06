@@ -139,6 +139,12 @@ describe("Thor", () => {
       expect(child.map()["-v"]).toBe("version");
       expect(parent.map()["-v"]).toBeUndefined();
     });
+
+    it("maps each subkey of a Set key", () => {
+      const klass = thor((k) => k.map(new Map([[new Set(["-a", "-b"]), "zoo"]])));
+      expect(klass.map()["-a"]).toBe("zoo");
+      expect(klass.map()["-b"]).toBe("zoo");
+    });
   });
 
   describe(".map with mappings and keywords", () => {

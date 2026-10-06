@@ -15,9 +15,11 @@ import {
   puts,
   Range,
   rbCmpint,
+  rbFArray,
   rbFCaller,
   rbInspect,
   rbObjAsString,
+  rbObjRespondTo,
   rbSetClassPathString,
   rtest,
   sort,
@@ -38,7 +40,7 @@ import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
 
-type Mappings = Record<string, string> | Map<string | string[], string>;
+type Mappings = Record<string, string> | Map<string | Iterable<string>, string>;
 
 type DescOptions = { for?: string; hide?: unknown };
 
@@ -176,11 +178,11 @@ export class Thor {
       mappings ||= kw;
     }
     if (rtest(mappings)) {
-      eachPair(mappings as Map<string, string>, (key: string | string[], value) => {
-        if (Array.isArray(key)) {
-          key.forEach((subkey) => (this._map![subkey] = value));
+      eachPair(mappings as Map<string, string>, (key: string | Iterable<string>, value) => {
+        if (rbObjRespondTo(key, "each")) {
+          for (const subkey of key as Iterable<string>) this._map![subkey] = value;
         } else {
-          this._map![key] = value;
+          this._map![key as string] = value;
         }
       });
     }
@@ -342,9 +344,7 @@ export class Thor {
     }
     eachPair(options, (key, value) => {
       if (rtest(value)) {
-        (this._checkUnknownOptions as CheckUnknownOptions)[key] = Array.isArray(value)
-          ? value
-          : [value];
+        (this._checkUnknownOptions as CheckUnknownOptions)[key] = rbFArray(value);
       } else {
         hashDelete(this._checkUnknownOptions as CheckUnknownOptions, key);
       }

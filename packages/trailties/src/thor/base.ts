@@ -18,7 +18,6 @@ import {
   merge,
   max,
   mergeBang,
-  NoMethodError,
   NotImplementedError,
   rbArgv,
   rbFSend,
@@ -27,7 +26,6 @@ import {
   rbModAttrWriter,
   rbModName,
   rbModPublicMethodDefined,
-  rbModToS,
   rbObjAsString,
   rbObjClone,
   rbObjDup,
@@ -551,14 +549,9 @@ export const ClassMethods = {
       const prototype = this.prototype;
       Object.defineProperty(this.prototype, name, {
         value: function (this: object, ...args: unknown[]) {
-          const superMethod = (Object.getPrototypeOf(prototype) as Record<string, unknown>)[name];
-          if (typeof superMethod !== "function") {
-            throw new NoMethodError(
-              `super: no superclass method '${name}' for an instance of ${rbModToS(prototype.constructor as never)}`,
-              name,
-            );
-          }
-          return superMethod.apply(this, args);
+          return (
+            Object.getPrototypeOf(prototype) as Record<string, (...args: unknown[]) => unknown>
+          )[name].apply(this, args);
         },
         writable: true,
         configurable: true,
