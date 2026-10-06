@@ -229,7 +229,28 @@ describe("intXor", () => {
     expect(intXor(2 ** 40, 1)).toBe(2 ** 40 + 1);
   });
 
-  it("raises TypeError for an operand that is not an Integer", () => {
+  it("raises TypeError naming an operand that cannot be coerced", () => {
     expect(() => intXor(1, null)).toThrow(new TypeError("nil can't be coerced into Integer"));
+    expect(() => intXor(1, true)).toThrow(new TypeError("true can't be coerced into Integer"));
+    expect(() => intXor(1, 1.5)).toThrow(new TypeError("1.5 can't be coerced into Integer"));
+    expect(() => intXor(1, "a")).toThrow(new TypeError("String can't be coerced into Integer"));
+    expect(() => intXor(1, {})).toThrow(new TypeError("Hash can't be coerced into Integer"));
+  });
+
+  it("XORs the pair an operand's coerce answers", () => {
+    expect(intXor(3, { coerce: (x: unknown) => [x, 6] })).toBe(5);
+  });
+
+  it("raises when coerce answers a pair whose first member has no ^, or no pair", () => {
+    class Operand {
+      constructor(private readonly ary: unknown) {}
+      coerce(): unknown {
+        return this.ary;
+      }
+    }
+    expect(() => intXor(3, new Operand([1.5, 2]))).toThrow(
+      new TypeError("Operand can't be coerced into Integer"),
+    );
+    expect(() => intXor(3, new Operand(5))).toThrow(new TypeError("coerce must return [x, y]"));
   });
 });

@@ -2,7 +2,7 @@ import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NilClass } from "./nil-class.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbBuiltinClassName, rbObjClassname } from "./object.js";
+import { rbBuiltinClassName, rbInspect, rbObjClassname } from "./object.js";
 import { Rational, ZeroDivisionError } from "./rational.js";
 import { TypeError } from "./type-error.js";
 import { rbStrToF, rbStrToI } from "./string/convert.js";
@@ -452,11 +452,49 @@ export function numericPlus(x: unknown, y: unknown): unknown {
 }
 
 /**
+ * `coerce_failed` (`vendor/ruby/v3.3.11/numeric.c:442`): names a special
+ * constant, Symbol or Float by its `inspect`, and anything else by its class.
+ */
+function coerceFailed(x: unknown, y: unknown): never {
+  let desc: string;
+  if (
+    y == null ||
+    typeof y === "boolean" ||
+    typeof y === "number" ||
+    isSymbol(y) ||
+    rbFloatTypeP(y)
+  ) {
+    desc = rbInspect(y);
+  } else {
+    desc = rbObjClassname(y);
+  }
+  throw new TypeError(`${desc} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/**
+ * `do_coerce` with `err` set (`vendor/ruby/v3.3.11/numeric.c:455`): sends
+ * `y.coerce(x)` and answers the pair, raising when `y` has no `coerce` or it
+ * answers anything but a two-element Array.
+ */
+function doCoerce(x: unknown, y: unknown): [unknown, unknown] {
+  const coerce = (y as { coerce?: unknown } | null)?.coerce;
+  if (typeof coerce !== "function") {
+    coerceFailed(x, y);
+  }
+  const ary = coerce.call(y, x) as unknown;
+  if (!Array.isArray(ary) || ary.length !== 2) {
+    throw new TypeError("coerce must return [x, y]");
+  }
+  return [ary[0], ary[1]];
+}
+
+/**
  * Ruby `Integer#^` (`vendor/ruby/v3.3.11/numeric.c:5055` `int_xor`, over
  * `fix_xor`, `numeric.c:5025`, and `rb_big_xor`): the bitwise exclusive OR of
- * two Integers. An operand that is not an Integer and cannot be coerced to
- * one raises `TypeError` (`rb_num_coerce_bit`, `numeric.c:4923`), which is
- * what `1 ^ nil` raises.
+ * two Integers. Any other operand goes through `rb_num_coerce_bit`
+ * (`numeric.c:4923`): `y.coerce(x)` supplies the pair that is XORed, and an
+ * operand with no `coerce`, or a pair whose first member has no `^`, raises
+ * `TypeError` naming the original operands, which is what `1 ^ nil` raises.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -467,7 +505,11 @@ export function intXor(x: unknown, y: unknown): number | bigint {
     }
     return rbBigNorm(BigInt(x) ^ BigInt(y));
   }
-  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+  const args = doCoerce(x, y);
+  if (!rbIntegerTypeP(args[0])) {
+    coerceFailed(x, y);
+  }
+  return intXor(args[0], args[1]);
 }
 
 /**
