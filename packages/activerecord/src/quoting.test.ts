@@ -114,7 +114,7 @@ describe("QuotingTest", () => {
 
   it("quote(new Date()) throws with Temporal guidance", () => {
     expect(() => quote(new Date())).toThrow(TypeError);
-    expect(() => quote(new Date())).toThrow("can't quote Time");
+    expect(() => quote(new Date())).toThrow(/Temporal/);
   });
 
   it("quote column name", () => {

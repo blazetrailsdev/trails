@@ -1,6 +1,7 @@
 import { quotingHost } from "./support/quoting-host.js";
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/date";
+import { TypeError } from "@blazetrails/ruby-compat";
 import {
   quote as quoteFn,
   quoteDefaultExpression as quoteDefaultExpressionFn,

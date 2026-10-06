@@ -62,7 +62,9 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
   }
   if (typeof value === "symbol") {
-    return `'${this.quoteString(value.description ?? String(value))}'`;
+    const desc = value.description;
+    if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
+    return `'${this.quoteString(desc)}'`;
   }
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
@@ -86,6 +88,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   ) {
     return `'${this.quotedDate(value)}'`;
   }
+  if (value instanceof Date)
+    throw new TypeError(
+      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   if (typeof value === "function" && value.name) {
     return `'${value.name}'`;
   }
@@ -114,6 +120,10 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   ) {
     return this.quotedDate(value);
   }
+  if (value instanceof Date)
+    throw new TypeError(
+      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
   throw new TypeError(`can't cast ${rbObjClassname(value)}`);
 }
 
