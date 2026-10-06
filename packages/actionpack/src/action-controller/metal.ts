@@ -243,8 +243,8 @@ export class Metal extends AbstractController {
     return (this.constructor as typeof Metal).controllerName();
   }
 
-  urlFor(string: string): string {
-    return string;
+  urlFor(string: unknown): string {
+    return string as string;
   }
 
   async dispatch(name: string, request: Request, response: Response): Promise<RackResponse> {
@@ -330,7 +330,7 @@ export class Metal extends AbstractController {
     }
     this.status = resolvedStatus;
     if (location != null && location !== false) {
-      this.location = this.urlFor(location as string);
+      this.location = this.urlFor(location);
     }
     if (includeContent(this.status)) {
       if (!this.mediaType) {
