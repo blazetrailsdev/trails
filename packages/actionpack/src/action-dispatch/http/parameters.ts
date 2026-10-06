@@ -1,5 +1,5 @@
 import { Logger } from "@blazetrails/activesupport";
-import { stderr } from "@blazetrails/ruby-compat";
+import { Exception, StandardError, stderr } from "@blazetrails/ruby-compat";
 import {
   ParameterTypeError as RackParameterTypeError,
   InvalidParameterError as RackInvalidParameterError,
@@ -115,6 +115,7 @@ export function parseFormattedParameters(
   try {
     return strategy(this.rawPost);
   } catch (e) {
+    if (e instanceof Exception && !(e instanceof StandardError)) throw e;
     if (e instanceof ParseError) throw e;
     if (
       e instanceof RackParameterTypeError ||

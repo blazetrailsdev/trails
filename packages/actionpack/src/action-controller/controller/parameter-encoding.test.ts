@@ -17,7 +17,7 @@ class ParameterEncodingController extends Base {
   }
 
   static {
-    this.paramEncoding("testParamEncoding", "baz", Encoding.find("Shift_JIS")!);
+    this.paramEncoding("testParamEncoding", "baz", Encoding.SHIFT_JIS);
   }
   async testParamEncoding(): Promise<void> {
     await this.render({
