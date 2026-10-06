@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   FrozenError,
+  Hash,
   Method,
   Module,
   RangeError,
@@ -11,6 +12,8 @@ import {
   rbModAncestors,
   rbModConstSet,
   rbObjClass,
+  rbObjClassname,
+  rbObjIsKindOf,
   rbObjMethod,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
@@ -233,10 +236,12 @@ export class Factory {
     extModule: unknown,
     options: RegisterTypeOptions | null,
   ): null {
+    if (!Number.isInteger(extType)) {
+      throw new TypeError(`wrong argument type ${rbObjClassname(extType)} (expected Integer)`);
+    }
+
     if (typeof extModule !== "function" && !(extModule instanceof Module)) {
-      throw new ArgumentError(
-        `expected Module/Class but found ${(rbObjClass(extModule) as { name: string }).name}.`,
-      );
+      throw new ArgumentError(`expected Module/Class but found ${rbObjClassname(extModule)}.`);
     }
 
     let flags = 0;
@@ -244,6 +249,9 @@ export class Factory {
     let packerProc: PackerProc | null = null;
     let unpackerProc: UnpackerProc | null = null;
     if (options != null) {
+      if (!rbObjIsKindOf(options, Hash)) {
+        throw new TypeError(`wrong argument type ${rbObjClassname(options)} (expected Hash)`);
+      }
       packerProc = (options.packer as PackerProc | undefined) ?? null;
       unpackerProc = (options.unpacker as UnpackerProc | undefined) ?? null;
     }

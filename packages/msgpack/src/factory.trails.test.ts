@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FrozenError, TypeError } from "@blazetrails/ruby-compat";
+import { FrozenError, NameError, TypeError } from "@blazetrails/ruby-compat";
 import { Factory } from "./index.js";
 
 class MyType {
@@ -35,6 +35,23 @@ describe("MessagePack::Factory", () => {
     );
     expect(() => factory.registerType(0x00, MyType, { unpacker: 1 })).toThrow(
       new TypeError("expected :unpacker argument to be a callable object, got: 1"),
+    );
+  });
+
+  it("register_type takes the gem's respond_to?(:call) arms only for a boolean", () => {
+    const factory = new Factory();
+    expect(() => factory.registerType(0x00, MyType, { packer: false })).toThrow(NameError);
+    expect(() => factory.registerType(0x00, MyType, { packer: () => "", unpacker: true })).toThrow(
+      NameError,
+    );
+    expect(() => factory.registerType(0x00, MyType, { unpacker: false })).toThrow(NameError);
+    expect(factory.registeredTypes()).toEqual([]);
+  });
+
+  it("register_type raises TypeError for a type id that is not an Integer", () => {
+    const factory = new Factory();
+    expect(() => factory.registerType(1.5, MyType)).toThrow(
+      new TypeError("wrong argument type Float (expected Integer)"),
     );
   });
 
