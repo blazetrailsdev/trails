@@ -46,7 +46,7 @@ export function head(
   if (location != null && location !== false) this.location = this.urlFor(location);
 
   if (this.includeContent(this.responseCode)) {
-    if (!this.mediaType) {
+    if (this.mediaType == null) {
       let f: ReadonlyArray<string> | undefined;
       this.contentType = String(
         (contentType != null && contentType !== false ? contentType : null) ??
