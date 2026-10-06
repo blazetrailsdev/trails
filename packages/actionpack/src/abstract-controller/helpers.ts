@@ -1,4 +1,5 @@
 import {
+  callerLocations,
   camelize,
   classAttribute,
   Concern,
@@ -96,30 +97,38 @@ export async function helperModulesFromPaths(
 
 export const Resolution = { modulesForHelpers, allHelpersFromPath, helperModulesFromPaths };
 
-/** @inventedArm if — PERMANENT */
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm getScriptNameOrSourceURL — PERMANENT
+ * @inventedArm getLineNumber — PERMANENT
+ */
 export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameList[]): void {
   const flat = (methods as readonly unknown[]).flat(Infinity) as string[];
   this._helperMethods = [...this._helperMethods, ...flat];
+
+  const location = callerLocations(1, 1)[0];
+  const [file, line] = [
+    location?.callSite?.getScriptNameOrSourceURL(),
+    location?.callSite?.getLineNumber() ?? 1,
+  ];
 
   for (const method of flat) {
     const attr = /^[A-Za-z_]\w*=$/.test(method) ? method.slice(0, -1) : method;
     const writer = this._helperMethods.includes(`${attr}=`);
     this._helpersForModification().moduleEval((mod) => {
-      Object.defineProperty(mod, attr, {
-        get(this: { controller: Record<string, unknown> }) {
-          const controller = this.controller;
-          if (attr in controller && typeof controller[attr] !== "function") {
-            return rbFSend(controller, attr);
-          }
-          return (...args: unknown[]) => rbFSend(controller, attr, ...args);
-        },
-        set: writer
-          ? function (this: { controller: object }, value: unknown) {
-              rbFSend(this.controller, `${attr}=`, value);
-            }
-          : undefined,
-        configurable: true,
-      });
+      Object.defineProperty(
+        mod,
+        attr,
+        (0, eval)(
+          `${"\n".repeat(line - 1)}(function (rbFSend, attr, writer) { return { ` +
+            `get() { const controller = this.controller; ` +
+            `if (attr in controller && typeof controller[attr] !== "function") return rbFSend(controller, attr); ` +
+            `return (...args) => rbFSend(controller, attr, ...args); }, ` +
+            `set: writer ? function (value) { rbFSend(this.controller, attr + "=", value); } : undefined, ` +
+            `configurable: true }; })` +
+            (file ? `\n//# sourceURL=${file.replace(/[\r\n\u2028\u2029]/g, "")}` : ""),
+        )(rbFSend, attr, writer),
+      );
     });
   }
 }

@@ -489,10 +489,12 @@ export class Response {
     if (this._sending) return;
     this.beforeSending();
     this._sending = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   sentBang(): void {
     this._sent = true;
+    for (const broadcast of this.cv.splice(0)) broadcast();
   }
 
   get isSending(): boolean {
@@ -506,7 +508,10 @@ export class Response {
   async awaitCommit(): Promise<void> {
     while (!this._committed) await new Promise<void>((broadcast) => this.cv.push(broadcast));
   }
-  async awaitSent(): Promise<void> {}
+
+  async awaitSent(): Promise<void> {
+    while (!this._sent) await new Promise<void>((broadcast) => this.cv.push(broadcast));
+  }
 
   get header(): Headers {
     return this._headers;

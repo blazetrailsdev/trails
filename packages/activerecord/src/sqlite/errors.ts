@@ -190,6 +190,8 @@ export function status2klass(status: number): typeof Exception | null {
   }
 }
 
+const MISSING_DIRECTORY = "Cannot open database because the directory does not exist";
+
 /** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 function nativeStatus(error: unknown): number | null {
   const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
@@ -203,7 +205,20 @@ function nativeStatus(error: unknown): number | null {
     if (errorCode == null) return null;
     return (/^\d+$/.test(errorCode) ? Number(errorCode) : errorCode.charCodeAt(0)) & 0xff;
   }
+  if (error instanceof TypeError && message === MISSING_DIRECTORY) return ErrorCode.CANTOPEN;
   return null;
+}
+
+/** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
+function sqlite3Errmsg(error: unknown): string {
+  const { code, message } = error as { code?: unknown; message: string };
+  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
+    return message.replace(/^[^]*?Error code (?:\d+|[^]): /, "");
+  }
+  if (error instanceof TypeError && message === MISSING_DIRECTORY) {
+    return "unable to open database file";
+  }
+  return message;
 }
 
 /** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
@@ -212,7 +227,7 @@ export function rbSqlite3Raise(error: unknown): never {
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass((error as Error).message);
+  const exception = new klass(sqlite3Errmsg(error));
   exception.code = status;
   exception.cause = error;
 
@@ -225,7 +240,7 @@ export function rbSqlite3RaiseWithSql(error: unknown, sql: string | null): never
   const klass = status == null ? null : status2klass(status);
   if (klass == null) throw error;
 
-  const exception = new klass((error as Error).message);
+  const exception = new klass(sqlite3Errmsg(error));
   exception.code = status;
   exception.cause = error;
   if (sql != null) {

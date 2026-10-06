@@ -254,6 +254,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
     );
     expect(error).toBeInstanceOf(errors.ReadOnlyException);
     expect((error as InstanceType<typeof errors.ReadOnlyException>).code).toBe(8);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
     expect((error as Error).cause).toBe(native);
   });
 
@@ -262,7 +263,12 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       readonly("Error code \b: attempt to write a readonly database"),
     );
     const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
-    await expect(stmt.run()).rejects.toBeInstanceOf(errors.ReadOnlyException);
+    const error = await Promise.resolve(stmt.run()).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
   });
 
   it("every statement read path raises the gem class", async () => {

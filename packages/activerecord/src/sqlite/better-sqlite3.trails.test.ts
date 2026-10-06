@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { type ColumnInfo, type SqliteConnection, SQLite3Constants } from "../sqlite-adapter.js";
 import { File, getOs } from "@blazetrails/ruby-compat";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
+import { CantOpenException } from "./errors.js";
 
 describe("SqliteDriver — better-sqlite3 round-trip", () => {
   let driver: SqliteConnection;
@@ -298,5 +299,35 @@ describe("SqliteDriver — better-sqlite3 strict", () => {
     } finally {
       await conn.close();
     }
+  });
+});
+
+describe("SqliteDriver — better-sqlite3 open under a missing directory", () => {
+  const database = "/nonexistent-trails-dir/a.sqlite3";
+  const expectCantOpen = (error: unknown) => {
+    expect(error).toBeInstanceOf(CantOpenException);
+    expect((error as CantOpenException).code).toBe(14);
+    expect((error as Error).message).toBe("unable to open database file");
+    expect((error as Error).cause).toBeInstanceOf(TypeError);
+  };
+
+  it("open raises SQLite3::CantOpenException", async () => {
+    const error = await Promise.resolve()
+      .then(() => betterSqlite3Driver.open({ database }))
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expectCantOpen(error);
+  });
+
+  it("openSync raises SQLite3::CantOpenException", () => {
+    let error: unknown = null;
+    try {
+      betterSqlite3Driver.openSync!({ database });
+    } catch (e) {
+      error = e;
+    }
+    expectCantOpen(error);
   });
 });

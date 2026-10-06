@@ -64,6 +64,12 @@ export class Thread<R = unknown> {
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#name` (`vendor/ruby/v3.3.11/thread.c:3396`).
    */
   name: string | null = null;
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#abort_on_exception=` (`vendor/ruby/v3.3.11/thread.c:3069`):
+   * an exception the thread dies of is re-raised in the main thread, which in JS
+   * is a throw outside every promise chain.
+   */
+  abortOnException = false;
   #value!: R;
   #error: { raised: unknown } | null = null;
 
@@ -81,15 +87,25 @@ export class Thread<R = unknown> {
     } catch (error) {
       this.#error = { raised: error };
       this.status = "dead";
+      if (this.abortOnException) this.#abort(error);
       return;
     }
     const value = this.#value as unknown;
     if (value && typeof (value as PromiseLike<unknown>).then === "function") {
       const die = () => void (this.status = "dead");
-      (value as PromiseLike<unknown>).then(die, die);
+      (value as PromiseLike<unknown>).then(die, (error) => {
+        die();
+        if (this.abortOnException) this.#abort(error);
+      });
     } else {
       this.status = "dead";
     }
+  }
+
+  #abort(error: unknown): void {
+    queueMicrotask(() => {
+      throw error;
+    });
   }
 
   /**
@@ -156,6 +172,13 @@ export class Thread<R = unknown> {
     if (!locals) _locals.set(this, (locals = new Map()));
     locals.set(id, value);
     return value;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#keys` (`vendor/ruby/v3.3.11/thread.c:3810`).
+   */
+  keys(): string[] {
+    return [...(_locals.get(this)?.keys() ?? [])];
   }
 
   /**

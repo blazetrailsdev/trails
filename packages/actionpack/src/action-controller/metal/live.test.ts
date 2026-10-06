@@ -13,8 +13,9 @@ import {
   sendStream,
   type LiveControllerHost,
 } from "./live.js";
-import { IOError, RuntimeError, SizedQueue, ThreadError } from "@blazetrails/ruby-compat";
+import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/ruby-compat/include";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { Request } from "../../action-dispatch/http/request.js";
 
 function makeResponse() {
@@ -291,6 +292,17 @@ describe("ActionController::Live::Response", () => {
     expect(res.committed).toBe(true);
     expect(res.cookies).toEqual({ hello: "world" });
   });
+
+  it("await_sent waits on sent!'s broadcast", async () => {
+    const res = makeResponse();
+    let sent = false;
+    const waiting = res.awaitSent().then(() => (sent = true));
+    await Promise.resolve();
+    expect(sent).toBe(false);
+    res.sentBang();
+    await waiting;
+    expect(sent).toBe(true);
+  });
 });
 
 function makeHost() {
@@ -350,6 +362,31 @@ describe("ActionController::Live#process", () => {
     };
     await host.process("show");
     expect(fired).toHaveBeenCalledOnce();
+  });
+
+  it("copies the thread locals and execution state onto the controller thread, then clears them", async () => {
+    await new Thread(async () => {
+      const t1 = Thread.current();
+      t1.set("live_local", "copied");
+      IsolatedExecutionState.set("live_state", "shared");
+
+      const host = new LiveHost();
+      let t2!: Thread;
+      const seen: unknown[] = [];
+      host.action = () => {
+        t2 = Thread.current();
+        seen.push(t2.get("live_local"), IsolatedExecutionState.get("live_state"));
+        IsolatedExecutionState.set("live_state", "child");
+      };
+      await host.process("show");
+
+      expect(t2).not.toBe(t1);
+      expect(seen).toEqual(["copied", "shared"]);
+      expect(t2.keys()).toEqual([]);
+      expect(t2.activeSupportExecutionState()!.size).toBe(0);
+      expect(t1.get("live_local")).toBe("copied");
+      expect(IsolatedExecutionState.get("live_state")).toBe("shared");
+    }).join();
   });
 
   it("dispatches new_controller_thread on the receiver", async () => {
@@ -418,8 +455,22 @@ describe("ActionController::Live private helpers", () => {
     expect(order).toEqual(["after-call", "inside"]);
   });
 
-  it("cleanUpThreadLocals is a no-op; originals are reference-equal; pool is a singleton", () => {
-    expect(() => cleanUpThreadLocals.call(makeHost(), [], null)).not.toThrow();
+  it("newControllerThread runs the block on a thread of its own, aborting on exception", async () => {
+    let t2: Thread | undefined;
+    await newControllerThread.call(makeHost(), () => {
+      t2 = Thread.current();
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(t2).not.toBe(Thread.current());
+    expect(t2!.abortOnException).toBe(true);
+  });
+
+  it("cleanUpThreadLocals clears the copied locals; pool is a singleton", () => {
+    const thread = new Thread(() => null);
+    thread.set("copied", 1);
+    thread.set("kept", 2);
+    cleanUpThreadLocals.call(makeHost(), [["copied", 1]], thread);
+    expect(thread.keys()).toEqual(["kept"]);
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 
