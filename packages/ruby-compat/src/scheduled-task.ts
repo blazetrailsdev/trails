@@ -1,26 +1,29 @@
 import { ArgumentError } from "./argument-error.js";
 
-type Executor<A extends unknown[]> = {
-  post(...argsAndTask: [...args: A, task: (...args: A) => unknown]): unknown;
-  scheduledTasks?: Set<{ cancel(): boolean }>;
-};
+type Executor = { post(task: () => unknown): unknown };
+
+const MAX_TIMEOUT = 2 ** 31 - 1;
 
 /**
- * @noRailsEquivalent PERMANENT — concurrent-ruby `Concurrent::ScheduledTask`
- * (`vendor/ruby/v3.3.11/thread.c:1404`).
+ * @noRailsEquivalent PERMANENT — concurrent-ruby 1.3.6 `Concurrent::ScheduledTask`
+ * (`concurrent/scheduled_task.rb:158-330`, not vendored) over `TimerSet#ns_post_task` /
+ * `#process_tasks` (`concurrent/executor/timer_set.rb:95-107,146-180`), whose timer thread
+ * waits through `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`). The wait here is
+ * an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling.
  */
 export class ScheduledTask<A extends unknown[] = unknown[]> {
   private state: "unscheduled" | "pending" | "processing" | "cancelled" = "unscheduled";
   private readonly args: A;
-  private readonly delay: number;
+  private delay: number;
   private readonly task: (...args: A) => unknown;
-  private readonly executor: Executor<A>;
+  private time: number | null = null;
+  private readonly executor: Executor;
   private timer: ReturnType<typeof setTimeout> | undefined;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
     delay: number,
-    opts: { args?: A; executor: Executor<A> },
+    opts: { args?: A; executor: Executor },
     task: (...args: A) => unknown,
   ) {
     if (typeof task !== "function") throw new ArgumentError("no block given");
@@ -34,22 +37,10 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
   /** @noRailsEquivalent PERMANENT */
   static execute<A extends unknown[]>(
     delay: number,
-    opts: { args?: A; executor: Executor<A> },
+    opts: { args?: A; executor: Executor },
     task: (...args: A) => unknown,
   ): ScheduledTask<A> {
     return new ScheduledTask(delay, opts, task).execute();
-  }
-
-  /** @noRailsEquivalent PERMANENT */
-  execute(): this {
-    if (this.state === "unscheduled") {
-      this.state = "pending";
-      const timer: unknown = setTimeout(() => this.processTask(), this.delay * 1000);
-      this.timer = timer as ReturnType<typeof setTimeout>;
-      (timer as { unref?: () => unknown }).unref?.();
-      this.executor.scheduledTasks?.add(this);
-    }
-    return this;
   }
 
   /** @noRailsEquivalent PERMANENT */
@@ -57,16 +48,48 @@ export class ScheduledTask<A extends unknown[] = unknown[]> {
     if (this.state === "pending" || this.state === "unscheduled") {
       this.state = "cancelled";
       clearTimeout(this.timer);
-      this.executor.scheduledTasks?.delete(this);
       return true;
     } else {
       return false;
     }
   }
 
-  private processTask(): void {
-    this.state = "processing";
-    this.executor.scheduledTasks?.delete(this);
-    this.executor.post(...this.args, this.task);
+  /** @noRailsEquivalent PERMANENT */
+  execute(): this {
+    if (this.state === "unscheduled") {
+      this.state = "pending";
+      this.nsSchedule(this.delay);
+    }
+    return this;
+  }
+
+  private processTask(): unknown {
+    return this.task(...this.args);
+  }
+
+  private nsSchedule(delay: number): void {
+    this.delay = delay;
+    this.time = performance.now() / 1000 + this.delay;
+    if (this.delay <= 0.01) {
+      this.state = "processing";
+      this.executor.post(() => this.processTask());
+    } else {
+      this.processTasks();
+    }
+  }
+
+  private processTasks(): void {
+    const diff = this.time! - performance.now() / 1000;
+    if (diff <= 0) {
+      this.state = "processing";
+      this.executor.post(() => this.processTask());
+    } else {
+      const timer: unknown = setTimeout(
+        () => this.processTasks(),
+        Math.min(diff * 1000, MAX_TIMEOUT),
+      );
+      this.timer = timer as ReturnType<typeof setTimeout>;
+      (timer as { unref?: () => unknown }).unref?.();
+    }
   }
 }

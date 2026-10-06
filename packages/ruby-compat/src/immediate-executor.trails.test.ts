@@ -23,6 +23,14 @@ describe("ImmediateExecutor", () => {
     expect(finished).toBe(true);
   });
 
+  it("refuses a post once shut down", () => {
+    const executor = new ImmediateExecutor();
+    let ran = false;
+    expect(executor.shutdown()).toBe(true);
+    expect(executor.post(() => void (ran = true))).toBe(false);
+    expect(ran).toBe(false);
+  });
+
   it("raises without a block", () => {
     const post = new ImmediateExecutor().post as (...args: unknown[]) => unknown;
     expect(() => post(1)).toThrow(ArgumentError);

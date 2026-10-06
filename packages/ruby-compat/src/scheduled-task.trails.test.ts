@@ -29,18 +29,31 @@ describe("ScheduledTask", () => {
     expect(performed).toEqual(["job"]);
   });
 
-  it("never runs once the executor it was scheduled on is shut down", async () => {
+  it("runs on the caller when its caller_runs pool was shut down before it fired", async () => {
     const executor = pool();
     let ran = false;
-    const scheduled = ScheduledTask.execute(0.05, { executor }, () => {
-      ran = true;
-    });
-    expect(executor.scheduledTasks.size).toBe(1);
+    ScheduledTask.execute(0.03, { executor }, () => void (ran = true));
     executor.shutdown();
-    expect(executor.scheduledTasks.size).toBe(0);
-    await sleep(80);
+    await sleep(60);
+    expect(ran).toBe(true);
+  });
+
+  it("posts at once when the delay is at most 0.01", () => {
+    let ran = false;
+    ScheduledTask.execute(0.01, { executor: new ImmediateExecutor() }, () => void (ran = true));
+    expect(ran).toBe(true);
+  });
+
+  it("re-arms a delay past setTimeout's 2^31-1 ms ceiling instead of firing", async () => {
+    let ran = false;
+    const scheduled = ScheduledTask.execute(
+      30 * 86400,
+      { executor: new ImmediateExecutor() },
+      () => void (ran = true),
+    );
+    await sleep(20);
     expect(ran).toBe(false);
-    expect(scheduled.cancel()).toBe(false);
+    expect(scheduled.cancel()).toBe(true);
   });
 
   it("cancels a pending task, and not one that has run", async () => {
@@ -62,16 +75,24 @@ describe("ScheduledTask", () => {
 });
 
 describe("ThreadPoolExecutor", () => {
-  it("posts a task with its arguments and waits for termination", async () => {
+  it("posts a task with its arguments and terminates once shut down and drained", async () => {
     const executor = pool();
     const performed: string[] = [];
     executor.post("a", async (name: string) => {
-      await sleep(10);
+      await sleep(20);
       performed.push(name);
     });
+    expect(await executor.waitForTermination(0.005)).toBe(false);
     executor.shutdown();
     expect(await executor.waitForTermination()).toBe(true);
     expect(performed).toEqual(["a"]);
+    executor.post("b", (name: string) => void performed.push(name));
+    expect(performed).toEqual(["a", "b"]);
     expect(await executor.waitForTermination()).toBe(true);
+  });
+
+  it("raises without a block", () => {
+    const post = pool().post as (...args: unknown[]) => unknown;
+    expect(() => post.call(pool(), 1)).toThrow(new ArgumentError("no block given"));
   });
 });

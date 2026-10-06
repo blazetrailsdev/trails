@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Thread } from "./thread.js";
 
 /**
@@ -18,9 +19,8 @@ export class ThreadPoolExecutor {
   private readonly fallbackPolicy: "caller_runs";
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
-  private readonly _terminated: (() => void)[] = [];
-  /** @noRailsEquivalent PERMANENT */
-  readonly scheduledTasks = new Set<{ cancel(): boolean }>();
+  private _stopped = false;
+  private readonly _stoppedEvent: (() => void)[] = [];
 
   /** @noRailsEquivalent PERMANENT */
   constructor({
@@ -43,9 +43,12 @@ export class ThreadPoolExecutor {
   /** @noRailsEquivalent PERMANENT */
   post<A extends unknown[]>(...argsAndTask: [...args: A, task: (...args: A) => unknown]): void {
     const args = argsAndTask.slice(0, -1) as A;
-    const block = argsAndTask[argsAndTask.length - 1] as (...args: A) => unknown;
+    const block = argsAndTask[argsAndTask.length - 1] as ((...args: A) => unknown) | undefined;
+    if (typeof block !== "function") throw new ArgumentError("no block given");
     const task = () => block(...args);
-    if (this._running < this.maxThreads) {
+    if (!this.isRunning()) {
+      task();
+    } else if (this._running < this.maxThreads) {
       this._running += 1;
       queueMicrotask(() => this._runWorker(task));
     } else if (this.maxQueue === 0 || this._queue.length < this.maxQueue) {
@@ -55,15 +58,40 @@ export class ThreadPoolExecutor {
     }
   }
 
-  /** @noRailsEquivalent PERMANENT */
-  shutdown(): void {
-    for (const scheduledTask of [...this.scheduledTasks]) scheduledTask.cancel();
+  private isRunning(): boolean {
+    return !this._stopped;
   }
 
   /** @noRailsEquivalent PERMANENT */
-  waitForTermination(): Promise<boolean> {
-    if (this._running === 0) return Promise.resolve(true);
-    return new Promise((resolve) => this._terminated.push(() => resolve(true)));
+  shutdown(): true {
+    if (this.isRunning()) {
+      this._stopped = true;
+      if (this._running === 0) this._setStoppedEvent();
+    }
+    return true;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  waitForTermination(timeout: number | null = null): Promise<boolean> {
+    if (this._stopped && this._running === 0) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const set = () => {
+        clearTimeout(timer);
+        resolve(true);
+      };
+      this._stoppedEvent.push(set);
+      if (timeout != null) {
+        timer = setTimeout(() => {
+          this._stoppedEvent.splice(this._stoppedEvent.indexOf(set), 1);
+          resolve(false);
+        }, timeout * 1000);
+      }
+    });
+  }
+
+  private _setStoppedEvent(): void {
+    for (const set of this._stoppedEvent.splice(0)) set();
   }
 
   private _runWorker(task: () => unknown): void {
@@ -77,7 +105,7 @@ export class ThreadPoolExecutor {
       const next = this._queue.shift();
       if (next) this._runWorker(next);
       else this._running -= 1;
-      if (this._running === 0) for (const terminated of this._terminated.splice(0)) terminated();
+      if (this._stopped && this._running === 0) this._setStoppedEvent();
     });
   }
 }
