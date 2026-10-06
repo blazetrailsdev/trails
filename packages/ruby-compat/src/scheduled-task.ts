@@ -5,11 +5,14 @@ type Executor = { post(task: () => unknown): unknown };
 const MAX_TIMEOUT = 2 ** 31 - 1;
 
 /**
- * @noRailsEquivalent PERMANENT — concurrent-ruby 1.3.6 `Concurrent::ScheduledTask`
- * (`concurrent/scheduled_task.rb:158-330`, not vendored) over `TimerSet#ns_post_task` /
- * `#process_tasks` (`concurrent/executor/timer_set.rb:95-107,146-180`), whose timer thread
- * waits through `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`). The wait here is
- * an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling.
+ * concurrent-ruby 1.3.6 `Concurrent::ScheduledTask`
+ * (`concurrent/scheduled_task.rb:158-330`, not vendored) over
+ * `TimerSet#ns_post_task` / `#process_tasks`
+ * (`concurrent/executor/timer_set.rb:95-107,146-180`), whose timer thread waits
+ * through `rb_mutex_sleep` (`vendor/ruby/v3.3.11/thread_sync.c:626`). The wait
+ * here is an unref'd `setTimeout`, re-armed past its 2^31-1 ms ceiling.
+ *
+ * @noRailsEquivalent PERMANENT
  */
 export class ScheduledTask<A extends unknown[] = unknown[]> {
   private state: "unscheduled" | "pending" | "processing" | "cancelled" = "unscheduled";

@@ -1,15 +1,19 @@
 import { ArgumentError } from "./argument-error.js";
 
 /**
- * @noRailsEquivalent PERMANENT — concurrent-ruby 1.3.6 `Concurrent::ImmediateExecutor`
- * (`concurrent/executor/immediate_executor.rb:17-65`, not vendored), whose `task.call(*args)`
- * is `rb_proc_call` (`vendor/ruby/v3.3.11/proc.c:990`). `post` answers the promise of a task
- * that returns one: a JS caller cannot block on it, where Ruby's returns after the task.
+ * concurrent-ruby 1.3.6 `Concurrent::ImmediateExecutor`
+ * (`concurrent/executor/immediate_executor.rb:17-65`, not vendored), whose
+ * `task.call(*args)` is `rb_proc_call` (`vendor/ruby/v3.3.11/proc.c:990`).
+ *
+ * @noRailsEquivalent PERMANENT
  */
 export class ImmediateExecutor {
   private stopped = false;
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * @noRailsEquivalent PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   post<A extends unknown[]>(
     ...argsAndTask: [...args: A, task: (...args: A) => unknown]
   ): boolean | Promise<boolean> {
