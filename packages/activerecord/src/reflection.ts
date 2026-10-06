@@ -100,8 +100,8 @@ function arrayLen(value: string | string[]): number {
 }
 
 export abstract class AbstractReflection {
-  /** @internal */
   private _className?: string;
+  /** @internal */
   private _counterCacheColumn?: string | null;
   private _inverseWhichUpdatesCounterCacheDefined?: boolean;
   private _inverseWhichUpdatesCounterCache?: AbstractReflection;
