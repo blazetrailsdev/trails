@@ -17,6 +17,42 @@ describe("BigDecimal", () => {
     expect(new BigDecimal("123456.789").toString("F")).toBe("123456.789");
   });
 
+  it("_dump prefixes the bare to_s with MaxPrec in digits", () => {
+    expect(
+      [
+        "9876543210.0123456789",
+        "1",
+        "-1.5",
+        "0",
+        "123456789",
+        "1234567890",
+        "NaN",
+        "-Infinity",
+      ].map((v) => new BigDecimal(v)._dump()),
+    ).toEqual([
+      "36:0.98765432100123456789e10",
+      "18:0.1e1",
+      "18:-0.15e1",
+      "18:0.0",
+      "18:0.123456789e9",
+      "27:0.123456789e10",
+      "9:NaN",
+      "9:-Infinity",
+    ]);
+  });
+
+  it("_load reads the value after the precision prefix", () => {
+    expect(BigDecimal._load("18:0.1e1").toString("E")).toBe("0.1e1");
+    expect(BigDecimal._load("9:-Infinity").toString("E")).toBe("-Infinity");
+    expect(BigDecimal._load("36:0.98765432100123456789e10")._dump()).toBe(
+      "36:0.98765432100123456789e10",
+    );
+    expect(() => BigDecimal._load("0.1e1")).toThrow(TypeError);
+    expect(() => BigDecimal._load("0.1e1")).toThrow(
+      "load failed: invalid character in the marshaled string",
+    );
+  });
+
   it("encodes as a JSON string in fixed form", () => {
     expect(JSON.stringify(new BigDecimal("1.5"))).toBe('"1.5"');
     expect(JSON.stringify({ price: new BigDecimal("42") })).toBe('{"price":"42.0"}');

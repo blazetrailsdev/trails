@@ -2,6 +2,7 @@ import type { Factory, Packer, Unpacker } from "./factory.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
 import {
+  BigDecimal,
   Complex,
   NameError,
   Rational,
@@ -103,6 +104,15 @@ export const Extensions = {
       match: () => false,
       packer: (v) => bigIntToMsgpackExt(v as bigint),
       unpacker: (payload) => bigIntFromMsgpackExt(payload as Buffer),
+    });
+
+    registry.registerType({
+      type: 2,
+      klass: "BigDecimal",
+      recursive: false,
+      match: (v) => v instanceof BigDecimal,
+      packer: (v) => Buffer.from((v as BigDecimal)._dump(), "utf-8"),
+      unpacker: (payload) => BigDecimal._load((payload as Buffer).toString("utf-8")),
     });
 
     registry.registerType({

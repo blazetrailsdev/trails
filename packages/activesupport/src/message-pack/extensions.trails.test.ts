@@ -17,9 +17,7 @@ describe("MessagePackExtensionsTest", () => {
     const packer = factory.packer();
     packer.write(numerator);
     if (denominator !== undefined) packer.write(denominator);
-    return factory.unpacker((unpacker) =>
-      Extensions.readRational(unpacker.feedReference(packer.toBuffer())),
-    );
+    return Extensions.readRational(factory.unpacker(packer.toBuffer()));
   };
 
   it("normalizes the sign of a decoded Rational onto the numerator", () => {
@@ -49,7 +47,7 @@ describe("MessagePackExtensionsTest", () => {
   const load = (dumped: Buffer) => {
     const factory = new Factory();
     Extensions.install(factory);
-    return factory.unpacker((unpacker) => unpacker.feedReference(dumped).read());
+    return factory.unpacker(dumped).read();
   };
 
   it("round-trips a Rational whose numerator is past Number.MAX_SAFE_INTEGER", () => {
@@ -99,9 +97,7 @@ describe("MessagePackExtensionsTest", () => {
     const nested = factory.packer();
     nested.write(new HashWithIndifferentAccess({ b: 1 }));
     expect([...dumped].join(",")).toContain([...nested.toBuffer()].join(","));
-    const result = factory.unpacker((unpacker) =>
-      unpacker.feedReference(dumped).read(),
-    ) as HashWithIndifferentAccess;
+    const result = factory.unpacker(dumped).read() as HashWithIndifferentAccess;
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
     expect(result.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
   });
