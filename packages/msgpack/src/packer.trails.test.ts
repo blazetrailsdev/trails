@@ -35,6 +35,9 @@ describe("MessagePack::Packer", () => {
     expect(new Packer().writeArrayHeader(-1).toS()).toEqual(
       Uint8Array.of(0xdd, 255, 255, 255, 255),
     );
+    expect(() => new Packer().writeMapHeader(-(2 ** 31) - 1)).toThrow(
+      "integer -2147483649 too small to convert to `unsigned int'",
+    );
     expect(() => new Packer().writeMapHeader(2 ** 32)).toThrow(
       "integer 4294967296 too big to convert to `unsigned int'",
     );
@@ -91,7 +94,7 @@ describe("MessagePack::Unpacker", () => {
     unpacker.reset();
     unpacker.registerType(6, null, null, () => [5n]);
     expect(unpacker.feed(Uint8Array.of(0xd4, 6, 0)).read()).toEqual([5n]);
-    expect(() => Object.freeze(new Unpacker()).registerType(1, Pair, "new")).toThrow(
+    expect(() => Object.freeze(new Unpacker()).registerType(1, null, null, () => 1)).toThrow(
       "can't modify frozen MessagePack::Unpacker",
     );
   });

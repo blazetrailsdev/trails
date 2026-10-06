@@ -6,7 +6,7 @@ import {
   Hash,
   RangeError,
   StandardError,
-  rbFSend,
+  rbObjMethod,
   rbObjClass,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -84,6 +84,7 @@ export class Unpacker {
               if (extFlags & MSGPACK_EXT_RECURSIVE) {
                 const uk = new Unpacker(null, options);
                 for (const [key, value] of this.extRegistry) uk.extRegistry.set(key, value);
+                if (Object.isFrozen(this)) Object.freeze(uk);
                 uk.feedReference(data);
                 return new ExtObject(proc(uk as never));
               }
@@ -105,7 +106,8 @@ export class Unpacker {
     block?: UnpackerProc,
   ): null {
     if (klass != null && methodName != null) {
-      block = (data: unknown) => rbFSend(klass, methodName, data);
+      const method = rbObjMethod(klass, methodName);
+      block = (data: unknown) => method.call(data);
     } else if (block == null) {
       throw new ArgumentError("register_type takes either 3 arguments or a block");
     }

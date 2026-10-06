@@ -8,6 +8,7 @@ import {
   RangeError,
   rbFSend,
   rbInspect,
+  rbModAncestors,
   rbObjClass,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -69,8 +70,8 @@ export class Packer {
   isTypeRegistered(klassOrType: unknown): boolean {
     if (typeof klassOrType === "function") {
       const klass = klassOrType;
-      return this.registeredTypes().some(
-        (entry) => klass === entry.class || rbObjIsKindOf(klass.prototype, entry.class),
+      return this.registeredTypes().some((entry) =>
+        rbModAncestors(klass).includes(entry.class as object),
       );
     } else if (typeof klassOrType === "number") {
       const type = klassOrType;
@@ -113,8 +114,10 @@ export class Packer {
   }
 
   writeArrayHeader(n: number): this {
-    if (n > 0xffffffff) {
-      throw new RangeError(`integer ${n} too big to convert to \`unsigned int'`);
+    if (n > 0xffffffff || n < -0x80000000) {
+      throw new RangeError(
+        `integer ${n} too ${n < 0 ? "small" : "big"} to convert to \`unsigned int'`,
+      );
     }
     n = n >>> 0;
     if (n < 16) this.buffer.write(Uint8Array.of(0x90 | n));
@@ -124,8 +127,10 @@ export class Packer {
   }
 
   writeMapHeader(n: number): this {
-    if (n > 0xffffffff) {
-      throw new RangeError(`integer ${n} too big to convert to \`unsigned int'`);
+    if (n > 0xffffffff || n < -0x80000000) {
+      throw new RangeError(
+        `integer ${n} too ${n < 0 ? "small" : "big"} to convert to \`unsigned int'`,
+      );
     }
     n = n >>> 0;
     if (n < 16) this.buffer.write(Uint8Array.of(0x80 | n));
@@ -211,9 +216,9 @@ export class Packer {
     return null;
   }
 
-  private extFindSuperclass(instance: unknown): unknown {
+  private extFindSuperclass(lookupClass: { prototype: object }): unknown {
     for (const key of this.extRegistry.keys()) {
-      if (rbObjIsKindOf(instance, key)) return key;
+      if (rbModAncestors(lookupClass).includes(key as object)) return key;
     }
     return null;
   }
@@ -223,7 +228,7 @@ export class Packer {
     const type = this.extRegistryFetch(lookupClass);
     if (type?.[1] != null) return type;
 
-    const superclass = this.extFindSuperclass(instance);
+    const superclass = this.extFindSuperclass(lookupClass);
     if (superclass != null) {
       const superclassType = this.extRegistry.get(superclass)!;
       this.extRegistryCache.set(lookupClass, superclassType);
