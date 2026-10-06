@@ -146,7 +146,7 @@ export class Logger {
     ...args: [output?: LoggerOutput | null, kwargs?: { level?: number | LogLevel | string }]
   ) {
     const [output = defaultOutput, kwargs = {}] = args;
-    if (kwargs.level !== undefined) this.level = kwargs.level;
+    if (Object.hasOwn(kwargs, "level")) this.level = kwargs.level!;
     this._defaultFormatter = new Formatter();
     this.output = output;
     this._formatter ??= new SimpleFormatter();
