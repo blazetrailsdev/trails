@@ -454,13 +454,6 @@ export async function save<T extends SaveRecord>(
     return (await withTransactionReturningStatus.call(self, async () => {
       const validationsPassed = await performValidations.call(this, options);
       if (!validationsPassed) return false;
-      if (this._readonly) {
-        throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-      }
-      if (this._destroyed) {
-        return false;
-      }
-
       if (this._newRecord && isStiSubclass(ctor)) {
         const col = getStiBase(ctor).inheritanceColumn;
         if (col && !this._readAttribute(col)) {
