@@ -166,6 +166,10 @@ export class StatementCache {
     return new StatementCache(queryBuilder, bindMap, relation.model);
   }
 
+  /**
+   * @missingRailsCall async_find_by_sql — PERMANENT
+   * @missingRailsCall wrap — PERMANENT
+   */
   async execute(
     params: unknown[],
     connection: unknown,

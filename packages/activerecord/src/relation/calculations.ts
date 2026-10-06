@@ -361,6 +361,7 @@ export function asyncSum(
   return this.async().sum(identityOrColumn);
 }
 
+/** @missingRailsArgs new — PERMANENT */
 export async function calculate(
   this: CalculationRelation,
   operation: string,
@@ -406,7 +407,7 @@ export async function calculate(
   }
 }
 
-/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
+/** @missingRailsCall new — PERMANENT */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -460,7 +461,7 @@ export function asyncPluck(
   return this.async().pluck(...columnNames);
 }
 
-/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
+/** @missingRailsCall new — PERMANENT */
 export async function pick(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -492,6 +493,7 @@ export function asyncPick(
   return this.async().pick(...columnNames);
 }
 
+/** @missingRailsCall new — PERMANENT */
 export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
   const primaryKey = this.model.primaryKey as string | string[] | null;
   const primaryKeyArray = kernelArray<string>(primaryKey);
