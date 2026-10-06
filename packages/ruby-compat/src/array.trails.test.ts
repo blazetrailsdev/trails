@@ -596,6 +596,15 @@ describe("deleteAt", () => {
     expect(ary).toEqual(["foo", 2]);
   });
 
+  it("converts the index as NUM2LONG does before indexing", () => {
+    const ary = ["a", "b", "c", "d"];
+    expect(deleteAt(ary, 1.9)).toBe("b");
+    expect(deleteAt(ary, -1.9)).toBe("d");
+    expect(ary).toEqual(["a", "c"]);
+    expect(() => deleteAt(ary, NaN)).toThrow();
+    expect(ary).toEqual(["a", "c"]);
+  });
+
   it("answers nil and leaves the array alone when the index is out of range", () => {
     const ary = ["foo"];
     expect(deleteAt(ary, 1)).toBeNull();

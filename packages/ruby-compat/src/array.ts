@@ -513,6 +513,7 @@ export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T)
  * @noRailsEquivalent PERMANENT
  */
 export function deleteAt<T>(ary: T[], pos: number): T | null {
+  pos = num2long(pos);
   const len = ary.length;
 
   if (pos >= len) return null;

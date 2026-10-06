@@ -494,17 +494,22 @@ export function encodeCsrfToken(csrfToken: Bytes): string {
 
 /** @internal */
 export function decodeCsrfToken(encodedCsrfToken: string): Bytes {
-  if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedCsrfToken)) throw new TypeError("invalid base64");
+  if (!/^[A-Za-z0-9+/_-]*={0,2}$/.test(encodedCsrfToken)) throw new ArgumentError("invalid base64");
   const stripped = encodedCsrfToken.replace(/=+$/, "");
-  if (stripped.length % 4 === 1) throw new TypeError("invalid base64 length");
+  if (stripped.length % 4 === 1) throw new ArgumentError("invalid base64");
   return Buffer.from(stripped.replace(/-/g, "+").replace(/_/g, "/"), "base64");
 }
 
 /** @internal */
 export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
-  const out = Buffer.alloc(s1.length);
-  for (let i = 0; i < s1.length; i++) out[i] = s1[i] ^ s2[i];
-  return out;
+  s2 = Buffer.from(s2);
+  const size = s1.length;
+  let i = 0;
+  while (i < size) {
+    s2[i] = s1[i] ^ s2[i];
+    i += 1;
+  }
+  return s2;
 }
 
 /** @internal */
@@ -633,8 +638,9 @@ export function isValidAuthenticityToken(
   let masked: Bytes;
   try {
     masked = this.decodeCsrfToken(encodedMaskedToken);
-  } catch {
-    return false;
+  } catch (e) {
+    if (e instanceof ArgumentError) return false;
+    throw e;
   }
   if (masked.length === RequestForgeryProtection.AUTHENTICITY_TOKEN_LENGTH)
     return this.compareWithRealToken(masked);
