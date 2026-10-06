@@ -510,11 +510,6 @@ export default defineConfig({
       },
       {
         // All non-AR packages + scripts: parallel, no DB concerns.
-        // `vitest related` crawls every included test file's imports and
-        // re-resolves each specifier against the root, where a bare `eslint`
-        // (eslint/*.test.mjs) is this repo's own eslint/ directory, which it
-        // then fails to load. Pinning the package entry keeps the crawl in
-        // node_modules, which it skips.
         resolve: {
           alias: { ...alias, eslint: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
         },
@@ -526,9 +521,6 @@ export default defineConfig({
           // eslint/*.test.mjs that drives RuleTester alone registers zero
           // cases and collects as "No test suite found in file".
           globals: true,
-          // TRAILS_OTHER_INCLUDE narrows the project to a comma-separated glob
-          // list. `vitest related` crawls every included file whatever
-          // --dir says, so the thor-only Trailties Tests step sets it.
           include: process.env.TRAILS_OTHER_INCLUDE?.split(",") ?? [
             "packages/*/src/**/*.test.ts",
             "scripts/guides-typecheck/*.test.ts",
