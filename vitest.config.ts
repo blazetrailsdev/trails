@@ -405,6 +405,21 @@ const COVERAGE_EXCLUDE = [
   "packages/*/virtualized-dx-tests/**",
 ];
 
+const otherResolve = {
+  alias: [
+    ...Object.entries(alias).map(([find, replacement]) => ({ find, replacement })),
+    { find: /^eslint$/, replacement: path.resolve(__dirname, "node_modules/eslint/lib/api.js") },
+  ],
+};
+
+// Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
+// (it runs under activerecord, where the engine is ActiveRecord::Base).
+const otherSetupFiles = [
+  "./packages/activesupport/src/testing/autorun.ts",
+  "./packages/activesupport/src/test-setup-abstract-unit.ts",
+  "./packages/arel/src/test-setup-engine.ts",
+];
+
 export default defineConfig({
   resolve: { alias },
   test: {
@@ -510,7 +525,7 @@ export default defineConfig({
       },
       {
         // All non-AR packages + scripts: parallel, no DB concerns.
-        resolve: { alias },
+        resolve: otherResolve,
         test: {
           name: "other",
           // Projects do NOT inherit the root `test.globals`, and ESLint's
@@ -536,14 +551,18 @@ export default defineConfig({
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
-          exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
-          // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
-          // (it runs under activerecord, where the engine is ActiveRecord::Base).
-          setupFiles: [
-            "./packages/activesupport/src/testing/autorun.ts",
-            "./packages/activesupport/src/test-setup-abstract-unit.ts",
-            "./packages/arel/src/test-setup-engine.ts",
-          ],
+          exclude: ["packages/activerecord/**", "packages/trailties/**", ...SHARED_EXCLUDE],
+          setupFiles: otherSetupFiles,
+        },
+      },
+      {
+        resolve: otherResolve,
+        test: {
+          name: "trailties",
+          globals: true,
+          include: ["packages/trailties/src/**/*.test.ts"],
+          exclude: SHARED_EXCLUDE,
+          setupFiles: otherSetupFiles,
         },
       },
     ],

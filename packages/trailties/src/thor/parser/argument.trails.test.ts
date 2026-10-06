@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError, NoMethodError, Range } from "@blazetrails/ruby-compat";
+import "../thor.js";
 import { Argument } from "./argument.js";
 
 describe("Thor::Argument", () => {

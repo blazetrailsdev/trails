@@ -955,7 +955,7 @@ jobs:
         run: pnpm vitest run packages/trailties
       - if: needs.changes.outputs.thor_only == 'true'
         run: >
-          pnpm vitest related --run --config vitest.trailties.config.ts
+          pnpm vitest related --run --project trailties
           packages/trailties/src/thor/*.ts
 
   # Reporting-only code coverage. Runs the light (non-AR) packages together

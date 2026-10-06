@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError, env, rational, setEnv, stderr, toD } from "@blazetrails/ruby-compat";
 import { HashWithIndifferentAccess } from "../core-ext/hash-with-indifferent-access.js";
+import "../thor.js";
 import { Option } from "./option.js";
 
 describe("Thor::Option", () => {
@@ -57,6 +58,16 @@ describe("Thor::Option", () => {
     for (const value of [1, 1.5, 10n, rational(1, 3), toD("1.5")]) {
       const option = new Option("foo", { type: "numeric", default: value, checkDefaultType: true });
       expect(option.default).toBe(value);
+    }
+  });
+
+  it("names itself after the Ruby class, not the JS one", () => {
+    const name = Object.getOwnPropertyDescriptor(Option, "name")!;
+    Object.defineProperty(Option, "name", { ...name, value: "q" });
+    try {
+      expect(() => new Option(null)).toThrow(new ArgumentError("Option name can't be nil."));
+    } finally {
+      Object.defineProperty(Option, "name", name);
     }
   });
 

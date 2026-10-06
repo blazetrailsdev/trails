@@ -75,13 +75,4 @@ export {
   loadApplicationHelperNames,
   modulesForHelpers,
 } from "./metal/helpers.js";
-export { RescueRegistry } from "./metal/rescue.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";
-export {
-  MemoryRateLimitStore,
-  rateLimit,
-  type RateLimitOptions,
-  type RateLimitStore,
-  type RateLimitingClassHost,
-  type RateLimitingHost,
-} from "./metal/rate-limiting.js";

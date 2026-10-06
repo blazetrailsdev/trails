@@ -443,9 +443,9 @@ function gateRegex(yml: string, name: string): RegExp {
  *  Thor imports nothing outside src/thor/, but trailties imports Thor
  *  (generators/base.ts includes Thor::Actions), so the flag narrows rather
  *  than skips:
- *  - trailties-tests runs `vitest related` over the thor sources, through
- *    vitest.trailties.config.ts (the root `other` project narrowed to
- *    packages/trailties; related mode cannot crawl eslint/*.test.mjs).
+ *  - trailties-tests runs `vitest related` over the thor sources, on the
+ *    root config's `trailties` project (related mode crawls the whole
+ *    include list of the project it runs).
  *  - virtualized-dx-type-tests and leaf-tests' DX type step skip: thor has
  *    no DX-type surface. The ci aggregate accepts those skips only when
  *    thor_only is true.

@@ -986,7 +986,6 @@ export default defineConfig(
       "eslint.config.mjs",
       "vitest.config.ts",
       "vitest.dx-tests.config.ts",
-      "vitest.trailties.config.ts",
     ],
     rules: {
       "blazetrails/no-freeform-comments": "error",
@@ -1104,7 +1103,6 @@ export default defineConfig(
             "packages/website/docs/.vitepress/config.ts",
             "vitest.config.ts",
             "vitest.dx-tests.config.ts",
-            "vitest.trailties.config.ts",
           ],
         },
         tsconfigRootDir: import.meta.dirname,

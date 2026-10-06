@@ -19,7 +19,6 @@ import {
   rbObjIsKindOf,
   rbObjNotMatch,
   rbObjRespondTo,
-  rbSetClassPathString,
   rbStrToF,
   rtest,
   stringSplit,
@@ -237,4 +236,3 @@ export class Arguments {
     );
   }
 }
-rbSetClassPathString(Arguments, { name: "Thor" }, "Arguments");

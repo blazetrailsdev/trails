@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FrozenError, NoMethodError, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import "../thor.js";
 import {
   AtLeastOneRequiredArgumentError,
   ExclusiveArgumentError,
   MalformattedArgumentError,
+  RequiredArgumentMissingError,
   UnknownArgumentError,
 } from "../error.js";
 import { Option } from "./option.js";
@@ -235,5 +237,17 @@ describe("Thor::Options", () => {
     const assigns = options.parse([]);
     expect(Object.fromEntries(assigns)).toEqual({ foo: "d", other: 1 });
     expect(() => assigns.set("x", 1)).toThrow(FrozenError);
+  });
+
+  it("names the missing requirement after the Ruby class, not the JS one", () => {
+    const name = Object.getOwnPropertyDescriptor(Options, "name")!;
+    Object.defineProperty(Options, "name", { ...name, value: "q" });
+    try {
+      expect(() => create({ foo: ":required" }).parse([])).toThrow(
+        new RequiredArgumentMissingError("No value provided for required options '--foo'"),
+      );
+    } finally {
+      Object.defineProperty(Options, "name", name);
+    }
   });
 });

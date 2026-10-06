@@ -2,7 +2,10 @@ import { Metal } from "./metal.js";
 import { statusCode } from "@blazetrails/rack";
 import { DoubleRenderError, type RenderOptions } from "./base.js";
 import { renderForApi } from "./api/api-rendering.js";
-import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
+import {
+  RateLimiting,
+  type ClassMethods as RateLimitingClassMethods,
+} from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
 import { classAttribute, include } from "@blazetrails/activesupport";
 import {
@@ -32,14 +35,9 @@ export class API extends Metal {
     return this;
   }
 
-  static rateLimit = rateLimit;
+  declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
   static logAt = logAt;
-
-  /** @internal */
-  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
-    return rateLimiting.call(this, args);
-  }
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
@@ -96,4 +94,5 @@ export class API extends Metal {
   }
 }
 
+include(API, RateLimiting);
 include(API, StrongParameters);
