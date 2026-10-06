@@ -4,6 +4,7 @@ import {
   include,
   included,
   initialize,
+  Module,
   Notifications,
   toF,
 } from "@blazetrails/activesupport";
@@ -24,18 +25,23 @@ import {
 } from "./data-streaming.js";
 import { Flash } from "./flash.js";
 
-export class Instrumentation {
-  static [included](base: LoggerIncludingClass): void {
+export const Instrumentation: Module = new Module((mod) => {
+  (mod as unknown as Record<symbol, unknown>)[included] = (base: LoggerIncludingClass): void => {
     include(base, Logger);
-  }
-
-  declare viewRuntime: number | null;
-
-  static [initialize](this: Instrumentation): void {
+  };
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: {
+    viewRuntime: number | null;
+  }): void {
     this.viewRuntime = null;
-  }
-}
-attrInternal.call(Instrumentation.prototype, "viewRuntime");
+  };
+
+  mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
+
+  mod.defineMethod("processAction", processAction);
+  mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
+  mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
+  mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
+});
 
 interface InstrumentationHost {
   actionName?: string;
@@ -47,8 +53,8 @@ interface InstrumentationHost {
 /** @internal */
 export async function processAction(
   this: InstrumentationHost,
-  block: () => Promise<void>,
-): Promise<void> {
+  ...args: unknown[]
+): Promise<unknown> {
   ExecutionContext.setKey("controller", this);
 
   const rawPayload: Record<string, unknown> = {
@@ -64,12 +70,12 @@ export async function processAction(
 
   Notifications.instrument("start_processing.action_controller", rawPayload);
 
-  await Notifications.instrument(
+  return await Notifications.instrument(
     "process_action.action_controller",
     rawPayload,
     async (payload) => {
       try {
-        const result = await block();
+        const result = await Instrumentation.superMethod(this, "processAction")!(...args);
         payload.response = this.response;
         payload.status = this.response.status;
         return result;

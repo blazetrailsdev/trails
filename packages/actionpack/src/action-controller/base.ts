@@ -53,11 +53,7 @@ import {
   type RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import {
-  Rescue,
-  type isShowDetailedExceptions,
-  processAction as _rescueProcessAction,
-} from "./metal/rescue.js";
+import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -176,7 +172,6 @@ import {
   _setVaryHeader,
   _processVariant,
   _normalizeOptions,
-  processAction as _processAction,
   Rendering,
   renderToString,
 } from "./metal/rendering.js";
@@ -192,7 +187,6 @@ import {
   appendInfoToPayload,
   cleanupViewRuntime,
   haltedCallbackHook,
-  processAction as _instrumentProcessAction,
   redirectTo as _instrumentRedirectTo,
   sendData,
   sendFile,
@@ -323,8 +317,7 @@ export interface Base
   extends
     Included<typeof HttpAuthentication.Basic.ControllerMethods>,
     Included<typeof HttpAuthentication.Digest.ControllerMethods>,
-    Included<typeof HttpAuthentication.Token.ControllerMethods>,
-    Instrumentation {
+    Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   helpers(): ActionViewBase;
@@ -656,12 +649,7 @@ export class Base extends Metal {
         ...this.request.pathParameters,
       });
     }
-    await _instrumentProcessAction.call(this as never, () =>
-      _rescueProcessAction.call(this, async () => {
-        _processAction.call(this as never, action, ...args);
-        await super.processAction(action, ...args);
-      }),
-    );
+    await super.processAction(action, ...args);
   }
 
   declare freshWhen: typeof freshWhen;
@@ -739,6 +727,8 @@ export class Base extends Metal {
   /** @internal */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
   /** @internal */
+  declare viewRuntime: number | null;
+
   declare appendInfoToPayload: typeof appendInfoToPayload;
   /** @internal */
   declare cleanupViewRuntime: typeof cleanupViewRuntime;
@@ -810,9 +800,6 @@ extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Rescue);
 include(Base, Instrumentation);
 Base.prototype.redirectTo = _instrumentRedirectTo;
-Base.prototype.appendInfoToPayload = appendInfoToPayload;
-Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
-Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
