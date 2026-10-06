@@ -614,6 +614,62 @@ describe("runCli", () => {
     expect(strict).toContain("type ObjectLocals = {};");
   }, 30_000);
 
+  it("resolves a controller render with no template name to the action's template", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        "  render(..._args: unknown[]): void {}",
+        "  showAll(): void { [1].forEach(() => this.render({ locals: { foo: 1 } })); }",
+        "  private renderEdit(): void { this.render({ locals: { foo: 1 } }); }",
+        "}",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/package.json",
+      '{ "name": "@blazetrails/actionview", "types": "index.d.ts" }',
+    );
+    write(
+      cwd,
+      "node_modules/@blazetrails/actionview/index.d.ts",
+      [
+        "export interface TemplateRegistry {}",
+        "export type TemplateLocals<T> = T;",
+        "export declare class Base { csrfMetaTags(): string; }",
+      ].join("\n"),
+    );
+    write(
+      cwd,
+      "app/views/posts/show_all.html.tse",
+      "<%= foo %><%= csrfMetaTags() %><%= noSuchHelper() %>",
+    );
+    write(cwd, "app/views/layouts/application.html.tse", "<%= noSuchHelper() %>");
+    await buildViews({ cwd });
+    const shim = (rel: string): string =>
+      fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.html.tse.ts`), "utf8");
+    expect(shim("posts/show_all")).toContain("type ObjectLocals = { foo: number };");
+    expect(shim("posts/show_all")).toContain("      : any;");
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        "  render(..._args: unknown[]): void {}",
+        "  showAll(): void { [1].forEach(() => this.render({ locals: { foo: 1 } })); }",
+        "}",
+      ].join("\n"),
+    );
+    await buildViews({ cwd });
+    expect(shim("posts/show_all")).toContain("      : never;");
+    expect(viewDiagnostics(cwd).map((d) => d.split(":")[0])).toEqual([
+      "layouts/application.html.tse.ts",
+      "posts/show_all.html.tse.ts",
+    ]);
+  }, 30_000);
+
   it("types a template's locals from view and controller renders that pass a hash", async () => {
     const cwd = mkScratch();
     write(
