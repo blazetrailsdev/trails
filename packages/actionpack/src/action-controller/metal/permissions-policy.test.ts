@@ -28,9 +28,9 @@ class PolicyController extends Base {
   }
 }
 
-async function process(action: string): Promise<PolicyController> {
+async function process(action: string, policy = POLICY): Promise<PolicyController> {
   const request = new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" });
-  request.permissionsPolicy = POLICY;
+  request.permissionsPolicy = policy;
   const controller = new PolicyController();
   await controller.dispatch(action, request, new Response());
   return controller;
@@ -52,5 +52,9 @@ describe("permissionsPolicy class DSL", () => {
   it("registers a no-op before_action when no block is provided (matches Rails)", async () => {
     const controller = await process("bare");
     expect(controller.request.permissionsPolicy).toBe(POLICY);
+  });
+
+  it("hands the block nil when the request has no policy, as nil.clone answers nil", async () => {
+    await expect(process("index", null as never)).rejects.toThrow(TypeError);
   });
 });
