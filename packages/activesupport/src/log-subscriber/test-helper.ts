@@ -1,6 +1,6 @@
 import { compact, Hash, strip, toS } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
-import { LOG_LEVELS, Logger } from "../logger.js";
+import { LOG_LEVELS, type Logger, type LogLevel } from "../logger.js";
 import { Notifications } from "../notifications.js";
 import { Fanout } from "../notifications/fanout.js";
 
@@ -28,9 +28,16 @@ export function teardown(this: TestHelperHost): void {
 }
 
 export class MockLogger {
+  declare static readonly DEBUG: number;
+  declare static readonly INFO: number;
+  declare static readonly WARN: number;
+  declare static readonly ERROR: number;
+  declare static readonly FATAL: number;
+  declare static readonly UNKNOWN: number;
+
   private _flushCount: number;
   level: number;
-  private _logged: Hash<string, unknown[]>;
+  private _logged: Hash<LogLevel, unknown[]>;
 
   declare debug: (message?: unknown) => void;
   declare info: (message?: unknown) => void;
@@ -45,10 +52,10 @@ export class MockLogger {
   declare readonly "fatal?": boolean;
   declare readonly "unknown?": boolean;
 
-  constructor(level: number = Logger.DEBUG) {
+  constructor(level: number = MockLogger.DEBUG) {
     this._flushCount = 0;
     this.level = level;
-    this._logged = new Hash<string, unknown[]>((h, k) => {
+    this._logged = new Hash<LogLevel, unknown[]>((h, k) => {
       const v: unknown[] = [];
       h.set(k, v);
       return v;
@@ -59,7 +66,7 @@ export class MockLogger {
     return this._flushCount;
   }
 
-  methodMissing(level: string, message: unknown = null, block?: () => unknown): void {
+  methodMissing(level: LogLevel, message: unknown = null, block?: () => unknown): void {
     if (block) {
       this._logged.get(level)!.push(block());
     } else {
@@ -67,7 +74,7 @@ export class MockLogger {
     }
   }
 
-  logged(level: string): string[] {
+  logged(level: LogLevel): string[] {
     return compact(this._logged.get(level)!).map((l) => strip(toS(l)));
   }
 
@@ -76,20 +83,20 @@ export class MockLogger {
   }
 }
 
-for (const [severity, value] of Object.entries(LOG_LEVELS)) {
-  const level = severity.slice(1);
-  Object.defineProperty(MockLogger.prototype, level, {
+for (const [severity, value] of Object.entries(LOG_LEVELS) as [LogLevel, number][]) {
+  Object.defineProperty(MockLogger, severity.slice(1).toUpperCase(), { value });
+  Object.defineProperty(MockLogger.prototype, severity.slice(1), {
     value(this: MockLogger, message: unknown = null): void {
       if (typeof message === "function") {
-        this.methodMissing(level, null, message as () => unknown);
+        this.methodMissing(severity, null, message as () => unknown);
       } else {
-        this.methodMissing(level, message);
+        this.methodMissing(severity, message);
       }
     },
     writable: true,
     configurable: true,
   });
-  Object.defineProperty(MockLogger.prototype, `${level}?`, {
+  Object.defineProperty(MockLogger.prototype, `${severity.slice(1)}?`, {
     get(this: MockLogger): boolean {
       return value >= this.level;
     },
@@ -101,6 +108,8 @@ export function wait(this: TestHelperHost): void {
   this.notifier.wait();
 }
 
-export function setLogger(logger: MockLogger | null): void {
+export function setLogger(this: TestHelperHost, logger: MockLogger | null): void {
   LogSubscriber.logger = logger as unknown as Logger | null;
 }
+
+export const TestHelper = { setup, teardown, MockLogger, wait, setLogger };

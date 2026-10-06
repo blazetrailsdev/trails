@@ -5,7 +5,8 @@ import { Logger } from "../logger.js";
 import { Notifications } from "../notifications.js";
 import type { Event } from "../notifications/instrumenter.js";
 import type { Fanout } from "../notifications/fanout.js";
-import { MockLogger, setLogger, setup, teardown, wait } from "./test-helper.js";
+import { include, type Included } from "@blazetrails/ruby-compat/include";
+import { MockLogger, TestHelper } from "./test-helper.js";
 
 class MyLogSubscriber extends LogSubscriber {
   foo(_event: Event): void {
@@ -16,23 +17,21 @@ class MyLogSubscriber extends LogSubscriber {
 }
 
 describe("ActiveSupport::LogSubscriber::TestHelper", () => {
-  const test = {
-    logger: undefined as unknown as MockLogger,
-    notifier: undefined as unknown as Fanout,
-    oldNotifier: undefined as unknown as Fanout,
-    setLogger,
-  };
+  type Helped = Included<typeof TestHelper> & { logger: MockLogger; notifier: Fanout };
+  class TestCase {}
+  include(TestCase, TestHelper);
+  const test = new TestCase() as Helped;
   let oldNotifier: Fanout;
 
   beforeEach(() => {
     oldNotifier = Notifications.notifier;
-    setup.call(test);
+    test.setup();
   });
 
   afterEach(() => {
     LogSubscriber.subscribers.length = 0;
     LogSubscriber.logLevels.clear();
-    teardown.call(test);
+    test.teardown();
   });
 
   it("setup swaps in a MockLogger and a fresh notifier, and teardown restores them", () => {
@@ -41,20 +40,20 @@ describe("ActiveSupport::LogSubscriber::TestHelper", () => {
     expect(Notifications.notifier).toBe(test.notifier);
     expect(test.notifier).not.toBe(oldNotifier);
 
-    teardown.call(test);
+    test.teardown();
     expect(Notifications.notifier).toBe(oldNotifier);
-    setup.call(test);
+    test.setup();
   });
 
   it("reads back what an attached subscriber logged at each level", () => {
     MyLogSubscriber.attachTo("my_log_subscriber");
     Notifications.instrument("foo.my_log_subscriber");
-    wait.call(test);
+    test.wait();
 
-    expect(test.logger.logged("debug")).toEqual(["debug"]);
-    expect(test.logger.logged("info")).toEqual(["info"]);
-    expect(test.logger.logged("warn")).toEqual([]);
-    expect(test.logger.logged("error")).toEqual([]);
+    expect(test.logger.logged(":debug")).toEqual(["debug"]);
+    expect(test.logger.logged(":info")).toEqual(["info"]);
+    expect(test.logger.logged(":warn")).toEqual([]);
+    expect(test.logger.logged(":error")).toEqual([]);
   });
 
   it("answers a severity predicate from its level", () => {
@@ -64,6 +63,20 @@ describe("ActiveSupport::LogSubscriber::TestHelper", () => {
     expect(logger["unknown?"]).toBe(true);
     logger.level = Logger.DEBUG;
     expect(logger["debug?"]).toBe(true);
+  });
+
+  it("lets an including class overwrite setLogger", () => {
+    const set: Array<MockLogger | null> = [];
+    class Overriding {
+      setLogger(logger: MockLogger | null): void {
+        set.push(logger);
+      }
+    }
+    include(Overriding, TestHelper);
+    const overriding = new Overriding() as Overriding & Helped;
+    overriding.setup();
+    overriding.teardown();
+    expect(set).toEqual([overriding.logger, null]);
   });
 
   it("counts flushes", () => {
