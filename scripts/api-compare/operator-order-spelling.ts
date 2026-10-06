@@ -65,6 +65,9 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // `SimpleType#equals` (the class Rails aliases to `Types` at :47), and the
   // singleton `def [](type)` inside `class << self` (:13-14) → `static get`.
   "ActionView::Template::SimpleType": { "self.[]": ["get"], "==": ["equals"] },
+  // action_controller/metal/strong_parameters.rb:797 `def [](key)` →
+  // metal/strong-parameters.ts `Parameters#get`, and :803 `def []=(key, value)` → `set`.
+  "ActionController::Parameters": { "[]": ["get"], "[]=": ["set"] },
   "ActionDispatch::Journey::Path::Pattern::MatchData": { "[]": ["at"] },
   "ActionDispatch::Journey::GTG::TransitionTable": { "[]=": ["set"] },
   // arel/table.rb:82 `def [](name, table = self)` → table.ts `get`.

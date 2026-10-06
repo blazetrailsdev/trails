@@ -9,7 +9,7 @@ describe("NestedParametersPermitTest", () => {
     const post = permitted.get("post") as Parameters;
     expect(post).toBeInstanceOf(Parameters);
     expect(post.get("title")).toBe("Hello");
-    expect(post.has("admin")).toBe(false);
+    expect(post.hasKey("admin")).toBe(false);
   });
 
   it("permitted nested parameters with a string or a symbol as a key", () => {
@@ -61,21 +61,21 @@ describe("NestedParametersPermitTest", () => {
     });
     const params = new Parameters({ items: inner });
     const permitted = params.permit({ items: ["name"] });
-    expect(permitted.has("items")).toBe(true);
+    expect(permitted.hasKey("items")).toBe(true);
   });
 
   it("nested params with non_numeric keys", () => {
     const inner = new Parameters({ x: new Parameters({ name: "a" }) });
     const params = new Parameters({ items: inner });
     const permitted = params.permit({ items: ["name"] });
-    expect(permitted.has("items")).toBe(true);
+    expect(permitted.hasKey("items")).toBe(true);
   });
 
   it("nested params with negative numeric keys", () => {
     const inner = new Parameters({ "-1": new Parameters({ name: "a" }) });
     const params = new Parameters({ items: inner });
     const permitted = params.permit({ items: ["name"] });
-    expect(permitted.has("items")).toBe(true);
+    expect(permitted.hasKey("items")).toBe(true);
   });
 
   it("nested params with numeric keys addressing individual numeric keys", () => {
@@ -95,7 +95,7 @@ describe("NestedParametersPermitTest", () => {
   it("nested params with numeric keys addressing individual numeric keys to arrays", () => {
     const params = new Parameters({ items: [new Parameters({ name: "a" })] });
     const permitted = params.permit({ items: ["name"] });
-    expect(permitted.has("items")).toBe(true);
+    expect(permitted.hasKey("items")).toBe(true);
   });
 
   it("nested params with numeric keys addressing individual numeric keys to more nested params", () => {

@@ -49,7 +49,7 @@ describe("ParametersForbiddenAttributesTest", () => {
   });
 
   it("permitted attributes can be used for mass assignment", () => {
-    const params = new Parameters({ name: "Bob" }).permitAll();
+    const params = new Parameters({ name: "Bob" }).permitBang();
     expect(params.permitted).toBe(true);
     const record = new Account(params as unknown as Record<string, unknown>);
     expect(record._readAttribute("name")).toBe("Bob");

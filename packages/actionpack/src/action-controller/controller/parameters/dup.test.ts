@@ -1,49 +1,71 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("ParametersDupTest", () => {
+  let params: Parameters;
+
+  beforeEach(() => {
+    Parameters.permitAllParameters = false;
+
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+  });
+
   it("a duplicate maintains the original's permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    const dup = params.deepDup();
-    expect(dup.permitted).toBe(true);
+    params.permitBang();
+    const duppedParams = rbObjDup(params);
+    expect(duppedParams.permitted).toBe(true);
   });
 
   it("a duplicate maintains the original's parameters", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    const dup = params.deepDup();
-    expect(dup._toRawHash()).toEqual({ a: "1", b: "2" });
+    params.permitBang();
+    const duppedParams = rbObjDup(params);
+    expect(duppedParams.toH()).toEqual(params.toH());
   });
 
   it("changes to a duplicate's parameters do not affect the original", () => {
-    const params = new Parameters({ a: "1" });
-    const dup = params.deepDup();
-    dup.set("a", "2");
-    expect(params.get("a")).toBe("1");
+    const duppedParams = rbObjDup(params);
+    duppedParams.delete("person");
+    expect(duppedParams.equals(params)).toBe(false);
   });
 
   it("changes to a duplicate's permitted status do not affect the original", () => {
-    const params = new Parameters({ a: "1" });
-    const dup = params.deepDup();
-    dup.permitBang();
-    expect(params.permitted).toBe(false);
+    const duppedParams = rbObjDup(params);
+    duppedParams.permitBang();
+    expect(duppedParams.equals(params)).toBe(false);
   });
 
   it("deep_dup content", () => {
-    const params = new Parameters({ a: { nested: "value" } });
-    const dup = params.deepDup();
-    (dup._toRawHash().a as any).nested = "changed";
-    expect((params._toRawHash().a as any).nested).toBe("value");
+    const duppedParams = params.deepDup();
+    (duppedParams.get("person") as Parameters).set("age", "45");
+    ((duppedParams.get("person") as Parameters).get("addresses") as unknown[]).length = 0;
+
+    expect((duppedParams.get("person") as Parameters).get("age")).not.toEqual(
+      (params.get("person") as Parameters).get("age"),
+    );
+    expect((duppedParams.get("person") as Parameters).get("addresses")).not.toEqual(
+      (params.get("person") as Parameters).get("addresses"),
+    );
   });
 
   it("deep_dup @permitted", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
-    expect(params.deepDup().permitted).toBe(true);
+    const duppedParams = params.deepDup();
+    duppedParams.permitBang();
+
+    expect(params.permitted).toBe(false);
   });
 
   it("deep_dup @permitted is being copied", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.deepDup().permitted).toBe(false);
-    const permitted = params.permitAll();
-    expect(permitted.deepDup().permitted).toBe(true);
+    params.permitBang();
+    expect(params.deepDup().permitted).toBe(true);
   });
 });

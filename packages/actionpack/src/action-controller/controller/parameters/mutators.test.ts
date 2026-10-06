@@ -4,7 +4,7 @@ import { assertNil } from "@blazetrails/activesupport";
 
 describe("ParametersMutatorsTest", () => {
   it("delete retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.delete("a");
     expect(params.permitted).toBe(true);
   });
@@ -23,7 +23,7 @@ describe("ParametersMutatorsTest", () => {
   it("delete removes the entry when the key present", () => {
     const params = new Parameters({ a: "1", b: "2" });
     params.delete("a");
-    expect(params.has("a")).toBe(false);
+    expect(params.hasKey("a")).toBe(false);
   });
 
   it("delete returns nil when the key is not present", () => {
@@ -42,7 +42,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("delete_if retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.deleteIf((k) => k === "a");
     expect(params.permitted).toBe(true);
   });
@@ -54,7 +54,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("extract! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     const extracted = params.extractBang("a");
     expect(extracted.permitted).toBe(true);
   });
@@ -66,7 +66,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("keep_if retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.keepIf((k) => k === "a");
     expect(params.permitted).toBe(true);
   });
@@ -78,7 +78,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("reject! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.rejectBang((k) => k === "a");
     expect(params.permitted).toBe(true);
   });
@@ -90,7 +90,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("select! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.selectBang((k) => k === "a");
     expect(params.permitted).toBe(true);
   });
@@ -102,7 +102,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("slice! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     params.sliceBang("a");
     expect(params.permitted).toBe(true);
   });
@@ -114,7 +114,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("transform_keys! retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     params.transformKeysBang((k) => k.toUpperCase());
     expect(params.permitted).toBe(true);
   });
@@ -126,7 +126,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("transform_values! retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     params.transformValuesBang((v) => v);
     expect(params.permitted).toBe(true);
   });
@@ -138,7 +138,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("deep_transform_keys! retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     params.deepTransformKeysBang((k) => k.toUpperCase());
     expect(params.permitted).toBe(true);
   });
@@ -147,20 +147,20 @@ describe("ParametersMutatorsTest", () => {
     const inner = new Parameters({ x: "1" });
     const params = new Parameters({ a: inner });
     params.deepTransformKeysBang((k) => k.toUpperCase());
-    expect(params.has("A")).toBe(true);
+    expect(params.hasKey("A")).toBe(true);
     const nested = params.get("A");
     expect(nested).toBeInstanceOf(Parameters);
-    expect((nested as Parameters).has("X")).toBe(true);
+    expect((nested as Parameters).hasKey("X")).toBe(true);
   });
 
   it("deep_transform_keys transforms nested keys", () => {
     const inner = new Parameters({ x: "1" });
     const params = new Parameters({ a: inner });
     const result = params.deepTransformKeys((k) => k.toUpperCase());
-    expect(result.has("A")).toBe(true);
+    expect(result.hasKey("A")).toBe(true);
     const nested = result.get("A");
     expect(nested).toBeInstanceOf(Parameters);
-    expect((nested as Parameters).has("X")).toBe(true);
+    expect((nested as Parameters).hasKey("X")).toBe(true);
   });
 
   it("deep_transform_keys! retains unpermitted status", () => {
@@ -170,7 +170,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("compact retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: null }).permitAll();
+    const params = new Parameters({ a: "1", b: null }).permitBang();
     expect(params.compact().permitted).toBe(true);
   });
 
@@ -185,7 +185,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("compact! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: null }).permitAll();
+    const params = new Parameters({ a: "1", b: null }).permitBang();
     params.compactBang();
     expect(params.permitted).toBe(true);
   });
@@ -197,7 +197,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("compact_blank retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "" }).permitAll();
+    const params = new Parameters({ a: "1", b: "" }).permitBang();
     expect(params.compactBlank().permitted).toBe(true);
   });
 
@@ -207,7 +207,7 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("compact_blank! retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "" }).permitAll();
+    const params = new Parameters({ a: "1", b: "" }).permitBang();
     params.compactBlankBang();
     expect(params.permitted).toBe(true);
   });
@@ -219,20 +219,20 @@ describe("ParametersMutatorsTest", () => {
   });
 
   it("to_h returns a ActiveSupport::HashWithIndifferentAccess", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     const hash = params.toH();
     expect(typeof hash).toBe("object");
     expect(hash.name).toBe("John");
   });
 
   it("to_h receives a block and transforms keys", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     const hash = params.toH((k, v) => [k.toUpperCase(), v]);
     expect(hash.NAME).toBe("John");
   });
 
   it("to_h receives a block and transforms values", () => {
-    const params = new Parameters({ count: "5" }).permitAll();
+    const params = new Parameters({ count: "5" }).permitBang();
     const hash = params.toH((k, v) => [k, Number(v) * 2]);
     expect(hash.count).toBe(10);
   });

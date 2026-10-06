@@ -18,7 +18,7 @@ describe("ParametersExpectTest", () => {
     const params = new Parameters({ person: inner });
     const result = params.expect({ person: ["name"] });
     expect(result.get("name")).toBe("John");
-    expect(result.has("admin")).toBe(false);
+    expect(result.hasKey("admin")).toBe(false);
   });
 
   it("key to hash: returns permitted params", () => {
@@ -85,7 +85,7 @@ describe("ParametersExpectTest", () => {
     const result = params.expect({ person: ["name", "age"] });
     expect(result.get("name")).toBe("John");
     expect(result.get("age")).toBe(22);
-    expect(result.has("admin")).toBe(false);
+    expect(result.hasKey("admin")).toBe(false);
   });
 
   it("chain of keys: returns permitted params", () => {
@@ -174,7 +174,7 @@ describe("ParametersExpectTest", () => {
     const inner = new Parameters({ name: "John", admin: true });
     const params = new Parameters({ person: inner });
     const result = params.expect({ person: ["name"] });
-    expect(result.has("admin")).toBe(false);
+    expect(result.hasKey("admin")).toBe(false);
   });
 
   it("array of keys: raises ParameterMissing when one is missing", () => {
