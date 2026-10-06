@@ -14,7 +14,7 @@ import {
 } from "../sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
 import { ConfigurationError } from "../errors.js";
-import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
+import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 /** @internal */
 interface ExpoSQLiteStatement {
@@ -74,6 +74,8 @@ const COMPLETE_KEYWORDS: Record<string, number> = {
   end: 7,
 };
 
+const COMPLETE_WORD = /[A-Za-z_\u0080-\uffff][\w$\u0080-\uffff]*/y;
+
 const COMPLETE_TRANS = [
   [1, 0, 2, 3, 4, 2, 2, 2],
   [1, 1, 2, 3, 4, 2, 2, 2],
@@ -114,7 +116,8 @@ function statementTail(sql: string): [tail: number, empty: boolean] {
       if (close === -1) return [sql.length, false];
       i = close + 1;
     } else {
-      const word = /^[A-Za-z_\u0080-\uffff][\w$\u0080-\uffff]*/.exec(sql.slice(i))?.[0];
+      COMPLETE_WORD.lastIndex = i;
+      const word = COMPLETE_WORD.exec(sql)?.[0];
       if (word !== undefined) token = COMPLETE_KEYWORDS[word.toLowerCase()] ?? 2;
       i += word?.length ?? 1;
     }
@@ -138,9 +141,14 @@ class ExpoSqliteStatement implements SqliteStatement {
     this._closed = stmt === null;
   }
 
+  private requireOpenStmt(): ExpoSQLiteStatement {
+    if (this._closed) throw new Exception("cannot use a closed statement");
+    return this.stmt!;
+  }
+
   async run(binds?: SqliteBinds): Promise<RunResult> {
     try {
-      const result = await this.stmt!.executeAsync(expandBinds(binds));
+      const result = await this.requireOpenStmt().executeAsync(expandBinds(binds));
       return {
         changes: result.changes,
         lastInsertRowid: result.lastInsertRowId,
@@ -152,7 +160,7 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   async get(binds?: SqliteBinds): Promise<unknown> {
     try {
-      const result = await this.stmt!.executeAsync(expandBinds(binds));
+      const result = await this.requireOpenStmt().executeAsync(expandBinds(binds));
       return await result.getFirstAsync();
     } catch (e) {
       rbSqlite3Raise(e);
@@ -161,7 +169,7 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   async all(binds?: SqliteBinds): Promise<unknown[]> {
     try {
-      const result = await this.stmt!.executeAsync(expandBinds(binds));
+      const result = await this.requireOpenStmt().executeAsync(expandBinds(binds));
       return await result.getAllAsync();
     } catch (e) {
       rbSqlite3Raise(e);
@@ -170,7 +178,7 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   async *iterate(binds?: SqliteBinds): AsyncIterable<unknown> {
     try {
-      const result = await this.stmt!.executeAsync(expandBinds(binds));
+      const result = await this.requireOpenStmt().executeAsync(expandBinds(binds));
       for await (const row of result) {
         yield row;
       }
@@ -192,7 +200,9 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   async toA(): Promise<unknown[][]> {
     try {
-      const result = await this.stmt!.executeForRawResultAsync(expandBinds(this.boundParams));
+      const result = await this.requireOpenStmt().executeForRawResultAsync(
+        expandBinds(this.boundParams),
+      );
       return (await result.getAllAsync()) as unknown[][];
     } catch (e) {
       rbSqlite3Raise(e);
@@ -234,7 +244,8 @@ class ExpoSqliteConnection implements SqliteConnection {
     const [tail, empty] = statementTail(sql);
     const remainder = sql.slice(tail);
     try {
-      const stmt = empty ? null : await this.raw.prepareAsync(sql.slice(0, tail));
+      sql = sql.slice(0, tail);
+      const stmt = empty ? null : await this.raw.prepareAsync(sql);
       return new ExpoSqliteStatement(stmt, sql, remainder);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql);

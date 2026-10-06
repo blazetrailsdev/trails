@@ -359,4 +359,22 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       "/* block; comment */ SELECT [a;b] FROM widgets",
     ]);
   });
+
+  it("a closed statement raises SQLite3::Exception, and reads its own text for reader", async () => {
+    const { conn, errors } = await openWith(readonly("unused"));
+    const empty = await conn.prepare("-- nothing; here\n; SELECT 1");
+    expect(empty.closed).toBe(true);
+    expect(empty.reader).toBe(false);
+    const error = await Promise.resolve()
+      .then(() => empty.all())
+      .then(
+        () => null,
+        (e: unknown) => e,
+      );
+    expect((error as Error).constructor).toBe(errors.Exception);
+    expect((error as Error).message).toBe("cannot use a closed statement");
+
+    const insert = await conn.prepare("INSERT INTO widgets DEFAULT VALUES; SELECT 1");
+    expect(insert.reader).toBe(false);
+  });
 });
