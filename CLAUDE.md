@@ -1967,10 +1967,13 @@ As a consequence:
   omitted, with `@missingRailsCall new — PERMANENT` (`@missingRailsArgs` where
   the body makes another `new`) or `@missingRailsCall wrap — PERMANENT` on the
   declaration. The value is returned as it is.
-- Only the promise object is omitted, never the arm around it.
-  `StatementCache#execute` keeps its `async:` kwarg and dispatches to
-  `async_find_by_sql` (`statement_cache.rb:149-153`); its `rescue ::RangeError`
-  answers `[]` on both arms where Rails wraps one (`:155`).
+- An arm that does something else is kept: `StatementCache#execute` keeps its
+  `async:` kwarg and dispatches to `async_find_by_sql`
+  (`statement_cache.rb:149-153`).
+- A conditional whose arms differ only in the wrap collapses to its value:
+  `async ? Promise.wrap([]) : []` in that method's `rescue ::RangeError`
+  (`:155`) is `return []`, and `@async ? Promise::Complete.new(result) : result`
+  is `return result`. The omitted call's receipt is the collapsed arm's receipt.
 - `Promise#pending?`, `#value` and `#inspect` have no counterpart. A Rails test
   asserting on one ports the assertions that await the value and drops the
   rest, citing this section.
