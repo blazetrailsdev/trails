@@ -63,7 +63,7 @@ export function head(
 }
 
 /** @internal */
-export function includeContent(status: number): boolean {
+function includeContent(status: number): boolean {
   if (status >= 100 && status <= 199) {
     return false;
   } else if (status === 204 || status === 205 || status === 304) {

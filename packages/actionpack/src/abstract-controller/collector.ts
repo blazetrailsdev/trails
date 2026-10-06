@@ -44,7 +44,7 @@ export const Collector = new Module((mod) => {
 };
 Collector.generateMethodForMime = generateMethodForMime;
 
-export function generateMethodForMime(mime: MimeType | string): void {
+function generateMethodForMime(mime: MimeType | string): void {
   const sym = typeof mime === "string" ? mime : mime.toSym()!;
   Collector.defineMethod(
     camelize(symbolToS(sym), false),

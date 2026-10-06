@@ -229,4 +229,19 @@ describe("generateMethodForMime", () => {
   it("camelizes a multi-word MIME symbol", () => {
     expect(Collector.isMethodDefined("urlEncodedForm")).toBe(true);
   });
+
+  it("round-trips a multi-word MIME symbol registered later, and through method_missing", () => {
+    MimeType.register("application/tablet-phone", ":tablet_phone");
+    try {
+      const c = new TestCollector() as TestCollector & { tabletPhone(): unknown };
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
+      expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
+      Collector.removeMethod("tabletPhone");
+      expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
+    } finally {
+      MimeType.unregister(":tablet_phone");
+      Collector.removeMethod("tabletPhone");
+    }
+  });
 });
