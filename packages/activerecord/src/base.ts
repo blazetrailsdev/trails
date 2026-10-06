@@ -1657,7 +1657,6 @@ export class Base extends Model {
   _readonly = false;
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
-  _transactionAction: "create" | "update" | "destroy" | undefined = undefined;
 
   constructor(
     attributes: Record<string, unknown> | PermittedAttributes = {},
@@ -1821,7 +1820,6 @@ export class Base extends Model {
     if (!destroyResult) return false;
 
     if (didDelete) {
-      this._transactionAction = "destroy";
       (this as any)._triggerDestroyCallback = true;
       (this as any)._newRecordBeforeLastCommit = false;
       (this as any)._triggerUpdateCallback = false;

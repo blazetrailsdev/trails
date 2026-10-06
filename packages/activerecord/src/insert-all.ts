@@ -446,9 +446,10 @@ export class Builder implements InsertBuilder {
     tableName: string,
     keys: string[],
   ): Promise<Hash<string, ValueType | null>> {
-    const columns = (await this.model.schemaCache().columnsHash(tableName)) ?? {};
+    const columns = await this.model.schemaCache().columnsHash(tableName);
 
-    const unknownColumn = first(keys.filter((key) => !Object.keys(columns).includes(key)));
+    const columnsKeys = Object.keys(columns);
+    const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
     if (unknownColumn !== undefined) {
       throw new UnknownAttributeError(new this.model(), unknownColumn);
     }
