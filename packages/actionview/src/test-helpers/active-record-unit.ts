@@ -1,7 +1,15 @@
 import "./abstract-unit.js";
 import { Base } from "@blazetrails/activerecord";
 import { cattrAccessor, isBlank } from "@blazetrails/activesupport";
-import { Dir, File, getFs, warn } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  File,
+  RuntimeError,
+  getFs,
+  isRegisteredConstant,
+  registerConstant,
+  warn,
+} from "@blazetrails/ruby-compat";
 
 const __dir__ = new URL(".", import.meta.url).pathname;
 
@@ -38,11 +46,19 @@ export class ActiveRecordTestConnector {
   }
 
   private static async setupConnection(): Promise<void> {
-    const defaults = { database: ":memory:" };
-    const options = { ...defaults, adapter: "sqlite3", timeout: 500 };
-    await Base.establishConnection(options);
-    Base.configurations({ sqlite3_ar_integration: options });
-    await Base.leaseConnection();
+    if (isRegisteredConstant("ActiveRecord")) {
+      const defaults = { database: ":memory:" };
+      const options = { ...defaults, adapter: "sqlite3", timeout: 500 };
+      await Base.establishConnection(options);
+      Base.configurations({ sqlite3_ar_integration: options });
+      await Base.leaseConnection();
+
+      if (!isRegisteredConstant("QUOTED_TYPE")) {
+        registerConstant("QUOTED_TYPE", (await Base.leaseConnection()).quoteColumnName("type"));
+      }
+    } else {
+      throw new RuntimeError("Can't setup connection since ActiveRecord isn't loaded.");
+    }
   }
 
   private static async loadSchema(): Promise<void> {

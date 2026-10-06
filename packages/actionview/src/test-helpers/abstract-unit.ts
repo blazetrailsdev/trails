@@ -1,4 +1,4 @@
-import { ActionController, RouteSet } from "@blazetrails/actionpack";
+import { ActionController, ActionDispatch, RouteSet } from "@blazetrails/actionpack";
 import { include, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 
 type DrawCallback = Parameters<RouteSet["draw"]>[0];
@@ -12,6 +12,8 @@ declare module "@blazetrails/actionpack" {
     }
   }
 }
+
+include(ActionController.TestCase, ActionDispatch.TestProcess);
 
 ActionController.TestCase.withRoutes = function (
   this: typeof ActionController.TestCase,

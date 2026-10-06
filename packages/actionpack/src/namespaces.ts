@@ -7,6 +7,7 @@ import type { TemplateAssertions } from "./action-controller/template-assertions
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
 import type { Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
+import type { TestProcess } from "./action-dispatch/testing/test-process.js";
 import type * as PolymorphicRoutes from "./action-dispatch/routing/polymorphic-routes.js";
 import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 
@@ -16,6 +17,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "action_controller/test_case": () => import("./action-controller/test-case.js"),
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
   "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
+  "action_dispatch/testing/test_process": () => import("./action-dispatch/testing/test-process.js"),
   "action_dispatch/routing/polymorphic_routes": () =>
     import("./action-dispatch/routing/polymorphic-routes.js"),
   "action_dispatch/routing/routes_proxy": () => import("./action-dispatch/routing/routes-proxy.js"),
@@ -29,6 +31,7 @@ export const ActionDispatch = {
   Request: typeof Request;
   Routing: typeof Routing;
   Assertions: typeof Assertions;
+  TestProcess: typeof TestProcess;
   testApp: unknown;
 };
 extend(ActionDispatch, Autoload);
@@ -40,6 +43,7 @@ ActionDispatch.eagerAutoload(() => {
 
 ActionDispatch.autoloadUnder("testing", () => {
   ActionDispatch.autoload("Assertions");
+  ActionDispatch.autoload("TestProcess");
 });
 
 export const Routing = { name: "ActionDispatch::Routing", loadPath } as AutoloadModule & {
