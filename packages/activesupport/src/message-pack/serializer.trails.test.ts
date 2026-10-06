@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BigDecimal, FrozenError } from "@blazetrails/ruby-compat";
 
-import { Factory } from "./factory.js";
+import { Factory, MessagePackError } from "./factory.js";
 import { Serializer } from "./serializer.js";
 
 describe("MessagePackSerializerTrailsTest", () => {
@@ -55,5 +55,14 @@ describe("MessagePackSerializerTrailsTest", () => {
     const pool = factory.pool(1);
     expect(factory.isFrozen()).toBe(false);
     expect(pool.packer((packer) => (packer.write(1), packer.fullPack()))).toEqual(Buffer.from([1]));
+    factory.registerType({
+      type: 100,
+      klass: "Set",
+      recursive: true,
+      match: (v) => v instanceof Set,
+      packer: (v, packer) => packer.write([...(v as Set<unknown>)]),
+      unpacker: () => null,
+    });
+    expect(() => pool.packer((packer) => packer.write(new Set()))).toThrow(MessagePackError);
   });
 });
