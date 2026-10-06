@@ -51,6 +51,7 @@ export class Factory {
   }
 
   freeze(): this {
+    Object.freeze(this.types);
     return Object.freeze(this);
   }
 

@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
 
 const BASE_FIG = 9;
@@ -32,7 +33,7 @@ export class BigDecimal {
   private digits: string;
   private exp: number;
   private readonly nonFinite: "NaN" | "Infinity" | null;
-  private readonly maxPrec: number;
+  private maxPrec: number;
 
   /** @noRailsEquivalent PERMANENT */
   constructor(
@@ -287,26 +288,43 @@ export class BigDecimal {
    *
    * @noRailsEquivalent PERMANENT
    */
-  _dump(): string {
+  _dump(_dummy?: unknown): string {
     return `${this.maxPrec * BASE_FIG}:${this.toString("E")}`;
   }
 
   /**
    * Ruby's `BigDecimal._load` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:805`
-   * `BigDecimal_load`).
+   * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
+   * (`bigdecimal.c:5420-5421`) over the prefix.
    *
    * @noRailsEquivalent PERMANENT
    */
   static _load(str: string): BigDecimal {
     let pch = 0;
+    let m = 0;
     while (pch < str.length) {
       const ch = str[pch++];
       if (ch === ":") break;
       if (!(ch >= "0" && ch <= "9")) {
         throw new TypeError("load failed: invalid character in the marshaled string");
       }
+      m = m * 10 + Number(ch);
     }
-    return new BigDecimal(str.slice(pch));
+    if (m > BASE_FIG) m -= BASE_FIG;
+    const szVal = str.slice(pch);
+    const parsed = parse(szVal);
+    if (parsed === null) {
+      throw new ArgumentError(`invalid value for BigDecimal(): "${szVal}"`);
+    }
+    const pv = new BigDecimal(szVal);
+    if (pv.nonFinite === null) {
+      pv.maxPrec = Math.max(pv.maxPrec, Math.max(Math.ceil(m / BASE_FIG), 1));
+    }
+    m = Math.floor(m / BASE_FIG);
+    if (m && pv.maxPrec > m) {
+      pv.maxPrec = m + 1;
+    }
+    return pv;
   }
 
   private unscaled(signum = 1): bigint {

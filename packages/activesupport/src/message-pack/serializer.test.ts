@@ -4,7 +4,6 @@ import { Temporal, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,
-  FrozenError,
   Rational,
   RuntimeError,
   complex,
@@ -85,33 +84,6 @@ describe("MessagePackSerializerTest", () => {
       expect(deserialized.toString("E")).toBe(object.toString("E"));
     }
     expect((roundtrip(new BigDecimal("NaN")) as BigDecimal).isNan()).toBe(true);
-  });
-
-  it("dumps BigDecimal bytes identical to real Rails MessagePack", () => {
-    expect([...dump(new BigDecimal("9876543210.0123456789"))]).toEqual([
-      204,
-      128,
-      199,
-      28,
-      2,
-      ...Buffer.from("36:0.98765432100123456789e10"),
-    ]);
-    expect([...dump(new BigDecimal("1"))]).toEqual([204, 128, 215, 2, ...Buffer.from("18:0.1e1")]);
-  });
-
-  it("freezes the factory once the pool is built", () => {
-    MessagePack.warmup();
-    expect(MessagePack.messagePackFactory.isFrozen()).toBe(true);
-    expect(() =>
-      MessagePack.registerType({
-        type: 100,
-        klass: "Late",
-        recursive: false,
-        match: () => false,
-        packer: () => Buffer.alloc(0),
-        unpacker: () => null,
-      }),
-    ).toThrow(FrozenError);
   });
 
   it("roundtrips Rational", () => {

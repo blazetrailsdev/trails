@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { BigDecimal, toD } from "./big-decimal.js";
 
 describe("BigDecimal", () => {
@@ -47,6 +48,13 @@ describe("BigDecimal", () => {
     expect(BigDecimal._load("36:0.98765432100123456789e10")._dump()).toBe(
       "36:0.98765432100123456789e10",
     );
+    expect(
+      ["9:0.1e1", "18:0.1e1", "0:0.1e1", "90:0.1e1", "27:0.123456789e9"].map((v) =>
+        BigDecimal._load(v)._dump(),
+      ),
+    ).toEqual(["18:0.1e1", "18:0.1e1", "18:0.1e1", "81:0.1e1", "27:0.123456789e9"]);
+    expect(() => BigDecimal._load("12")).toThrow(ArgumentError);
+    expect(() => BigDecimal._load("12")).toThrow('invalid value for BigDecimal(): ""');
     expect(() => BigDecimal._load("0.1e1")).toThrow(TypeError);
     expect(() => BigDecimal._load("0.1e1")).toThrow(
       "load failed: invalid character in the marshaled string",
