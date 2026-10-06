@@ -275,7 +275,14 @@ describe("QueryingTest — update_all / delete_all delegate to all on an abstrac
     await expect(AbstractThing.updateAll({ title: "x" })).rejects.toThrow(TableNotSpecified);
   });
 
-  it("deleteAll reaches the relation instead of raising up front", async () => {
-    await expect(AbstractThing.deleteAll()).rejects.not.toThrow(/on abstract class/);
+  it("deleteAll delegates to the relation", async () => {
+    const deleteAll = vi.spyOn(Relation.prototype, "deleteAll").mockResolvedValue(3);
+    try {
+      expect(await AbstractThing.deleteAll()).toBe(3);
+      expect(deleteAll).toHaveBeenCalledTimes(1);
+      expect((deleteAll.mock.contexts[0] as Relation<Base>).model).toBe(AbstractThing);
+    } finally {
+      deleteAll.mockRestore();
+    }
   });
 });
