@@ -9,11 +9,6 @@
     "reason": "Rails Promise wraps a thread-backed FutureResult with a blocking #value. JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly."
   },
   {
-    "pattern": "marshalling.rb",
-    "testFile": "marshal_serialization_test.rb",
-    "reason": "Ruby's Marshal binary format (Marshal.dump/load). No JS equivalent; JS cache/session layers use JSON or structured clone."
-  },
-  {
     "pattern": "message_pack.rb",
     "testFile": "message_pack_test.rb",
     "reason": "Rails-integrated MessagePack (:nodoc:) registers AR records with ActiveSupport::MessagePack encoder/decoder. Ruby-only coupling; MessagePack-the-format exists in JS but this file is the Marshal bridge, not a reusable impl."
@@ -26,10 +21,6 @@
     "pattern": "coders/yaml_column.rb",
     "testFile": "coders/yaml_column_test.rb",
     "reason": "YAML column coder. The store-column dump/load path and the Psych safe-dump class restriction are ported (coders/yaml-column.ts, backed by the `yaml` package — `store :col, coder: \"YAML\"`), but the Psych-specific safe-LOAD machinery (permitted_classes on load, type-mismatch-on-Ruby-class) has no JS analog; those test cases stay Ruby-only."
-  },
-  {
-    "pattern": "encryption/encrypted_fixtures.rb",
-    "reason": "Encrypts YAML fixture rows on load. Behavior ported inline into FixtureSet.createFixtures() (define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts."
   },
   {
     "pattern": "destroy_association_async_job.rb",

@@ -35,7 +35,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "cross-thread session barriers, none of which exist without threads.",
   },
   {
-    pattern: "marshalling.rb",
     testFile: "marshal_serialization_test.rb",
     reason:
       "Ruby's Marshal binary format (Marshal.dump/load). No JS equivalent; " +
@@ -294,12 +293,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "instance test object to construct and run from inside another test, and trails' " +
       "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
       "setup has a counterpart. The other 3 cases are ported in test-fixtures.test.ts.",
-  },
-  {
-    pattern: "encryption/encrypted_fixtures.rb",
-    reason:
-      "Encrypts YAML fixture rows on load. Behavior ported inline into FixtureSet.createFixtures() " +
-      "(define-fixtures.ts) rather than as a separate module. Tests live in encrypted-fixtures.test.ts.",
   },
   {
     pattern: "destroy_association_async_job.rb", // no test counterpart

@@ -1,7 +1,6 @@
 import type { UnportedFile } from "./types.js";
 
 const STORIES: Record<string, string> = {
-  activerecord: "activerecord-port-version-and-gem-version",
   activesupport: "activesupport-port-version-rb",
   actionview: "actionview-port-version-rb",
   trailties: "trailties-port-version-rb",
