@@ -1891,3 +1891,33 @@ This is ratified repo-wide here, and there is no story to port Zeitwerk. It is
 about the application loader only: framework-internal call-time constant
 resolution (Ruby's `ActiveSupport::Autoload` / `Module#autoload` inside the gems)
 is § "Call-time constant resolution" above.
+
+## Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)
+
+Rails ships a second MySQL adapter over [Trilogy](https://github.com/trilogy-libraries/trilogy),
+a C client library with Ruby bindings: `activerecord/lib/active_record/connection_adapters/trilogy_adapter.rb`
+and `activerecord/lib/active_record/connection_adapters/trilogy/`.
+
+**Trilogy has no Node client and trails will not port it.** There is no npm
+package wrapping the C library, and nothing to wrap it with: a TrilogyAdapter
+built on the `mysql2` npm driver would be a second `Mysql2Adapter` under a
+Rails name that means "not mysql2", which is a worse divergence than the
+absent file. MySQL goes through `Mysql2Adapter`, as it already does.
+
+As a consequence:
+
+- `trilogy_adapter.rb` and `adapters/trilogy/` stay in
+  `scripts/parity/unported-files/unscoped.ts`, and their rows are **permanent** —
+  not a burndown row, and not covered by the
+  "a documented deviation is debt" rule above. The same holds for
+  `trilogy_adapter_test.rb` and for the trilogy arms of a shared MySQL test.
+- A Rails body or test that branches on Trilogy (`current_adapter?(:Mysql2Adapter,
+:TrilogyAdapter)`, a `Trilogy::` error class) ports its mysql2 arm and drops the
+  trilogy one. Dropping an adapter arm is normally the bug
+  `project_rails_test_adapter_conditional_dropped_in_port` records; this is the
+  one adapter where it is correct.
+- There is no story to port it. Do not file one, do not claim one, and do not
+  un-exclude the files to "measure" them — the exclusion is the answer.
+
+This is an ecosystem gap rather than a TypeScript language shortcoming, and it is
+ratified repo-wide here. A new instance is not a new decision to argue.
