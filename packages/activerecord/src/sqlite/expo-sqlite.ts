@@ -98,7 +98,7 @@ function statementTail(sql: string): [tail: number, empty: boolean] {
     if (c === ";") {
       token = 0;
       i++;
-    } else if (/\s/.test(c)) {
+    } else if (/[ \r\t\n\f]/.test(c)) {
       token = 1;
       i++;
     } else if (c === "/" && sql[i + 1] === "*") {
