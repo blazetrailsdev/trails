@@ -15,7 +15,6 @@ import {
   rbObjDup,
   rbObjNotMatch,
   rbObjRespondTo,
-  rbSetClassPathString,
   rtest,
 } from "@blazetrails/ruby-compat";
 import {
@@ -395,4 +394,3 @@ export class Options extends Arguments {
     );
   }
 }
-rbSetClassPathString(Options, { name: "Thor" }, "Options");

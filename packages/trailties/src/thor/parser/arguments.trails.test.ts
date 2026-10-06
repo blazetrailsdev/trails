@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { NoMethodError, Range, rational, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import "../thor.js";
 import { MalformattedArgumentError, RequiredArgumentMissingError } from "../error.js";
 import { Argument } from "./argument.js";
 import { Arguments } from "./arguments.js";

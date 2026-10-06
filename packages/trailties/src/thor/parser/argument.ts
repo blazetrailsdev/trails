@@ -8,7 +8,6 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjRespondTo,
-  rbSetClassPathString,
   rbStrDump,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -143,4 +142,3 @@ export class Argument {
     }
   }
 }
-rbSetClassPathString(Argument, { name: "Thor" }, "Argument");

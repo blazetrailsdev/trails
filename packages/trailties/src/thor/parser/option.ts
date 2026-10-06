@@ -11,7 +11,6 @@ import {
   rbObjAsString,
   rbObjClassname,
   rbObjIsKindOf,
-  rbSetClassPathString,
   rtest,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -220,4 +219,3 @@ export class Option extends Argument {
     return rbFArray(aliases).map((short) => rbObjAsString(short).replace(/^(?!-)/, "-"));
   }
 }
-rbSetClassPathString(Option, { name: "Thor" }, "Option");

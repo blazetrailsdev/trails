@@ -18,6 +18,7 @@ import {
   rbFCaller,
   rbInspect,
   rbObjAsString,
+  rbSetClassPathString,
   rtest,
   sort,
   stringSplit,
@@ -30,8 +31,9 @@ import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, thorRunner } from
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
 import { AmbiguousTaskError } from "./error.js";
 import { Group, type GroupClass } from "./group.js";
+import { Argument } from "./parser/argument.js";
 import { Arguments } from "./parser/arguments.js";
-import type { Option, OptionOptions } from "./parser/option.js";
+import { Option, type OptionOptions } from "./parser/option.js";
 import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
@@ -679,6 +681,11 @@ export class Thor {
     }
   }
 }
+
+rbSetClassPathString(Argument, Thor, "Argument");
+rbSetClassPathString(Arguments, Thor, "Arguments");
+rbSetClassPathString(Option, Thor, "Option");
+rbSetClassPathString(Options, Thor, "Options");
 
 Thor.defaultTask = Thor.defaultCommand;
 Thor.options = Thor.methodOptions;

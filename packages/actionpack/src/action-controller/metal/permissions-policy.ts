@@ -1,31 +1,32 @@
-import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
+import { Concern, Module, extend } from "@blazetrails/activesupport";
+import { rbObjClone } from "@blazetrails/ruby-compat";
+import type { CallbackOptions, beforeAction } from "../../abstract-controller/callbacks.js";
+import type { PermissionsPolicy as Policy } from "../../action-dispatch/http/permissions-policy.js";
+import type { Request } from "../../action-dispatch/http/request.js";
 
-export function buildPermissionsPolicy(directives: Record<string, string | string[]>): string {
-  const parts: string[] = [];
-  for (const [feature, values] of Object.entries(directives)) {
-    const valueList = Array.isArray(values) ? values.join(" ") : values;
-    parts.push(`${feature}=(${valueList})`);
-  }
-  return parts.join(", ");
+/** @internal */
+export interface PermissionsPolicyClassHost {
+  beforeAction: OmitThisParameter<typeof beforeAction>;
 }
 
-export type PermissionsPolicyBlock = (
-  this: unknown,
-  directives: Record<string, string | string[]>,
-) => void;
+export const ClassMethods = {
+  permissionsPolicy(
+    this: PermissionsPolicyClassHost,
+    options: CallbackOptions = {},
+    block?: (this: any, policy: Policy) => void,
+  ): void {
+    this.beforeAction((controller) => {
+      if (block) {
+        const request = (controller as unknown as { request: Request }).request;
+        const policy = rbObjClone(request.permissionsPolicy!);
+        block.call(controller, policy);
+        request.permissionsPolicy = policy;
+      }
+    }, options);
+  },
+};
 
-interface PermissionsPolicyHost {
-  beforeAction(callback: (controller: unknown) => void | boolean, options: CallbackOptions): void;
-}
-
-export function permissionsPolicy(
-  this: PermissionsPolicyHost,
-  options: CallbackOptions = {},
-  block?: PermissionsPolicyBlock,
-): void {
-  this.beforeAction(function (controller: unknown) {
-    if (!block) return;
-    const directives: Record<string, string | string[]> = {};
-    block.call(controller, directives);
-  }, options);
-}
+export const PermissionsPolicy = new Module((mod) => {
+  extend(mod, Concern);
+}) as Module<object> & { ClassMethods: typeof ClassMethods };
+PermissionsPolicy.ClassMethods = ClassMethods;

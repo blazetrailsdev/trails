@@ -104,8 +104,14 @@ import {
   AllowBrowser,
   type ClassMethods as AllowBrowserClassMethods,
 } from "./metal/allow-browser.js";
-import { permissionsPolicy } from "./metal/permissions-policy.js";
-import { rateLimit, rateLimiting } from "./metal/rate-limiting.js";
+import {
+  PermissionsPolicy,
+  type ClassMethods as PermissionsPolicyClassMethods,
+} from "./metal/permissions-policy.js";
+import {
+  RateLimiting,
+  type ClassMethods as RateLimitingClassMethods,
+} from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
 import { AssetPaths } from "../abstract-controller/asset-paths.js";
@@ -560,7 +566,9 @@ export class Base extends Metal {
 
   declare static allowBrowser: OmitThisParameter<(typeof AllowBrowserClassMethods)["allowBrowser"]>;
 
-  static permissionsPolicy = permissionsPolicy;
+  declare static permissionsPolicy: OmitThisParameter<
+    (typeof PermissionsPolicyClassMethods)["permissionsPolicy"]
+  >;
 
   static contentSecurityPolicy = contentSecurityPolicy;
 
@@ -579,15 +587,10 @@ export class Base extends Metal {
     return currentContentSecurityPolicy.call(this as never);
   }
 
-  static rateLimit = rateLimit;
+  declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
   static logAt = logAt;
   static logProcessAction = logProcessAction;
-
-  /** @internal */
-  async rateLimiting(args: Parameters<typeof rateLimiting>[0]): Promise<void> {
-    return rateLimiting.call(this, args);
-  }
 
   static defaultFormBuilder = defaultFormBuilder;
 
@@ -801,6 +804,8 @@ Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
+include(Base, PermissionsPolicy);
+include(Base, RateLimiting);
 include(Base, AllowBrowser);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 include(Base, ImplicitRender);
