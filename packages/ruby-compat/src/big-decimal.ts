@@ -285,8 +285,6 @@ export class BigDecimal {
    * Ruby's `BigDecimal#_dump` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:781`
    * `BigDecimal_dump`): `VpMaxPrec(vp)*VpBaseFig()`, a colon, then the bare
    * `to_s`.
-   *
-   * @noRailsEquivalent PERMANENT
    */
   _dump(_dummy?: unknown): string {
     return `${this.maxPrec * BASE_FIG}:${this.toString("E")}`;
@@ -296,8 +294,6 @@ export class BigDecimal {
    * Ruby's `BigDecimal._load` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:805`
    * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
    * (`bigdecimal.c:5420-5421`) over the prefix.
-   *
-   * @noRailsEquivalent PERMANENT
    */
   static _load(str: string): BigDecimal {
     let pch = 0;
