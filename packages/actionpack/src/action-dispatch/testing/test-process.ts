@@ -1,4 +1,4 @@
-import { File, NoMethodError } from "@blazetrails/ruby-compat";
+import { File, NoMethodError, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export { NoMethodError };
 
@@ -6,6 +6,7 @@ import { CookieJar, type RequestCookieMethodsHost } from "../middleware/cookies.
 import type { FlashHash } from "../middleware/flash.js";
 import type { Session } from "../request/session.js";
 import { UploadedFile } from "@blazetrails/rack-test";
+import { ActionDispatch } from "../../namespaces.js";
 
 /** @internal */
 export interface TestProcessRequest extends RequestCookieMethodsHost {
@@ -83,3 +84,4 @@ export const FixtureFile = {
   fileFixtureUpload,
   fixtureFileUpload,
 };
+rbModConstSet(ActionDispatch, "TestProcess", TestProcess);

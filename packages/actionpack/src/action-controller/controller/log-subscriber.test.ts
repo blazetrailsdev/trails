@@ -3,7 +3,6 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   assertEqual,
   assertMatch,
-  LogSubscriber as BaseLogSubscriber,
   NotificationEvent,
   Notifications,
 } from "@blazetrails/activesupport";
@@ -133,6 +132,7 @@ function makeEvent(
 describe("ACLogSubscriberTest", () => {
   let subscriber: LogSubscriber;
   let logger: CaptureLogger;
+  let oldLogger: typeof Base.logger;
   let controller: TestCase;
   let logs: string[];
   let oldEnableFragmentCacheLogging: boolean;
@@ -143,7 +143,8 @@ describe("ACLogSubscriberTest", () => {
     subscriber = new LogSubscriber();
     logger = new CaptureLogger();
     logs = logger.messages;
-    vi.spyOn(BaseLogSubscriber, "logger", "get").mockReturnValue(logger as never);
+    oldLogger = Base.logger;
+    Base.logger = logger as never;
 
     const caching = Base as unknown as CachingClassMethods;
     oldEnableFragmentCacheLogging = caching.enableFragmentCacheLogging!;
@@ -162,6 +163,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   afterEach(() => {
+    Base.logger = oldLogger;
     vi.restoreAllMocks();
     Notifications.unsubscribeAll();
     FileUtils.rmRf(cachePath);

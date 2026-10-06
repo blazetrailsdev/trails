@@ -4,9 +4,9 @@ import { Hash, Module, extend, hashAref, hashAset } from "@blazetrails/ruby-comp
 type DeduplicableClass = { registry(): Hash<object, object> };
 
 export const Deduplicable = new Module() as Module<{
-  deduplicate: typeof deduplicate;
-  negate: typeof negate;
-  deduplicated: typeof deduplicated;
+  deduplicate<T>(this: T): T;
+  negate<T>(this: T): T;
+  deduplicated(): object;
 }> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 

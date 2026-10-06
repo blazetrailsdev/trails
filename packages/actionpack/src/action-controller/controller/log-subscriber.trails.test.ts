@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import {
-  LogSubscriber as BaseLogSubscriber,
-  NotificationEvent,
-  Notifications,
-} from "@blazetrails/activesupport";
+import { NotificationEvent, Notifications } from "@blazetrails/activesupport";
 import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
 import type { CachingClassMethods } from "../../abstract-controller/caching.js";
@@ -21,14 +17,17 @@ class CaptureLogger {
 describe("ACLogSubscriberTest", () => {
   let subscriber: LogSubscriber;
   let logger: CaptureLogger;
+  let oldLogger: typeof Base.logger;
 
   beforeEach(() => {
     subscriber = new LogSubscriber();
     logger = new CaptureLogger();
-    vi.spyOn(BaseLogSubscriber, "logger", "get").mockReturnValue(logger as never);
+    oldLogger = Base.logger;
+    Base.logger = logger as never;
   });
 
   afterEach(() => {
+    Base.logger = oldLogger;
     vi.restoreAllMocks();
     Notifications.unsubscribeAll();
   });

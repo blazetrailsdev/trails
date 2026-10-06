@@ -188,8 +188,9 @@ export const UrlFor = new Module((mod) => {
     if (rbObjRespondTo(this, "_urlForModules")) include(this, this._urlForModules!());
   });
 
+  /** @inventedArm if — CONVERGEABLE url-for-routes-ivar-shares-the-routes-reader-property */
   (mod as unknown as Record<symbol, unknown>)[moduleInitialize] = function (this: UrlForHost) {
-    this._routes = null;
+    if ("_routes" in this) this._routes = null;
   };
 
   mod.moduleEval((m) => {

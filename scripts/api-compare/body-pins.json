@@ -31086,13 +31086,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/column.rb",
-    "rubyName": "deduplicate",
-    "digest": "422f93cac54f75c5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/column.rb",
     "rubyName": "deduplicated",
     "digest": "1bedee0cbc39936e",
     "ref": "v8.0.2"
@@ -31711,13 +31704,6 @@
     "rubyFile": "connection_adapters/mysql/type_metadata.rb",
     "rubyName": "==",
     "digest": "45f6f5912ffa99af",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/mysql/type_metadata.rb",
-    "rubyName": "deduplicate",
-    "digest": "422f93cac54f75c5",
     "ref": "v8.0.2"
   },
   {
@@ -34271,13 +34257,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql/type_metadata.rb",
-    "rubyName": "deduplicate",
-    "digest": "422f93cac54f75c5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql/type_metadata.rb",
     "rubyName": "deduplicated",
     "digest": "4e59cfcad344b8d0",
     "ref": "v8.0.2"
@@ -35421,13 +35400,6 @@
     "rubyFile": "connection_adapters/sql_type_metadata.rb",
     "rubyName": "==",
     "digest": "78146f766f8c7c80",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/sql_type_metadata.rb",
-    "rubyName": "deduplicate",
-    "digest": "422f93cac54f75c5",
     "ref": "v8.0.2"
   },
   {
