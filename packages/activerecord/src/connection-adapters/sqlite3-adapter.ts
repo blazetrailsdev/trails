@@ -1082,18 +1082,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   static readonly VIRTUAL_TABLE_REGEX = /USING\s+(\w+)\s*\((.+)\)/i;
 
-  get schemaCreation(): SQLite3SchemaCreation {
-    return sqliteSchemaCreation.call(this);
-  }
-
-  /** @internal */
-  createTableDefinition(
-    name: string,
-    options: Record<string, unknown> = {},
-  ): SQLite3TableDefinition {
-    return sqliteCreateTableDefinition.call(this, name, options);
-  }
-
   static columnNameMatcher(): RegExp {
     const id = String.raw`(?:\w+|"(?:[^"]|"")*")`;
     const col = String.raw`(?:${id}\.)?${id}`;
@@ -1478,6 +1466,11 @@ SQLite3Adapter.prototype.commitDbTransaction = sqliteCommitDbTransaction;
 SQLite3Adapter.prototype.execRollbackDbTransaction = sqliteExecRollbackDbTransaction;
 SQLite3Adapter.prototype.resetIsolationLevel = sqliteResetIsolationLevel;
 SQLite3Adapter.prototype.execute = sqliteExecute;
+Object.defineProperty(SQLite3Adapter.prototype, "schemaCreation", {
+  get: sqliteSchemaCreation,
+  configurable: true,
+});
+SQLite3Adapter.prototype.createTableDefinition = sqliteCreateTableDefinition;
 SQLite3Adapter.prototype.defaultInsertValue = sqliteDefaultInsertValue;
 SQLite3Adapter.prototype.explain = sqliteExplain;
 SQLite3Adapter.prototype.isWriteQuery = sqliteIsWriteQuery;
@@ -1488,6 +1481,9 @@ SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurr
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export interface SQLite3Adapter {
+  get schemaCreation(): SQLite3SchemaCreation;
+  /** @internal */
+  createTableDefinition(name: string, options?: Record<string, unknown>): SQLite3TableDefinition;
   get databaseVersion(): Version | Promise<Version>;
   beginDbTransaction: typeof sqliteBeginDbTransaction;
   beginDeferredTransaction: typeof sqliteBeginDeferredTransaction;

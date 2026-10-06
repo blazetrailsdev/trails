@@ -111,13 +111,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
-  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
-    return PgSchemaDumper.create(
-      this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
-      options,
-    );
-  }
-
   override async dropTable(
     ...args: Parameters<AbstractSchemaStatements["dropTable"]>
   ): Promise<unknown> {
@@ -237,49 +230,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       "SCHEMA",
     );
     return Number(count) > 0;
-  }
-
-  async addIndexOptions(
-    tableName: string,
-    columnName: string | string[],
-    options: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2] = {},
-  ): Promise<[IndexDefinition, string | undefined, boolean]> {
-    options = { ...options };
-    const where = options.where;
-    if (
-      typeof where === "string" &&
-      (await this.tableExists(tableName)) &&
-      (await this.columnExists(tableName, where))
-    ) {
-      options.where = this.quoteColumnName(where);
-    }
-    return super.addIndexOptions(tableName, columnName, options);
-  }
-
-  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
-    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
-
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
-    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
-  }
-
-  get schemaCreation(): PgSchemaCreation {
-    return new PgSchemaCreation(
-      this as unknown as ConstructorParameters<typeof PgSchemaCreation>[0],
-    );
-  }
-
-  /** @internal */
-  createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
-    return new PgTableDefinition(this, name, options);
-  }
-
-  /** @internal */
-  createAlterTable(name: string): PgAlterTable {
-    return new PgAlterTable(this.createTableDefinition(name));
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
@@ -819,6 +769,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
+  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
+    return PgSchemaDumper.create(
+      this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
+      options,
+    );
+  }
+
   async validateConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
     const at = this.createAlterTable(tableName);
     at.validateConstraint(constraintName);
@@ -848,6 +805,39 @@ export class SchemaStatements extends AbstractSchemaStatements {
   override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
     const [, table] = this.extractSchemaQualifiedName(tableName);
     return `${singularize(table)}_${columnName}`;
+  }
+
+  async addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2] = {},
+  ): Promise<[IndexDefinition, string | undefined, boolean]> {
+    options = { ...options };
+    const where = options.where;
+    if (
+      typeof where === "string" &&
+      (await this.tableExists(tableName)) &&
+      (await this.columnExists(tableName, where))
+    ) {
+      options.where = this.quoteColumnName(where);
+    }
+    return super.addIndexOptions(tableName, columnName, options);
+  }
+
+  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
+    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
+
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
+    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
+  }
+
+  get schemaCreation(): PgSchemaCreation {
+    return new PgSchemaCreation(
+      this as unknown as ConstructorParameters<typeof PgSchemaCreation>[0],
+    );
   }
 
   /** @internal */
@@ -946,15 +936,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return foreignKeys;
   }
 
-  override async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
-  ): Promise<void> {
-    this.assertValidDeferrable(options.deferrable);
-    await super.addForeignKey(fromTable, toTable, options);
-  }
-
   async foreignTables(): Promise<string[]> {
     const names = await this.queryValues(this.dataSourceSql({ type: "FOREIGN TABLE" }), "SCHEMA");
     return names as string[];
@@ -966,6 +947,15 @@ export class SchemaStatements extends AbstractSchemaStatements {
         await this.queryValues(this.dataSourceSql(tableName, { type: "FOREIGN TABLE" }), "SCHEMA"),
       );
     }
+  }
+
+  override async addForeignKey(
+    fromTable: string,
+    toTable: string,
+    options: AddForeignKeyOptions = {},
+  ): Promise<void> {
+    this.assertValidDeferrable(options.deferrable);
+    await super.addForeignKey(fromTable, toTable, options);
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
@@ -1337,6 +1327,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
       if (!(error instanceof StatementInvalid)) throw error;
       return new Name(null, `${tableName}_${pk}_seq`).toString();
     }
+  }
+
+  /** @internal */
+  createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
+    return new PgTableDefinition(this, name, options);
+  }
+
+  /** @internal */
+  createAlterTable(name: string): PgAlterTable {
+    return new PgAlterTable(this.createTableDefinition(name));
   }
 
   /** @internal */

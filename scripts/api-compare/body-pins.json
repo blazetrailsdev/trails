@@ -36147,13 +36147,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/sqlite3_adapter.rb",
-    "rubyName": "create_table_definition",
-    "digest": "de0c097021b4c105",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/sqlite3_adapter.rb",
     "rubyName": "create_virtual_table",
     "digest": "f658c5be8b91f496",
     "ref": "v8.0.2"
