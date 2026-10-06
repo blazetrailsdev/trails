@@ -24,11 +24,8 @@ export const Callbacks = {
 };
 
 /** @internal */
-export function createOrUpdate(this: any, block?: (record: any) => void): Promise<boolean> {
-  return (this._createOrUpdate as (block?: (record: any) => void) => Promise<boolean>).call(
-    this,
-    block,
-  );
+export function createOrUpdate(this: any, superFn: () => Promise<boolean>): Promise<boolean> {
+  return this.runCallbacks("save", superFn) as Promise<boolean>;
 }
 
 export function touch(

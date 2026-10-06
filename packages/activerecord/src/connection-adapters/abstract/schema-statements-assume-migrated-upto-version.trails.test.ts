@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { SchemaStatements } from "./schema-statements.js";
 
 function makeStatements(options: { migrated?: number[]; versions?: number[] } = {}) {
@@ -85,7 +86,9 @@ describe("SchemaStatements#assumeMigratedUptoVersion", () => {
 
   it("raises on a duplicate migration version", async () => {
     const { ss } = makeStatements({ migrated: [], versions: [1, 1, 3] });
-    await expect(ss.assumeMigratedUptoVersion(3)).rejects.toThrow(
+    const error = await ss.assumeMigratedUptoVersion(3).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(RuntimeError);
+    expect((error as Error).message).toBe(
       "Duplicate migration 1. Please renumber your migrations to resolve the conflict.",
     );
   });

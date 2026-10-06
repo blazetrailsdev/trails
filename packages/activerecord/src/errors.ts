@@ -14,8 +14,8 @@ export class SubclassNotFound extends ActiveRecordError {
 }
 
 export class AssociationTypeMismatch extends ActiveRecordError {
-  constructor(expected: string, actual: string) {
-    super(`${expected} expected, got ${actual}`);
+  constructor(message?: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = "ActiveRecord::AssociationTypeMismatch";
   }
 }

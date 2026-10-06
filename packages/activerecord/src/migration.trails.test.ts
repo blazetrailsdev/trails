@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { excBacktraceLocations, StandardError } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Migrator } from "./index.js";
@@ -122,6 +123,36 @@ describe("MigrationTest", () => {
     );
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(1);
+  });
+
+  it("a failed migration's error carries the rescued exception's backtrace and cause", async () => {
+    const adapter = await Base.leaseConnection();
+    await new SchemaMigration(adapter.pool).dropTable();
+    const failure = new Error("boom");
+    const migrator = new Migrator(
+      "up",
+      [
+        migrationProxy({
+          version: 1,
+          name: "Failing",
+          migration: () =>
+            anonymousMigration("Failing", 1, async () => {
+              throw failure;
+            }),
+        }),
+      ],
+      new SchemaMigration(adapter.pool),
+      new InternalMetadata(adapter.pool),
+    );
+
+    const error = (await migrator.migrate().catch((e: unknown) => e)) as Error;
+    expect(error).toBeInstanceOf(StandardError);
+    expect(error.message).toContain("all later migrations canceled:\n\nboom");
+    expect(error.cause).toBe(failure);
+    expect(excBacktraceLocations(error)!.map(String)).toEqual(
+      excBacktraceLocations(failure)!.map(String),
+    );
+    expect(error.stack).toContain("migration.trails.test.ts");
   });
 
   it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {

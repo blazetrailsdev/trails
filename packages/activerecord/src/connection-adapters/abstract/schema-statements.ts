@@ -9,6 +9,7 @@ import {
   slice,
   rbInspect,
   rtest,
+  RuntimeError,
   toI,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
@@ -1147,17 +1148,17 @@ export class SchemaStatements {
 
     const migrationContext = pool.migrationContext;
     const migrated = await migrationContext.getAllVersions();
-    const allVersions = migrationContext.migrations.map((m) => m.version);
+    const versions = migrationContext.migrations.map((m) => m.version);
 
     if (!migrated.includes(version)) {
       await this.execute(`INSERT INTO ${smTable} (version) VALUES (${this.quote(version)})`);
     }
 
-    const inserting = allVersions.filter((v) => v < version && !migrated.includes(v));
+    const inserting = versions.filter((v) => !migrated.includes(v)).filter((v) => v < version);
     if (inserting.length > 0) {
       const duplicate = inserting.find((v) => inserting.filter((x) => x === v).length > 1);
       if (duplicate !== undefined) {
-        throw new Error(
+        throw new RuntimeError(
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }

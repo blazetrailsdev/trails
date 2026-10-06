@@ -10,7 +10,10 @@ import {
   hasKey,
   rbEnsure,
   rbEqual,
+  rbInspect,
+  rbObjClass,
   rbObjClassname,
+  rbObjId,
   rbObjInstanceVariables,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -445,10 +448,10 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     if (!(record instanceof this.reflection.klass)) {
       const freshClass = safeConstantize(this.reflection.className) as typeof Base | null;
       if (!(freshClass && (record as object) instanceof freshClass)) {
-        throw new AssociationTypeMismatch(
-          this.reflection.className,
-          `${inspectMismatchedRecord(record)} which is an instance of ${rbObjClassname(record)}`,
-        );
+        const message =
+          `${this.reflection.className}(#${rbObjId(this.reflection.klass)}) expected, ` +
+          `got ${rbInspect(record)} which is an instance of ${rbObjClassname(record)}(#${rbObjId(rbObjClass(record))})`;
+        throw new AssociationTypeMismatch(message);
       }
     }
   }
@@ -487,19 +490,5 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
       ownerAny._afterCommitJobs ??= [];
       ownerAny._afterCommitJobs.push([jobClass, options]);
     }
-  }
-}
-
-/** @internal */
-function inspectMismatchedRecord(record: unknown): string {
-  if (record == null) return String(record);
-  if (typeof record === "object") {
-    const ctorName = (record.constructor as { name?: string })?.name ?? "Object";
-    return `#<${ctorName}>`;
-  }
-  try {
-    return JSON.stringify(record) ?? String(record);
-  } catch {
-    return String(record);
   }
 }

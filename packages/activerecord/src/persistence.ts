@@ -892,6 +892,26 @@ export function _updateRow(
 }
 
 /** @internal */
+export async function createOrUpdate(
+  this: PersistenceInstanceChainHost & {
+    isReadonly(): boolean;
+    isDestroyed(): boolean;
+    isNewRecord(): boolean;
+    _raiseReadonlyRecordError(): never;
+    _createRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+    _updateRecord(attributeNames?: string[], block?: (record: any) => void): Promise<unknown>;
+  },
+  block?: (record: any) => void,
+): Promise<boolean> {
+  if (this.isReadonly()) this._raiseReadonlyRecordError();
+  if (this.isDestroyed()) return false;
+  const result = this.isNewRecord()
+    ? await this._createRecord(undefined, block)
+    : await this._updateRecord(undefined, block);
+  return result !== false;
+}
+
+/** @internal */
 async function instanceUpdateRecord(
   this: PersistenceInstanceChainHost,
   attributeNames?: string[],

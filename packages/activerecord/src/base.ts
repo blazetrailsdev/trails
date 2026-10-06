@@ -1760,34 +1760,6 @@ export class Base extends Model {
 
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
-  private async _createOrUpdate(block?: (record: this) => void): Promise<boolean> {
-    const ctor = this.constructor as typeof Base;
-    let saved = false;
-    let wasNewRecord = false;
-
-    const saveOk = await this.runCallbacks("save", async () => {
-      wasNewRecord = this._newRecord;
-      if (wasNewRecord) {
-        const result = await this._createRecord(undefined, block);
-        saved = result !== false;
-      } else {
-        const result = await this._updateRecord(undefined, block);
-        saved = result !== false;
-      }
-
-      if (saved) {
-        this._transactionAction = wasNewRecord ? "create" : "update";
-        (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-      }
-
-      return saved;
-    });
-
-    if (!saveOk) return false;
-
-    return saved;
-  }
-
   private _touchRecord: boolean | null = null;
   private _instanceRecordTimestamps: boolean | null = null;
 
@@ -2822,7 +2794,9 @@ for (const [name, fn] of [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {
       return Timestamp.createOrUpdate.call(this as any, touch, () =>
-        callbacksCreateOrUpdate.call(this, block),
+        callbacksCreateOrUpdate.call(this, () =>
+          _Persistence.createOrUpdate.call(this as any, block),
+        ),
       );
     },
   ],
