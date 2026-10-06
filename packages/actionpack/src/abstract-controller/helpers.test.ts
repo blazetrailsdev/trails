@@ -19,6 +19,22 @@ function makeBase(): HelpersClass {
   return Base as unknown as HelpersClass;
 }
 
+class Named {
+  #name?: string;
+
+  constructor(name?: string) {
+    this.#name = name;
+  }
+
+  get name(): string | undefined {
+    return this.#name;
+  }
+
+  set name(value: string | undefined) {
+    this.#name = value;
+  }
+}
+
 type View = Record<string, (...args: unknown[]) => unknown>;
 
 function view(cls: HelpersClass, controller: object = {}): View {
@@ -51,11 +67,11 @@ describe("helperMethod", () => {
   it.each([
     ["reader then writer", ["name", "name="]],
     ["writer then reader", ["name=", "name"]],
-  ])("a name= entry reads and writes a field-backed attribute (%s)", (_order, names) => {
+  ])("a name= entry reads and writes an attribute (%s)", (_order, names) => {
     const cls = makeBase();
     helperMethod.call(cls, ...names);
 
-    const controller: { name?: string } = { name: "david" };
+    const controller = new Named("david");
     const view = extend({ controller } as { controller: object; name: string }, cls._helpers!);
     expect(view.name).toBe("david");
     view.name = "jamis";
@@ -67,7 +83,7 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name=");
 
-    const controller: { name?: string } = { name: undefined };
+    const controller = new Named();
     const view = extend({ controller } as { controller: object; name?: string }, cls._helpers!);
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
@@ -88,11 +104,12 @@ describe("helperMethod", () => {
     expect(controller.written).toBe("jamis");
   });
 
-  it("a writer entry for a name the controller does not hold raises NoMethodError", () => {
+  it("a writer entry for a field with no writer raises NoMethodError", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name=");
 
-    const proxy = extend({ controller: {} } as { name?: string }, cls._helpers!);
+    const controller = { name: "david" };
+    const proxy = extend({ controller } as { name?: string }, cls._helpers!);
     expect(() => (proxy.name = "jamis")).toThrow(NoMethodError);
   });
 
@@ -110,7 +127,7 @@ describe("helperMethod", () => {
     helperMethod.call(cls, "name", "name=");
     cls.clearHelpers();
 
-    const controller: { name?: string } = { name: "david" };
+    const controller = new Named("david");
     const view = extend({ controller } as { controller: object; name: string }, cls._helpers!);
     view.name = "jamis";
     expect(view.name).toBe("jamis");
