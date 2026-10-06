@@ -9,8 +9,7 @@ import { Thread } from "./thread.js";
  * beyond that runs on the caller (`fallback_policy: :caller_runs`). Each worker
  * is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
  *
- * @noRailsEquivalent PERMANENT — concurrent-ruby `Concurrent::ThreadPoolExecutor`
- * (`vendor/ruby/v3.3.11/thread.c:897`).
+ * @noRailsEquivalent PERMANENT
  */
 export class ThreadPoolExecutor {
   private readonly minThreads: number;
