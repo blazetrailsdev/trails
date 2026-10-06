@@ -7,13 +7,11 @@ import {
 } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
 import { classAttribute, include, type Included } from "@blazetrails/activesupport";
-import { Caching, type CachingClassMethods } from "../abstract-controller/caching.js";
-import { UrlFor } from "../action-dispatch/routing/url-for.js";
+import { Caching } from "../abstract-controller/caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
-import { sendFileHeadersBang } from "./metal/data-streaming.js";
-import { sendData, sendFile } from "./metal/instrumentation.js";
+import { DataStreaming } from "./metal/data-streaming.js";
 import { Redirecting, redirectTo } from "./metal/redirecting.js";
-import { urlOptions } from "./metal/url-for.js";
+import { UrlFor } from "./metal/url-for.js";
 import {
   Options as ParamsWrapperOptions,
   _performParameterWrapping,
@@ -26,12 +24,9 @@ import {
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface API extends Included<typeof ConditionalGet> {
-  urlOptions: typeof urlOptions;
+export interface API
+  extends Included<typeof UrlFor>, Included<typeof ConditionalGet>, Included<typeof DataStreaming> {
   redirectTo: OmitThisParameter<typeof redirectTo>;
-  sendFile: OmitThisParameter<typeof sendFile>;
-  sendData: OmitThisParameter<typeof sendData>;
-  sendFileHeadersBang: OmitThisParameter<typeof sendFileHeadersBang>;
   get params(): Params;
   set params(value: Params | Record<string, unknown>);
 }
@@ -49,8 +44,6 @@ export class API extends Metal {
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
   static logAt = logAt;
-
-  declare static cacheStore: CachingClassMethods["cacheStore"];
 
   declare static _wrapperOptions: ParamsWrapperOptions;
   /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
@@ -96,13 +89,10 @@ export class API extends Metal {
 }
 
 include(API, UrlFor);
-API.prototype.urlOptions = urlOptions;
 include(API, Redirecting);
 API.prototype.redirectTo = redirectTo;
 include(API, ConditionalGet);
 include(API, StrongParameters);
 include(API, RateLimiting);
 include(API, Caching);
-API.prototype.sendFile = sendFile as API["sendFile"];
-API.prototype.sendData = sendData as API["sendData"];
-API.prototype.sendFileHeadersBang = sendFileHeadersBang;
+include(API, DataStreaming);

@@ -1,5 +1,9 @@
 import type { Request } from "../../action-dispatch/http/request.js";
-import { urlOptions as routingUrlOptions } from "../../action-dispatch/routing/url-for.js";
+import { Concern, Module, extend } from "@blazetrails/activesupport";
+import {
+  UrlFor as AbstractControllerUrlFor,
+  urlOptions as routingUrlOptions,
+} from "../../action-dispatch/routing/url-for.js";
 import type { UrlForHost as RoutingUrlForHost } from "../../action-dispatch/routing/url-for.js";
 
 export interface UrlForHost extends RoutingUrlForHost {
@@ -41,3 +45,10 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
     return this._urlOptions as Record<string, unknown>;
   }
 }
+
+export const UrlFor = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(AbstractControllerUrlFor);
+
+  mod.defineMethod("urlOptions", urlOptions);
+});

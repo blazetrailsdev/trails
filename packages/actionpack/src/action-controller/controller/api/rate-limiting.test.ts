@@ -5,9 +5,11 @@ import "../../../test-helpers/abstract-unit.js";
 import { API } from "../../api.js";
 import { TestCase } from "../../test-case.js";
 
+type CacheStoreHost = { cacheStore: MemoryStore };
+
 class ApiRateLimitedController extends API {
   static {
-    this.cacheStore = new MemoryStore();
+    (this as unknown as CacheStoreHost).cacheStore = new MemoryStore();
     this.rateLimit({ to: 2, within: Duration.seconds(2), only: "limitedToTwo" });
   }
 
@@ -30,7 +32,7 @@ describe("ApiRateLimitingTest", () => {
     tc = new ApiRateLimitingTest(task.name);
     await tc.beforeSetup();
     tc.setup();
-    ApiRateLimitedController.cacheStore!.clear();
+    (ApiRateLimitedController as unknown as CacheStoreHost).cacheStore.clear();
   });
 
   it("exceeding basic limit", async () => {
