@@ -67,7 +67,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_one dependent destroy_async requires destroy_association_async_job", () => {
@@ -78,7 +78,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("has_many dependent destroy_async requires destroy_association_async_job", () => {
@@ -89,7 +89,7 @@ describe("DestroyAssociationAsyncJobTest", () => {
       error = e;
     }
     expect(error).toBeInstanceOf(ConfigurationError);
-    expect((error as Error).message).toMatch(/destroyAssociationAsyncJob/);
+    expect((error as Error).message).toMatch(/destroy_association_async_job/);
   });
 
   it("resolves a job configured by name and caches the class", () => {
