@@ -108,3 +108,23 @@ export class ThreadPoolExecutor {
     });
   }
 }
+
+/**
+ * concurrent-ruby's `Concurrent::CachedThreadPool`, the pool
+ * `ActionController::Live.live_thread_pool_executor` builds
+ * (`actionpack/lib/action_controller/metal/live.rb:391`): a
+ * `ThreadPoolExecutor` with no minimum, no bound on its threads and no queue.
+ * Each worker is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export class CachedThreadPool extends ThreadPoolExecutor {
+  /** @noRailsEquivalent PERMANENT */
+  readonly name: string | null;
+
+  /** @noRailsEquivalent PERMANENT */
+  constructor({ name = null }: { name?: string | null } = {}) {
+    super({ minThreads: 0, maxThreads: 2147483647, maxQueue: 0, fallbackPolicy: "caller_runs" });
+    this.name = name;
+  }
+}

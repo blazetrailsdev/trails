@@ -6,9 +6,16 @@ import {
   Response as DispatchResponse,
   ResponseBuffer,
 } from "../../action-dispatch/http/response.js";
-import { Queue, RuntimeError, SizedQueue, merge } from "@blazetrails/ruby-compat";
+import {
+  CachedThreadPool,
+  Queue,
+  RuntimeError,
+  SizedQueue,
+  Thread,
+  merge,
+} from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
-import { Concern, extend } from "@blazetrails/activesupport";
+import { Concern, IsolatedExecutionState, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 
 export class ClientDisconnected extends RuntimeError {}
@@ -185,14 +192,22 @@ export interface LiveControllerHost {
   response: Response;
   logger?: LoggerLike;
   newControllerThread(block: () => void | Promise<void>): Promise<void>;
-  cleanUpThreadLocals(locals: unknown, thread: unknown): void;
+  cleanUpThreadLocals(locals: [string, unknown][], thread: Thread): void;
   logError(exception: unknown): void;
 }
 
 export async function process(this: LiveControllerHost, name: string): Promise<void> {
+  const t1 = Thread.current();
+  const locals = t1.keys().map((key): [string, unknown] => [key, t1.get(key)]);
+
   let error: unknown = undefined;
   let errorSet = false;
   await this.newControllerThread(async () => {
+    const t2 = Thread.current();
+
+    locals.forEach(([k, v]) => t2.set(k, v));
+    IsolatedExecutionState.shareWith(t1);
+
     try {
       await Live.superMethod(this, "process")!(name);
     } catch (e) {
@@ -214,7 +229,8 @@ export async function process(this: LiveControllerHost, name: string): Promise<v
         errorSet = true;
       }
     } finally {
-      this.cleanUpThreadLocals([], null);
+      IsolatedExecutionState.clear();
+      this.cleanUpThreadLocals(locals, t2);
 
       this.response.commitBang();
     }
@@ -275,29 +291,27 @@ export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
 ): Promise<void> {
-  void liveThreadPoolExecutor().post(block);
+  liveThreadPoolExecutor().post(() => {
+    const t2 = Thread.current();
+    t2.abortOnException = true;
+    return block();
+  });
 }
 
 /** @internal */
 export function cleanUpThreadLocals(
   this: LiveControllerHost,
-  _locals: unknown,
-  _thread: unknown,
-): void {}
-
-interface LiveExecutor {
-  post(fn: () => void | Promise<void>): Promise<void>;
+  locals: [string, unknown][],
+  thread: Thread,
+): void {
+  locals.forEach(([k, _]) => thread.set(k, null));
 }
-let _liveExecutor: LiveExecutor | undefined;
+
+let _liveThreadPoolExecutor: CachedThreadPool | undefined;
 
 /** @internal */
-export function liveThreadPoolExecutor(): LiveExecutor {
-  return (_liveExecutor ??= {
-    post: async (fn) => {
-      await Promise.resolve();
-      await fn();
-    },
-  });
+export function liveThreadPoolExecutor(): CachedThreadPool {
+  return (_liveThreadPoolExecutor ??= new CachedThreadPool({ name: "action_controller.live" }));
 }
 
 export function makeResponseBang(this: object, request: Request): DispatchResponse {

@@ -248,8 +248,7 @@ describe("HelperTest", () => {
     expect(helpersOf(new controllerClass()).delegateMethodKwarg({ hi: ":there" })).toBe(":there");
   });
 
-  // BLOCKED: helper-method-forwarders-carry-no-caller-location
-  it.skip("helper method with error has correct backgrace", () => {
+  it("helper method with error has correct backgrace", () => {
     controllerClass.helperMethod("methodThatRaises");
     const expectedBacktracePattern = `${thisFile}:${excBacktraceLocations(new Error())![0].lineno - 1}`;
 

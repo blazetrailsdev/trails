@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Thread } from "./thread.js";
 
 describe("Thread", () => {
@@ -86,5 +86,36 @@ describe("Thread", () => {
     thread.set("greeting", "hi");
     expect(thread.set(":greeting", null)).toBeNull();
     expect(thread.get("greeting")).toBeNull();
+  });
+
+  it("keys names the fiber-locals", () => {
+    const thread = new Thread(() => null);
+    expect(thread.keys()).toEqual([]);
+    thread.set(":cat", "meow");
+    thread.set("dog", "woof");
+    expect(thread.keys()).toEqual(["cat", "dog"]);
+  });
+
+  it("abort_on_exception re-raises outside the thread's own promise", async () => {
+    const raised: (() => void)[] = [];
+    const queue = vi.spyOn(globalThis, "queueMicrotask").mockImplementation((fn) => {
+      raised.push(fn);
+    });
+    try {
+      const error = new Error("boom");
+      const quiet = new Thread(async () => {
+        throw error;
+      });
+      const thread = new Thread(async () => {
+        Thread.current().abortOnException = true;
+        throw error;
+      });
+      await Promise.resolve(thread.join()).catch(() => null);
+      await Promise.resolve(quiet.join()).catch(() => null);
+      expect(raised).toHaveLength(1);
+      expect(raised[0]).toThrow(error);
+    } finally {
+      queue.mockRestore();
+    }
   });
 });

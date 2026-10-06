@@ -109,12 +109,20 @@ export interface CallerLocation {
   absolutePath?: string;
   lineno: number;
   label: string;
+  callSite?: CallSite;
   toString(): string;
 }
 
 /** @noRailsEquivalent PERMANENT */
+export interface CallSite {
+  isEval(): boolean;
+  getLineNumber(): number | null;
+  getScriptNameOrSourceURL(): string | null | undefined;
+}
+
+/** @noRailsEquivalent PERMANENT */
 export function callerLocations(start = 1, length?: number): CallerLocation[] {
-  let sites: { isEval(): boolean }[] = [];
+  let sites: CallSite[] = [];
   const prepareStackTrace = Error.prepareStackTrace;
   Error.prepareStackTrace = (error, callSites) => {
     sites = callSites;
@@ -136,13 +144,19 @@ export function callerLocations(start = 1, length?: number): CallerLocation[] {
       const m = /\((.*):(\d+):\d+\)$|at (.*):(\d+):\d+$/.exec(line.trim());
       if (!m) return [];
       const path = m[1] ?? m[3];
-      const absolutePath = sites[1 + start + i]?.isEval()
-        ? undefined
-        : path.replace(/^file:\/\//, "");
+      const callSite = sites[1 + start + i];
+      const absolutePath = callSite?.isEval() ? undefined : path.replace(/^file:\/\//, "");
       const lineno = Number(m[2] ?? m[4]);
       const label = /at ([^ (]+)/.exec(line.trim())?.[1] ?? "";
       return [
-        { path, absolutePath, lineno, label, toString: () => `${path}:${lineno}:in '${label}'` },
+        {
+          path,
+          absolutePath,
+          lineno,
+          label,
+          callSite,
+          toString: () => `${path}:${lineno}:in '${label}'`,
+        },
       ];
     });
   return length == null ? locations : locations.slice(0, length);
