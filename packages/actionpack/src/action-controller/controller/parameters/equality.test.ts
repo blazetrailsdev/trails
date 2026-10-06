@@ -18,7 +18,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("not eql? when permitted is different", () => {
-    const a = new Parameters({ x: "1" }).permitAll();
+    const a = new Parameters({ x: "1" }).permitBang();
     const b = new Parameters({ x: "1" });
     expect(a.eql(b)).toBe(false);
   });

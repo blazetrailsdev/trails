@@ -1,15 +1,14 @@
 import {
   arySlice,
-  BigDecimal,
   cmp,
-  Complex,
   format,
   isEmpty,
   max,
   puts,
-  Rational,
+  rbCNumeric,
   rbEqual,
   rbObjAsString as toS,
+  rbObjIsKindOf,
   rtest,
   strlen,
   type StdStream,
@@ -98,13 +97,7 @@ export class TablePrinter extends ColumnPrinter {
     const maxima = this._maximas[index];
 
     let f: string;
-    if (
-      typeof column === "number" ||
-      typeof column === "bigint" ||
-      column instanceof Rational ||
-      column instanceof Complex ||
-      column instanceof BigDecimal
-    ) {
+    if (rbObjIsKindOf(column, rbCNumeric)) {
       if (rtest(this.options.borders)) {
         f = `%${toS(maxima)}s`;
       } else if (index === rowSize - 1) {

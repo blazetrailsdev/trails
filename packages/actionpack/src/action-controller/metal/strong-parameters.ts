@@ -18,13 +18,20 @@ import {
   merge,
   mergeBang,
   rbBlockGivenP,
+  rbHash,
+  rbModConstSet,
+  rbModName,
+  rbObjDup,
 } from "@blazetrails/ruby-compat";
+import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
 import {
   BigDecimal,
   Notifications,
   cattrAccessor,
   ToJsonWithActiveSupportEncoder,
   asJson,
+  deepDup,
   include,
   isBlank,
   toQuery,
@@ -145,7 +152,10 @@ export class Parameters {
     cattrAccessor.call(this, "alwaysPermittedParameters", { default: ["controller", "action"] });
   }
 
-  static hookIntoYamlLoading(): void {}
+  static hookIntoYamlLoading(): void {
+    YAML.loadTags["!ruby/hash-with-ivars:ActionController::Parameters"] = rbModName(this)!;
+    YAML.loadTags["!ruby/hash:ActionController::Parameters"] = rbModName(this)!;
+  }
 
   constructor(data: Record<string, unknown> = {}, loggingContext: Record<string, unknown> = {}) {
     this._data = { ...data };
@@ -167,12 +177,6 @@ export class Parameters {
       onUnpermitted: Parameters.actionOnUnpermittedParameters,
       explicitArrays: false,
     });
-  }
-
-  permitAll(): Parameters {
-    const p = this.deepDup();
-    p.permitBang();
-    return p;
   }
 
   permitBang(): this {
@@ -199,6 +203,12 @@ export class Parameters {
       return value;
     }
     throw new ParameterMissing(key, Object.keys(this._data));
+  }
+
+  required(key: string[]): unknown[];
+  required(key: string): unknown;
+  required(key: string | string[]): unknown {
+    return this.require(key as string);
   }
 
   expect<K extends string>(filter: Record<K, ExpectedHashFilter>): ExpectedHash<K>;
@@ -234,10 +244,6 @@ export class Parameters {
 
   set(key: string, value: unknown): void {
     this._data[key] = value;
-  }
-
-  has(key: string): boolean {
-    return hasKey(this._data, key);
   }
 
   isKey(key: string): boolean {
@@ -276,14 +282,6 @@ export class Parameters {
     return isEmpty(this._data);
   }
 
-  get length(): number {
-    return Object.keys(this._data).length;
-  }
-
-  get size(): number {
-    return this.length;
-  }
-
   except(...keys: string[]): Parameters {
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(this._data)) {
@@ -310,10 +308,6 @@ export class Parameters {
       if (!keepSet.has(k)) delete this._data[k];
     }
     return this;
-  }
-
-  extract(...keys: string[]): Parameters {
-    return this.slice(...keys);
   }
 
   extractBang(...keys: string[]): Parameters {
@@ -371,19 +365,6 @@ export class Parameters {
 
   withDefaultsBang(otherHash: Parameters | Record<string, unknown>): this {
     return this.reverseMergeBang(otherHash);
-  }
-
-  /** @deprecated */
-  reversemerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    return this.reverseMerge(otherHash);
-  }
-
-  transform(fn: (key: string, value: unknown) => unknown): Parameters {
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this._data)) {
-      result[k] = fn(k, v);
-    }
-    return this._newWithInheritedPermitted(result);
   }
 
   transformKeys(fn: (key: string) => string): Parameters {
@@ -626,7 +607,7 @@ export class Parameters {
   }
 
   stringifyKeys(): Parameters {
-    return this.deepDup();
+    return rbObjDup(this);
   }
 
   get convertedArrays(): Set<string> {
@@ -651,6 +632,10 @@ export class Parameters {
     return this.equals(other);
   }
 
+  hash(): number {
+    return rbHash([this.constructor, this._data, this._permitted]);
+  }
+
   toString(): string {
     return JSON.stringify(this._data);
   }
@@ -660,10 +645,35 @@ export class Parameters {
     return `#<ActionController::Parameters ${JSON.stringify(this._data)}${permitted}>`;
   }
 
+  initWith(coder: Psych.Coder): void {
+    switch (coder[coderTag]) {
+      case "!ruby/hash:ActionController::Parameters":
+        this._data = { ...coder };
+        this._permitted = false;
+        break;
+      case "!ruby/hash-with-ivars:ActionController::Parameters":
+        this._data = { ...(coder["elements"] as Record<string, unknown>) };
+        this._permitted = (coder["ivars"] as Record<string, boolean>)[":@permitted"];
+        break;
+      case "!ruby/object:ActionController::Parameters":
+        this._data = coder["parameters"] as Record<string, unknown>;
+        this._permitted = coder["permitted"] as boolean;
+        break;
+    }
+  }
+
+  encodeWith(coder: Psych.Coder): void {
+    coder["parameters"] = this._data;
+    coder["permitted"] = this._permitted;
+  }
+
   deepDup(): Parameters {
-    const p = new Parameters(structuredClone(this._data), this.loggingContext);
-    p._permitted = this._permitted;
-    return p;
+    const duplicate = new (this.constructor as typeof Parameters)(
+      deepDup(this._data),
+      this.loggingContext,
+    );
+    duplicate._permitted = this._permitted;
+    return duplicate;
   }
 
   /** @missingRailsArgs split — PERMANENT */
@@ -671,10 +681,6 @@ export class Parameters {
     const val = this._data[key];
     if (val === null || val === undefined) return null;
     return String(val).split(delimiter);
-  }
-
-  static create(data: Record<string, unknown> = {}): Parameters {
-    return new Parameters(data);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
@@ -1076,6 +1082,11 @@ export class Parameters {
     }
     return object;
   }
+
+  /** @internal */
+  protected initializeCopy(_source: this): void {
+    this._data = rbObjDup(this._data);
+  }
 }
 
 include(Parameters, ToJsonWithActiveSupportEncoder);
@@ -1175,4 +1186,5 @@ function deepEqualValue(a: unknown, b: unknown): boolean {
   return false;
 }
 
-ActionController.Parameters = Parameters;
+rbModConstSet(ActionController, "Parameters", Parameters);
+Parameters.hookIntoYamlLoading();

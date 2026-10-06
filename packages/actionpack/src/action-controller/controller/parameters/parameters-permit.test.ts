@@ -71,7 +71,7 @@ describe("ParametersPermitTest", () => {
     params.each(() => {});
     const permitted = params.permit("name");
     expect(permitted.get("name")).toBe("John");
-    expect(permitted.has("age")).toBe(false);
+    expect(permitted.hasKey("age")).toBe(false);
   });
 
   it("if nothing is permitted, the hash becomes empty", () => {
@@ -97,31 +97,31 @@ describe("ParametersPermitTest", () => {
   it("key: unknown keys are filtered out", () => {
     const params = new Parameters({ name: "John", admin: true });
     const permitted = params.permit("name");
-    expect(permitted.has("admin")).toBe(false);
+    expect(permitted.hasKey("admin")).toBe(false);
   });
 
   it("key: arrays are filtered out", () => {
     const params = new Parameters({ name: "John", tags: ["a", "b"] });
     const permitted = params.permit("name");
-    expect(permitted.has("tags")).toBe(false);
+    expect(permitted.hasKey("tags")).toBe(false);
   });
 
   it("key: hashes are filtered out", () => {
     const params = new Parameters({ name: "John", meta: new Parameters({ x: "1" }) });
     const permitted = params.permit("name");
-    expect(permitted.has("meta")).toBe(false);
+    expect(permitted.hasKey("meta")).toBe(false);
   });
 
   it("key: non-permitted scalar values are filtered out", () => {
     const params = new Parameters({ name: "John", admin: true });
     const permitted = params.permit("name");
-    expect(permitted.has("admin")).toBe(false);
+    expect(permitted.hasKey("admin")).toBe(false);
   });
 
   it("key: it is not assigned if not present in params", () => {
     const params = new Parameters({ name: "John" });
     const permitted = params.permit("name", "age");
-    expect(permitted.has("age")).toBe(false);
+    expect(permitted.hasKey("age")).toBe(false);
   });
 
   it("key to empty array: empty arrays pass", () => {
@@ -146,13 +146,13 @@ describe("ParametersPermitTest", () => {
   it("key to empty array: permitted scalar values do not pass", () => {
     const params = new Parameters({ tags: "not_an_array" });
     const permitted = params.permit({ tags: [] });
-    expect(permitted.has("tags")).toBe(false);
+    expect(permitted.hasKey("tags")).toBe(false);
   });
 
   it("key to empty array: arrays of non-permitted scalar do not pass", () => {
     const params = new Parameters({ tags: [{ bad: true }, { also_bad: true }] });
     const permitted = params.permit({ tags: [] });
-    expect(permitted.has("tags")).toBe(false);
+    expect(permitted.hasKey("tags")).toBe(false);
   });
 
   it("key to empty hash: arbitrary hashes are permitted", () => {
@@ -242,7 +242,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("permitted is sticky beyond merges", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.merge({ b: "2" });
     expect(merged.permitted).toBe(true);
   });
@@ -262,7 +262,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("permitted is sticky beyond merge!", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     params.mergeBang({ b: "2" });
     expect(params.permitted).toBe(true);
   });
@@ -282,7 +282,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("permitted is sticky beyond deep merges", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.deepMerge({ b: "2" });
     expect(merged.permitted).toBe(true);
   });
@@ -294,7 +294,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("permitted is sticky beyond deep_merge!", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     params.deepMergeBang({ b: "2" });
     expect(params.permitted).toBe(true);
   });
@@ -356,7 +356,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("permitted is sticky beyond reverse_merge", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.reverseMerge({ b: "2" });
     expect(merged.permitted).toBe(true);
   });
@@ -407,7 +407,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("to_h returns converted hash on permitted params", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     expect(params.toH()).toEqual({ name: "John" });
   });
 
@@ -423,12 +423,12 @@ describe("ParametersPermitTest", () => {
   });
 
   it("to_hash returns converted hash on permitted params", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     expect(params.toHash()).toEqual({ name: "John" });
   });
 
   it("parameters can be implicit converted to Hash", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     const hash = params.toHash();
     expect(typeof hash).toBe("object");
     expect(hash.name).toBe("John");
@@ -459,7 +459,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("to_h only deep dups Ruby collections", () => {
-    const params = new Parameters({ name: "John" }).permitAll();
+    const params = new Parameters({ name: "John" }).permitBang();
     const h1 = params.toH();
     const h2 = params.toH();
     expect(h1).toEqual(h2);
@@ -481,7 +481,7 @@ describe("ParametersPermitTest", () => {
   it("scalar values should be filtered when array or hash is specified", () => {
     const params = new Parameters({ name: "John", tags: "not_array" });
     const permitted = params.permit("name");
-    expect(permitted.has("tags")).toBe(false);
+    expect(permitted.hasKey("tags")).toBe(false);
   });
 
   it("#permitted? is false by default", () => {

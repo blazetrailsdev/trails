@@ -33,7 +33,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("[] retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     expect(params.permitted).toBe(true);
     expect(params.get("a")).toBe("1");
   });
@@ -54,7 +54,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const keys: string[] = [];
     params.each((k) => keys.push(k));
     expect(keys).toEqual(["a"]);
@@ -81,7 +81,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each_pair carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const keys: string[] = [];
     params.eachPair((k) => keys.push(k));
     expect(keys).toEqual(["a"]);
@@ -108,7 +108,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each_value carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const values: unknown[] = [];
     params.eachValue((v) => values.push(v));
     expect(values).toEqual(["1"]);
@@ -129,7 +129,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each_key converts to hash for permitted", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     const keys: string[] = [];
     params.eachKey((k) => keys.push(k));
     expect(keys).toEqual(["a", "b"]);
@@ -158,7 +158,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("except retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     const result = params.except("b");
     expect(result.permitted).toBe(true);
   });
@@ -170,7 +170,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("without retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     const result = params.without("b");
     expect(result.permitted).toBe(true);
   });
@@ -229,11 +229,11 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("key? returns true if the given key is present in the params", () => {
-    expect(new Parameters({ a: "1" }).has("a")).toBe(true);
+    expect(new Parameters({ a: "1" }).hasKey("a")).toBe(true);
   });
 
   it("key? returns false if the given key is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).has("b")).toBe(false);
+    expect(new Parameters({ a: "1" }).hasKey("b")).toBe(false);
   });
 
   it("member? returns true if the given key is present in the params", () => {
@@ -249,7 +249,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("reject retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     expect(params.reject(() => false).permitted).toBe(true);
   });
 
@@ -259,7 +259,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("select retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     expect(params.select(() => true).permitted).toBe(true);
   });
 
@@ -269,7 +269,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("slice retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     expect(params.slice("a").permitted).toBe(true);
   });
 
@@ -279,7 +279,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("transform_keys retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     expect(params.transformKeys((k) => k).permitted).toBe(true);
   });
 
@@ -291,17 +291,17 @@ describe("ParametersAccessorsTest", () => {
   it("transform_keys without a block returns an enumerator", () => {
     const params = new Parameters({ a: "1" });
     const result = params.transformKeys((k) => k.toUpperCase());
-    expect(result.has("A")).toBe(true);
+    expect(result.hasKey("A")).toBe(true);
   });
 
   it("transform_keys! without a block returns an enumerator", () => {
     const params = new Parameters({ a: "1" });
     params.transformKeysBang((k) => k.toUpperCase());
-    expect(params.has("A")).toBe(true);
+    expect(params.hasKey("A")).toBe(true);
   });
 
   it("deep_transform_keys retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     expect(params.deepTransformKeys((k) => k).permitted).toBe(true);
   });
 
@@ -311,7 +311,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("transform_values retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     expect(params.transformValues((v) => v).permitted).toBe(true);
   });
 
@@ -357,7 +357,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("values_at retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitAll();
+    const params = new Parameters({ a: "1", b: "2" }).permitBang();
     const result = params.valuesAt("a", "b");
     expect(result).toEqual(["1", "2"]);
     expect(params.permitted).toBe(true);
@@ -377,8 +377,8 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("is equal to Parameters instance with same permitted params", () => {
-    const a = new Parameters({ x: "1" }).permitAll();
-    const b = new Parameters({ x: "1" }).permitAll();
+    const a = new Parameters({ x: "1" }).permitBang();
+    const b = new Parameters({ x: "1" }).permitBang();
     expect(a.equals(b)).toBe(true);
   });
 
@@ -389,7 +389,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("is not equal to an unpermitted Parameters instance with same params", () => {
-    const a = new Parameters({ x: "1" }).permitAll();
+    const a = new Parameters({ x: "1" }).permitBang();
     const b = new Parameters({ x: "1" });
     expect(a.equals(b)).toBe(false);
   });
@@ -407,7 +407,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("inspect shows both class name, parameters and permitted flag", () => {
-    const params = new Parameters({ a: "1" }).permitAll();
+    const params = new Parameters({ a: "1" }).permitBang();
     const s = params.inspect();
     expect(s).toContain("ActionController::Parameters");
     expect(s).toContain("permitted: true");

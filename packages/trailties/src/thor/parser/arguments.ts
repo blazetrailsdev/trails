@@ -9,12 +9,14 @@ import {
   lastMatchGetter,
   matchOperator,
   Range,
+  rbCNumeric,
   rbFSend,
   rbInspect,
   rbModName,
   rbObjAsString,
   rbObjClassname,
   rbObjDup,
+  rbObjIsKindOf,
   rbObjNotMatch,
   rbObjRespondTo,
   rbSetClassPathString,
@@ -167,7 +169,7 @@ export class Arguments {
 
   /** @internal */
   protected parseNumeric(name: string): unknown {
-    if (typeof this.peek() === "number" || typeof this.peek() === "bigint") return this.shift();
+    if (rbObjIsKindOf(this.peek(), rbCNumeric)) return this.shift();
 
     if (
       !(rtest(matchOperator(this.peek(), Arguments.NUMERIC)) && lastMatchGetter() === this.peek())

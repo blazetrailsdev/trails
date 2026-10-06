@@ -1,4 +1,5 @@
 import { Autoload, TopLevel, extend, onLoad, type Extended } from "@blazetrails/activesupport";
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
@@ -67,6 +68,7 @@ ActionController.autoloadAt("action_controller/test_case", () => {
 
 TopLevel.ActionDispatch = ActionDispatch;
 TopLevel.ActionController = ActionController;
+registerConstant("ActionController", ActionController);
 
 onLoad("action_view", () => {
   Base.defaultFormats ??= MimeType.SET.symbols;

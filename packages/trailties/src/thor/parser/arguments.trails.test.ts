@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError, Range, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { NoMethodError, Range, rational, rbFSend, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import { MalformattedArgumentError, RequiredArgumentMissingError } from "../error.js";
 import { Argument } from "./argument.js";
 import { Arguments } from "./arguments.js";
@@ -141,6 +141,12 @@ describe("Thor::Arguments", () => {
     expect(currentIsValue(false)).toBe(false);
     expect(currentIsValue("--b")).toBe(false);
     expect(currentIsValue("b")).toBe(true);
+  });
+
+  it("shifts a Rational peek as a numeric, as is_a?(Numeric) answers it", () => {
+    const numeric = new Argument("numeric", { type: "numeric" });
+    const peek = rational(1, 3);
+    expect(new Arguments([numeric]).parse([peek])).toEqual({ numeric: peek });
   });
 
   it("sends parse_ for an underscored type", () => {

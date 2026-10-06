@@ -6,6 +6,7 @@ import {
   isEmpty,
   isSymbol,
   rbCNumeric,
+  rbFArray,
   rbInspect,
   rbObjAsString,
   rbObjClassname,
@@ -216,9 +217,7 @@ export class Option extends Argument {
 
   /** @internal */
   private normalizeAliases(aliases: string | string[] | null | undefined): string[] {
-    return (aliases == null ? [] : Array.isArray(aliases) ? aliases : [aliases]).map((short) =>
-      rbObjAsString(short).replace(/^(?!-)/, "-"),
-    );
+    return rbFArray(aliases).map((short) => rbObjAsString(short).replace(/^(?!-)/, "-"));
   }
 }
 rbSetClassPathString(Option, { name: "Thor" }, "Option");

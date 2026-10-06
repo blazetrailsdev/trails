@@ -14,6 +14,8 @@ import { ScalarScanner as PsychScalarScanner } from "./psych/scalar-scanner.js";
 import { NoAliasRuby, ToRuby } from "./psych/visitors/to-ruby.js";
 import { YAMLTree } from "./psych/visitors/yaml-tree.js";
 
+export { coderTag } from "./psych/coder.js";
+
 /**
  * Ruby's stdlib `Psych` module (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:234`).
  *
