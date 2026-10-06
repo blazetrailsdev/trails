@@ -145,6 +145,11 @@ describe("Thor", () => {
       expect(klass.map()["-a"]).toBe("zoo");
       expect(klass.map()["-b"]).toBe("zoo");
     });
+
+    it("yields each pair of a Hash key", () => {
+      const klass = thor((k) => k.map(new Map([[{ "-a": "-b" }, "zoo"]])));
+      expect(klass.map()[String(["-a", "-b"])]).toBe("zoo");
+    });
   });
 
   describe(".map with mappings and keywords", () => {

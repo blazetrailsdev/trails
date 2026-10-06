@@ -264,6 +264,11 @@ describe("Object#respond_to?", () => {
     }
     expect(rbObjRespondTo("-h", "each")).toBe(false);
     expect(rbObjRespondTo(1, "each")).toBe(false);
+    const yielded: unknown[] = [];
+    for (const obj of [["-h"], new Set([1]), new Map([["a", 1]]), { b: 2 }]) {
+      expect(rbFSend(obj, "each", (i: unknown) => yielded.push(i))).toBe(obj);
+    }
+    expect(yielded).toEqual(["-h", 1, ["a", 1], ["b", 2]]);
   });
 
   it("answers include? for the core collections and to_sym for a String, which their JS values do not define", () => {

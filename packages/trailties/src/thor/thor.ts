@@ -17,6 +17,7 @@ import {
   rbCmpint,
   rbFArray,
   rbFCaller,
+  rbFSend,
   rbInspect,
   rbObjAsString,
   rbObjRespondTo,
@@ -40,7 +41,7 @@ import { Options } from "./parser/options.js";
 import type { Basic } from "./shell/basic.js";
 import { thorClassesIn } from "./util.js";
 
-type Mappings = Record<string, string> | Map<string | Iterable<string>, string>;
+type Mappings = Record<string, string> | Map<unknown, string>;
 
 type DescOptions = { for?: string; hide?: unknown };
 
@@ -178,9 +179,9 @@ export class Thor {
       mappings ||= kw;
     }
     if (rtest(mappings)) {
-      eachPair(mappings as Map<string, string>, (key: string | Iterable<string>, value) => {
+      eachPair(mappings as Map<string, string>, (key: unknown, value) => {
         if (rbObjRespondTo(key, "each")) {
-          for (const subkey of key as Iterable<string>) this._map![subkey] = value;
+          rbFSend(key, "each", (subkey: string) => (this._map![subkey] = value));
         } else {
           this._map![key as string] = value;
         }

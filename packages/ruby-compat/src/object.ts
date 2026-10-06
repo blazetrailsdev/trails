@@ -812,6 +812,17 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (isPlainHash(recv)) return hasKey(recv, args[0] as PropertyKey);
     if (recv == null) throw new NoMethodError("undefined method 'include?' for nil", "include?");
   }
+  if (mid === "each" && typeof args[0] === "function") {
+    const block = args[0] as AnyFunction;
+    if (Array.isArray(recv) || recv instanceof Set || recv instanceof Map) {
+      for (const i of recv) block(i);
+      return recv;
+    }
+    if (isPlainHash(recv)) {
+      for (const key of Object.keys(recv)) block([key, recv[key]]);
+      return recv;
+    }
+  }
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }

@@ -1,8 +1,9 @@
 import {
   classAttribute,
+  Concern,
   extend,
   include,
-  included,
+  Module,
   type InheritableOptions,
 } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
@@ -89,15 +90,18 @@ export function helpers(this: {
   return (this._helperProxy ??= this.viewContext());
 }
 
-export class Helpers {
-  static ClassMethods = ClassMethods;
+export const Helpers = new Module((mod) => {
+  extend(mod, Concern);
 
-  static [included](base: HelpersClass): void {
-    include(base, AbstractHelpers);
-    extend(base, ClassMethods);
-    classAttribute.call(base, "helpersPath", { default: [] });
-    classAttribute.call(base, "includeAllHelpers", { default: true });
-  }
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      include(this as HelpersClass, AbstractHelpers);
+      classAttribute.call(this, "helpersPath", { default: [] });
+      classAttribute.call(this, "includeAllHelpers", { default: true });
+    },
+  );
 
-  helpers = helpers;
-}
+  mod.defineMethod("helpers", helpers);
+}) as Module<{ helpers: typeof helpers }> & { ClassMethods: typeof ClassMethods };
+Helpers.ClassMethods = ClassMethods;

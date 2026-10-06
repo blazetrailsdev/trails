@@ -15,6 +15,8 @@ import { Base } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
 import { Cookies } from "./metal/cookies.js";
+import { Helpers } from "./metal/helpers.js";
+import type { HelpersClass } from "../abstract-controller/helpers.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 
@@ -307,5 +309,23 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
     const request = makeRequest();
     await c.dispatch("index", request, new Response());
     expect(request.env["action_dispatch.show_detailed_exceptions"]).toBe(false);
+  });
+});
+
+describe("ActionController::Helpers included into ActionController::API", () => {
+  it("carries helper, helpers and the class attributes onto a subclass", () => {
+    const ApiWithHelper = { myHelper: () => "helper" };
+    type WithHelpers = typeof API &
+      HelpersClass & { helpers(): { myHelper(): string }; helpersPath: string[] };
+    class WithHelpersController extends API {}
+    include(WithHelpersController, Helpers);
+    (WithHelpersController as unknown as WithHelpers).helper(ApiWithHelper);
+    class SubclassWithHelpersController extends WithHelpersController {}
+
+    const subclass = SubclassWithHelpersController as unknown as WithHelpers;
+    expect(subclass.helpers().myHelper()).toBe("helper");
+    expect(subclass.helpersPath).toEqual([]);
+    expect(rbObjRespondTo(new SubclassWithHelpersController(), "helpers")).toBe(true);
+    expect(rbObjRespondTo(API, "helper", true)).toBe(false);
   });
 });
