@@ -353,13 +353,13 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
     registerConstant("DefaultHelperProbeHelper", new Module().include({ probe: () => "probed" }));
     class DefaultHelperProbeController extends Base {}
     new DefaultHelperProbeController();
-    expect((extend({}, DefaultHelperProbeController._helpers!) as Probe).probe()).toBe("probed");
+    expect((extend({}, DefaultHelperProbeController._helpers) as Probe).probe()).toBe("probed");
   });
 
   it("leaves a controller with no matching helper constant unaffected", () => {
     class HelperlessProbeController extends Base {}
     expect(() => new HelperlessProbeController()).not.toThrow();
-    expect("probe" in extend({}, HelperlessProbeController._helpers!)).toBe(false);
+    expect("probe" in extend({}, HelperlessProbeController._helpers)).toBe(false);
   });
 
   it("keeps helpers a subclass declared before the hook fired", () => {
@@ -369,13 +369,13 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
       }
     }
     new DeclaredProbeController();
-    expect((extend({}, DeclaredProbeController._helpers!) as Probe).declared()).toBe("declared");
+    expect((extend({}, DeclaredProbeController._helpers) as Probe).declared()).toBe("declared");
   });
 
   it("skips an anonymous controller class", () => {
     registerConstant("KlassHelper", new Module().include({ leaked: () => "leaked" }));
     const klass = (() => class extends Base {})();
     new klass();
-    expect("leaked" in extend({}, klass._helpers!)).toBe(false);
+    expect("leaked" in extend({}, klass._helpers)).toBe(false);
   });
 });

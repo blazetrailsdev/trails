@@ -182,10 +182,7 @@ describe("helper_method registration on Base", () => {
       isContentSecurityPolicy: () => true,
       contentSecurityPolicyNonce: () => "abc123",
     };
-    const proxy = extend(
-      { controller } as unknown as Record<string, () => unknown>,
-      Base._helpers!,
-    );
+    const proxy = extend({ controller } as unknown as Record<string, () => unknown>, Base._helpers);
     expect(proxy.isContentSecurityPolicy()).toBe(true);
     expect(proxy.contentSecurityPolicyNonce()).toBe("abc123");
   });

@@ -194,26 +194,26 @@ describe("defaultHelperModuleBang", () => {
   it("strips the Controller suffix and includes the matching helper", () => {
     const cls = controller("FooController");
     cls.defaultHelperModuleBang();
-    expect((extend({}, cls._helpers!) as Probe).foo()).toBe("FOO");
+    expect((extend({}, cls._helpers) as Probe).foo()).toBe("FOO");
   });
 
   it("swallows the NameError when the helper does not exist", () => {
     const cls = controller("MissingController");
     expect(() => cls.defaultHelperModuleBang()).not.toThrow();
-    expect(cls._helpers!.instanceMethods()).toEqual([]);
+    expect(cls._helpers.instanceMethods()).toEqual([]);
   });
 
   it("still tries to resolve when the class name lacks a Controller suffix (Rails delete_suffix is a no-op then)", () => {
     const cls = controller("Plain");
     cls.defaultHelperModuleBang();
-    expect(cls._helpers!.instanceMethods()).toEqual([]);
+    expect(cls._helpers.instanceMethods()).toEqual([]);
   });
 
   it("composes with helper(): subsequent helper(cls, X) layers on top", () => {
     const cls = controller("FooController");
     cls.defaultHelperModuleBang();
     cls.helper(BarHelper);
-    expect((extend({}, cls._helpers!) as Probe).foo()).toBe("FOO");
-    expect((extend({}, cls._helpers!) as Probe).bar()).toBe("BAR");
+    expect((extend({}, cls._helpers) as Probe).foo()).toBe("FOO");
+    expect((extend({}, cls._helpers) as Probe).bar()).toBe("BAR");
   });
 });
