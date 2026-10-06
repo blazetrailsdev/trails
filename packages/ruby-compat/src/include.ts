@@ -249,8 +249,14 @@ export class Module<I extends object = Record<never, never>> {
         return this;
       }
       const installed = trackedKeys(carrier);
-      const members = mod as Record<string, unknown>;
-      for (const key of Object.keys(members)) {
+      const members = (typeof mod === "function" ? (mod as AnyClass).prototype : mod) as Record<
+        string,
+        unknown
+      >;
+      for (const key of typeof mod === "function"
+        ? Object.getOwnPropertyNames(members)
+        : Object.keys(members)) {
+        if (key === "constructor") continue;
         if (/^[A-Z]/.test(key) || typeof members[key] !== "function") continue;
         if (Object.prototype.hasOwnProperty.call(carrier, key) && !installed.has(key)) continue;
         installed.add(key);

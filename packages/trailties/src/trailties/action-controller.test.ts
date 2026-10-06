@@ -111,6 +111,18 @@ describe("action_controller.set_helpers_path", () => {
     expect("foobar" in methods).toBe(true);
   });
 
+  it("keeps a helper exported as a class, which is a Module", async () => {
+    writeFileSync(
+      join(root, "klass-helper.ts"),
+      "export class KlassHelper { fromKlass() { return 'klass'; } }",
+    );
+    const base = receivingController();
+    await runTrailtieInitializers(Trailtie, app);
+    bootAndInstantiate(base);
+
+    expect("fromKlass" in extend({}, base._helpers!)).toBe(true);
+  });
+
   it("sets helpersPath on the controller from config.helpersPaths", async () => {
     const base = receivingController();
     await runTrailtieInitializers(Trailtie, app);

@@ -145,8 +145,8 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
           return (...args: unknown[]) => rbFSend(controller, attr, ...args);
         },
         set: writer
-          ? function (this: { controller: Record<string, unknown> }, value: unknown) {
-              this.controller[attr] = value;
+          ? function (this: { controller: object }, value: unknown) {
+              rbFSend(this.controller, `${attr}=`, value);
             }
           : undefined,
         configurable: true,

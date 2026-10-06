@@ -67,11 +67,25 @@ describe("helperMethod", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name=");
 
-    const controller: { name?: string } = {};
+    const controller: { name?: string } = { name: undefined };
     const view = extend({ controller } as { controller: object; name?: string }, cls._helpers!);
     view.name = "jamis";
     expect(controller.name).toBe("jamis");
     expect(view.name).toBe("jamis");
+  });
+
+  it("a writer entry is sent to the controller, reaching a setName method", () => {
+    const cls = makeBase();
+    helperMethod.call(cls, "name=");
+
+    const controller = {
+      written: null as unknown,
+      setName(value: unknown) {
+        this.written = value;
+      },
+    };
+    extend({ controller } as { name?: string }, cls._helpers!).name = "jamis";
+    expect(controller.written).toBe("jamis");
   });
 
   it("an operator name ending in = is forwarded as a method, not read as a writer", () => {

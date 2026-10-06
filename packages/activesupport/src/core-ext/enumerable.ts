@@ -12,12 +12,16 @@ import { sum as enumerableSum } from "../enumerable-utils.js";
 
 export class SoleItemExpectedError extends StandardError {}
 
-export function maximum(this: Iterable<unknown> | Record<string, unknown>, key: string): unknown {
+export function maximum(
+  this: Iterable<unknown> | Record<string, unknown>,
+  key: string | null = null,
+): unknown {
   const entries = Symbol.iterator in this ? [...this] : Object.entries(this);
-  return max(entries.map((element) => rbFPublicSend(element, key)));
+  return max(key === null ? entries : entries.map((element) => rbFPublicSend(element, key)));
 }
 
-ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key: string) => maximum.call(self, key);
+ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key?: string | null) =>
+  maximum.call(self, key);
 
 export function sum<T>(
   this: Range<T>,

@@ -21,6 +21,10 @@ describe("Enumerable#maximum through send and try", () => {
     expect(tryCall(payments[0], "maximum", "price")).toBeUndefined();
   });
 
+  it("a nil key is no block, so the elements themselves are compared", () => {
+    expect(rbFSend([3, 9, 4], "maximum", null)).toBe(9);
+  });
+
   it("try reaches it on an Array of records", () => {
     expect(tryCall(payments, "maximum", "price")).toBe(15);
   });
