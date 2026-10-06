@@ -587,13 +587,13 @@ describe("IrregularInflectionParamsWrapperTest", () => {
   });
 
   async function withDup(block: () => Promise<void>): Promise<void> {
-    const instances = (Inflections as unknown as { instances: Map<string, Inflections> }).instances;
-    const original = instances.get("en")!;
-    instances.set("en", rbObjDup(original));
+    const klass = Inflections as unknown as { instances: Map<string, Inflections> };
+    const original = klass.instances.get("en")!;
+    klass.instances = new Map([["en", rbObjDup(original)]]);
     try {
       await block();
     } finally {
-      instances.set("en", original);
+      klass.instances = new Map([["en", original]]);
     }
   }
 });
