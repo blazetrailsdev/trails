@@ -67,7 +67,7 @@ describe("helperMethod", () => {
   it.each([
     ["reader then writer", ["name", "name="]],
     ["writer then reader", ["name=", "name"]],
-  ])("a name= entry reads and writes an attribute (%s)", (_order, names) => {
+  ])("a name= entry reads and writes a field-backed attribute (%s)", (_order, names) => {
     const cls = makeBase();
     helperMethod.call(cls, ...names);
 
@@ -104,12 +104,11 @@ describe("helperMethod", () => {
     expect(controller.written).toBe("jamis");
   });
 
-  it("a writer entry for a field with no writer raises NoMethodError", () => {
+  it("a writer entry for a name the controller does not hold raises NoMethodError", () => {
     const cls = makeBase();
     helperMethod.call(cls, "name=");
 
-    const controller = { name: "david" };
-    const proxy = extend({ controller } as { name?: string }, cls._helpers!);
+    const proxy = extend({ controller: {} } as { name?: string }, cls._helpers!);
     expect(() => (proxy.name = "jamis")).toThrow(NoMethodError);
   });
 
