@@ -3,7 +3,7 @@
    test model it mirrors does (attributes_test.rb:6-8); the empty class/interface merge beside it is
    how `include()` surfaces those members on the type side. */
 import { describe, it, expect } from "vitest";
-import { include, isOwnClassAttribute } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/activesupport";
 import { Model } from "./index.js";
 import { Errors } from "./errors.js";
 import { ModelName } from "./naming.js";
@@ -847,7 +847,7 @@ describe("ValidationsTest (trails)", () => {
       class Child extends Base {}
       Base.validates("name", { presence: true });
       expect(Child.validatorsOn("name")).toHaveLength(1);
-      expect(isOwnClassAttribute(Child, "_validators")).toBe(true);
+      expect(Object.prototype.hasOwnProperty.call(Child, "__class_attr__validators")).toBe(true);
       const copy = Child._validators;
       expect(Child._validators).toBe(copy);
       expect(copy).not.toBe(Base._validators);

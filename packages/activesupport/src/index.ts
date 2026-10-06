@@ -326,7 +326,7 @@ export type {
   CallbackObject,
 } from "./callbacks.js";
 
-export { classAttribute, isOwnClassAttribute } from "./class-attribute.js";
+export { classAttribute } from "./class-attribute.js";
 export { onLoad, runLoadHooks, resetLoadHooks } from "./lazy-load-hooks.js";
 export type { ClassAttributeOptions } from "./class-attribute.js";
 

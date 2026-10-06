@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
-import { classAttribute, isOwnClassAttribute } from "../../class-attribute.js";
+import { classAttribute } from "../../class-attribute.js";
 import { assertNotRespondTo, assertPredicate } from "../../testing/assertions.js";
 
 describe("ClassAttributeTest", () => {
@@ -145,8 +145,8 @@ describe("ClassAttributeTest", () => {
   });
 
   it("can check if value is set on a sub class", () => {
-    expect(isOwnClassAttribute(Sub, "setting")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(false);
     Sub.setting = true;
-    expect(isOwnClassAttribute(Sub, "setting")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(Sub, "__class_attr_setting")).toBe(true);
   });
 });

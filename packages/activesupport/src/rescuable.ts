@@ -52,7 +52,11 @@ export const ClassMethods = {
 
     for (const klass of klasses as unknown[]) {
       let key: string | ExceptionClass;
-      if (typeof klass === "function" || klass instanceof Module) {
+      if (
+        (typeof klass === "function" &&
+          Object.getOwnPropertyDescriptor(klass, "prototype")?.writable === false) ||
+        klass instanceof Module
+      ) {
         const name = rbModName(klass);
         key = name != null && safeConstantize(name) === klass ? name : (klass as ExceptionClass);
       } else if (typeof klass === "string") {

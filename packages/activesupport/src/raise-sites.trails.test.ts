@@ -20,6 +20,9 @@ describe("raise sites Rails has and the port had dropped", () => {
     expect(() => rescueFrom.call({ rescueHandlers: [] }, 42 as never, { with: () => {} })).toThrow(
       new ArgumentError("42 must be an Exception class or a String referencing an Exception class"),
     );
+    expect(() =>
+      rescueFrom.call({ rescueHandlers: [] }, (() => true) as never, { with: () => {} }),
+    ).toThrow(ArgumentError);
   });
 
   it("Fanout#subscribe raises on a pattern that is not a String, Regexp or nil", () => {
