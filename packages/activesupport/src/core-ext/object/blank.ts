@@ -132,12 +132,10 @@ export function isPresent(value: unknown): boolean | Promise<boolean> {
   return !isBlank(value);
 }
 
-export function presence<T extends { isBlank(): Promise<boolean> }>(
-  value: T,
-): Promise<T | undefined>;
-export function presence<T>(value: T): T | undefined;
-export function presence<T>(value: T): T | undefined | Promise<T | undefined> {
+export function presence<T extends { isBlank(): Promise<boolean> }>(value: T): Promise<T | null>;
+export function presence<T>(value: T): T | null;
+export function presence<T>(value: T): T | null | Promise<T | null> {
   const present = isPresent(value as unknown) as boolean | Promise<boolean>;
-  if (typeof present !== "boolean") return present.then((p) => (p ? value : undefined));
-  return present ? value : undefined;
+  if (typeof present !== "boolean") return present.then((p) => (p ? value : null));
+  return present ? value : null;
 }

@@ -91,6 +91,10 @@ export function rbModConstSet<T>(
   ) {
     const klass = mod as abstract new (...args: never) => unknown;
     const valPath = classpaths.get(value);
+    if (mod === Object) {
+      if (valPath?.permanent !== true) classpaths.set(value, { path: id, permanent: true });
+      return value;
+    }
     const parentalPathPermanent =
       mod instanceof Module ? classpaths.get(mod)?.permanent === true : Boolean(mod.name);
     const parentalPath = parentalPathPermanent

@@ -72,7 +72,7 @@ export class RequestEncoder {
     return this._paramEncoder(params);
   }
 
-  static parser(contentType: string | undefined): ResponseParser {
+  static parser(contentType: string | null | undefined): ResponseParser {
     const symbol = contentType ? MimeType.lookup(contentType).symbol : null;
     const type = symbol != null ? symbolToS(symbol) : undefined;
     return RequestEncoder.encoder(type).responseParser;

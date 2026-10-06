@@ -21,7 +21,7 @@ export class OrderedOptions {
           const nameString = method.slice(0, -1);
           return () => {
             const value = presence(target.get(nameString));
-            if (value === undefined) throw new KeyError(`:${nameString} is blank`);
+            if (value == null) throw new KeyError(`:${nameString} is blank`);
             return value;
           };
         }

@@ -1165,7 +1165,7 @@ export class SchemaStatements {
     }
   }
 
-  columnsForDistinct(columns: string | string[], _orders?: string[]): string | string[] {
+  columnsForDistinct(columns: string | string[], _orders: string[]): string | string[] {
     return columns;
   }
 

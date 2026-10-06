@@ -200,7 +200,7 @@ export class Version {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter {
-  columnsForDistinct(columns: string | string[], orders?: string[]): string | string[];
+  columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
     tableName: string,
     options?:
@@ -1849,7 +1849,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async,
           connection: this,
-          transaction: presence(this.currentTransaction().userTransaction) ?? null,
+          transaction: presence(this.currentTransaction().userTransaction),
           row_count: 0,
         },
         block,

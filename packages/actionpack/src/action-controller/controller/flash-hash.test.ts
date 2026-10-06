@@ -70,7 +70,7 @@ describe("FlashHashTest", () => {
   it("each", () => {
     const flash = new FlashHash({ a: "1", b: "2" });
     const entries: [string, unknown][] = [];
-    flash.each((k, v) => entries.push([k, v]));
+    flash.each(([k, v]) => entries.push([k, v]));
     expect(entries).toEqual([
       ["a", "1"],
       ["b", "2"],

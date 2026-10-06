@@ -825,12 +825,13 @@ WHERE fk.referenced_column_name IS NOT NULL
     return column.isCaseSensitive();
   }
 
-  columnsForDistinct(columns: string, orders?: (string | ArelNode)[]): string {
+  columnsForDistinct(columns: string, orders: (string | ArelNode)[]): string {
     const visitor = this.arelVisitor();
     const orderColumns = compactBlank(
-      compactBlank(orders ?? []).map((s) =>
-        (typeof s === "string" ? s : visitor.compile(s)).replace(/\s+(?:ASC|DESC)\b/gi, ""),
-      ),
+      compactBlank(orders).map((s) => {
+        if (typeof s !== "string") s = visitor.compile(s);
+        return s.replace(/\s+(?:ASC|DESC)\b/gi, "");
+      }),
     ).map((column, i) => `${column} AS alias_${i}`);
 
     return [...orderColumns, super.columnsForDistinct(columns, orders as string[])].join(", ");

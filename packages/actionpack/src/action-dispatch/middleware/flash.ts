@@ -1,4 +1,5 @@
 import type { RackApp, RackEnv } from "@blazetrails/rack";
+import { Enumerable, include } from "@blazetrails/ruby-compat";
 
 /** @internal */
 export const KEY = "action_dispatch.request.flash_hash";
@@ -58,6 +59,7 @@ export function resetSession(this: FlashRequestHost): void {
   this.env[KEY] = null;
 }
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`actionpack/lib/action_dispatch/middleware/flash.rb:120`); the class/interface merge is how a mixin surfaces on the type side. */
 export class FlashHash {
   private _flashes: Map<string, unknown> = new Map();
   private _discard: Set<string>;
@@ -98,10 +100,10 @@ export class FlashHash {
     return this._flashes.size === 0 && this._now.size === 0;
   }
 
-  each(fn: (key: string, value: unknown) => void): void {
-    for (const [k, v] of this._flashes) fn(k, v);
+  each(block: (pair: [string, unknown]) => void): void {
+    for (const [k, v] of this._flashes) block([k, v]);
     for (const [k, v] of this._now) {
-      if (!this._flashes.has(k)) fn(k, v);
+      if (!this._flashes.has(k)) block([k, v]);
     }
   }
 
@@ -233,6 +235,13 @@ export class FlashHash {
     return out;
   }
 }
+
+export interface FlashHash {
+  [Symbol.iterator](): IterableIterator<[string, unknown]>;
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+include(FlashHash, Enumerable);
 
 export class Flash {
   constructor(app: RackApp) {

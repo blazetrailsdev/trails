@@ -14,7 +14,7 @@ import {
 } from "../../action-dispatch/middleware/exception-wrapper.js";
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
-import { merge } from "@blazetrails/ruby-compat";
+import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-compat";
 import {
   sendData as _sendData,
   sendFile as _sendFile,
@@ -74,6 +74,8 @@ export async function processAction(
         payload.status = this.response.status;
         return result;
       } catch (error) {
+        if (throwDataP(error)) throw error;
+        if (error instanceof Exception && !(error instanceof StandardError)) throw error;
         payload.status = ExceptionWrapper.statusCodeForException(classNameOf(error as Error));
         throw error;
       } finally {

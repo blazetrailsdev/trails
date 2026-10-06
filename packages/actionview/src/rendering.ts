@@ -118,13 +118,13 @@ export function viewContextClass(this: ViewContextClassMethods): typeof Base {
 
 /** @internal */
 export interface ViewContextHost {
-  constructor: ViewContextClassMethods;
+  viewContextClass(): typeof Base;
   lookupContext: LookupContext;
   viewAssigns(): Record<string, unknown>;
 }
 
 export function viewContext(this: ViewContextHost): Base {
-  return new (this.constructor.viewContextClass())(
+  return new (this.viewContextClass())(
     this.lookupContext,
     this.viewAssigns(),
     this as unknown as null,
@@ -254,7 +254,7 @@ export const Rendering = new Module((mod) => {
   extend(mod, Concern);
   mod.include(ViewPaths);
 
-  mod.defineMethod("viewContextClass", function (this: ViewContextHost) {
+  mod.defineMethod("viewContextClass", function (this: { constructor: ViewContextClassMethods }) {
     return this.constructor.viewContextClass();
   });
   mod.defineMethod("viewContext", viewContext);

@@ -277,7 +277,7 @@ export class Response {
     this._headers.delete(key);
   }
 
-  get contentType(): string | undefined {
+  get contentType(): string | null | undefined {
     return presence(this.getHeader(CONTENT_TYPE));
   }
 
@@ -718,7 +718,7 @@ Object.defineProperty(Response.prototype, "cacheControl", {
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Response extends Omit<
   RackResponseHelpers,
-  "status" | "headers" | "mediaType" | "contentLength" | "cacheControl"
+  "status" | "headers" | "mediaType" | "contentLength" | "cacheControl" | "contentType"
 > {
   get lastModified(): Date | undefined;
   set lastModified(t: Date | Time | { epochMilliseconds: number });

@@ -218,6 +218,16 @@ describe("rb_mod_constants", () => {
     static Own = 3;
   }
 
+  it("names a class seated on Object by the bare constant name (variable.c:3652-3654)", () => {
+    const klass = class {};
+    rbModConstSet(Object, "ConstSetTopLevel", klass);
+    try {
+      expect(rbModName(klass)).toBe("ConstSetTopLevel");
+    } finally {
+      delete (Object as unknown as Record<string, unknown>)["ConstSetTopLevel"];
+    }
+  });
+
   it("lists the constants seated on the class, not its other statics", () => {
     expect(rbModConstants(Outer)).toEqual(["LIMIT", "Nested"]);
   });

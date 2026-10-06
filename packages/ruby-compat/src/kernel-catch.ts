@@ -69,6 +69,17 @@ class VmThrowData {
   constructor(readonly tag: unknown) {}
 }
 
+/**
+ * `THROW_DATA_P` (`vendor/ruby/v3.3.11/internal/imemo.h:118`): a `throw` in
+ * flight is not an exception, so no `rescue` clause sees it. A JS `catch`
+ * does, and asks this before treating what it caught as one.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function throwDataP(err: unknown): boolean {
+  return err instanceof VmThrowData;
+}
+
 let _ecTag: AsyncContext<RbVmTag> | null = null;
 let _adapter: AsyncContextAdapter | null = null;
 

@@ -205,8 +205,23 @@ describe("Thor::Base", () => {
       expect((error as Error).message).toBe(
         '"destinationRoot" is a Thor reserved word and cannot be defined as argument',
       );
-      expect(() => klass.isThorReservedWord("destination_root", "command")).toThrow(RuntimeError);
+      expect(klass.isThorReservedWord("destination_root", "command")).toBe(false);
       expect(klass.isThorReservedWord("name", "argument")).toBe(false);
+    });
+
+    it("raises a RuntimeError for a command named by a Thor reserved word", () => {
+      const klass = baseclass();
+      klass.prototype.destinationRoot = () => {};
+      let error: unknown;
+      try {
+        klass.methodAdded("destinationRoot");
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeInstanceOf(RuntimeError);
+      expect((error as Error).message).toBe(
+        '"destinationRoot" is a Thor reserved word and cannot be defined as command',
+      );
     });
   });
 

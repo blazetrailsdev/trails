@@ -30,9 +30,9 @@ const Zlib: Compressor = {
 };
 
 export class Config {
-  private _primaryKey?: string | string[];
-  private _deterministicKey?: string;
-  private _keyDerivationSalt?: string;
+  private _primaryKey?: string | string[] | null;
+  private _deterministicKey?: string | null;
+  private _keyDerivationSalt?: string | null;
   declare storeKeyReferences: boolean;
   declare hashDigestClass: DigestClass;
   declare supportUnencryptedData: boolean;
@@ -86,21 +86,21 @@ export class Config {
     }
   }
 
-  hasKeyDerivationSalt(): string | undefined {
+  hasKeyDerivationSalt(): string | null | undefined {
     return presence(this._keyDerivationSalt);
   }
 
-  hasPrimaryKey(): string | string[] | undefined {
+  hasPrimaryKey(): string | string[] | null | undefined {
     return presence(this._primaryKey);
   }
 
-  hasDeterministicKey(): string | undefined {
+  hasDeterministicKey(): string | null | undefined {
     return presence(this._deterministicKey);
   }
 
   get keyDerivationSalt(): string {
     const value = this.hasKeyDerivationSalt();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.key_derivation_salt",
       );
@@ -108,13 +108,13 @@ export class Config {
     return value;
   }
 
-  set keyDerivationSalt(value: string | undefined) {
+  set keyDerivationSalt(value: string | null | undefined) {
     this._keyDerivationSalt = value;
   }
 
   get primaryKey(): string | string[] {
     const value = this.hasPrimaryKey();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.primary_key",
       );
@@ -122,13 +122,13 @@ export class Config {
     return value;
   }
 
-  set primaryKey(value: string | string[] | undefined) {
+  set primaryKey(value: string | string[] | null | undefined) {
     this._primaryKey = value;
   }
 
   get deterministicKey(): string {
     const value = this.hasDeterministicKey();
-    if (value === undefined) {
+    if (value == null) {
       throw new Configuration(
         "Missing Active Record encryption credential: active_record_encryption.deterministic_key",
       );
@@ -136,7 +136,7 @@ export class Config {
     return value;
   }
 
-  set deterministicKey(value: string | undefined) {
+  set deterministicKey(value: string | null | undefined) {
     this._deterministicKey = value;
   }
 

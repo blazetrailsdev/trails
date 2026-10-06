@@ -1,11 +1,21 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
+  assertEqual,
+  assertMatch,
   LogSubscriber as BaseLogSubscriber,
   NotificationEvent,
   Notifications,
 } from "@blazetrails/activesupport";
-import { Dir, FileUtils } from "@blazetrails/ruby-compat";
+import {
+  Dir,
+  Exception,
+  FileUtils,
+  inspect,
+  kernelCatch,
+  kernelThrow,
+} from "@blazetrails/ruby-compat";
+import type { Headers } from "../../action-dispatch/http/headers.js";
 import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
@@ -14,7 +24,51 @@ import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 registerConstant("Another", { name: "Another" });
 import "../../test-helpers/abstract-unit.js";
 
+class SpecialException extends Error {}
+
 class LogSubscribersController extends Base {
+  static {
+    this.wrapParameters("person", { include: "name", format: ":json" });
+
+    this.rescueFrom(SpecialException, function (this: LogSubscribersController) {
+      this.head(406);
+    });
+
+    this.beforeAction("redirector", { only: "neverExecuted" });
+  }
+
+  lastPayload!: Record<string, unknown>;
+
+  neverExecuted() {}
+
+  show() {
+    this.head("ok");
+  }
+
+  redirector() {
+    this.redirectTo("http://foo.bar/");
+  }
+
+  filterableRedirector() {
+    this.redirectTo("http://secret.foo.bar/");
+  }
+
+  filterableRedirectorWithParams() {
+    this.redirectTo("http://secret.foo.bar?username=repinel&password=1234");
+  }
+
+  filterableRedirectorBadUri() {
+    this.redirectTo(" s:/invalid-string0uri");
+  }
+
+  withThrow() {
+    kernelThrow(":halt");
+  }
+
+  withException() {
+    throw new Exception();
+  }
+
   async withFragmentCache() {
     await this.render({ inline: '<%= context.cache("foo", {}, () => { %>bar<% }) %>' });
   }
@@ -44,6 +98,13 @@ class LogSubscribersController extends Base {
   }
 }
 
+const appendInfoToPayload = Base.prototype.appendInfoToPayload;
+LogSubscribersController.prototype.appendInfoToPayload = function (payload) {
+  appendInfoToPayload.call(this, payload);
+  payload.test_key = "test_value";
+  (this as LogSubscribersController).lastPayload = payload;
+};
+
 Object.defineProperty(LogSubscribersController, "name", {
   value: "Another::LogSubscribersController",
 });
@@ -54,7 +115,7 @@ class CaptureLogger {
     return true;
   }
   info(msg: string | (() => string)): void {
-    this.messages.push(typeof msg === "function" ? msg() : msg);
+    this.messages.push((typeof msg === "function" ? msg() : msg).trim());
   }
 }
 
@@ -73,6 +134,7 @@ describe("ACLogSubscriberTest", () => {
   let logs: string[];
   let oldEnableFragmentCacheLogging: boolean;
   let cachePath: string;
+  const lastPayload = () => (controller.controller as LogSubscribersController).lastPayload;
 
   beforeEach(async ({ task }) => {
     subscriber = new LogSubscriber();
@@ -158,20 +220,75 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages.every((m) => !/Parameters/.test(m))).toBe(true);
   });
 
-  it.skip("process action with parameters", () => {});
-  it.skip("multiple process with parameters", () => {});
-  it.skip("process action with wrapped parameters", () => {});
+  it("process action with parameters", async () => {
+    await controller.get("show", { params: { id: "10" } });
+
+    assertEqual(3, logs.length);
+    assertEqual(`Parameters: ${inspect({ id: "10" })}`, logs[1]);
+  });
+
+  it("multiple process with parameters", async () => {
+    await controller.get("show", { params: { id: "10" } });
+    await controller.get("show", { params: { id: "20" } });
+
+    assertEqual(6, logs.length);
+    assertEqual(`Parameters: ${inspect({ id: "10" })}`, logs[1]);
+    assertEqual(`Parameters: ${inspect({ id: "20" })}`, logs[4]);
+  });
+
+  it("process action with wrapped parameters", async () => {
+    controller.request.env["CONTENT_TYPE"] = "application/json";
+    await controller.post("show", { params: { id: "10", name: "jose" } });
+
+    assertEqual(3, logs.length);
+    assertMatch(inspect({ person: { name: "jose" } }).slice(1, -1), logs[1]);
+  });
 
   it("process action with view runtime", () => {
     subscriber.processAction(makeEvent("process_action.action_controller", { status: 200 }, 37));
     expect(logger.messages[0]).toMatch(/Completed 200 OK in \d+ms/);
   });
 
-  it.skip("process action with path", () => {});
-  it.skip("process action with throw", () => {});
-  it.skip("append info to payload is called even with exception", () => {});
-  it.skip("process action headers", () => {});
-  it.skip("process action with filter parameters", () => {});
+  it("process action with path", async () => {
+    controller.request.env["action_dispatch.parameter_filter"] = ["password"];
+    await controller.get("show", { params: { password: "test" } });
+    assertMatch(/\/show\?password=\[FILTERED\]/, lastPayload().path as string);
+  });
+
+  it("process action with throw", async () => {
+    await kernelCatch(":halt", async () => {
+      await controller.get("withThrow");
+    });
+    assertMatch(/Completed {3}in \d+ms/, logs[1]);
+  });
+
+  it("append info to payload is called even with exception", async () => {
+    try {
+      await controller.get("withException");
+    } catch (e) {
+      if (!(e instanceof Exception)) throw e;
+    }
+
+    assertEqual("test_value", lastPayload().test_key);
+  });
+
+  it("process action headers", async () => {
+    await controller.get("show");
+    assertEqual("Rails Testing", (lastPayload().headers as Headers).get("User-Agent"));
+  });
+
+  it("process action with filter parameters", async () => {
+    controller.request.env["action_dispatch.parameter_filter"] = ["lifo", "amount"];
+
+    await controller.get("show", {
+      params: { lifo: "Pratik", amount: "420", step: "1" },
+    });
+
+    const params = logs[1];
+    assertMatch(inspect({ amount: "[FILTERED]" }).slice(1, -1), params);
+    assertMatch(inspect({ lifo: "[FILTERED]" }).slice(1, -1), params);
+    assertMatch(inspect({ step: "1" }).slice(1, -1), params);
+  });
 
   it("redirect to", () => {
     subscriber.redirectTo(
@@ -180,12 +297,59 @@ describe("ACLogSubscriberTest", () => {
     expect(logger.messages[0]).toBe("Redirected to http://foo.bar/");
   });
 
-  it.skip("filter redirect url by string", () => {});
-  it.skip("filter redirect url by regexp", () => {});
-  it.skip("does not filter redirect params by default", () => {});
-  it.skip("filter redirect params by string", () => {});
-  it.skip("filter redirect params by regexp", () => {});
-  it.skip("filter redirect bad uri", () => {});
+  it("filter redirect url by string", async () => {
+    controller.request.env["action_dispatch.redirect_filter"] = ["secret"];
+    await controller.get("filterableRedirector");
+
+    assertEqual(3, logs.length);
+    assertEqual("Redirected to [FILTERED]", logs[1]);
+  });
+
+  it("filter redirect url by regexp", async () => {
+    controller.request.env["action_dispatch.redirect_filter"] = [/secret\.foo.+/];
+    await controller.get("filterableRedirector");
+
+    assertEqual(3, logs.length);
+    assertEqual("Redirected to [FILTERED]", logs[1]);
+  });
+
+  it("does not filter redirect params by default", async () => {
+    await controller.get("filterableRedirectorWithParams");
+
+    assertEqual(3, logs.length);
+    assertEqual("Redirected to http://secret.foo.bar?username=repinel&password=1234", logs[1]);
+  });
+
+  it("filter redirect params by string", async () => {
+    controller.request.env["action_dispatch.parameter_filter"] = ["password"];
+    await controller.get("filterableRedirectorWithParams");
+
+    assertEqual(3, logs.length);
+    assertEqual(
+      "Redirected to http://secret.foo.bar?username=repinel&password=[FILTERED]",
+      logs[1],
+    );
+  });
+
+  it("filter redirect params by regexp", async () => {
+    controller.request.env["action_dispatch.parameter_filter"] = [/pass.+/];
+    await controller.get("filterableRedirectorWithParams");
+
+    assertEqual(3, logs.length);
+    assertEqual(
+      "Redirected to http://secret.foo.bar?username=repinel&password=[FILTERED]",
+      logs[1],
+    );
+  });
+
+  it("filter redirect bad uri", async () => {
+    controller.request.env["action_dispatch.parameter_filter"] = [/pass.+/];
+
+    await controller.get("filterableRedirectorBadUri");
+
+    assertEqual(3, logs.length);
+    assertEqual("Redirected to [FILTERED]", logs[1]);
+  });
 
   it("send data", () => {
     subscriber.sendData(makeEvent("send_data.action_controller", { filename: "file.txt" }));

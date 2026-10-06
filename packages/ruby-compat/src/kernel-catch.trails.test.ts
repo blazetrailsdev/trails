@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { kernelCatch, kernelThrow, UncaughtThrowError } from "./kernel-catch.js";
+import { kernelCatch, kernelThrow, throwDataP, UncaughtThrowError } from "./kernel-catch.js";
 
 describe("kernelCatch", () => {
   it("raises UncaughtThrowError at the throw site with the inspected tag and value", () => {
@@ -29,6 +29,8 @@ describe("kernelCatch", () => {
     });
     expect(res).toBe(1);
     expect(carrier).not.toBeInstanceOf(Error);
+    expect(throwDataP(carrier)).toBe(true);
+    expect(throwDataP(new Error("raised"))).toBe(false);
   });
 
   it("raises ArgumentError when throw is given no tag", () => {

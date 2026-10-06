@@ -63,15 +63,15 @@ export const THOR_RESERVED_WORDS = [
   "options",
   "behavior",
   "root",
-  "destination_root",
-  "relative_root",
+  "destinationRoot",
+  "relativeRoot",
   "action",
-  "add_file",
-  "create_file",
-  "in_root",
+  "addFile",
+  "createFile",
+  "inRoot",
   "inside",
   "run",
-  "run_ruby_script",
+  "runRubyScript",
 ];
 
 export const TEMPLATE_EXTNAME = ".tt";
@@ -639,12 +639,7 @@ export const ClassMethods = {
 
   /** @internal */
   isThorReservedWord(this: BaseClass, word: string, type: string): boolean {
-    if (
-      !THOR_RESERVED_WORDS.includes(
-        rbObjAsString(word).replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`),
-      )
-    )
-      return false;
+    if (!THOR_RESERVED_WORDS.includes(rbObjAsString(word))) return false;
     throw new RuntimeError(
       `${rbInspect(word)} is a Thor reserved word and cannot be defined as ${type}`,
     );
