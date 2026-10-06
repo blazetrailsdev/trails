@@ -60,7 +60,8 @@ export {
   locale as viewPathsLocale,
   setLocale as viewPathsSetLocale,
 } from "./view-paths.js";
-export type { ViewPaths, ViewPathsClass, ViewPathsInput } from "./view-paths.js";
+export { ViewPaths } from "./view-paths.js";
+export type { ViewPathsClass, ViewPathsInput } from "./view-paths.js";
 
 export * from "./layouts.js";
 

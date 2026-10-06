@@ -1,4 +1,7 @@
+import { ViewPaths } from "@blazetrails/actionview";
+import { Concern, extend, include } from "@blazetrails/activesupport";
 import { ArgumentError, Module } from "@blazetrails/ruby-compat";
+import { Mime } from "../action-dispatch/http/mime-type.js";
 import { AbstractControllerError } from "./error.js";
 
 const DEFAULT_DOUBLE_RENDER_MESSAGE =
@@ -70,6 +73,12 @@ export function renderToString<T extends RenderingHost>(this: T, ...args: unknow
   return this.renderToBody(options);
 }
 
+export function renderToBody(options: RenderOptions = {}): void {}
+
+export function renderedFormat(): unknown {
+  return Mime.get("text");
+}
+
 export function viewAssigns<T extends object>(this: T): Record<string, unknown> {
   const out: Record<string, unknown> = Object.create(null);
   const protectedSet = new Set(DEFAULT_PROTECTED_INSTANCE_VARIABLES);
@@ -124,8 +133,13 @@ export function _protectedIvars(): readonly string[] {
 }
 
 export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
+  include(mod, ViewPaths);
+
   mod.defineMethod("render", render);
   mod.defineMethod("renderToString", renderToString);
+  mod.defineMethod("renderToBody", renderToBody);
+  mod.defineMethod("renderedFormat", renderedFormat);
   mod.defineMethod("viewAssigns", viewAssigns);
   mod.defineMethod("_normalizeArgs", _normalizeArgs);
   mod.defineMethod("_normalizeOptions", _normalizeOptions);
