@@ -131,22 +131,23 @@ describe("FlashTest", () => {
   it.skip("sweep after halted action chain", () => {});
 
   it("redirect to with adding flash types", async () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
     const controller = await get("redirectWithFooFlash", testControllerWithFlashTypeFoo);
     expect(controller.flash.get("foo")).toBe("for great justice");
   });
 
   it("additional flash types are not listed in actions set", () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
     expect(testControllerWithFlashTypeFoo.actionMethods()).not.toContain("foo");
   });
 
   it("add flash type to subclasses", () => {
-    const testControllerWithFlashTypeFoo = class extends TestController {};
+    const testControllerWithFlashTypeFoo = (() => class extends TestController {})();
     testControllerWithFlashTypeFoo.addFlashTypes("foo");
-    const subclassControllerWithNoFlashType = class extends testControllerWithFlashTypeFoo {};
+    const subclassControllerWithNoFlashType = (() =>
+      class extends testControllerWithFlashTypeFoo {})();
     expect(subclassControllerWithNoFlashType._flashTypes).toContain("foo");
   });
 
@@ -233,7 +234,7 @@ describe("FlashIntegrationTest", () => {
     let controllerClass: typeof Metal | null = null;
 
     assertNothingRaised(() => {
-      controllerClass = class extends Metal {};
+      controllerClass = (() => class extends Metal {})();
       include(controllerClass, ControllerFlash);
     });
 

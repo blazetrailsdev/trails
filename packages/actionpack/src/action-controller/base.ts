@@ -791,31 +791,22 @@ export class Base extends Metal {
   }
 }
 
-include(Base, AbstractHelpers);
 include(Base, AbstractControllerRendering);
-include(Base, ActionViewRendering);
-include(Base, Rendering);
-include(Base, ConfigMethods);
 include(Base, AssetPaths);
+include(Base, AbstractHelpers);
+classAttribute.call(Base, "helpersPath", { default: [] });
+classAttribute.call(Base, "includeAllHelpers", { default: true });
 Base.prototype.helpers = helpers;
+include(Base, UrlFor);
+Base.prototype.urlOptions = urlOptions;
+include(Base, Redirecting);
+mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
-include(Base, ConditionalGet);
-include(Base, EtagWithTemplateDigest);
-include(Base, EtagWithFlash);
-include(Base, PermissionsPolicy);
-include(Base, RateLimiting);
-include(Base, AllowBrowser);
-Base.prototype.redirectTo = _instrumentRedirectTo;
-include(Base, ImplicitRender);
-include(Base, StrongParametersModule);
-extend(Base, ParameterEncoding.ClassMethods);
-include(Base, Cookies);
-include(Base, Flash);
+include(Base, ActionViewRendering);
+extend(Base, ViewPathsClassMethods);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
 Base.prototype.isActionHasLayout = isActionHasLayout;
 Base.prototype._isConditionalLayout = _isConditionalLayout;
 Base.prototype._layoutForOption = _layoutForOption;
@@ -829,6 +820,12 @@ classAttribute.call(Base, "_layoutConditions", {
   default: {},
 });
 Base._writeLayoutMethod();
+include(Base, Rendering);
+Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
+include(Base, ConditionalGet);
+include(Base, EtagWithTemplateDigest);
+include(Base, EtagWithFlash);
+include(Base, ConfigMethods);
 Base.prototype.viewCacheDependencies = viewCacheDependencies;
 Base.prototype.cache = cache;
 Base.prototype.combinedFragmentCacheKey = combinedFragmentCacheKey;
@@ -842,37 +839,33 @@ Base.prototype.expireFragment = expireFragment;
 (
   Base as unknown as CachingClassMethods & { viewCacheDependency: typeof viewCacheDependency }
 ).viewCacheDependency = viewCacheDependency;
-
 include(Base, Caching);
-extend(Base, ViewPathsClassMethods);
+include(Base, ImplicitRender);
+include(Base, StrongParametersModule);
+extend(Base, ParameterEncoding.ClassMethods);
+include(Base, Cookies);
+include(Base, Flash);
+include(Base, RequestForgeryProtection);
+Base.helperMethod("isContentSecurityPolicy", "contentSecurityPolicyNonce");
+include(Base, PermissionsPolicy);
+include(Base, RateLimiting);
+include(Base, AllowBrowser);
+Base.prototype._renderTemplate = _renderTemplate;
+Base.prototype.sendFile = sendFile;
+Base.prototype.sendData = sendData;
+Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);
 extend(Base, DefaultHeaders.ClassMethods);
-include(Base, Redirecting);
-include(Base, Instrumentation);
-include(Base, RequestForgeryProtection);
-
-mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
-
-classAttribute.call(Base, "helpersPath", { default: [] });
-classAttribute.call(Base, "includeAllHelpers", { default: true });
-
-runLoadHooks("action_controller_base", Base);
-runLoadHooks("action_controller", Base);
-
-include(Base, UrlFor);
-Base.prototype.urlOptions = urlOptions;
-
-Base.prototype.sendFile = sendFile;
-Base.prototype.sendData = sendData;
-Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
 Base.prototype.isShowDetailedExceptions = isShowDetailedExceptions;
-
+include(Base, Instrumentation);
+Base.prototype.redirectTo = _instrumentRedirectTo;
 Base.prototype.appendInfoToPayload = appendInfoToPayload;
 Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
 Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
-Base.helperMethod("isContentSecurityPolicy", "contentSecurityPolicyNonce");
+runLoadHooks("action_controller_base", Base);
+runLoadHooks("action_controller", Base);
 
 export { DoubleRenderError };

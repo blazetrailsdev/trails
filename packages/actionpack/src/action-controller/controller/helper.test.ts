@@ -205,7 +205,7 @@ describe("HelperTest", () => {
   let controllerClass: typeof TestController;
 
   beforeEach(() => {
-    controllerClass = class extends TestController {};
+    controllerClass = (() => class extends TestController {})();
 
     setTestHelper(LocalAbcHelper);
   });

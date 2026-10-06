@@ -410,7 +410,7 @@ describe("AbstractController::Base — trails-only", () => {
       async show() {}
     }
     const c = new MethodController();
-    const actions = c.availableActions();
+    const actions = c.actionMethods();
     expect(actions).toContain("index");
     expect(actions).toContain("show");
   });

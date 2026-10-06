@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
 import {
   Assertion,
@@ -9,6 +10,8 @@ import { TestCase } from "../test-case.js";
 import { Base } from "../base.js";
 import { deprecator } from "../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../action-dispatch/routing/route-set.js";
+
+registerConstant("Admin", { name: "Admin" });
 import "../../test-helpers/abstract-unit.js";
 
 class ActionPackAssertionsController extends Base {

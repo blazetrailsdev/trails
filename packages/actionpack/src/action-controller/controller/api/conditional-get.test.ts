@@ -15,7 +15,10 @@ class ConditionalGetApiController extends API {
 
   async one() {
     if (
-      this.isStale(null, { lastModified: Time.now().utc().beginningOfDay(), etag: [":foo", 123] })
+      await this.isStale(null, {
+        lastModified: Time.now().utc().beginningOfDay(),
+        etag: [":foo", 123],
+      })
     ) {
       await this.render({ plain: "Hi!" });
     }
@@ -25,8 +28,11 @@ class ConditionalGetApiController extends API {
     await this.render({ plain: "Hi!" });
   }
 
-  private handleLastModifiedAndEtags() {
-    this.freshWhen(null, { lastModified: Time.now().utc().beginningOfDay(), etag: [":foo", 123] });
+  private async handleLastModifiedAndEtags() {
+    await this.freshWhen(null, {
+      lastModified: Time.now().utc().beginningOfDay(),
+      etag: [":foo", 123],
+    });
   }
 }
 

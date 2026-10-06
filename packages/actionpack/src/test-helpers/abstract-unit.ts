@@ -416,15 +416,16 @@ class TestSetRequest extends DelegateClass(Request) {
   override controllerClass(): typeof Base {
     const helpers = this._helpers;
     const block = this._block;
-    const klass = class extends (this._strict ? (super.controllerClass() as typeof Base) : Base) {
-      override async process(name: string): Promise<void> {
-        block(this);
-      }
+    const klass = (() =>
+      class extends (this._strict ? (super.controllerClass() as typeof Base) : Base) {
+        override async process(name: string): Promise<void> {
+          block(this);
+        }
 
-      override toA(): RackResponse {
-        return [200, {}, []] as unknown as RackResponse;
-      }
-    };
+        override toA(): RackResponse {
+          return [200, {}, []] as unknown as RackResponse;
+        }
+      })();
     include(klass, helpers);
     return klass;
   }

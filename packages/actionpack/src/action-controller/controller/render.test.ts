@@ -69,29 +69,30 @@ class TestControllerWithExtraEtags extends Base {
   }
 
   async fresh(): Promise<void> {
-    if (this.isStale(null, { etag: "123", template: false })) await this.render({ plain: "stale" });
+    if (await this.isStale(null, { etag: "123", template: false }))
+      await this.render({ plain: "stale" });
   }
 
   async array(): Promise<void> {
-    if (this.isStale(null, { etag: ["1", "2", "3"], template: false })) {
+    if (await this.isStale(null, { etag: ["1", "2", "3"], template: false })) {
       await this.render({ plain: "stale" });
     }
   }
 
   async strong(): Promise<void> {
-    if (this.isStale(null, { strongEtag: "strong", template: false })) {
+    if (await this.isStale(null, { strongEtag: "strong", template: false })) {
       await this.render({ plain: "stale" });
     }
   }
 
   async withTemplate(): Promise<void> {
-    if (this.isStale(null, { template: "test/hello_world" })) {
+    if (await this.isStale(null, { template: "test/hello_world" })) {
       await this.render({ plain: "stale" });
     }
   }
 
-  withImplicitTemplate(): void {
-    this.freshWhen(null, { etag: "123" });
+  async withImplicitTemplate(): Promise<void> {
+    await this.freshWhen(null, { etag: "123" });
   }
 }
 
@@ -125,15 +126,15 @@ rbModConstSet(
       ]);
     }
 
-    helloWorld(): void {
-      this.freshWhen(null, { etag: "abc" });
+    async helloWorld(): Promise<void> {
+      await this.freshWhen(null, { etag: "abc" });
     }
   },
 );
 
 class InheritedRenderTestController extends ImplicitRenderTestController {
-  helloWorld(): void {
-    this.freshWhen(null, { etag: "abc" });
+  async helloWorld(): Promise<void> {
+    await this.freshWhen(null, { etag: "abc" });
   }
 }
 
@@ -160,7 +161,7 @@ class TestController extends Base {
 
   async conditionalHello(): Promise<void> {
     if (
-      this.isStale(null, {
+      await this.isStale(null, {
         lastModified: Time.now().utc().beginningOfDay(),
         etag: [":foo", 123],
         cacheControl: { noCache: true },
@@ -176,7 +177,7 @@ class TestController extends Base {
       "foo/123",
     );
 
-    if (this.isStale(record)) {
+    if (await this.isStale(record)) {
       await this.render({ action: "hello_world" });
     }
   }
@@ -191,7 +192,7 @@ class TestController extends Base {
       "bar/123",
     );
 
-    if (this.isStale([record, oldRecord])) {
+    if (await this.isStale([record, oldRecord])) {
       await this.render({ action: "hello_world" });
     }
   }
@@ -233,7 +234,7 @@ class TestController extends Base {
       "bar/123",
     );
 
-    if (this.isStale(new TestController.Collection([record, oldRecord]))) {
+    if (await this.isStale(new TestController.Collection([record, oldRecord]))) {
       await this.render({ action: "hello_world" });
     }
   }
@@ -324,8 +325,8 @@ class TestController extends Base {
     this.beforeAction("handleLastModifiedAndEtags", { only: "conditionalHelloWithBangs" });
   }
 
-  handleLastModifiedAndEtags(): void {
-    this.freshWhen(null, {
+  async handleLastModifiedAndEtags(): Promise<void> {
+    await this.freshWhen(null, {
       lastModified: Time.now().utc().beginningOfDay(),
       etag: [":foo", 123],
       public: false,
@@ -1222,7 +1223,7 @@ describe("HttpCacheForeverTest", () => {
   class HttpCacheForeverController extends Base {
     async cacheMeForever(): Promise<void> {
       let rendered: void | Promise<void> = undefined;
-      this.httpCacheForever({ public: this.params.get("public") as boolean }, () => {
+      await this.httpCacheForever({ public: this.params.get("public") as boolean }, () => {
         rendered = this.render({ plain: "hello" });
       });
       await rendered;
@@ -1310,7 +1311,7 @@ describe("HttpCacheNoStoreTest", () => {
       });
     }
     async noStoreOverriddenByFreshWhen(): Promise<void> {
-      this.freshWhen(null, { etag: "123abc" });
+      await this.freshWhen(null, { etag: "123abc" });
       await this.render({ plain: "hello world" });
     }
 

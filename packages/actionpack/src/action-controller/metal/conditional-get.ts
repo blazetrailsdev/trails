@@ -29,7 +29,7 @@ export interface FreshWhenOptions {
   template?: string | false | null;
 }
 
-export function freshWhen(
+export async function freshWhen(
   this: ConditionalGetHost,
   object: unknown = null,
   {
@@ -41,7 +41,7 @@ export function freshWhen(
     cacheControl = {},
     template = null,
   }: FreshWhenOptions = {},
-): void {
+): Promise<void> {
   hashDelete(this.response.cacheControl, "noStore");
   if (strongEtag == null || strongEtag === false) {
     if (weakEtag == null || weakEtag === false) {
@@ -53,7 +53,7 @@ export function freshWhen(
     lastModified = (
       updatedAt != null && updatedAt !== false
         ? updatedAt
-        : tryCall(object as object, "maximum", "updatedAt")
+        : await tryCall(object as object, "maximum", "updatedAt")
     ) as Date | null;
   }
 
@@ -74,12 +74,12 @@ export function freshWhen(
   if (this.request.fresh(this.response)) this.head("not_modified");
 }
 
-export function isStale(
+export async function isStale(
   this: ConditionalGetHost,
   object: unknown = null,
   freshnessKwargs: FreshWhenOptions = {},
-): boolean {
-  this.freshWhen(object, freshnessKwargs);
+): Promise<boolean> {
+  await this.freshWhen(object, freshnessKwargs);
   return !this.request.fresh(this.response);
 }
 
@@ -108,21 +108,21 @@ export function expiresNow(this: ConditionalGetHost): void {
 }
 
 /** @missingRailsArgs stale? — PERMANENT */
-export function httpCacheForever(
+export async function httpCacheForever(
   this: ConditionalGetHost,
   { public: public_ = false }: { public?: boolean } = {},
-  block?: () => void,
-): void {
+  block?: () => unknown,
+): Promise<void> {
   this.expiresIn(Duration.years(100), { public: public_, immutable: true });
 
   if (
-    this.isStale(null, {
+    await this.isStale(null, {
       etag: this.request.fullpath,
       lastModified: Time.new(2011, 1, 1).utc(),
       public: public_,
     })
   ) {
-    block?.();
+    await block?.();
   }
 }
 

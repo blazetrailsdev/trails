@@ -20,7 +20,7 @@ describe("FragmentCachingTest", () => {
   it("freshWhen sets ETag", async () => {
     class C extends Base {
       async show() {
-        this.freshWhen(null, { etag: "resource-v1" });
+        await this.freshWhen(null, { etag: "resource-v1" });
         if (!this.performed) await this.render({ plain: "content" });
       }
     }
@@ -33,7 +33,7 @@ describe("FragmentCachingTest", () => {
     const date = new Date("2024-06-15T12:00:00Z");
     class C extends Base {
       async show() {
-        this.freshWhen(null, { lastModified: date });
+        await this.freshWhen(null, { lastModified: date });
         if (!this.performed) await this.render({ plain: "content" });
       }
     }
@@ -46,7 +46,7 @@ describe("FragmentCachingTest", () => {
     const instant = Temporal.Instant.from("2024-06-15T12:00:00Z");
     class C extends Base {
       async show() {
-        this.freshWhen(null, { lastModified: instant });
+        await this.freshWhen(null, { lastModified: instant });
         if (!this.performed) await this.render({ plain: "content" });
       }
     }
@@ -58,7 +58,7 @@ describe("FragmentCachingTest", () => {
   it("freshWhen sets Cache-Control public", async () => {
     class C extends Base {
       async show() {
-        this.freshWhen(null, { etag: "test", public: true });
+        await this.freshWhen(null, { etag: "test", public: true });
         if (!this.performed) await this.render({ plain: "content" });
       }
     }
@@ -70,7 +70,7 @@ describe("FragmentCachingTest", () => {
   it("freshWhen returns 304 when ETag matches", async () => {
     class C extends Base {
       async show() {
-        this.freshWhen(null, { etag: "stable" });
+        await this.freshWhen(null, { etag: "stable" });
         if (!this.performed) await this.render({ plain: "body" });
       }
     }
@@ -97,7 +97,7 @@ describe("FragmentCachingTest", () => {
     const date = new Date("2024-01-01T00:00:00Z");
     class C extends Base {
       async show() {
-        this.freshWhen(null, { lastModified: date });
+        await this.freshWhen(null, { lastModified: date });
         if (!this.performed) await this.render({ plain: "body" });
       }
     }
@@ -118,7 +118,7 @@ describe("FragmentCachingTest", () => {
   it("freshWhen does not return 304 for different ETag", async () => {
     class C extends Base {
       async show() {
-        this.freshWhen(null, { etag: "current" });
+        await this.freshWhen(null, { etag: "current" });
         if (!this.performed) await this.render({ plain: "body" });
       }
     }
@@ -140,7 +140,7 @@ describe("FragmentCachingTest", () => {
     let result: boolean | undefined;
     class C extends Base {
       async show() {
-        result = this.isStale(null, { etag: "test" });
+        result = await this.isStale(null, { etag: "test" });
         if (result) await this.render({ plain: "content" });
       }
     }
@@ -153,7 +153,7 @@ describe("FragmentCachingTest", () => {
   it("stale? returns false when ETag matches", async () => {
     class C extends Base {
       async show() {
-        this.freshWhen(null, { etag: "match" });
+        await this.freshWhen(null, { etag: "match" });
         if (!this.performed) await this.render({ plain: "body" });
       }
     }
@@ -164,7 +164,7 @@ describe("FragmentCachingTest", () => {
     let result: boolean | undefined;
     class C2 extends Base {
       async show() {
-        result = this.isStale(null, { etag: "match" });
+        result = await this.isStale(null, { etag: "match" });
         if (result) await this.render({ plain: "body" });
       }
     }

@@ -311,7 +311,7 @@ describe("ActionController::Base conditional GET", () => {
   it("freshWhen sets etag header", async () => {
     class FreshController extends Base {
       async index() {
-        this.freshWhen(null, { etag: "test-data" });
+        await this.freshWhen(null, { etag: "test-data" });
         if (!this.performed) {
           await this.render({ plain: "fresh" });
         }
@@ -326,7 +326,7 @@ describe("ActionController::Base conditional GET", () => {
     const date = new Date("2024-01-01T00:00:00Z");
     class LmController extends Base {
       async index() {
-        this.freshWhen(null, { lastModified: date });
+        await this.freshWhen(null, { lastModified: date });
         if (!this.performed) {
           await this.render({ plain: "ok" });
         }
@@ -340,7 +340,7 @@ describe("ActionController::Base conditional GET", () => {
   it("freshWhen returns 304 when etag matches", async () => {
     class Match304Controller extends Base {
       async index() {
-        this.freshWhen(null, { etag: "match-me" });
+        await this.freshWhen(null, { etag: "match-me" });
         if (!this.performed) {
           await this.render({ plain: "content" });
         }
@@ -365,7 +365,7 @@ describe("ActionController::Base conditional GET", () => {
     let staleResult: boolean | undefined;
     class StaleController extends Base {
       async index() {
-        staleResult = this.isStale(null, { etag: "stale-test" });
+        staleResult = await this.isStale(null, { etag: "stale-test" });
         if (staleResult) {
           await this.render({ plain: "rendered" });
         }

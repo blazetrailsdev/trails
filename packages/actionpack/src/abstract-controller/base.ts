@@ -116,7 +116,6 @@ export class AbstractController {
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
     "constructor",
     "processAction",
-    "availableActions",
     "actionMissing",
     "dispatch",
     "head",
@@ -347,10 +346,6 @@ export class AbstractController {
 
   protected markPerformed(): void {
     this._performed = true;
-  }
-
-  availableActions(): string[] {
-    return (this.constructor as typeof AbstractController).actionMethods();
   }
 }
 

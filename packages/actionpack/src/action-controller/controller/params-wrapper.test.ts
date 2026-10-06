@@ -5,6 +5,18 @@ import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
+registerConstant("IrregularInflectionParamsWrapperTest", {
+  name: "IrregularInflectionParamsWrapperTest",
+});
+registerConstant("NamespacedParamsWrapperTest", { name: "NamespacedParamsWrapperTest" });
+registerConstant("NamespacedParamsWrapperTest::Admin", {
+  name: "NamespacedParamsWrapperTest::Admin",
+});
+registerConstant("NamespacedParamsWrapperTest::Admin::Users", {
+  name: "NamespacedParamsWrapperTest::Admin::Users",
+});
+registerConstant("ParamsWrapperTest", { name: "ParamsWrapperTest" });
+
 registerConstant("Admin::User", class User {});
 
 let tc: TestCase;
