@@ -92,6 +92,7 @@ export {
 } from "./template-details.js";
 
 export * from "./helpers/index.js";
+export { FormBuilder } from "./helpers/form-helper.js";
 
 export { deprecator, Deprecator } from "./deprecator.js";
 export type { TemplateRegistry, TemplateLocals } from "./template-registry.js";

@@ -15,6 +15,7 @@ import {
   isPresent,
   maxBy,
 } from "@blazetrails/activesupport";
+import { FormBuilder } from "@blazetrails/actionview";
 import { Utils } from "@blazetrails/rack";
 import { Time } from "@blazetrails/date";
 import {
@@ -145,7 +146,11 @@ class TestController extends Base {
     this.protectFromForgery();
 
     this.beforeAction("setVariableForLayout");
+  }
 
+  static LabellingFormBuilder = class LabellingFormBuilder extends FormBuilder {};
+
+  static {
     this.layout(":determineLayout");
   }
 

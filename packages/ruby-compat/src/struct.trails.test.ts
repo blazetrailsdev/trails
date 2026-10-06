@@ -62,4 +62,37 @@ describe("Struct", () => {
     const typeError = new TypeError("initialize_copy should take same class object");
     expect(() => new Other().initializeCopy(joe)).toThrow(typeError);
   });
+
+  it("answers its members' values as a hash, through a block when given", () => {
+    const joe = new Customer("Joe", 1);
+    expect(joe.toH()).toEqual({ name: "Joe", zip: 1 });
+    expect(joe.toH((k, v) => [k.toUpperCase(), String(v)])).toEqual({ NAME: "Joe", ZIP: "1" });
+  });
+
+  it("keeps the raw slot beneath a subclass reader, which reaches it as super", () => {
+    class Lazy extends Struct.new("name", "zip") {
+      get name(): unknown {
+        return super.name ?? (this.name = "default");
+      }
+      set name(name: unknown) {
+        super.name = name;
+      }
+    }
+    const lazy = new Lazy(null, 1);
+    expect(lazy.toH()).toEqual({ name: null, zip: 1 });
+    expect(rbEqual(lazy, new Lazy(null, 1))).toBe(true);
+    expect(lazy.name).toBe("default");
+    expect(lazy.toH()).toEqual({ name: "default", zip: 1 });
+  });
+
+  it("does not share its slot with a copy, and refuses a write when frozen", () => {
+    const joe = new Customer("Joe", 1);
+    const copy = new Customer(null, null).initializeCopy(joe);
+    copy.zip = 2;
+    expect(joe.zip).toBe(1);
+    Object.freeze(joe);
+    expect(() => {
+      joe.zip = 3;
+    }).toThrow(FrozenError);
+  });
 });
