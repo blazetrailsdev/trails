@@ -192,11 +192,16 @@ export function status2klass(status: number): typeof Exception | null {
 
 /** @noRailsEquivalent CONVERGEABLE sqlite3-gem-c-surface-and-driver-covers-score-against-the-vendored-gem */
 function nativeStatus(error: unknown): number | null {
-  const { errcode, rawCode, code } = (error ?? {}) as Record<string, unknown>;
+  const { errcode, rawCode, code, message } = (error ?? {}) as Record<string, unknown>;
   if (typeof errcode === "number") return errcode & 0xff;
   if (typeof rawCode === "number") return rawCode & 0xff;
   if (typeof code === "string" && code.startsWith("SQLITE_")) {
     return ErrorCode[code.split("_")[1] as keyof typeof ErrorCode] ?? null;
+  }
+  if (code === "ERR_INTERNAL_SQLITE_ERROR") {
+    const errorCode = /Error code (\d+|[^]): /.exec(String(message))?.[1];
+    if (errorCode == null) return null;
+    return (/^\d+$/.test(errorCode) ? Number(errorCode) : errorCode.charCodeAt(0)) & 0xff;
   }
   return null;
 }

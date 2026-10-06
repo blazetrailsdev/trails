@@ -16,14 +16,14 @@ import type {
 } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
-import { BusyException, CantOpenException } from "../sqlite/errors.js";
+import { BusyException } from "../sqlite/errors.js";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { AddReferenceOptions } from "./abstract/schema-definitions.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { SQLite3Config } from "./pool-config.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
-import { Concurrent, SystemCallError, groupBy, rtest } from "@blazetrails/ruby-compat";
+import { Concurrent, Errno, SystemCallError, groupBy, rtest } from "@blazetrails/ruby-compat";
 import { SchemaCreation as SQLite3SchemaCreation } from "./sqlite3/schema-creation.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema-definitions.js";
@@ -136,11 +136,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     config: SQLite3ConnectionParameters,
   ): SqliteConnection | Promise<SqliteConnection> {
     const rescue = (error: unknown): never => {
-      if (
-        error instanceof CantOpenException &&
-        (error.message.includes("No such file or directory") ||
-          !File.isExist(String(config.database)))
-      ) {
+      if (!(error instanceof Errno.ENOENT)) throw error;
+      if ((error as Error).message.includes("No such file or directory")) {
         throw new NoDatabaseError();
       } else {
         throw error;

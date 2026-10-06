@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { type SqliteConnection, SQLite3Constants } from "../sqlite-adapter.js";
 import { isExpoSqliteAvailable, expoSqliteDriver } from "./expo-sqlite.js";
 
@@ -202,3 +202,69 @@ describe.skipIf(!isExpoSqliteAvailable)(
     });
   },
 );
+
+describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classes", () => {
+  const readonly = (message: string) =>
+    Object.assign(new Error(message), { code: "ERR_INTERNAL_SQLITE_ERROR" });
+
+  const openWith = async (native: Error) => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            executeAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {},
+          }),
+          execAsync: async () => {
+            throw new Error("attempt to write a readonly database");
+          },
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const errors = await import("./errors.js");
+      return { conn: await driver.open({ database: ":memory:" }), errors };
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  };
+
+  it("a readonly write surfaces as SQLite3::ReadOnlyException on iOS", async () => {
+    const native = readonly(
+      "Calling the 'executeAsync' function has failed\n→ Caused by: Error code 8: attempt to write a readonly database",
+    );
+    const { conn, errors } = await openWith(native);
+    const error = await Promise.resolve(
+      conn.execute("INSERT INTO widgets (name) VALUES ('x')"),
+    ).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as InstanceType<typeof errors.ReadOnlyException>).code).toBe(8);
+    expect((error as Error).cause).toBe(native);
+  });
+
+  it("a readonly write surfaces as SQLite3::ReadOnlyException on Android", async () => {
+    const { conn, errors } = await openWith(
+      readonly("Error code \b: attempt to write a readonly database"),
+    );
+    const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
+    await expect(stmt.run()).rejects.toBeInstanceOf(errors.ReadOnlyException);
+  });
+
+  it("rethrows an exec error, whose message carries no result code", async () => {
+    const { conn, errors } = await openWith(readonly("unused"));
+    const error = await Promise.resolve(conn.exec("INSERT INTO widgets DEFAULT VALUES")).then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(error).not.toBeInstanceOf(errors.Exception);
+    expect((error as Error).message).toBe("attempt to write a readonly database");
+  });
+});
