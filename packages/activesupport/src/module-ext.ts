@@ -206,7 +206,7 @@ export function attrInternalAccessor(this: object, ...attrs: string[]): void {
 export const attrInternal = attrInternalAccessor;
 
 export function isAnonymous(klass: { name: string }): boolean {
-  return !klass.name || !/^[A-Z]/.test(klass.name);
+  return !klass.name || klass.name === "";
 }
 
 export function moduleParentName(klass: object): string | null {

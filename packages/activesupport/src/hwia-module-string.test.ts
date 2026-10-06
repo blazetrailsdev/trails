@@ -190,12 +190,6 @@ describe("ModuleTest", () => {
     expect(isAnonymous(Named)).toBe(false);
   });
 
-  it("isAnonymous — returns true for a class named only by a local binding", () => {
-    const klass = class {};
-    expect(klass.name).toBe("klass");
-    expect(isAnonymous(klass)).toBe(true);
-  });
-
   it("moduleParentName — returns null for top-level class", () => {
     class TopLevel {}
     expect(moduleParentName(TopLevel)).toBeNull();

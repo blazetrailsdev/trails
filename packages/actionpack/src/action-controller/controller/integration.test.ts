@@ -365,7 +365,7 @@ class IntegrationProcessTest extends IntegrationTest {
         this.resetBang();
         this.httpsBang(https);
         this.hostBang(host);
-        const controller = class extends IntegrationProcessTest.IntegrationController {};
+        const controller = (() => class extends IntegrationProcessTest.IntegrationController {})();
         include(controller, set.urlHelpers());
         const to = controller as unknown as MountableApp;
 

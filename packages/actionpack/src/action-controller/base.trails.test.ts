@@ -372,7 +372,7 @@ describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)
 
   it("skips an anonymous controller class", () => {
     registerConstant("KlassHelper", { leaked: () => "leaked" });
-    const klass = class extends Base {};
+    const klass = (() => class extends Base {})();
     new klass();
     expect(klass._helpers!.leaked).toBeUndefined();
   });
