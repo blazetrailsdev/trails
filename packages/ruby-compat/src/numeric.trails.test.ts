@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
+import { TypeError } from "./type-error.js";
 import {
+  intXor,
   anybits,
   fixDiv,
   fixMod,
@@ -218,5 +220,16 @@ describe("Integer#/ and Integer#%", () => {
   it("raises ZeroDivisionError for a zero divisor", () => {
     expect(() => fixDiv(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
     expect(() => fixMod(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
+  });
+});
+
+describe("intXor", () => {
+  it("is the bitwise exclusive OR of two Integers", () => {
+    expect(intXor(0b1100, 0b1010)).toBe(0b0110);
+    expect(intXor(2 ** 40, 1)).toBe(2 ** 40 + 1);
+  });
+
+  it("raises TypeError for an operand that is not an Integer", () => {
+    expect(() => intXor(1, null)).toThrow(new TypeError("nil can't be coerced into Integer"));
   });
 });

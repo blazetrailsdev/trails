@@ -2,6 +2,7 @@ import {
   ArgumentError,
   Base64,
   getCrypto,
+  intXor,
   chomp,
   OpenSSL,
   rbObjRespondTo,
@@ -506,7 +507,7 @@ export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   const size = s1.length;
   let i = 0;
   while (i < size) {
-    rbStrSetbyte(s2, i, rbStrGetbyte(s1, i)! ^ rbStrGetbyte(s2, i)!);
+    rbStrSetbyte(s2, i, intXor(rbStrGetbyte(s1, i), rbStrGetbyte(s2, i)));
     i += 1;
   }
   return s2;

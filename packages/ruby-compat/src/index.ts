@@ -236,6 +236,7 @@ export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
 export { anybits, fixDiv, fixMod, isNan, round, toF, toI } from "./numeric.js";
 export {
+  intXor,
   numericMinus,
   numericModulo,
   numericMul,

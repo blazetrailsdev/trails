@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { IndexError } from "@blazetrails/ruby-compat";
+import { TypeError } from "@blazetrails/ruby-compat";
 import { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 import {
   Exception,
@@ -489,6 +489,8 @@ describe("xorByteStrings", () => {
   it("keeps the trailing bytes of a longer s2 and raises once s2 is exhausted", () => {
     const c = controller();
     expect([...c.xorByteStrings(Buffer.from([1, 2]), Buffer.from([3, 4, 5]))]).toEqual([2, 6, 5]);
-    expect(() => c.xorByteStrings(Buffer.from([1, 2, 3]), Buffer.from([3]))).toThrow(IndexError);
+    expect(() => c.xorByteStrings(Buffer.from([1, 2, 3]), Buffer.from([3]))).toThrow(
+      new TypeError("nil can't be coerced into Integer"),
+    );
   });
 });

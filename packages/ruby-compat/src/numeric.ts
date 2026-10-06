@@ -452,6 +452,25 @@ export function numericPlus(x: unknown, y: unknown): unknown {
 }
 
 /**
+ * Ruby `Integer#^` (`vendor/ruby/v3.3.11/numeric.c:5055` `int_xor`, over
+ * `fix_xor`, `numeric.c:5025`, and `rb_big_xor`): the bitwise exclusive OR of
+ * two Integers. An operand that is not an Integer and cannot be coerced to
+ * one raises `TypeError` (`rb_num_coerce_bit`, `numeric.c:4923`), which is
+ * what `1 ^ nil` raises.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function intXor(x: unknown, y: unknown): number | bigint {
+  if (rbIntegerTypeP(x) && rbIntegerTypeP(y)) {
+    if (typeof x === "number" && typeof y === "number" && (x | 0) === x && (y | 0) === y) {
+      return x ^ y;
+    }
+    return rbBigNorm(BigInt(x) ^ BigInt(y));
+  }
+  throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
+}
+
+/**
  * The `+` send (`rb_funcallv(v, idPLUS, 1, &i)`, `vendor/ruby/v3.3.11/enum.c:4583`),
  * over `vm_opt_plus`'s String and Array arms (`vendor/ruby/v3.3.11/vm_insnhelper.c:6010`).
  * @noRailsEquivalent PERMANENT
