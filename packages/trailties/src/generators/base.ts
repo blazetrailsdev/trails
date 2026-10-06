@@ -28,6 +28,7 @@ import * as Actions from "./actions.js";
 import type { GeneratorActionsState } from "./actions.js";
 import * as TrailsActions from "./trails-actions.js";
 import * as ThorActions from "../thor/actions.js";
+import { fromSuperclass } from "../thor/base.js";
 
 export interface GeneratorOptions {
   cwd: string;
@@ -765,6 +766,12 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   static baseclass(): typeof GeneratorBase {
     return GeneratorBase;
   }
+
+  /**
+   * @internal
+   * @noRailsEquivalent CONVERGEABLE rebase-generator-base-onto-thor-group
+   */
+  static fromSuperclass = fromSuperclass;
 
   /** @internal */
   protected static async defaultGeneratorRoot(): Promise<string | undefined> {

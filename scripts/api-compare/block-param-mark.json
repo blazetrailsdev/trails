@@ -12,7 +12,7 @@
     }
   },
   "actiondispatch": {
-    "total": 44,
+    "total": 43,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
@@ -22,7 +22,7 @@
       "journey/router.rb": 1,
       "middleware/cookies.rb": 1,
       "middleware/exception_wrapper.rb": 1,
-      "middleware/stack.rb": 6,
+      "middleware/stack.rb": 5,
       "request/utils.rb": 1,
       "routing/mapper.rb": 20,
       "system_test_case.rb": 1,
@@ -31,12 +31,11 @@
     }
   },
   "actionview": {
-    "total": 5,
+    "total": 3,
     "byFile": {
       "helpers/number_helper.rb": 1,
       "helpers/tag_helper.rb": 1,
-      "path_set.rb": 1,
-      "renderer/streaming_template_renderer.rb": 2
+      "path_set.rb": 1
     }
   },
   "activemodel": {
@@ -90,14 +89,13 @@
     }
   },
   "trailties": {
-    "total": 8,
+    "total": 7,
     "byFile": {
       "application.rb": 1,
       "generators/actions.rb": 2,
       "generators/actions/create_migration.rb": 1,
       "generators/base.rb": 2,
-      "initializable.rb": 1,
-      "railtie/configuration.rb": 1
+      "initializable.rb": 1
     }
   }
 }
