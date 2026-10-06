@@ -364,6 +364,8 @@ export {
 } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
 export { ThreadPoolExecutor } from "./thread-pool-executor.js";
+export { ImmediateExecutor } from "./immediate-executor.js";
+export { ScheduledTask } from "./scheduled-task.js";
 export { Concurrent } from "./concurrent/map.js";
 export type { MonitorMixin } from "./monitor.js";
 
