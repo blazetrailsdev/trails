@@ -95,12 +95,13 @@ export class ThreadPoolExecutor {
 
   private _runWorker(task: () => unknown): void {
     const thread = new Thread(async () => {
-      await task();
+      try {
+        await task();
+      } catch {
+        return;
+      }
     });
-    const settled = Promise.resolve()
-      .then(() => thread.value())
-      .catch(() => undefined);
-    void settled.then(() => {
+    void Promise.resolve(thread.value()).then(() => {
       const next = this._queue.shift();
       if (next) this._runWorker(next);
       else this._running -= 1;
@@ -113,7 +114,11 @@ export class ThreadPoolExecutor {
  * concurrent-ruby's `Concurrent::CachedThreadPool`, the pool
  * `ActionController::Live.live_thread_pool_executor` builds
  * (`actionpack/lib/action_controller/metal/live.rb:391`): a
- * `ThreadPoolExecutor` with no minimum, no bound on its threads and no queue.
+ * `ThreadPoolExecutor` with no minimum, no bound on its threads and no queue,
+ * so its `fallback_policy` (concurrent-ruby's default is `:abort`) is never
+ * reached. `name:` is the option concurrent-ruby stores as the pool's `@name`.
+ * As concurrent-ruby's worker does, a task's exception is rescued on the worker
+ * thread, which therefore does not die of it.
  * Each worker is a `Thread.new` (`vendor/ruby/v3.3.11/thread.c:897` `thread_s_new`).
  *
  * @noRailsEquivalent PERMANENT

@@ -213,8 +213,7 @@ function nativeStatus(error: unknown): number | null {
 function sqlite3Errmsg(error: unknown): string {
   const { code, message } = error as { code?: unknown; message: string };
   if (code === "ERR_INTERNAL_SQLITE_ERROR") {
-    const errorCode = /Error code (\d+|[^]): /.exec(message)!;
-    return message.slice(errorCode.index + errorCode[0].length);
+    return message.replace(/^[^]*?Error code (?:\d+|[^]): /, "");
   }
   if (error instanceof TypeError && message === MISSING_DIRECTORY) {
     return "unable to open database file";

@@ -97,7 +97,11 @@ export async function helperModulesFromPaths(
 
 export const Resolution = { modulesForHelpers, allHelpersFromPath, helperModulesFromPaths };
 
-/** @inventedArm if — PERMANENT */
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm getScriptNameOrSourceURL — PERMANENT
+ * @inventedArm getLineNumber — PERMANENT
+ */
 export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameList[]): void {
   const flat = (methods as readonly unknown[]).flat(Infinity) as string[];
   this._helperMethods = [...this._helperMethods, ...flat];

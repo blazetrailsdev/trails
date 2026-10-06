@@ -291,7 +291,7 @@ export async function newControllerThread(
   this: LiveControllerHost,
   block: () => void | Promise<void>,
 ): Promise<void> {
-  liveThreadPoolExecutor().post(() => {
+  return liveThreadPoolExecutor().post(() => {
     const t2 = Thread.current();
     t2.abortOnException = true;
     return block();
