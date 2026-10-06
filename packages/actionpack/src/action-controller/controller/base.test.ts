@@ -182,7 +182,7 @@ describe("ControllerInstanceTests", () => {
 
   it("temporary anonymous controllers", () => {
     const name = "ExamplesController";
-    const klass = class extends Base {};
+    const klass = (() => class extends Base {})();
     rbModConstSet(Object, name, klass);
 
     try {
