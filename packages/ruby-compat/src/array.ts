@@ -505,6 +505,28 @@ export function aryDelete<T, U = undefined>(ary: T[], item: T, block?: (item: T)
 }
 
 /**
+ * Ruby `Array#delete_at` (`vendor/ruby/v3.3.11/array.c:4072` `rb_ary_delete_at_m`,
+ * over `rb_ary_delete_at`, `array.c:4027`): removes, in place, the element at
+ * `pos` and answers it. A negative `pos` counts back from the end, and one out
+ * of range either way answers `nil` and leaves the array alone.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function deleteAt<T>(ary: T[], pos: number): T | null {
+  const len = ary.length;
+
+  if (pos >= len) return null;
+  if (pos < 0) {
+    pos += len;
+    if (pos < 0) return null;
+  }
+
+  const del = ary[pos];
+  ary.splice(pos, 1);
+  return del;
+}
+
+/**
  * Ruby `Array#pop(n)` (`vendor/ruby/v3.3.11/array.c:1437` `rb_ary_pop_m`): removes, in
  * place, the last `n` elements and answers them in order. `n` past the length
  * takes them all, and a negative `n` raises (`ary_take_first_or_last_n`,

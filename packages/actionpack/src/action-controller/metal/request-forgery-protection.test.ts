@@ -37,6 +37,9 @@ import {
   type CsrfController,
   type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
+import * as requestForgeryProtection from "./request-forgery-protection.js";
+
+const methods = requestForgeryProtection as unknown as Omit<CsrfController, "request">;
 
 const verbs = {
   isGet(this: { method: string }): boolean {
@@ -59,6 +62,7 @@ const cookieJar = () => {
 
 function controller(overrides: Partial<CsrfController> = {}): CsrfController {
   return {
+    ...methods,
     allowForgeryProtection: true,
     forgeryProtectionOriginCheck: true,
     logWarningOnCsrfFailure: true,
@@ -317,7 +321,7 @@ describe("isVerifiedRequest", () => {
     const c = controller({
       request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, env },
     });
-    const masked = maskToken(globalCsrfToken.call(c));
+    const masked = maskToken.call(controller(), globalCsrfToken.call(c));
     const withParam = (value: unknown) => ({ get: () => value });
     expect(
       isVerifiedRequest.call({
@@ -341,9 +345,8 @@ describe("isVerifiedRequest", () => {
 describe("P20b/P20c smoke", () => {
   function tokenC(overrides: Partial<CsrfController> = {}): CsrfController {
     return {
+      ...methods,
       requestForgeryProtectionToken: "authenticity_token",
-      formAuthenticityParam,
-      isValidAuthenticityToken,
       request: {
         ...verbs,
         method: "POST",
@@ -358,22 +361,28 @@ describe("P20b/P20c smoke", () => {
 
   it("mask/unmask round-trips and realCsrfToken is stable per request", () => {
     const raw = decodeCsrfToken(generateCsrfToken());
-    expect(Buffer.from(unmaskToken(decodeCsrfToken(maskToken(raw)))).equals(raw)).toBe(true);
+    expect(
+      Buffer.from(
+        unmaskToken.call(controller(), decodeCsrfToken(maskToken.call(controller(), raw))),
+      ).equals(raw),
+    ).toBe(true);
     const c = tokenC();
     expect(Buffer.from(realCsrfToken.call(c)).equals(realCsrfToken.call(c))).toBe(true);
   });
 
   it("encode/decodeCsrfToken use urlsafe base64 without padding; reject garbage", () => {
     const raw = Buffer.from("?".repeat(32));
-    const encoded = maskToken(raw);
+    const encoded = maskToken.call(controller(), raw);
     expect(encoded).not.toMatch(/[+/=]/);
-    expect(Buffer.from(unmaskToken(decodeCsrfToken(encoded))).equals(raw)).toBe(true);
+    expect(Buffer.from(unmaskToken.call(controller(), decodeCsrfToken(encoded))).equals(raw)).toBe(
+      true,
+    );
     expect(() => decodeCsrfToken("!!! not base64 !!!")).toThrow();
   });
 
   it("isAnyAuthenticityTokenValid: masked global via param + X-CSRF; rejects empty", () => {
     const c = tokenC();
-    const masked = maskToken(globalCsrfToken.call(c));
+    const masked = maskToken.call(controller(), globalCsrfToken.call(c));
     const params = (hash: Record<string, unknown>) => ({ get: (key: string) => hash[key] });
     expect(
       isAnyAuthenticityTokenValid.call({
@@ -410,7 +419,7 @@ describe("P20b/P20c smoke", () => {
     expect(compareWithGlobalToken.call(c, globalCsrfToken.call(c))).toBe(true);
     expect(compareWithRealToken.call(c, realCsrfToken.call(c))).toBe(true);
     expect(
-      maskedAuthenticityToken.call(c, { action: "/posts", ...verbs, method: "POST" }),
+      maskedAuthenticityToken.call(c, { formOptions: { action: "/posts", method: "POST" } }),
     ).toBeTruthy();
   });
 
@@ -454,6 +463,7 @@ describe("P20b/P20c smoke", () => {
 describe("normalizeActionPath / normalizeRelativeActionPath", () => {
   const at = (path: string): CsrfController =>
     ({
+      ...methods,
       request: { ...verbs, method: "POST", baseUrl: "https://example.com", cookieJar, path },
     }) as CsrfController;
 

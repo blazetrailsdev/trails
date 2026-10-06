@@ -168,6 +168,7 @@ export {
   arySlice,
   compact,
   compactBang,
+  deleteAt,
   drop,
   each,
   first,
