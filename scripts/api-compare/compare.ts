@@ -3694,6 +3694,11 @@ export const MODULE_INITIALIZE_HOOK = "[initialize]";
  * The hook is offered only when the expected file declares one, so a module
  * whose `initialize` is unported still falls through to the arms that report
  * it.
+ *
+ * A module's `new` is the same: `Deduplicable::ClassMethods#new`
+ * (`connection_adapters/deduplicable.rb:13-15`) wraps the includer's
+ * constructor through `super` and is ported as a `new` member, so it is
+ * offered `new` ahead of the includer's `constructor` (`Column`, column.ts).
  */
 export function moduleInitializeCandidates(
   rubyName: string,
@@ -3701,6 +3706,7 @@ export function moduleInitializeCandidates(
   tsMethods: ReadonlySet<string>,
   candidates: string[],
 ): string[] {
+  if (rubyName === "new" && ownerIsModule && tsMethods.has("new")) return ["new", ...candidates];
   if (rubyName !== "initialize" || !ownerIsModule) return candidates;
   if (!tsMethods.has(MODULE_INITIALIZE_HOOK)) return candidates;
   return [MODULE_INITIALIZE_HOOK, ...candidates];

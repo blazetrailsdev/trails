@@ -1358,21 +1358,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     }
   }
 
-  override async removeForeignKey(
-    fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
-    options: RemoveForeignKeyOptions = {},
-  ): Promise<void> {
-    if (typeof toTable === "object" && toTable !== null) {
-      options = toTable;
-      toTable = options.toTable;
-    }
-    options = { ...options };
-    if (options.onUpdate === "restrict") delete options.onUpdate;
-    if (options.onDelete === "restrict") delete options.onDelete;
-    return super.removeForeignKey(fromTable, toTable, options);
-  }
-
   /** @internal */
 
   tableAliasLength(): number {
@@ -1530,6 +1515,12 @@ export interface AbstractMysqlAdapter {
     fn?: (t: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<unknown>;
 
+  removeForeignKey(
+    fromTable: string,
+    toTable?: string | RemoveForeignKeyOptions,
+    options?: RemoveForeignKeyOptions,
+  ): Promise<void>;
+  internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>>;
   removeColumn(
     tableName: string,
     columnName: string,

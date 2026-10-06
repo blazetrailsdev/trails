@@ -1495,6 +1495,9 @@ export function extractFromProgram(
 
       const pushMethods = (methods: MethodInfo[]): void => {
         for (const m of methods) {
+          // A module's `def initialize` runs through `initializeIncludedModules`;
+          // `include` never flattens it onto the includer.
+          if (m.name === "[initialize]") continue;
           if (hostInfo.instanceMethods.some((existing) => existing.name === m.name)) continue;
           hostInfo.instanceMethods.push({ ...m, file: hostInfo.file });
         }
@@ -3544,6 +3547,19 @@ function moduleInitializeHook(node: ts.Node, mod: string): ts.FunctionExpression
   return ts.isIdentifier(key) && key.text === "initialize" ? node.right : undefined;
 }
 
+/**
+ * `{ [initialize]() {} }`: a plain-object module's `def initialize`
+ * (`DatabaseStatements#initialize`, abstract/database_statements.rb:6-9),
+ * recorded as `[initialize]` like a class's `static [initialize]`.
+ */
+function isInitializeHookName(name: ts.PropertyName): name is ts.ComputedPropertyName {
+  return (
+    ts.isComputedPropertyName(name) &&
+    ts.isIdentifier(name.expression) &&
+    name.expression.text === "initialize"
+  );
+}
+
 export function harvestObjectLiteralMethods(
   obj: ts.ObjectLiteralExpression,
   checker: ts.TypeChecker,
@@ -3583,9 +3599,11 @@ export function harvestObjectLiteralMethods(
     if (
       ts.isMethodDeclaration(prop) &&
       prop.name &&
-      (ts.isIdentifier(prop.name) || ts.isStringLiteral(prop.name))
+      (ts.isIdentifier(prop.name) ||
+        ts.isStringLiteral(prop.name) ||
+        isInitializeHookName(prop.name))
     ) {
-      mname = prop.name.text;
+      mname = ts.isComputedPropertyName(prop.name) ? "[initialize]" : prop.name.text;
       params = extractParameters(prop.parameters);
       optionKeys = extractOptionKeys(prop.parameters, checker);
       optionReads = extractOptionReads(prop.parameters, prop.body);

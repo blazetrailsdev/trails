@@ -40,8 +40,8 @@ export class SchemaMigration {
   async createTable(): Promise<unknown> {
     return await this._pool.withConnection(async (connection) => {
       if (!(await connection.tableExists(this.tableName))) {
-        return await connection.createTable(this.tableName, { id: false }, (t) => {
-          t.string(this.primaryKey, connection.internalStringOptionsForPrimaryKey());
+        return await connection.createTable(this.tableName, { id: false }, async (t) => {
+          t.string(this.primaryKey, await connection.internalStringOptionsForPrimaryKey());
         });
       }
     });

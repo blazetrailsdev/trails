@@ -58,7 +58,7 @@ export const ModelHelpers = {
     });
   },
 
-  [initialize](this: ModelHelpersHost): void {
+  [initialize](this: ModelHelpersHost, args: unknown, ..._options: unknown[]): void {
     if (this.isPluralModelName(this.name) && !this.options.forcePlural) {
       const singular = singularize(this.name);
       if (!ModelHelpers.skipWarn) {

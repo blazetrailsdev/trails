@@ -1135,7 +1135,7 @@ export class SchemaStatements {
     return this.insertVersionsSql(versions);
   }
 
-  internalStringOptionsForPrimaryKey(): Record<string, unknown> {
+  internalStringOptionsForPrimaryKey(): Record<string, unknown> | Promise<Record<string, unknown>> {
     return { primaryKey: true };
   }
 
