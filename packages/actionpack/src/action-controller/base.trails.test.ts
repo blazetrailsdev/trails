@@ -7,7 +7,7 @@ import {
   TemplateHandlers,
 } from "@blazetrails/actionview";
 import { Model } from "@blazetrails/activemodel";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
 
@@ -253,7 +253,7 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
   it("freshWhen merges the cacheControl option", async () => {
     class CcController extends Base {
       async index() {
-        this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
+        await this.freshWhen(null, { etag: "v1", public: true, cacheControl: { noCache: true } });
         if (!this.performed) await this.render({ plain: "ok" });
       }
     }
@@ -261,13 +261,29 @@ describe("ActionController::ConditionalGet (conditional_get.rb:137-155,290-303)"
     await c.dispatch("index", makeRequest(), new Response());
     expect(c.headers.get("cache-control")).toBe("public, no-cache");
   });
+
+  it("freshWhen awaits a relation's maximum(:updated_at)", async () => {
+    const updatedAt = new Date(Date.UTC(2024, 0, 2, 3, 4, 5));
+    const relation = {
+      cacheKey: "posts/query-1",
+      maximum: async (attribute: string) => (attribute === "updatedAt" ? updatedAt : null),
+    };
+    class RelationController extends Base {
+      async index() {
+        if (await this.isStale(relation)) await this.render({ plain: "ok" });
+      }
+    }
+    const c = new RelationController();
+    await c.dispatch("index", makeRequest(), new Response());
+    expect(c.headers.get("last-modified")).toBe(updatedAt.toUTCString());
+  });
 });
 
 describe("ActionController::ConditionalGet#http_cache_forever (conditional_get.rb:316-322)", () => {
   class ForeverController extends Base {
     yielded = false;
     async index() {
-      this.httpCacheForever({ public: true }, () => (this.yielded = true));
+      await this.httpCacheForever({ public: true }, () => (this.yielded = true));
       if (!this.performed) await this.render({ plain: "ok" });
     }
   }
@@ -327,5 +343,37 @@ describe("ActionController::Helpers included into ActionController::API", () => 
     expect(subclass.helpersPath).toEqual([]);
     expect(rbObjRespondTo(new SubclassWithHelpersController(), "helpers")).toBe(true);
     expect(rbObjRespondTo(API, "helper", true)).toBe(false);
+  });
+});
+
+describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)", () => {
+  it("includes the controller's default helper module with no helper call", () => {
+    registerConstant("DefaultHelperProbeHelper", { probe: () => "probed" });
+    class DefaultHelperProbeController extends Base {}
+    new DefaultHelperProbeController();
+    expect(DefaultHelperProbeController._helpers!.probe.call({})).toBe("probed");
+  });
+
+  it("leaves a controller with no matching helper constant unaffected", () => {
+    class HelperlessProbeController extends Base {}
+    expect(() => new HelperlessProbeController()).not.toThrow();
+    expect(HelperlessProbeController._helpers!.probe).toBeUndefined();
+  });
+
+  it("keeps helpers a subclass declared before the hook fired", () => {
+    class DeclaredProbeController extends Base {
+      static {
+        this.helper({ declared: () => "declared" });
+      }
+    }
+    new DeclaredProbeController();
+    expect(DeclaredProbeController._helpers!.declared.call({})).toBe("declared");
+  });
+
+  it("skips an anonymous controller class", () => {
+    registerConstant("KlassHelper", { leaked: () => "leaked" });
+    const klass = class extends Base {};
+    new klass();
+    expect(klass._helpers!.leaked).toBeUndefined();
   });
 });

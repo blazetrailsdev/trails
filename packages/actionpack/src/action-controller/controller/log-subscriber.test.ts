@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   LogSubscriber as BaseLogSubscriber,
@@ -9,6 +10,8 @@ import { LogSubscriber } from "../log-subscriber.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import type { CachingClassMethods } from "../../abstract-controller/caching.js";
+
+registerConstant("Another", { name: "Another" });
 import "../../test-helpers/abstract-unit.js";
 
 class LogSubscribersController extends Base {

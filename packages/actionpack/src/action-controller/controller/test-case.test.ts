@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import {
   assert,
   Assertion,
@@ -42,6 +43,10 @@ import { Response } from "../../action-dispatch/http/response.js";
 import { TestResponse } from "../../action-dispatch/testing/test-response.js";
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ContentController } from "../../test-helpers/lib/controller/fake-controllers.js";
+
+registerConstant("EngineControllerTests", { name: "EngineControllerTests" });
+registerConstant("ResponseDefaultHeadersTest", { name: "ResponseDefaultHeadersTest" });
+registerConstant("TestCaseTest", { name: "TestCaseTest" });
 
 class TestController extends Base {
   declare counter: number | undefined;

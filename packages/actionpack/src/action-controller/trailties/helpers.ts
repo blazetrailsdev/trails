@@ -1,3 +1,4 @@
+import { isAnonymous } from "@blazetrails/activesupport";
 import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import { helpersPath } from "../metal/helpers.js";
 
@@ -26,6 +27,7 @@ export function fireInherited(
   for (const k of chain) {
     if (fired.has(k)) continue;
     fired.add(k);
+    if (!isAnonymous(k as HelpersClass)) (k as HelpersClass).defaultHelperModuleBang();
     inherited(k, base);
     (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
   }

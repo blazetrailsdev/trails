@@ -1,8 +1,12 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { assertEqual } from "@blazetrails/activesupport";
 import { describe, it } from "vitest";
 import { Base } from "../../base.js";
 import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { Rack } from "../../../test-helpers/abstract-unit.js";
+
+registerConstant("Dispatching", { name: "Dispatching" });
+registerConstant("Dispatching::Submodule", { name: "Dispatching::Submodule" });
 
 class SimpleController extends Base {
   static {

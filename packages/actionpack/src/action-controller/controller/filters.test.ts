@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it, expect } from "vitest";
 import { assertNothingRaised, assertRaises, type CallbackChain } from "@blazetrails/activesupport";
 import { rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -6,6 +7,8 @@ import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
+
+registerConstant("FilterTest", { name: "FilterTest" });
 import "../../test-helpers/abstract-unit.js";
 
 type Ctor = new () => Base;
