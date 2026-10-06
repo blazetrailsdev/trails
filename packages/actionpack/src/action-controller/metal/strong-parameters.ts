@@ -254,7 +254,7 @@ export class Parameters {
   declare member: Parameters["include"];
 
   exclude(key: string): boolean {
-    return !(key in this._data);
+    return !hasKey(this._data, key);
   }
 
   get keys(): string[] {

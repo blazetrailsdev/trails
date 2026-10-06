@@ -84,6 +84,8 @@ describe("ActionController::Parameters", () => {
     expect(proto.withDefaults).toBe(proto.reverseMerge);
     expect(proto.withDefaultsBang).toBe(proto.reverseMergeBang);
     expect(new Parameters({ a: 1 }).include("toString")).toBe(false);
+    expect(new Parameters({ a: 1 }).exclude("toString")).toBe(true);
+    expect(new Parameters({ a: 1 }).exclude("a")).toBe(false);
   });
 
   it("aliases required to require", () => {
