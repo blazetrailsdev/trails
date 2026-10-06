@@ -46,7 +46,7 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
   }
 }
 
-export const UrlFor = new Module((mod) => {
+export const UrlFor: Module<{ urlOptions: typeof urlOptions }> = new Module((mod) => {
   extend(mod, Concern);
   mod.include(AbstractControllerUrlFor);
 

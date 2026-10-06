@@ -114,7 +114,11 @@ export function sendFileHeadersBang(
   this.headers.set("Content-Transfer-Encoding", "binary");
 }
 
-export const DataStreaming = new Module((mod) => {
+export const DataStreaming: Module<{
+  sendFile: OmitThisParameter<typeof sendFile>;
+  sendData: OmitThisParameter<typeof sendData>;
+  sendFileHeadersBang: OmitThisParameter<typeof sendFileHeadersBang>;
+}> = new Module((mod) => {
   extend(mod, Concern);
 
   mod.defineMethod("sendFile", sendFile);
