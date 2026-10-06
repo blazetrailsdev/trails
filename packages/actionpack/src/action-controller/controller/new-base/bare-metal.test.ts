@@ -14,7 +14,6 @@ import { Metal } from "../../metal.js";
 import { Head } from "../../metal/head.js";
 import { TestCase } from "../../test-case.js";
 import { Request } from "../../../action-dispatch/request.js";
-import type { Response } from "../../../action-dispatch/response.js";
 import "../../../test-helpers/abstract-unit.js";
 
 class BareController extends Metal {
@@ -23,13 +22,15 @@ class BareController extends Metal {
   }
 
   assignResponseArray(): void {
-    this.response = [200, { "content-type": "text/html" }, ["Hello world"]] as unknown as Response;
+    this.response = [
+      200,
+      { "content-type": "text/html" },
+      ["Hello world"],
+    ] as unknown as RackTriplet;
   }
 
   assignResponseObject(): void {
-    this.response = new RackResponseObject("Hello world", 200, {
-      "content-type": "text/html",
-    }) as unknown as Response;
+    this.response = new RackResponseObject("Hello world", 200, { "content-type": "text/html" });
   }
 
   assignResponseBodyProc(): void {
@@ -69,8 +70,7 @@ describe("BareTest", () => {
     assertEqual(["Hello world"], controller.responseBody);
   });
 
-  // BLOCKED: metal-response-setter-stores-true-in-response-body
-  it.skip("can assign response array as part of the controller execution", () => {
+  it("can assign response array as part of the controller execution", () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
     controller.assignResponseArray();
@@ -81,8 +81,7 @@ describe("BareTest", () => {
     assertEqual("text/html", (controller.response as unknown as RackTriplet)[1]["content-type"]);
   });
 
-  // BLOCKED: metal-response-setter-stores-true-in-response-body
-  it.skip("can assign response object as part of the controller execution", () => {
+  it("can assign response object as part of the controller execution", () => {
     const controller = new BareController();
     controller.setRequestBang(Request.empty());
     controller.assignResponseObject();

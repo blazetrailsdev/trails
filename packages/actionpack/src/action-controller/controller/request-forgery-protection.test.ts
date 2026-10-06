@@ -14,7 +14,7 @@ import {
   embedAuthenticityTokenInRemoteForms,
   setEmbedAuthenticityTokenInRemoteForms,
 } from "@blazetrails/actionview";
-import { SecureRandom, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
+import { SecureRandom, rbEnsure, rbFSend, type Bytes } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TestCase, TestSession } from "../test-case.js";
 import {
@@ -462,8 +462,11 @@ function RequestForgeryProtectionTests(
 
   it("should allow post with token", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() =>
-      tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    await rbEnsure(
+      () =>
+        assertNotBlocked(() => tc.post("index", { params: { custom_authenticity_token: TOKEN } })),
+      () => stub.mockRestore(),
     );
   });
 
@@ -471,27 +474,47 @@ function RequestForgeryProtectionTests(
     const tokenLength = Math.ceil((32 * 4.0) / 3);
     const tokenIncludingUrlUnsafeChars = "+/".padEnd(tokenLength, "A");
     initializeCsrfToken(tokenIncludingUrlUnsafeChars);
-    await assertNotBlocked(() =>
-      tc.post("index", { params: { custom_authenticity_token: tokenIncludingUrlUnsafeChars } }),
+    const stub = vi
+      .spyOn(tc.controller as Base, "formAuthenticityToken")
+      .mockReturnValue(tokenIncludingUrlUnsafeChars);
+    await rbEnsure(
+      () =>
+        assertNotBlocked(() =>
+          tc.post("index", { params: { custom_authenticity_token: tokenIncludingUrlUnsafeChars } }),
+        ),
+      () => stub.mockRestore(),
     );
   });
 
   it("should allow patch with token", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() =>
-      tc.patch("index", { params: { custom_authenticity_token: TOKEN } }),
+    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    await rbEnsure(
+      () =>
+        assertNotBlocked(() => tc.patch("index", { params: { custom_authenticity_token: TOKEN } })),
+      () => stub.mockRestore(),
     );
   });
 
   it("should allow put with token", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() => tc.put("index", { params: { custom_authenticity_token: TOKEN } }));
+    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    await rbEnsure(
+      () =>
+        assertNotBlocked(() => tc.put("index", { params: { custom_authenticity_token: TOKEN } })),
+      () => stub.mockRestore(),
+    );
   });
 
   it("should allow delete with token", async () => {
     initializeCsrfToken();
-    await assertNotBlocked(() =>
-      tc.delete("index", { params: { custom_authenticity_token: TOKEN } }),
+    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    await rbEnsure(
+      () =>
+        assertNotBlocked(() =>
+          tc.delete("index", { params: { custom_authenticity_token: TOKEN } }),
+        ),
+      () => stub.mockRestore(),
     );
   });
 
@@ -522,9 +545,14 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and correct origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      tc.request.setHeader("HTTP_ORIGIN", "http://test.host");
-      await assertNotBlocked(() =>
-        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      await rbEnsure(
+        () =>
+          assertNotBlocked(() => {
+            tc.request.setHeader("HTTP_ORIGIN", "http://test.host");
+            return tc.post("index", { params: { custom_authenticity_token: TOKEN } });
+          }),
+        () => stub.mockRestore(),
       );
     });
   });
@@ -532,8 +560,13 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and no origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      await assertNotBlocked(() =>
-        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      await rbEnsure(
+        () =>
+          assertNotBlocked(() =>
+            tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+          ),
+        () => stub.mockRestore(),
       );
     });
   });
@@ -541,11 +574,17 @@ function RequestForgeryProtectionTests(
   it("should raise for post with null origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      tc.request.setHeader("HTTP_ORIGIN", "null");
-      const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
-        tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      await rbEnsure(
+        async () => {
+          const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
+            tc.request.setHeader("HTTP_ORIGIN", "null");
+            return tc.post("index", { params: { custom_authenticity_token: TOKEN } });
+          });
+          expect(exception.message).toMatch("The browser returned a 'null' origin for a request");
+        },
+        () => stub.mockRestore(),
       );
-      expect(exception.message).toMatch("The browser returned a 'null' origin for a request");
     });
   });
 
@@ -556,9 +595,16 @@ function RequestForgeryProtectionTests(
     try {
       await forgeryProtectionOriginCheck(async () => {
         initializeCsrfToken();
-        tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
-        await assertBlocked(() =>
-          tc.post("index", { params: { custom_authenticity_token: TOKEN } }),
+        const stub = vi
+          .spyOn(tc.controller as Base, "formAuthenticityToken")
+          .mockReturnValue(TOKEN);
+        await rbEnsure(
+          () =>
+            assertBlocked(() => {
+              tc.request.setHeader("HTTP_ORIGIN", "http://bad.host");
+              return tc.post("index", { params: { custom_authenticity_token: TOKEN } });
+            }),
+          () => stub.mockRestore(),
         );
       });
 
@@ -796,12 +842,18 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
-        t().request.setHeader("HTTP_ORIGIN", "http://bad.host");
-        return t().post("index", { params: { custom_authenticity_token: TOKEN } });
-      });
-      expect(exception.message).toMatch(
-        "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+      const stub = vi.spyOn(t().controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      await rbEnsure(
+        async () => {
+          const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
+            t().request.setHeader("HTTP_ORIGIN", "http://bad.host");
+            return t().post("index", { params: { custom_authenticity_token: TOKEN } });
+          });
+          expect(exception.message).toMatch(
+            "HTTP Origin header (http://bad.host) didn't match request.base_url (http://test.host)",
+          );
+        },
+        () => stub.mockRestore(),
       );
     });
   });

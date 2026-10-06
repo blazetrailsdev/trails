@@ -102,16 +102,14 @@ export class AbstractController {
 
   declare static raiseOnMissingCallbackActions: boolean;
 
-  protected _responseBody: string | Buffer | null = null;
+  protected _responseBody: string | Buffer | true | null = null;
 
-  get responseBody(): string | Buffer | null {
+  get responseBody(): string | Buffer | true | null {
     return this._responseBody;
   }
   set responseBody(value: string | Buffer | null) {
     this._responseBody = value;
   }
-
-  protected _performed: boolean = false;
 
   private static readonly _internalMethods: ReadonlySet<string> = new Set([
     "constructor",
@@ -135,7 +133,6 @@ export class AbstractController {
     "sendData",
     "verifyAuthenticityToken",
     "formAuthenticityToken",
-    "markPerformed",
     "inspect",
     "controllerPath",
     "controllerName",
@@ -262,7 +259,6 @@ export class AbstractController {
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    this._performed = false;
     await _runProcessActionCallbacks(this, action, async () => {
       await this.sendAction(action, ...args);
     });
@@ -340,11 +336,7 @@ export class AbstractController {
   }
 
   get performed(): boolean {
-    return this._performed || this._responseBody !== null;
-  }
-
-  protected markPerformed(): void {
-    this._performed = true;
+    return this.responseBody != null;
   }
 }
 

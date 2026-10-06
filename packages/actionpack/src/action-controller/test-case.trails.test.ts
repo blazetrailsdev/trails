@@ -449,7 +449,6 @@ describe("TestCase over a PostsController", () => {
         async index() {
           this.responseBody = "metal response";
           this.contentType = "text/plain";
-          this.markPerformed();
         }
       }
 

@@ -85,7 +85,6 @@ export class API extends Metal {
     const result = renderForApi(options as Record<string, unknown>);
     this.contentType = result.contentType;
     this.responseBody = result.body;
-    this.markPerformed();
   }
 }
 

@@ -18,10 +18,15 @@ import {
   merge,
   mergeBang,
   rbBlockGivenP,
+  rbEql,
+  rbEqual,
   rbHash,
+  rbInspect,
   rbModConstSet,
   rbModName,
+  rbObjClass,
   rbObjDup,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -594,13 +599,23 @@ export class Parameters {
 
   declare toParam: Parameters["toQuery"];
 
-  equals(other: Parameters): boolean {
-    if (!(other instanceof Parameters)) return false;
-    return this._permitted === other._permitted && deepEqualValue(this._data, other._data);
+  equals(other: unknown): boolean {
+    if (rbObjRespondTo(other, "permitted")) {
+      return (
+        this.permitted === (other as Parameters).permitted &&
+        rbEqual(this.parameters, (other as Parameters).parameters)
+      );
+    } else {
+      return this === other;
+    }
   }
 
-  eql(other: Parameters): boolean {
-    return this.equals(other);
+  eql(other: unknown): boolean {
+    return (
+      rbObjClass(this) === rbObjClass(other) &&
+      this.permitted === (other as Parameters).permitted &&
+      rbEql(this.parameters, (other as Parameters).parameters)
+    );
   }
 
   hash(): number {
@@ -608,12 +623,11 @@ export class Parameters {
   }
 
   toString(): string {
-    return JSON.stringify(this._data);
+    return rbInspect(this._data);
   }
 
   inspect(): string {
-    const permitted = this._permitted ? " permitted: true" : "";
-    return `#<ActionController::Parameters ${JSON.stringify(this._data)}${permitted}>`;
+    return `#<${rbModName(rbObjClass(this))} ${rbInspect(this._data)} permitted: ${this._permitted}>`;
   }
 
   initWith(coder: Psych.Coder): void {
@@ -1133,41 +1147,6 @@ function deepMergeObjects(
     }
   }
   return result;
-}
-
-function deepEqualValue(a: unknown, b: unknown): boolean {
-  if (Object.is(a, b)) return true;
-  if (typeof a !== typeof b) return false;
-  if (a === null || b === null) return false;
-
-  if (a instanceof Parameters && b instanceof Parameters) {
-    if (a.permitted !== b.permitted) return false;
-    return deepEqualValue(a._toRawHash(), b._toRawHash());
-  }
-
-  if (Array.isArray(a) && Array.isArray(b)) {
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      if (!deepEqualValue(a[i], b[i])) return false;
-    }
-    return true;
-  }
-  if (Array.isArray(a) || Array.isArray(b)) return false;
-
-  if (isPlainObject(a) && isPlainObject(b)) {
-    const keysA = Object.keys(a).sort();
-    const keysB = Object.keys(b).sort();
-    if (keysA.length !== keysB.length) return false;
-    for (let i = 0; i < keysA.length; i++) {
-      if (keysA[i] !== keysB[i]) return false;
-    }
-    for (const key of keysA) {
-      if (!deepEqualValue(a[key], b[key])) return false;
-    }
-    return true;
-  }
-
-  return false;
 }
 
 rbModConstSet(ActionController, "Parameters", Parameters);
