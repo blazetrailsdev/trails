@@ -258,8 +258,10 @@ describe("ActionController::Base rescue_from", () => {
         throw new CustomError("boom");
       }
     }
-    RescueController2.rescueFrom(CustomError, () => {
-      rescued = true;
+    RescueController2.rescueFrom(CustomError, {
+      with: () => {
+        rescued = true;
+      },
     });
 
     const c = new RescueController2();
@@ -279,7 +281,7 @@ describe("ActionController::Base rescue_from", () => {
         throw new OtherError("nope");
       }
     }
-    NoRescueController.rescueFrom(SpecificError, () => {});
+    NoRescueController.rescueFrom(SpecificError, { with: () => {} });
 
     const c = new NoRescueController();
     await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(OtherError);
@@ -295,8 +297,10 @@ describe("ActionController::Base rescue_from", () => {
       }
     }
     let handled = false;
-    ParentRescue.rescueFrom(AppError, () => {
-      handled = true;
+    ParentRescue.rescueFrom(AppError, {
+      with: () => {
+        handled = true;
+      },
     });
 
     class ChildRescue extends ParentRescue {}
