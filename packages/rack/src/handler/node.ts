@@ -1,10 +1,11 @@
 import { getHttpAsync, stderr, StringIO, Thread } from "@blazetrails/ruby-compat";
-import type { HttpRequest, HttpResponse, HttpServer } from "@blazetrails/ruby-compat";
+import type { HttpRequest, HttpResponse, HttpServer, HttpSocket } from "@blazetrails/ruby-compat";
 import {
   HTTPS,
   PATH_INFO,
   QUERY_STRING,
   RACK_ERRORS,
+  RACK_HIJACK,
   RACK_INPUT,
   RACK_IS_HIJACK,
   RACK_URL_SCHEME,
@@ -16,13 +17,20 @@ import {
   SERVER_PROTOCOL,
   SET_COOKIE,
 } from "../constants.js";
+import { HTTP_STATUS_CODES } from "../utils.js";
 import { RELEASE } from "../version.js";
-import type { RackApp, RackEnv } from "../index.js";
+import type { RackApp, RackEnv, RackResponse } from "../index.js";
 
 export interface Options {
   Port?: number;
   Host?: string;
 }
+
+/** @noRailsEquivalent PERMANENT */
+export const RACK_HIJACK_IO = "rack.hijack_io";
+
+/** @noRailsEquivalent PERMANENT */
+const unhijacked = new Set<HttpSocket>();
 
 export class Node {
   static server: HttpServer | null = null;
@@ -39,6 +47,9 @@ export class Node {
     const server = http.createServer((req, res) => {
       void handler.service(req, res);
     });
+    server.on("upgrade", (req, socket, head) => {
+      void handler.upgrade(req, socket, head);
+    });
     Node.server = server;
     return new Promise<HttpServer>((resolve) => {
       server.listen(options.Port ?? 8080, options.Host ?? "localhost", () => resolve(server));
@@ -49,6 +60,8 @@ export class Node {
     const server = Node.server;
     if (!server) return;
     Node.server = null;
+    for (const socket of unhijacked) socket.destroy();
+    unhijacked.clear();
     await new Promise<void>((resolve, reject) => {
       server.close((error) => (error ? reject(error) : resolve()));
     });
@@ -57,54 +70,79 @@ export class Node {
   /** @noRailsEquivalent PERMANENT */
   service(req: HttpRequest, res: HttpResponse): Promise<void> {
     return new Thread(async (): Promise<void> => {
-      const env = await this.metaVars(req);
-      for (const key of Object.keys(env)) {
-        if (env[key] == null) delete env[key];
-      }
-
-      const input = new StringIO(await readBody(req));
-
-      env[RACK_INPUT] = input;
-      env[RACK_ERRORS] = stderr;
-      env[RACK_URL_SCHEME] = ["yes", "on", "1"].includes(env[HTTPS] as string) ? "https" : "http";
+      const env = await this.requestEnv(req, new StringIO(await readBody(req)));
       env[RACK_IS_HIJACK] = false;
-
-      env[QUERY_STRING] ??= "";
-      if (env[PATH_INFO] !== "") {
-        const path = new URL(env["REQUEST_URI"] as string).pathname;
-        const n = (env[SCRIPT_NAME] as string).length;
-        env[PATH_INFO] = path.slice(n, path.length);
-      }
-      env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
 
       const [status, headers, body] = await this.app(env);
       try {
-        const sent: Record<string, string | string[]> = {};
-        const setCookie = headers[SET_COOKIE];
-        if (setCookie) {
-          sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
-        }
-
-        for (const [key, value] of Object.entries(headers)) {
-          if (key.startsWith("rack.")) continue;
-          if (key === SET_COOKIE) continue;
-          sent[key] = Array.isArray(value) ? value.join(", ") : value;
-        }
-
-        res.writeHead(status, sent);
+        res.writeHead(status, sentHeaders(headers));
         for await (const chunk of body) {
           res.write(chunk);
         }
         res.end();
       } finally {
-        const { close, return: finish } = body as {
-          close?: () => void;
-          return?: () => Promise<unknown>;
-        };
-        if (close) close.call(body);
-        else if (finish) await finish.call(body);
+        await closeBody(body);
       }
     }).value();
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  upgrade(req: HttpRequest, socket: HttpSocket, head: Uint8Array): Promise<void> {
+    return new Thread(async (): Promise<void> => {
+      let hijacked = false;
+      const discard = (): void => {
+        socket.destroy();
+      };
+      socket.on("error", discard);
+      unhijacked.add(socket);
+      socket.on("close", () => {
+        unhijacked.delete(socket);
+      });
+      if (head.length > 0) socket.unshift(head);
+
+      const env = await this.requestEnv(req, new StringIO(""));
+      env[RACK_IS_HIJACK] = true;
+      env[RACK_HIJACK] = (): HttpSocket => {
+        hijacked = true;
+        unhijacked.delete(socket);
+        socket.removeListener("error", discard);
+        env[RACK_HIJACK_IO] = socket;
+        return socket;
+      };
+
+      const [status, headers, body] = await this.app(env);
+      try {
+        if (hijacked) return;
+        socket.write(responseHead(status, sentHeaders(headers)));
+        for await (const chunk of body) {
+          socket.write(chunk);
+        }
+        socket.end();
+      } finally {
+        await closeBody(body);
+      }
+    }).value();
+  }
+
+  /** @internal */
+  private async requestEnv(req: HttpRequest, input: StringIO): Promise<RackEnv> {
+    const env = await this.metaVars(req);
+    for (const key of Object.keys(env)) {
+      if (env[key] == null) delete env[key];
+    }
+
+    env[RACK_INPUT] = input;
+    env[RACK_ERRORS] = stderr;
+    env[RACK_URL_SCHEME] = ["yes", "on", "1"].includes(env[HTTPS] as string) ? "https" : "http";
+
+    env[QUERY_STRING] ??= "";
+    if (env[PATH_INFO] !== "") {
+      const path = new URL(env["REQUEST_URI"] as string).pathname;
+      const n = (env[SCRIPT_NAME] as string).length;
+      env[PATH_INFO] = path.slice(n, path.length);
+    }
+    env[REQUEST_PATH] ??= `${env[SCRIPT_NAME] as string}${env[PATH_INFO] as string}`;
+    return env;
   }
 
   async metaVars(req: HttpRequest): Promise<RackEnv> {
@@ -141,6 +179,41 @@ export class Node {
 
     return meta;
   }
+}
+
+function sentHeaders(headers: RackResponse[1]): Record<string, string | string[]> {
+  const sent: Record<string, string | string[]> = {};
+  const setCookie = headers[SET_COOKIE];
+  if (setCookie) {
+    sent[SET_COOKIE] = Array.isArray(setCookie) ? setCookie : [setCookie];
+  }
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.startsWith("rack.")) continue;
+    if (key === SET_COOKIE) continue;
+    sent[key] = Array.isArray(value) ? value.join(", ") : value;
+  }
+  return sent;
+}
+
+async function closeBody(body: RackResponse[2]): Promise<void> {
+  const { close, return: finish } = body as {
+    close?: () => void;
+    return?: () => Promise<unknown>;
+  };
+  if (close) close.call(body);
+  else if (finish) await finish.call(body);
+}
+
+/** @noRailsEquivalent PERMANENT */
+function responseHead(status: number, headers: Record<string, string | string[]>): string {
+  const lines = [`HTTP/1.1 ${status} ${HTTP_STATUS_CODES[status] ?? ""}`.trimEnd()];
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === "connection") continue;
+    for (const each of Array.isArray(value) ? value : [value]) lines.push(`${key}: ${each}`);
+  }
+  lines.push("connection: close");
+  return `${lines.join("\r\n")}\r\n\r\n`;
 }
 
 function parseUri(str: string, scheme: string, host: string): URL {

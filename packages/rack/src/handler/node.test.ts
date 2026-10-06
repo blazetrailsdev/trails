@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import type { HttpRequest, HttpResponse, StringIO } from "@blazetrails/ruby-compat";
+import { connect, type Socket } from "node:net";
+import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
 import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
-import { Node } from "./node.js";
+import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
+import { Lint } from "../lint.js";
+import { Node, RACK_HIJACK_IO } from "./node.js";
 
 async function serving(app: RackApp, body: (url: string) => Promise<void>): Promise<void> {
   const server = await Node.run(app, { Port: 0, Host: "127.0.0.1" });
@@ -217,4 +220,176 @@ describe("Rack::Handler::Node", () => {
       expect(await response.text()).toBe("onetwo");
     });
   });
+
+  describe("upgrade requests", () => {
+    it("offers the app a callable rack.hijack that Rack::Lint accepts", async () => {
+      let env: RackEnv = {};
+      let lintError: unknown = null;
+      const linted = new Lint(async (e) => {
+        env = { ...e };
+        return [200, { "content-type": "text/plain", "content-length": "0" }, bodyFromString("")];
+      });
+      await serving(
+        async (e) => {
+          try {
+            return await linted.call({ ...e, [RACK_ERRORS]: lintableErrors });
+          } catch (error) {
+            lintError = error;
+            return [500, {}, bodyFromString("")];
+          }
+        },
+        async (url) => void (await upgradeRequest(url, "/cable")),
+      );
+
+      expect(lintError).toBeNull();
+      expect(env[RACK_IS_HIJACK]).toBe(true);
+      expect(typeof env[RACK_HIJACK]).toBe("function");
+      expect((env[RACK_INPUT] as StringIO).read()).toBe("");
+      expect(env.PATH_INFO).toBe("/cable");
+      expect(env.HTTP_UPGRADE).toBe("websocket");
+      expect(lintError).toBeNull();
+    });
+
+    it("hands over the socket, sets rack.hijack_io, and writes nothing itself", async () => {
+      let hijackIo: unknown;
+      let returned: unknown;
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            returned = io;
+            hijackIo = env[RACK_HIJACK_IO];
+            io.on("data", (chunk) => {
+              io.write(`echo:${Buffer.from(chunk).toString()}`);
+              io.end();
+            });
+            return [-1, {}, bodyFromString("")];
+          },
+          async (url) => {
+            const { text } = await upgradeRequest(url, "/cable", "after-handshake");
+            resolve(text);
+          },
+        ).catch(reject);
+      });
+
+      expect(returned).toBe(hijackIo);
+      expect(reply).toBe("echo:after-handshake");
+    });
+
+    it("delivers bytes pipelined with the handshake to the hijacked socket", async () => {
+      const reply = await new Promise<string>((resolve, reject) => {
+        serving(
+          async (env) => {
+            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            io.on("data", (chunk) => {
+              io.write(`head:${Buffer.from(chunk).toString()}`);
+              io.end();
+            });
+            return [-1, {}, bodyFromString("")];
+          },
+          async (url) => {
+            const { text } = await upgradeRequest(url, "/cable", "", "first-frame");
+            resolve(text);
+          },
+        ).catch(reject);
+      });
+
+      expect(reply).toBe("head:first-frame");
+    });
+
+    it("answers an upgrade the app does not hijack and closes the socket", async () => {
+      let text = "";
+      let closed = false;
+      await serving(
+        async () => [404, { "content-type": "text/plain" }, bodyFromString("Page not found")],
+        async (url) => {
+          ({ text, closed } = await upgradeRequest(url, "/cable"));
+        },
+      );
+
+      expect(text.startsWith("HTTP/1.1 404 Not Found\r\n")).toBe(true);
+      expect(text).toContain("content-type: text/plain\r\n");
+      expect(text).toContain("connection: close\r\n");
+      expect(text.endsWith("\r\n\r\nPage not found")).toBe(true);
+      expect(closed).toBe(true);
+    });
+
+    it("leaves rack.hijack? false and rack.hijack unset on an ordinary request", async () => {
+      const env = await envFor("/users");
+
+      expect(env[RACK_IS_HIJACK]).toBe(false);
+      expect(env[RACK_HIJACK]).toBeUndefined();
+    });
+
+    it("closes a socket it still owns on shutdown, and waits for the app to close one it hijacked", async () => {
+      let hijackedIo: HttpSocket | null = null;
+      const server = await Node.run(
+        async (env) => {
+          if (env.PATH_INFO === "/taken") {
+            hijackedIo = (env[RACK_HIJACK] as () => HttpSocket)();
+            return [-1, {}, bodyFromString("")];
+          }
+          await new Promise(() => {});
+          return [200, {}, bodyFromString("")];
+        },
+        { Port: 0, Host: "127.0.0.1" },
+      );
+      const address = server.address();
+      const port = address && typeof address === "object" ? address.port : 0;
+      const taken = await openUpgrade(port, "/taken");
+      const pending = await openUpgrade(port, "/pending");
+      const pendingClosed = new Promise<void>((resolve) => pending.on("close", () => resolve()));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      let stopped = false;
+      const shutdown = Node.shutdown().then(() => {
+        stopped = true;
+      });
+      await pendingClosed;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(pending.destroyed).toBe(true);
+      expect(taken.destroyed).toBe(false);
+      expect(stopped).toBe(false);
+
+      hijackedIo!.destroy();
+      await shutdown;
+      expect(stopped).toBe(true);
+    });
+  });
 });
+
+const lintableErrors = { puts() {}, write() {}, flush() {} };
+
+function openUpgrade(port: number, path: string, pipelined = ""): Promise<Socket> {
+  return new Promise((resolve, reject) => {
+    const socket = connect(port, "127.0.0.1", () => {
+      socket.write(
+        `GET ${path} HTTP/1.1\r\nHost: 127.0.0.1:${port}\r\n` +
+          `Connection: Upgrade\r\nUpgrade: websocket\r\n\r\n${pipelined}`,
+      );
+      resolve(socket);
+    });
+    socket.on("error", reject);
+  });
+}
+
+async function upgradeRequest(
+  url: string,
+  path: string,
+  afterHandshake = "",
+  pipelined = "",
+): Promise<{ text: string; closed: boolean }> {
+  const socket = await openUpgrade(Number(new URL(url).port), path, pipelined);
+  if (afterHandshake !== "") {
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    socket.write(afterHandshake);
+  }
+  return new Promise((resolve) => {
+    let text = "";
+    socket.on("data", (chunk) => {
+      text += chunk.toString();
+    });
+    socket.on("close", () => resolve({ text, closed: true }));
+  });
+}
