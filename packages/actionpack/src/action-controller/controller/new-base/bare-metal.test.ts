@@ -8,9 +8,10 @@ import {
 } from "@blazetrails/activesupport";
 import { MockRequest, Response as RackResponseObject } from "@blazetrails/rack";
 import type { RackResponse as RackTriplet } from "@blazetrails/rack";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { include, registerConstant, type Included } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { Metal } from "../../metal.js";
+import { Head } from "../../metal/head.js";
 import { TestCase } from "../../test-case.js";
 import { Request } from "../../../action-dispatch/request.js";
 import type { Response } from "../../../action-dispatch/response.js";
@@ -132,7 +133,9 @@ describe("BareEmptyTest", () => {
   });
 });
 
-// BLOCKED: head-is-a-module-included-by-conditional-get-not-a-metal-method
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface HeadController extends Included<typeof Head> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class HeadController extends Metal {
   index(): void {
     this.head("not_found");
@@ -173,6 +176,7 @@ class HeadController extends Metal {
     this.head(304);
   }
 }
+include(HeadController, Head);
 
 async function body(rackResponse: RackTriplet): Promise<string> {
   const buf: unknown[] = [];

@@ -1,46 +1,87 @@
-import { underscore } from "@blazetrails/activesupport";
+import { Module, camelize, underscore } from "@blazetrails/activesupport";
+import {
+  KERNEL_METHODS,
+  NoMethodError,
+  PROTOCOL_PROBES,
+  included,
+  rbFPublicSend,
+  rbObjClassname,
+  symbolToS,
+} from "@blazetrails/ruby-compat";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 
-export abstract class Collector {
-  abstract custom(mime: MimeType, ...args: unknown[]): unknown;
-
-  constructor() {
-    return new Proxy(this, COLLECTOR_HANDLER) as this;
-  }
+export function generateMethodForMime(mime: MimeType | string): void {
+  const sym = typeof mime === "string" ? mime : mime.toSym()!;
+  Collector.defineMethod(
+    camelize(symbolToS(sym), false),
+    function (
+      this: { custom(mime: MimeType | undefined, ...args: unknown[]): unknown },
+      ...args: unknown[]
+    ) {
+      return this.custom(Mime.get(sym), ...args);
+    },
+  );
 }
-
-const RESERVED_KEYS = new Set<string | symbol>(["then", "catch", "finally", "toJSON", "inspect"]);
-
-const COLLECTOR_HANDLER: ProxyHandler<Collector> = {
-  get(target, prop, receiver) {
-    if (Reflect.has(target, prop)) return Reflect.get(target, prop, receiver);
-    if (RESERVED_KEYS.has(prop)) return undefined;
-    if (typeof prop !== "string") return undefined;
-    const mimeConstant = Mime.get(underscore(prop));
-    if (!mimeConstant) {
-      return (): never => {
-        throw new TypeError(
-          `To respond to a custom format, register it as a MIME type first. ` +
-            `Unknown format: ${prop}`,
-        );
-      };
-    }
-    return (...args: unknown[]): unknown => {
-      const fn = Reflect.get(target, "custom", receiver);
-      return fn.call(receiver, mimeConstant, ...args);
-    };
-  },
-
-  has(target, prop) {
-    if (Reflect.has(target, prop)) return true;
-    if (RESERVED_KEYS.has(prop)) return false;
-    return typeof prop === "string" && Mime.get(underscore(prop)) !== undefined;
-  },
-};
 
 /** @internal */
-export function generateMethodForMime(mime: MimeType | string): void {
-  if (typeof mime === "string" && !Mime.get(mime)) {
-    throw new TypeError(`generateMethodForMime: unknown MIME ${JSON.stringify(mime)}`);
+export function methodMissing(this: object, symbol: string, ...args: unknown[]): unknown {
+  const mimeConstant = Mime.get(underscore(symbol));
+  if (mimeConstant == null) {
+    throw new NoMethodError(
+      "To respond to a custom format, register it as a MIME type first: " +
+        "https://guides.rubyonrails.org/action_controller_overview.html#restful-downloads. " +
+        "If you meant to respond to a variant like :tablet or :phone, not a custom format, " +
+        "be sure to nest your variant response within a format response: " +
+        "format.html { |html| html.tablet { ... } }",
+    );
+  }
+
+  if (MimeType.SET.select(() => true).includes(mimeConstant)) {
+    Collector.generateMethodForMime(mimeConstant);
+    return rbFPublicSend(this, symbol, ...args);
+  } else {
+    const super_ = Collector.superMethod(this, "methodMissing");
+    if (super_ !== undefined) return super_(symbol, ...args);
+    throw new NoMethodError(
+      `undefined method '${symbol}' for an instance of ${rbObjClassname(this)}`,
+      symbol,
+      args,
+      false,
+      { receiver: this },
+    );
   }
 }
+
+export const Collector = new Module((mod) => {
+  mod.defineMethod("methodMissing", methodMissing);
+
+  (mod as unknown as Record<symbol, unknown>)[included] = (base: { prototype: object }): void => {
+    const link = Object.getPrototypeOf(base.prototype) as object;
+    Object.setPrototypeOf(
+      link,
+      new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
+        get(target, prop, receiver: object) {
+          const value = Reflect.get(target, prop, receiver);
+          if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
+            return value;
+          }
+          if (KERNEL_METHODS.has(prop) || PROTOCOL_PROBES.has(prop)) return value;
+          return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
+        },
+      }),
+    );
+  };
+}) as Module<{ methodMissing: typeof methodMissing }> & {
+  generateMethodForMime: typeof generateMethodForMime;
+};
+Collector.generateMethodForMime = generateMethodForMime;
+
+MimeType.SET.each((mime) => {
+  generateMethodForMime(mime);
+});
+
+MimeType.registerCallback((mime) => {
+  if (!Collector.instanceMethods().includes(camelize(symbolToS(mime.toSym()!), false))) {
+    generateMethodForMime(mime);
+  }
+});

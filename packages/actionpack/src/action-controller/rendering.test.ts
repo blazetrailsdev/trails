@@ -4,6 +4,8 @@ import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
+import { Head } from "./metal/head.js";
+import { include, type Included } from "@blazetrails/ruby-compat";
 import { Request } from "../action-dispatch/request.js";
 import { Response } from "../action-dispatch/response.js";
 
@@ -15,6 +17,12 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
+interface HeadMetal extends Included<typeof Head> {}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class HeadMetal extends Metal {}
+include(HeadMetal, Head);
+
 function makeResponse(): Response {
   return new Response();
 }
@@ -190,7 +198,7 @@ describe("ActionController rendering", () => {
 
   describe("head", () => {
     it("head with numeric status", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head(204);
         }
@@ -202,7 +210,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head with symbol status", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head("not_found");
         }
@@ -213,7 +221,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head with ok", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head("ok");
         }
@@ -224,7 +232,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head marks as performed", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head(200);
         }
