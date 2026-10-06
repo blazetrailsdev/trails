@@ -1,4 +1,4 @@
-import { NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
+import { Module, NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import { Collector } from "./collector.js";
@@ -169,6 +169,47 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     expect("custom" in c).toBe(true);
     expect("html" in c).toBe(true);
     expect("bogusFormatXyz" in c).toBe(false);
+  });
+});
+
+describe("AbstractController::Collector — the method_missing splice", () => {
+  it("reaches method_missing with a module included after Collector", () => {
+    class Late {
+      custom(mime: MimeType): unknown {
+        return mime;
+      }
+    }
+    include(Late, Collector);
+    include(Late, new Module((mod) => mod.defineMethod("extra", () => "extra")));
+    const c = new Late() as Late & { extra(): string; unknown(): void; html(): unknown };
+    expect(c.extra()).toBe("extra");
+    expect(c.html()).toBe(MimeType.HTML);
+    expect(() => c.unknown()).toThrow(NoMethodError);
+  });
+
+  it("reaches method_missing from a subclass, and including twice splices once", () => {
+    class Sub extends MyCollector {}
+    include(Sub, Collector);
+    include(MyCollector, Collector);
+    const c = new Sub() as Sub & { unknown(): void; html(): unknown };
+    c.html();
+    expect(c.responses[0][0]).toBe(MimeType.HTML);
+    expect(() => c.unknown()).toThrow(NoMethodError);
+    expect(c).toBeInstanceOf(MyCollector);
+  });
+
+  it("dispatches to a class's own methodMissing", () => {
+    class Own {
+      custom(): unknown {
+        return null;
+      }
+      methodMissing(symbol: string): string {
+        return `own:${symbol}`;
+      }
+    }
+    include(Own, Collector);
+    const c = new Own() as Own & { unknown(): string };
+    expect(c.unknown()).toBe("own:unknown");
   });
 });
 

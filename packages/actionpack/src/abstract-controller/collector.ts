@@ -10,21 +10,31 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 
+const spliced = new WeakSet<object>();
+
 export const Collector = new Module((mod) => {
   mod.defineMethod("methodMissing", methodMissing);
 
   (mod as unknown as Record<symbol, unknown>)[included] = (base: { prototype: object }): void => {
-    const link = Object.getPrototypeOf(base.prototype) as object;
+    let link = Object.getPrototypeOf(base.prototype) as object | null;
+    while (
+      link &&
+      Object.getOwnPropertyDescriptor(link, "methodMissing")?.value !== methodMissing
+    ) {
+      link = Object.getPrototypeOf(link) as object | null;
+    }
+    if (!link || spliced.has(link)) return;
+    spliced.add(link);
     Object.setPrototypeOf(
       link,
       new Proxy(Object.create(Object.getPrototypeOf(link) as object) as object, {
-        get(target, prop, receiver: object) {
+        get(target, prop, receiver: { methodMissing: typeof methodMissing }) {
           const value = Reflect.get(target, prop, receiver);
           if (value !== undefined || typeof prop === "symbol" || Reflect.has(target, prop)) {
             return value;
           }
           if (KERNEL_METHODS.has(prop) || PROTOCOL_PROBES.has(prop)) return value;
-          return (...args: unknown[]) => methodMissing.call(receiver, prop, ...args);
+          return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
         },
       }),
     );

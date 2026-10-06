@@ -12,6 +12,7 @@ import {
 } from "@blazetrails/rack";
 import type { CookieExpires, SetCookieOptions } from "../middleware/cookies.js";
 import type { Request } from "./request.js";
+import type { MimeType } from "./mime-type.js";
 import {
   type CacheControlHash,
   cacheControlHeaders as _cacheControlHeaders,
@@ -281,7 +282,7 @@ export class Response {
     return presence(this.getHeader(CONTENT_TYPE));
   }
 
-  set contentType(value: string | undefined) {
+  set contentType(value: string | MimeType | undefined) {
     if (value == null) return;
     const newHeaderInfo = this.parseContentType(String(value));
     const prevHeaderInfo = this.parsedContentTypeHeader();

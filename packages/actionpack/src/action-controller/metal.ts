@@ -1,3 +1,4 @@
+import type { MimeType } from "../action-dispatch/http/mime-type.js";
 import { AbstractController } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -293,7 +294,7 @@ export class Metal extends AbstractController {
     return this.response.location;
   }
 
-  set contentType(value: string) {
+  set contentType(value: string | MimeType | undefined) {
     this.response.contentType = value;
   }
 

@@ -1,6 +1,6 @@
 import { Module, isPlainObject } from "@blazetrails/activesupport";
 import { ArgumentError, hashDelete, rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
-import { Mime } from "../../action-dispatch/http/mime-type.js";
+import { Mime, type MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Metal } from "../metal.js";
 
 type HeadHost = Pick<
@@ -9,7 +9,7 @@ type HeadHost = Pick<
 > & {
   set status(value: number | string);
   set location(value: string);
-  set contentType(value: string);
+  set contentType(value: string | MimeType | undefined);
   formats?: ReadonlyArray<string>;
   includeContent: typeof includeContent;
 };
@@ -48,11 +48,10 @@ export function head(
   if (this.includeContent(this.responseCode)) {
     if (this.mediaType == null) {
       let f: ReadonlyArray<string> | undefined;
-      this.contentType = String(
-        (contentType != null && contentType !== false ? contentType : null) ??
-          ((f = this.formats) != null ? Mime.get(f[0] ?? null) : null) ??
-          Mime.get(":html"),
-      );
+      this.contentType =
+        (contentType != null && contentType !== false ? (contentType as string) : null) ??
+        ((f = this.formats) != null ? Mime.get(f[0] ?? null) : null) ??
+        Mime.get(":html");
     }
 
     this.response.charset = false;
