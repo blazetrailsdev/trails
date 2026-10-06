@@ -302,6 +302,8 @@ export {
   resetConstants,
   isRegisteredConstant,
   rbConstGet,
+  rbGvGet,
+  rbGvSet,
   rbModConstGet,
   rbModConstants,
   rbConstMissing,

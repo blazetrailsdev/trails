@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/ruby-compat";
-import { rescueFrom } from "./rescuable.js";
+import { Rescuable } from "./rescuable.js";
 import { Fanout } from "./notifications/fanout.js";
 import { numberToHuman } from "./number-helper.js";
+
+const { rescueFrom } = Rescuable.ClassMethods;
 
 describe("raise sites Rails has and the port had dropped", () => {
   it("rescue_from raises without a handler", () => {
     expect(() => rescueFrom.call({ rescueHandlers: [] }, Error)).toThrow(
+      new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block."),
+    );
+    expect(() => rescueFrom.call({ rescueHandlers: [] }, Error, { with: false as never })).toThrow(
       new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block."),
     );
   });
@@ -15,6 +20,9 @@ describe("raise sites Rails has and the port had dropped", () => {
     expect(() => rescueFrom.call({ rescueHandlers: [] }, 42 as never, { with: () => {} })).toThrow(
       new ArgumentError("42 must be an Exception class or a String referencing an Exception class"),
     );
+    expect(() =>
+      rescueFrom.call({ rescueHandlers: [] }, (() => true) as never, { with: () => {} }),
+    ).toThrow(ArgumentError);
   });
 
   it("Fanout#subscribe raises on a pattern that is not a String, Regexp or nil", () => {

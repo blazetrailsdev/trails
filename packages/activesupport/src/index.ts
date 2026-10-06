@@ -310,7 +310,7 @@ export {
   subclasses,
   descendants,
 } from "./module-ext.js";
-export { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
+export { Rescuable } from "./rescuable.js";
 export type { MattrOptions } from "./module-ext.js";
 
 export type {

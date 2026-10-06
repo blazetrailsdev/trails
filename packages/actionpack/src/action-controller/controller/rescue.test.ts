@@ -26,8 +26,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let rescued = false;
-    C.rescueFrom(AppError, () => {
-      rescued = true;
+    C.rescueFrom(AppError, {
+      with: () => {
+        rescued = true;
+      },
     });
 
     const c = new C();
@@ -45,8 +47,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let message = "";
-    C.rescueFrom(AppError, (err: Error) => {
-      message = err.message;
+    C.rescueFrom(AppError, {
+      with: (err: Error) => {
+        message = err.message;
+      },
     });
 
     const c = new C();
@@ -66,7 +70,7 @@ describe("RescueControllerTest", () => {
         throw new UnknownError("nope");
       }
     }
-    C.rescueFrom(KnownError, () => {});
+    C.rescueFrom(KnownError, { with: () => {} });
 
     const c = new C();
     await expect(c.dispatch("index", makeRequest(), makeResponse())).rejects.toThrow(UnknownError);
@@ -85,8 +89,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let rescued = false;
-    C.rescueFrom(BaseError, () => {
-      rescued = true;
+    C.rescueFrom(BaseError, {
+      with: () => {
+        rescued = true;
+      },
     });
 
     const c = new C();
@@ -104,8 +110,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let handled = false;
-    Parent.rescueFrom(AppError, () => {
-      handled = true;
+    Parent.rescueFrom(AppError, {
+      with: () => {
+        handled = true;
+      },
     });
 
     class Child extends Parent {}
@@ -126,12 +134,14 @@ describe("RescueControllerTest", () => {
         throw new ChildError("child");
       }
     }
-    Parent.rescueFrom(ParentError, () => {});
+    Parent.rescueFrom(ParentError, { with: () => {} });
 
     class Child extends Parent {}
     let childRescued = false;
-    Child.rescueFrom(ChildError, () => {
-      childRescued = true;
+    Child.rescueFrom(ChildError, {
+      with: () => {
+        childRescued = true;
+      },
     });
 
     const c = new Child();
@@ -148,7 +158,7 @@ describe("RescueControllerTest", () => {
         throw new AppError("fail");
       }
     }
-    C.rescueFrom(AppError, function (this: any, _err: Error) {});
+    C.rescueFrom(AppError, { with: function (this: any, _err: Error) {} });
 
     let rescued = false;
     class C2 extends Base {
@@ -156,8 +166,10 @@ describe("RescueControllerTest", () => {
         throw new AppError("fail");
       }
     }
-    C2.rescueFrom(AppError, () => {
-      rescued = true;
+    C2.rescueFrom(AppError, {
+      with: () => {
+        rescued = true;
+      },
     });
     const c = new C2();
     await c.dispatch("index", makeRequest(), makeResponse());
@@ -174,9 +186,11 @@ describe("RescueControllerTest", () => {
       }
     }
     let handled = false;
-    C.rescueFrom(AsyncError, async () => {
-      await new Promise((r) => setTimeout(r, 1));
-      handled = true;
+    C.rescueFrom(AsyncError, {
+      with: async () => {
+        await new Promise((r) => setTimeout(r, 1));
+        handled = true;
+      },
     });
 
     const c = new C();
@@ -197,11 +211,15 @@ describe("RescueControllerTest", () => {
       }
     }
     let which = "";
-    C.rescueFrom(BaseError, () => {
-      which = "base";
+    C.rescueFrom(BaseError, {
+      with: () => {
+        which = "base";
+      },
     });
-    C.rescueFrom(SpecificError, () => {
-      which = "specific";
+    C.rescueFrom(SpecificError, {
+      with: () => {
+        which = "specific";
+      },
     });
 
     const c = new C();
@@ -216,8 +234,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let rescued = false;
-    C.rescueFrom(Error, () => {
-      rescued = true;
+    C.rescueFrom(Error, {
+      with: () => {
+        rescued = true;
+      },
     });
 
     const c = new C();
@@ -232,8 +252,10 @@ describe("RescueControllerTest", () => {
         throw new NotAuthorized();
       }
     }
-    C.rescueFrom(NotAuthorized, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(NotAuthorized, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
     const c = new C();
     await c.dispatch("notAuthorized", makeRequest(), makeResponse());
@@ -247,8 +269,10 @@ describe("RescueControllerTest", () => {
         throw new NotAuthorizedString();
       }
     }
-    C.rescueFrom(NotAuthorizedString, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(NotAuthorizedString, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -263,8 +287,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalid, (err: Error) => {
-      caughtError = err;
+    C.rescueFrom(RecordInvalid, {
+      with: (err: Error) => {
+        caughtError = err;
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -279,8 +305,10 @@ describe("RescueControllerTest", () => {
       }
     }
     let caughtError: Error | null = null;
-    C.rescueFrom(RecordInvalidStr, (err: Error) => {
-      caughtError = err;
+    C.rescueFrom(RecordInvalidStr, {
+      with: (err: Error) => {
+        caughtError = err;
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -294,8 +322,10 @@ describe("RescueControllerTest", () => {
         throw new NotAllowed();
       }
     }
-    C.rescueFrom(NotAllowed, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(NotAllowed, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -309,8 +339,10 @@ describe("RescueControllerTest", () => {
         throw new NotAllowedStr();
       }
     }
-    C.rescueFrom(NotAllowedStr, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(NotAllowedStr, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -328,8 +360,10 @@ describe("RescueControllerTest", () => {
         throw new InvalidRequest();
       }
     }
-    C.rescueFrom(InvalidRequest, async function (this: Base, err: Error) {
-      await this.render({ plain: err.message });
+    C.rescueFrom(InvalidRequest, {
+      with: async function (this: Base, err: Error) {
+        await this.render({ plain: err.message });
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -347,8 +381,10 @@ describe("RescueControllerTest", () => {
         throw new InvalidRequestStr();
       }
     }
-    C.rescueFrom(InvalidRequestStr, async function (this: Base, err: Error) {
-      await this.render({ plain: err.message });
+    C.rescueFrom(InvalidRequestStr, {
+      with: async function (this: Base, err: Error) {
+        await this.render({ plain: err.message });
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -362,8 +398,10 @@ describe("RescueControllerTest", () => {
         throw new BadGateway();
       }
     }
-    C.rescueFrom(BadGateway, function (this: Base) {
-      this.head(502);
+    C.rescueFrom(BadGateway, {
+      with: function (this: Base) {
+        this.head(502);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -377,8 +415,10 @@ describe("RescueControllerTest", () => {
         throw new BadGatewayStr();
       }
     }
-    C.rescueFrom(BadGatewayStr, function (this: Base) {
-      this.head(502);
+    C.rescueFrom(BadGatewayStr, {
+      with: function (this: Base) {
+        this.head(502);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -396,8 +436,10 @@ describe("RescueControllerTest", () => {
         throw new ResourceUnavailable();
       }
     }
-    C.rescueFrom(ResourceUnavailable, async function (this: Base, err: Error) {
-      await this.render({ plain: err.message });
+    C.rescueFrom(ResourceUnavailable, {
+      with: async function (this: Base, err: Error) {
+        await this.render({ plain: err.message });
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -415,8 +457,10 @@ describe("RescueControllerTest", () => {
         throw new ResourceUnavailableStr();
       }
     }
-    C.rescueFrom(ResourceUnavailableStr, async function (this: Base, err: Error) {
-      await this.render({ plain: err.message });
+    C.rescueFrom(ResourceUnavailableStr, {
+      with: async function (this: Base, err: Error) {
+        await this.render({ plain: err.message });
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -431,11 +475,15 @@ describe("RescueControllerTest", () => {
         throw new WrapperError("wrapper", { cause: new CauseError("cause") });
       }
     }
-    C.rescueFrom(CauseError, function (this: Base) {
-      this.head(422);
+    C.rescueFrom(CauseError, {
+      with: function (this: Base) {
+        this.head(422);
+      },
     });
-    C.rescueFrom(WrapperError, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(WrapperError, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -450,11 +498,15 @@ describe("RescueControllerTest", () => {
         throw new GenericError("generic", { cause: new SpecificCause("specific") });
       }
     }
-    C.rescueFrom(GenericError, function (this: Base) {
-      this.head(403);
+    C.rescueFrom(GenericError, {
+      with: function (this: Base) {
+        this.head(403);
+      },
     });
-    C.rescueFrom(SpecificCause, function (this: Base) {
-      this.head(422);
+    C.rescueFrom(SpecificCause, {
+      with: function (this: Base) {
+        this.head(422);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -469,8 +521,10 @@ describe("RescueControllerTest", () => {
         throw new UnhandledWrapper("wrapper", { cause: new HandledCause("cause") });
       }
     }
-    C.rescueFrom(HandledCause, function (this: Base) {
-      this.head(422);
+    C.rescueFrom(HandledCause, {
+      with: function (this: Base) {
+        this.head(422);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -488,8 +542,10 @@ describe("RescueControllerTest", () => {
         throw new ParseError();
       }
     }
-    C.rescueFrom(ParseError, async function (this: Base) {
-      await this.render({ plain: "parse error", status: 400 });
+    C.rescueFrom(ParseError, {
+      with: async function (this: Base) {
+        await this.render({ plain: "parse error", status: 400 });
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -508,11 +564,15 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
         throw new GrandchildException();
       }
     }
-    C.rescueFrom(ParentException, function (this: Base) {
-      this.head(201);
+    C.rescueFrom(ParentException, {
+      with: function (this: Base) {
+        this.head(201);
+      },
     });
-    C.rescueFrom(GrandchildException, function (this: Base) {
-      this.head(204);
+    C.rescueFrom(GrandchildException, {
+      with: function (this: Base) {
+        this.head(204);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -527,8 +587,10 @@ describe("ExceptionInheritanceRescueControllerTest", () => {
         throw new ChildException();
       }
     }
-    C.rescueFrom(ParentException, function (this: Base) {
-      this.head(201);
+    C.rescueFrom(ParentException, {
+      with: function (this: Base) {
+        this.head(201);
+      },
     });
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -545,12 +607,16 @@ describe("ControllerInheritanceRescueControllerTest", () => {
         throw new FirstChildException();
       }
     }
-    Parent.rescueFrom(ParentException, function (this: Base) {
-      this.head(201);
+    Parent.rescueFrom(ParentException, {
+      with: function (this: Base) {
+        this.head(201);
+      },
     });
     class Child extends Parent {}
-    Child.rescueFrom(FirstChildException, function (this: Base) {
-      this.head(410);
+    Child.rescueFrom(FirstChildException, {
+      with: function (this: Base) {
+        this.head(410);
+      },
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -565,12 +631,16 @@ describe("ControllerInheritanceRescueControllerTest", () => {
         throw new SecondChildException();
       }
     }
-    Parent.rescueFrom(ParentException, function (this: Base) {
-      this.head(201);
+    Parent.rescueFrom(ParentException, {
+      with: function (this: Base) {
+        this.head(201);
+      },
     });
     class Child extends Parent {}
-    Child.rescueFrom(SecondChildException, function (this: Base) {
-      this.head(410);
+    Child.rescueFrom(SecondChildException, {
+      with: function (this: Base) {
+        this.head(410);
+      },
     });
     const c = new Child();
     await c.dispatch("action", makeRequest(), makeResponse());
@@ -584,8 +654,10 @@ describe("ControllerInheritanceRescueControllerTest", () => {
         throw new ParentException();
       }
     }
-    Parent.rescueFrom(ParentException, function (this: Base) {
-      this.head(201);
+    Parent.rescueFrom(ParentException, {
+      with: function (this: Base) {
+        this.head(201);
+      },
     });
     class Child extends Parent {}
     const c = new Child();
@@ -617,8 +689,10 @@ describe("RescueTest", () => {
         throw new RecordInvalid();
       }
     }
-    C.rescueFrom(RecordInvalid, async function (this: Base, err: Error) {
-      await this.render({ plain: err.message });
+    C.rescueFrom(RecordInvalid, {
+      with: async function (this: Base, err: Error) {
+        await this.render({ plain: err.message });
+      },
     });
     const c = new C();
     await c.dispatch("invalid", makeRequest(), makeResponse());

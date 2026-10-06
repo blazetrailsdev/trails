@@ -8,6 +8,8 @@ import {
   rbFSend,
   rbObjRespondTo,
   RuntimeError,
+  rbGvGet,
+  rbGvSet,
 } from "@blazetrails/ruby-compat";
 import { Base, type BaseClass, ClassMethods } from "./base.js";
 import { Command } from "./command.js";
@@ -453,6 +455,22 @@ describe("Thor::Base", () => {
       klass.methodAdded("build");
       expect(() => klass.handleNoCommandError("biuld")).toThrow(UndefinedCommandError);
       expect(() => klass.handleNoCommandError("biuld", true)).toThrow(/in "root" namespace\./);
+    });
+
+    it("names the namespace when $thor_runner is set", () => {
+      const klass = baseclass();
+      klass.namespace("ns");
+      const thorRunner = rbGvGet("$thor_runner");
+      try {
+        rbGvSet("$thor_runner", false);
+        expect(() => klass.handleNoCommandError("x")).toThrow('Could not find command "x".');
+        rbGvSet("$thor_runner", true);
+        expect(() => klass.handleNoCommandError("x")).toThrow(
+          'Could not find command "x" in "ns" namespace.',
+        );
+      } finally {
+        rbGvSet("$thor_runner", thorRunner);
+      }
     });
 
     it("raises InvocationError naming the basename, the arguments and the banner", () => {

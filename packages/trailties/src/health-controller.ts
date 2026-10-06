@@ -26,8 +26,10 @@ export class HealthController extends ActionController.Base {
   }
 }
 
-HealthController.rescueFrom(Error, function (this: HealthController) {
-  return this.renderDown();
+HealthController.rescueFrom(Error, {
+  with: function (this: HealthController) {
+    return this.renderDown();
+  },
 });
 
 controllerConstants.set("rails/health", HealthController);

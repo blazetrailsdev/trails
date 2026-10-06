@@ -29,8 +29,10 @@ import {
   STDOUT,
   union,
   uniq,
+  rbGvGet,
+  rbGvSet,
 } from "@blazetrails/ruby-compat";
-import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS, thorRunner } from "./base.js";
+import { Base, type BaseClass, type BaseConfig, HELP_MAPPINGS } from "./base.js";
 import { Command, DynamicCommand, HiddenCommand } from "./command.js";
 import { AmbiguousTaskError } from "./error.js";
 import { Group, type GroupClass } from "./group.js";
@@ -60,6 +62,10 @@ type Instance = Base & {
 export type ThorClass = typeof Thor & Omit<BaseClass, keyof typeof Thor>;
 
 export class Thor {
+  static {
+    if (!rtest(rbGvGet("$thor_runner"))) rbGvSet("$thor_runner", false);
+  }
+
   static Group = Group;
 
   /** @internal */
@@ -518,7 +524,7 @@ export class Thor {
     namespace: unknown = null,
     subcommand: unknown = false,
   ): string {
-    return stringSplit(command.formattedUsage(this, thorRunner, subcommand), "\n")
+    return stringSplit(command.formattedUsage(this, rbGvGet("$thor_runner"), subcommand), "\n")
       .map((formattedUsage) => `${this.basename() ?? ""} ${formattedUsage}`)
       .join("\n");
   }

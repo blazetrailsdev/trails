@@ -320,7 +320,7 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
         throw new RangeError("boom");
       }
     }
-    BoomController.rescueFrom(RangeError, () => {});
+    BoomController.rescueFrom(RangeError, { with: () => {} });
     const c = new BoomController();
     const request = makeRequest();
     await c.dispatch("index", request, new Response());

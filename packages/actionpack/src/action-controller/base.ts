@@ -6,6 +6,7 @@ import {
   extend,
   include,
   type Included,
+  type Rescuable,
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import type { StatusSymbol } from "@blazetrails/rack";
@@ -50,7 +51,11 @@ import {
   type RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import { isShowDetailedExceptions, processAction as _rescueProcessAction } from "./metal/rescue.js";
+import {
+  Rescue,
+  type isShowDetailedExceptions,
+  processAction as _rescueProcessAction,
+} from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -251,8 +256,6 @@ type RenderArgs<P extends string> =
 
 type StreamingBody = { each(block: (chunk: string) => void): Promise<unknown> };
 
-export type RescueHandler = (error: Error) => void | Promise<void>;
-
 export const MODULES: readonly string[] = [
   "AbstractController::Rendering",
   "AbstractController::Translation",
@@ -438,11 +441,6 @@ export class Base extends Metal {
   }
 
   declare viewRenderer: typeof viewRenderer;
-
-  private static _rescueHandlers: Array<{
-    errorClass: new (...args: any[]) => Error;
-    handler: RescueHandler;
-  }> = [];
 
   static withoutModules(...modules: string[]): readonly string[] {
     const drop = new Set(modules);
@@ -637,12 +635,14 @@ export class Base extends Metal {
     typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith
   >;
 
-  static rescueFrom(errorClass: new (...args: any[]) => Error, handler: RescueHandler): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_rescueHandlers")) {
-      (this as any)._rescueHandlers = [];
-    }
-    (this as any)._rescueHandlers.push({ errorClass, handler });
-  }
+  declare static rescueHandlers: unknown[][];
+  declare static rescueFrom: OmitThisParameter<typeof Rescuable.ClassMethods.rescueFrom>;
+  declare static rescueWithHandler: OmitThisParameter<
+    typeof Rescuable.ClassMethods.rescueWithHandler
+  >;
+  declare static handlerForRescue: OmitThisParameter<
+    typeof Rescuable.ClassMethods.handlerForRescue
+  >;
 
   /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
@@ -745,50 +745,8 @@ export class Base extends Metal {
   declare sendData: typeof sendData;
   declare isShowDetailedExceptions: typeof isShowDetailedExceptions;
 
-  async rescueWithHandler(exception: unknown): Promise<boolean> {
-    if (!(exception instanceof Error)) return false;
-    const match = this._findRescueHandler(exception);
-    if (!match) return false;
-    await match.handler.call(this, match.error);
-    return true;
-  }
-
-  private _findRescueHandler(error: Error): { handler: RescueHandler; error: Error } | null {
-    const hierarchy: Array<typeof Base> = [];
-    let klass = this.constructor as typeof Base;
-    while (klass && klass !== (Object as unknown)) {
-      hierarchy.unshift(klass);
-      klass = Object.getPrototypeOf(klass);
-    }
-
-    const matchHandler = (err: Error): RescueHandler | null => {
-      for (let i = hierarchy.length - 1; i >= 0; i--) {
-        const k = hierarchy[i];
-        if (Object.prototype.hasOwnProperty.call(k, "_rescueHandlers")) {
-          const handlers = (k as any)._rescueHandlers as Array<{
-            errorClass: new (...args: any[]) => Error;
-            handler: RescueHandler;
-          }>;
-          for (let j = handlers.length - 1; j >= 0; j--) {
-            if (err instanceof handlers[j].errorClass) return handlers[j].handler;
-          }
-        }
-      }
-      return null;
-    };
-
-    let current: Error | undefined = error;
-    const seen = new Set<Error>();
-    while (current) {
-      if (seen.has(current)) break;
-      seen.add(current);
-      const handler = matchHandler(current);
-      if (handler) return { handler, error: current };
-      current = (current as any).cause instanceof Error ? (current as any).cause : undefined;
-    }
-
-    return null;
-  }
+  declare rescueWithHandler: Rescuable["rescueWithHandler"];
+  declare handlerForRescue: Rescuable["handlerForRescue"];
 }
 
 include(Base, AbstractControllerRendering);
@@ -858,7 +816,7 @@ include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);
 extend(Base, DefaultHeaders.ClassMethods);
-Base.prototype.isShowDetailedExceptions = isShowDetailedExceptions;
+include(Base, Rescue);
 include(Base, Instrumentation);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 Base.prototype.appendInfoToPayload = appendInfoToPayload;

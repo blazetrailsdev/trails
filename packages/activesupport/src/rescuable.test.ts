@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { Module, block, include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 
-import { Rescuable, rescueFrom, handleRescue } from "./rescuable.js";
+import { Rescuable } from "./rescuable.js";
 
 class WraithAttack extends Error {}
 
@@ -9,48 +9,54 @@ class MadRonon extends Error {}
 
 class CoolError extends Error {}
 
-class WeirdError {
-  static [Symbol.hasInstance](other: unknown): boolean {
-    return other instanceof Error && "isWeird" in other;
-  }
-}
+const WeirdError = Object.assign(new Module(), {
+  caseEquals(other: unknown): boolean {
+    return other instanceof Error && rbObjRespondTo(other, "isWeird");
+  },
+});
 
-for (const klass of [WraithAttack, MadRonon, CoolError, WeirdError]) {
+for (const klass of [WraithAttack, MadRonon, CoolError]) {
   registerConstant(klass.name, klass);
 }
+registerConstant("WeirdError", WeirdError);
 
 class Stargate {
   static NuclearExplosion = class NuclearExplosion extends Error {};
 
   declare static rescueHandlers: [string, unknown][];
+  declare static rescueFrom: typeof Rescuable.ClassMethods.rescueFrom;
   declare rescueHandlers: [string, unknown][];
+  declare rescueWithHandler: Rescuable["rescueWithHandler"];
 
   result: string | null = null;
 
   static {
     include(this, Rescuable);
 
-    rescueFrom.call(this, WraithAttack, { with: "sosFirst" });
+    this.rescueFrom(WraithAttack, { with: "sosFirst" });
 
-    rescueFrom.call(this, WraithAttack, { with: "sos" });
+    this.rescueFrom(WraithAttack, { with: "sos" });
 
-    rescueFrom.call(this, "NuclearExplosion", {
-      with: function (this: Stargate) {
+    this.rescueFrom(
+      "NuclearExplosion",
+      block(function (this: Stargate) {
         this.result = "alldead";
-      },
-    });
+      }),
+    );
 
-    rescueFrom.call(this, MadRonon, {
-      with: function (this: Stargate, e: Error) {
+    this.rescueFrom(
+      MadRonon,
+      block(function (this: Stargate, e: Error) {
         this.result = e.message;
-      },
-    });
+      }),
+    );
 
-    rescueFrom.call(this, WeirdError as never, {
-      with: function (this: Stargate) {
+    this.rescueFrom(
+      WeirdError,
+      block(function (this: Stargate) {
         this.result = "weird";
-      },
-    });
+      }),
+    );
   }
 
   dispatch(
@@ -59,7 +65,7 @@ class Stargate {
     try {
       this[method]();
     } catch (e) {
-      if (!handleRescue(this, e as Error)) {
+      if (!this.rescueWithHandler(e)) {
         this.result = "unhandled";
       }
     }
@@ -111,7 +117,7 @@ class Stargate {
 
 class CoolStargate extends Stargate {
   static {
-    rescueFrom.call(this, CoolError, { with: "sosCoolError" });
+    this.rescueFrom(CoolError, { with: "sosCoolError" });
   }
 
   sosCoolError(): void {
@@ -167,8 +173,7 @@ describe("RescuableTest", () => {
     expect(result).toEqual(expected);
   });
 
-  it.skip("rescue falls back to exception cause", () => {
-    // BLOCKED: port-rescuable-tagged-logging-and-isolated-execution-cases
+  it("rescue falls back to exception cause", () => {
     stargate.dispatch("fallBackToCause");
     expect(stargate.result).toBe("dex");
   });
@@ -178,8 +183,7 @@ describe("RescuableTest", () => {
     expect(stargate.result).toBe("unhandled");
   });
 
-  it.skip("rescue handles loops in exception cause chain", () => {
-    // BLOCKED: port-rescuable-tagged-logging-and-isolated-execution-cases
+  it("rescue handles loops in exception cause chain", () => {
     stargate.dispatch("loopedCrash");
     expect(stargate.result).toBe("unhandled");
   });

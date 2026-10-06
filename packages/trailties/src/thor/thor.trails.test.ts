@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ArgumentError, STDOUT } from "@blazetrails/ruby-compat";
-import { HELP_MAPPINGS, setThorRunner } from "./base.js";
+import { ArgumentError, STDOUT, rbGvSet } from "@blazetrails/ruby-compat";
+import { HELP_MAPPINGS } from "./base.js";
 import { Command, HiddenCommand } from "./command.js";
 import { AmbiguousCommandError, UndefinedCommandError } from "./error.js";
 import { Thor, type ThorClass } from "./thor.js";
@@ -363,7 +363,7 @@ describe("Thor", () => {
 
     afterEach(() => {
       calls.length = 0;
-      setThorRunner(false);
+      rbGvSet("$thor_runner", false);
     });
 
     it("dispatches a command by name, by mapping and by unambiguous prefix", async () => {
@@ -455,7 +455,7 @@ describe("Thor", () => {
     it("shows the namespace in the banner under $thor_runner", () => {
       const zoo = script.allCommands().zoo;
       expect(script.banner(zoo)).toBe(`${b} zoo`);
-      setThorRunner(true);
+      rbGvSet("$thor_runner", true);
       expect(script.banner(zoo)).toBe(`${b} script:zoo`);
     });
   });
