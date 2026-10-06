@@ -34,9 +34,5 @@
     "@blazetrails/did-you-mean": "workspace:*",
     "@blazetrails/html-sanitizer": "workspace:*",
     "@blazetrails/tse-compiler": "workspace:*"
-  },
-  "devDependencies": {
-    "@blazetrails/actionpack": "workspace:*",
-    "@blazetrails/activerecord": "workspace:*"
   }
 }
