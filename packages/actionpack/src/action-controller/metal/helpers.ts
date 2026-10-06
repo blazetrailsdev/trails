@@ -55,14 +55,12 @@ type HelpersClassHost = HelpersClass & { allApplicationHelpers(): string[] };
 
 export function modulesForHelpers(
   this: HelpersClassHost,
-  args: Array<Module | HelperMethodsModule | string | Array<unknown>>,
-): Array<Module | HelperMethodsModule> {
+  args: Array<HelperMethodsModule | string | Array<unknown>>,
+): HelperMethodsModule[] {
   if (aryDelete(args, ":all") != null) {
     args = [...args, ...this.allApplicationHelpers()];
   }
-  return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as Array<
-    Module | HelperMethodsModule
-  >;
+  return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as HelperMethodsModule[];
 }
 
 /**
