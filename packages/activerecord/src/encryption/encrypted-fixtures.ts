@@ -51,14 +51,14 @@ function processPreservedOriginalColumns(
 
 export const EncryptedFixtures: PrependModule = {
   initialize(
+    this: EncryptedFixtureHost,
     super_: (fixture: FixtureRow, modelClass: FixtureModelClass) => unknown,
     fixture: FixtureRow,
     modelClass: FixtureModelClass,
   ): unknown {
-    const host = this as unknown as EncryptedFixtureHost;
-    host.cleanValues = {};
-    encryptFixtureData.call(host, fixture, modelClass);
-    processPreservedOriginalColumns.call(host, fixture, modelClass);
+    this.cleanValues = {};
+    encryptFixtureData.call(this, fixture, modelClass);
+    processPreservedOriginalColumns.call(this, fixture, modelClass);
     return super_(fixture, modelClass);
   },
 };
