@@ -11,6 +11,7 @@ import {
   rbObjRespondTo,
   rbStrSend,
   slice,
+  Struct,
   toS,
 } from "@blazetrails/ruby-compat";
 
@@ -30,13 +31,10 @@ import { ParseError } from "../../action-dispatch/http/parameters.js";
 /** @internal */
 export const EXCLUDE_PARAMETERS = ["authenticity_token", "_method", "utf8"];
 
-export class Options {
-  private _name: string | null;
-  format: string[];
-  private _include: string[] | null;
-  exclude: string[] | null;
-  klass: WrapperHostClass | null;
-  private _model: unknown;
+export class Options extends Struct.new("name", "format", "include", "exclude", "klass", "model") {
+  declare format: string[];
+  declare exclude: string[] | null;
+  declare klass: WrapperHostClass | null;
   private includeSet: boolean;
   private nameSet: boolean;
 
@@ -62,31 +60,26 @@ export class Options {
     klass: WrapperHostClass | null,
     model: unknown,
   ) {
-    this._name = name;
-    this.format = format;
-    this._include = include;
-    this.exclude = exclude;
-    this.klass = klass;
-    this._model = model;
+    super(name, format, include, exclude, klass, model);
     this.includeSet = include != null;
     this.nameSet = name != null;
   }
 
   get model(): unknown {
-    return this._model ?? (this.model = this._defaultWrapModel());
+    return super.model ?? (this.model = this._defaultWrapModel());
   }
 
   set model(model: unknown) {
-    this._model = model;
+    super.model = model;
   }
 
   get include(): string[] | null {
-    if (this.includeSet) return this._include;
+    if (this.includeSet) return super.include as string[] | null;
 
     const m = this.model as WrapModel | null;
     this.includeSet = true;
 
-    if (!(this._include != null || this.exclude != null)) {
+    if (!(super.include != null || this.exclude != null)) {
       if (rbObjRespondTo(m, "attributeNames") && any(m!.attributeNames!())) {
         this.include = m!.attributeNames!();
 
@@ -94,41 +87,41 @@ export class Options {
           rbObjRespondTo(m, "storedAttributes") &&
           Object.keys(m!.storedAttributes!()).length > 0
         ) {
-          this.include = this._include!.concat(
+          this.include = this.include.concat(
             flatten(Object.values(m!.storedAttributes!())).map((attr) => toS(attr)),
           );
         }
 
         if (rbObjRespondTo(m, "attributeAliases") && any(Object.keys(m!.attributeAliases!()))) {
-          this.include = this._include!.concat(Object.keys(m!.attributeAliases!()));
+          this.include = this.include.concat(Object.keys(m!.attributeAliases!()));
         }
 
         if (
           rbObjRespondTo(m, "nestedAttributesOptions") &&
           any(Object.keys(m!.nestedAttributesOptions!()))
         ) {
-          this.include = this._include!.concat(
+          this.include = this.include.concat(
             Object.keys(m!.nestedAttributesOptions!()).map((key) => toS(key).concat("_attributes")),
           );
         }
 
-        return this._include;
+        return this.include;
       }
     }
     return null;
   }
 
   set include(include: string[] | null) {
-    this._include = include;
+    super.include = include;
   }
 
   get name(): string | null {
-    if (this.nameSet) return this._name;
+    if (this.nameSet) return super.name as string | null;
 
     const m = this.model as WrapModel | null;
     this.nameSet = true;
 
-    if (!(this._name != null || isAnonymous(this.klass!))) {
+    if (!(super.name != null || isAnonymous(this.klass!))) {
       return (this.name =
         m != null ? underscore(demodulize(toS(m))) : singularize(this.klass!.controllerName()!));
     }
@@ -136,19 +129,7 @@ export class Options {
   }
 
   set name(name: string | null) {
-    this._name = name;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE params-wrapper-options-is-not-a-struct */
-  toH(): Record<string, unknown> {
-    return {
-      name: this._name,
-      format: this.format,
-      include: this._include,
-      exclude: this.exclude,
-      klass: this.klass,
-      model: this._model,
-    };
+    super.name = name;
   }
 
   private _defaultWrapModel(): unknown {

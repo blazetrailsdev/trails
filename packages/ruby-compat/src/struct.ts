@@ -18,7 +18,10 @@ export interface StructInstance {
   equals(other: unknown): boolean;
   eql(other: unknown): boolean;
   hash(): number;
+  toH(block?: (k: string, v: unknown) => [unknown, unknown]): Record<string, unknown>;
 }
+
+const RSTRUCT = Symbol("RSTRUCT");
 
 const structClasses = new WeakSet<object>();
 
@@ -31,7 +34,7 @@ function isStruct(value: unknown): value is StructInstance & object {
 }
 
 function structValues(s: StructInstance): unknown[] {
-  return s.members().map((member) => (s as unknown as Record<string, unknown>)[member]);
+  return [...(s as unknown as { [RSTRUCT]: unknown[] })[RSTRUCT]];
 }
 
 const pairedRecursion: [object, object][] = [];
@@ -67,7 +70,9 @@ function recursiveEql(s: StructInstance, s2: StructInstance, recur: boolean): bo
 /**
  * Ruby's `Struct` (`vendor/ruby/v3.3.11/struct.c:2166` `rb_cStruct`). `Struct.new`
  * returns the members' anonymous class, which `class X < Struct.new(...)`
- * inherits from; each member is read off the instance by name.
+ * inherits from. The values live in the instance's `RSTRUCT` slot and each
+ * member is an accessor over it on the anonymous class, so a subclass reader
+ * of the same name reaches the raw slot as `super.member`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -77,14 +82,16 @@ export const Struct = {
    *
    * @noRailsEquivalent PERMANENT
    */
-  new(...memberNames: string[]): new (...values: unknown[]) => StructInstance {
+  new<M extends string>(
+    ...memberNames: M[]
+  ): new (...values: unknown[]) => StructInstance & Record<M, unknown> {
     const klass = class {
+      [RSTRUCT]: unknown[];
+
       /** `rb_struct_initialize_m` (`vendor/ruby/v3.3.11/struct.c:742`). */
       constructor(...values: unknown[]) {
         if (memberNames.length < values.length) throw new ArgumentError("struct size differs");
-        memberNames.forEach((member, i) => {
-          (this as Record<string, unknown>)[member] = values[i] ?? null;
-        });
+        this[RSTRUCT] = memberNames.map((_member, i) => values[i] ?? null);
       }
 
       /**
@@ -115,10 +122,7 @@ export const Struct = {
         if (this.members().length !== s.members().length) {
           throw new TypeError("struct size mismatch");
         }
-        const values = structValues(s);
-        memberNames.forEach((member, i) => {
-          (this as Record<string, unknown>)[member] = values[i];
-        });
+        this[RSTRUCT] = structValues(s);
         return this;
       }
 
@@ -154,8 +158,48 @@ export const Struct = {
       hash(): number {
         return rbHash([this.constructor, ...structValues(this)]);
       }
+
+      /**
+       * `rb_struct_to_h` (`vendor/ruby/v3.3.11/struct.c:1057`).
+       *
+       * @noRailsEquivalent PERMANENT
+       */
+      toH(block?: (k: string, v: unknown) => [unknown, unknown]): Record<string, unknown> {
+        const h: Record<string, unknown> = {};
+        const members = this.members();
+        for (let i = 0; i < this[RSTRUCT].length; i++) {
+          const k = members[i];
+          const v = this[RSTRUCT][i];
+          if (block) {
+            const pair = block(k, v);
+            h[pair[0] as string] = pair[1];
+          } else {
+            h[k] = v;
+          }
+        }
+        return h;
+      }
     };
+    memberNames.forEach((member, i) => {
+      Object.defineProperty(klass.prototype, member, {
+        /** `define_aref_method` (`vendor/ruby/v3.3.11/struct.c:283`). */
+        get(this: InstanceType<typeof klass>) {
+          return this[RSTRUCT][i];
+        },
+        /** `define_aset_method` (`vendor/ruby/v3.3.11/struct.c:289`), behind `rb_struct_modify` (`:246`). */
+        set(this: InstanceType<typeof klass>, val: unknown) {
+          if (Object.isFrozen(this)) {
+            throw new FrozenError(
+              `can't modify frozen ${rbObjClassname(this)}: ${rbInspect(this)}`,
+              { receiver: this },
+            );
+          }
+          this[RSTRUCT][i] = val;
+        },
+        configurable: true,
+      });
+    });
     structClasses.add(klass.prototype);
-    return klass;
+    return klass as unknown as new (...values: unknown[]) => StructInstance & Record<M, unknown>;
   },
 };

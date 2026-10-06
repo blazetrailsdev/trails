@@ -302,13 +302,61 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
     await expect(stmt.run()).rejects.toBeInstanceOf(errors.ConstraintException);
   });
 
-  it("rethrows an exec error, whose message carries no result code", async () => {
-    const { conn, errors } = await openWith(readonly("unused"));
+  it("exec raises the gem class for a failed statement", async () => {
+    const native = readonly("Error code 8: attempt to write a readonly database");
+    const { conn, errors } = await openWith(native);
     const error = await Promise.resolve(conn.exec("INSERT INTO widgets DEFAULT VALUES")).then(
       () => null,
       (e: unknown) => e,
     );
-    expect(error).not.toBeInstanceOf(errors.Exception);
+    expect(error).toBeInstanceOf(errors.ReadOnlyException);
+    expect((error as InstanceType<typeof errors.ReadOnlyException>).code).toBe(8);
     expect((error as Error).message).toBe("attempt to write a readonly database");
+    expect((error as Error).cause).toBe(native);
+  });
+
+  it("the pragma write arm raises the gem class", async () => {
+    const { conn, errors } = await openWith(readonly("Error code 5: database is locked"));
+    await expect(Promise.resolve(conn.pragma("journal_mode = WAL"))).rejects.toBeInstanceOf(
+      errors.BusyException,
+    );
+  });
+
+  it("exec prepares and steps each statement of a batch in turn", async () => {
+    const prepared: string[] = [];
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async (sql: string) => {
+            prepared.push(sql);
+            return {
+              executeAsync: async () => ({ changes: 0, lastInsertRowId: 0 }),
+              finalizeAsync: async () => {},
+            };
+          },
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      await conn.exec(`
+        INSERT INTO widgets (name) VALUES ('a;b'); -- trailing; comment
+        ;
+        CREATE TEMP TRIGGER t AFTER INSERT ON widgets BEGIN
+          UPDATE widgets SET qty = 1; DELETE FROM "x;y";
+        END;
+        /* block; comment */ SELECT [a;b] FROM widgets
+      `);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+    expect(prepared.map((sql) => sql.replace(/\s+/g, " "))).toEqual([
+      "INSERT INTO widgets (name) VALUES ('a;b');",
+      'CREATE TEMP TRIGGER t AFTER INSERT ON widgets BEGIN UPDATE widgets SET qty = 1; DELETE FROM "x;y"; END;',
+      "/* block; comment */ SELECT [a;b] FROM widgets",
+    ]);
   });
 });
