@@ -57,7 +57,7 @@ export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
     throw new MissingExactTemplate(message, this.constructor, this.actionName);
   }
   this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
-  return ImplicitRender.superMethod(this, "defaultRender")!() as void;
+  return ImplicitRender.superMethod(this, "defaultRender")!() as void | Promise<void>;
 }
 
 /** @internal */
