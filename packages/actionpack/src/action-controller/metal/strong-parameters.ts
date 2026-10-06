@@ -13,6 +13,7 @@ import {
   block as blockOf,
   type ConflictBlock,
   eachPair,
+  isEmpty,
   rbBlockGivenP,
   rbEql,
   rbEqual,
@@ -275,7 +276,7 @@ export class Parameters {
   }
 
   isEmpty(): boolean {
-    return this._data.size === 0;
+    return isEmpty(this._data);
   }
 
   except(...keys: string[]): Parameters {
@@ -397,7 +398,7 @@ export class Parameters {
   declare keepIf: Parameters["selectBang"];
 
   reject(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this.select((k, v) => !fn(k, v));
+    return this._newWithInheritedPermitted(this._data.reject(fn));
   }
 
   rejectBang(fn: (key: string, value: unknown) => boolean): this {
@@ -408,7 +409,9 @@ export class Parameters {
   declare deleteIf: Parameters["rejectBang"];
 
   compact(): Parameters {
-    return this.select((_k, v) => v !== null && v !== undefined);
+    return this._newWithInheritedPermitted(
+      this._data.compact() as HashWithIndifferentAccess<unknown>,
+    );
   }
 
   compactBang(): this | null {
@@ -424,7 +427,7 @@ export class Parameters {
   }
 
   valuesAt(...keys: string[]): unknown[] {
-    return keys.map((k) => this.get(k));
+    return this._convertValueToParameters(this._data.valuesAt(...keys)) as unknown[];
   }
 
   eachPair(fn: (key: string, value: unknown) => void): this {
