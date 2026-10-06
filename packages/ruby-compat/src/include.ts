@@ -269,6 +269,18 @@ export class Module<I extends object = Record<never, never>> {
   }
 
   /**
+   * Mirrors: Ruby's Module#include? — vendor/ruby/v3.3.11/class.c:1538
+   * `rb_mod_include_p`, which walks the module's ancestry, so a module
+   * included by an included module answers true.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  isInclude(mod2: object): boolean {
+    if (isModuleMethodTablePresent({ prototype: carrierOf(this) }, mod2)) return true;
+    return (nestedModules.get(this) ?? []).some((nested) => nested.isInclude(mod2));
+  }
+
+  /**
    * Mirrors: Ruby's Module#define_method — vendor/ruby/v3.3.11/proc.c:2325
    * `rb_mod_define_method`.
    *

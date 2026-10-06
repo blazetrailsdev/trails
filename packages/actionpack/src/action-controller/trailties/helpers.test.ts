@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { include } from "@blazetrails/ruby-compat";
+import { include, Module } from "@blazetrails/ruby-compat";
 import {
   helpersPath,
   modulesForHelpers,
@@ -8,9 +8,9 @@ import {
   setHelpersPath,
 } from "../metal/helpers.js";
 import { inherited, type HelpersPathControllerClass } from "./helpers.js";
-import { Helpers, type HelperMethodsModule } from "../../abstract-controller/helpers.js";
+import { Helpers } from "../../abstract-controller/helpers.js";
 
-const AbcHelper: HelperMethodsModule = { bareA: () => "a" };
+const AbcHelper = new Module().include({ bareA: () => "a" });
 
 function base(): HelpersPathControllerClass {
   const Base = class Base {};
@@ -37,7 +37,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     inherited(klass, Base);
 
     expect(klass.helpersPath).toEqual(helpersPath());
-    expect(klass._helpers!.bareA.call({})).toBe("a");
+    expect(klass._helpers!.isInclude(AbcHelper)).toBe(true);
   });
 
   it("includes nothing into a class that is not a direct subclass of Base", () => {
@@ -49,7 +49,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
     inherited(grandchild, Base);
 
     expect(grandchild.helpersPath).toEqual(helpersPath());
-    expect(grandchild._helpers?.bareA).toBeUndefined();
+    expect(grandchild._helpers?.isInclude(AbcHelper)).toBeFalsy();
   });
 
   it("includes nothing when includeAllHelpers is false", () => {
@@ -60,7 +60,7 @@ describe("ActionController::Railties::Helpers.inherited", () => {
 
     inherited(klass, Base);
 
-    expect(klass._helpers?.bareA).toBeUndefined();
+    expect(klass._helpers?.isInclude(AbcHelper)).toBeFalsy();
   });
 
   it("returns without touching a class that has no helpersPath slot", () => {

@@ -2,7 +2,9 @@
 
 import { include, includedModules, isModuleIncluded, Module } from "@blazetrails/ruby-compat";
 
-import type { HelperMethodsModule, HelpersClassMethods } from "../helpers.js";
+import type { HelpersClassMethods } from "../helpers.js";
+
+type HelperMethodsModule = Record<string, (...args: unknown[]) => unknown>;
 
 export interface UrlHelpersRouteSet {
   urlHelpers(includePathHelpers?: boolean): HelperMethodsModule | Module;

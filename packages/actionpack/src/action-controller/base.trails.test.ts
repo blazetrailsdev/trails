@@ -7,7 +7,7 @@ import {
   TemplateHandlers,
 } from "@blazetrails/actionview";
 import { Model } from "@blazetrails/activemodel";
-import { rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import { extend, Module, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
 
@@ -330,7 +330,7 @@ describe("ActionController::Rescue#process_action (rescue.rb:26-31)", () => {
 
 describe("ActionController::Helpers included into ActionController::API", () => {
   it("carries helper, helpers and the class attributes onto a subclass", () => {
-    const ApiWithHelper = { myHelper: () => "helper" };
+    const ApiWithHelper = new Module().include({ myHelper: () => "helper" });
     type WithHelpers = typeof API &
       HelpersClass & { helpers(): { myHelper(): string }; helpersPath: string[] };
     class WithHelpersController extends API {}
@@ -346,34 +346,36 @@ describe("ActionController::Helpers included into ActionController::API", () => 
   });
 });
 
+type Probe = Record<string, () => unknown>;
+
 describe("AbstractController::Helpers::ClassMethods#inherited (helpers.rb:68-74)", () => {
   it("includes the controller's default helper module with no helper call", () => {
-    registerConstant("DefaultHelperProbeHelper", { probe: () => "probed" });
+    registerConstant("DefaultHelperProbeHelper", new Module().include({ probe: () => "probed" }));
     class DefaultHelperProbeController extends Base {}
     new DefaultHelperProbeController();
-    expect(DefaultHelperProbeController._helpers!.probe.call({})).toBe("probed");
+    expect((extend({}, DefaultHelperProbeController._helpers!) as Probe).probe()).toBe("probed");
   });
 
   it("leaves a controller with no matching helper constant unaffected", () => {
     class HelperlessProbeController extends Base {}
     expect(() => new HelperlessProbeController()).not.toThrow();
-    expect(HelperlessProbeController._helpers!.probe).toBeUndefined();
+    expect("probe" in extend({}, HelperlessProbeController._helpers!)).toBe(false);
   });
 
   it("keeps helpers a subclass declared before the hook fired", () => {
     class DeclaredProbeController extends Base {
       static {
-        this.helper({ declared: () => "declared" });
+        this.helper(new Module().include({ declared: () => "declared" }));
       }
     }
     new DeclaredProbeController();
-    expect(DeclaredProbeController._helpers!.declared.call({})).toBe("declared");
+    expect((extend({}, DeclaredProbeController._helpers!) as Probe).declared()).toBe("declared");
   });
 
   it("skips an anonymous controller class", () => {
-    registerConstant("KlassHelper", { leaked: () => "leaked" });
+    registerConstant("KlassHelper", new Module().include({ leaked: () => "leaked" }));
     const klass = (() => class extends Base {})();
     new klass();
-    expect(klass._helpers!.leaked).toBeUndefined();
+    expect("leaked" in extend({}, klass._helpers!)).toBe(false);
   });
 });

@@ -5,7 +5,9 @@ import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   ArgumentError,
+  extend,
   include,
+  Module,
   registerConstant,
   unregisterConstant,
 } from "@blazetrails/ruby-compat";
@@ -14,9 +16,11 @@ import { Helpers, Resolution, type HelperMethodsModule, type HelpersClass } from
 
 const { modulesForHelpers, allHelpersFromPath } = Resolution;
 
-const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
-const BarHelper: HelperMethodsModule = { bar: () => "BAR" };
-const NamespacedHelper: HelperMethodsModule = { ns: () => "NS" };
+const FooHelper = new Module().include({ foo: () => "FOO" });
+const BarHelper = new Module().include({ bar: () => "BAR" });
+const NamespacedHelper = new Module().include({ ns: () => "NS" });
+
+type Probe = Record<string, () => unknown>;
 
 const registry: Record<string, HelperMethodsModule> = {
   FooHelper,
@@ -69,6 +73,14 @@ describe("modulesForHelpers", () => {
   it("raises TypeError for non-string/symbol/module entries", () => {
     expect(() => modulesForHelpers([42 as unknown as string])).toThrow(
       /must be a String, Symbol, or Module/,
+    );
+  });
+
+  it("raises ArgumentError for a Hash, which is not a Module", () => {
+    const hash = { foo: () => "FOO" } as unknown as HelperMethodsModule;
+    expect(() => modulesForHelpers([hash])).toThrow(ArgumentError);
+    expect(() => modulesForHelpers([{} as HelperMethodsModule])).toThrow(
+      "helper must be a String, Symbol, or Module",
     );
   });
 });
@@ -182,26 +194,26 @@ describe("defaultHelperModuleBang", () => {
   it("strips the Controller suffix and includes the matching helper", () => {
     const cls = controller("FooController");
     cls.defaultHelperModuleBang();
-    expect(cls._helpers!.foo.call({})).toBe("FOO");
+    expect((extend({}, cls._helpers!) as Probe).foo()).toBe("FOO");
   });
 
   it("swallows the NameError when the helper does not exist", () => {
     const cls = controller("MissingController");
     expect(() => cls.defaultHelperModuleBang()).not.toThrow();
-    expect(Object.keys(cls._helpers!)).toEqual([]);
+    expect(cls._helpers!.instanceMethods()).toEqual([]);
   });
 
   it("still tries to resolve when the class name lacks a Controller suffix (Rails delete_suffix is a no-op then)", () => {
     const cls = controller("Plain");
     cls.defaultHelperModuleBang();
-    expect(Object.keys(cls._helpers!)).toEqual([]);
+    expect(cls._helpers!.instanceMethods()).toEqual([]);
   });
 
   it("composes with helper(): subsequent helper(cls, X) layers on top", () => {
     const cls = controller("FooController");
     cls.defaultHelperModuleBang();
     cls.helper(BarHelper);
-    expect(cls._helpers!.foo.call({})).toBe("FOO");
-    expect(cls._helpers!.bar.call({})).toBe("BAR");
+    expect((extend({}, cls._helpers!) as Probe).foo()).toBe("FOO");
+    expect((extend({}, cls._helpers!) as Probe).bar()).toBe("BAR");
   });
 });

@@ -341,6 +341,31 @@ export const OBJECT_METHOD_TABLE: Record<string, (self: never, ...args: never[])
   Object.create(null);
 
 /**
+ * The methods a package defines on `Enumerable`, keyed by the camelCased Ruby
+ * name, which {@link rbFSend} dispatches and {@link basicObjRespondTo} answers
+ * for on the receivers `each` is bound for: a JS array, a `Set`, and a `Map`
+ * or plain hash, whose Ruby classes include `Enumerable`
+ * (`vendor/ruby/v3.3.11/array.c:8606`, `lib/set.rb:221`, `hash.c:7184`).
+ * ActiveSupport's `Enumerable#maximum`
+ * (`activesupport/lib/active_support/core_ext/enumerable.rb:40`) is reached by
+ * `object.try(:maximum, :updated_at)` on an Array of records.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const ENUMERABLE_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+function enumerableMethod(
+  obj: unknown,
+  mid: string,
+): ((...args: unknown[]) => unknown) | undefined {
+  return Object.hasOwn(ENUMERABLE_METHOD_TABLE, mid) &&
+    (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
+    ? (ENUMERABLE_METHOD_TABLE[mid] as (...args: unknown[]) => unknown)
+    : undefined;
+}
+
+/**
  * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
  * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
  * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
@@ -424,6 +449,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     return true;
   }
   if (temporalMethod(obj, mid) !== undefined) return true;
+  if (enumerableMethod(obj, mid) !== undefined) return true;
   if (
     mid === "each" &&
     (Array.isArray(obj) || obj instanceof Set || obj instanceof Map || isPlainHash(obj))
@@ -823,6 +849,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
       return recv;
     }
   }
+  const enumerable = enumerableMethod(recv, mid);
+  if (enumerable !== undefined) return enumerable(recv, ...args);
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {
     return (OBJECT_METHOD_TABLE[predicate] as AnyFunction)(recv, ...args);
   }

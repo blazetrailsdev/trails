@@ -1,8 +1,23 @@
-import { StandardError, rbBigNorm, rbIntegerTypeP, rbPlus } from "@blazetrails/ruby-compat";
+import {
+  ENUMERABLE_METHOD_TABLE,
+  StandardError,
+  max,
+  rbBigNorm,
+  rbFPublicSend,
+  rbIntegerTypeP,
+  rbPlus,
+} from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { sum as enumerableSum } from "../enumerable-utils.js";
 
 export class SoleItemExpectedError extends StandardError {}
+
+export function maximum(this: Iterable<unknown> | Record<string, unknown>, key: string): unknown {
+  const entries = Symbol.iterator in this ? [...this] : Object.entries(this);
+  return max(entries.map((element) => rbFPublicSend(element, key)));
+}
+
+ENUMERABLE_METHOD_TABLE.maximum = (self: Iterable<unknown>, key: string) => maximum.call(self, key);
 
 export function sum<T>(
   this: Range<T>,

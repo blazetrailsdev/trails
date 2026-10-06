@@ -736,14 +736,12 @@ describe("LastModifiedRenderTest", () => {
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
-  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
-  it.skip("responds with last modified with array of records", async () => {
+  it("responds with last modified with array of records", async () => {
     await tc.get("conditionalHelloWithArrayOfRecords");
     expect(tc.response.headers.get("Last-Modified")).toBe(lastModified);
   });
 
-  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
-  it.skip("request not modified with array of records", async () => {
+  it("request not modified with array of records", async () => {
     tc.request.setIfModifiedSince(lastModified);
     await tc.get("conditionalHelloWithArrayOfRecords");
     expect(toI(tc.response.status)).toBe(304);
@@ -758,8 +756,7 @@ describe("LastModifiedRenderTest", () => {
     assertResponse("success");
   });
 
-  // BLOCKED: fresh-when-array-of-records-has-no-enumerable-maximum
-  it.skip("request modified with array of records", async () => {
+  it("request modified with array of records", async () => {
     tc.request.setIfModifiedSince("Thu, 16 Jul 2008 00:00:00 GMT");
     await tc.get("conditionalHelloWithArrayOfRecords");
     expect(toI(tc.response.status)).toBe(200);

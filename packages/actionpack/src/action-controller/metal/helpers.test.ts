@@ -1,11 +1,12 @@
+import { Module } from "@blazetrails/ruby-compat";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
 import { Base } from "../base.js";
 import { modulesForHelpers, setApplicationHelpers, setHelpersPath } from "./helpers.js";
 
-const AbcHelper: HelperMethodsModule = { bareA: () => "a" };
-const FooHelper: HelperMethodsModule = { foo: () => "FOO" };
+const AbcHelper = new Module().include({ bareA: () => "a" });
+const FooHelper = new Module().include({ foo: () => "FOO" });
 
 const constants = new Map<string, HelperMethodsModule>([
   ["AbcHelper", AbcHelper],
@@ -30,7 +31,7 @@ describe("ActionController::Helpers.modulesForHelpers", () => {
 
     AllHelpersController.helper(":all");
 
-    expect(AllHelpersController._helpers!.bareA.call({})).toBe("a");
+    expect(AllHelpersController._helpers!.isInclude(AbcHelper)).toBe(true);
   });
 
   it("appends the application helpers after the arguments that stay", () => {
