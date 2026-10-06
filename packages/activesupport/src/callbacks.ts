@@ -10,7 +10,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { kernelArray } from "./array-utils.js";
-import { classAttribute, isOwnClassAttribute } from "./class-attribute.js";
+import { classAttribute } from "./class-attribute.js";
 import { Concern } from "./concern.js";
 import { ArgumentError, extractOptionsBang } from "./hash-utils.js";
 import { DescendantsTracker, type AnyClass } from "./descendants-tracker.js";
@@ -1123,7 +1123,7 @@ export const ClassMethods = {
     name: string,
     callbacks: CallbackChain,
   ): Record<string, CallbackChain> {
-    if (!isOwnClassAttribute(this, "__callbacks")) {
+    if (!Object.prototype.hasOwnProperty.call(this, "__class_attr___callbacks")) {
       this.__callbacks = { ...this.__callbacks };
       if (!rbModSingletonP(this)) {
         let klass = this as unknown as AnyClass;

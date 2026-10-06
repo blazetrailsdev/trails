@@ -3,6 +3,7 @@ import {
   NameError,
   rbBlockGivenP,
   rbConstGet,
+  rbEqq,
   rbInspect,
   rbModName,
   rbObjMethod,
@@ -15,7 +16,7 @@ import { safeConstantize } from "./inflector.js";
 
 type ErrorHandler = ((this: any, error: any) => unknown) | string;
 
-type ExceptionClass = abstract new (...args: any[]) => unknown;
+type ExceptionClass = (abstract new (...args: any[]) => unknown) | Module;
 
 interface RescuableClass {
   rescueHandlers: unknown[][];
@@ -36,8 +37,10 @@ export const ClassMethods = {
     const block = rbBlockGivenP(klasses[klasses.length - 1])
       ? (klasses.pop() as Exclude<ErrorHandler, string>)
       : undefined;
-    let { with: with_ = null } = extractOptionsBang(klasses) as { with?: ErrorHandler | null };
-    if (with_ == null) {
+    let { with: with_ = null } = extractOptionsBang(klasses) as {
+      with?: ErrorHandler | false | null;
+    };
+    if (with_ == null || with_ === false) {
       if (block !== undefined) {
         with_ = block;
       } else {
@@ -49,7 +52,7 @@ export const ClassMethods = {
 
     for (const klass of klasses as unknown[]) {
       let key: string | ExceptionClass;
-      if (typeof klass === "function") {
+      if (typeof klass === "function" || klass instanceof Module) {
         const name = rbModName(klass);
         key = name != null && safeConstantize(name) === klass ? name : (klass as ExceptionClass);
       } else if (typeof klass === "string") {
@@ -123,7 +126,7 @@ export const ClassMethods = {
         ([...this.rescueHandlers].reverse() as [string | ExceptionClass, ErrorHandler][]).find(
           ([classOrName]) => {
             const klass = this.constantizeRescueHandlerClass(classOrName);
-            return klass != null && exception instanceof klass;
+            return klass != null && rbEqq(klass, exception);
           },
         ) ?? [];
 

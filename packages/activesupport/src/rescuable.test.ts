@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { block, include, registerConstant } from "@blazetrails/ruby-compat";
+import { Module, block, include, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
 
 import { Rescuable } from "./rescuable.js";
 
@@ -9,15 +9,16 @@ class MadRonon extends Error {}
 
 class CoolError extends Error {}
 
-class WeirdError {
-  static [Symbol.hasInstance](other: unknown): boolean {
-    return other instanceof Error && "isWeird" in other;
-  }
-}
+const WeirdError = Object.assign(new Module(), {
+  caseEquals(other: unknown): boolean {
+    return other instanceof Error && rbObjRespondTo(other, "isWeird");
+  },
+});
 
-for (const klass of [WraithAttack, MadRonon, CoolError, WeirdError]) {
+for (const klass of [WraithAttack, MadRonon, CoolError]) {
   registerConstant(klass.name, klass);
 }
+registerConstant("WeirdError", WeirdError);
 
 class Stargate {
   static NuclearExplosion = class NuclearExplosion extends Error {};
@@ -51,7 +52,7 @@ class Stargate {
     );
 
     this.rescueFrom(
-      WeirdError as never,
+      WeirdError,
       block(function (this: Stargate) {
         this.result = "weird";
       }),

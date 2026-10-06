@@ -11,6 +11,9 @@ describe("raise sites Rails has and the port had dropped", () => {
     expect(() => rescueFrom.call({ rescueHandlers: [] }, Error)).toThrow(
       new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block."),
     );
+    expect(() => rescueFrom.call({ rescueHandlers: [] }, Error, { with: false as never })).toThrow(
+      new ArgumentError("Need a handler. Pass the with: keyword argument or provide a block."),
+    );
   });
 
   it("rescue_from raises on a key that is neither a class nor a String", () => {
