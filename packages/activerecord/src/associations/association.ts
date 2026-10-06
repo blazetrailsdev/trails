@@ -6,7 +6,6 @@ import { ActiveRecord, Associations } from "../namespaces.js";
 import type { AssociationReflection, ThroughReflection } from "../reflection.js";
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
 import {
-  NoMethodError,
   except,
   hasKey,
   rbEnsure,
@@ -22,7 +21,7 @@ import {
 import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
-export class Association<Target extends Base | Base[] = Base | Base[]> {
+export abstract class Association<Target extends Base | Base[] = Base | Base[]> {
   owner: Base;
   reflection: AssociationDefinition;
   readonly disableJoins: boolean;
@@ -331,15 +330,11 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return false;
   }
 
-  protected async _createRecord(
-    _attributes?: Record<string, unknown> | Record<string, unknown>[],
-    _raise = false,
-    _block?: (record: Base) => void | Promise<void>,
-  ): Promise<Base | Base[] | null> {
-    throw new NoMethodError(
-      `undefined method '_create_record' for an instance of ${rbObjClassname(this)}`,
-    );
-  }
+  protected abstract _createRecord(
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    raise?: boolean,
+    block?: (record: Base) => void | Promise<void>,
+  ): Promise<Base | Base[] | null>;
 
   /** @internal */
   buildRecord(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
