@@ -185,6 +185,7 @@ export const RUBY_FILE_TS_OVERRIDES: Record<string, string> = {
   // umbrella files it owns real surface. trails ports it to `src/i18n.ts`;
   // without this the default rule would expect `../i18n.ts`, outside src.
   "i18n:../i18n.rb": "i18n.ts",
+  "msgpack:../msgpack.rb": "msgpack.ts",
   // `interpolate/ruby.rb` reopens `module I18n`, which `backend/cache.rb`
   // defines first — so without an entry here its `interpolate` /
   // `interpolate_hash` are measured against `backend/cache.ts` and, since
