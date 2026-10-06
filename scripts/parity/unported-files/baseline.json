@@ -5,10 +5,6 @@
     "reason": "Rails boot lifecycle hook that wires I18n into the Railtie/Application init sequence. No JS equivalent — I18n is configured directly in user code."
   },
   {
-    "pattern": "promise.rb",
-    "reason": "Rails Promise wraps a thread-backed FutureResult with a blocking #value. JS is single-threaded; native Promise covers #then. Async methods return Promise<T> directly."
-  },
-  {
     "pattern": "legacy_yaml_adapter.rb",
     "reason": "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; JS doesn't use YAML for AR column serialization."
   },

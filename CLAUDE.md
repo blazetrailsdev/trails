@@ -1927,3 +1927,59 @@ As a consequence:
 
 This is an ecosystem gap rather than a TypeScript language shortcoming, and it is
 ratified repo-wide here. A new instance is not a new decision to argue.
+
+## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
+
+Rails' `ActiveRecord::Promise` (`activerecord/lib/active_record/promise.rb`) is
+a `BasicObject` over a thread-backed `FutureResult`: `value` (`:20-29`) blocks
+the caller until the query completes, and `then` (`:36-38`) composes a block
+onto it. `Promise::Complete` (`:63-81`) is the same surface over a value that
+is already there, which is what the `async_*` readers hand back when there is
+no query to wait for: `calculate`'s `none` arms
+(`relation/calculations.rb:224,227`), `pluck` (`:294,303`), `pick` (`:355`) and
+`ids` (`:382`) on a loaded relation, `StatementCache#execute`'s
+`Promise.wrap([])` (`statement_cache.rb:155`), and `FutureResult#then`
+(`future_result.rb:22,82`).
+
+**The native JS promise is the port of `ActiveRecord::Promise`.** `promise.rb`
+is not ported and stays in `scripts/parity/unported-files/unscoped.ts`. Every
+`async_*` reader returns a native promise, and so does the reader it wraps.
+
+A complete port was written and dropped on the maintainer's decision
+(2026-10-01), for these reasons:
+
+- **`value` cannot be ported.** It blocks until the query completes, and JS has
+  no synchronous await. What is left of the class is `then`, `pending?` and
+  `inspect` over a value only an `await` can reach.
+- **JS unwraps it.** `FutureResult#then` (`future-result.ts`) is a native
+  thenable, so a JS promise resolving to a `FutureResult` unwraps it. And an
+  `async function` unwraps any thenable it returns, so `pluck`, `pick` and
+  `calculate` cannot hand back a promise object of their own: the caller
+  receives a native promise whatever the body returns.
+- **There is nothing to tell apart.** In Rails `pluck` answers an Array and
+  `async_pluck` a Promise. In trails both are awaited (§ "`Relation` is
+  evaluated by an async query"), so `@async ? Promise::Complete.new(result) :
+result` has one arm.
+
+As a consequence:
+
+- A Rails `Promise.new`, `Promise::Complete.new` or `Promise.wrap` call is
+  omitted and the value returned as it is. It needs no receipt: the parity
+  extractor drops those sites by receiver, as it drops `Proc.new`
+  (`native_promise_call?`, `scripts/api-compare/extract-ruby-api.rb`), so
+  neither call gate asks for them. Do not write `@missingRailsCall new` or
+  `@missingRailsCall wrap` for one.
+- An arm that does something else is kept: `StatementCache#execute` keeps its
+  `async:` kwarg and dispatches to `async_find_by_sql`
+  (`statement_cache.rb:149-153`).
+- A conditional whose arms differ only in the wrap collapses to its value:
+  `async ? Promise.wrap([]) : []` in that method's `rescue ::RangeError`
+  (`:155`) is `return []`, and `@async ? Promise::Complete.new(result) : result`
+  is `return result`.
+- `Promise#pending?`, `#value` and `#inspect` have no counterpart. A Rails test
+  asserting on one ports the assertions that await the value and drops the
+  rest, citing this section.
+
+This is a genuine language shortcoming, ratified repo-wide here. There is no
+story to port `ActiveRecord::Promise` or `Promise::Complete`, and a new instance
+is not a new decision to argue.

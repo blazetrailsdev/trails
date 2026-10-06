@@ -3883,6 +3883,21 @@ class ApiExtractor
     inner.is_a?(Array) && inner[0] == :@const && inner[1] == "Proc"
   end
 
+  # `Promise.new(...)`, `Promise::Complete.new(...)` and `Promise.wrap(...)` port
+  # to the value itself: the native JS promise is the port of
+  # `ActiveRecord::Promise` (CLAUDE.md § "`ActiveRecord::Promise` is the native
+  # promise"), and an awaited body answers one whatever it returns. Like
+  # `Proc.new`, the verdict is per SITE and by RECEIVER, so a body's other `new`
+  # sites still record.
+  NATIVE_PROMISE_CONSTANTS = %w[
+    Promise Promise::Complete ActiveRecord::Promise ActiveRecord::Promise::Complete
+  ].freeze
+  NATIVE_PROMISE_CALLS = %w[new wrap].freeze
+
+  def native_promise_call?(name, recv)
+    NATIVE_PROMISE_CALLS.include?(name) && NATIVE_PROMISE_CONSTANTS.include?(const_name(recv))
+  end
+
   LITERAL_NEW_CONSTANTS = %w[Hash Array Concurrent::Array].freeze
 
   def core_new_kind(recv, args, has_block)
@@ -3989,7 +4004,8 @@ class ApiExtractor
     name = nil if name == "call" && recv && attr_reader_receiver_name(recv)
 
     if name && !name.start_with?("_") && name =~ /\A[a-z]/ &&
-       !(name == "new" && recv && proc_new_receiver?(recv))
+       !(name == "new" && recv && proc_new_receiver?(recv)) &&
+       !(recv && native_promise_call?(name, recv))
       calls << name
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind
@@ -4172,6 +4188,8 @@ class ApiExtractor
     # would let the argument gate flag a site the other extractor says is gone.
     name = nil if name == "new" && (callee[0] == :call || callee[0] == :command_call) &&
                   proc_new_receiver?(callee[1])
+    name = nil if (callee[0] == :call || callee[0] == :command_call) &&
+                  native_promise_call?(name, callee[1])
     name = nil if name && attr_reader_read?(callee, args, flags)
     if name == "call" && (callee[0] == :call || callee[0] == :command_call)
       name = attr_reader_receiver_name(callee[1]) || name

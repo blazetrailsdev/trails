@@ -406,7 +406,6 @@ export async function calculate(
   }
 }
 
-/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
@@ -460,7 +459,6 @@ export function asyncPluck(
   return this.async().pluck(...columnNames);
 }
 
-/** @missingRailsCall new — CONVERGEABLE port-promise-complete-for-async-loaded-arms */
 export async function pick(
   this: CalculationRelation,
   ...columnNames: Array<
