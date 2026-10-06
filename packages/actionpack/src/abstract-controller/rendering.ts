@@ -71,6 +71,10 @@ export function renderToString<T extends RenderingHost>(this: T, ...args: unknow
   return this.renderToBody(options);
 }
 
+export function renderToBody(_options: RenderOptions = {}): unknown {
+  return undefined;
+}
+
 export function renderedFormat(): unknown {
   return Mime.get("text");
 }
@@ -131,6 +135,7 @@ export function _protectedIvars(): readonly string[] {
 export const Rendering = new Module((mod) => {
   mod.defineMethod("render", render);
   mod.defineMethod("renderToString", renderToString);
+  mod.defineMethod("renderToBody", renderToBody);
   mod.defineMethod("renderedFormat", renderedFormat);
   mod.defineMethod("viewAssigns", viewAssigns);
   mod.defineMethod("_normalizeArgs", _normalizeArgs);
