@@ -2437,7 +2437,7 @@ Object.setPrototypeOf(
       ) {
         return value;
       }
-      if (receiver.respondToMissing(prop)) {
+      if (receiver.respondToMissing(prop, false)) {
         return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
       }
       return value;

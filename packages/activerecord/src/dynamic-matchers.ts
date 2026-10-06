@@ -14,7 +14,7 @@ interface DynamicMatchersHost {
   reflectOnAggregation(aggregation: string): unknown;
 }
 
-export function respondToMissing(this: DynamicMatchersHost, name: string, _?: unknown): boolean {
+export function respondToMissing(this: DynamicMatchersHost, name: string, _: boolean): boolean {
   if ((this as unknown) === ActiveRecord.Base) {
     return false;
   } else {

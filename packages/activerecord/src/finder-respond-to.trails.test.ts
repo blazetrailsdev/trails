@@ -8,13 +8,13 @@ describe("FinderRespondToTrailsTest", () => {
   fixtures(["customers"]);
 
   it("responds to find by an aggregation", () => {
-    expect(Customer.respondToMissing("findByAddress")).toBe(true);
-    expect(Customer.respondToMissing("findByNonBlankGpsLocation")).toBe(true);
-    expect(Customer.respondToMissing("findByNotAnAggregation")).toBe(false);
+    expect(Customer.respondToMissing("findByAddress", false)).toBe(true);
+    expect(Customer.respondToMissing("findByNonBlankGpsLocation", false)).toBe(true);
+    expect(Customer.respondToMissing("findByNotAnAggregation", false)).toBe(false);
   });
 
   it("never matches a finder on Base itself", () => {
-    expect(Base.respondToMissing("findByAddress")).toBe(false);
+    expect(Base.respondToMissing("findByAddress", false)).toBe(false);
   });
 
   it("raises ArgumentError when a generated finder gets the wrong argument count", async () => {
@@ -28,8 +28,8 @@ describe("FinderRespondToTrailsTest", () => {
   });
 
   it("matches the bang finder only for a Bang-suffixed name", () => {
-    expect(Customer.respondToMissing("findByName")).toBe(true);
-    expect(Customer.respondToMissing("findByNameBang")).toBe(true);
-    expect(Customer.respondToMissing("findByNameBangBang")).toBe(false);
+    expect(Customer.respondToMissing("findByName", false)).toBe(true);
+    expect(Customer.respondToMissing("findByNameBang", false)).toBe(true);
+    expect(Customer.respondToMissing("findByNameBangBang", false)).toBe(false);
   });
 });
