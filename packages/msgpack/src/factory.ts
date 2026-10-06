@@ -32,74 +32,6 @@ export type RegisteredType = {
   unpacker?: UnpackerProc | null;
 };
 
-export class MemberPool<T extends { reset(): unknown }> {
-  private readonly size: number;
-  private readonly newMember: () => T;
-  private readonly members: T[];
-
-  constructor(size: number, block: () => T) {
-    this.size = size;
-    this.newMember = block;
-    this.members = [];
-  }
-
-  with<R>(block: (member: T) => R): R {
-    const member = this.members.pop() || this.newMember();
-    return rbEnsure(
-      () => block(member),
-      () => {
-        if (member && this.members.length < this.size) {
-          member.reset();
-          this.members.push(member);
-        }
-      },
-    );
-  }
-}
-
-export class Pool {
-  declare static MemberPool: typeof MemberPool;
-
-  private readonly factory: Factory;
-  private readonly packers: MemberPool<Packer>;
-  private readonly unpackers: MemberPool<Unpacker>;
-
-  constructor(factory: Factory, size: number, options: object | null = null) {
-    if (options == null || Object.keys(options).length === 0) options = null;
-    this.factory = factory;
-    this.packers = new Pool.MemberPool(
-      size,
-      () => Object.freeze(factory.packer(options)) as Packer,
-    );
-    this.unpackers = new Pool.MemberPool(
-      size,
-      () => Object.freeze(factory.unpacker(options)) as Unpacker,
-    );
-  }
-
-  load(data: string | Uint8Array): unknown {
-    return this.unpackers.with((unpacker) => {
-      unpacker.feed(data);
-      return unpacker.fullUnpack();
-    });
-  }
-
-  dump(object: unknown): Uint8Array {
-    return this.packers.with((packer) => {
-      packer.write(object);
-      return packer.fullPack();
-    });
-  }
-
-  unpacker<R>(block: (unpacker: Unpacker) => R): R {
-    return this.unpackers.with(block);
-  }
-
-  packer<R>(block: (packer: Packer) => R): R {
-    return this.packers.with(block);
-  }
-}
-
 export class Factory {
   declare static Pool: typeof Pool;
 
@@ -116,36 +48,47 @@ export class Factory {
     if (options != null) {
       options = { ...options };
       const packer = options.packer;
-      if (packer != null && typeof packer !== "function") {
-        if (typeof packer === "string") {
+      switch (true) {
+        case packer == null || typeof packer === "function":
+          break;
+        case typeof packer === "string":
           options.packer = (obj: unknown, ...args: unknown[]) => rbFSend(obj, packer, ...args);
-        } else if (packer instanceof Method) {
+          break;
+        case packer instanceof Method:
           options.packer = (...args: unknown[]) => packer.call(...args);
-        } else if (rbObjRespondTo(packer, "call") === packer) {
+          break;
+        case rbObjRespondTo(packer, "call") === packer: {
           const method = rbObjMethod(packer, "call");
           options.packer = (...args: unknown[]) => method.call(...args);
-        } else {
+          break;
+        }
+        default:
           throw new TypeError(
             `expected :packer argument to be a callable object, got: ${rbInspect(packer)}`,
           );
-        }
       }
 
       const unpacker = options.unpacker;
-      if (unpacker != null && typeof unpacker !== "function") {
-        if (typeof unpacker === "string") {
+      switch (true) {
+        case unpacker == null || typeof unpacker === "function":
+          break;
+        case typeof unpacker === "string": {
           const method = rbObjMethod(klass, unpacker);
           options.unpacker = (...args: unknown[]) => method.call(...args);
-        } else if (unpacker instanceof Method) {
+          break;
+        }
+        case unpacker instanceof Method:
           options.unpacker = (...args: unknown[]) => unpacker.call(...args);
-        } else if (rbObjRespondTo(packer, "call") === unpacker) {
+          break;
+        case rbObjRespondTo(packer, "call") === unpacker: {
           const method = rbObjMethod(unpacker, "call");
           options.unpacker = (...args: unknown[]) => method.call(...args);
-        } else {
+          break;
+        }
+        default:
           throw new TypeError(
             `expected :unpacker argument to be a callable object, got: ${rbInspect(unpacker)}`,
           );
-        }
       }
     }
 
@@ -323,6 +266,74 @@ export class Factory {
     this.ukrg.set(extType, [extModule, unpackerProc, flags]);
 
     return null;
+  }
+}
+
+export class MemberPool<T extends { reset(): unknown }> {
+  private readonly size: number;
+  private readonly newMember: () => T;
+  private readonly members: T[];
+
+  constructor(size: number, block: () => T) {
+    this.size = size;
+    this.newMember = block;
+    this.members = [];
+  }
+
+  with<R>(block: (member: T) => R): R {
+    const member = this.members.pop() || this.newMember();
+    return rbEnsure(
+      () => block(member),
+      () => {
+        if (member && this.members.length < this.size) {
+          member.reset();
+          this.members.push(member);
+        }
+      },
+    );
+  }
+}
+
+export class Pool {
+  declare static MemberPool: typeof MemberPool;
+
+  private readonly factory: Factory;
+  private readonly packers: MemberPool<Packer>;
+  private readonly unpackers: MemberPool<Unpacker>;
+
+  constructor(factory: Factory, size: number, options: object | null = null) {
+    if (options == null || Object.keys(options).length === 0) options = null;
+    this.factory = factory;
+    this.packers = new Pool.MemberPool(
+      size,
+      () => Object.freeze(factory.packer(options)) as Packer,
+    );
+    this.unpackers = new Pool.MemberPool(
+      size,
+      () => Object.freeze(factory.unpacker(options)) as Unpacker,
+    );
+  }
+
+  load(data: string | Uint8Array): unknown {
+    return this.unpackers.with((unpacker) => {
+      unpacker.feed(data);
+      return unpacker.fullUnpack();
+    });
+  }
+
+  dump(object: unknown): Uint8Array {
+    return this.packers.with((packer) => {
+      packer.write(object);
+      return packer.fullPack();
+    });
+  }
+
+  unpacker<R>(block: (unpacker: Unpacker) => R): R {
+    return this.unpackers.with(block);
+  }
+
+  packer<R>(block: (packer: Packer) => R): R {
+    return this.packers.with(block);
   }
 }
 
