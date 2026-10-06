@@ -33,12 +33,6 @@ describe("ActiveRecordMessagePackTest", () => {
     return _serializer;
   }
 
-  function createAuthorBang(post: Post, attributes: object): Promise<Author> {
-    return (
-      post as unknown as { createAuthorBang(attributes: object): Promise<Author> }
-    ).createAuthorBang(attributes);
-  }
-
   function roundtrip<T>(input: T): T {
     return serializer().load(serializer().dump(input)) as T;
   }
@@ -60,7 +54,7 @@ describe("ActiveRecordMessagePackTest", () => {
 
   it("roundtrips record and cached associations", async () => {
     const post = await Post.createBang({ title: "A Title", body: "A body." });
-    await createAuthorBang(post, { name: "An Author" });
+    await post.createAuthorBang({ name: "An Author" });
     await post.comments.createBang({ body: "A comment." });
     await post.comments.createBang({ body: "Another comment.", author: post.author });
     await post.comments.load();
@@ -84,7 +78,7 @@ describe("ActiveRecordMessagePackTest", () => {
 
   it("roundtrips new_record? status", async () => {
     const post = new Post({ title: "A Title", body: "A body." });
-    await createAuthorBang(post, { name: "An Author" });
+    await post.createAuthorBang({ name: "An Author" });
 
     await assertNoQueries(false, () => {
       const roundtrippedPost = roundtrip(post);

@@ -2076,7 +2076,6 @@ export class Base extends Model {
 
   declare equals: (other: unknown) => boolean;
   declare encodeWith: (coder: Record<string, unknown>) => void;
-  declare initWithAttributes: (attributes: unknown, newRecord?: boolean) => this;
   declare isAssociationCached: (name: string) => boolean;
 
   declare eql: (other: unknown) => boolean;
@@ -2302,6 +2301,11 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _associationCache: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
+  initWithAttributes(
+    attributes: unknown,
+    newRecord?: boolean,
+    block?: (record: this) => void,
+  ): this;
   readonly savedChanges: Hash<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;
   readonly changesToSave: HashWithIndifferentAccess<[unknown, unknown]>;

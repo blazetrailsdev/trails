@@ -35,7 +35,6 @@ import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Speedometer } from "../test-helpers/models/speedometer.js";
 import { Invoice } from "../test-helpers/models/invoice.js";
 import { Project } from "../test-helpers/models/project.js";
-import { isAssociationCached } from "../associations.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import { assertCalled, assertNotCalledOnInstanceOf } from "@blazetrails/activesupport";
@@ -2992,11 +2991,11 @@ describe("HasManyAssociationsTest", () => {
     registerModel(CachePost);
     const author = await CacheAuthor.create({ name: "Alice" });
 
-    expect(isAssociationCached.call(author, "cache_posts")).toBe(false);
+    expect(author.isAssociationCached("cache_posts")).toBe(false);
 
     association(author, "cache_posts");
-    expect(isAssociationCached.call(author, "cache_posts")).toBe(true);
-    expect(isAssociationCached.call(author, "other")).toBe(false);
+    expect(author.isAssociationCached("cache_posts")).toBe(true);
+    expect(author.isAssociationCached("other")).toBe(false);
   });
 
   it("get ids for association on new record does not try to find records", async () => {

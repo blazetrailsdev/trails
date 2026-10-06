@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations, isAssociationCached } from "../associations.js";
+import { Associations } from "../associations.js";
 import { aliasedRow } from "../support/join-dependency-aliased-row.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -70,7 +70,7 @@ describe("JoinDependency nested hydration", () => {
     expect(authorProxy1?.target).toBe(authorProxy2?.target);
 
     expect(comment1.association("author").target).toBeDefined();
-    expect(isAssociationCached.call(post, "author")).toBe(false);
+    expect(post.isAssociationCached("author")).toBe(false);
   });
 
   it("eager association loading with cascaded two levels and one level", () => {

@@ -50,13 +50,7 @@ export type {
 } from "./connection-adapters/abstract/schema-definitions.js";
 export { SchemaCreation } from "./connection-adapters/abstract/schema-creation.js";
 export { Schema } from "./schema.js";
-export {
-  Associations,
-  registerModel,
-  modelRegistry,
-  collectionProxyFor,
-  isAssociationCached,
-} from "./associations.js";
+export { Associations, registerModel, modelRegistry, collectionProxyFor } from "./associations.js";
 export { CollectionProxy } from "./associations/collection-proxy.js";
 export type { AssociationProxy } from "./associations/collection-proxy.js";
 export { AssociationRelation } from "./association-relation.js";
