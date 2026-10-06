@@ -35,6 +35,7 @@ interface FinderRelation {
     compositePrimaryKey: boolean;
     implicitOrderColumn?: string | null;
     createBang(attrs: any): Promise<any>;
+    connectionPool(): { withConnectionSync<R>(block: (c: DatabaseAdapter) => R): R };
     transaction<R>(
       fn: (tx: any) => Promise<R>,
       options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
@@ -95,7 +96,8 @@ interface FinderRelation {
   includesValues: unknown[];
   joinsValues: unknown[];
   leftOuterJoinsValues: unknown[];
-  except(...skips: string[]): any;
+  except(...skips: string[]): FinderRelation;
+  joinsBang(...args: unknown[]): FinderRelation;
   /** @internal */
   constructJoinDependency(associations: unknown[], joinType: unknown): JoinDependency;
   /** @internal */
@@ -528,7 +530,7 @@ export function applyJoinDependency<R>(
   ) {
     return Promise.resolve(
       this.skipQueryCacheIfNecessary(() =>
-        (this.model as any).connectionPool().withConnectionSync((c: DatabaseAdapter) =>
+        this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
           (
             c as unknown as {
               distinctRelationForPrimaryKey(rel: unknown): Promise<void>;
