@@ -190,33 +190,45 @@ export class Batches {
     };
 
     const generator = async function* (): AsyncGenerator<LoadedRelation<Relation<T>>> {
-      let pending: { relation: any; resume: () => void } | null = null;
-      let finished = false;
-      let failure: { error: unknown } | null = null;
+      type Batch = { relation: any; resume: () => void; stop: (reason: unknown) => void };
+      const stopped = {};
+      const state: { pending: Batch | null; finished: boolean; failure: unknown[] } = {
+        pending: null,
+        finished: false,
+        failure: [],
+      };
       let wake = (): void => {};
+      let batch: Batch | null = null;
       void run(
         (relation) =>
-          new Promise<void>((resume) => {
-            pending = { relation, resume };
+          new Promise<void>((resume, stop) => {
+            state.pending = { relation, resume, stop };
             wake();
           }),
       )
         .catch((error: unknown) => {
-          failure = { error };
+          if (error !== stopped) state.failure.push(error);
         })
         .then(() => {
-          finished = true;
+          state.finished = true;
           wake();
         });
-      while (true) {
-        if (!pending && !finished) await new Promise<void>((resolve) => (wake = resolve));
-        const batch = pending as { relation: any; resume: () => void } | null;
-        if (!batch) break;
-        pending = null;
-        yield batch.relation;
-        batch.resume();
+      try {
+        while (true) {
+          if (!state.pending && !state.finished) {
+            await new Promise<void>((resolve) => (wake = resolve));
+          }
+          batch = state.pending;
+          if (!batch) break;
+          state.pending = null;
+          yield batch.relation;
+          batch.resume();
+          batch = null;
+        }
+      } finally {
+        batch?.stop(stopped);
       }
-      if (failure) throw (failure as { error: unknown }).error;
+      if (state.failure.length > 0) throw state.failure[0];
     };
 
     if (!block) {
