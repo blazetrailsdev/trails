@@ -152,7 +152,7 @@ export const CROSS_PACKAGE_TEST_FILES: Record<string, { package: string; tsFile:
  * `-behavior.test.ts`.
  */
 export function rubyToConventionTs(rubyFile: string, pkg: string): string {
-  if (pkg === "rack-test" || pkg === "thor" || pkg === "bcrypt") {
+  if (pkg === "rack-test" || pkg === "thor" || pkg === "bcrypt" || pkg === "msgpack") {
     // Specs are reported relative to `spec`, so each repeats the gem's
     // `lib/rack/test` root as a leading `rack/` (plus a further `test/` below
     // `rack/test_spec.rb`). Drop both, the same redundant-leading-segment case
@@ -1575,6 +1575,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
   bcrypt: "packages/bcrypt/src/",
+  msgpack: "packages/msgpack/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",

@@ -272,6 +272,21 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "msgpack",
+    origin: {
+      type: "git",
+      url: "https://github.com/msgpack/msgpack-ruby.git",
+      ref: "v1.8.0",
+    },
+    packages: [
+      {
+        name: "msgpack",
+        libPath: "lib/msgpack",
+        testPath: "spec",
+      },
+    ],
+  },
+  {
     name: "sqlite3",
     origin: {
       type: "git",

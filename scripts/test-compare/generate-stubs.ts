@@ -32,6 +32,7 @@ const PKG_DIRS: Record<string, string> = {
   "rack-session": "packages/rack-session/src/",
   "rack-test": "packages/rack-test/src/",
   bcrypt: "packages/bcrypt/src/",
+  msgpack: "packages/msgpack/src/",
   actiondispatch: "packages/actionpack/src/action-dispatch/",
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
