@@ -200,9 +200,9 @@ export class Association {
 
   static checkDependentOptions(dependent: string, model: any): void {
     if (dependent === "destroyAsync" && !model.destroyAssociationAsyncJob) {
-      throw new ConfigurationError(
-        "A valid destroyAssociationAsyncJob is required to use `dependent: destroyAsync` on associations",
-      );
+      const errMessage =
+        "A valid destroy_association_async_job is required to use `dependent: :destroyAsync` on associations";
+      throw new ConfigurationError(errMessage);
     }
     const validOptions = this.validDependentOptions();
     if (!validOptions.includes(dependent)) {
