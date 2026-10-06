@@ -278,12 +278,6 @@ const LEXICAL_PREPENDS: Record<string, { includes: string[] }> = {
  * `addRubyName`). The justification is a source-unported *lexical* include
  * rather than a railtie `on_load` injection.
  *
- *   - `ActiveRecord::Railtie` re-exports `Railties::ControllerRuntime`
- *     (railtie.rb:267 — `on_load(:action_controller) { include … }`); the port
- *     lives in `trailties/controller-runtime.ts`. Its source (vendored at
- *     `activerecord/lib/active_record/railties/controller_runtime.rb`, matched
- *     by the `railties/controller_runtime.rb` UNPORTED_FILES pattern) is
- *     unported (Railties / ActionController integration not ported yet).
  *   - The association error classes `include DidYouMean::Correctable`
  *     (associations/errors.rb:18,47,88); `Correctable#detailed_message` is
  *     ported inline as `detailedMessage` in `associations/errors.ts`.
@@ -424,7 +418,6 @@ const CORE_MIXIN_OPERATOR_SPELLINGS: Record<string, string[]> = {
 };
 
 const PORTED_METHODS_FROM_UNPORTED_MIXINS: Record<string, string[]> = {
-  "ActiveRecord::Railtie": ["process_action", "cleanup_view_runtime", "append_info_to_payload"],
   "ActiveRecord::AssociationNotFoundError": ["detailed_message"],
 };
 

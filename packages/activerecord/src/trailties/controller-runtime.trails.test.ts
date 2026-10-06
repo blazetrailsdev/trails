@@ -234,11 +234,14 @@ describe("ControllerRuntimeTest", () => {
       include(SeatController as never, ControllerRuntime);
 
       const controller = new SeatController() as SeatController & { dbRuntime: number | null };
+      expect(
+        typeof Object.getOwnPropertyDescriptor(SeatController.prototype, "dbRuntime")?.get,
+      ).toBe("function");
       expect(controller.dbRuntime).toBe(null);
-      expect(Object.hasOwn(controller, "dbRuntime")).toBe(true);
+      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
 
       controller.dbRuntime = 1.5;
-      expect(Object.hasOwn(controller, "dbRuntime")).toBe(true);
+      expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);
       expect(new SeatController() as unknown as { dbRuntime: unknown }).toMatchObject({
         dbRuntime: null,
       });

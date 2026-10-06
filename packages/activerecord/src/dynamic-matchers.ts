@@ -1,15 +1,20 @@
 import { camelize, underscore } from "@blazetrails/activesupport";
-import { ArgumentError, NoMethodError, NotImplementedError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NoMethodError,
+  NotImplementedError,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 
 interface DynamicMatchersHost {
   name: string;
   columnsHash(): Record<string, unknown>;
-  attributeAliases?: Record<string, string>;
-  reflectOnAggregation?(aggregation: string): unknown;
+  attributeAliases: Record<string, string>;
+  reflectOnAggregation(aggregation: string): unknown;
 }
 
-export function respondToMissing(this: DynamicMatchersHost, name: string): boolean {
+export function respondToMissing(this: DynamicMatchersHost, name: string, _: boolean): boolean {
   if ((this as unknown) === ActiveRecord.Base) {
     return false;
   } else {
@@ -27,14 +32,14 @@ export function methodMissing(
 
   if (match !== null && match.isValid()) {
     match.define();
-    return (this as unknown as Record<string, (...args: unknown[]) => unknown>)[name](...args);
+    return rbFSend(this, name, ...args);
   } else {
     throw new NoMethodError(`undefined method '${name}' for class ${this.name}`);
   }
 }
 
-abstract class Method {
-  static matchers: (typeof FindBy | typeof FindByBang)[] = [];
+export class Method {
+  static matchers: (typeof Method)[] = [];
 
   static match(model: DynamicMatchersHost, name: string): Method | null {
     const klass = this.matchers.find((k) => k.pattern().test(name));
@@ -72,60 +77,70 @@ abstract class Method {
       this.name.match((this.constructor as typeof Method).pattern())![1],
     ).split("_and_");
     this.attributeNames = this.attributeNames.map(
-      (name) => this.model.attributeAliases?.[name] ?? name,
+      (name) => this.model.attributeAliases[name] || name,
     );
   }
 
   isValid(): boolean {
-    const columnsHash = this.model.columnsHash();
     return this.attributeNames.every(
       (name) =>
-        columnsHash[name] != null ||
-        this.model.reflectOnAggregation?.(camelize(name, false)) != null,
+        this.model.columnsHash()[name] != null ||
+        this.model.reflectOnAggregation(camelize(name, false)) != null,
     );
   }
 
   define(): void {
-    const method = this;
+    const arity = this.attributeNames.length;
     Object.defineProperty(this.model, this.name, {
-      value: function (
-        this: Record<string, (hash: Record<string, unknown>) => unknown>,
-        ...args: unknown[]
-      ) {
-        const arity = method.attributeNames.length;
-        if (args.length !== arity) {
-          throw new ArgumentError(
-            `wrong number of arguments (given ${args.length}, expected ${arity})`,
-          );
-        }
-        return this[method.finder()](method.attributesHash(args));
-      },
+      value: new Function(
+        "ArgumentError",
+        `return function (${this.signature()}) {
+          if (arguments.length !== ${arity}) {
+            throw new ArgumentError(
+              "wrong number of arguments (given " + arguments.length + ", expected ${arity})",
+            );
+          }
+          return this.${this.body()};
+        };`,
+      )(ArgumentError),
       writable: true,
       configurable: true,
     });
   }
 
   /** @internal */
-  private attributesHash(args: unknown[]): Record<string, unknown> {
-    return Object.fromEntries(this.attributeNames.map((name, i) => [name, args[i]]));
+  private body(): string {
+    return `${this.finder()}(${this.attributesHash()})`;
   }
 
   /** @internal */
-  protected abstract finder(): string;
+  private signature(): string {
+    return this.attributeNames.map((name) => `_${name}`).join(", ");
+  }
+
+  /** @internal */
+  private attributesHash(): string {
+    return "{" + this.attributeNames.map((name) => `${name}: _${name}`).join(",") + "}";
+  }
+
+  protected finder(): string {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/dynamic_matchers.rb:91
+    throw new NotImplementedError();
+  }
 }
 
-class FindBy extends Method {
+export class FindBy extends Method {
   static prefix(): string {
     return "findBy";
   }
 
-  protected finder(): string {
+  finder(): string {
     return "findBy";
   }
 }
 Method.matchers.push(FindBy);
 
-class FindByBang extends Method {
+export class FindByBang extends Method {
   static prefix(): string {
     return "findBy";
   }
@@ -134,7 +149,7 @@ class FindByBang extends Method {
     return "Bang";
   }
 
-  protected finder(): string {
+  finder(): string {
     return "findByBang";
   }
 }

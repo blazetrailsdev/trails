@@ -308,25 +308,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "ported ActiveJob; async destroy is out of scope until a job framework lands.",
   },
   {
-    pattern: "dynamic_matchers.rb", // no test counterpart
-    reason:
-      "Ruby `method_missing` magic that synthesizes `find_by_<attr>` / `find_or_*_by_<attr>` " +
-      "at call time. No TS analog — Proxy-based dispatch can't infer attribute lists at " +
-      "compile time, and `findBy({ ... })` already covers the use case idiomatically. " +
-      "`respond_to_missing?` alone is ported, in dynamic-matchers.ts, with `Method.match` / " +
-      "`Method#valid?` standing in as module-private functions there: the `Method` / `FindBy` / " +
-      "`FindByBang` classes exist only to serve `Method#define`'s `class_eval` codegen, which is " +
-      "the part with no TS analog.",
-  },
-  {
-    pattern: "railties/controller_runtime.rb",
-    testFile: "controller_runtime_test.rb",
-    reason:
-      "Railties ActionController integration that logs DB runtime per request. " +
-      "Trails has not ported Railties / ActionController; reintroduce when a web " +
-      "framework integration lands.",
-  },
-  {
     pattern: "adapters/trilogy",
     testFile: "adapters/trilogy/",
     reason:
