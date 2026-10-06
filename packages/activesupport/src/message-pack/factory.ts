@@ -1,6 +1,6 @@
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, StandardError } from "@blazetrails/ruby-compat";
 
-export class MessagePackError extends Error {}
+export class MessagePackError extends StandardError {}
 
 /** @internal */
 function isPlainObject(value: object): boolean {

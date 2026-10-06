@@ -1,4 +1,5 @@
-import { Factory, MessagePackError } from "./factory.js";
+import { RuntimeError } from "@blazetrails/ruby-compat";
+import { Factory } from "./factory.js";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE_INT = 128;
@@ -29,8 +30,8 @@ export class Serializer {
   load(dumped: Uint8Array | string): unknown {
     return this.messagePackPool().unpacker((unpacker) => {
       unpacker.feedReference(dumped);
-      if (unpacker.read() !== SIGNATURE_INT)
-        throw new MessagePackError("Invalid serialization format");
+      if (!(unpacker.read() === SIGNATURE_INT))
+        throw new RuntimeError("Invalid serialization format");
       return unpacker.fullUnpack();
     });
   }
