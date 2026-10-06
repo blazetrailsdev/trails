@@ -1910,10 +1910,15 @@ As a consequence:
   `scripts/parity/unported-files/unscoped.ts`, and their rows are **permanent** —
   not a burndown row, and not covered by the
   "a documented deviation is debt" rule above. The same holds for
-  `trilogy_adapter_test.rb` and for the trilogy arms of a shared MySQL test.
-- A Rails body or test that branches on Trilogy (`current_adapter?(:Mysql2Adapter,
-:TrilogyAdapter)`, a `Trilogy::` error class) ports its mysql2 arm and drops the
-  trilogy one. Dropping an adapter arm is normally the bug
+  `trilogy_adapter_test.rb`.
+- Out of scope means the adapter, not the name. Rails registers
+  `register_task(/trilogy/, "ActiveRecord::Tasks::MySQLDatabaseTasks")`
+  (`activerecord/lib/active_record/tasks/database_tasks.rb:79`), and so does
+  trails: a body or test that only routes the `"trilogy"` adapter string never
+  reaches a client, and is ported in full.
+- A Rails body or test that needs a live Trilogy connection — one branching on
+  `current_adapter?(:TrilogyAdapter)`, or rescuing a `Trilogy::` error class —
+  ports its mysql2 arm and drops the trilogy one. Dropping an adapter arm is normally the bug
   `project_rails_test_adapter_conditional_dropped_in_port` records; this is the
   one adapter where it is correct.
 - There is no story to port it. Do not file one, do not claim one, and do not

@@ -572,21 +572,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "tasks/database_tasks_test.rb",
-    tests: [
-      "trilogy create",
-      "trilogy drop",
-      "trilogy purge",
-      "trilogy charset",
-      "trilogy collation",
-      "trilogy structure dump",
-      "trilogy structure load",
-    ],
-    reason:
-      "The `trilogy` row of Rails' ADAPTERS_TASKS loop. Trails has no TrilogyAdapter " +
-      'and will not have one. PERMANENT: CLAUDE.md § "Trilogy is out of scope".',
-  },
-  {
-    testFile: "tasks/database_tasks_test.rb",
     tests: ["raises an error when called with protected environment which name is a symbol"],
     reason:
       "Ruby Symbol env names (symbol→string coercion in protected_environments); env " +
