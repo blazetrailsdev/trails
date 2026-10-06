@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../errors.js";
 import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 export interface DatabaseConfigOptions {
@@ -58,11 +59,12 @@ export class DatabaseConfig {
     return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
   }
 
+  /** @inventedArm if — CONVERGEABLE database-config-new-connection-invents-a-still-loading-arm */
   newConnection(): unknown {
     const adapterClass = this.adapterClass();
     if (adapterClass instanceof Promise) {
       adapterClass.catch(() => {});
-      throw new Error(
+      throw new RuntimeError(
         `Adapter "${this.adapter}" is still loading — await adapterClass() before newConnection.`,
       );
     }

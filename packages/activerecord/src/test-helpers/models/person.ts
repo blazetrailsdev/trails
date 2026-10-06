@@ -1,3 +1,4 @@
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -296,7 +297,7 @@ export class NestedPerson extends Base {
   }
 
   set comments(_newComments: any) {
-    throw new Error("RuntimeError");
+    throw new RuntimeError();
   }
 
   setBestFriendFirstName(newName: string): Promise<void> | void {

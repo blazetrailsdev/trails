@@ -15,7 +15,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Module, Range } from "@blazetrails/ruby-compat";
+import { Module, Range, RuntimeError } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -286,7 +286,7 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
     });
     this.beforeDestroy(async function (developer: DeveloperWithBeforeDestroyRaise) {
       const projects = await (developer as any).projects;
-      if (projects.length === 0) throw new Error();
+      if (projects.length === 0) throw new RuntimeError("unhandled exception");
     });
   }
 }
