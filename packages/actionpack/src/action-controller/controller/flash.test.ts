@@ -27,7 +27,7 @@ import { Flash as ControllerFlash } from "../metal/flash.js";
 
 class TestController extends Base {
   static {
-    this.beforeAction("haltAndRedir", { only: "filterHaltingAction" });
+    this.beforeAction("haltAndRedir", { only: "filter_halting_action" });
   }
 
   flashCopy!: Record<string, unknown>;
@@ -43,7 +43,7 @@ class TestController extends Base {
 
   haltAndRedir(): void {
     this.flash.set("foo", "bar");
-    this.redirectTo({ action: "stdAction" });
+    this.redirectTo({ action: "std_action" });
     this.flashCopy = { ...this.flash.toHash() };
   }
 
@@ -159,13 +159,13 @@ describe("FlashTest", () => {
     await tc.beforeSetup();
     const flashCopy = () => (tc.controller as TestController).flashCopy;
 
-    await tc.get("stdAction");
+    await tc.get("std_action");
     assertNil(flashCopy()["foo"]);
-    await tc.get("filterHaltingAction");
+    await tc.get("filter_halting_action");
     assertEqual("bar", flashCopy()["foo"]);
-    await tc.get("stdAction");
+    await tc.get("std_action");
     assertEqual("bar", flashCopy()["foo"]);
-    await tc.get("stdAction");
+    await tc.get("std_action");
     assertNil(flashCopy()["foo"]);
   });
 
