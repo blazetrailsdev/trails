@@ -13,6 +13,7 @@ import {
   aryFetch,
   aryIncludes,
   aryPop,
+  deleteAt,
   arySlice,
   compact,
   compactBang,
@@ -579,5 +580,35 @@ describe("rbFArray", () => {
     expect(rbFArray({ toAry: () => [1] })).toEqual([1]);
     expect(rbFArray("json")).toEqual(["json"]);
     expect(rbFArray(false)).toEqual([false]);
+  });
+});
+
+describe("deleteAt", () => {
+  it("removes the element at a non-negative index and answers it", () => {
+    const ary = ["foo", "bar", 2];
+    expect(deleteAt(ary, 1)).toBe("bar");
+    expect(ary).toEqual(["foo", 2]);
+  });
+
+  it("counts a negative index back from the end", () => {
+    const ary = ["foo", "bar", 2];
+    expect(deleteAt(ary, -2)).toBe("bar");
+    expect(ary).toEqual(["foo", 2]);
+  });
+
+  it("converts the index as NUM2LONG does before indexing", () => {
+    const ary = ["a", "b", "c", "d"];
+    expect(deleteAt(ary, 1.9)).toBe("b");
+    expect(deleteAt(ary, -1.9)).toBe("d");
+    expect(ary).toEqual(["a", "c"]);
+    expect(() => deleteAt(ary, NaN)).toThrow();
+    expect(ary).toEqual(["a", "c"]);
+  });
+
+  it("answers nil and leaves the array alone when the index is out of range", () => {
+    const ary = ["foo"];
+    expect(deleteAt(ary, 1)).toBeNull();
+    expect(deleteAt(ary, -2)).toBeNull();
+    expect(ary).toEqual(["foo"]);
   });
 });

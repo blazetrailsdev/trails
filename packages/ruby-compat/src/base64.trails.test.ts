@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ArgumentError } from "./argument-error.js";
 import { Base64 } from "./base64.js";
 
 describe("Base64", () => {
@@ -20,5 +21,24 @@ describe("Base64", () => {
 
   it("decode64 round-trips strictEncode64", () => {
     expect(Base64.decode64(Base64.strictEncode64("\x80\xff:ok"))).toBe("\x80\xff:ok");
+  });
+
+  it("strict_decode64 decodes padded input and raises ArgumentError for malformed input", () => {
+    expect(Base64.strictDecode64("dXNlcjpwYXNz")).toBe("user:pass");
+    expect(Base64.strictDecode64("AH+A/w==")).toBe("\x00\x7f\x80\xff");
+    expect(Base64.strictDecode64("w6k=")).toBe("\xc3\xa9");
+    expect(Base64.strictDecode64("")).toBe("");
+    for (const bad of ["=", "abc==", "a", "ab", "abc", "ab=c", "a===", "w6l=", "AB==", "a b="]) {
+      expect(() => Base64.strictDecode64(bad)).toThrow(ArgumentError);
+    }
+  });
+
+  it("urlsafe_decode64 pads unpadded input and maps the URL-safe alphabet", () => {
+    expect(Base64.urlsafeDecode64("AH-A_w")).toBe("\x00\x7f\x80\xff");
+    expect(Base64.urlsafeDecode64("AH-A_w==")).toBe("\x00\x7f\x80\xff");
+    expect(Base64.urlsafeDecode64("w6k")).toBe("\xc3\xa9");
+    for (const bad of ["=", "abc==", "a", "!!!!"]) {
+      expect(() => Base64.urlsafeDecode64(bad)).toThrow(ArgumentError);
+    }
   });
 });

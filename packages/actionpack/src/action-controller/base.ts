@@ -340,6 +340,7 @@ export interface Base
   isProtectAgainstForgery(): boolean;
   verifyAuthenticityToken(): void;
   formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
+  csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
   resetCsrfToken: typeof resetCsrfToken;
   commitCsrfToken: typeof commitCsrfToken;
   verifySameOriginRequest(): void;
@@ -508,13 +509,6 @@ export class Base extends Metal {
   isAnyTemplates = isAnyTemplates;
 
   declare defaultRender: typeof defaultRender;
-
-  /** @internal */
-  override async sendAction(method: string, ...args: unknown[]): Promise<unknown> {
-    const ret = await super.sendAction(method, ...args);
-    if (!this.performed) await this.defaultRender();
-    return ret;
-  }
 
   /** @internal */
   renderToBody(options: Record<string, unknown> = {}): unknown {

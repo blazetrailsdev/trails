@@ -1,4 +1,6 @@
+import { ArgumentError } from "./argument-error.js";
 import { pack } from "./array.js";
+import { trTrans } from "./string/tr.js";
 
 const B64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
@@ -56,5 +58,73 @@ export class Base64 {
       }
     }
     return res;
+  }
+
+  /**
+   * `Base64.strict_decode64` (`vendor/ruby/v3.3.11/lib/base64.rb:297`), which is
+   * `str.unpack1("m0")` (`base64.rb:298`): the strict decode of
+   * `vendor/ruby/v3.3.11/pack.c:1433-1463`, raising `ArgumentError` for a
+   * character outside the alphabet, a group short of four characters,
+   * misplaced padding, or non-zero bits under the padding. It answers an
+   * ASCII-8BIT String, one code unit per byte.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.strict_decode64`
+   * (`vendor/ruby/v3.3.11/lib/base64.rb:297`).
+   */
+  static strictDecode64(str: string): string {
+    const send = str.length;
+    const xtable = (ch: string | undefined): number => (ch == null ? -1 : B64_TABLE.indexOf(ch));
+    let res = "";
+    let s = 0;
+    let a = -1;
+    let b = -1;
+    let c = 0;
+    let d = 0;
+    while (s < send) {
+      c = d = -1;
+      a = xtable(str[s++]);
+      if (s >= send || a === -1) throw new ArgumentError("invalid base64");
+      b = xtable(str[s++]);
+      if (s >= send || b === -1) throw new ArgumentError("invalid base64");
+      if (str[s] === "=") {
+        if (s + 2 === send && str[s + 1] === "=") break;
+        throw new ArgumentError("invalid base64");
+      }
+      c = xtable(str[s++]);
+      if (s >= send || c === -1) throw new ArgumentError("invalid base64");
+      if (s + 1 === send && str[s] === "=") break;
+      d = xtable(str[s++]);
+      if (d === -1) throw new ArgumentError("invalid base64");
+      res += String.fromCharCode(((a << 2) | (b >> 4)) & 0xff);
+      res += String.fromCharCode(((b << 4) | (c >> 2)) & 0xff);
+      res += String.fromCharCode(((c << 6) | d) & 0xff);
+    }
+    if (c === -1) {
+      res += String.fromCharCode(((a << 2) | (b >> 4)) & 0xff);
+      if (b & 0xf) throw new ArgumentError("invalid base64");
+    } else if (d === -1) {
+      res += String.fromCharCode(((a << 2) | (b >> 4)) & 0xff);
+      res += String.fromCharCode(((b << 4) | (c >> 2)) & 0xff);
+      if (c & 0x3) throw new ArgumentError("invalid base64");
+    }
+    return res;
+  }
+
+  /**
+   * `Base64.urlsafe_decode64` (`vendor/ruby/v3.3.11/lib/base64.rb:351`): pads
+   * an unpadded input out to a multiple of four, maps the URL-safe alphabet
+   * back, and decodes strictly.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.urlsafe_decode64`
+   * (`vendor/ruby/v3.3.11/lib/base64.rb:351`).
+   */
+  static urlsafeDecode64(str: string): string {
+    if (!str.endsWith("=") && str.length % 4 !== 0) {
+      str = str.padEnd((str.length + 3) & ~3, "=");
+      str = trTrans(str, "-_", "+/", false);
+    } else {
+      str = trTrans(str, "-_", "+/", false);
+    }
+    return Base64.strictDecode64(str);
   }
 }

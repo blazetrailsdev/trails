@@ -2,7 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Complex } from "./complex.js";
 import { FloatDomainError } from "./float-domain-error.js";
 import { NoMethodError } from "./no-method-error.js";
+import { NameError } from "./name-error.js";
+import { TypeError } from "./type-error.js";
 import {
+  intXor,
   anybits,
   fixDiv,
   fixMod,
@@ -218,5 +221,61 @@ describe("Integer#/ and Integer#%", () => {
   it("raises ZeroDivisionError for a zero divisor", () => {
     expect(() => fixDiv(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
     expect(() => fixMod(1, 0)).toThrow(new ZeroDivisionError("divided by 0"));
+  });
+});
+
+describe("intXor", () => {
+  it("is the bitwise exclusive OR of two Integers", () => {
+    expect(intXor(0b1100, 0b1010)).toBe(0b0110);
+    expect(intXor(2 ** 40, 1)).toBe(2 ** 40 + 1);
+  });
+
+  it("raises TypeError naming an operand that cannot be coerced", () => {
+    expect(() => intXor(1, null)).toThrow(new TypeError("nil can't be coerced into Integer"));
+    expect(() => intXor(1, true)).toThrow(new TypeError("true can't be coerced into Integer"));
+    expect(() => intXor(1, 1.5)).toThrow(new TypeError("1.5 can't be coerced into Integer"));
+    expect(() => intXor(1, "a")).toThrow(new TypeError("String can't be coerced into Integer"));
+    expect(() => intXor(1, {})).toThrow(new TypeError("Hash can't be coerced into Integer"));
+  });
+
+  it("XORs the pair an operand's coerce answers", () => {
+    expect(intXor(3, { coerce: (x: unknown) => [x, 6] })).toBe(5);
+  });
+
+  it("sends ^ to the first member of the coerced pair", () => {
+    const operand = {
+      coerce(x: unknown): unknown {
+        return [this, x];
+      },
+      "^"(y: unknown): string {
+        return `mine ${String(y)}`;
+      },
+    };
+    expect(intXor(3, operand)).toBe("mine 3");
+  });
+
+  it("raises NameError when the coerced pair recurses", () => {
+    class Operand {
+      coerce(x: unknown): unknown {
+        return [x, this];
+      }
+      toString(): string {
+        return "operand";
+      }
+    }
+    expect(() => intXor(3, new Operand())).toThrow(new NameError("3^operand", "^"));
+  });
+
+  it("raises when coerce answers a pair whose first member has no ^, or no pair", () => {
+    class Operand {
+      constructor(private readonly ary: unknown) {}
+      coerce(): unknown {
+        return this.ary;
+      }
+    }
+    expect(() => intXor(3, new Operand([1.5, 2]))).toThrow(
+      new TypeError("Operand can't be coerced into Integer"),
+    );
+    expect(() => intXor(3, new Operand(5))).toThrow(new TypeError("coerce must return [x, y]"));
   });
 });

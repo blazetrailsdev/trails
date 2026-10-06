@@ -14,6 +14,15 @@ describe("SecureRandom", () => {
     expect(SecureRandom.hex(null)).toMatch(/^[0-9a-f]{32}$/);
   });
 
+  it("urlsafe_base64 is unpadded URL-safe base64 over random_bytes(n)", () => {
+    expect(SecureRandom.urlsafeBase64(32)).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(SecureRandom.urlsafeBase64()).toMatch(/^[A-Za-z0-9_-]{22}$/);
+  });
+
+  it("urlsafe_base64 keeps the padding when asked", () => {
+    expect(SecureRandom.urlsafeBase64(null, true)).toMatch(/^[A-Za-z0-9_-]{22}==$/);
+  });
+
   it("bytes returns one character per byte", () => {
     expect(SecureRandom.bytes(20)).toHaveLength(20);
   });

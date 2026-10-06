@@ -1,4 +1,5 @@
 import {
+  deleteAt,
   except,
   flatten,
   hasKey,
@@ -159,10 +160,10 @@ export class Options {
 
     do {
       if ((modelKlass = safeConstantize(modelName) ?? null) != null) {
-        break;
+        void modelKlass;
       } else {
         const namespaces = modelName.split("::");
-        if (namespaces.length >= 2) namespaces.splice(-2, 1);
+        deleteAt(namespaces, -2);
         if (last(namespaces) === modelName) break;
         modelName = namespaces.join("::");
       }

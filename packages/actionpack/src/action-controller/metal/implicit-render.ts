@@ -3,18 +3,7 @@ import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
 
-import {
-  defaultRender as _defaultRender,
-  sendAction as _sendAction,
-} from "./basic-implicit-render.js";
-
-/** @internal */
-export function sendAction(
-  this: { performed: boolean; head(status: number | string): void },
-  method: () => unknown,
-): unknown {
-  return _sendAction.call(this, method);
-}
+import { BasicImplicitRender } from "./basic-implicit-render.js";
 
 export interface ImplicitRenderHost {
   performed: boolean;
@@ -68,7 +57,7 @@ export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
     throw new MissingExactTemplate(message, this.constructor, this.actionName);
   }
   this.logger?.info(`No template found for ${name}#${this.actionName}, rendering head :no_content`);
-  _defaultRender.call(this);
+  return ImplicitRender.superMethod(this, "defaultRender")!() as void | Promise<void>;
 }
 
 /** @internal */
@@ -96,6 +85,8 @@ export function isInteractiveBrowserRequest(this: ImplicitRenderHost): boolean {
 }
 
 export const ImplicitRender = new Module((mod) => {
+  mod.include(BasicImplicitRender);
+
   mod.moduleEval((m) => {
     Object.assign(m, { defaultRender, methodForAction, isInteractiveBrowserRequest });
   });

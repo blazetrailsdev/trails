@@ -860,21 +860,35 @@ describe("FreeCookieControllerTest", () => {
   // BLOCKED: action-controller-test-case-has-no-assert-select
   it.skip("should not render button to with token tag", () => {});
 
-  it("should allow all methods without token", async ({ task }) => {
-    const tc = new TestCase(task.name);
+  let tc: TestCase;
+  let token: string;
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
     tc.controller = new FreeCookieController();
+    token = "cf50faa3fe97702ca1ae";
     await tc.beforeSetup();
-    for (const method of ["post", "patch", "put", "delete"] as const) {
-      await assertNothingRaised(() => tc[method]("index"));
+  });
+
+  it("should allow all methods without token", async () => {
+    const stub = vi.spyOn(SecureRandom, "urlsafeBase64").mockReturnValue(token);
+    try {
+      for (const method of ["post", "patch", "put", "delete"] as const) {
+        await assertNothingRaised(() => tc[method]("index"));
+      }
+    } finally {
+      stub.mockRestore();
     }
   });
 
-  it("should not emit a csrf-token meta tag", async ({ task }) => {
-    const tc = new TestCase(task.name);
-    tc.controller = new FreeCookieController();
-    await tc.beforeSetup();
-    await tc.get("meta");
-    expect(isBlank(tc.response.body)).toBe(true);
+  it("should not emit a csrf-token meta tag", async () => {
+    const stub = vi.spyOn(SecureRandom, "urlsafeBase64").mockReturnValue(token);
+    try {
+      await tc.get("meta");
+      expect(isBlank(tc.response.body)).toBe(true);
+    } finally {
+      stub.mockRestore();
+    }
   });
 });
 

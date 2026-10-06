@@ -1835,13 +1835,6 @@
   },
   {
     "package": "actioncontroller",
-    "rubyFile": "metal/implicit_render.rb",
-    "rubyName": "send_action",
-    "digest": "19846f268b8497eb",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
     "rubyFile": "metal/instrumentation.rb",
     "rubyName": "append_info_to_payload",
     "digest": "c8b72182f62836b9",
