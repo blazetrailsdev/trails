@@ -17,10 +17,9 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface HeadMetal extends Included<typeof Head> {}
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-class HeadMetal extends Metal {}
+class HeadMetal extends Metal {
+  declare head: Included<typeof Head>["head"];
+}
 include(HeadMetal, Head);
 
 function makeResponse(): Response {

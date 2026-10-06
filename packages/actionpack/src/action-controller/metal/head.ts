@@ -1,5 +1,5 @@
-import { Module } from "@blazetrails/activesupport";
-import { ArgumentError, hashDelete, rbInspect } from "@blazetrails/ruby-compat";
+import { Module, isPlainObject } from "@blazetrails/activesupport";
+import { ArgumentError, hashDelete, rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 import type { Metal } from "../metal.js";
 
@@ -19,7 +19,7 @@ export function head(
   status: number | string | null | false,
   options: Record<string, unknown> | null = null,
 ): true {
-  if (status !== null && typeof status === "object") {
+  if (isPlainObject(status)) {
     throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
   }
 
@@ -37,7 +37,7 @@ export function head(
           .split(/[-_]/)
           .map((v) => v[0].toUpperCase() + v.slice(1))
           .join("-"),
-        String(value),
+        rbObjAsString(value),
       );
     }
   }

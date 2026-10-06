@@ -133,10 +133,9 @@ describe("BareEmptyTest", () => {
   });
 });
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type
-interface HeadController extends Included<typeof Head> {}
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class HeadController extends Metal {
+  declare head: Included<typeof Head>["head"];
+
   index(): void {
     this.head("not_found");
   }
