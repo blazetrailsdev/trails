@@ -232,6 +232,8 @@ export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 export * from "./active-record.js";
+export { VERSION, gemVersion } from "./gem-version.js";
+export { version } from "./version.js";
 export { ActiveRecord } from "./namespaces.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";
