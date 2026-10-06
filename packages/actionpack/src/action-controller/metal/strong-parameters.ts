@@ -167,7 +167,6 @@ export class Parameters {
     return /^-?\d+$/.test(key) && (value instanceof Parameters || isPlainObject(value));
   }
 
-  /** @internal */
   get permitted(): boolean {
     return this._permitted;
   }
