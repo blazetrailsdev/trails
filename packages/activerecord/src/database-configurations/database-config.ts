@@ -1,4 +1,3 @@
-import { RuntimeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../errors.js";
 import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 export interface DatabaseConfigOptions {
@@ -40,41 +39,32 @@ export class DatabaseConfig {
     this.#adapterClass = null;
   }
 
-  adapterClass(): (new (...args: any[]) => unknown) | Promise<new (...args: any[]) => unknown> {
-    if (this.#adapterClass) return this.#adapterClass;
-    const adapterClass = ConnectionAdapters.resolve(this.adapter);
-    if (!(adapterClass instanceof Promise)) return (this.#adapterClass = adapterClass);
-    return adapterClass.then((klass) => (this.#adapterClass = klass));
+  adapterClass(): new (...args: any[]) => unknown {
+    return (this.#adapterClass ||= ConnectionAdapters.resolve(this.adapter) as new (
+      ...args: any[]
+    ) => unknown);
   }
 
   inspect(): string {
-    const adapterClass = this.adapterClass();
-    let rendered: string | undefined;
-    if (adapterClass instanceof Promise) {
-      adapterClass.catch(() => {});
-      rendered = this.adapter;
-    } else {
-      rendered = adapterClass.name;
-    }
-    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
+    return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${this.adapterClass().name}>`;
   }
 
-  /** @inventedArm if — CONVERGEABLE database-config-new-connection-invents-a-still-loading-arm */
   newConnection(): unknown {
-    const adapterClass = this.adapterClass();
-    if (adapterClass instanceof Promise) {
-      adapterClass.catch(() => {});
-      throw new RuntimeError(
-        `Adapter "${this.adapter}" is still loading — await adapterClass() before newConnection.`,
-      );
-    }
-    const configurationHash = (this as unknown as { configurationHash: DatabaseConfigOptions })
-      .configurationHash;
-    return new (adapterClass as new (config: DatabaseConfigOptions) => unknown)(configurationHash);
+    return new (this.adapterClass())(
+      (this as unknown as { configurationHash: DatabaseConfigOptions }).configurationHash,
+    );
   }
 
+  /** @inventedArm rescue — CONVERGEABLE connection-adapters-resolve-answers-a-promise-for-an-unloaded-adapter */
   async validateBang(): Promise<true> {
-    if (this.adapter != null) await this.adapterClass();
+    if (this.adapter != null) {
+      try {
+        this.#adapterClass = await this.adapterClass();
+      } catch (error) {
+        this.#adapterClass = null;
+        throw error;
+      }
+    }
 
     return true;
   }

@@ -1,32 +1,52 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
+import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("ParametersAccessorsTest", () => {
+  let params: Parameters;
+  beforeEach(() => {
+    Parameters.permitAllParameters = false;
+
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+  });
+
   it("parameters are not equal to the hash", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.equals({ a: "1" } as any)).toBe(false);
+    const hash: Record<string, unknown> = {};
+    params.eachPair((key, value) => {
+      hash[key] = value;
+    });
+    assertNotEqual(params, hash);
   });
 
   it("not eql? to equivalent hash", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.eql({ a: "1" } as any)).toBe(false);
+    const hash = {};
+    params = new Parameters(hash);
+    assertNot(params.eql(hash));
   });
 
   it("not eql? to equivalent nested hash", () => {
-    const params = new Parameters({ a: { b: "1" } });
-    expect(params.eql({ a: { b: "1" } } as any)).toBe(false);
+    const params1 = new Parameters({ foo: {} });
+    const params2 = new Parameters({ foo: new Parameters({}) });
+    assertNot(params1.eql(params2));
   });
 
   it("not eql? when permitted is different", () => {
-    const a = new Parameters({ x: "1" }).permitBang();
-    const b = new Parameters({ x: "1" });
-    expect(a.eql(b)).toBe(false);
+    const permitted = params.permit("person");
+    assertNot(params.eql(permitted));
   });
 
   it("eql? when equivalent", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "1" });
-    expect(a.eql(b)).toBe(true);
+    const permitted = params.permit("person");
+    assert(params.permit("person").eql(permitted));
   });
 
   it("has_value? converts hashes to parameters", () => {

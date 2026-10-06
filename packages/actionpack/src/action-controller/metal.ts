@@ -4,7 +4,7 @@ import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
-import type { RackResponse } from "@blazetrails/rack";
+import type { RackResponse, Response as RackResponseObject } from "@blazetrails/rack";
 import {
   classAttribute,
   demodulize,
@@ -13,7 +13,7 @@ import {
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import { rbModSingletonP } from "@blazetrails/ruby-compat";
+import { rbCheckArrayType, rbModSingletonP, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -165,10 +165,10 @@ export class Metal extends AbstractController {
   get response(): Response {
     return this._response;
   }
-  set response(value: Response) {
-    this.setResponseBang(value);
+  set response(response: Response | RackResponse | RackResponseObject) {
+    this.setResponseBang(response);
 
-    this.markPerformed();
+    this._responseBody = true;
   }
 
   get session(): Session {
@@ -260,8 +260,13 @@ export class Metal extends AbstractController {
     request.controllerInstance = this;
   }
 
-  setResponseBang(response: Response): void {
-    this._response = response;
+  setResponseBang(response: Response | RackResponse | RackResponseObject): void {
+    if (this._response) {
+      const [, , body] = rbCheckArrayType(this._response) ?? [];
+      if (rbObjRespondTo(body, "close")) (body as { close(): void }).close();
+    }
+
+    this._response = response as Response;
   }
 
   resetSession(): void {
@@ -320,13 +325,12 @@ export class Metal extends AbstractController {
     if (this.response) this.response.body = str;
   }
 
-  override get responseBody(): string | null {
-    const body = this._responseBody;
-    return typeof body === "string" ? body : (body?.toString() ?? null);
+  override get responseBody(): string | true | null {
+    return this._responseBody as string | true | null;
   }
 
   override get performed(): boolean {
-    return super.performed || (this.response?.committed ?? false);
+    return this.responseBody != null || this.response.committed;
   }
 
   toA(): RackResponse {

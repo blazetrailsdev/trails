@@ -1,6 +1,7 @@
 import { beforeEach, describe, it, expect } from "vitest";
 import { Parameters } from "../../metal/strong-parameters.js";
-import { assertNil } from "@blazetrails/activesupport";
+import { assertEqual, assertMatch, assertNil } from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
 
 describe("ParametersAccessorsTest", () => {
   let params: Parameters;
@@ -49,8 +50,16 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("to_s returns the string representation of the parameters hash", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.toString()).toBe('{"a":"1"}');
+    assertEqual(
+      rbInspect({
+        person: {
+          age: "32",
+          name: { first: "David", last: "Heinemeier Hansson" },
+          addresses: [{ city: "Chicago", state: "Illinois" }],
+        },
+      }),
+      params.toString(),
+    );
   });
 
   it("each carries permitted status", () => {
@@ -407,17 +416,29 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("inspect shows both class name, parameters and permitted flag", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    const s = params.inspect();
-    expect(s).toContain("ActionController::Parameters");
-    expect(s).toContain("permitted: true");
+    const hash = {
+      person: {
+        age: "32",
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    };
+
+    assertEqual(
+      `#<ActionController::Parameters ${rbInspect(hash)} permitted: false>`,
+      params.inspect(),
+    );
   });
 
   it("inspect prints updated permitted flag in the output", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.inspect()).not.toContain("permitted: true");
+    assertMatch(/permitted: false/, params.inspect());
+
     params.permitBang();
-    expect(params.inspect()).toContain("permitted: true");
+
+    assertMatch(/permitted: true/, params.inspect());
   });
 
   it("#dig delegates the dig method to its values", () => {

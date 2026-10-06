@@ -150,16 +150,14 @@ describe("ControllerClassTests", () => {
 });
 
 describe("ControllerInstanceTests", () => {
-  it("performed?", async () => {
-    class EmptyController extends Base {
-      async index() {
-        await this.render({ plain: "done" });
-      }
-    }
-    const c = new EmptyController();
-    expect(c.performed).toBe(false);
-    await c.dispatch("index", makeRequest(), makeResponse());
-    expect(c.performed).toBe(true);
+  it("performed?", () => {
+    class EmptyController extends Base {}
+    const empty = new EmptyController();
+    empty.setRequestBang(Request.empty());
+    empty.setResponseBang(EmptyController.makeResponseBang(empty.request));
+    expect(empty.performed).toBe(false);
+    empty.responseBody = ["sweet"];
+    expect(empty.performed).toBe(true);
   });
 
   it("empty controller action methods", () => {

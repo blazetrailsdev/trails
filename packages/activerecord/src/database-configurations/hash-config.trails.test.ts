@@ -102,6 +102,24 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
+      class TrailsFirstAdapter {}
+      class TrailsSecondAdapter {}
+      register("trails_memo_adapter", "TrailsTestAdapter", "./trails-memo-adapter.js", () =>
+        Promise.resolve(TrailsFirstAdapter as never),
+      );
+      const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
+      config.adapterClass();
+      await config.validateBang();
+      expect(config.adapterClass()).toBe(TrailsFirstAdapter);
+
+      register("trails_memo_adapter", "TrailsTestAdapter", "./trails-memo-adapter.js", () =>
+        Promise.resolve(TrailsSecondAdapter as never),
+      );
+      await config.validateBang();
+      expect(config.adapterClass()).toBe(TrailsFirstAdapter);
+    });
+
     it("inspect renders the resolved adapter class", async () => {
       class TrailsInspectAdapter {}
       register(
@@ -113,39 +131,9 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_inspect_adapter",
       });
-      await resolve("trails_inspect_adapter");
-      await config.adapterClass();
+      await config.validateBang();
       expect(config.inspect()).toBe(
         "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=TrailsInspectAdapter>",
-      );
-    });
-
-    it("inspect does not leave the driver load rejection unhandled", async () => {
-      register(
-        "trails_inspect_broken_adapter",
-        "TrailsTestAdapter",
-        "./trails-inspect-broken-adapter.js",
-        () => Promise.reject(new Error("Cannot find module 'pg'")),
-      );
-      const config = new HashConfig("default_env", "primary", {
-        adapter: "trails_inspect_broken_adapter",
-      });
-      expect(config.inspect()).toContain("adapter_class=trails_inspect_broken_adapter");
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-
-    it("inspect falls back to the adapter name while the adapter is still loading", () => {
-      register(
-        "trails_inflight_adapter",
-        "TrailsTestAdapter",
-        "./trails-inflight-adapter.js",
-        () => new Promise<never>(() => {}),
-      );
-      const config = new HashConfig("default_env", "primary", {
-        adapter: "trails_inflight_adapter",
-      });
-      expect(config.inspect()).toBe(
-        "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=trails_inflight_adapter>",
       );
     });
 

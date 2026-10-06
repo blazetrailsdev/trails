@@ -177,6 +177,7 @@ export {
   first,
   flatten,
   rbFArray,
+  rbCheckArrayType,
   groupBy,
   last,
   pack,
