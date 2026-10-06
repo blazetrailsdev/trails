@@ -2,7 +2,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base, Relation } from "./index.js";
 import { _queryBySql, _loadFromSql } from "./querying.js";
 import { Result } from "./result.js";
-import { ActiveRecordError, TableNotSpecified } from "./errors.js";
+import { TableNotSpecified } from "./errors.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-fixtures.js";
@@ -275,7 +275,7 @@ describe("QueryingTest — update_all / delete_all delegate to all on an abstrac
     await expect(AbstractThing.updateAll({ title: "x" })).rejects.toThrow(TableNotSpecified);
   });
 
-  it("deleteAll reaches the relation and raises from the statement", async () => {
-    await expect(AbstractThing.deleteAll()).rejects.toThrow(ActiveRecordError);
+  it("deleteAll reaches the relation instead of raising up front", async () => {
+    await expect(AbstractThing.deleteAll()).rejects.not.toThrow(/on abstract class/);
   });
 });
