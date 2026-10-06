@@ -1,10 +1,27 @@
 import { describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
+import { include } from "@blazetrails/activesupport";
+import { Rendering as AbstractControllerRendering } from "../../../abstract-controller/rendering.js";
 import { Base } from "../../base.js";
+import { Metal } from "../../metal.js";
+import { Rendering } from "../../metal/rendering.js";
 import { controllerConstants } from "../../../action-dispatch/http/request.js";
 import { deprecator } from "../../../action-dispatch/deprecator.js";
 import type { RouteSet } from "../../../action-dispatch/routing/route-set.js";
 import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit.js";
+
+class MinimalController extends Metal {
+  declare render: (options: Record<string, unknown>) => void | Promise<void>;
+
+  static {
+    include(this, AbstractControllerRendering);
+    include(this, Rendering);
+  }
+
+  async index(): Promise<void> {
+    await this.render({ plain: "Hello World!" });
+  }
+}
 
 class SimpleController extends Base {
   static {
@@ -73,14 +90,19 @@ class WithLayoutController extends ApplicationController {
   }
 }
 
+controllerConstants.set("render_plain/minimal", MinimalController);
 controllerConstants.set("render_plain/simple", SimpleController);
 controllerConstants.set("render_plain/with_layout", WithLayoutController);
 
 class RenderPlainTest extends Rack.TestCase {}
 
 describe("RenderPlainTest", () => {
-  // BLOCKED: action-controller-rendering-is-not-an-includable-module
-  it.skip("rendering text from a minimal controller", () => {});
+  it("rendering text from a minimal controller", async ({ task }) => {
+    const t = new RenderPlainTest(task.name);
+    await t.get("/render_plain/minimal/index");
+    t.assertBody("Hello World!");
+    t.assertStatus(200);
+  });
 
   it("rendering text from an action with default options renders the text with the layout", async ({
     task,
@@ -183,8 +205,13 @@ describe("RenderPlainTest", () => {
     t.assertStatus(200);
   });
 
-  // BLOCKED: action-controller-rendering-is-not-an-includable-module
-  it.skip("rendering from minimal controller returns response with text/plain content type", () => {});
+  it("rendering from minimal controller returns response with text/plain content type", async ({
+    task,
+  }) => {
+    const t = new RenderPlainTest(task.name);
+    await t.get("/render_plain/minimal/index");
+    t.assertContentType("text/plain; charset=utf-8");
+  });
 
   it("rendering from normal controller returns response with text/plain content type", async ({
     task,
