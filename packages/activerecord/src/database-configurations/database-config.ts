@@ -59,6 +59,7 @@ export class DatabaseConfig {
     return `#<${this.constructor.name} env_name=${this.envName} name=${this.name} adapter_class=${rendered}>`;
   }
 
+  /** @inventedArm if — CONVERGEABLE database-config-new-connection-invents-a-still-loading-arm */
   newConnection(): unknown {
     const adapterClass = this.adapterClass();
     if (adapterClass instanceof Promise) {
