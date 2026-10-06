@@ -28,28 +28,46 @@ export function teardown(this: TestHelperHost): void {
 }
 
 export class MockLogger {
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly DEBUG: number;
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly INFO: number;
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly WARN: number;
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly ERROR: number;
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly FATAL: number;
+  /** @noRailsEquivalent PERMANENT */
   declare static readonly UNKNOWN: number;
 
   private _flushCount: number;
   level: number;
   private _logged: Hash<LogLevel, unknown[]>;
 
+  /** @noRailsEquivalent PERMANENT */
   declare debug: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare info: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare warn: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare error: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare fatal: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare unknown: (message?: unknown) => void;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "debug?": boolean;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "info?": boolean;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "warn?": boolean;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "error?": boolean;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "fatal?": boolean;
+  /** @noRailsEquivalent PERMANENT */
   declare readonly "unknown?": boolean;
 
   constructor(level: number = MockLogger.DEBUG) {
