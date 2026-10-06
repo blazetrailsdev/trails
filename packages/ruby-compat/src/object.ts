@@ -879,7 +879,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
         : recv === false
           ? "false"
           : `an instance of ${rbObjClassname(recv)}`;
-  throw new NoMethodError(`undefined method '${mid}' for ${d}`, mid, {
+  throw new NoMethodError(`undefined method '${mid}' for ${d}`, mid, args, false, {
     receiver: recv,
   });
 }
