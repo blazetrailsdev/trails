@@ -55,9 +55,12 @@ export class DatabaseConfig {
     );
   }
 
-  /** @inventedArm resolve — CONVERGEABLE connection-adapters-resolve-answers-a-promise-for-an-unloaded-adapter */
   async validateBang(): Promise<true> {
-    if (this.adapter != null) this.#adapterClass = await ConnectionAdapters.resolve(this.adapter);
+    if (this.adapter != null) {
+      const adapterClass = this.adapterClass();
+      this.#adapterClass = null;
+      this.#adapterClass = await adapterClass;
+    }
 
     return true;
   }

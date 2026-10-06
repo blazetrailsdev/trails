@@ -102,6 +102,24 @@ describe("DatabaseConfigurations", () => {
       );
     });
 
+    it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
+      class TrailsFirstAdapter {}
+      class TrailsSecondAdapter {}
+      register("trails_memo_adapter", "TrailsTestAdapter", "./trails-memo-adapter.js", () =>
+        Promise.resolve(TrailsFirstAdapter as never),
+      );
+      const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
+      config.adapterClass();
+      await config.validateBang();
+      expect(config.adapterClass()).toBe(TrailsFirstAdapter);
+
+      register("trails_memo_adapter", "TrailsTestAdapter", "./trails-memo-adapter.js", () =>
+        Promise.resolve(TrailsSecondAdapter as never),
+      );
+      await config.validateBang();
+      expect(config.adapterClass()).toBe(TrailsFirstAdapter);
+    });
+
     it("inspect renders the resolved adapter class", async () => {
       class TrailsInspectAdapter {}
       register(
