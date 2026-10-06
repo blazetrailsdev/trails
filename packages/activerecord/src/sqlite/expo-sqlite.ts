@@ -181,11 +181,7 @@ class ExpoSqliteConnection implements SqliteConnection {
   }
 
   async exec(sql: string): Promise<void> {
-    try {
-      await this.raw.execAsync(sql);
-    } catch (e) {
-      rbSqlite3Raise(e);
-    }
+    await this.raw.execAsync(sql);
   }
 
   execute(sql: string, bindVars?: SqliteBinds): Promise<readonly unknown[]>;
@@ -219,11 +215,11 @@ class ExpoSqliteConnection implements SqliteConnection {
   }
 
   async pragma(source: string, opts?: { simple?: boolean }): Promise<unknown> {
+    if (source.includes("=")) {
+      await this.raw.execAsync(`PRAGMA ${source}`);
+      return [];
+    }
     try {
-      if (source.includes("=")) {
-        await this.raw.execAsync(`PRAGMA ${source}`);
-        return [];
-      }
       if (opts?.simple) {
         const row = (await this.raw.getFirstAsync(`PRAGMA ${source}`)) as
           | Record<string, unknown>

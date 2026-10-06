@@ -207,23 +207,30 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
   const readonly = (message: string) =>
     Object.assign(new Error(message), { code: "ERR_INTERNAL_SQLITE_ERROR" });
 
-  const openWith = async (native: Error) => {
+  const openWith = async (native: Error, open?: Error) => {
     vi.resetModules();
     vi.doMock("node:module", () => ({
       createRequire: () => () => ({
-        openDatabaseAsync: async () => ({
-          prepareAsync: async () => ({
-            executeAsync: async () => {
-              throw native;
-            },
-            finalizeAsync: async () => {},
-          }),
-          execAsync: async () => {
-            throw new Error("attempt to write a readonly database");
-          },
-        }),
+        openDatabaseAsync: async () => {
+          if (open) throw open;
+          return database;
+        },
       }),
     }));
+    const database = {
+      prepareAsync: async () => ({
+        executeAsync: async () => {
+          throw native;
+        },
+        executeForRawResultAsync: async () => {
+          throw native;
+        },
+        finalizeAsync: async () => {},
+      }),
+      execAsync: async () => {
+        throw new Error("attempt to write a readonly database");
+      },
+    };
     try {
       const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
       const errors = await import("./errors.js");
@@ -256,6 +263,37 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
     );
     const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
     await expect(stmt.run()).rejects.toBeInstanceOf(errors.ReadOnlyException);
+  });
+
+  it("every statement read path raises the gem class", async () => {
+    const { conn, errors } = await openWith(readonly("Error code 5: database is locked"));
+    const stmt = await conn.prepare("SELECT * FROM widgets");
+    const raises = async (fn: () => unknown) =>
+      expect(Promise.resolve().then(fn)).rejects.toBeInstanceOf(errors.BusyException);
+    await raises(() => stmt.get());
+    await raises(() => stmt.all());
+    await raises(() => stmt.toA());
+    await raises(async () => {
+      for await (const _row of stmt.iterate() as AsyncIterable<unknown>) void _row;
+    });
+  });
+
+  it("a failed open raises the gem class", async () => {
+    const native = readonly("Error code 14: unable to open database file");
+    const error = await openWith(native, native).then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(error!.name).toBe("SQLite3::CantOpenException");
+    expect(error!.cause).toBe(native);
+  });
+
+  it("reads an Android code char through its char code, masked to the primary code", async () => {
+    const { conn, errors } = await openWith(
+      readonly(`Error code ${String.fromCharCode(19)}: UNIQUE constraint failed: widgets.name`),
+    );
+    const stmt = await conn.prepare("INSERT INTO widgets (name) VALUES ('x')");
+    await expect(stmt.run()).rejects.toBeInstanceOf(errors.ConstraintException);
   });
 
   it("rethrows an exec error, whose message carries no result code", async () => {
