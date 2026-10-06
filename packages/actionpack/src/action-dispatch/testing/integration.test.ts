@@ -169,20 +169,20 @@ describe("ActionDispatch::IntegrationTest", () => {
   beforeEach(({ task }) => {
     app = new IntegrationTestWithSession(task.name);
     app.routes.draw(function () {
-      this.get("/posts/xml", { to: "posts#renderXml", as: "posts_xml" });
-      this.get("/posts/xml2", { to: "posts#renderXml2", as: "posts_xml2" });
-      this.get("/posts/html", { to: "posts#renderHtml", as: "posts_html" });
-      this.get("/posts/error", { to: "posts#serverError", as: "posts_error" });
-      this.get("/posts/redirect", { to: "posts#redirectToIndex", as: "posts_redirect" });
-      this.get("/posts/header", { to: "posts#customHeader", as: "posts_header" });
-      this.get("/posts/session", { to: "posts#readSession", as: "posts_session" });
+      this.get("/posts/xml", { to: "posts#render_xml", as: "posts_xml" });
+      this.get("/posts/xml2", { to: "posts#render_xml2", as: "posts_xml2" });
+      this.get("/posts/html", { to: "posts#render_html", as: "posts_html" });
+      this.get("/posts/error", { to: "posts#server_error", as: "posts_error" });
+      this.get("/posts/redirect", { to: "posts#redirect_to_index", as: "posts_redirect" });
+      this.get("/posts/header", { to: "posts#custom_header", as: "posts_header" });
+      this.get("/posts/session", { to: "posts#read_session", as: "posts_session" });
       this.post("/posts/create-and-redirect", {
-        to: "posts#createAndRedirect",
+        to: "posts#create_and_redirect",
         as: "posts_create_and_redirect",
       });
-      this.get("/posts/flash", { to: "posts#showFlash", as: "posts_flash" });
-      this.get("/posts/set-cookie", { to: "posts#setCookie", as: "posts_set_cookie" });
-      this.get("/posts/read-cookie", { to: "posts#readCookie", as: "posts_read_cookie" });
+      this.get("/posts/flash", { to: "posts#show_flash", as: "posts_flash" });
+      this.get("/posts/set-cookie", { to: "posts#set_cookie", as: "posts_set_cookie" });
+      this.get("/posts/read-cookie", { to: "posts#read_cookie", as: "posts_read_cookie" });
       this.resources("posts", {}, () => {
         this.resources("comments");
       });

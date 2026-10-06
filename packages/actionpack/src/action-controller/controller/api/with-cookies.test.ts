@@ -35,7 +35,7 @@ describe("WithCookiesTest", () => {
   it("with cookies", async () => {
     tc.request.cookies["foobar"] = "bazbang";
 
-    await tc.get("withCookies");
+    await tc.get("with_cookies");
 
     assertEqual("bazbang", tc.response.body);
   });

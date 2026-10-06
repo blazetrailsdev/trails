@@ -126,14 +126,14 @@ const RequestForgeryProtectionActions = {
 class RequestForgeryProtectionControllerUsingResetSession extends Base {}
 include(RequestForgeryProtectionControllerUsingResetSession, RequestForgeryProtectionActions);
 RequestForgeryProtectionControllerUsingResetSession.protectFromForgery({
-  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  only: ["index", "meta", "same_origin_js", "negotiate_same_origin"],
   with: "reset_session",
 });
 
 class RequestForgeryProtectionControllerUsingException extends Base {}
 include(RequestForgeryProtectionControllerUsingException, RequestForgeryProtectionActions);
 RequestForgeryProtectionControllerUsingException.protectFromForgery({
-  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  only: ["index", "meta", "same_origin_js", "negotiate_same_origin"],
   with: "exception",
 });
 
@@ -175,7 +175,7 @@ class RequestForgeryProtectionControllerUsingCustomStrategy extends Base {
 }
 include(RequestForgeryProtectionControllerUsingCustomStrategy, RequestForgeryProtectionActions);
 RequestForgeryProtectionControllerUsingCustomStrategy.protectFromForgery({
-  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  only: ["index", "meta", "same_origin_js", "negotiate_same_origin"],
   with: CustomStrategy,
 });
 
@@ -276,7 +276,7 @@ class CookieCsrfTokenStorageStrategyController extends Base {
 include(CookieCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
 CookieCsrfTokenStorageStrategyController.afterAction("commitToken", { only: "cookie" });
 CookieCsrfTokenStorageStrategyController.protectFromForgery({
-  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  only: ["index", "meta", "same_origin_js", "negotiate_same_origin"],
   with: "exception",
   store: "cookie",
 });
@@ -298,7 +298,7 @@ class CustomCsrfTokenStorageStrategyController extends Base {
 }
 include(CustomCsrfTokenStorageStrategyController, RequestForgeryProtectionActions);
 CustomCsrfTokenStorageStrategyController.protectFromForgery({
-  only: ["index", "meta", "sameOriginJs", "negotiateSameOrigin"],
+  only: ["index", "meta", "same_origin_js", "negotiate_same_origin"],
   with: "reset_session",
   store: new CustomCsrfTokenStorageStrategyController.CustomStrategy(),
 });
@@ -366,7 +366,7 @@ function RequestForgeryProtectionTests(
   it.skip("should render button to with token tag", () => {});
 
   it("should render form without token tag if remote", async () => {
-    await assertNotBlocked(() => tc.get("formForRemote"));
+    await assertNotBlocked(() => tc.get("form_for_remote"));
     expect(tc.response.body).not.toMatch(/authenticity_token/);
   });
 
@@ -374,7 +374,7 @@ function RequestForgeryProtectionTests(
     const original = embedAuthenticityTokenInRemoteForms;
     try {
       setEmbedAuthenticityTokenInRemoteForms(true);
-      await assertNotBlocked(() => tc.get("formForRemote"));
+      await assertNotBlocked(() => tc.get("form_for_remote"));
       expect(tc.response.body).toMatch(/authenticity_token/);
     } finally {
       setEmbedAuthenticityTokenInRemoteForms(original);
@@ -394,7 +394,7 @@ function RequestForgeryProtectionTests(
   it.skip("should render form with token tag with authenticity token requested", () => {});
 
   it("should render form with with token tag if remote", async () => {
-    await assertNotBlocked(() => tc.get("formWithRemote"));
+    await assertNotBlocked(() => tc.get("form_with_remote"));
     expect(tc.response.body).toMatch(/authenticity_token/);
   });
 
@@ -402,7 +402,7 @@ function RequestForgeryProtectionTests(
     const original = embedAuthenticityTokenInRemoteForms;
     try {
       setEmbedAuthenticityTokenInRemoteForms(false);
-      await assertNotBlocked(() => tc.get("formWithRemote"));
+      await assertNotBlocked(() => tc.get("form_with_remote"));
       expect(tc.response.body).not.toMatch(/authenticity_token/);
     } finally {
       setEmbedAuthenticityTokenInRemoteForms(original);
@@ -602,23 +602,23 @@ function RequestForgeryProtectionTests(
   });
 
   it("should only allow same origin js get with xhr header", async () => {
-    await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
-    await assertCrossOriginBlocked(() => tc.get("sameOriginJs", { format: "js" }));
+    await assertCrossOriginBlocked(() => tc.get("same_origin_js"));
+    await assertCrossOriginBlocked(() => tc.get("same_origin_js", { format: "js" }));
     await assertCrossOriginBlocked(() => {
       tc.request.accept = "text/javascript";
-      return tc.get("negotiateSameOrigin");
+      return tc.get("negotiate_same_origin");
     });
 
     await assertCrossOriginBlocked(() => {
       tc.request.accept = "application/javascript";
-      return tc.get("negotiateSameOrigin");
+      return tc.get("negotiate_same_origin");
     });
 
-    await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true }));
-    await assertCrossOriginNotBlocked(() => tc.get("sameOriginJs", { xhr: true, format: "js" }));
+    await assertCrossOriginNotBlocked(() => tc.get("same_origin_js", { xhr: true }));
+    await assertCrossOriginNotBlocked(() => tc.get("same_origin_js", { xhr: true, format: "js" }));
     await assertCrossOriginNotBlocked(() => {
       tc.request.accept = "text/javascript";
-      return tc.get("negotiateSameOrigin", { xhr: true });
+      return tc.get("negotiate_same_origin", { xhr: true });
     });
   });
 
@@ -628,7 +628,7 @@ function RequestForgeryProtectionTests(
     Base.logger = logger as never;
 
     try {
-      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+      await assertCrossOriginBlocked(() => tc.get("same_origin_js"));
 
       expect(logger.logged("warn").length).toBe(1);
       expect(logger.logged("warn").at(-1)).toMatch(
@@ -646,7 +646,7 @@ function RequestForgeryProtectionTests(
     Base.logWarningOnCsrfFailure = false;
 
     try {
-      await assertCrossOriginBlocked(() => tc.get("sameOriginJs"));
+      await assertCrossOriginBlocked(() => tc.get("same_origin_js"));
 
       expect(logger.logged("warn").length).toBe(0);
     } finally {
@@ -658,30 +658,30 @@ function RequestForgeryProtectionTests(
   it("should allow non get js without xhr header", async () => {
     initializeCsrfToken();
     await assertCrossOriginNotBlocked(() =>
-      tc.post("sameOriginJs", { params: { custom_authenticity_token: TOKEN } }),
+      tc.post("same_origin_js", { params: { custom_authenticity_token: TOKEN } }),
     );
     await assertCrossOriginNotBlocked(() =>
-      tc.post("sameOriginJs", { params: { format: "js", custom_authenticity_token: TOKEN } }),
+      tc.post("same_origin_js", { params: { format: "js", custom_authenticity_token: TOKEN } }),
     );
     await assertCrossOriginNotBlocked(() => {
       tc.request.accept = "text/javascript";
-      return tc.post("negotiateSameOrigin", { params: { custom_authenticity_token: TOKEN } });
+      return tc.post("negotiate_same_origin", { params: { custom_authenticity_token: TOKEN } });
     });
   });
 
   it("should only allow cross origin js get without xhr header if protection disabled", async () => {
-    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs"));
-    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { format: "js" }));
+    await assertCrossOriginNotBlocked(() => tc.get("cross_origin_js"));
+    await assertCrossOriginNotBlocked(() => tc.get("cross_origin_js", { format: "js" }));
     await assertCrossOriginNotBlocked(() => {
       tc.request.accept = "text/javascript";
-      return tc.get("negotiateCrossOrigin");
+      return tc.get("negotiate_cross_origin");
     });
 
-    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true }));
-    await assertCrossOriginNotBlocked(() => tc.get("crossOriginJs", { xhr: true, format: "js" }));
+    await assertCrossOriginNotBlocked(() => tc.get("cross_origin_js", { xhr: true }));
+    await assertCrossOriginNotBlocked(() => tc.get("cross_origin_js", { xhr: true, format: "js" }));
     await assertCrossOriginNotBlocked(() => {
       tc.request.accept = "text/javascript";
-      return tc.get("negotiateCrossOrigin", { xhr: true });
+      return tc.get("negotiate_cross_origin", { xhr: true });
     });
   });
 
@@ -782,7 +782,7 @@ describe("RequestForgeryProtectionControllerUsingNullSessionTest", () => {
   });
 
   it("should allow reset_session", async () => {
-    await tc.post("tryToResetSession");
+    await tc.post("try_to_reset_session");
     tc.assertResponse("ok");
   });
 });
@@ -992,7 +992,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1007,7 +1007,7 @@ describe("PerFormTokensControllerTest", () => {
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     tc.request.env["QUERY_STRING"] = "key=value";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
   });
 
@@ -1020,7 +1020,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/foo/bar<";
     const exception = await assertRaises([InvalidAuthenticityToken], {}, () =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     expect(exception.message).toMatch("Can't verify CSRF token authenticity.");
   });
@@ -1034,7 +1034,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_two";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
-      tc.post("postTwo", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_two", { params: { custom_authenticity_token: formToken } }),
     );
   });
 
@@ -1047,12 +1047,12 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
-      tc.patch("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.patch("post_one", { params: { custom_authenticity_token: formToken } }),
     );
   });
 
   it("rejects token for incorrect method button to", async () => {
-    await tc.get("buttonTo", { params: { form_method: "delete" } });
+    await tc.get("button_to", { params: { form_method: "delete" } });
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
@@ -1060,12 +1060,12 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertRaises([InvalidAuthenticityToken], {}, () =>
-      tc.patch("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.patch("post_one", { params: { custom_authenticity_token: formToken } }),
     );
   });
 
   it("Accepts proper token for implicit post method on button_to tag", async () => {
-    await tc.get("buttonTo");
+    await tc.get("button_to");
 
     const formToken = assertPresenceAndFetchFormCsrfToken();
 
@@ -1073,13 +1073,13 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
   });
 
   for (const verb of ["delete", "post", "patch"] as const) {
     it(`Accepts proper token for ${verb} method on button_to tag`, async () => {
-      await tc.get("buttonTo", { params: { form_method: verb } });
+      await tc.get("button_to", { params: { form_method: verb } });
 
       const formToken = assertPresenceAndFetchFormCsrfToken();
 
@@ -1087,7 +1087,7 @@ describe("PerFormTokensControllerTest", () => {
 
       tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
       await assertNothingRaised(() =>
-        tc[verb]("postOne", { params: { custom_authenticity_token: formToken } }),
+        tc[verb]("post_one", { params: { custom_authenticity_token: formToken } }),
       );
     });
   }
@@ -1099,7 +1099,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: token } }),
+      tc.post("post_one", { params: { custom_authenticity_token: token } }),
     );
     tc.assertResponse("success");
   });
@@ -1135,7 +1135,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: nonHmacToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: nonHmacToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1149,7 +1149,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken, baz: "foo" } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken, baz: "foo" } }),
     );
     tc.assertResponse("success");
   });
@@ -1161,7 +1161,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1173,7 +1173,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1185,7 +1185,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1197,7 +1197,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1209,7 +1209,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1221,7 +1221,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1235,7 +1235,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1247,7 +1247,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });
@@ -1259,7 +1259,7 @@ describe("PerFormTokensControllerTest", () => {
 
     tc.request.env["PATH_INFO"] = "/per_form_tokens/post_one/";
     await assertNothingRaised(() =>
-      tc.post("postOne", { params: { custom_authenticity_token: formToken } }),
+      tc.post("post_one", { params: { custom_authenticity_token: formToken } }),
     );
     tc.assertResponse("success");
   });

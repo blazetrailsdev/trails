@@ -42,11 +42,11 @@ async function dispatch(action: string): Promise<unknown> {
 
 describe("FIXTURE_LOAD_PATH", () => {
   it("renders a template inside a fixture layout", async () => {
-    expect(await dispatch("helloWorldWithLayout")).toBe("<html>Hello world!</html>\n");
+    expect(await dispatch("hello_world_with_layout")).toBe("<html>Hello world!</html>\n");
   });
 
   it("renders through a fixture helper module", async () => {
-    expect(await dispatch("renderHelloWorld")).toBe("hello: Iz guuut!");
+    expect(await dispatch("render_hello_world")).toBe("hello: Iz guuut!");
   });
 });
 

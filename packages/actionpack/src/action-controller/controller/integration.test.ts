@@ -455,7 +455,7 @@ describe("IntegrationProcessTest", () => {
     await t.withTestRouteSet(async () => {
       t.cookies.set("cookie_1", "sugar");
       t.cookies.set("cookie_2", "oatmeal");
-      await t.get("/cookieMonster");
+      await t.get("/cookie_monster");
       assertSetCookieHeader(
         "cookie_1=; path=/\ncookie_3=chocolate; path=/",
         t.headers!.get("Set-Cookie"),
@@ -470,13 +470,13 @@ describe("IntegrationProcessTest", () => {
 
   it("cookie persist to next request", async () => {
     await t.withTestRouteSet(async () => {
-      await t.get("/setCookie");
+      await t.get("/set_cookie");
       assertResponse("success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
-      await t.get("/getCookie");
+      await t.get("/get_cookie");
       assertResponse("success");
       expect(t.body).toBe("bar");
 
@@ -489,13 +489,13 @@ describe("IntegrationProcessTest", () => {
     await t.withTestRouteSet(async () => {
       t.hostBang("37s.backpack.test");
 
-      await t.get("/setCookie");
+      await t.get("/set_cookie");
       assertResponse("success");
 
       expect(t.headers!.get("Set-Cookie")).toBe("foo=bar; path=/");
       expect(t.cookies.toHash()).toEqual({ foo: "bar" });
 
-      await t.get("/getCookie");
+      await t.get("/get_cookie");
       assertResponse("success");
       expect(t.body).toBe("bar");
 
@@ -598,9 +598,9 @@ describe("IntegrationProcessTest", () => {
 
   it("get with query string", async () => {
     await t.withTestRouteSet(async () => {
-      await t.get("/getWithParams?foo=bar");
-      expect(t.request.env["REQUEST_URI"]).toBe("/getWithParams?foo=bar");
-      expect(t.request.fullpath).toBe("/getWithParams?foo=bar");
+      await t.get("/get_with_params?foo=bar");
+      expect(t.request.env["REQUEST_URI"]).toBe("/get_with_params?foo=bar");
+      expect(t.request.fullpath).toBe("/get_with_params?foo=bar");
       expect(t.request.env["QUERY_STRING"]).toBe("foo=bar");
       expect(t.request.queryString).toBe("foo=bar");
       expect(t.request.parameters["foo"]).toBe("bar");
@@ -612,9 +612,9 @@ describe("IntegrationProcessTest", () => {
 
   it("get with parameters", async () => {
     await t.withTestRouteSet(async () => {
-      await t.get("/getWithParams", { params: { foo: "bar" } });
-      expect(t.request.env["PATH_INFO"]).toBe("/getWithParams");
-      expect(t.request.pathInfo).toBe("/getWithParams");
+      await t.get("/get_with_params", { params: { foo: "bar" } });
+      expect(t.request.env["PATH_INFO"]).toBe("/get_with_params");
+      expect(t.request.pathInfo).toBe("/get_with_params");
       expect(t.request.env["QUERY_STRING"]).toBe("foo=bar");
       expect(t.request.queryString).toBe("foo=bar");
       expect(t.request.parameters["foo"]).toBe("bar");
@@ -628,7 +628,7 @@ describe("IntegrationProcessTest", () => {
     await t.withTestRouteSet(async () => {
       await t.post("/post", { params: { leaks: "does-leak?" } });
 
-      await t.get("/getWithParams", { params: { foo: "bar" } });
+      await t.get("/get_with_params", { params: { foo: "bar" } });
 
       const input = t.request.env["rack.input"] as { read(): string } | null | undefined;
       expect(input == null || input.read() === "").toBeTruthy();
@@ -718,7 +718,7 @@ describe("IntegrationProcessTest", () => {
   it("respect removal of default headers by a controller action", async () => {
     await t.withTestRouteSet(async () => {
       await t.withDefaultHeaders({ a: "1", b: "2" }, async () => {
-        await t.get("/removeHeader", { params: { header: "a" } });
+        await t.get("/remove_header", { params: { header: "a" } });
       });
     });
 
@@ -759,7 +759,7 @@ describe("IntegrationProcessTest", () => {
 
   it("not setting vary header when it has already been set", async () => {
     await t.withTestRouteSet(async () => {
-      await t.get("/getWithVarySetXRequestedWith", {
+      await t.get("/get_with_vary_set_x_requested_with", {
         headers: { Accept: "application/json" },
         xhr: true,
       });

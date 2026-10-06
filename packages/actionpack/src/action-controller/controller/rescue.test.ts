@@ -258,7 +258,7 @@ describe("RescueControllerTest", () => {
       },
     });
     const c = new C();
-    await c.dispatch("notAuthorized", makeRequest(), makeResponse());
+    await c.dispatch("not_authorized", makeRequest(), makeResponse());
     expect(c.status).toBe(403);
   });
 

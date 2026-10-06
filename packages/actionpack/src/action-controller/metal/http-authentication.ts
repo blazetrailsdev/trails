@@ -77,7 +77,7 @@ export namespace HttpAuthentication {
         return this.authenticateOrRequestWithHttpBasic(
           realm,
           message,
-          (givenName: string, givenPassword: string): boolean => {
+          (givenName: string | undefined, givenPassword: string | undefined): boolean => {
             return (
               (Number(SecurityUtils.secureCompare(String(givenName ?? ""), name)) &
                 Number(SecurityUtils.secureCompare(String(givenPassword ?? ""), password))) ===
@@ -91,7 +91,7 @@ export namespace HttpAuthentication {
         this: BasicController,
         realm: string | null | undefined,
         message: string | null | undefined,
-        loginProcedure: (userName: string, password: string) => T,
+        loginProcedure: (userName: string | undefined, password: string | undefined) => T,
       ): T | string {
         const authenticated = this.authenticateWithHttpBasic(loginProcedure) as T | undefined;
         return authenticated != null && authenticated !== false
@@ -101,7 +101,7 @@ export namespace HttpAuthentication {
 
       export function authenticateWithHttpBasic<T>(
         this: BasicController,
-        loginProcedure: (userName: string, password: string) => T,
+        loginProcedure: (userName: string | undefined, password: string | undefined) => T,
       ): T | undefined {
         return HttpAuthentication.Basic.authenticate(this.request, loginProcedure);
       }
@@ -117,10 +117,10 @@ export namespace HttpAuthentication {
 
     export function authenticate<T>(
       request: Request,
-      loginProcedure: (userName: string, password: string) => T,
+      loginProcedure: (userName: string | undefined, password: string | undefined) => T,
     ): T | undefined {
       if (hasBasicCredentials(request)) {
-        return loginProcedure(...(userNameAndPassword(request) as [string, string]));
+        return Reflect.apply(loginProcedure, undefined, userNameAndPassword(request));
       }
     }
 

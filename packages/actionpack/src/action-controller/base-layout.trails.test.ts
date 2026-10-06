@@ -41,7 +41,7 @@ describe("ActionController::Base#renderAsync layout", () => {
   });
 
   it("raises MissingTemplate for an explicit layout that does not exist", async () => {
-    await expect(dispatch(new DefaultLayoutController(), "withNofile")).rejects.toBeInstanceOf(
+    await expect(dispatch(new DefaultLayoutController(), "with_nofile")).rejects.toBeInstanceOf(
       MissingTemplate,
     );
   });

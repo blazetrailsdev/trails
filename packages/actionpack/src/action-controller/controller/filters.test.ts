@@ -93,7 +93,7 @@ class FT_ChangingTheRequirementsController extends FT_TestController {
     await this.render({ plain: "gobble" });
   }
 }
-FT_ChangingTheRequirementsController.beforeAction("ensureLogin", { except: ["goWild"] });
+FT_ChangingTheRequirementsController.beforeAction("ensureLogin", { except: ["go_wild"] });
 
 class FT_TestMultipleFiltersController extends Base {}
 FT_TestMultipleFiltersController.beforeAction("try1");
@@ -222,7 +222,7 @@ class FT_ConditionalSkippingController extends FT_TestController {
 }
 FT_ConditionalSkippingController.skipBeforeAction("ensureLogin", { only: ["login"] });
 FT_ConditionalSkippingController.skipAfterAction("cleanUp", { only: ["login"] });
-FT_ConditionalSkippingController.beforeAction("findUser", { only: ["changePassword"] });
+FT_ConditionalSkippingController.beforeAction("findUser", { only: ["change_password"] });
 
 class FT_AroundFilter {
   executionLog?: string;
@@ -416,7 +416,7 @@ class FT_ConditionalFilterController extends Base {
 
 class FT_ConditionalCollectionFilterController extends FT_ConditionalFilterController {}
 FT_ConditionalCollectionFilterController.beforeAction(push("ensure_login"), {
-  except: ["showWithoutAction", "anotherAction"],
+  except: ["show_without_action", "another_action"],
 });
 
 class FT_OnlyConditionSymController extends FT_ConditionalFilterController {}
@@ -424,7 +424,7 @@ FT_OnlyConditionSymController.beforeAction(push("ensure_login"), { only: ["show"
 
 class FT_ExceptConditionSymController extends FT_ConditionalFilterController {}
 FT_ExceptConditionSymController.beforeAction(push("ensure_login"), {
-  except: ["showWithoutAction"],
+  except: ["show_without_action"],
 });
 
 class FT_BeforeAndAfterConditionController extends FT_ConditionalFilterController {}
@@ -444,7 +444,7 @@ FT_ExceptConditionProcController.beforeAction(
   (c) => {
     ivars(c).ranProcAction = true;
   },
-  { except: ["showWithoutAction"] },
+  { except: ["show_without_action"] },
 );
 
 class FT_OnlyConditionClassController extends FT_ConditionalFilterController {}
@@ -460,30 +460,30 @@ FT_ExceptConditionClassController.beforeAction(
   (c) => {
     ivars(c).ranClassAction = true;
   },
-  { except: ["showWithoutAction"] },
+  { except: ["show_without_action"] },
 );
 
 class FT_AnomalousYetValidConditionController extends FT_ConditionalFilterController {}
 FT_AnomalousYetValidConditionController.beforeAction(push("ensure_login"), {
-  except: ["showWithoutAction"],
+  except: ["show_without_action"],
 });
 FT_AnomalousYetValidConditionController.beforeAction(
   (c) => {
     ivars(c).ranClassAction = true;
   },
-  { except: ["showWithoutAction"] },
+  { except: ["show_without_action"] },
 );
 FT_AnomalousYetValidConditionController.beforeAction(
   (c) => {
     ivars(c).ranProcAction1 = true;
   },
-  { except: ["showWithoutAction"] },
+  { except: ["show_without_action"] },
 );
 FT_AnomalousYetValidConditionController.beforeAction(
   (c) => {
     ivars(c).ranProcAction2 = true;
   },
-  { except: ["showWithoutAction"] },
+  { except: ["show_without_action"] },
 );
 
 class FT_OnlyConditionalOptionsFilter extends FT_ConditionalFilterController {}
@@ -554,18 +554,18 @@ class FT_ConditionalParentOfConditionalSkippingController extends FT_Conditional
   }
 }
 FT_ConditionalParentOfConditionalSkippingController.beforeAction("conditionalInParentBefore", {
-  only: ["show", "anotherAction"],
+  only: ["show", "another_action"],
 });
 FT_ConditionalParentOfConditionalSkippingController.afterAction("conditionalInParentAfter", {
-  only: ["show", "anotherAction"],
+  only: ["show", "another_action"],
 });
 
 class FT_ChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
 FT_ChildOfConditionalParentController.skipBeforeAction("conditionalInParentBefore", {
-  only: "anotherAction",
+  only: "another_action",
 });
 FT_ChildOfConditionalParentController.skipAfterAction("conditionalInParentAfter", {
-  only: "anotherAction",
+  only: "another_action",
 });
 
 class FT_AnotherChildOfConditionalParentController extends FT_ConditionalParentOfConditionalSkippingController {}
@@ -666,7 +666,7 @@ describe("FilterTest", () => {
     expect(ivars(c1).ranClassAction).toBe(true);
     expect(ivars(c1).ranProcAction1).toBe(true);
     expect(ivars(c1).ranProcAction2).toBe(true);
-    const c2 = await run(new FT_AnomalousYetValidConditionController(), "showWithoutAction");
+    const c2 = await run(new FT_AnomalousYetValidConditionController(), "show_without_action");
     expect(ivars(c2).ranFilter).toBeUndefined();
     expect(ivars(c2).ranClassAction).toBeUndefined();
     expect(ivars(c2).ranProcAction1).toBeUndefined();
@@ -705,40 +705,40 @@ describe("FilterTest", () => {
       "ensure_login",
     ]);
     expect(
-      (await run(new FT_ConditionalCollectionFilterController(), "showWithoutAction")).ranFilter,
+      (await run(new FT_ConditionalCollectionFilterController(), "show_without_action")).ranFilter,
     ).toBeUndefined();
     expect(
-      (await run(new FT_ConditionalCollectionFilterController(), "anotherAction")).ranFilter,
+      (await run(new FT_ConditionalCollectionFilterController(), "another_action")).ranFilter,
     ).toBeUndefined();
   });
 
   it("running only condition actions", async () => {
     expect((await run(new FT_OnlyConditionSymController())).ranFilter).toEqual(["ensure_login"]);
     expect(
-      (await run(new FT_OnlyConditionSymController(), "showWithoutAction")).ranFilter,
+      (await run(new FT_OnlyConditionSymController(), "show_without_action")).ranFilter,
     ).toBeUndefined();
     expect((await run(new FT_OnlyConditionProcController())).ranProcAction).toBe(true);
     expect(
-      (await run(new FT_OnlyConditionProcController(), "showWithoutAction")).ranProcAction,
+      (await run(new FT_OnlyConditionProcController(), "show_without_action")).ranProcAction,
     ).toBeUndefined();
     expect((await run(new FT_OnlyConditionClassController())).ranClassAction).toBe(true);
     expect(
-      (await run(new FT_OnlyConditionClassController(), "showWithoutAction")).ranClassAction,
+      (await run(new FT_OnlyConditionClassController(), "show_without_action")).ranClassAction,
     ).toBeUndefined();
   });
 
   it("running except condition actions", async () => {
     expect((await run(new FT_ExceptConditionSymController())).ranFilter).toEqual(["ensure_login"]);
     expect(
-      (await run(new FT_ExceptConditionSymController(), "showWithoutAction")).ranFilter,
+      (await run(new FT_ExceptConditionSymController(), "show_without_action")).ranFilter,
     ).toBeUndefined();
     expect((await run(new FT_ExceptConditionProcController())).ranProcAction).toBe(true);
     expect(
-      (await run(new FT_ExceptConditionProcController(), "showWithoutAction")).ranProcAction,
+      (await run(new FT_ExceptConditionProcController(), "show_without_action")).ranProcAction,
     ).toBeUndefined();
     expect((await run(new FT_ExceptConditionClassController())).ranClassAction).toBe(true);
     expect(
-      (await run(new FT_ExceptConditionClassController(), "showWithoutAction")).ranClassAction,
+      (await run(new FT_ExceptConditionClassController(), "show_without_action")).ranClassAction,
     ).toBeUndefined();
   });
 
@@ -752,7 +752,7 @@ describe("FilterTest", () => {
     const c1 = await run(new FT_BeforeAndAfterConditionController());
     expect(ivars(c1).ranFilter).toEqual(["ensure_login", "clean_up_tmp"]);
     expect(
-      (await run(new FT_BeforeAndAfterConditionController(), "showWithoutAction")).ranFilter,
+      (await run(new FT_BeforeAndAfterConditionController(), "show_without_action")).ranFilter,
     ).toBeUndefined();
   });
 
@@ -864,12 +864,12 @@ describe("FilterTest", () => {
   it("conditional skipping of actions", async () => {
     await testProcess(FT_ConditionalSkippingController, "login");
     expect("ranFilter" in tc.controller).toBe(false);
-    await testProcess(FT_ConditionalSkippingController, "changePassword");
+    await testProcess(FT_ConditionalSkippingController, "change_password");
     expect(ivars(tc.controller).ranFilter).toEqual(["ensure_login", "find_user"]);
 
     await testProcess(FT_ConditionalSkippingController, "login");
     expect("ranAfterAction" in tc.controller).toBe(false);
-    await testProcess(FT_ConditionalSkippingController, "changePassword");
+    await testProcess(FT_ConditionalSkippingController, "change_password");
     expect(ivars(tc.controller).ranAfterAction).toEqual(["clean_up"]);
   });
 
@@ -879,7 +879,7 @@ describe("FilterTest", () => {
       "conditional_in_parent_before",
       "conditional_in_parent_after",
     ]);
-    await testProcess(FT_ChildOfConditionalParentController, "anotherAction");
+    await testProcess(FT_ChildOfConditionalParentController, "another_action");
     expect("ranFilter" in tc.controller).toBe(false);
   });
 
@@ -899,7 +899,7 @@ describe("FilterTest", () => {
   });
 
   it("changing the requirements", async () => {
-    await testProcess(FT_ChangingTheRequirementsController, "goWild");
+    await testProcess(FT_ChangingTheRequirementsController, "go_wild");
     expect("ranFilter" in tc.controller).toBe(false);
   });
 
@@ -975,9 +975,9 @@ class ControllerWithSymbolAsFilter extends PostsController {
     return wtf + 1;
   }
 }
-ControllerWithSymbolAsFilter.aroundAction("raiseBefore", { only: "raisesBefore" });
-ControllerWithSymbolAsFilter.aroundAction("raiseAfter", { only: "raisesAfter" });
-ControllerWithSymbolAsFilter.aroundAction("withoutException", { only: "noRaise" });
+ControllerWithSymbolAsFilter.aroundAction("raiseBefore", { only: "raises_before" });
+ControllerWithSymbolAsFilter.aroundAction("raiseAfter", { only: "raises_after" });
+ControllerWithSymbolAsFilter.aroundAction("withoutException", { only: "no_raise" });
 
 class ControllerWithFilterClass extends PostsController {
   static YieldingFilter = class YieldingFilter {
@@ -988,7 +988,7 @@ class ControllerWithFilterClass extends PostsController {
   };
 }
 ControllerWithFilterClass.aroundAction(ControllerWithFilterClass.YieldingFilter, {
-  only: "raisesAfter",
+  only: "raises_after",
 });
 
 class ControllerWithFilterInstance extends PostsController {
@@ -1000,7 +1000,7 @@ class ControllerWithFilterInstance extends PostsController {
   };
 }
 ControllerWithFilterInstance.aroundAction(new ControllerWithFilterInstance.YieldingFilter(), {
-  only: "raisesAfter",
+  only: "raises_after",
 });
 
 class ControllerWithProcFilter extends PostsController {}
@@ -1010,12 +1010,12 @@ ControllerWithProcFilter.aroundAction(
     await b();
     ivars(c).after = true;
   },
-  { only: "noRaise" },
+  { only: "no_raise" },
 );
 
 class ControllerWithNestedFilters extends ControllerWithSymbolAsFilter {}
 ControllerWithNestedFilters.aroundAction("raiseBefore", "raiseAfter", "withoutException", {
-  only: "raisesBoth",
+  only: "raises_both",
 });
 
 class ControllerWithAllTypesOfFilters extends PostsController {
@@ -1056,34 +1056,34 @@ describe("YieldingAroundFiltersTest", () => {
 
   it("base", async () => {
     const controller = PostsController;
-    await assertNothingRaised(() => testProcess(controller, "noRaise"));
-    await assertNothingRaised(() => testProcess(controller, "raisesBefore"));
-    await assertNothingRaised(() => testProcess(controller, "raisesAfter"));
-    await assertNothingRaised(() => testProcess(controller, "noAction"));
+    await assertNothingRaised(() => testProcess(controller, "no_raise"));
+    await assertNothingRaised(() => testProcess(controller, "raises_before"));
+    await assertNothingRaised(() => testProcess(controller, "raises_after"));
+    await assertNothingRaised(() => testProcess(controller, "no_action"));
   });
 
   it("with symbol", async () => {
     const controller = ControllerWithSymbolAsFilter;
-    await assertNothingRaised(() => testProcess(controller, "noRaise"));
-    await assertRaises([Before], {}, () => testProcess(controller, "raisesBefore"));
-    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
-    await assertNothingRaised(() => testProcess(controller, "noRaise"));
+    await assertNothingRaised(() => testProcess(controller, "no_raise"));
+    await assertRaises([Before], {}, () => testProcess(controller, "raises_before"));
+    await assertRaises([After], {}, () => testProcess(controller, "raises_after"));
+    await assertNothingRaised(() => testProcess(controller, "no_raise"));
   });
 
   it("with class", async () => {
     const controller = ControllerWithFilterClass;
-    await assertNothingRaised(() => testProcess(controller, "noRaise"));
-    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
+    await assertNothingRaised(() => testProcess(controller, "no_raise"));
+    await assertRaises([After], {}, () => testProcess(controller, "raises_after"));
   });
 
   it("with instance", async () => {
     const controller = ControllerWithFilterInstance;
-    await assertNothingRaised(() => testProcess(controller, "noRaise"));
-    await assertRaises([After], {}, () => testProcess(controller, "raisesAfter"));
+    await assertNothingRaised(() => testProcess(controller, "no_raise"));
+    await assertRaises([After], {}, () => testProcess(controller, "raises_after"));
   });
 
   it("with proc", async () => {
-    await testProcess(ControllerWithProcFilter, "noRaise");
+    await testProcess(ControllerWithProcFilter, "no_raise");
     expect(ivars(tc.controller).before).toBeTruthy();
     expect(ivars(tc.controller).after).toBeTruthy();
   });
@@ -1092,14 +1092,14 @@ describe("YieldingAroundFiltersTest", () => {
     const controller = ControllerWithNestedFilters;
     await assertNothingRaised(async () => {
       try {
-        await testProcess(controller, "raisesBoth");
+        await testProcess(controller, "raises_both");
       } catch (e) {
         if (!(e instanceof Before || e instanceof After)) throw e;
       }
     });
     await assertRaises([Before], {}, async () => {
       try {
-        await testProcess(controller, "raisesBoth");
+        await testProcess(controller, "raises_both");
       } catch (e) {
         if (!(e instanceof After)) throw e;
       }
@@ -1107,14 +1107,14 @@ describe("YieldingAroundFiltersTest", () => {
   });
 
   it("action order with all action types", async () => {
-    await testProcess(ControllerWithAllTypesOfFilters, "noRaise");
+    await testProcess(ControllerWithAllTypesOfFilters, "no_raise");
     expect(ivars(tc.controller).ranFilter!.join(" ")).toBe(
       "before around (before yield) around_again (before yield) around_again (after yield) after around (after yield)",
     );
   });
 
   it("action order with skip action method", async () => {
-    await testProcess(ControllerWithTwoLessFilters, "noRaise");
+    await testProcess(ControllerWithTwoLessFilters, "no_raise");
     expect(ivars(tc.controller).ranFilter!.join(" ")).toBe(
       "before around (before yield) around (after yield)",
     );

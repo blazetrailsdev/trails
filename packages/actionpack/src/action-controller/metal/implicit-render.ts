@@ -1,4 +1,3 @@
-import { underscore } from "@blazetrails/activesupport";
 import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
@@ -37,13 +36,13 @@ export interface ImplicitRenderHost {
 export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
   const name = this.constructor.name;
   if (
-    this.templateExists?.(underscore(String(this.actionName)), this._prefixes?.(), false, [], {
+    this.templateExists?.(String(this.actionName), this._prefixes?.(), false, [], {
       variants: variantsFor(this.request?.variant),
     })
   ) {
     return this.render();
   }
-  if (this.isAnyTemplates?.(underscore(String(this.actionName)), this._prefixes?.())) {
+  if (this.isAnyTemplates?.(String(this.actionName), this._prefixes?.())) {
     const message =
       `${name}#${this.actionName} is missing a template ` +
       "for this request format and variant.\n" +
@@ -72,8 +71,7 @@ export function methodForAction(this: ImplicitRenderHost, actionName: string): s
     | string
     | undefined;
   if (sup) return sup;
-  if (this.templateExists?.(underscore(String(actionName)), this._prefixes?.()))
-    return "defaultRender";
+  if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
   return undefined;
 }
 

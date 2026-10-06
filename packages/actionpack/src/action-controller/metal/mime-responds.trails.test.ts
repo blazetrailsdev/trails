@@ -261,7 +261,7 @@ describe("ActionView::Rendering#_process_format", () => {
       HTTP_HOST: "localhost",
       HTTP_ACCEPT: "*/*",
     });
-    await controller.dispatch("jsonOrHtml", request, new Response());
+    await controller.dispatch("json_or_html", request, new Response());
 
     expect(controller.lookupContext.formats).toEqual([":json"]);
     expect(controller.response.mediaType).toBe("application/json");

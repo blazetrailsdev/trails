@@ -37,7 +37,7 @@ class LogSubscribersController extends Base {
       }),
     );
 
-    this.beforeAction("redirector", { only: "neverExecuted" });
+    this.beforeAction("redirector", { only: "never_executed" });
   }
 
   lastPayload!: Record<string, unknown>;
@@ -260,14 +260,14 @@ describe("ACLogSubscriberTest", () => {
 
   it("process action with throw", async () => {
     await kernelCatch(":halt", async () => {
-      await controller.get("withThrow");
+      await controller.get("with_throw");
     });
     assertMatch(/Completed {3}in \d+ms/, logs[1]);
   });
 
   it("append info to payload is called even with exception", async () => {
     try {
-      await controller.get("withException");
+      await controller.get("with_exception");
     } catch (e) {
       if (!(e instanceof Exception)) throw e;
     }
@@ -302,7 +302,7 @@ describe("ACLogSubscriberTest", () => {
 
   it("filter redirect url by string", async () => {
     controller.request.env["action_dispatch.redirect_filter"] = ["secret"];
-    await controller.get("filterableRedirector");
+    await controller.get("filterable_redirector");
 
     assertEqual(3, logs.length);
     assertEqual("Redirected to [FILTERED]", logs[1]);
@@ -310,14 +310,14 @@ describe("ACLogSubscriberTest", () => {
 
   it("filter redirect url by regexp", async () => {
     controller.request.env["action_dispatch.redirect_filter"] = [/secret\.foo.+/];
-    await controller.get("filterableRedirector");
+    await controller.get("filterable_redirector");
 
     assertEqual(3, logs.length);
     assertEqual("Redirected to [FILTERED]", logs[1]);
   });
 
   it("does not filter redirect params by default", async () => {
-    await controller.get("filterableRedirectorWithParams");
+    await controller.get("filterable_redirector_with_params");
 
     assertEqual(3, logs.length);
     assertEqual("Redirected to http://secret.foo.bar?username=repinel&password=1234", logs[1]);
@@ -325,7 +325,7 @@ describe("ACLogSubscriberTest", () => {
 
   it("filter redirect params by string", async () => {
     controller.request.env["action_dispatch.parameter_filter"] = ["password"];
-    await controller.get("filterableRedirectorWithParams");
+    await controller.get("filterable_redirector_with_params");
 
     assertEqual(3, logs.length);
     assertEqual(
@@ -336,7 +336,7 @@ describe("ACLogSubscriberTest", () => {
 
   it("filter redirect params by regexp", async () => {
     controller.request.env["action_dispatch.parameter_filter"] = [/pass.+/];
-    await controller.get("filterableRedirectorWithParams");
+    await controller.get("filterable_redirector_with_params");
 
     assertEqual(3, logs.length);
     assertEqual(
@@ -348,7 +348,7 @@ describe("ACLogSubscriberTest", () => {
   it("filter redirect bad uri", async () => {
     controller.request.env["action_dispatch.parameter_filter"] = [/pass.+/];
 
-    await controller.get("filterableRedirectorBadUri");
+    await controller.get("filterable_redirector_bad_uri");
 
     assertEqual(3, logs.length);
     assertEqual("Redirected to [FILTERED]", logs[1]);
@@ -366,7 +366,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache", async () => {
-    await controller.get("withFragmentCache");
+    await controller.get("with_fragment_cache");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -375,18 +375,18 @@ describe("ACLogSubscriberTest", () => {
 
   it("with fragment cache when log disabled", async () => {
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = false;
-    await controller.get("withFragmentCache");
+    await controller.get("with_fragment_cache");
 
     expect(logs.length).toBe(2);
     expect(logs[0]).toBe(
-      "Processing by Another::LogSubscribersController#withFragmentCache as HTML",
+      "Processing by Another::LogSubscribersController#with_fragment_cache as HTML",
     );
     expect(logs[1]).toMatch(/Completed 200 OK in \d+ms/);
     (Base as unknown as CachingClassMethods).enableFragmentCacheLogging = true;
   });
 
   it("with fragment cache if with true", async () => {
-    await controller.get("withFragmentCacheIfWithTrueCondition");
+    await controller.get("with_fragment_cache_if_with_true_condition");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -394,7 +394,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache if with false", async () => {
-    await controller.get("withFragmentCacheIfWithFalseCondition");
+    await controller.get("with_fragment_cache_if_with_false_condition");
 
     expect(logs.length).toBe(2);
     expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
@@ -402,7 +402,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache unless with true", async () => {
-    await controller.get("withFragmentCacheUnlessWithTrueCondition");
+    await controller.get("with_fragment_cache_unless_with_true_condition");
 
     expect(logs.length).toBe(2);
     expect(logs[1]).not.toMatch(/Read fragment views\/foo/);
@@ -410,7 +410,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache unless with false", async () => {
-    await controller.get("withFragmentCacheUnlessWithFalseCondition");
+    await controller.get("with_fragment_cache_unless_with_false_condition");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
@@ -418,7 +418,7 @@ describe("ACLogSubscriberTest", () => {
   });
 
   it("with fragment cache and percent in key", async () => {
-    await controller.get("withFragmentCacheAndPercentInKey");
+    await controller.get("with_fragment_cache_and_percent_in_key");
 
     expect(logs.length).toBe(4);
     expect(logs[1]).toMatch(/Read fragment views\/foo/);
