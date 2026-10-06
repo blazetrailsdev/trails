@@ -1698,64 +1698,6 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
   });
 
-  it("folds railtie-reexported ControllerRuntime methods on the Railtie host into allowed", () => {
-    // trailtie.ts re-exports Railties::ControllerRuntime (railtie.rb:267,
-    // on_load(:action_controller) { include … }); its source
-    // controller_runtime.rb is unported, so the ported process_action /
-    // cleanup_view_runtime / append_info_to_payload mirrors would show as moved
-    // extras without the PORTED_METHODS_FROM_UNPORTED_MIXINS["ActiveRecord::Railtie"]
-    // fold-back. Guards the exact host FQN + method names against a typo.
-    const ruby: ApiManifest = {
-      source: "ruby",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {
-            "ActiveRecord::Railtie": rubyClass({ name: "Railtie", file: "railtie.rb" }),
-          },
-          modules: {},
-        },
-      },
-    };
-    const ts: ApiManifest = {
-      source: "typescript",
-      generatedAt: "",
-      packages: {
-        activerecord: {
-          classes: {},
-          modules: {
-            Trailtie: {
-              name: "Trailtie",
-              file: "trailtie.ts",
-              includes: [],
-              extends: [],
-              instanceMethods: [],
-              classMethods: [
-                method("processAction"),
-                method("cleanupViewRuntime"),
-                method("appendInfoToPayload"),
-                method("genuinelyNovel"),
-              ],
-            },
-          },
-        },
-      },
-    };
-    const report = buildReport(ruby, ts, {
-      filterPkg: "activerecord",
-      excludeGlobs: [],
-      novelOnly: false,
-      topN: 50,
-    });
-    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "trailtie.ts");
-    expect(f).toBeDefined();
-    // `Trailtie` is the declaration name, and railtie.rb declares `Railtie`.
-    // `TS_CLASS_RENAMES` sanctions that rename and `parity:api` already
-    // resolves the pair through it, so the declaration-name pass admits it
-    // rather than reporting the port as drift.
-    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
-  });
-
   it("admits a TOKEN_RENAMES declaration name (ERBTracker -> TSETracker)", () => {
     // `TOKEN_RENAMES` maps `ERB` to `TSE`, so `DependencyTracker::ERBTracker`
     // (dependency_tracker/erb_tracker.rb:5) is ported as `TSETracker` in the

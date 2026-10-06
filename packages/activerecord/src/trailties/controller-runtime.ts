@@ -1,4 +1,4 @@
-import { included, initialize, pluralize, toF } from "@blazetrails/activesupport";
+import { attrInternal, included, initialize, pluralize, toF } from "@blazetrails/activesupport";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 interface ControllerRuntimeHost {
@@ -90,12 +90,9 @@ export function appendInfoToPayload(
   payload["cached_queries_count"] = RuntimeRegistry.resetCachedQueriesCount();
 }
 
-export const ControllerRuntime = {
-  processAction,
-  cleanupViewRuntime,
-  appendInfoToPayload,
-
-  [included](klass: unknown): void {
+export class ControllerRuntime {
+  /** @noRailsEquivalent CONVERGEABLE controller-runtime-supers-map-onto-module-super */
+  static [included](klass: unknown): void {
     const base = klass as ControllerClass;
     const proto = base.prototype as Record<string, unknown>;
     for (
@@ -115,9 +112,10 @@ export const ControllerRuntime = {
     supers.set(base, supers.get(proto)!);
     Object.assign(proto, { processAction, cleanupViewRuntime, appendInfoToPayload });
     base.logProcessAction = logProcessAction;
-  },
+  }
 
-  [initialize](this: ControllerRuntimeHost): void {
+  static [initialize](this: ControllerRuntimeHost): void {
     this.dbRuntime = null;
-  },
-};
+  }
+}
+attrInternal.call(ControllerRuntime.prototype, "dbRuntime");
