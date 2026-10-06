@@ -680,7 +680,13 @@ function renderSite(
     if (!keys.includes("locals")) return undefined;
     const named = option(first, "template") ?? option(first, "action");
     return {
-      template: named && ts.isStringLiteral(named) ? named.text : undefined,
+      template: named
+        ? ts.isStringLiteral(named)
+          ? named.text
+          : undefined
+        : inController
+          ? actionName(call)
+          : undefined,
       locals: option(first, "locals"),
     };
   }
@@ -694,6 +700,16 @@ function renderSite(
     };
   }
   return "unknown";
+}
+
+function actionName(call: ts.CallExpression): string | undefined {
+  const method = ts.findAncestor(call.parent, ts.isFunctionLike);
+  return method &&
+    ts.isMethodDeclaration(method) &&
+    ts.isClassDeclaration(method.parent) &&
+    ts.isIdentifier(method.name)
+    ? underscore(method.name.text)
+    : undefined;
 }
 
 function localVariable({ name }: { name: string }): string | undefined {
