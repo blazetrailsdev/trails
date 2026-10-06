@@ -12,6 +12,21 @@ describe("rbEqual over the values a Ruby binary String stands in for", () => {
     expect(rbEqual(new Uint8Array([0x80]), "")).toBe(false);
   });
 
+  it("answers false for a byte string against a non-String, and asks a to_str responder", () => {
+    class Bytes extends Uint8Array {
+      equals(): boolean {
+        throw new Error("not a byte string");
+      }
+    }
+    const bytes = Bytes.from([0x62, 0x6f]);
+    expect(rbEqual(bytes, { other: true })).toBe(false);
+    expect(rbEqual(bytes, 5)).toBe(false);
+    expect(rbEqual(bytes, new Uint8Array([0x62, 0x6f]))).toBe(true);
+    const data = { toStr: () => bytes, equals: (other: unknown) => other === bytes };
+    expect(rbEqual(bytes, data)).toBe(true);
+    expect(rbEql(bytes, data)).toBe(false);
+  });
+
   it("compares a String with a binary String only where both are 7-bit", () => {
     expect(rbEqual("1", new Uint8Array([0x31]))).toBe(true);
     expect(rbEqual(new Uint8Array([0x31]), "1")).toBe(true);

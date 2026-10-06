@@ -9,7 +9,7 @@ import type { MessageSerializerLike } from "./message-serializer.js";
 export class MessagePackMessageSerializer implements MessageSerializerLike {
   dump(message: Message): Bytes {
     if (!(message instanceof Message)) {
-      throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
+      throw new ForbiddenClass();
     }
     return MessagePack.dump(this.messageToHash(message));
   }

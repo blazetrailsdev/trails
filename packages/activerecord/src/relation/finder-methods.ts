@@ -9,6 +9,7 @@ import {
   last as aryLast,
   take as aryTake,
   uniq,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";

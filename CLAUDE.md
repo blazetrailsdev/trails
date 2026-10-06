@@ -1712,8 +1712,8 @@ INSERT, and its writes after the record is persisted. **The settled shape is
 the captured-and-awaited block**: each async create path wraps the block to
 capture its return value (`yielded = block(record)`) and `await`s it after the
 build and before the save. That is `create` / `createBang` in `persistence.ts`,
-`CollectionAssociation#_createRecord`, `SingularAssociation#_createRecord`, and
-the `Association#_createRecord` fallback they override. Each of these types its
+`CollectionAssociation#_createRecord` and `SingularAssociation#_createRecord`.
+Each of these types its
 block `(record) => void | Promise<void>`.
 `Relation#create` reaches the first through `currentScopeRestoringBlock`, which
 returns the block's value as `relation.rb:1344-1350` does.

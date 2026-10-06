@@ -21,7 +21,7 @@ import {
 import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 
-export class Association<Target extends Base | Base[] = Base | Base[]> {
+export abstract class Association<Target extends Base | Base[] = Base | Base[]> {
   owner: Base;
   reflection: AssociationDefinition;
   readonly disableJoins: boolean;
@@ -330,30 +330,11 @@ export class Association<Target extends Base | Base[] = Base | Base[]> {
     return false;
   }
 
-  protected async _createRecord(
+  protected abstract _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
-    raise = false,
+    raise?: boolean,
     block?: (record: Base) => void | Promise<void>,
-  ): Promise<Base | Base[] | null> {
-    await this.klass.ensureSchemaLoaded();
-    let yielded: unknown;
-    const record = this.buildRecord(
-      attributes as Record<string, unknown> | undefined,
-      block &&
-        ((record: Base) => {
-          yielded = block(record);
-        }),
-    );
-    if (!record) return null;
-    await yielded;
-    if (typeof (record as any).save === "function") {
-      const saved = await (record as any).save();
-      if (!saved && raise) {
-        throw new Error(`Failed to save the new associated ${this.reflection.name}.`);
-      }
-    }
-    return record;
-  }
+  ): Promise<Base | Base[] | null>;
 
   /** @internal */
   buildRecord(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {

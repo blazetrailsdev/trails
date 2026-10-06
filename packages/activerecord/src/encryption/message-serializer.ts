@@ -14,7 +14,7 @@ export interface MessageSerializerLike {
 export class MessageSerializer implements MessageSerializerLike {
   dump(message: Message): string {
     if (!(message instanceof Message)) {
-      throw new ForbiddenClass(`Can only serialize Message instances, got ${typeof message}`);
+      throw new ForbiddenClass();
     }
     return JSON.dump(this.messageToJson(message));
   }

@@ -54,6 +54,20 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
     return a.length === b.length && b.every((byte, i) => byte < 0x80 && byte === a.charCodeAt(i));
   }
   if (a instanceof Uint8Array && typeof b === "string") return equalOrEql(b, a, eql);
+  /* A `Uint8Array` stands in for a Ruby binary String (the representation
+     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27). `rb_str_equal`
+     (`vendor/ruby/v3.3.11/string.c:3742`) compares two of them by their bytes,
+     and asks a non-String `other == self` only when it answers `to_str`;
+     `rb_str_eql` (`string.c:3773`) answers false for any non-String. Tried
+     ahead of the `equals` arm: a Node `Buffer` carries an `equals` of its own,
+     which raises for a non-buffer operand. */
+  if (a instanceof Uint8Array) {
+    if (b instanceof Uint8Array) {
+      return a.length === b.length && a.every((byte, i) => byte === b[i]);
+    }
+    if (eql || !rbObjRespondTo(b, "toStr")) return false;
+    return equalOrEql(b, a, eql);
+  }
   /* `rb_str_equal` (`vendor/ruby/v3.3.11/string.c:3742`): a non-String answering
      `to_str` is asked `other == self` in turn. */
   if (typeof a === "string" && typeof b !== "string") {
@@ -127,13 +141,6 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
       a.length === b.length &&
       a.every((element, i) => equalOrEql(element, b[i], eql))
     );
-  }
-  /* A `Uint8Array` stands in for a Ruby binary String (the representation
-     `ActiveModel::Type::Binary#cast` produces, binary.rb:20-27), whose `==`
-     (`vendor/ruby/v3.3.11/string.c:3269` `rb_str_equal`) compares bytes rather than
-     identity. */
-  if (a instanceof Uint8Array) {
-    return b instanceof Uint8Array && a.length === b.length && a.every((byte, i) => byte === b[i]);
   }
   /* boundary: a JS Date is one of the values a ported `==` is handed, and
      Ruby's `Date#==` / `Time#==` (`vendor/ruby/v3.3.11/time.c:3951` `time_cmp`)

@@ -535,7 +535,7 @@ export abstract class CollectionAssociation extends Association {
    * @inventedArm try — CONVERGEABLE collection-association-load-target-in-flight-memo-and-reader-catch
    */
   get reader(): AssociationProxy {
-    this.ensureKlassExists();
+    this.ensureKlassExistsBang();
 
     if (this.isStaleTarget()) {
       const reloaded = this.reload();
@@ -548,16 +548,6 @@ export abstract class CollectionAssociation extends Association {
     this._proxy ??= CollectionProxy.create(this.klass, this);
     this._proxy.resetScope();
     return this._proxy;
-  }
-
-  private ensureKlassExists(): void {
-    try {
-      void this.klass;
-    } catch (error) {
-      throw new Error(`Association ${this.reflection.name}: target class does not exist`, {
-        cause: error,
-      });
-    }
   }
 
   private foreignKeyColumns(): string[] {
