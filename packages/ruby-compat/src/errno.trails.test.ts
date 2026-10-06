@@ -32,5 +32,10 @@ describe("SystemCallError", () => {
     expect(isDir instanceof Errno.EISDIR).toBe(true);
     expect(new Errno.EISDIR("doc").message).toBe("Is a directory - doc");
     expect(new Errno.EEXIST().errno).toBe(17);
+    const missing = Object.assign(new Error("ENOENT: no such file"), { code: "ENOENT" });
+    expect(missing instanceof Errno.ENOENT).toBe(true);
+    expect(exists instanceof Errno.ENOENT).toBe(false);
+    expect(new Errno.ENOENT("db.sqlite3").message).toBe("No such file or directory - db.sqlite3");
+    expect(new Errno.ENOENT().errno).toBe(2);
   });
 });

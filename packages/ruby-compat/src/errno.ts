@@ -97,6 +97,29 @@ class EEXIST extends SystemCallError {
 }
 
 /**
+ * `Errno::ENOENT`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
+ * {@link ENOTTY} is. The fs layer's own error carrying `code: "ENOENT"` is this
+ * class to `rescue Errno::ENOENT`.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Errno::ENOENT`, which Rails
+ * rescues without defining.
+ */
+class ENOENT extends SystemCallError {
+  static readonly Errno = 2;
+  readonly code = "ENOENT";
+
+  constructor(mesg?: string) {
+    super(mesg == null ? "No such file or directory" : `No such file or directory - ${mesg}`);
+    this.name = "Errno::ENOENT";
+    this.errno = ENOENT.Errno;
+  }
+
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return (error as { code?: unknown } | null | undefined)?.code === "ENOENT";
+  }
+}
+
+/**
  * `Errno::EISDIR`, defined by `set_syserr` (`vendor/ruby/v3.3.11/error.c:2700-2737`) as
  * {@link ENOTTY} is. The fs layer's own error carrying `code: "EISDIR"` is this
  * class to `rescue Errno::EISDIR`.
@@ -126,4 +149,4 @@ class EISDIR extends SystemCallError {
  * @noRailsEquivalent PERMANENT — Ruby core `Errno`, which Rails rescues
  * without defining.
  */
-export const Errno = { EEXIST, EISDIR, ENOTTY, EPIPE };
+export const Errno = { EEXIST, EISDIR, ENOENT, ENOTTY, EPIPE };

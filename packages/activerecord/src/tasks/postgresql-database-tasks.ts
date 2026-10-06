@@ -3,8 +3,10 @@ import {
   File,
   FileUtils,
   getChildProcessAsync,
-  getOsAsync,
   rbEqq,
+  RuntimeError,
+  stderr,
+  stdout,
   type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
@@ -110,21 +112,17 @@ export class PostgreSQLDatabaseTasks {
   }
 
   async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
-    const os = await getOsAsync();
-    const nullDevice = os.platform() === "win32" ? "NUL" : "/dev/null";
     const args = [
       "--set",
       ON_ERROR_STOP_1,
       "--quiet",
       "--no-psqlrc",
       "--output",
-      nullDevice,
+      File.NULL,
       "--file",
       filename,
     ];
-    if (extraFlags) {
-      args.push(...(Array.isArray(extraFlags) ? extraFlags : [extraFlags]));
-    }
+    if (extraFlags != null) args.push(...kernelArray(extraFlags));
     args.push(this.dbConfig.database as string);
     await this.runCmd("psql", args, "loading");
   }
@@ -153,25 +151,16 @@ export class PostgreSQLDatabaseTasks {
     return env;
   }
 
+  /** @inventedArm write — CONVERGEABLE tasks-run-cmd-through-kernel-system-inherited-stdio */
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     const childProcess = await getChildProcessAsync();
     const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
       env: this.psqlEnv(),
       encoding: "utf8",
     });
-    if (result.error || result.status !== 0 || result.signal) {
-      const details: string[] = [];
-      if (result.error) details.push(`Error: ${result.error.message}`);
-      if (result.status !== null && result.status !== 0) {
-        details.push(`Exit status: ${result.status}`);
-      }
-      if (result.signal) details.push(`Signal: ${result.signal}`);
-      if (result.stderr) details.push(`stderr:\n${String(result.stderr).trimEnd()}`);
-      if (result.stdout) details.push(`stdout:\n${String(result.stdout).trimEnd()}`);
-      throw new Error(
-        runCmdError(cmd, args, action) + (details.length ? `${details.join("\n\n")}\n` : ""),
-      );
-    }
+    stdout.write(result.stdout ?? "");
+    stderr.write(result.stderr ?? "");
+    if (result.status !== 0) throw new RuntimeError(runCmdError(cmd, args, action));
   }
 
   private removeSqlHeaderComments(filename: string): void {

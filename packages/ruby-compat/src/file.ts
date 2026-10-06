@@ -143,6 +143,18 @@ export class File extends IO {
   }
 
   /**
+   * `vendor/ruby/v3.3.11/file.c:7848` — `File::NULL`, `ruby_null_device`
+   * (`file.c:6540`): `"NUL"` on a DOSISH build and `"/dev/null"` everywhere
+   * else. The platform answer comes from the registered path backend's
+   * separator, as `ALT_SEPARATOR` above does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `File::NULL`.
+   */
+  static get NULL(): string {
+    return getPath().sep === "\\" ? "NUL" : "/dev/null";
+  }
+
+  /**
    * `vendor/ruby/v3.3.11/file.c:7440` — `File::PATH_SEPARATOR`, the `';'` of a DOSISH
    * build and `':'` everywhere else. The platform answer comes from the
    * registered path backend's separator, as `ALT_SEPARATOR` above does.
