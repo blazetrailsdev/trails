@@ -644,6 +644,9 @@ importers:
       '@blazetrails/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@blazetrails/msgpack':
+        specifier: workspace:*
+        version: link:../../packages/msgpack
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../../packages/nokogiri
