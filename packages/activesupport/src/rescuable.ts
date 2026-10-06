@@ -1,6 +1,7 @@
 import {
   ArgumentError,
   NameError,
+  rbBlockGivenP,
   rbConstGet,
   rbInspect,
   rbModName,
@@ -28,13 +29,22 @@ export const ClassMethods = {
   /** @inventedArm safeConstantize — PERMANENT */
   rescueFrom(
     this: Pick<RescuableClass, "rescueHandlers">,
-    ...klasses: Array<ExceptionClass | string | { with?: ErrorHandler }>
+    ...klasses: Array<
+      ExceptionClass | string | { with?: ErrorHandler } | ((this: any, error: any) => unknown)
+    >
   ): void {
-    const { with: with_ } = extractOptionsBang(klasses) as { with?: ErrorHandler };
+    const block = rbBlockGivenP(klasses[klasses.length - 1])
+      ? (klasses.pop() as Exclude<ErrorHandler, string>)
+      : undefined;
+    let { with: with_ = null } = extractOptionsBang(klasses) as { with?: ErrorHandler | null };
     if (with_ == null) {
-      throw new ArgumentError(
-        "Need a handler. Pass the with: keyword argument or provide a block.",
-      );
+      if (block !== undefined) {
+        with_ = block;
+      } else {
+        throw new ArgumentError(
+          "Need a handler. Pass the with: keyword argument or provide a block.",
+        );
+      }
     }
 
     for (const klass of klasses as unknown[]) {

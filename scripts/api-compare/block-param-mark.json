@@ -54,12 +54,11 @@
     }
   },
   "activesupport": {
-    "total": 9,
+    "total": 8,
     "byFile": {
       "configurable.rb": 1,
       "core_ext/module/attribute_accessors.rb": 3,
-      "core_ext/object/try.rb": 4,
-      "rescuable.rb": 1
+      "core_ext/object/try.rb": 4
     }
   },
   "arel": {

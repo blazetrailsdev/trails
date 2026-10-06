@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { include, registerConstant } from "@blazetrails/ruby-compat";
+import { block, include, registerConstant } from "@blazetrails/ruby-compat";
 
 import { Rescuable } from "./rescuable.js";
 
@@ -36,23 +36,26 @@ class Stargate {
 
     this.rescueFrom(WraithAttack, { with: "sos" });
 
-    this.rescueFrom("NuclearExplosion", {
-      with: function (this: Stargate) {
+    this.rescueFrom(
+      "NuclearExplosion",
+      block(function (this: Stargate) {
         this.result = "alldead";
-      },
-    });
+      }),
+    );
 
-    this.rescueFrom(MadRonon, {
-      with: function (this: Stargate, e: Error) {
+    this.rescueFrom(
+      MadRonon,
+      block(function (this: Stargate, e: Error) {
         this.result = e.message;
-      },
-    });
+      }),
+    );
 
-    this.rescueFrom(WeirdError as never, {
-      with: function (this: Stargate) {
+    this.rescueFrom(
+      WeirdError as never,
+      block(function (this: Stargate) {
         this.result = "weird";
-      },
-    });
+      }),
+    );
   }
 
   dispatch(
