@@ -1,3 +1,4 @@
+import type { MimeType } from "../action-dispatch/http/mime-type.js";
 import { AbstractController } from "../abstract-controller/base.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -12,7 +13,7 @@ import {
   SafeBuffer,
   underscore,
 } from "@blazetrails/activesupport";
-import { ArgumentError, rbInspect, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { rbModSingletonP } from "@blazetrails/ruby-compat";
 import {
   MiddlewareStack as AbstractMiddlewareStack,
   Middleware as AbstractMiddleware,
@@ -22,9 +23,7 @@ import {
   type RackAppObject,
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
-import { includeContent } from "./metal/head.js";
 import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
-import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
 import {
   _normalizeOptions as _normalizeOptionsFn,
   _normalizeText as _normalizeTextFn,
@@ -295,7 +294,7 @@ export class Metal extends AbstractController {
     return this.response.location;
   }
 
-  set contentType(value: string) {
+  set contentType(value: string | MimeType | undefined) {
     this.response.contentType = value;
   }
 
@@ -305,45 +304,6 @@ export class Metal extends AbstractController {
 
   get mediaType(): string | undefined {
     return this.response.mediaType;
-  }
-
-  head(status: number | string | null | false, options?: Record<string, unknown>): true {
-    if (status !== null && typeof status === "object") {
-      throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
-    }
-    const resolvedStatus = status == null || status === false ? "ok" : status;
-    let location: unknown;
-    let contentType: unknown;
-    if (options) {
-      location = options.location;
-      delete options.location;
-      contentType = options.contentType;
-      delete options.contentType;
-      for (const [key, value] of Object.entries(options)) {
-        this.headers.set(
-          key
-            .split(/[-_]/)
-            .map((v) => v[0].toUpperCase() + v.slice(1))
-            .join("-"),
-          String(value),
-        );
-      }
-    }
-    this.status = resolvedStatus;
-    if (location != null && location !== false) {
-      this.location = this.urlFor(location);
-    }
-    if (includeContent(this.status)) {
-      if (!this.mediaType) {
-        const f = (this as Metal & { formats?: ReadonlyArray<string | symbol> }).formats;
-        const negotiated = f && f.length > 0 ? Mime.get(String(f[0]))?.toString() : undefined;
-        this.contentType =
-          contentType != null ? String(contentType) : (negotiated ?? MimeType.HTML.toString());
-      }
-      this.response.charset = false;
-    }
-    this.responseBody = "";
-    return true;
   }
 
   override set responseBody(body: string | SafeBuffer | string[] | Buffer | null | undefined) {

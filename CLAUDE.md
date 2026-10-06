@@ -1536,6 +1536,7 @@ the capability, in a different place. Each is decided here, and each but
 | `rails/railtie.rb`                                    | Proxy (class chain)   |
 | `rails/engine/lazy_route_set.rb`                      | Proxy (module chain)  |
 | `rails/railtie/configuration.rb`                      | Proxy                 |
+| `abstract_controller/collector.rb`                    | Proxy (proto chain)   |
 | `action_controller/metal/mime_responds.rb`            | Proxy                 |
 | `action_dispatch/http/mime_type.rb`                   | Proxy (`is…` names)   |
 | `action_dispatch/testing/assertions/routing.rb`       | Proxy (proto chain)   |

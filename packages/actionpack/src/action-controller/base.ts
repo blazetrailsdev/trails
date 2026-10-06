@@ -23,6 +23,7 @@ import {
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
+import type { head } from "./metal/head.js";
 import {
   ConditionalGet,
   type ClassMethods as ConditionalGetClassMethods,
@@ -663,6 +664,7 @@ export class Base extends Metal {
   declare noStore: typeof noStore;
   /** @internal */
   declare combineEtags: typeof combineEtags;
+  declare head: OmitThisParameter<typeof head>;
 
   /** @internal */
   _actionHasLayout?: boolean;

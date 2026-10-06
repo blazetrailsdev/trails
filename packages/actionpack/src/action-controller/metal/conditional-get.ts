@@ -9,9 +9,11 @@ import {
 import { Time } from "@blazetrails/date";
 import { hashDelete, hashReplace, mergeBang } from "@blazetrails/ruby-compat";
 import type { Metal } from "../metal.js";
+import { Head, type head } from "./head.js";
 import type { CacheControlHash } from "../../action-dispatch/http/cache.js";
 
-export type ConditionalGetHost = Pick<Metal, "request" | "response" | "head"> & {
+export type ConditionalGetHost = Pick<Metal, "request" | "response"> & {
+  head: OmitThisParameter<typeof head>;
   etaggers: Etagger[];
   freshWhen: typeof freshWhen;
   isStale: typeof isStale;
@@ -138,9 +140,10 @@ export const ClassMethods = {
   },
 };
 
-/** @missingRailsCall include — CONVERGEABLE head-is-a-module-included-by-conditional-get-not-a-metal-method */
 export const ConditionalGet = new Module((mod) => {
   extend(mod, Concern);
+
+  mod.include(Head);
 
   (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
     null,
@@ -164,6 +167,7 @@ export const ConditionalGet = new Module((mod) => {
   httpCacheForever: typeof httpCacheForever;
   noStore: typeof noStore;
   combineEtags: typeof combineEtags;
+  head: typeof head;
 }> & { ClassMethods: typeof ClassMethods };
 ConditionalGet.ClassMethods = ClassMethods;
 

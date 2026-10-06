@@ -4,6 +4,8 @@ import { FixtureResolver } from "@blazetrails/actionview";
 import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
+import { Head } from "./metal/head.js";
+import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
 import { Request } from "../action-dispatch/request.js";
 import { Response } from "../action-dispatch/response.js";
 
@@ -15,6 +17,11 @@ function makeRequest(opts: Record<string, string> = {}): Request {
     ...opts,
   });
 }
+class HeadMetal extends Metal {
+  declare head: Included<typeof Head>["head"];
+}
+include(HeadMetal, Head);
+
 function makeResponse(): Response {
   return new Response();
 }
@@ -189,8 +196,15 @@ describe("ActionController rendering", () => {
   });
 
   describe("head", () => {
+    it("head raises ArgumentError for a Hash status", () => {
+      const c = new HeadMetal();
+      c.setResponseBang(makeResponse());
+      expect(() => c.head({ location: "/" } as never)).toThrow(ArgumentError);
+      expect(() => c.head(new Map() as never)).toThrow(ArgumentError);
+    });
+
     it("head with numeric status", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head(204);
         }
@@ -202,7 +216,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head with symbol status", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head("not_found");
         }
@@ -213,7 +227,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head with ok", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head("ok");
         }
@@ -224,7 +238,7 @@ describe("ActionController rendering", () => {
     });
 
     it("head marks as performed", async () => {
-      class C extends Metal {
+      class C extends HeadMetal {
         async index() {
           this.head(200);
         }

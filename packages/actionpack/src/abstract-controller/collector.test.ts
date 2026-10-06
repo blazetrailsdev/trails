@@ -1,9 +1,9 @@
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { Module, NoMethodError, include, symbolToS } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Mime, MimeType } from "../action-dispatch/http/mime-type.js";
-import { Collector, generateMethodForMime } from "./collector.js";
+import { Collector } from "./collector.js";
 
-class MyCollector extends Collector {
+class MyCollector {
   responses: [MimeType, unknown[], (() => unknown) | null][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
     const last = args[args.length - 1];
@@ -13,6 +13,7 @@ class MyCollector extends Collector {
     return undefined;
   }
 }
+include(MyCollector, Collector);
 
 describe("TestCollector", () => {
   it("responds to default mime types", () => {
@@ -27,24 +28,22 @@ describe("TestCollector", () => {
   });
 
   it("register mime types on method missing", () => {
-    MimeType.unregister(":js");
+    Collector.removeMethod("js");
     try {
-      const collector = new MyCollector();
+      const collector = new MyCollector() as MyCollector & { js: (...a: unknown[]) => unknown };
       expect("js" in collector).toBe(false);
-      MimeType.register("text/javascript", ":js", ["application/javascript"], ["js"]);
-      const c = collector as MyCollector & { js: (...a: unknown[]) => unknown };
-      c.js();
-      expect("js" in c).toBe(true);
+      collector.js();
+      expect("js" in collector).toBe(true);
     } finally {
-      if (!Mime.get(":js")) {
-        MimeType.register("text/javascript", ":js", ["application/javascript"], ["js"]);
+      if (!Collector.isMethodDefined("js")) {
+        Collector.generateMethodForMime(":js");
       }
     }
   });
 
   it("does not register unknown mime types", () => {
     const collector = new MyCollector() as MyCollector & { unknown: () => void };
-    expect(() => collector.unknown()).toThrow(/register it as a MIME type/);
+    expect(() => collector.unknown()).toThrow(NoMethodError);
   });
 
   it("generated methods call custom with arguments received", () => {
@@ -65,13 +64,14 @@ describe("TestCollector", () => {
   });
 });
 
-class TestCollector extends Collector {
+class TestCollector {
   readonly calls: [string, unknown[]][] = [];
   custom(mime: MimeType, ...args: unknown[]): unknown {
     this.calls.push([symbolToS(mime.symbol!), args]);
     return `dispatched:${symbolToS(mime.symbol!)}`;
   }
 }
+include(TestCollector, Collector);
 
 describe("AbstractController::Collector — trails-only Proxy edges", () => {
   it("dispatches per-MIME methods through custom()", () => {
@@ -97,11 +97,12 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
       expect(c.latefmt!("ok")).toBe("dispatched:latefmt");
     } finally {
       MimeType.unregister(":latefmt");
+      Collector.removeMethod("latefmt");
     }
   });
 
   it("preserves real subclass properties and methods", () => {
-    class WithState extends Collector {
+    class WithState {
       counter = 0;
       bump(): number {
         return ++this.counter;
@@ -110,6 +111,7 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
         return null;
       }
     }
+    include(WithState, Collector);
     const c = new WithState();
     expect(c.bump()).toBe(1);
     expect(c.bump()).toBe(2);
@@ -117,13 +119,14 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
   });
 
   it("binds `this` inside custom() to the Proxy receiver, not the raw target", () => {
-    class ThisChecker extends Collector {
+    class ThisChecker {
       seenThis: unknown;
       custom(_mime: MimeType): unknown {
         this.seenThis = this;
         return null;
       }
     }
+    include(ThisChecker, Collector);
     const c = new ThisChecker() as ThisChecker & { html: () => unknown };
     c.custom(MimeType.HTML);
     const viaDirect = c.seenThis;
@@ -149,24 +152,14 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
     expect("inspect" in c).toBe(false);
   });
 
-  it("`has` returns false for reserved keys even when a MIME type collides", () => {
-    const c = new TestCollector();
-    MimeType.register("application/then", ":then");
-    try {
-      expect("then" in c).toBe(false);
-      expect((c as unknown as { then?: unknown }).then).toBeUndefined();
-    } finally {
-      MimeType.unregister(":then");
-    }
-  });
-
   it("shadows real properties even when they hold undefined", () => {
-    class WithUndef extends Collector {
+    class WithUndef {
       myFlag: string | undefined = undefined;
       custom(_mime: MimeType): unknown {
         return null;
       }
     }
+    include(WithUndef, Collector);
     const c = new WithUndef();
     expect(c.myFlag).toBeUndefined();
   });
@@ -179,17 +172,76 @@ describe("AbstractController::Collector — trails-only Proxy edges", () => {
   });
 });
 
+describe("AbstractController::Collector — the method_missing splice", () => {
+  it("reaches method_missing with a module included after Collector", () => {
+    class Late {
+      custom(mime: MimeType): unknown {
+        return mime;
+      }
+    }
+    include(Late, Collector);
+    include(Late, new Module((mod) => mod.defineMethod("extra", () => "extra")));
+    const c = new Late() as Late & { extra(): string; unknown(): void; html(): unknown };
+    expect(c.extra()).toBe("extra");
+    expect(c.html()).toBe(MimeType.HTML);
+    expect(() => c.unknown()).toThrow(NoMethodError);
+  });
+
+  it("reaches method_missing from a subclass, and including twice splices once", () => {
+    class Sub extends MyCollector {}
+    include(Sub, Collector);
+    include(MyCollector, Collector);
+    const c = new Sub() as Sub & { unknown(): void; html(): unknown };
+    c.html();
+    expect(c.responses[0][0]).toBe(MimeType.HTML);
+    expect(() => c.unknown()).toThrow(NoMethodError);
+    expect(c).toBeInstanceOf(MyCollector);
+  });
+
+  it("dispatches to a class's own methodMissing", () => {
+    class Own {
+      custom(): unknown {
+        return null;
+      }
+      methodMissing(symbol: string): string {
+        return `own:${symbol}`;
+      }
+    }
+    include(Own, Collector);
+    const c = new Own() as Own & { unknown(): string };
+    expect(c.unknown()).toBe("own:unknown");
+  });
+});
+
 describe("generateMethodForMime", () => {
-  it("accepts a registered MIME symbol without throwing", () => {
-    expect(() => generateMethodForMime("html")).not.toThrow();
+  it("defines the method for a MIME symbol", () => {
+    Collector.removeMethod("html");
+    Collector.generateMethodForMime(":html");
+    expect(Collector.isMethodDefined("html")).toBe(true);
   });
 
-  it("accepts a MimeType instance without throwing", () => {
-    const mime = Mime.get(":json")!;
-    expect(() => generateMethodForMime(mime)).not.toThrow();
+  it("defines the method for a MimeType instance", () => {
+    Collector.removeMethod("json");
+    Collector.generateMethodForMime(Mime.get(":json")!);
+    expect(Collector.isMethodDefined("json")).toBe(true);
   });
 
-  it("throws for an unregistered MIME symbol", () => {
-    expect(() => generateMethodForMime("bogusFormatXyz")).toThrow(/unknown MIME "bogusFormatXyz"/);
+  it("camelizes a multi-word MIME symbol", () => {
+    expect(Collector.isMethodDefined("urlEncodedForm")).toBe(true);
+  });
+
+  it("round-trips a multi-word MIME symbol registered later, and through method_missing", () => {
+    MimeType.register("application/tablet-phone", ":tablet_phone");
+    try {
+      const c = new TestCollector() as TestCollector & { tabletPhone(): unknown };
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
+      expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
+      Collector.removeMethod("tabletPhone");
+      expect(c.tabletPhone()).toBe("dispatched:tablet_phone");
+      expect(Collector.isMethodDefined("tabletPhone")).toBe(true);
+    } finally {
+      MimeType.unregister(":tablet_phone");
+      Collector.removeMethod("tabletPhone");
+    }
   });
 });

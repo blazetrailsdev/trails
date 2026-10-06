@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Metal } from "../metal.js";
+import { Head } from "../metal/head.js";
+import { include, type Included } from "@blazetrails/ruby-compat";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 import { Parameters } from "../metal/strong-parameters.js";
@@ -69,7 +71,9 @@ describe("Metal#response_body= / #status=", () => {
   });
 
   it("status= and head raise on an unknown status symbol", () => {
-    const c = new (class extends Metal {})();
+    const klass = class extends Metal {};
+    include(klass, Head);
+    const c = new klass() as Metal & Included<typeof Head>;
     c.setResponseBang(makeResponse());
     expect(() => {
       c.status = "bogus";
