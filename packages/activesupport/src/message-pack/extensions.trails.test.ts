@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { NameError, ZeroDivisionError, complex, rational } from "@blazetrails/ruby-compat";
+import {
+  EOFError,
+  NameError,
+  ZeroDivisionError,
+  complex,
+  rational,
+} from "@blazetrails/ruby-compat";
 
 import { Extensions, MissingClassError } from "./extensions.js";
 import { Factory } from "./factory.js";
@@ -67,6 +73,20 @@ describe("MessagePackExtensionsTest", () => {
     const nested = complex(1.5, rational(1, 2));
     expect([...dump(nested)]).toEqual([199, 13, 4, 203, 63, 248, 0, 0, 0, 0, 0, 0, 213, 3, 1, 2]);
     expect(load(dump(nested))).toEqual(nested);
+  });
+
+  it("raises EOFError on a truncated payload", () => {
+    for (const bytes of [
+      [0x92, 0x01],
+      [0xcf, 0x01],
+      [0xd3, 0x01],
+      [0xcb, 0x01],
+      [0xa5, 0x61],
+      [],
+    ]) {
+      expect(() => load(Buffer.from(bytes))).toThrow(EOFError);
+      expect(() => load(Buffer.from(bytes))).toThrow("end of buffer reached");
+    }
   });
 
   it("packs a nested HashWithIndifferentAccess through the type-17 handler again", () => {
