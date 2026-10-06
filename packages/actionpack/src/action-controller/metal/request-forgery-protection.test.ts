@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { IndexError } from "@blazetrails/ruby-compat";
 import { CookieJar } from "../../action-dispatch/middleware/cookies.js";
 import {
   Exception,
@@ -481,5 +482,13 @@ describe("normalizeActionPath / normalizeRelativeActionPath", () => {
     expect(normalizeActionPath.call(at("/foo"), "bar")).toBe("/foo/bar");
     expect(normalizeActionPath.call(at("/foo"), "./bar")).toBe("/foo/bar");
     expect(normalizeRelativeActionPath.call(at("/foo"), "bar/")).toBe("/foo/bar");
+  });
+});
+
+describe("xorByteStrings", () => {
+  it("keeps the trailing bytes of a longer s2 and raises once s2 is exhausted", () => {
+    const c = controller();
+    expect([...c.xorByteStrings(Buffer.from([1, 2]), Buffer.from([3, 4, 5]))]).toEqual([2, 6, 5]);
+    expect(() => c.xorByteStrings(Buffer.from([1, 2, 3]), Buffer.from([3]))).toThrow(IndexError);
   });
 });

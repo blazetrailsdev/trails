@@ -324,7 +324,7 @@ export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
-export { byteslice } from "./string/byte-methods.js";
+export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";
 export { scrub } from "./string/scrub.js";
 export { capitalize, casecmp } from "./string/case-mapping.js";
 export { chomp } from "./string/chomp.js";

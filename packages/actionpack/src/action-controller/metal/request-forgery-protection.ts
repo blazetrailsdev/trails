@@ -5,6 +5,8 @@ import {
   chomp,
   OpenSSL,
   rbObjRespondTo,
+  rbStrGetbyte,
+  rbStrSetbyte,
   rtest,
   SecureRandom,
   URI,
@@ -498,18 +500,13 @@ export function decodeCsrfToken(encodedCsrfToken: string): Bytes {
   return Buffer.from(Base64.urlsafeDecode64(encodedCsrfToken), "latin1");
 }
 
-/**
- * @internal
- * @inventedArm if — PERMANENT
- * @inventedArm throw — PERMANENT
- */
+/** @internal */
 export function xorByteStrings(s1: Bytes, s2: Bytes): Bytes {
   s2 = Buffer.from(s2);
   const size = s1.length;
   let i = 0;
   while (i < size) {
-    if (i >= s2.length) throw new TypeError("nil can't be coerced into Integer");
-    s2[i] = s1[i] ^ s2[i];
+    rbStrSetbyte(s2, i, rbStrGetbyte(s1, i)! ^ rbStrGetbyte(s2, i)!);
     i += 1;
   }
   return s2;
