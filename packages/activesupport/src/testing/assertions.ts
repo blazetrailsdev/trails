@@ -93,6 +93,9 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  setup(): void {}
+
+  /** @noRailsEquivalent PERMANENT */
   teardown(): unknown {
     return undefined;
   }
