@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { block, registerConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   assertEqual,
@@ -30,9 +30,12 @@ class LogSubscribersController extends Base {
   static {
     this.wrapParameters("person", { include: "name", format: ":json" });
 
-    this.rescueFrom(SpecialException, function (this: LogSubscribersController) {
-      this.head(406);
-    });
+    this.rescueFrom(
+      SpecialException,
+      block(function (this: LogSubscribersController) {
+        this.head(406);
+      }),
+    );
 
     this.beforeAction("redirector", { only: "neverExecuted" });
   }
