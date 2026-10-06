@@ -44,7 +44,7 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include ActiveSupport::LogSubscriber::TestHelper` (`controller_runtime_test.rb:39`); the class/interface merge is how a mixin surfaces on the type side.
   interface ControllerRuntimeLogSubscriberTest extends Omit<
     Included<typeof TestHelper>,
-    "setup" | "setLogger"
+    "setup" | "teardown" | "setLogger"
   > {}
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
@@ -73,8 +73,8 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
       ActionController.LogSubscriber.attachTo("action_controller");
     }
 
-    teardown(): void {
-      TestHelper.instanceMethod("teardown")!.value.call(this);
+    override teardown(): void {
+      super.teardown();
       ActiveSupportLogSubscriber.logSubscribers().length = 0;
       ActionController.Base.logger = this.oldLogger;
     }

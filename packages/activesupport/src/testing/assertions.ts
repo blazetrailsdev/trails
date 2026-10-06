@@ -93,6 +93,11 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  teardown(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   afterTeardown(): unknown {
     return undefined;
   }

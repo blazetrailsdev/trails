@@ -4,18 +4,17 @@ import { Hash, Module, extend, hashAref, hashAset } from "@blazetrails/ruby-comp
 type DeduplicableClass = { registry(): Hash<object, object> };
 
 export const Deduplicable = new Module() as Module<{
-  deduplicate: typeof deduplicate;
-  negate: typeof negate;
+  deduplicate<T>(this: T): T;
+  negate<T>(this: T): T;
   deduplicated(): object;
 }> & { ClassMethods: typeof ClassMethods };
 extend(Deduplicable, Concern);
 
 const registries = new WeakMap<object, Hash<object, object>>();
 
-export function deduplicate<T>(this: T): T {
-  const registry = ((this as object).constructor as unknown as DeduplicableClass).registry();
-  return (hashAref(registry, this as object) ??
-    hashAset(registry, this as object, (this as { deduplicated(): object }).deduplicated())) as T;
+export function deduplicate<T extends object & { deduplicated(): T }>(this: T): T {
+  const registry = (this.constructor as unknown as DeduplicableClass).registry();
+  return (hashAref(registry, this) ?? hashAset(registry, this, this.deduplicated())) as T;
 }
 export const negate = deduplicate;
 
