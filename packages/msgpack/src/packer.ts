@@ -3,6 +3,8 @@ import {
   ArgumentError,
   FrozenError,
   Hash,
+  Module,
+  NoMethodError,
   RangeError,
   rbFSend,
   rbInspect,
@@ -15,17 +17,21 @@ export const MSGPACK_EXT_RECURSIVE = 0b0001;
 
 export type PackerProc = (obj: never, packer?: Packer) => unknown;
 
-export type PackerExtRegistry = Map<unknown, [number, PackerProc | null, number]>;
+export type PackerExtType = [number, PackerProc | null, number];
+
+export type PackerExtRegistry = Map<unknown, PackerExtType>;
 
 const encoder = new Encoder();
+const floatEncoder = new Encoder({ forceIntegerToFloat: true });
 
 export class Packer {
   /** @internal */
   readonly extRegistry: PackerExtRegistry = new Map();
+  private readonly extRegistryCache: PackerExtRegistry = new Map();
   readonly buffer: Buffer;
 
   constructor(io: unknown = null, options: object | null = null) {
-    if (options == null && io != null && rbObjClass(io) === Hash) {
+    if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
       io = null;
     }
     this.buffer = new Buffer(io);
@@ -37,8 +43,11 @@ export class Packer {
     methodName: string | null = null,
     block?: PackerProc,
   ): null {
-    if (typeof klass !== "function" && (typeof klass !== "object" || klass === null)) {
+    if (typeof klass !== "function" && !(klass instanceof Module)) {
       throw new ArgumentError(`expected Module/Class got: ${rbInspect(klass)}`);
+    }
+    if (block == null && methodName == null) {
+      throw new NoMethodError("undefined method `to_proc' for nil", "to_proc");
     }
     return this.registerTypeInternal(
       type,
@@ -93,6 +102,8 @@ export class Packer {
           this.write(value);
         }
       }
+    } else if (v instanceof Number) {
+      this.buffer.write(floatEncoder.encodeSharedRef(v.valueOf()));
     } else if (typeof v === "bigint") {
       this.writeBignumValue(v);
     } else if (!this.tryWriteWithExtTypeLookup(v)) {
@@ -102,6 +113,10 @@ export class Packer {
   }
 
   writeArrayHeader(n: number): this {
+    if (n > 0xffffffff) {
+      throw new RangeError(`integer ${n} too big to convert to \`unsigned int'`);
+    }
+    n = n >>> 0;
     if (n < 16) this.buffer.write(Uint8Array.of(0x90 | n));
     else if (n < 0x10000) this.buffer.write(Uint8Array.of(0xdc, n >> 8, n));
     else this.buffer.write(Uint8Array.of(0xdd, n >>> 24, n >> 16, n >> 8, n));
@@ -109,6 +124,10 @@ export class Packer {
   }
 
   writeMapHeader(n: number): this {
+    if (n > 0xffffffff) {
+      throw new RangeError(`integer ${n} too big to convert to \`unsigned int'`);
+    }
+    n = n >>> 0;
     if (n < 16) this.buffer.write(Uint8Array.of(0x80 | n));
     else if (n < 0x10000) this.buffer.write(Uint8Array.of(0xde, n >> 8, n));
     else this.buffer.write(Uint8Array.of(0xdf, n >>> 24, n >> 16, n >> 8, n));
@@ -155,6 +174,7 @@ export class Packer {
       throw new RangeError(`integer ${type} too big to convert to \`signed char'`);
     }
 
+    this.extRegistryCache.clear();
     this.extRegistry.set(klass, [type, proc, 0]);
     return null;
   }
@@ -181,13 +201,35 @@ export class Packer {
     this.buffer.write(bytes);
   }
 
-  private extRegistryLookup(instance: unknown): [number, PackerProc | null, number] {
-    const type = this.extRegistry.get(rbObjClass(instance));
+  private extRegistryFetch(lookupClass: unknown): PackerExtType | null {
+    const type = this.extRegistry.get(lookupClass);
+    if (type != null) return type;
+
+    const typeInht = this.extRegistryCache.get(lookupClass);
+    if (typeInht != null) return typeInht;
+
+    return null;
+  }
+
+  private extFindSuperclass(instance: unknown): unknown {
+    for (const key of this.extRegistry.keys()) {
+      if (rbObjIsKindOf(instance, key)) return key;
+    }
+    return null;
+  }
+
+  private extRegistryLookup(instance: unknown): PackerExtType {
+    const lookupClass = rbObjClass(instance);
+    const type = this.extRegistryFetch(lookupClass);
     if (type?.[1] != null) return type;
 
-    for (const [key, superclassType] of this.extRegistry) {
-      if (rbObjIsKindOf(instance, key)) return superclassType;
+    const superclass = this.extFindSuperclass(instance);
+    if (superclass != null) {
+      const superclassType = this.extRegistry.get(superclass)!;
+      this.extRegistryCache.set(lookupClass, superclassType);
+      return superclassType;
     }
+
     return [0, null, 0];
   }
 

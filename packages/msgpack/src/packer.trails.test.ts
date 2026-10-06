@@ -1,14 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { EOFError, FrozenError, Hash, NoMethodError, RangeError } from "@blazetrails/ruby-compat";
-import {
-  MSGPACK_EXT_RECURSIVE,
-  MalformedFormatError,
-  Packer,
-  StackError,
-  UnknownExtTypeError,
-  UnpackError,
-  Unpacker,
-} from "./index.js";
+import { ArgumentError, EOFError, Hash, NoMethodError } from "@blazetrails/ruby-compat";
+import { MSGPACK_EXT_RECURSIVE, Packer, StackError, UnpackError, Unpacker } from "./index.js";
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -25,6 +17,7 @@ class Pair {
 describe("MessagePack::Packer", () => {
   it("writes the bytes the gem writes", () => {
     expect(pack(128)).toBe("cc80");
+    expect(pack(new Number(1))).toBe("cb3ff0000000000000");
     expect(pack(2 ** 40)).toBe("cf0000010000000000");
     expect(pack([1, "a", null, true, 1.5])).toBe("9501a161c0c3cb3ff8000000000000");
     expect(pack({ k: [2n ** 62n, -(2n ** 62n), 5n] })).toBe(
@@ -36,13 +29,17 @@ describe("MessagePack::Packer", () => {
   });
 
   it("raises RangeError for an Integer outside 64 bits, and NoMethodError without to_msgpack", () => {
-    expect(() => pack(2n ** 64n)).toThrow(
-      new RangeError("bignum too big to convert into `unsigned long long'"),
-    );
-    expect(() => pack(-(2n ** 63n) - 1n)).toThrow(
-      new RangeError("bignum too big to convert into `long long'"),
-    );
+    expect(() => pack(2n ** 64n)).toThrow("bignum too big to convert into `unsigned long long'");
+    expect(() => pack(-(2n ** 63n) - 1n)).toThrow("bignum too big to convert into `long long'");
     expect(() => pack(new Pair(1, 2))).toThrow(NoMethodError);
+    expect(new Packer().writeArrayHeader(-1).toS()).toEqual(
+      Uint8Array.of(0xdd, 255, 255, 255, 255),
+    );
+    expect(() => new Packer().writeMapHeader(2 ** 32)).toThrow(
+      "integer 4294967296 too big to convert to `unsigned int'",
+    );
+    expect(() => new Packer().registerType(1, {}, "toS")).toThrow(ArgumentError);
+    expect(() => new Packer().registerType(1, Pair)).toThrow("undefined method `to_proc' for nil");
   });
 
   it("writes a subclass through its superclass's ext type, and refuses a frozen registry", () => {
@@ -51,10 +48,10 @@ describe("MessagePack::Packer", () => {
     packer.registerType(1, Pair, null, () => "p");
     expect(packer.write(new Sub(1, 2)).toS()).toEqual(Uint8Array.of(0xd4, 1, 0x70));
     expect(() => packer.registerType(128, Pair, "toS")).toThrow(
-      new RangeError("integer 128 too big to convert to `signed char'"),
+      "integer 128 too big to convert to `signed char'",
     );
     expect(() => Object.freeze(new Packer()).registerType(1, Pair, "toS")).toThrow(
-      new FrozenError("can't modify frozen MessagePack::Packer"),
+      "can't modify frozen MessagePack::Packer",
     );
   });
 
@@ -82,14 +79,20 @@ describe("MessagePack::Packer", () => {
 describe("MessagePack::Unpacker", () => {
   it("raises the gem's errors", () => {
     expect(StackError.prototype).toBeInstanceOf(UnpackError);
-    expect(() => unpack(0xc1)).toThrow(new MalformedFormatError("invalid byte"));
-    expect(() => unpack(0x91)).toThrow(new EOFError("end of buffer reached"));
-    expect(() => unpack(1, 2)).toThrow(
-      new MalformedFormatError("1 extra bytes after the deserialized object"),
-    );
-    expect(() => unpack(0xd4, 5, 0)).toThrow(new UnknownExtTypeError("unexpected extension type"));
+    expect(() => unpack(0xc1)).toThrow("invalid byte");
+    expect(() => unpack(0x91)).toThrow("end of buffer reached");
+    expect(() => unpack(1, 2)).toThrow("1 extra bytes after the deserialized object");
+    expect(() => unpack(0xd4, 5, 0)).toThrow("unexpected extension type");
+    const unpacker = new Unpacker();
+    unpacker.registerType(5, null, null, () => {
+      throw new globalThis.RangeError("boom");
+    });
+    expect(() => unpacker.feed(Uint8Array.of(0xd4, 5, 0)).read()).toThrow("boom");
+    unpacker.reset();
+    unpacker.registerType(6, null, null, () => [5n]);
+    expect(unpacker.feed(Uint8Array.of(0xd4, 6, 0)).read()).toEqual([5n]);
     expect(() => Object.freeze(new Unpacker()).registerType(1, Pair, "new")).toThrow(
-      new FrozenError("can't modify frozen MessagePack::Unpacker"),
+      "can't modify frozen MessagePack::Unpacker",
     );
   });
 

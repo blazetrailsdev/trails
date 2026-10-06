@@ -8,6 +8,7 @@ import {
   StandardError,
   rbFSend,
   rbObjClass,
+  rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
 import { MSGPACK_EXT_RECURSIVE } from "./packer.js";
@@ -26,7 +27,16 @@ export type UnpackerProc = (data: never) => unknown;
 
 export type UnpackerExtRegistry = Map<number, [unknown, UnpackerProc | null, number]>;
 
+class RecursiveRaised {
+  constructor(readonly lastObject: unknown) {}
+}
+
+class ExtObject {
+  constructor(readonly obj: unknown) {}
+}
+
 function raiseUnpackerError(error: unknown): never {
+  if (error instanceof RecursiveRaised) throw error.lastObject;
   if (error instanceof DecodeError) {
     if (error.message.startsWith("Unrecognized")) throw new MalformedFormatError("invalid byte");
     throw new UnpackError(error.message);
@@ -38,6 +48,7 @@ function raiseUnpackerError(error: unknown): never {
 }
 
 function ll2inum(obj: unknown): unknown {
+  if (obj instanceof ExtObject) return obj.obj;
   if (typeof obj === "bigint") return Number.isSafeInteger(Number(obj)) ? Number(obj) : obj;
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) obj[i] = ll2inum(obj[i]);
@@ -55,10 +66,10 @@ export class Unpacker {
   private readonly decoder: Decoder;
 
   constructor(io: unknown = null, options: object | null = null) {
-    if (options == null && io != null && rbObjClass(io) === Hash) {
+    if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
       options = io as object;
       io = null;
-    } else if (options != null && rbObjClass(options) !== Hash) {
+    } else if (options != null && !rbObjIsKindOf(options, Hash)) {
       throw new ArgumentError(`expected Hash but found ${rbObjClass(options).name}.`);
     }
     this.buffer = new Buffer(io);
@@ -69,13 +80,17 @@ export class Unpacker {
         decode: (data, type) => {
           const [, proc, extFlags] = this.extRegistry.get(type) ?? [null, null, 0];
           if (proc != null) {
-            if (extFlags & MSGPACK_EXT_RECURSIVE) {
-              const uk = new Unpacker(null, options);
-              for (const [key, value] of this.extRegistry) uk.extRegistry.set(key, value);
-              uk.feedReference(data);
-              return proc(uk as never);
+            try {
+              if (extFlags & MSGPACK_EXT_RECURSIVE) {
+                const uk = new Unpacker(null, options);
+                for (const [key, value] of this.extRegistry) uk.extRegistry.set(key, value);
+                uk.feedReference(data);
+                return new ExtObject(proc(uk as never));
+              }
+              return new ExtObject(proc(data as never));
+            } catch (error) {
+              throw new RecursiveRaised(error);
             }
-            return proc(data as never);
           }
           throw new UnknownExtTypeError("unexpected extension type");
         },

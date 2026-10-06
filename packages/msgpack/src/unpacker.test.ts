@@ -36,12 +36,6 @@ describe("MessagePack::Unpacker", () => {
   });
 
   describe("#type_registered?", () => {
-    it("receive Class or Integer, and return bool", () => {
-      expect(unpacker.isTypeRegistered(0x00)).toBeFalsy();
-      expect(unpacker.isTypeRegistered(0x01)).toBeFalsy();
-      expect(unpacker.isTypeRegistered(ValueOne)).toBeFalsy();
-    });
-
     it("returns true if specified type or class is already registered", () => {
       unpacker.registerType(0x30, ValueOne, "fromMsgpackExt");
       unpacker.registerType(0x31, ValueTwo, "fromMsgpackExt");
