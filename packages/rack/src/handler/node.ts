@@ -87,6 +87,7 @@ export class Node {
   upgrade(req: HttpRequest, socket: HttpSocket, head: Uint8Array): Promise<void> {
     return new Thread(async (): Promise<void> => {
       let hijacked = false;
+      let started = false;
       const discard = (): void => {
         socket.destroy();
       };
@@ -115,11 +116,13 @@ export class Node {
           if (hijacked) return;
           const partial = headers[RACK_HIJACK] as unknown;
           if (typeof partial === "function") {
+            started = true;
             socket.write(responseHead(status, sentHeaders(headers)));
             release();
             await (partial as (stream: HttpSocket) => unknown)(socket);
             return;
           }
+          started = true;
           socket.write(responseHead(status, sentHeaders(headers)));
           for await (const chunk of body) {
             if (hijacked) return;
@@ -130,11 +133,12 @@ export class Node {
           await closeBody(body);
         }
       } catch (error) {
-        if (hijacked) throw error;
         stderr.write(
           `${error instanceof Error ? (error.stack ?? error.message) : String(error)}\n`,
         );
-        socket.end(responseHead(500, { "content-length": "0" }));
+        if (hijacked) return;
+        if (started) socket.destroy();
+        else socket.end(responseHead(500, { "content-length": "0" }));
       }
     }).value();
   }

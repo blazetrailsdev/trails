@@ -372,6 +372,58 @@ describe("Rack::Handler::Node", () => {
       expect(closed).toBe(true);
     });
 
+    it("destroys the socket, without a second head, when the body raises mid-response", async () => {
+      let text = "";
+      let closed = false;
+      await serving(
+        async () => [
+          200,
+          {},
+          {
+            async *[Symbol.asyncIterator]() {
+              yield "first";
+              throw new Error("boom");
+            },
+          },
+        ],
+        async (url) => {
+          ({ text, closed } = await upgradeRequest(url, "/cable"));
+        },
+      );
+
+      expect(text.match(/HTTP\/1\.1/g)).toHaveLength(1);
+      expect(text).not.toContain("500");
+      expect(closed).toBe(true);
+    });
+
+    it("reports an error raised after a hijack and leaves the socket to the app", async () => {
+      const rejections: unknown[] = [];
+      const onRejection = (reason: unknown): void => void rejections.push(reason);
+      process.on("unhandledRejection", onRejection);
+      let text = "";
+      try {
+        await serving(
+          async (env) => {
+            const io = (env[RACK_HIJACK] as () => HttpSocket)();
+            setTimeout(() => {
+              io.write("still mine");
+              io.end();
+            }, 30);
+            throw new Error("after hijack");
+          },
+          async (url) => {
+            ({ text } = await upgradeRequest(url, "/cable"));
+          },
+        );
+        await new Promise((resolve) => setTimeout(resolve, 20));
+      } finally {
+        process.off("unhandledRejection", onRejection);
+      }
+
+      expect(text).toBe("still mine");
+      expect(rejections).toEqual([]);
+    });
+
     it("stops writing the response once the app hijacks from inside the body", async () => {
       let text = "";
       await serving(
