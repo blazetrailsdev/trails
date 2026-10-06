@@ -20,6 +20,11 @@
       "kind": 93,
       "value": 2
     },
+    "activejob": {
+      "assertionCount": 0,
+      "kind": 0,
+      "value": 0
+    },
     "activemodel": {
       "assertionCount": 0,
       "kind": 0,

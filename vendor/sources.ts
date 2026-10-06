@@ -143,6 +143,11 @@ export const SOURCES: readonly UpstreamSource[] = [
         testPath: "actionview/test",
       },
       {
+        name: "activejob",
+        libPath: "activejob/lib/active_job",
+        testPath: "activejob/test",
+      },
+      {
         name: "trailties",
         libPath: "railties/lib/rails",
         testPath: "railties/test",

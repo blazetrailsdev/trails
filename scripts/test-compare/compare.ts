@@ -190,6 +190,13 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     rubyFile = rubyFile.slice("i18n/".length);
   }
 
+  // activejob's `testPath` is the test root, so `test/serializers/` is counted;
+  // `test/cases/` is where the suite keeps everything else and names no
+  // `lib/active_job` directory.
+  if (pkg === "activejob" && rubyFile.startsWith("cases/")) {
+    rubyFile = rubyFile.slice("cases/".length);
+  }
+
   const dir = path.dirname(rubyFile);
   const rawBase = path.basename(rubyFile, ".rb").replace(/_test$/, "");
   // Trails renames `railtie`/`railties` path segments to `trailtie`/`trailties`
@@ -1575,6 +1582,7 @@ export const PKG_SRC_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  activejob: "packages/activejob/src/",
   trailties: "packages/trailties/src/",
   globalid: "packages/globalid/src/",
   "did-you-mean": "packages/did-you-mean/src/",

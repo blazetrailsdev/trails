@@ -37,6 +37,8 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "to_f",
   "to_s",
   "to_sym",
+  // String#strip — exported by @blazetrails/ruby-compat as `strip(str)`.
+  "strip",
 
   // ActiveSupport inflections — String core-exts, exported by
   // @blazetrails/activesupport as free functions of the string.

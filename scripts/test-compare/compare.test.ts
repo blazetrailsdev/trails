@@ -155,6 +155,15 @@ describe("rubyToConventionTs", () => {
     );
   });
 
+  it("strips activejob's test/cases directory, which names no lib/active_job directory", () => {
+    expect(rubyToConventionTs("cases/queue_naming_test.rb", "activejob")).toBe(
+      "queue-naming.test.ts",
+    );
+    expect(rubyToConventionTs("serializers/time_with_zone_serializer_test.rb", "activejob")).toBe(
+      "serializers/time-with-zone-serializer.test.ts",
+    );
+  });
+
   it("strips the spec_ prefix rack-style gem suites carry", () => {
     expect(rubyToConventionTs("spec_auth_basic.rb", "rack")).toBe("auth-basic.test.ts");
     expect(rubyToConventionTs("spec_body_proxy.rb", "rack")).toBe("body-proxy.test.ts");
