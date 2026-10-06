@@ -19,7 +19,7 @@ export function head(
   status: number | string | null | false,
   options: Record<string, unknown> | null = null,
 ): true {
-  if (isPlainObject(status)) {
+  if (isPlainObject(status) || (status as unknown) instanceof Map) {
     throw new ArgumentError(`${rbInspect(status)} is not a valid value for \`status\`.`);
   }
 
@@ -74,8 +74,7 @@ export function includeContent(status: number): boolean {
   }
 }
 
-export const Head: Module<{ head: typeof head; includeContent: typeof includeContent }> =
-  new Module((mod) => {
-    mod.defineMethod("head", head);
-    mod.defineMethod("includeContent", includeContent);
-  });
+export const Head: Module<{ head: typeof head }> = new Module((mod) => {
+  mod.defineMethod("head", head);
+  mod.defineMethod("includeContent", includeContent);
+});

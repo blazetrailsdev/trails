@@ -29,7 +29,7 @@ export const Collector = new Module((mod) => {
       }),
     );
   };
-}) as Module<{ methodMissing: typeof methodMissing }> & {
+}) as Module & {
   generateMethodForMime: typeof generateMethodForMime;
 };
 Collector.generateMethodForMime = generateMethodForMime;

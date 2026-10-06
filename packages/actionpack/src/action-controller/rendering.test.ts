@@ -5,7 +5,7 @@ import { Base, DoubleRenderError } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
 import { Head } from "./metal/head.js";
-import { include, type Included } from "@blazetrails/ruby-compat";
+import { ArgumentError, include, type Included } from "@blazetrails/ruby-compat";
 import { Request } from "../action-dispatch/request.js";
 import { Response } from "../action-dispatch/response.js";
 
@@ -196,6 +196,13 @@ describe("ActionController rendering", () => {
   });
 
   describe("head", () => {
+    it("head raises ArgumentError for a Hash status", () => {
+      const c = new HeadMetal();
+      c.setResponseBang(makeResponse());
+      expect(() => c.head({ location: "/" } as never)).toThrow(ArgumentError);
+      expect(() => c.head(new Map() as never)).toThrow(ArgumentError);
+    });
+
     it("head with numeric status", async () => {
       class C extends HeadMetal {
         async index() {
