@@ -11,6 +11,7 @@ import { ScalarScanner } from "../scalar-scanner.js";
 type RubyClass = { prototype: object; allocate?: () => object };
 
 function allocate(klass: RubyClass): object {
+  if (klass.prototype instanceof Map) return new (klass as unknown as new () => object)();
   return klass.allocate?.() ?? (Object.create(klass.prototype) as object);
 }
 
@@ -143,7 +144,8 @@ export class ToRuby {
         if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") Object.assign(hash, val);
         else if (yaml.isSeq(v)) Object.assign(hash, ...(val as object[]).slice().reverse());
         else hash[key] = val;
-      } else hash[key] = val;
+      } else if (hash instanceof Map) hash.set(key, val);
+      else hash[key] = val;
     }
     return hash;
   }

@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { rbObjDup } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
+import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Parameters, UnpermittedParameters } from "./strong-parameters.js";
 
 describe("Parameters#unpermitted_parameters!", () => {
@@ -124,13 +125,17 @@ describe("ActionController::Parameters", () => {
     expect([withIvars.get("key"), withIvars.permitted]).toEqual([":value", true]);
 
     const object = allocate("!ruby/object:ActionController::Parameters", {
-      parameters: { key: ":value" },
+      parameters: withIndifferentAccess({ key: ":value" }),
       permitted: true,
     });
     expect([object.get("key"), object.permitted]).toEqual([":value", true]);
 
     const coder = new Psych.Coder(null);
     object.encodeWith(coder);
-    expect({ ...coder }).toEqual({ parameters: { key: ":value" }, permitted: true });
+    expect(coder["parameters"]).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(JSON.parse(JSON.stringify({ ...coder }))).toEqual({
+      parameters: { key: ":value" },
+      permitted: true,
+    });
   });
 });

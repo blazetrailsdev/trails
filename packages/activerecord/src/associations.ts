@@ -430,6 +430,7 @@ export async function _loadSingularViaStatementCache(
   assocName: string,
   reflection: ReflectionLike,
   targetModel: typeof Base,
+  async = false,
 ): Promise<Base | null> {
   let instance: AssociationInstance | undefined;
   const assocFn = (owner as { association?: (n: string) => unknown }).association;
@@ -465,7 +466,7 @@ export async function _loadSingularViaStatementCache(
   const chain = (reflection as unknown as { chain: never[] }).chain;
   const binds = AssociationScope.getBindValues(owner, chain);
   const records = await targetModel.withConnection((c) =>
-    sc.execute(binds, c, { allowRetry: true }, (record) => {
+    sc.execute(binds, c, { async }, (record) => {
       instance?.setInverseInstance(record);
       instance?.setStrictLoading(record);
     }),

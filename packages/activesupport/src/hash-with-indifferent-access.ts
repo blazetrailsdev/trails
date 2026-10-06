@@ -1,5 +1,6 @@
 import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
+import { ActiveSupport } from "./namespaces.js";
 import {
   ArgumentError,
   type DefaultProc,
@@ -8,6 +9,7 @@ import {
   TypeError,
   eachPair,
   isSymbol,
+  rbModConstSet,
   rbObjClassname,
   rbObjRespondTo,
   symbolToS,
@@ -665,3 +667,5 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     }
   }
 }
+
+rbModConstSet(ActiveSupport, "HashWithIndifferentAccess", HashWithIndifferentAccess);

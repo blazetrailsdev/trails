@@ -85,7 +85,7 @@ export class SingularAssociation extends Association<Base> {
    * @inventedArm loop — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
    * @inventedArm throw — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
    */
-  protected override findTarget(): Promise<Base | null> {
+  protected override findTarget({ async = false }: { async?: boolean } = {}): Promise<Base | null> {
     if (!this.disableJoins && this.isViolatesStrictLoading()) {
       strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
     }
@@ -121,7 +121,13 @@ export class SingularAssociation extends Association<Base> {
 
       let result: Base | null;
       if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-        result = await _loadSingularViaStatementCache(owner, assocName, reflection, targetModel);
+        result = await _loadSingularViaStatementCache(
+          owner,
+          assocName,
+          reflection,
+          targetModel,
+          async,
+        );
       } else {
         const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
         const baseRelation = _scopeForAssociation(targetModel);

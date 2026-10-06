@@ -36,9 +36,8 @@ export class PartialQuery extends Query {
 
   override sqlFor(binds: unknown[], connection: unknown): string {
     const val = [...this._values];
-    const bindsCopy = [...binds];
     for (const i of this._indexes) {
-      let value = bindsCopy.shift();
+      let value = binds.shift();
       if (value instanceof Attribute) {
         value = value.valueForDatabase;
       }
@@ -177,16 +176,20 @@ export class StatementCache {
       const sql = this._queryBuilder.sqlFor(bindValues, connection);
       const allowRetry = opts.allowRetry ?? false;
       const async = opts.async ?? false;
-      const binds = this._queryBuilder instanceof PartialQuery ? [] : bindValues;
       if (async) {
         return await this._model.asyncFindBySql(
           sql,
-          binds,
+          bindValues,
           { preparable: true, allowRetry },
           block,
         );
       } else {
-        return await this._model.findBySql(sql, binds, { preparable: true, allowRetry }, block);
+        return await this._model.findBySql(
+          sql,
+          bindValues,
+          { preparable: true, allowRetry },
+          block,
+        );
       }
     } catch (e) {
       if (e instanceof ActiveModelRangeError || e instanceof ARRangeError) return [];
