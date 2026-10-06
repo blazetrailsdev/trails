@@ -908,12 +908,12 @@ describe("BelongsToAssociationsTest", () => {
 
   it("polymorphic association class", async () => {
     const sponsor = Sponsor.new({});
-    expect(sponsor.association("sponsorable").klass).toBeUndefined();
+    expect(sponsor.association("sponsorable").klass).toBeNull();
     await sponsor.association("sponsorable").reload();
     expect(await (sponsor as any).sponsorable).toBeNull();
 
     (sponsor as any).sponsorable_type = "";
-    expect(sponsor.association("sponsorable").klass).toBeUndefined();
+    expect(sponsor.association("sponsorable").klass).toBeNull();
     await sponsor.association("sponsorable").reload();
     expect(await (sponsor as any).sponsorable).toBeNull();
 
