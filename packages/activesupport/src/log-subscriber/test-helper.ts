@@ -1,4 +1,4 @@
-import { compact, strip, toS } from "@blazetrails/ruby-compat";
+import { compact, Hash, strip, toS } from "@blazetrails/ruby-compat";
 import { LogSubscriber } from "../log-subscriber.js";
 import { LOG_LEVELS, Logger } from "../logger.js";
 import { Notifications } from "../notifications.js";
@@ -30,7 +30,7 @@ export function teardown(this: TestHelperHost): void {
 export class MockLogger {
   private _flushCount: number;
   level: number;
-  private _logged: Map<string, unknown[]>;
+  private _logged: Hash<string, unknown[]>;
 
   declare debug: (message?: unknown) => void;
   declare info: (message?: unknown) => void;
@@ -48,7 +48,11 @@ export class MockLogger {
   constructor(level: number = Logger.DEBUG) {
     this._flushCount = 0;
     this.level = level;
-    this._logged = new Map();
+    this._logged = new Hash<string, unknown[]>((h, k) => {
+      const v: unknown[] = [];
+      h.set(k, v);
+      return v;
+    });
   }
 
   get flushCount(): number {
@@ -56,7 +60,6 @@ export class MockLogger {
   }
 
   methodMissing(level: string, message: unknown = null, block?: () => unknown): void {
-    if (!this._logged.has(level)) this._logged.set(level, []);
     if (block) {
       this._logged.get(level)!.push(block());
     } else {
@@ -65,7 +68,6 @@ export class MockLogger {
   }
 
   logged(level: string): string[] {
-    if (!this._logged.has(level)) this._logged.set(level, []);
     return compact(this._logged.get(level)!).map((l) => strip(toS(l)));
   }
 

@@ -1,8 +1,3 @@
-/**
- * Entries scoped to `package: "activejob"`. The `package` field, not this file's
- * name, is what scopes the match. Schema: ./types.ts.
- */
-
 import type { UnportedFile } from "./types.js";
 
 const GEM_ADAPTER =

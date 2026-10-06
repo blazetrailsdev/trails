@@ -190,9 +190,6 @@ export function rubyToConventionTs(rubyFile: string, pkg: string): string {
     rubyFile = rubyFile.slice("i18n/".length);
   }
 
-  // activejob's `testPath` is the test root, so `test/serializers/` is counted;
-  // `test/cases/` is where the suite keeps everything else and names no
-  // `lib/active_job` directory.
   if (pkg === "activejob" && rubyFile.startsWith("cases/")) {
     rubyFile = rubyFile.slice("cases/".length);
   }
