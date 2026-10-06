@@ -89,8 +89,9 @@ export interface MethodInfo {
    *  `block_given?`. Compared by block-params.ts. */
   takesBlock?: boolean;
   /** TS side only (RFC 0156): a class property assigned a callable
-   *  (`static assertRaises = assertRaises`) carries no `params` of its own;
-   *  these are the target's, read by the block-parameter check alone. */
+   *  (`static assertRaises = assertRaises`), or a `declare`d one typed by a
+   *  function type (`declare transaction: (block: () => void) => void`),
+   *  carries no `params` of its own; these are the target's. */
   aliasParams?: ParamInfo[];
   /**
    * TS-side only (RFC 0084): the same call names in SOURCE ORDER, deduplicated

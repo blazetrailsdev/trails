@@ -53,14 +53,14 @@ export class LogSubscriber extends BaseLogSubscriber {
   declare backtraceCleaner: BacktraceCleaner;
 
   strictLoadingViolation(event: Event): void {
-    this._debug(() => {
+    this.debug(null, () => {
       const owner = event.payload.owner;
       const reflection = event.payload.reflection as any;
       return this.color(reflection.strictLoadingViolationMessage(owner), BaseLogSubscriber.RED);
     });
   }
 
-  sql(event: Event): boolean | undefined {
+  sql(event: Event): undefined {
     const payload = event.payload as Event["payload"] & { binds?: any[] | null };
 
     if (LogSubscriber.IGNORE_PAYLOAD_NAMES.includes(payload.name as string)) return;
@@ -107,7 +107,7 @@ export class LogSubscriber extends BaseLogSubscriber {
       : sql;
 
     const message = `  ${colorizedName}  ${colorizedSql}${binds ?? ""}`;
-    return this.debugSql(message);
+    return this.debug(message);
   }
 
   /** @internal */
@@ -115,16 +115,13 @@ export class LogSubscriber extends BaseLogSubscriber {
     return ActiveRecord.Base.logger as Logger | null;
   }
 
-  protected debugSql(message: string): boolean {
-    const l = this.logger;
-    if (!l) return false;
-    const result = l.debug(message);
+  /** @internal */
+  protected debug(progname: string | null = null, block?: () => string): undefined {
+    if (!super._debug(block ?? progname ?? undefined)) return;
 
     if (verboseQueryLogs()) {
       this.logQuerySource();
     }
-
-    return result;
   }
 
   private logQuerySource(): void {
@@ -189,16 +186,3 @@ classAttribute.call(LogSubscriber, "backtraceCleaner", { default: new BacktraceC
 
 LogSubscriber.subscribeLogLevel("sql", "debug");
 LogSubscriber.subscribeLogLevel("strict_loading_violation", "debug");
-
-/** @internal */
-export function debug(subscriber: LogSubscriber, message: string): boolean {
-  const logger = subscriber.logger;
-  if (!logger) return false;
-  const result = logger.debug(message);
-  if (!result) return false;
-  if (verboseQueryLogs()) {
-    const source = subscriber["querySourceLocation"]?.();
-    if (source) logger.debug(`  ↳ ${source}`);
-  }
-  return true;
-}

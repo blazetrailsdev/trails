@@ -85,6 +85,31 @@ describe("extractClass — a `declare` member typed `typeof fn`", () => {
   });
 });
 
+describe("extractClass — a `declare` member typed by a function type", () => {
+  it("records the declared method's parameters as aliasParams, through a named call signature too", () => {
+    const cls = extractFromSource(
+      `interface Define { (info: object, block: () => void): void }
+      class Foo {
+        declare transaction: (block: () => void) => void;
+        declare static define: Define;
+      }`,
+    );
+    const transaction = cls.instanceMethods.find((m) => m.name === "transaction")!;
+    expect(transaction.aliasParams?.map((p) => p.name)).toEqual(["block"]);
+    const define = cls.classMethods.find((m) => m.name === "define")!;
+    expect(define.aliasParams?.find((p) => p.name === "block")?.admitsFunction).toBe(true);
+  });
+
+  it("leaves a stored field holding a callable parameterless, as an attr_reader is", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        resolver!: (request: object) => string;
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "resolver")!.aliasParams).toBeUndefined();
+  });
+});
+
 function objectLiteralMethods(source: string): MethodInfo[] {
   const { sourceFile, checker } = compile(source);
   let out: MethodInfo[] = [];

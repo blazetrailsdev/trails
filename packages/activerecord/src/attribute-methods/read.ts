@@ -5,8 +5,8 @@ import { rbFCaller } from "@blazetrails/ruby-compat";
 import { AttributeMethods as AttributeMethodsNamespace } from "../namespaces.js";
 
 export interface Read {
-  readAttribute(name: string): unknown;
-  _readAttribute(name: string): unknown;
+  readAttribute(attrName: string, block?: (name: string) => unknown): unknown;
+  _readAttribute(attrName: string, block?: (name: string) => unknown): unknown;
   /** @internal */
   attribute(name: string): unknown;
 }
