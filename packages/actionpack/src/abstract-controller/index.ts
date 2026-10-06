@@ -67,7 +67,6 @@ export {
 } from "./caching/fragments.js";
 export {
   _helpersForModification,
-  _helpersInstance,
   clearHelpers,
   defaultHelperModuleBang,
   helper,

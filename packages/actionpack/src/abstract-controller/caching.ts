@@ -1,8 +1,8 @@
 /** @internal */
 
 import { expandCacheKey, lookupStore } from "@blazetrails/activesupport/cache";
-import { classAttribute, extend, include, included } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { classAttribute, Concern, extend, include } from "@blazetrails/activesupport";
+import { Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Fragments } from "./caching/fragments.js";
 import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activesupport";
 
@@ -29,7 +29,7 @@ export interface CachingHost {
 
 type ConfigReceiver = { config(): Configuration & { cacheStore: CacheStore | null } };
 
-export const ConfigMethods = {
+export const ConfigMethods = new Module().include({
   get cacheStore(): CacheStore | null {
     return (this as unknown as ConfigReceiver).config().cacheStore;
   },
@@ -42,45 +42,65 @@ export const ConfigMethods = {
   isCacheConfigured(this: Omit<CachingHost, "constructor" | "isCacheConfigured">) {
     return this.performCaching && this.cacheStore;
   },
-};
-
-export class Caching {
-  static [included](
-    base: CachingClassMethods & {
-      configAccessor(...names: string[]): void;
-      helperMethod?(...methods: string[]): void;
-    },
-  ): void {
-    include(base, Fragments);
-    extend(base, ConfigMethods);
-
-    base.configAccessor("defaultStaticExtension");
-    base.defaultStaticExtension ??= ".html";
-
-    base.configAccessor("performCaching");
-    if (base.performCaching == null) base.performCaching = true;
-
-    base.configAccessor("enableFragmentCacheLogging");
-    base.enableFragmentCacheLogging = false;
-
-    classAttribute.call(base, "_viewCacheDependencies", { default: [] });
-    if (rbObjRespondTo(base, "helperMethod")) base.helperMethod!("viewCacheDependencies");
-  }
-}
+});
 
 export function viewCacheDependency(
   this: CachingClassMethods,
   dependency: ViewCacheDependency,
 ): void {
-  this._viewCacheDependencies = [...(this._viewCacheDependencies ?? []), dependency];
+  this._viewCacheDependencies = [...this._viewCacheDependencies!, dependency];
 }
 
+export const ClassMethods = new Module((mod) => {
+  mod.defineMethod("viewCacheDependency", viewCacheDependency);
+});
+
+export const Caching = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.include(ConfigMethods);
+  include(mod, Fragments);
+
+  (
+    mod as unknown as {
+      included(
+        base: null,
+        block: (
+          this: CachingClassMethods & {
+            configAccessor(...names: string[]): void;
+            helperMethod(...methods: string[]): void;
+          },
+        ) => void,
+      ): void;
+    }
+  ).included(null, function () {
+    extend(this, ConfigMethods);
+
+    this.configAccessor("defaultStaticExtension");
+    this.defaultStaticExtension ||= ".html";
+
+    this.configAccessor("performCaching");
+    if (this.performCaching == null) this.performCaching = true;
+
+    this.configAccessor("enableFragmentCacheLogging");
+    this.enableFragmentCacheLogging = false;
+
+    classAttribute.call(this, "_viewCacheDependencies", { default: [] });
+    if (rbObjRespondTo(this, "helperMethod")) this.helperMethod("viewCacheDependencies");
+  });
+
+  mod.defineMethod("viewCacheDependencies", viewCacheDependencies);
+  mod.defineMethod("cache", cache);
+}) as Module<{ viewCacheDependencies: typeof viewCacheDependencies; cache: typeof cache }> & {
+  ClassMethods: typeof ClassMethods;
+};
+Caching.ClassMethods = ClassMethods;
+
 export function viewCacheDependencies(this: CachingHost): unknown[] {
-  const deps = this.constructor._viewCacheDependencies ?? [];
   const out: unknown[] = [];
-  for (const dep of deps) {
+  for (const dep of this.constructor._viewCacheDependencies!) {
     const value = dep.call(this);
-    if (value != null) out.push(value);
+    if (value != null && value !== false) out.push(value);
   }
   return out;
 }

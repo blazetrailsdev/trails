@@ -1,4 +1,3 @@
-import { isAnonymous } from "@blazetrails/activesupport";
 import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import { helpersPath } from "../metal/helpers.js";
 
@@ -10,10 +9,7 @@ export interface HelpersPathControllerClass extends HelpersClassMethods {
 
 const fired = new WeakSet<object>();
 
-/**
- * @missingRailsCall _helpers= — CONVERGEABLE helpers-inherited-resets-helpers-and-includes-default-module-first
- * @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook
- */
+/** @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook */
 export function fireInherited(
   klass: HelpersPathControllerClass,
   base: HelpersPathControllerClass,
@@ -30,7 +26,6 @@ export function fireInherited(
   for (const k of chain) {
     if (fired.has(k)) continue;
     fired.add(k);
-    if (!isAnonymous(k as HelpersClass)) (k as HelpersClass).defaultHelperModuleBang();
     inherited(k, base);
     (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
   }

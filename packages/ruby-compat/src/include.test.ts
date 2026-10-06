@@ -1,4 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
+import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
 import { Hash } from "./hash.js";
 import { rbCBasicObject, rbObjClass, rbModName, rbModToS, rbObjSingletonClass } from "./object.js";
@@ -1373,6 +1374,44 @@ describe("rbObjDup", () => {
   });
 });
 
+describe("Module#include?", () => {
+  it("answers for a module included directly or through an included Module", () => {
+    const plain = { hello: () => "hello" };
+    const inner = new Module((mod) => mod.include(plain));
+    const outer = new Module((mod) => mod.include(inner));
+    expect(outer.isInclude(inner)).toBe(true);
+    expect(outer.isInclude(plain)).toBe(true);
+    expect(inner.isInclude(outer)).toBe(false);
+    expect(new Module().isInclude(plain)).toBe(false);
+  });
+});
+
+describe("Module#include of an accessor", () => {
+  it("carries a reader and writer pair without calling the reader", () => {
+    const mod = new Module().include({
+      get title(): string {
+        return (this as unknown as { _title: string })._title;
+      },
+      set title(value: string) {
+        (this as unknown as { _title: string })._title = value;
+      },
+    });
+    class Host {}
+    include(Host, mod);
+    const host = new Host() as { title: string; _title?: string };
+    host.title = "a";
+    expect(host._title).toBe("a");
+    expect(host.title).toBe("a");
+  });
+
+  it("installs an ES module namespace's exports as methods, not accessors", () => {
+    const mod = new Module().include(EnsureNamespace);
+    const entry = mod.instanceMethod("rbEnsure")!;
+    expect(entry.value).toBe(EnsureNamespace.rbEnsure);
+    expect(entry.get).toBeUndefined();
+  });
+});
+
 describe("Module#include of a Module", () => {
   it("splices the included module beneath the includer, live", () => {
     const inner = new Module();
@@ -1435,6 +1474,14 @@ describe("Module#const_defined?", () => {
     expect(rbModConstDefined(Reply, "Generated")).toBe(true);
     expect(rbModConstDefined(mod, "ATTR_d697")).toBe(true);
     expect(rbModConstDefined(mod, "Generated")).toBe(false);
+  });
+
+  it("looks at the module alone when recur is false", () => {
+    class Topic {}
+    class Reply extends Topic {}
+    rbModConstSet(Topic, "Generated", 1);
+    expect(rbModConstDefined(Topic, "Generated", false)).toBe(true);
+    expect(rbModConstDefined(Reply, "Generated", false)).toBe(false);
   });
 
   it("raises NameError for a name that is not a constant name", () => {

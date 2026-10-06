@@ -1,4 +1,4 @@
-import { TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
+import { CLASS_METHOD_TABLE, TypeError, rbModSingletonP } from "@blazetrails/ruby-compat";
 
 export interface ClassAttributeOptions {
   instanceAccessor?: boolean;
@@ -114,3 +114,10 @@ export function classAttribute(this: any, ...attrs: (string | ClassAttributeOpti
     }
   }
 }
+
+CLASS_METHOD_TABLE.classAttribute = function (
+  self: object,
+  ...attrs: (string | ClassAttributeOptions)[]
+): void {
+  classAttribute.call(self, ...attrs);
+};

@@ -173,7 +173,7 @@ export const FROZEN_EMPTY_ARRAY: readonly never[] = Object.freeze([]);
 
 export const FROZEN_EMPTY_HASH: Readonly<Record<string, never>> = Object.freeze({});
 
-type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
+type OrderDirection = ":asc" | ":desc" | ":ASC" | ":DESC" | "asc" | "desc" | "ASC" | "DESC";
 
 export type OrderArg =
   | string

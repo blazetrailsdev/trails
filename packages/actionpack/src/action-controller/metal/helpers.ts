@@ -7,7 +7,7 @@ import {
   type InheritableOptions,
 } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
-import { rbObjIvarGet, rbObjIvarSet, registerConstant } from "@blazetrails/ruby-compat";
+import { aryDelete, rbObjIvarGet, rbObjIvarSet, registerConstant } from "@blazetrails/ruby-compat";
 import {
   Helpers as AbstractHelpers,
   Resolution,
@@ -51,23 +51,31 @@ export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[])
 
 type ConfigReceiver = { config(): InheritableOptions };
 
-/** @internal */
+type HelpersClassHost = HelpersClass & { allApplicationHelpers(): string[] };
+
+export function modulesForHelpers(
+  this: HelpersClassHost,
+  args: Array<HelperMethodsModule | string | Array<unknown>>,
+): HelperMethodsModule[] {
+  if (aryDelete(args, ":all") != null) {
+    args = [...args, ...this.allApplicationHelpers()];
+  }
+  return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as HelperMethodsModule[];
+}
+
+/**
+ * @internal
+ * @missingRailsCall all_helpers_from_path — CONVERGEABLE action-controller-helpers-all-application-helpers-and-helper-method-accessor-arm
+ * @missingRailsCall helpers_path — CONVERGEABLE action-controller-helpers-all-application-helpers-and-helper-method-accessor-arm
+ */
 function allApplicationHelpers(): string[] {
   return _applicationHelpers;
 }
 
-export function modulesForHelpers(
-  args: ReadonlyArray<HelperMethodsModule | string | Array<unknown>>,
-): HelperMethodsModule[] {
-  const rest = args.filter((arg) => arg !== ":all");
-  const argsWithAll = rest.length === args.length ? rest : [...rest, ...allApplicationHelpers()];
-  return Resolution.modulesForHelpers(argsWithAll as Array<HelperMethodsModule | string>);
-}
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("helperAttr", helperAttr);
 
-export const ClassMethods = {
-  helperAttr,
-
-  helpers(this: { _helpers?: HelperMethodsModule }): ActionViewBase {
+  mod.defineMethod("helpers", function (this: HelpersClass): ActionViewBase {
     return ((rbObjIvarGet(this, "@helper_proxy") as ActionViewBase | null) ||
       rbObjIvarSet(
         this,
@@ -75,13 +83,14 @@ export const ClassMethods = {
         (() => {
           const proxy = ActionViewBase.empty();
           proxy.config = (this as unknown as ConfigReceiver).config().inheritableCopy();
-          return extend(proxy, this._helpers!);
+          return extend(proxy, this._helpers);
         })(),
       )) as ActionViewBase;
-  },
+  });
 
-  modulesForHelpers,
-};
+  mod.defineMethod("modulesForHelpers", modulesForHelpers);
+  mod.defineMethod("allApplicationHelpers", allApplicationHelpers);
+});
 
 export function helpers(this: {
   _helperProxy?: ActionViewBase | null;

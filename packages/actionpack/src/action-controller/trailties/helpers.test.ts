@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
 
-import { include, Module } from "@blazetrails/ruby-compat";
+import { extend, include, Module } from "@blazetrails/ruby-compat";
 import {
+  ClassMethods,
   helpersPath,
-  modulesForHelpers,
   setApplicationHelpers,
   setHelpersPath,
 } from "../metal/helpers.js";
@@ -15,11 +15,13 @@ const AbcHelper = new Module().include({ bareA: () => "a" });
 function base(): HelpersPathControllerClass {
   const Base = class Base {};
   include(Base, Helpers);
-  return Object.assign(Base, { helpersPath: [], includeAllHelpers: true, modulesForHelpers });
+  extend(Base, ClassMethods);
+  return Object.assign(Base, { helpersPath: [], includeAllHelpers: true });
 }
 
 function subclassOf(parent: HelpersPathControllerClass): HelpersPathControllerClass {
-  return Object.create(parent) as HelpersPathControllerClass;
+  return (() =>
+    class extends (parent as unknown as new () => object) {})() as HelpersPathControllerClass;
 }
 
 afterEach(() => {

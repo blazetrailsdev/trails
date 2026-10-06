@@ -19,6 +19,7 @@ import { readFragment, writeFragment } from "./caching/fragments.js";
 
 class HostClass {
   static _viewCacheDependencies?: Array<(this: CachingHost) => unknown>;
+  static fragmentCacheKeys: Array<() => unknown> = [];
 
   greeting = "hello";
   instrumentPayload(key: unknown) {
@@ -44,7 +45,7 @@ function makeHost(store?: MemoryStore | null): HostClass & CachingHost & typeof 
   if (store) HostConfig.cacheStore = store;
   HostConfig.performCaching = true;
   HostConfig.defaultStaticExtension = ".html";
-  HostClass._viewCacheDependencies = undefined;
+  HostClass._viewCacheDependencies = [];
   return new HostClass() as unknown as HostClass & CachingHost & typeof ConfigMethods;
 }
 

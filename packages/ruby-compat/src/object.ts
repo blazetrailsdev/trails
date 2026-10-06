@@ -366,6 +366,19 @@ function enumerableMethod(
 }
 
 /**
+ * The methods a package defines on `Class`, as `rb_define_method` on
+ * `rb_cClass` (`vendor/ruby/v3.3.11/class.c:2134`) does, keyed by the camelCased Ruby
+ * name, which {@link basicObjRespondTo} answers for a class receiver:
+ * ActiveSupport's `Class#class_attribute`
+ * (`activesupport/lib/active_support/core_ext/class/attribute.rb:86`) is what
+ * `respond_to?(:class_attribute)` asks of a class and not of a module.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) => unknown> =
+  Object.create(null);
+
+/**
  * The methods bound on a Temporal seat, keyed by its `Symbol.toStringTag` and
  * then by the camelCased Ruby name, which {@link rbFSend} dispatches and
  * {@link basicObjRespondTo} answers for: a Temporal value's prototype carries
@@ -496,6 +509,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
       return true;
     }
   }
+  if (klass && Object.hasOwn(CLASS_METHOD_TABLE, mid)) return true;
   let cme: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
