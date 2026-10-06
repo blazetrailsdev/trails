@@ -414,6 +414,7 @@ export default defineConfig(
       "packages/activemodel/src/**/*.ts",
       "packages/actionpack/src/**/*.ts",
       "packages/actionview/src/**/*.ts",
+      "packages/activejob/src/**/*.ts",
       "packages/activerecord/src/**/*.ts",
       "packages/rack/src/**/*.ts",
       "packages/globalid/src/**/*.ts",

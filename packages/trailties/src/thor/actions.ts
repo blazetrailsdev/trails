@@ -347,7 +347,6 @@ export async function runRubyScript(
   return this.run(command, merge(config, { with: rubyCommand() }));
 }
 
-/** @missingRailsArgs strip — PERMANENT */
 export async function thor(
   this: ActionsHost,
   command: unknown,

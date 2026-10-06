@@ -80,10 +80,7 @@ export class EmptyDirectory {
     this.relativeDestination = this.base.relativeToOriginalDestinationRoot(this._destination);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs strip — PERMANENT
-   */
+  /** @internal */
   protected convertEncodedInstructions(filename: string): string {
     return filename.replace(/%(.*?)%/g, (initialString: string, $1: string) => {
       const method = strip($1);

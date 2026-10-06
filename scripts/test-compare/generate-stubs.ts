@@ -36,6 +36,7 @@ const PKG_DIRS: Record<string, string> = {
   actioncontroller: "packages/actionpack/src/action-controller/",
   abstractcontroller: "packages/actionpack/src/abstract-controller/",
   actionview: "packages/actionview/src/",
+  activejob: "packages/activejob/src/",
   thor: PKG_SRC_DIRS.thor,
 };
 

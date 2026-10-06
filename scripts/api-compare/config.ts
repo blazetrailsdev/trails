@@ -189,6 +189,7 @@ export const MANIFEST_PACKAGES = [
   "abstractcontroller",
   "actionpackversion",
   "actionview",
+  "activejob",
   "trailties",
   "rack",
   "rack-session",
