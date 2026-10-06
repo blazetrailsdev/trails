@@ -332,6 +332,7 @@ const alias = {
   "@blazetrails/ruby-compat": path.resolve(__dirname, "packages/ruby-compat/src/index.ts"),
   "@blazetrails/bcrypt": path.resolve(__dirname, "packages/bcrypt/src/index.ts"),
   "@blazetrails/date": path.resolve(__dirname, "packages/date/src/index.ts"),
+  "@blazetrails/msgpack": path.resolve(__dirname, "packages/msgpack/src/index.ts"),
   "@blazetrails/did-you-mean": path.resolve(__dirname, "packages/did-you-mean/src/index.ts"),
   "@blazetrails/i18n": path.resolve(__dirname, "packages/i18n/src/index.ts"),
   "@blazetrails/nokogiri": path.resolve(__dirname, "packages/nokogiri/src/index.ts"),

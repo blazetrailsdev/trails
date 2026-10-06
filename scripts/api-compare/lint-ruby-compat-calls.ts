@@ -93,6 +93,7 @@ export const ENROLLED_PACKAGES: readonly string[] = [
   "did-you-mean",
   "globalid",
   "i18n",
+  "msgpack",
   "rack",
   "rack-session",
   "rack-test",

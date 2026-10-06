@@ -32,6 +32,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/globalid/signed-global-id", "../globalid/src/signed-global-id.ts"],
   ["@blazetrails/globalid", "../globalid/src/index.ts"],
   ["@blazetrails/bcrypt", "../bcrypt/src/index.ts"],
+  ["@blazetrails/msgpack", "../msgpack/src/index.ts"],
   ["@blazetrails/date", "../date/src/index.ts"],
   ["@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"],
   ["@blazetrails/i18n", "../i18n/src/index.ts"],

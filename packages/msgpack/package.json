@@ -1,0 +1,25 @@
+{
+  "name": "@blazetrails/msgpack",
+  "version": "0.1.0",
+  "description": "MessagePack serialization, mirroring Ruby's msgpack gem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@blazetrails/ruby-compat": "workspace:*",
+    "@msgpack/msgpack": "^3.1.3"
+  }
+}

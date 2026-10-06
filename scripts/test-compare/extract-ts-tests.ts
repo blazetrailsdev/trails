@@ -30,6 +30,7 @@ function getPackageTestFiles(): Record<string, string[]> {
     "rack-session",
     "rack-test",
     "bcrypt",
+    "msgpack",
     "actionview",
     "activejob",
     "trailties",

@@ -24,6 +24,10 @@
       "ref": "v5.27.0",
       "sha": "819e9b5f873d7ab6d4edfeaed48542279367ff93"
     },
+    "msgpack": {
+      "ref": "v1.8.0",
+      "sha": "e4305b4b8a2506422bc78b6fab624907eb7e74a5"
+    },
     "rack": {
       "ref": "v3.1.14",
       "sha": "5440b2c8b006f1c2ef202c2bd60dd70924c9b1c1"
