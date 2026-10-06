@@ -14,6 +14,7 @@ import {
 } from "../sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
 import { ConfigurationError } from "../errors.js";
+import { rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
 
 /** @internal */
 interface ExpoSQLiteStatement {
@@ -76,27 +77,43 @@ class ExpoSqliteStatement implements SqliteStatement {
   }
 
   async run(binds?: SqliteBinds): Promise<RunResult> {
-    const result = await this.stmt.executeAsync(expandBinds(binds));
-    return {
-      changes: result.changes,
-      lastInsertRowid: result.lastInsertRowId,
-    };
+    try {
+      const result = await this.stmt.executeAsync(expandBinds(binds));
+      return {
+        changes: result.changes,
+        lastInsertRowid: result.lastInsertRowId,
+      };
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   async get(binds?: SqliteBinds): Promise<unknown> {
-    const result = await this.stmt.executeAsync(expandBinds(binds));
-    return result.getFirstAsync();
+    try {
+      const result = await this.stmt.executeAsync(expandBinds(binds));
+      return await result.getFirstAsync();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   async all(binds?: SqliteBinds): Promise<unknown[]> {
-    const result = await this.stmt.executeAsync(expandBinds(binds));
-    return result.getAllAsync();
+    try {
+      const result = await this.stmt.executeAsync(expandBinds(binds));
+      return await result.getAllAsync();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   async *iterate(binds?: SqliteBinds): AsyncIterable<unknown> {
-    const result = await this.stmt.executeAsync(expandBinds(binds));
-    for await (const row of result) {
-      yield row;
+    try {
+      const result = await this.stmt.executeAsync(expandBinds(binds));
+      for await (const row of result) {
+        yield row;
+      }
+    } catch (e) {
+      rbSqlite3Raise(e);
     }
   }
 
@@ -112,8 +129,12 @@ class ExpoSqliteStatement implements SqliteStatement {
   }
 
   async toA(): Promise<unknown[][]> {
-    const result = await this.stmt.executeForRawResultAsync(expandBinds(this.boundParams));
-    return (await result.getAllAsync()) as unknown[][];
+    try {
+      const result = await this.stmt.executeForRawResultAsync(expandBinds(this.boundParams));
+      return (await result.getAllAsync()) as unknown[][];
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   columns(): ColumnInfo[] {
@@ -130,7 +151,11 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   async close(): Promise<void> {
     this._closed = true;
-    await this.stmt.finalizeAsync();
+    try {
+      await this.stmt.finalizeAsync();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 }
 
@@ -144,8 +169,11 @@ class ExpoSqliteConnection implements SqliteConnection {
   }
 
   async prepare(sql: string): Promise<ExpoSqliteStatement> {
-    const stmt = await this.raw.prepareAsync(sql);
-    return new ExpoSqliteStatement(stmt, sql);
+    try {
+      return new ExpoSqliteStatement(await this.raw.prepareAsync(sql), sql);
+    } catch (e) {
+      rbSqlite3RaiseWithSql(e, sql);
+    }
   }
 
   isOpen(): boolean {
@@ -191,30 +219,46 @@ class ExpoSqliteConnection implements SqliteConnection {
       await this.raw.execAsync(`PRAGMA ${source}`);
       return [];
     }
-    if (opts?.simple) {
-      const row = (await this.raw.getFirstAsync(`PRAGMA ${source}`)) as
-        | Record<string, unknown>
-        | undefined;
-      return row !== undefined ? Object.values(row)[0] : undefined;
+    try {
+      if (opts?.simple) {
+        const row = (await this.raw.getFirstAsync(`PRAGMA ${source}`)) as
+          | Record<string, unknown>
+          | undefined;
+        return row !== undefined ? Object.values(row)[0] : undefined;
+      }
+      return await this.raw.getAllAsync(`PRAGMA ${source}`);
+    } catch (e) {
+      rbSqlite3Raise(e);
     }
-    return this.raw.getAllAsync(`PRAGMA ${source}`);
   }
 
   async changes(): Promise<number> {
-    const row = (await this.raw.getFirstAsync("SELECT changes() AS v")) as { v: number };
-    return row.v;
+    try {
+      const row = (await this.raw.getFirstAsync("SELECT changes() AS v")) as { v: number };
+      return row.v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   async lastInsertRowId(): Promise<number | bigint> {
-    const row = (await this.raw.getFirstAsync("SELECT last_insert_rowid() AS v")) as {
-      v: number | bigint;
-    };
-    return row.v;
+    try {
+      const row = (await this.raw.getFirstAsync("SELECT last_insert_rowid() AS v")) as {
+        v: number | bigint;
+      };
+      return row.v;
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 
   async close(): Promise<void> {
-    this._open = false;
-    await this.raw.closeAsync();
+    try {
+      this._open = false;
+      await this.raw.closeAsync();
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   }
 }
 
@@ -242,9 +286,13 @@ export const expoSqliteDriver: SqliteDriver = {
         "SQLITE_OPEN_SHAREDCACHE is not supported by the expo-sqlite driver",
       );
     }
-    const db = await expoSqlite.openDatabaseAsync(config.database, {
-      ...config.driverOptions,
-    });
-    return new ExpoSqliteConnection(db);
+    try {
+      const db = await expoSqlite.openDatabaseAsync(config.database, {
+        ...config.driverOptions,
+      });
+      return new ExpoSqliteConnection(db);
+    } catch (e) {
+      rbSqlite3Raise(e);
+    }
   },
 };

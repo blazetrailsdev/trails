@@ -5,8 +5,8 @@ import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
-import { BusyException } from "../../sqlite/errors.js";
+import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
+import { BusyException, CantOpenException } from "../../sqlite/errors.js";
 import {
   ActiveRecordError,
   NoDatabaseError,
@@ -143,12 +143,37 @@ describe("SQLite3Adapter pragmas option", () => {
     expect(result[0]?.foreign_keys).toBe(1);
   });
 
-  it("raises NoDatabaseError opening a missing database file readonly", async () => {
+  it("raises SQLite3::CantOpenException opening a missing database file readonly", async () => {
     const missing = new BetterSQLite3Adapter({
       database: "tmp/missing-readonly-database.sqlite3",
       readonly: true,
     });
-    await expect(missing.connectBang()).rejects.toThrow(NoDatabaseError);
+    const error = await missing.connectBang().then(
+      () => null,
+      (e: Error) => e,
+    );
+    expect(error instanceof NoDatabaseError).toBe(false);
+    expect(error instanceof StatementInvalid).toBe(true);
+    expect(error!.message).toBe("SQLite3::CantOpenException: unable to open database file");
+    expect(error!.cause instanceof CantOpenException).toBe(true);
+  });
+
+  it("new_client raises NoDatabaseError for Errno::ENOENT and re-raises anything else", async () => {
+    const newClient = (error: Error) =>
+      Promise.resolve().then(() =>
+        BetterSQLite3Adapter.newClient({
+          database: ":memory:",
+          driver: {
+            name: "raising",
+            open: async () => {
+              throw error;
+            },
+          },
+        } as never),
+      );
+    await expect(newClient(new Errno.ENOENT("tmp/nope.sqlite3"))).rejects.toThrow(NoDatabaseError);
+    const cantOpen = new CantOpenException("unable to open database file");
+    await expect(newClient(cantOpen)).rejects.toBe(cantOpen);
   });
 
   it("raises NoDatabaseError with the pool when the database directory cannot be created", () => {
