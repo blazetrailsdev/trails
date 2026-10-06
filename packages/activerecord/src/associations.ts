@@ -346,8 +346,8 @@ export class Associations {
   }
 }
 
-export function isAssociationCached(record: Base, name: string): boolean {
-  return record._associationCache.has(name);
+export function isAssociationCached(this: Base, name: string): boolean {
+  return this._associationCache.has(name);
 }
 
 /** @internal */

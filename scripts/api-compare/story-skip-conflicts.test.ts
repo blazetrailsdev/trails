@@ -75,12 +75,12 @@ describe("namesMember", () => {
 });
 
 describe("storySkipConflicts", () => {
-  const body = "`active_record/message_pack.rb` and `lib/rack/headers.rb` `Headers#key?`";
+  const body = "`active_record/legacy_yaml_adapter.rb` and `lib/rack/headers.rb` `Headers#key?`";
   const rows = (status: string) =>
     storySkipConflicts([{ id: "s", status, body }]).map((c) => [c.register, c.pkg, c.rubyFile]);
 
   it("lists an unported file, and no scoped skip the register mirrors in TS", () => {
-    expect(rows("ready")).toEqual([["unported-file", "activerecord", "message_pack.rb"]]);
+    expect(rows("ready")).toEqual([["unported-file", "activerecord", "legacy_yaml_adapter.rb"]]);
   });
 
   it("skips a done or closed story", () => {

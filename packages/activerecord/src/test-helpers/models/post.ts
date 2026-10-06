@@ -688,6 +688,7 @@ export interface Post {
 export interface Post {
   get author(): Author | null | Promise<Author | null>;
   set author(value: Author | null);
+  createAuthorBang(attributes?: Record<string, unknown>): Promise<Author>;
   get readonlyAuthor(): Author | null | Promise<Author | null>;
   set readonlyAuthor(value: Author | null);
   get authorWithPosts(): Author | null | Promise<Author | null>;

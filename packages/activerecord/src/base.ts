@@ -1912,6 +1912,7 @@ export class Base extends Model {
   declare readAttributeBeforeTypeCast: (attrName: string) => unknown;
   declare attributes: Record<string, unknown>;
   declare attributesBeforeTypeCast: () => Record<string, unknown> | Hash<string, unknown>;
+  declare attributesForDatabase: () => Record<string, unknown> | Hash<string, unknown>;
   declare typeForAttribute: (name: string, block?: () => ValueType) => ValueType | null;
   declare columnForAttribute: (name: string) => any;
   declare toKey: () => unknown[] | null;
@@ -2075,6 +2076,7 @@ export class Base extends Model {
 
   declare equals: (other: unknown) => boolean;
   declare encodeWith: (coder: Record<string, unknown>) => void;
+  declare isAssociationCached: (name: string) => boolean;
 
   declare eql: (other: unknown) => boolean;
 
@@ -2299,6 +2301,11 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   /** @internal */
   _associationCache: Map<string, AssociationInstance>;
   association(name: string): AssociationInstance;
+  initWithAttributes(
+    attributes: unknown,
+    newRecord?: boolean,
+    block?: (record: this) => void,
+  ): this;
   readonly savedChanges: Hash<string, [unknown, unknown]>;
   readonly hasChangesToSave: boolean;
   readonly changesToSave: HashWithIndifferentAccess<[unknown, unknown]>;
