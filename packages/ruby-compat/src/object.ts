@@ -30,7 +30,11 @@ type Klass = abstract new (...args: never) => unknown;
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
  *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
- *  record whose prototype chain holds no class is a `Hash`.
+ *  record whose prototype chain holds no class is a `Hash`. `-0` is a whole
+ *  `number` and so an `Integer`, though Ruby has no negative Integer zero: JS
+ *  integer arithmetic answers `-0` (`Math.round(-0.4)`, `0 * -1`) where Ruby
+ *  answers `0`, so reading it as `-0.0` would turn those into Floats. The
+ *  Float `-0.0` is the boxed `new Number(-0)`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -141,6 +145,23 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
   });
   Object.setPrototypeOf(obj, klass.prototype);
   return klass;
+}
+
+/**
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
+ * the singleton class when the object has one, where {@link rbObjClass}
+ * skips it, and the class {@link rbObjClass} answers otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassOf(obj: unknown): Klass {
+  if (typeof obj === "object" && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+      return proto[FL_SINGLETON] as Klass;
+    }
+  }
+  return rbObjClass(obj);
 }
 
 /**

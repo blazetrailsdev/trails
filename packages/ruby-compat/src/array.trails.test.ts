@@ -28,6 +28,7 @@ import {
   union,
   uniq,
   flatten,
+  unpack,
   unpack1,
 } from "./array.js";
 import { Range } from "./range.js";
@@ -154,6 +155,16 @@ describe("Array#pack integer, float and position directives", () => {
     expect(() => pack([1], "C<")).toThrow(
       new ArgumentError("'<' allowed only after types sSiIlLqQjJ"),
     );
+  });
+});
+
+describe("String#unpack", () => {
+  it("answers every item the format pushes, and packs L as it unpacks it", () => {
+    const packed = pack([1, 0xffffffff, 2n], "CL>*");
+    expect(packed).toBe("\x01\xff\xff\xff\xff\x00\x00\x00\x02");
+    expect(unpack(packed, "CL>*")).toEqual([1, 0xffffffff, 2]);
+    expect(unpack(Uint8Array.of(7, 0, 0), "CL>*")).toEqual([7]);
+    expect(unpack1(packed, "L>", { offset: 1 })).toBe(0xffffffff);
   });
 });
 

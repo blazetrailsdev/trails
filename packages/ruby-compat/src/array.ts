@@ -72,7 +72,8 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * one UTF-8 character per Integer, which `ActiveSupport::Multibyte::Chars`
  * packs codepoints with (`multibyte/chars.rb:136,144`) — and to the `C`, `E`,
  * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
- * (`cache/coder.rb:44,77-82`): `C` and `l` through `pack_integer`
+ * (`cache/coder.rb:44,77-82`), and the `L>` `MessagePack::Bigint` packs its
+ * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`): `C`, `l` and `L` through `pack_integer`
  * (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
  * an absolute byte position (`pack.c:617-639`). Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
@@ -154,7 +155,7 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
       }
       continue;
     }
-    if (type === "C" || type === "l") {
+    if (type === "C" || type === "l" || type === "L") {
       const integerSize = type === "C" ? 1 : 4;
       const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       while (len-- > 0) {
@@ -230,7 +231,7 @@ export function unpack1(
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
- * {@link pack} answers bytes for — `C` and `l` through `unpack_integer`
+ * {@link pack} answers bytes for — `C`, `l` and `L` through `unpack_integer`
  * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
  * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
  * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
@@ -257,6 +258,36 @@ export function unpack1(
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
 ): number | string | null {
+  const ary = packUnpackInternal(str, fmt, UNPACK_1, offset);
+  return ary.length > 0 ? ary[0] : null;
+}
+
+/**
+ * `String#unpack` (`vendor/ruby/v3.3.11/pack.c:1611` `pack_unpack`):
+ * `pack_unpack_internal` in `UNPACK_ARRAY` mode, every item the format
+ * pushes. The directives are {@link unpack1}'s.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function unpack(
+  str: string | Uint8Array,
+  fmt: string,
+  { offset = 0 }: { offset?: number } = {},
+): (number | string)[] {
+  return packUnpackInternal(str, fmt, UNPACK_ARRAY, offset);
+}
+
+const UNPACK_ARRAY = 0;
+const UNPACK_1 = 2;
+
+/** `pack_unpack_internal` (`vendor/ruby/v3.3.11/pack.c:936`). */
+function packUnpackInternal(
+  str: string | Uint8Array,
+  fmt: string,
+  mode: number,
+  offset: number,
+): (number | string)[] {
+  const ary: (number | string)[] = [];
   if (offset < 0) throw new ArgumentError("offset can't be negative");
   const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
   const send = ptr.length;
@@ -299,27 +330,31 @@ export function unpack1(
       len = type !== "@" ? 1 : 0;
     }
 
-    if (type === "C" || type === "l") {
+    if (type === "C" || type === "l" || type === "L") {
       const signedP = type === "l";
       const integerSize = type === "C" ? 1 : 4;
       const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
-      if (len > 0) {
+      while (len-- > 0) {
         let val = 0n;
         for (let i = 0; i < integerSize; i++) {
           const byte = BigInt(ptr[bigendianP ? s + i : s + integerSize - 1 - i]);
           val = (val << 8n) | byte;
         }
-        return Number(signedP ? BigInt.asIntN(integerSize * 8, val) : val);
+        ary.push(Number(signedP ? BigInt.asIntN(integerSize * 8, val) : val));
+        if (mode === UNPACK_1) return ary;
+        s += integerSize;
       }
       continue;
     }
     if (type === "E") {
       if (len > Math.floor((send - s) / 8)) len = Math.floor((send - s) / 8);
-      if (len > 0) {
+      while (len-- > 0) {
         const tmp = new DataView(new ArrayBuffer(8));
         for (let i = 0; i < 8; i++) tmp.setUint8(i, ptr[s + i]);
-        return tmp.getFloat64(0, true);
+        ary.push(tmp.getFloat64(0, true));
+        if (mode === UNPACK_1) return ary;
+        s += 8;
       }
       continue;
     }
@@ -332,7 +367,9 @@ export function unpack1(
         else bits = ptr[s++];
         bitstr += "0123456789abcdef"[bits & 15];
       }
-      return bitstr;
+      ary.push(bitstr);
+      if (mode === UNPACK_1) return ary;
+      continue;
     }
     if (type === "H") {
       if (fmt[p - 1] === "*" || len > (send - s) * 2) len = (send - s) * 2;
@@ -343,7 +380,9 @@ export function unpack1(
         else bits = ptr[s++];
         bitstr += "0123456789abcdef"[(bits >> 4) & 15];
       }
-      return bitstr;
+      ary.push(bitstr);
+      if (mode === UNPACK_1) return ary;
+      continue;
     }
     if (type === "@") {
       if (len > send) throw new ArgumentError("@ outside of string");
@@ -353,7 +392,7 @@ export function unpack1(
     unknownDirective("unpack", type, fmt);
   }
 
-  return null;
+  return ary;
 }
 
 /**

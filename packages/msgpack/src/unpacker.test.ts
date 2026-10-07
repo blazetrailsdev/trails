@@ -36,6 +36,12 @@ describe("MessagePack::Unpacker", () => {
   });
 
   describe("#type_registered?", () => {
+    it("receive Class or Integer, and return bool", () => {
+      expect(unpacker.isTypeRegistered(0x00)).toBeFalsy();
+      expect(unpacker.isTypeRegistered(0x01)).toBeFalsy();
+      expect(unpacker.isTypeRegistered(ValueOne)).toBeFalsy();
+    });
+
     it("returns true if specified type or class is already registered", () => {
       unpacker.registerType(0x30, ValueOne, "fromMsgpackExt");
       unpacker.registerType(0x31, ValueTwo, "fromMsgpackExt");
@@ -54,6 +60,31 @@ describe("MessagePack::Unpacker", () => {
 
       expect(unpacker.isTypeRegistered(0x40)).toBeTruthy();
       expect(unpacker.isTypeRegistered(ValueOne)).toBeFalsy();
+    });
+  });
+
+  describe("with ext definitions", () => {
+    it("returns a Array of Hash which contains :type, :class and :unpacker", () => {
+      const unpacker = new Unpacker();
+      unpacker.registerType(0x02, ValueTwo, "fromMsgpackExt");
+      unpacker.registerType(0x01, ValueOne, "fromMsgpackExt");
+
+      const list = unpacker.registeredTypes();
+
+      expect(list).toBeInstanceOf(Array);
+      expect(list.length).toEqual(2);
+
+      const one = list[0];
+      expect(Object.keys(one).sort()).toEqual(["type", "class", "unpacker"].sort());
+      expect(one.type).toEqual(0x01);
+      expect(one.class).toEqual(ValueOne);
+      expect(one.unpacker).toBeInstanceOf(Function);
+
+      const two = list[1];
+      expect(Object.keys(two).sort()).toEqual(["type", "class", "unpacker"].sort());
+      expect(two.type).toEqual(0x02);
+      expect(two.class).toEqual(ValueTwo);
+      expect(two.unpacker).toBeInstanceOf(Function);
     });
   });
 });

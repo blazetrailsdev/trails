@@ -1,4 +1,11 @@
 import { describe, it, expect } from "vitest";
+import { include as includeModule, rbClassInheritedP } from "./include.js";
+import { rbAbsintSize } from "./numeric.js";
+import {
+  rbCInteger as rbCNumericInteger,
+  rbClassOf,
+  rbObjSingletonClass as singletonClassOf,
+} from "./object.js";
 import {
   rbCBasicObject,
   rbCDate,
@@ -947,5 +954,38 @@ describe("Exception#inspect", () => {
     class Inner extends Error {}
     rbModConstSet(Outer, "Inner", Inner);
     expect(inspect(new Inner("boom"))).toBe("#<Outer::Inner: boom>");
+  });
+});
+
+describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
+  class Base {}
+  class Sub extends Base {}
+  class Other {}
+  const Mod = { greet: () => "hi" };
+  includeModule(Base, Mod);
+
+  it("answers true, false or nil for Module#<=", () => {
+    expect(rbClassInheritedP(Sub, Sub)).toBe(true);
+    expect(rbClassInheritedP(Sub, Base)).toBe(true);
+    expect(rbClassInheritedP(Base, Mod)).toBe(true);
+    expect(rbClassInheritedP(Base, Sub)).toBe(false);
+    expect(rbClassInheritedP(Sub, Other)).toBeNull();
+    expect(() => rbClassInheritedP(Sub, 1)).toThrow("compared with non class/module");
+  });
+
+  it("answers the singleton class once an object has one", () => {
+    const obj = new Sub();
+    expect(rbClassOf(obj)).toBe(Sub);
+    const singleton = singletonClassOf(obj);
+    expect(rbClassOf(obj)).toBe(singleton);
+    expect(rbClassInheritedP(singleton, Base)).toBe(true);
+    expect(rbClassOf(1)).toBe(rbCNumericInteger);
+  });
+
+  it("counts the bytes of the absolute value and its leading zero bits", () => {
+    expect(rbAbsintSize(0)).toEqual([0, 0]);
+    expect(rbAbsintSize(-1)).toEqual([1, 7]);
+    expect(rbAbsintSize(2n ** 64n - 1n)).toEqual([8, 0]);
+    expect(rbAbsintSize(-(2n ** 64n))).toEqual([9, 7]);
   });
 });

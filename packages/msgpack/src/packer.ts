@@ -6,9 +6,11 @@ import {
   Module,
   NoMethodError,
   RangeError,
+  rbAbsintSize,
+  rbClassInheritedP,
+  rbClassOf,
   rbFSend,
   rbInspect,
-  rbModAncestors,
   rbObjClass,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
@@ -29,6 +31,8 @@ export class Packer {
   /** @internal */
   readonly extRegistry: PackerExtRegistry = new Map();
   private readonly extRegistryCache: PackerExtRegistry = new Map();
+  /** @internal */
+  hasBigintExtType = false;
   readonly buffer: Buffer;
 
   constructor(io: unknown = null, options: object | null = null) {
@@ -70,9 +74,7 @@ export class Packer {
   isTypeRegistered(klassOrType: unknown): boolean {
     if (typeof klassOrType === "function") {
       const klass = klassOrType;
-      return this.registeredTypes().some((entry) =>
-        rbModAncestors(klass).includes(entry.class as object),
-      );
+      return this.registeredTypes().some((entry) => rbClassInheritedP(klass, entry.class));
     } else if (typeof klassOrType === "number") {
       const type = klassOrType;
       return this.registeredTypes().some((entry) => type === entry.type);
@@ -89,12 +91,12 @@ export class Packer {
         this.buffer.write(encoder.encodeSharedRef(v));
       }
     } else if (Array.isArray(v)) {
-      if (v.constructor === Array || !this.tryWriteWithExtTypeLookup(v)) {
+      if (rbClassOf(v) === Array || !this.tryWriteWithExtTypeLookup(v)) {
         this.writeArrayHeader(v.length);
         for (const e of v) this.write(e);
       }
     } else if (rbObjIsKindOf(v, Hash)) {
-      if (rbObjClass(v) === Hash || !this.tryWriteWithExtTypeLookup(v)) {
+      if (rbClassOf(v) === Hash || !this.tryWriteWithExtTypeLookup(v)) {
         const pairs =
           v instanceof Hash ? [...(v as Hash<unknown, unknown>)] : Object.entries(v as object);
         this.writeMapHeader(pairs.length);
@@ -189,14 +191,33 @@ export class Packer {
       this.write(Number(v));
       return;
     }
+    const [size, leadingZeroBits] = rbAbsintSize(v);
+    let requiredSize = size;
     const bytes = new Uint8Array(9);
+
     if (v > 0n) {
+      if (requiredSize > 8 && this.hasBigintExtType) {
+        if (this.tryWriteWithExtTypeLookup(v)) {
+          return;
+        }
+      }
+
       if (v > 0xffff_ffff_ffff_ffffn) {
         throw new RangeError("bignum too big to convert into `unsigned long long'");
       }
       bytes[0] = 0xcf;
       new DataView(bytes.buffer).setBigUint64(1, v);
     } else {
+      if (leadingZeroBits === 0) {
+        requiredSize += 1;
+      }
+
+      if (requiredSize > 8 && this.hasBigintExtType) {
+        if (this.tryWriteWithExtTypeLookup(v)) {
+          return;
+        }
+      }
+
       if (v < -0x8000_0000_0000_0000n) {
         throw new RangeError("bignum too big to convert into `long long'");
       }
@@ -216,18 +237,27 @@ export class Packer {
     return null;
   }
 
-  private extFindSuperclass(lookupClass: { prototype: object }): unknown {
+  private extFindSuperclass(lookupClass: unknown): unknown {
     for (const key of this.extRegistry.keys()) {
-      if (rbModAncestors(lookupClass).includes(key as object)) return key;
+      if (rbClassInheritedP(lookupClass, key) === true) return key;
     }
     return null;
   }
 
-  /** @missingRailsCall rb_class_of — CONVERGEABLE msgpack-class-inherited-p-singleton-lookup-and-cut-specs */
   private extRegistryLookup(instance: unknown): PackerExtType {
-    const lookupClass = rbObjClass(instance);
-    const type = this.extRegistryFetch(lookupClass);
-    if (type?.[1] != null) return type;
+    const lookupClass = rbClassOf(instance);
+    let type = this.extRegistryFetch(lookupClass);
+    if (type?.[1] != null) {
+      return type;
+    }
+
+    const realClass = rbObjClass(instance);
+    if (lookupClass !== realClass) {
+      type = this.extRegistryFetch(realClass);
+      if (type?.[1] != null) {
+        return type;
+      }
+    }
 
     const superclass = this.extFindSuperclass(lookupClass);
     if (superclass != null) {

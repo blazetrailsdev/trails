@@ -1,5 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ArgumentError, FrozenError, NoMethodError } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  FrozenError,
+  NoMethodError,
+  NotImplementedError,
+  RangeError,
+  rbCInteger,
+} from "@blazetrails/ruby-compat";
 import { Factory, MessagePack, Packer, UnknownExtTypeError, Unpacker } from "./index.js";
 
 class MyType {
@@ -146,6 +153,57 @@ describe("MessagePack::Factory", () => {
       const my = unpacker.feed(data).read() as MyType;
       expect(my.a).toEqual(1);
       expect(my.b).toEqual(2);
+    });
+
+    describe("registering an ext type for Integer", () => {
+      let factory: Factory;
+      const bigint = 10n ** 150n;
+      const integer = (data: Uint8Array) => BigInt(new TextDecoder().decode(data));
+      beforeEach(() => {
+        factory = new Factory();
+      });
+
+      it("does not work by default without passing `oversized_integer_extension: true`", () => {
+        factory.registerType(0x01, rbCInteger, { packer: "toString", unpacker: integer });
+
+        expect(() => {
+          factory.dump(bigint);
+        }).toThrow(RangeError);
+      });
+
+      it("raises ArgumentError if the type is not Integer", () => {
+        expect(() => {
+          factory.registerType(0x01, MyType, {
+            packer: "toString",
+            unpacker: integer,
+            oversizedIntegerExtension: true,
+          });
+        }).toThrow(ArgumentError);
+      });
+
+      it("invokes the packer if registered with `oversized_integer_extension: true`", () => {
+        factory.registerType(0x01, rbCInteger, {
+          packer: "toString",
+          unpacker: integer,
+          oversizedIntegerExtension: true,
+        });
+
+        expect(factory.load(factory.dump(bigint)) == bigint).toBe(true);
+      });
+
+      it("does not use the oversized_integer_extension packer for integers fitting in native types", () => {
+        factory.registerType(0x01, rbCInteger, {
+          packer: () => {
+            throw new NotImplementedError();
+          },
+          unpacker: () => {
+            throw new NotImplementedError();
+          },
+          oversizedIntegerExtension: true,
+        });
+
+        expect(factory.dump(42)).toEqual(MessagePack.dump(42));
+      });
     });
 
     describe("registering ext type with recursive serialization", () => {

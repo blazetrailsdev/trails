@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { ArgumentError, EOFError, Hash, NoMethodError } from "@blazetrails/ruby-compat";
-import { MSGPACK_EXT_RECURSIVE, Packer, StackError, UnpackError, Unpacker } from "./index.js";
+import {
+  ArgumentError,
+  EOFError,
+  Hash,
+  Module,
+  NoMethodError,
+  include,
+  rbCInteger,
+  rbCSymbol,
+  rbObjSingletonClass,
+} from "@blazetrails/ruby-compat";
+import {
+  Bigint,
+  Buffer,
+  Factory,
+  MSGPACK_EXT_RECURSIVE,
+  Packer,
+  StackError,
+  UnpackError,
+  Unpacker,
+  toMsgpackExt,
+} from "./index.js";
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -76,6 +96,96 @@ describe("MessagePack::Packer", () => {
     const dumped = packer.write(src).fullPack();
     expect(hex(dumped)).toBe("91c70f0305c70b03a161cf8000000000000000");
     expect(unpacker.feed(dumped).fullUnpack()).toEqual(src);
+  });
+});
+
+describe("oversized_integer_extension", () => {
+  const factory = new Factory();
+  factory.registerType(1, rbCInteger, {
+    packer: Bigint.toMsgpackExt,
+    unpacker: Bigint.fromMsgpackExt,
+    oversizedIntegerExtension: true,
+  });
+  const dump = (v: unknown) => hex(factory.dump(v));
+
+  it("packs an Integer outside 64 bits as the ext type, byte for byte as the gem does", () => {
+    expect(dump(2n ** 70n)).toBe("c70d0100000000000000000000000040");
+    expect(dump(-(2n ** 70n))).toBe("c70d0101000000000000000000000040");
+    expect(dump(2n ** 64n)).toBe("c70d0100000000000000000000000001");
+    expect(dump(-(2n ** 63n) - 1n)).toBe("c70901010000000180000000");
+    expect(dump(-(2n ** 63n))).toBe("c70901010000000080000000");
+    for (const int of [2n ** 70n, -(2n ** 70n), -(2n ** 63n), [2n ** 64n]]) {
+      expect(factory.load(factory.dump(int))).toEqual(int);
+    }
+  });
+
+  it("leaves an Integer inside 64 bits on the native formats", () => {
+    expect(dump(2n ** 62n)).toBe("cf4000000000000000");
+    expect(dump(2n ** 64n - 1n)).toBe("cfffffffffffffffff");
+    expect(dump(-(2n ** 62n))).toBe("d3c000000000000000");
+    expect(dump(5n)).toBe("05");
+  });
+
+  it("is not carried over by Factory#dup, as Factory_dup does not copy it", () => {
+    expect(() => factory.dup().dump(2n ** 64n)).toThrow(
+      "bignum too big to convert into `unsigned long long'",
+    );
+  });
+});
+
+describe("ext registry lookup", () => {
+  const Mod = new Module((mod) => mod.defineMethod("toMsgpackExt", () => "value_msgpacked"));
+  const packed = Uint8Array.of(0xc7, 0x0f, 0x01, ...new TextEncoder().encode("value_msgpacked"));
+
+  it("finds a Module a base class includes", () => {
+    class Value {}
+    include(Value, Mod);
+    const packer = new Packer();
+    packer.registerType(0x01, Mod, "toMsgpackExt");
+    expect(packer.isTypeRegistered(Value)).toBe(true);
+    expect(packer.isTypeRegistered(Pair)).toBe(false);
+    expect(packer.write(new Value()).toS()).toEqual(packed);
+  });
+
+  it("looks up the singleton class, then the real class, then the singleton class's ancestors", () => {
+    const object = new Pair(1, 2);
+    const singleton = rbObjSingletonClass(object);
+    const packer = new Packer();
+    packer.registerType(0x02, Pair, null, () => "real");
+    expect(packer.write(object).fullPack()).toEqual(Uint8Array.of(0xd6, 2, 0x72, 0x65, 0x61, 0x6c));
+    packer.registerType(0x03, singleton, null, () => "s");
+    expect(packer.write(object).fullPack()).toEqual(Uint8Array.of(0xd4, 3, 0x73));
+    expect(packer.write(new Pair(1, 2)).fullPack()).toEqual(
+      Uint8Array.of(0xd6, 2, 0x72, 0x65, 0x61, 0x6c),
+    );
+
+    const extended = new Pair(1, 2);
+    include(rbObjSingletonClass(extended), Mod);
+    const other = new Packer();
+    other.registerType(0x01, Mod, "toMsgpackExt");
+    expect(other.write(extended).toS()).toEqual(packed);
+  });
+});
+
+describe("Float, Symbol and Buffer", () => {
+  it("packs -0.0 from its boxed Number, and a bare -0 as the Integer it reads as", () => {
+    expect(pack(new Number(-0))).toBe("cb8000000000000000");
+    expect(pack(-0)).toBe("00");
+  });
+
+  it("round-trips a Symbol through to_msgpack_ext and Symbol.from_msgpack_ext", () => {
+    expect(toMsgpackExt.call(":foo")).toBe("foo");
+    const unpacker = new Unpacker();
+    unpacker.registerType(0, rbCSymbol, "fromMsgpackExt");
+    expect(unpacker.feed(Uint8Array.of(0xc7, 3, 0, 0x66, 0x6f, 0x6f)).read()).toBe(":foo");
+    unpacker.reset();
+    expect(unpacker.feed(Uint8Array.of(0xd4, 0, 0xff)).read()).toBe(":\u00ff");
+  });
+
+  it("answers Buffer#to_s as to_str", () => {
+    const buffer = new Buffer();
+    buffer.write("ab");
+    expect(buffer.toS()).toEqual(Uint8Array.of(0x61, 0x62));
   });
 });
 
