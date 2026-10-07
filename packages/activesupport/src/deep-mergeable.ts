@@ -1,4 +1,4 @@
-import { isModuleIncluded } from "@blazetrails/ruby-compat";
+import { isModuleIncluded, rbObjDup } from "@blazetrails/ruby-compat";
 
 type MergeBlock = (key: unknown, thisVal: unknown, otherVal: unknown) => unknown;
 
@@ -11,8 +11,7 @@ export interface DeepMergeableHost {
 
 export const DeepMergeable = {
   deepMerge<T extends DeepMergeableHost>(this: T, other: unknown, block?: MergeBlock): T {
-    const dup = Object.assign(Object.create(Object.getPrototypeOf(this)) as T, this);
-    return dup.deepMergeBang(other, block);
+    return rbObjDup(this).deepMergeBang(other, block);
   },
 
   deepMergeBang<T extends DeepMergeableHost>(this: T, other: unknown, block?: MergeBlock): T {

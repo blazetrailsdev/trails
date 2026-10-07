@@ -1,8 +1,10 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
 import type { CacheStore } from "./cache/index.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
+import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import type { Logger } from "./logger.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
@@ -11,6 +13,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {};
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
+  HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
 };
 extend(ActiveSupport, Autoload);
 
@@ -69,3 +72,4 @@ export const TopLevel: {
 } = {};
 
 TopLevel.ActiveSupport = ActiveSupport;
+registerConstant("ActiveSupport", ActiveSupport);

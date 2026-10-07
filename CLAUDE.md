@@ -1660,6 +1660,21 @@ registers the class and its superclass chain with
 make. Without it Rails' `ResetCallbackTest` "reset impacts subclasses" is red.
 An extra call has no JSDoc receipt shape, so this section is its receipt.
 
+### `ParamsWrapper::ClassMethods#inherited` runs at a subclass's first `_wrapper_options` read
+
+Rails' `inherited` (`actionpack/lib/action_controller/metal/params_wrapper.rb:244-251`)
+runs when a controller subclass is defined: when the inherited options' `format`
+is non-empty it dups them, sets `klass` to the subclass and assigns them. The
+own-property guard is `deferInherited` (`metal/params-wrapper.ts`), which wraps
+the `_wrapperOptions` class reader on `Base` and `API`: a subclass's first read
+runs `inheritedParamsWrapper`, the ported body, once.
+
+One ordering differs. A subclass defined while its parent's `format` is empty,
+and first read after the parent calls `wrap_parameters`, gets its own dup, where
+Rails' definition-time call was a no-op and leaves it on the parent's options. A
+subclass read before the parent enables wrapping stays on the parent's options,
+as in Rails. `params-wrapper.trails.test.ts` pins both.
+
 ## `singleton_class` is a per-object subclass (`rbObjSingletonClass`)
 
 Ruby's `obj.singleton_class` (`vendor/ruby/v3.3.11/object.c:288`, `class.c:2215`) is a

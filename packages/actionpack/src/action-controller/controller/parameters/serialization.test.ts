@@ -15,7 +15,6 @@ describe("ParametersSerializationTest", () => {
   });
 
   // BLOCKED: psych-dump-puts-root-tag-on-its-own-line
-  // BLOCKED: parameters-holds-a-plain-object-not-hash-with-indifferent-access
   it.skip("YAML serialization", () => {
     const params = new Parameters({ key: ":value" });
     const yamlDump = YAML.dump(params);

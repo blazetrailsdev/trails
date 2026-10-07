@@ -222,6 +222,29 @@ export function inheritedParamsWrapper(this: WrapperHostClass): void {
   }
 }
 
+const INHERITED = Symbol("inherited");
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function deferInherited(this: WrapperHostClass): void {
+  const wrapperOptions = Object.getOwnPropertyDescriptor(this, "_wrapperOptions")!;
+  Object.defineProperty(this, "_wrapperOptions", {
+    ...wrapperOptions,
+    get(this: WrapperHostClass) {
+      if (
+        !Object.prototype.hasOwnProperty.call(this, "_wrapperOptions") &&
+        !Object.prototype.hasOwnProperty.call(this, INHERITED)
+      ) {
+        Object.defineProperty(this, INHERITED, { value: true });
+        inheritedParamsWrapper.call(this);
+      }
+      return wrapperOptions.get!.call(this);
+    },
+  });
+}
+
 /** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;

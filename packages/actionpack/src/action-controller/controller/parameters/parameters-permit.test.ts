@@ -159,7 +159,7 @@ describe("ParametersPermitTest", () => {
     const params = new Parameters({ prefs: { theme: "dark" } });
     const permitted = params.permit({ prefs: {} });
     const prefs = permitted.get("prefs");
-    const raw = prefs instanceof Parameters ? prefs._toRawHash() : prefs;
+    const raw = prefs instanceof Parameters ? prefs.toH() : prefs;
     expect(raw).toEqual({ theme: "dark" });
   });
 
@@ -249,7 +249,7 @@ describe("ParametersPermitTest", () => {
 
   it("merge with parameters", () => {
     const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
+    const b = new Parameters({ y: "2" }).permitBang();
     const merged = a.merge(b);
     expect(merged.get("x")).toBe("1");
     expect(merged.get("y")).toBe("2");
@@ -269,7 +269,7 @@ describe("ParametersPermitTest", () => {
 
   it("merge! with parameters", () => {
     const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
+    const b = new Parameters({ y: "2" }).permitBang();
     a.mergeBang(b);
     expect(a.get("x")).toBe("1");
     expect(a.get("y")).toBe("2");
@@ -302,40 +302,36 @@ describe("ParametersPermitTest", () => {
   it("deep_merge with other Hash", () => {
     const params = new Parameters({ a: { x: "1" } });
     const merged = params.deepMerge({ a: { y: "2" } });
-    const a = merged._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    expect(merged.dig("a", "x")).toBe("1");
+    expect(merged.dig("a", "y")).toBe("2");
   });
 
   it("deep_merge! with other Hash", () => {
     const params = new Parameters({ a: { x: "1" } });
     params.deepMergeBang({ a: { y: "2" } });
-    const a = params._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    expect(params.dig("a", "x")).toBe("1");
+    expect(params.dig("a", "y")).toBe("2");
   });
 
   it("deep_merge with other Parameters", () => {
     const params = new Parameters({ a: { x: "1" } });
-    const other = new Parameters({ a: { y: "2" } });
+    const other = new Parameters({ a: { y: "2" } }).permitBang();
     const merged = params.deepMerge(other);
-    const a = merged._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    expect(merged.dig("a", "x")).toBe("1");
+    expect(merged.dig("a", "y")).toBe("2");
   });
 
   it("deep_merge! with other Parameters", () => {
     const params = new Parameters({ a: { x: "1" } });
-    const other = new Parameters({ a: { y: "2" } });
+    const other = new Parameters({ a: { y: "2" } }).permitBang();
     params.deepMergeBang(other);
-    const a = params._toRawHash().a as Record<string, unknown>;
-    expect(a.x).toBe("1");
-    expect(a.y).toBe("2");
+    expect(params.dig("a", "x")).toBe("1");
+    expect(params.dig("a", "y")).toBe("2");
   });
 
   it("#reverse_merge with parameters", () => {
     const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "2", y: "3" });
+    const b = new Parameters({ x: "2", y: "3" }).permitBang();
     const result = a.reverseMerge(b);
     expect(result.get("x")).toBe("1");
     expect(result.get("y")).toBe("3");
@@ -343,10 +339,10 @@ describe("ParametersPermitTest", () => {
 
   it("#with_defaults is an alias of reverse_merge", () => {
     const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "2", y: "3" });
+    const b = new Parameters({ x: "2", y: "3" }).permitBang();
     const r1 = a.reverseMerge(b);
     const r2 = a.withDefaults(b);
-    expect(r1._toRawHash()).toEqual(r2._toRawHash());
+    expect(r1.toUnsafeH()).toEqual(r2.toUnsafeH());
   });
 
   it("not permitted is sticky beyond reverse_merge", () => {

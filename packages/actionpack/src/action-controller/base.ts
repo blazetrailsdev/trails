@@ -165,6 +165,7 @@ import {
   _performParameterWrapping,
   _setWrapperOptions,
   _wrapperEnabled,
+  deferInherited,
   inheritedParamsWrapper,
   wrapParameters,
   type ParamsWrapperHost,
@@ -625,6 +626,7 @@ export class Base extends Metal {
     classAttribute.call(this, "_wrapperOptions", {
       default: ParamsWrapperOptions.fromHash({ format: [] }),
     });
+    deferInherited.call(this);
   }
 
   static _setWrapperOptions = _setWrapperOptions;

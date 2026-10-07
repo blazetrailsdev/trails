@@ -149,6 +149,17 @@ describe("Psych object protocol", () => {
     );
   });
 
+  it("revives a !ruby/hash class as that Hash, merge keys included", () => {
+    const h = Psych.unsafeLoad(
+      "--- !ruby/hash:ActiveSupport::HashWithIndifferentAccess\n<<: { y: 1 }\nx: 42\n",
+    ) as HashWithIndifferentAccess;
+    expect(h).toBeInstanceOf(HashWithIndifferentAccess);
+    expect([...h]).toEqual([
+      ["y", 1],
+      ["x", 42],
+    ]);
+  });
+
   it("tags a Hash subclass without ivars as !ruby/hash", () => {
     const h = new (class Plain extends HashWithIndifferentAccess {})();
     h.set("x", 42);
