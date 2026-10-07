@@ -685,7 +685,7 @@ function renderSite(
       template: named
         ? ts.isStringLiteral(named)
           ? action
-            ? underscore(named.text)
+            ? dasherize(underscore(named.text))
             : named.text
           : undefined
         : inController
@@ -717,7 +717,7 @@ function actionName(call: ts.CallExpression): string | undefined {
     ts.isClassDeclaration(method.parent) &&
     ts.isIdentifier(method.name) &&
     !(ts.getCombinedModifierFlags(method) & hidden)
-    ? underscore(method.name.text)
+    ? dasherize(underscore(method.name.text))
     : undefined;
 }
 

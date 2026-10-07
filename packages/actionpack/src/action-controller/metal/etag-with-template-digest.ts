@@ -4,6 +4,7 @@ import {
   classAttribute,
   extend,
   include,
+  dasherize,
   underscore,
 } from "@blazetrails/activesupport";
 import { Digestor, type LookupContext, type Template } from "@blazetrails/actionview";
@@ -29,6 +30,7 @@ export function determineTemplateEtag(
 
 /**
  * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
  * @internal
  */
 export function pickTemplateForEtag(
@@ -39,9 +41,10 @@ export function pickTemplateForEtag(
     return options.template != null
       ? options.template
       : (
-          this.lookupContext.findAll(underscore(this.actionName), this._prefixes())[0] as
-            | Template
-            | undefined
+          this.lookupContext.findAll(
+            dasherize(underscore(this.actionName)),
+            this._prefixes(),
+          )[0] as Template | undefined
         )?.virtualPath;
   }
 }

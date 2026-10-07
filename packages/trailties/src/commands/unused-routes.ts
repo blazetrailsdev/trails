@@ -6,7 +6,7 @@ import {
   type RoutesFilter,
   type RoutesFormatter,
 } from "@blazetrails/actionpack";
-import { underscore } from "@blazetrails/activesupport";
+import { underscore, dasherize } from "@blazetrails/activesupport";
 import { getPath } from "@blazetrails/ruby-compat";
 import { glob } from "@blazetrails/activesupport/glob";
 import { exit } from "@blazetrails/ruby-compat";
@@ -54,11 +54,16 @@ export class RouteInfo {
 
   /**
    * @inventedArm underscore — PERMANENT
+   * @inventedArm dasherize — PERMANENT
    * @internal
    */
   private async viewPath(root: ViewPathRoot): Promise<string> {
     const path = getPath();
-    return path.join(root.path, String(this.controllerName), underscore(String(this.actionName)));
+    return path.join(
+      root.path,
+      String(this.controllerName),
+      dasherize(underscore(String(this.actionName))),
+    );
   }
 
   /** @internal */

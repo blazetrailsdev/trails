@@ -243,9 +243,9 @@ describe("AbstractController::Translation — trails-only", () => {
     expect(translate.call(host, ".foo")).toBe("admin users show foo");
   });
 
-  it("scopes a lazy lookup by the underscored form of a camelCase action", () => {
+  it("scopes a lazy lookup by the kebab-case form of a camelCase action", () => {
     I18n.backend().storeTranslations("en", {
-      abstract_controller: { testing: { translation: { recent_posts: { title: "Recent" } } } },
+      abstract_controller: { testing: { translation: { "recent-posts": { title: "Recent" } } } },
     });
     const controller = new TranslationController();
     controller.actionName = "recentPosts";

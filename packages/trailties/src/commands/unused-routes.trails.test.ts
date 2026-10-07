@@ -79,7 +79,7 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(false);
   });
 
-  it("RouteInfo finds a camelCase action's template under its underscored file name", async () => {
+  it("RouteInfo finds a camelCase action's template under its kebab-case file name", async () => {
     class PostsController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([

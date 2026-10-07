@@ -1929,12 +1929,18 @@ its own methods, and should not have to name them in a spelling they do not
 have. Two spellings for one action, with a conversion between them somewhere,
 was the alternative, and was rejected in favour of one rule.
 
-What stays in Rails' spelling is what lives in a FILE: a template's name and a
-locale key. The vendored fixtures and every Rails application's views are named
-`next_bundle.html.erb`, and locale files key a lazy lookup by
-`controller.next_bundle.title`. So the action name is underscored where it is
-turned into one of those, and nowhere else, each site carrying
-`@inventedArm underscore — PERMANENT`:
+**What lives in a file is kebab-case.** A template's file name and a
+lazy-lookup locale key are the action's name in kebab-case: the action
+`nextBundle` renders `next-bundle.html.tse` and scopes `t(".title")` by
+`controller.next-bundle.title`. File names in a trails application are
+kebab-case throughout (`stories-controller.ts`, `rfc-pages/`), and a view or a
+locale entry named for an action is one more of them. The repo owner set this.
+
+Rails passes `action_name` to these lookups unchanged, because there the action
+is already spelled as its file is. Here the name is converted, with
+`dasherize(underscore(name))`, where an action name is turned into a file name
+or a locale key, and nowhere else. Each site carries
+`@inventedArm underscore — PERMANENT` and `@inventedArm dasherize — PERMANENT`:
 
 - `ImplicitRender#defaultRender` and `#methodForAction`
   (`action-controller/metal/implicit-render.ts`; `implicit_render.rb:38-64`)
@@ -1949,22 +1955,21 @@ turned into one of those, and nowhere else, each site carrying
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
-the enclosing method's name, or a literal `action:`, underscored; a literal
+the enclosing method's name, or a literal `action:`, in kebab-case; a literal
 `template:` as written.
-
-`underscore` is ActiveSupport's, so it also maps `-` to `_` and `::` to `/`.
-An action's name is a method's name, which holds neither, so those arms never
-fire for one.
 
 The conversion is at these sites and not inside the template resolver, because
 the resolver is also handed names an application wrote out in full
-(`render template: "shared/lineItem"`, `render partial: "lineItem"`), which are
-not action names and must be looked up as written. Only the caller knows that
-the string in its hand is an action's name.
+(`render template: "shared/line-item"`, `render partial: "line-item"`), which
+are looked up as written. Only the caller knows that the string in its hand is
+an action's name.
 
 Consequences for a ported test: where Rails' test says `get :hello_world`, the
-port says `get("helloWorld")`, and an assertion on a string that embeds the
-action name (a log line, a generated URL) expects the method's spelling.
+port says `get("helloWorld")`, the fixture it renders implicitly is
+`hello-world.html.erb`, and an assertion on a string that embeds the action
+name (a log line, a generated URL) expects the method's spelling. A template
+named explicitly (`render template: "test/hello_world"`) is looked up as
+written.
 
 This is ratified repo-wide here by the repo owner.
 

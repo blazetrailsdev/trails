@@ -643,15 +643,15 @@ describe("runCli", () => {
     );
     write(
       cwd,
-      "app/views/posts/show_all.html.tse",
+      "app/views/posts/show-all.html.tse",
       "<%= foo %><%= csrfMetaTags() %><%= noSuchHelper() %>",
     );
     write(cwd, "app/views/layouts/application.html.tse", "<%= noSuchHelper() %>");
     await buildViews({ cwd });
     const shim = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.html.tse.ts`), "utf8");
-    expect(shim("posts/show_all")).toContain("type ObjectLocals = { foo: number };");
-    expect(shim("posts/show_all")).toContain("      : any;");
+    expect(shim("posts/show-all")).toContain("type ObjectLocals = { foo: number };");
+    expect(shim("posts/show-all")).toContain("      : any;");
     write(
       cwd,
       "app/controllers/posts-controller.ts",
@@ -663,10 +663,10 @@ describe("runCli", () => {
       ].join("\n"),
     );
     await buildViews({ cwd });
-    expect(shim("posts/show_all")).toContain("      : never;");
+    expect(shim("posts/show-all")).toContain("      : never;");
     expect(viewDiagnostics(cwd).map((d) => d.split(":")[0])).toEqual([
       "layouts/application.html.tse.ts",
-      "posts/show_all.html.tse.ts",
+      "posts/show-all.html.tse.ts",
     ]);
   }, 30_000);
 
@@ -697,7 +697,7 @@ describe("runCli", () => {
     expect(show).toContain("      : never;");
   }, 30_000);
 
-  it("types the underscored template a camelCase action renders, named implicitly or by action:", async () => {
+  it("types the kebab-case template a camelCase action renders, named implicitly or by action:", async () => {
     const cwd = mkScratch();
     write(
       cwd,
@@ -710,10 +710,10 @@ describe("runCli", () => {
         "}",
       ].join("\n"),
     );
-    write(cwd, "app/views/posts/recent_posts.html.tse", "<%= foo %><%= bar %>");
+    write(cwd, "app/views/posts/recent-posts.html.tse", "<%= foo %><%= bar %>");
     await buildViews({ cwd });
     const view = fs.readFileSync(
-      path.join(cwd, ".trails/views/posts/recent_posts.html.tse.ts"),
+      path.join(cwd, ".trails/views/posts/recent-posts.html.tse.ts"),
       "utf8",
     );
     expect(view).toContain("foo: number | undefined");

@@ -4,6 +4,7 @@ import {
   HtmlSafeTranslation,
   Module,
   htmlEscape,
+  dasherize,
   underscore,
 } from "@blazetrails/activesupport";
 
@@ -17,7 +18,10 @@ export interface TranslateOptions {
   [key: string]: unknown;
 }
 
-/** @inventedArm underscore — PERMANENT */
+/**
+ * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
+ */
 export function translate(
   this: TranslationHost,
   key: string,
@@ -41,7 +45,7 @@ export function translate(
 
   if (key.startsWith(".")) {
     const path = this.constructor.controllerPath().replace(/\//g, ".");
-    const scopedKey = `${path}.${underscore(String(this.actionName))}${key}`;
+    const scopedKey = `${path}.${dasherize(underscore(String(this.actionName)))}${key}`;
     const fallbackKey = `${path}${key}`;
 
     const passOptions = { ...options } as Record<string, unknown>;

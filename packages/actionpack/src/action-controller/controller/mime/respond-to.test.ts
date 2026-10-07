@@ -178,7 +178,7 @@ class RespondToController extends Base {
 
   async handleAnyWithTemplate(): Promise<void> {
     await this.respondTo((type) => {
-      type.any(() => this.render("test/hello_world"));
+      type.any(() => this.render("test/hello-world"));
     });
   }
 
