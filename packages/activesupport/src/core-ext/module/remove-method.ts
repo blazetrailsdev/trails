@@ -2,6 +2,7 @@ import { Module as RbModule } from "@blazetrails/ruby-compat";
 
 type Module = { prototype: object };
 
+/** @missingRailsCall private_method_defined? — PERMANENT */
 export function removePossibleMethod(this: Module | RbModule, method: string): void {
   if (this instanceof RbModule) {
     if (this.isMethodDefined(method)) this.undefMethod(method);
