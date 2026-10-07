@@ -155,7 +155,7 @@ import type {
   writeFragment,
 } from "../abstract-controller/caching/fragments.js";
 import { HttpAuthentication } from "./metal/http-authentication.js";
-import { sendFileHeadersBang } from "./metal/data-streaming.js";
+import { DataStreaming, type sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
   _performParameterWrapping,
@@ -320,6 +320,7 @@ export interface Base
     Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  viewRuntime: number | null;
   helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
@@ -727,8 +728,6 @@ export class Base extends Metal {
   /** @internal */
   declare sendFileHeadersBang: typeof sendFileHeadersBang;
   /** @internal */
-  declare viewRuntime: number | null;
-
   declare appendInfoToPayload: typeof appendInfoToPayload;
   /** @internal */
   declare cleanupViewRuntime: typeof cleanupViewRuntime;
@@ -790,9 +789,7 @@ include(Base, PermissionsPolicy);
 include(Base, RateLimiting);
 include(Base, AllowBrowser);
 Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype.sendFile = sendFile;
-Base.prototype.sendData = sendData;
-Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
+include(Base, DataStreaming);
 include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);

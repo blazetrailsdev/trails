@@ -26,6 +26,8 @@ export async function processAction(this: RescueHost, ...args: unknown[]): Promi
   } catch (exception) {
     this.request.env["action_dispatch.show_detailed_exceptions"] ||=
       this.isShowDetailedExceptions();
-    if (!rtest(await this.rescueWithHandler(exception))) throw exception;
+    const handled = await this.rescueWithHandler(exception);
+    if (!rtest(handled)) throw exception;
+    return handled;
   }
 }

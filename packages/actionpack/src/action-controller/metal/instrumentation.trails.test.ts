@@ -180,6 +180,24 @@ describe("ActionController::API process_action chain (api.rb:139-143)", () => {
     expect(events[0].status).toBe(204);
   });
 
+  it("instruments send_data through the DataStreaming module beneath it", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("send_data.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        this.sendData("hello", { filename: "hello.txt" });
+      }
+    }
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].filename).toBe("hello.txt");
+    expect(response.body).toBe("hello");
+  });
+
   it("rescues an action's error through the Rescue module API includes", async () => {
     const events: Record<string, unknown>[] = [];
     teardown.push(subscribeOnce("process_action.action_controller", events));

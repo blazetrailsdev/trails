@@ -16,13 +16,7 @@ import {
 import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-compat";
-import {
-  sendData as _sendData,
-  sendFile as _sendFile,
-  type DataStreamingHost,
-  type SendDataOptions,
-  type SendFileOptions,
-} from "./data-streaming.js";
+import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import { Flash } from "./flash.js";
 
 export const Instrumentation: Module = new Module((mod) => {
@@ -37,6 +31,8 @@ export const Instrumentation: Module = new Module((mod) => {
 
   mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
 
+  mod.defineMethod("sendFile", sendFile);
+  mod.defineMethod("sendData", sendData);
   mod.defineMethod("processAction", processAction);
   mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
   mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
@@ -97,8 +93,8 @@ export function sendFile(
   options: SendFileOptions = {},
 ): void {
   return Notifications.instrument("send_file.action_controller", merge(options, { path }), () =>
-    _sendFile.call(this, path, options),
-  );
+    Instrumentation.superMethod(this, "sendFile")!(path, options),
+  ) as void;
 }
 
 export function sendData(
@@ -109,8 +105,8 @@ export function sendData(
   return Notifications.instrument(
     "send_data.action_controller",
     options as Record<string, unknown>,
-    () => _sendData.call(this, data, options),
-  );
+    () => Instrumentation.superMethod(this, "sendData")!(data, options),
+  ) as void | Promise<void>;
 }
 
 export function redirectTo(
