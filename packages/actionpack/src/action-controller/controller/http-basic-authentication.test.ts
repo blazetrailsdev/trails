@@ -1,200 +1,249 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
+import { pack, rbInspect } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
-import type { Metal } from "../metal.js";
-import { Request } from "../../action-dispatch/http/request.js";
 import { HttpAuthentication } from "../metal/http-authentication.js";
+import { TestCase } from "../test-case.js";
+import "../../test-helpers/abstract-unit.js";
 
-const { encodeCredentials, ControllerMethods } = HttpAuthentication.Basic;
-const { authenticateOrRequestWithHttpBasic, authenticateWithHttpBasic } = ControllerMethods;
-const { requestHttpBasicAuthentication } = ControllerMethods;
-const { httpBasicAuthenticateWith } = ControllerMethods.ClassMethods;
+class DummyController extends Base {
+  declare loggedIn: boolean;
 
-class TestController extends Base {}
+  static {
+    this.beforeAction("authenticate", { only: "index" });
+    this.beforeAction("authenticateWithRequest", { only: "display" });
+    this.beforeAction("authenticateLongCredentials", { only: "show" });
+    this.beforeAction("authWithSpecialChars", { only: "special_creds" });
 
-function makeController(authHeader?: string): TestController {
-  const request = new Request(authHeader === undefined ? {} : { HTTP_AUTHORIZATION: authHeader });
-  const controller = new TestController();
-  controller.setRequestBang(request);
-  controller.setResponseBang(TestController.makeResponseBang(request));
-  return controller;
+    this.httpBasicAuthenticateWith({ name: "David", password: "Goliath", only: "search" });
+  }
+
+  async index(): Promise<void> {
+    await this.render({ plain: "Hello Secret" });
+  }
+
+  async display(): Promise<void> {
+    if (this.loggedIn) await this.render({ plain: "Definitely Maybe" });
+  }
+
+  async show(): Promise<void> {
+    await this.render({ plain: "Only for loooooong credentials" });
+  }
+
+  async specialCreds(): Promise<void> {
+    await this.render({ plain: "Only for special credentials" });
+  }
+
+  async search(): Promise<void> {
+    await this.render({ plain: "All inline" });
+  }
+
+  async noPassword(): Promise<void> {
+    const [username, password] = this.authenticateWithHttpBasic((username, password) => {
+      return [username, password];
+    }) as [string | undefined, string | undefined];
+    await this.render({ plain: `Hello ${username} (password: ${rbInspect(password)})` });
+  }
+
+  private authenticate(): unknown {
+    return this.authenticateOrRequestWithHttpBasic(undefined, undefined, (username, password) => {
+      return username === "lifo" && password === "world";
+    });
+  }
+
+  private authenticateWithRequest(): unknown {
+    if (
+      this.authenticateWithHttpBasic(
+        (username, password) => username === "pretty" && password === "please",
+      )
+    ) {
+      return (this.loggedIn = true);
+    } else {
+      return this.requestHttpBasicAuthentication("SuperSecret", "Authentication Failed\n");
+    }
+  }
+
+  private authWithSpecialChars(): unknown {
+    return this.authenticateOrRequestWithHttpBasic(undefined, undefined, (username, password) => {
+      return (
+        username === "login!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t" &&
+        password === "pwd:!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t"
+      );
+    });
+  }
+
+  private authenticateLongCredentials(): unknown {
+    return this.authenticateOrRequestWithHttpBasic(undefined, undefined, (username, password) => {
+      return (
+        username === "1234567890123456789012345678901234567890" &&
+        password === "1234567890123456789012345678901234567890"
+      );
+    });
+  }
 }
 
+const AUTH_HEADERS = [
+  "HTTP_AUTHORIZATION",
+  "X-HTTP_AUTHORIZATION",
+  "X_HTTP_AUTHORIZATION",
+  "REDIRECT_X_HTTP_AUTHORIZATION",
+];
+
 describe("HttpBasicAuthenticationTest", () => {
-  it("successful authentication with ", () => {
-    const c = makeController(encodeCredentials("lifo", "world"));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user, pass) => user === "lifo" && pass === "world",
-    );
-    expect(result).toBe(true);
-    expect(c.status).toBe(200);
+  let tc: TestCase;
+  const assertResponse = (type: number | string): void => tc.assertResponse(type);
+
+  beforeEach(async ({ task }) => {
+    tc = new TestCase(task.name);
+    tc.controller = new DummyController();
+    await tc.beforeSetup();
   });
 
-  it("successful authentication with  and long credentials", () => {
-    const longCred = "1234567890123456789012345678901234567890";
-    const c = makeController(encodeCredentials(longCred, longCred));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user, pass) => user === longCred && pass === longCred,
-    );
-    expect(result).toBe(true);
+  AUTH_HEADERS.forEach((header) => {
+    it(`successful authentication with ${header.toLowerCase()}`, async () => {
+      tc.request.env[header] = encodeCredentials("lifo", "world");
+      await tc.get("index");
+
+      assertResponse("success");
+      expect(tc.response.body, `Authentication failed for request header ${header}`).toBe(
+        "Hello Secret",
+      );
+    });
+    it(`successful authentication with ${header.toLowerCase()} and long credentials`, async () => {
+      tc.request.env[header] = encodeCredentials(
+        "1234567890123456789012345678901234567890",
+        "1234567890123456789012345678901234567890",
+      );
+      await tc.get("show");
+
+      assertResponse("success");
+      expect(
+        tc.response.body,
+        `Authentication failed for request header ${header} and long credentials`,
+      ).toBe("Only for loooooong credentials");
+    });
   });
 
-  it("unsuccessful authentication with ", () => {
-    const c = makeController(encodeCredentials("h4x0r", "world"));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "Application",
-      null,
-      (user, pass) => user === "lifo" && pass === "world",
-    );
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
-  });
+  AUTH_HEADERS.forEach((header) => {
+    it(`unsuccessful authentication with ${header.toLowerCase()}`, async () => {
+      tc.request.env[header] = encodeCredentials("h4x0r", "world");
+      await tc.get("index");
 
-  it("unsuccessful authentication with  and long credentials", () => {
-    const longUser = "h4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0r";
-    const longPass = "worldworldworldworldworldworldworldworld";
-    const longCred = "1234567890123456789012345678901234567890";
-    const c = makeController(encodeCredentials(longUser, longPass));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "Application",
-      null,
-      (user, pass) => user === longCred && pass === longCred,
-    );
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
-  });
+      assertResponse("unauthorized");
+      expect(tc.response.body, `Authentication didn't fail for request header ${header}`).toBe(
+        "HTTP Basic: Access denied.\n",
+      );
+    });
+    it(`unsuccessful authentication with ${header.toLowerCase()} and long credentials`, async () => {
+      tc.request.env[header] = encodeCredentials(
+        "h4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0rh4x0r",
+        "worldworldworldworldworldworldworldworld",
+      );
+      await tc.get("show");
 
-  it("unsuccessful authentication with  and no credentials", () => {
-    const c = makeController();
-    const result = authenticateOrRequestWithHttpBasic.call(c, "Application", null, () => true);
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("HTTP Basic: Access denied.\n");
+      assertResponse("unauthorized");
+      expect(
+        tc.response.body,
+        `Authentication didn't fail for request header ${header} and long credentials`,
+      ).toBe("HTTP Basic: Access denied.\n");
+    });
+
+    it(`unsuccessful authentication with ${header.toLowerCase()} and no credentials`, async () => {
+      await tc.get("show");
+
+      assertResponse("unauthorized");
+      expect(
+        tc.response.body,
+        `Authentication didn't fail for request header ${header} and no credentials`,
+      ).toBe("HTTP Basic: Access denied.\n");
+    });
   });
 
   it("encode credentials has no newline", () => {
     const username = "laskjdfhalksdjfhalkjdsfhalksdjfhklsdjhalksdjfhalksdjfhlakdsjfh";
     const password = "kjfhueyt9485osdfasdkljfh4lkjhakldjfhalkdsjf";
-    const result = encodeCredentials(username, password);
+    const result = HttpAuthentication.Basic.encodeCredentials(username, password);
     expect(result).not.toMatch(/\n/);
   });
 
-  it("successful authentication with uppercase authorization scheme", () => {
-    const creds = encodeCredentials("lifo", "world").replace(/^Basic /, "BASIC ");
-    const c = makeController(creds);
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user, pass) => user === "lifo" && pass === "world",
+  it("successful authentication with uppercase authorization scheme", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = `BASIC ${pack(["lifo:world"], "m")}`;
+    await tc.get("index");
+
+    assertResponse("success");
+    expect(tc.response.body, "Authentication failed when authorization scheme BASIC").toBe(
+      "Hello Secret",
     );
-    expect(result).toBe(true);
   });
 
-  it("authentication request without credential", () => {
-    const c = makeController();
-    requestHttpBasicAuthentication.call(c, "SuperSecret", "Authentication Failed\n");
-    expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("Authentication Failed\n");
-    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
+  it("authentication request without credential", async () => {
+    await tc.get("display");
+
+    assertResponse("unauthorized");
+    expect(tc.response.body).toBe("Authentication Failed\n");
+    expect(tc.response.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
   });
 
-  it("authentication request with invalid credential", () => {
-    const c = makeController(encodeCredentials("pretty", "foo"));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      "Authentication Failed\n",
-      (user, pass) => user === "pretty" && pass === "please",
+  it("authentication request with invalid credential", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("pretty", "foo");
+    await tc.get("display");
+
+    assertResponse("unauthorized");
+    expect(tc.response.body).toBe("Authentication Failed\n");
+    expect(tc.response.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
+  });
+
+  it("authentication request with a missing password", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${pack(["David"], "m")}`;
+    await tc.get("search");
+
+    assertResponse("unauthorized");
+  });
+
+  it("authentication request with no required password", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${pack(["George"], "m")}`;
+    await tc.get("no_password");
+
+    assertResponse("success");
+    expect(tc.response.body).toBe("Hello George (password: nil)");
+  });
+
+  it("authentication request with valid credential", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("pretty", "please");
+    await tc.get("display");
+
+    assertResponse("success");
+    expect(tc.response.body).toBe("Definitely Maybe");
+  });
+
+  it("authentication request with valid credential special chars", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials(
+      "login!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t",
+      "pwd:!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t",
     );
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
-    expect(c.responseBody).toBe("Authentication Failed\n");
-    expect(c.headers.get("WWW-Authenticate")).toBe('Basic realm="SuperSecret"');
+    await tc.get("special_creds");
+
+    assertResponse("success");
+    expect(tc.response.body).toBe("Only for special credentials");
   });
 
-  it("authentication request with a missing password", () => {
-    const noColon = `Basic ${Buffer.from("David").toString("base64")}`;
-    const c = makeController(noColon);
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "Application",
-      null,
-      (user, pass) => user === "David" && pass === "Goliath",
-    );
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
+  it("authenticate with class method", async () => {
+    tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("David", "Goliath");
+    await tc.get("search");
+    assertResponse("success");
+
+    tc.request.env["HTTP_AUTHORIZATION"] = encodeCredentials("David", "WRONG!");
+    await tc.get("search");
+    assertResponse("unauthorized");
   });
 
-  it("authentication request with no required password", () => {
-    const noColon = `Basic ${Buffer.from("George").toString("base64")}`;
-    const c = makeController(noColon);
-    const result = authenticateWithHttpBasic.call(c, (user, pass) => [user, pass]);
-    expect(result).toEqual(["George", undefined]);
-    expect(c.status).toBe(200);
+  it("authentication request with wrong scheme", async () => {
+    const header = "Bearer " + encodeCredentials("David", "Goliath").split(" ", 2)[1];
+    tc.request.env["HTTP_AUTHORIZATION"] = header;
+    await tc.get("search");
+    assertResponse("unauthorized");
   });
 
-  it("authentication request with valid credential", () => {
-    const c = makeController(encodeCredentials("lifo", "world"));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user, pass) => user === "lifo" && pass === "world",
-    );
-    expect(result).toBe(true);
-    expect(c.status).toBe(200);
-  });
-
-  it("authentication request with valid credential special chars", () => {
-    const specialUser = "login!@#$%^&*()_+{}[];\"',./<>?`~ \n\r\t";
-    const specialPass = "pwd:!@#$%^&*()_+{}[];\"',./<>?`~ \n\r\t";
-    const c = makeController(encodeCredentials(specialUser, specialPass));
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "SuperSecret",
-      null,
-      (user, pass) => user === specialUser && pass === specialPass,
-    );
-    expect(result).toBe(true);
-    expect(c.status).toBe(200);
-  });
-
-  it("authenticate with class method", () => {
-    const beforeActionCalls: Array<(c: Metal) => unknown> = [];
-    const host = {
-      beforeAction(cb: (c: Metal) => unknown) {
-        beforeActionCalls.push(cb);
-      },
-    };
-    httpBasicAuthenticateWith.call(host, { name: "David", password: "Goliath" });
-    expect(beforeActionCalls).toHaveLength(1);
-    const okCtrl = makeController(encodeCredentials("David", "Goliath"));
-    expect(beforeActionCalls[0](okCtrl)).toBe(true);
-    const badCtrl = makeController(encodeCredentials("David", "WRONG!"));
-    expect(beforeActionCalls[0](badCtrl)).toBe(badCtrl.responseBody);
-  });
-
-  it("authentication request with wrong scheme", () => {
-    const basicCreds = encodeCredentials("David", "Goliath");
-    const token = basicCreds.split(" ")[1];
-    const c = makeController(`Bearer ${token}`);
-    const result = authenticateOrRequestWithHttpBasic.call(
-      c,
-      "Application",
-      null,
-      (user, pass) => user === "David" && pass === "Goliath",
-    );
-    expect(result).toBe(c.responseBody);
-    expect(c.status).toBe(401);
-  });
+  function encodeCredentials(username: string, password: string): string {
+    return `Basic ${pack([`${username}:${password}`], "m")}`;
+  }
 });
