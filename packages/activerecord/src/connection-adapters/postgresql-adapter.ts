@@ -15,7 +15,7 @@ import {
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { File, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { IO, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -703,7 +703,7 @@ export class PostgreSQLAdapter
   override discardBang(): void {
     super.discardBang();
     try {
-      this._rawConnection?.socketIo()?.reopen(File.NULL);
+      this._rawConnection?.socketIo()?.reopen(IO.NULL);
     } catch {}
     this._rawConnection = null;
     void this._statements.reset();
@@ -1599,7 +1599,7 @@ export class PostgreSQLAdapter
   private _teardownRacedClient(client: pg.Client, acquireGen: number): void {
     if (this._discardedAcquireGenerations.has(acquireGen)) {
       try {
-        pgConnection(client).socketIo()?.reopen(File.NULL);
+        pgConnection(client).socketIo()?.reopen(IO.NULL);
       } catch {}
     } else {
       client.end().catch(() => {});
