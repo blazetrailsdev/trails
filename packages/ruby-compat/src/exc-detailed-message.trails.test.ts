@@ -18,3 +18,17 @@ describe("Exception#detailedMessage", () => {
     );
   });
 });
+
+describe("check_highlight_keyword", () => {
+  it("raises for a highlight that is not a boolean", () => {
+    expect(() => new StandardError("a").detailedMessage({ highlight: 1 as never })).toThrow(
+      "expected true or false as highlight: 1",
+    );
+  });
+
+  it("names an anonymous class by its temporary path", () => {
+    const klass = { "": class extends StandardError {} }[""];
+    expect(new klass("").detailedMessage()).toMatch(/^#<Class:0x[0-9a-f]+>$/);
+    expect(new klass("a").detailedMessage()).toBe("a");
+  });
+});

@@ -51,7 +51,7 @@ import { ActionController } from "../../namespaces.js";
 export class ParameterMissing extends KeyError {
   readonly param: string;
   readonly keys: string[] | null;
-  #cachedCorrections?: string[];
+  #corrections?: string[];
 
   constructor(param: string, keys: string[] | null = null) {
     super(`param is missing or the value is empty or invalid: ${param}`);
@@ -61,16 +61,11 @@ export class ParameterMissing extends KeyError {
   }
 
   get corrections(): string[] {
-    if (this.#cachedCorrections !== undefined) return this.#cachedCorrections;
-    if (!this.keys) {
-      this.#cachedCorrections = [];
-      return this.#cachedCorrections;
-    }
-    this.#cachedCorrections = new SpellChecker({ dictionary: this.keys }).correct(this.param);
-    return this.#cachedCorrections;
+    return (this.#corrections ||= new SpellChecker({ dictionary: this.keys! }).correct(
+      String(this.param),
+    ));
   }
 }
-
 include(ParameterMissing, Correctable);
 
 export class ExpectedParameterMissing extends ParameterMissing {
@@ -1069,5 +1064,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+rbModConstSet(ActionController, "ParameterMissing", ParameterMissing);
 rbModConstSet(ActionController, "Parameters", Parameters);
 Parameters.hookIntoYamlLoading();

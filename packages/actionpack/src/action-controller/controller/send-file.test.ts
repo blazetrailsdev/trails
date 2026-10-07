@@ -2,8 +2,13 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { assertEqual, assertNotNil, assertNothingRaised } from "@blazetrails/activesupport";
-import { Notifications } from "@blazetrails/activesupport";
+import {
+  assertEqual,
+  assertNotNil,
+  assertNothingRaised,
+  include,
+  Notifications,
+} from "@blazetrails/activesupport";
 import { File } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
@@ -39,20 +44,27 @@ function makeResponse(): Response {
 }
 
 const TestFileUtils = {
+  fileName(): string {
+    return File.basename(new URL(import.meta.url).pathname);
+  },
   filePath(): string {
     return new URL(import.meta.url).pathname;
   },
-  fileData(this: { _data?: string }): string {
-    return (this._data ||= File.binread(TestFileUtils.filePath()));
+  fileData(this: { _data?: string; filePath(): string }): string {
+    return (this._data ||= File.binread(this.filePath()));
   },
 };
 
 class SendFileController extends Base {
   declare _data?: string;
-  filePath = TestFileUtils.filePath;
-  fileData = TestFileUtils.fileData;
+  declare fileName: typeof TestFileUtils.fileName;
+  declare filePath: typeof TestFileUtils.filePath;
+  declare fileData: typeof TestFileUtils.fileData;
 
   static {
+    include(this, TestFileUtils);
+    this.layout("layouts/standard");
+
     this.beforeAction("file", { only: "file_from_before_action" });
   }
 
@@ -80,7 +92,11 @@ class SendFileController extends Base {
 describe("SendFileTest", () => {
   class SendFileTest extends TestCase {
     declare controller: SendFileController;
-    filePath = TestFileUtils.filePath;
+    declare filePath: typeof TestFileUtils.filePath;
+
+    static {
+      include(this, TestFileUtils);
+    }
 
     override setup() {
       this.controller = new SendFileController();

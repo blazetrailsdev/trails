@@ -1,4 +1,4 @@
-import { excToS, Module } from "@blazetrails/ruby-compat";
+import { Exception, excToS, Module, StandardError } from "@blazetrails/ruby-compat";
 import { formatter } from "../index.js";
 
 interface CorrectableHost extends Error {
@@ -32,7 +32,8 @@ function detailedMessage(
 
     msg += suggestion;
     return msg;
-  } catch {
+  } catch (error) {
+    if (error instanceof Exception && !(error instanceof StandardError)) throw error;
     return zsuper();
   }
 }

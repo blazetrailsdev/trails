@@ -1,5 +1,6 @@
 import { Exception } from "./exception.js";
-import { rbModName } from "./object.js";
+import { ArgumentError } from "./argument-error.js";
+import { rbInspect, rbModToS } from "./object.js";
 import { RuntimeError } from "./runtime-error.js";
 
 const underline = "\x1b[1;4m";
@@ -11,7 +12,11 @@ const reset = "\x1b[m";
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbDecorateMessage(eclass: object, emesg: unknown, highlight: boolean): string {
+export function rbDecorateMessage(
+  eclass: abstract new (...args: never) => unknown,
+  emesg: unknown,
+  highlight: boolean,
+): string {
   let str = "";
   let einfo = emesg == null ? "" : String(emesg);
 
@@ -20,7 +25,7 @@ export function rbDecorateMessage(eclass: object, emesg: unknown, highlight: boo
     str += "unhandled exception";
     if (highlight) str += reset;
   } else {
-    let epath = rbModName(eclass);
+    let epath: string | null = rbModToS(eclass);
     if (einfo.length === 0) {
       if (highlight) str += underline;
       str += epath;
@@ -67,10 +72,30 @@ export function rbDecorateMessage(eclass: object, emesg: unknown, highlight: boo
 }
 
 /**
- * `exc_detailed_message` (`vendor/ruby/v3.3.11/error.c:1657`),
- * `Exception#detailed_message`, defined on `Exception` as
- * `rb_define_method(rb_eException, "detailed_message", …)` (`error.c:3304`)
- * defines it.
+ * `check_highlight_keyword` (`vendor/ruby/v3.3.11/error.c:1511`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+function checkHighlightKeyword(opt: { highlight?: unknown } | null): boolean {
+  let highlight: unknown = null;
+
+  if (opt != null) {
+    highlight = opt.highlight ?? null;
+
+    if (highlight !== true && highlight !== false && highlight !== null) {
+      throw new ArgumentError(`expected true or false as highlight: ${rbInspect(highlight)}`);
+    }
+  }
+
+  if (highlight === null) {
+    highlight = false;
+  }
+
+  return highlight as boolean;
+}
+
+/**
+ * `exc_detailed_message` (`vendor/ruby/v3.3.11/error.c:1657`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -78,9 +103,9 @@ export function excDetailedMessage(
   this: Error,
   opt: { highlight?: boolean | null } | null = null,
 ): string {
-  const highlight = opt?.highlight ?? false;
+  const highlight = checkHighlightKeyword(opt);
 
-  return rbDecorateMessage(this.constructor, this.message, highlight);
+  return rbDecorateMessage(this.constructor as typeof Error, this.message, highlight);
 }
 
 Exception.prototype.detailedMessage = excDetailedMessage;
