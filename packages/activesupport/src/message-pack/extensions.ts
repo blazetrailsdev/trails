@@ -10,7 +10,10 @@ import {
   complex,
   rational,
   rbModConstGet,
+  zip,
 } from "@blazetrails/ruby-compat";
+import { Duration, type DurationParts } from "../duration.js";
+import { compact, valuesAt } from "../hash-utils.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { atWithoutCoercion } from "../core-ext/time/calculations.js";
 import { TimeZone, type Timezone } from "../values/time-zone.js";
@@ -179,6 +182,15 @@ export const Extensions = {
     });
 
     registry.registerType({
+      type: 10,
+      klass: "ActiveSupport::Duration",
+      recursive: true,
+      match: (v) => v instanceof Duration,
+      packer: (v, packer) => Extensions.writeDuration(v as Duration, packer),
+      unpacker: (unpacker) => Extensions.readDuration(unpacker as Unpacker),
+    });
+
+    registry.registerType({
       type: 12,
       klass: "Set",
       recursive: true,
@@ -309,6 +321,20 @@ export const Extensions = {
 
   readTimeZone(unpacker: Unpacker): TimeZone | null {
     return Extensions.loadTimeZone(unpacker.read() as string);
+  },
+
+  writeDuration(duration: Duration, packer: Packer): void {
+    packer.write(duration.value);
+    packer.write(valuesAt(duration._parts(), ...Duration.PARTS));
+  },
+
+  readDuration(unpacker: Unpacker): Duration {
+    const value = unpacker.read() as number;
+    let parts: Partial<DurationParts> = Object.fromEntries(
+      zip(Duration.PARTS, unpacker.read() as number[]),
+    );
+    parts = compact(parts);
+    return new Duration(value, parts);
   },
 
   dumpClass(klass: ObjectClass): string {
