@@ -1,5 +1,4 @@
-import { RuntimeError, rbStrToI } from "@blazetrails/ruby-compat";
-import { getEnv } from "../environment.js";
+import { RuntimeError, env as ENV, fetch, toI } from "@blazetrails/ruby-compat";
 import { Factory, type Pool } from "./factory.js";
 import { Extensions } from "./extensions.js";
 
@@ -47,10 +46,7 @@ export class Serializer {
     return dumped[0] === 0xcc && dumped[1] === 0x80;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall fetch — PERMANENT
-   */
+  /** @internal */
   protected messagePackPool(): Pool {
     if (this.pool === null) {
       if (!this.messagePackFactory.isFrozen()) {
@@ -58,7 +54,7 @@ export class Serializer {
         this.installUnregisteredTypeHandler();
         this.messagePackFactory.freeze();
       }
-      this.pool = this.messagePackFactory.pool(Number(rbStrToI(getEnv("RAILS_MAX_THREADS", "5"))));
+      this.pool = this.messagePackFactory.pool(Number(toI(fetch(ENV, "RAILS_MAX_THREADS", 5))));
     }
     return this.pool;
   }

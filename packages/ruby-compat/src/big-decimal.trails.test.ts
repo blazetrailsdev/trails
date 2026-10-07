@@ -61,6 +61,239 @@ describe("BigDecimal", () => {
     );
   });
 
+  it("_load clamps MaxPrec to the dumped prefix", () => {
+    const long = "0.123456789012345678901234567890e5";
+    expect(
+      [
+        "27:0.15e1",
+        "36:0.5e0",
+        "54:0.1e1",
+        "10:0.1e1",
+        ":0.1e1",
+        `45:${long}`,
+        `27:${long}`,
+        `18:${long}`,
+        "18:0.0",
+        "18:NaN",
+      ].map((v) => BigDecimal._load(v)._dump()),
+    ).toEqual([
+      "18:0.15e1",
+      "27:0.5e0",
+      "45:0.1e1",
+      "18:0.1e1",
+      "18:0.1e1",
+      "45:0.12345678901234567890123456789e5",
+      "27:0.12345678901234567890123456789e5",
+      "18:0.12345678901234567890123456789e5",
+      "18:0.0",
+      "9:NaN",
+    ]);
+    expect(BigDecimal._load("18:0.15e1").mult(new BigDecimal("2"))._dump()).toBe("36:0.3e1");
+  });
+
+  it("_dump of an Integer allots the words it fills", () => {
+    expect(
+      [
+        0n,
+        5n,
+        -1n,
+        999999999n,
+        1000000000n,
+        123456789012n,
+        10n ** 18n,
+        10n ** 19n,
+        2n ** 64n - 1n,
+        2n ** 64n,
+        10n ** 20n,
+        10n ** 40n,
+        -(2n ** 63n - 1n),
+        -(2n ** 63n),
+        -(10n ** 30n),
+        123456789012345678901234567890n,
+      ].map((v) => new BigDecimal(v)._dump()),
+    ).toEqual([
+      "9:0.0",
+      "9:0.5e1",
+      "9:-0.1e1",
+      "9:0.999999999e9",
+      "9:0.1e10",
+      "18:0.123456789012e12",
+      "9:0.1e19",
+      "9:0.1e20",
+      "27:0.18446744073709551615e20",
+      "36:0.18446744073709551616e20",
+      "36:0.1e21",
+      "54:0.1e41",
+      "27:-0.9223372036854775807e19",
+      "36:-0.9223372036854775808e19",
+      "45:-0.1e31",
+      "45:0.12345678901234567890123456789e30",
+    ]);
+    expect(new BigDecimal(new BigDecimal(5n))._dump()).toBe("9:0.5e1");
+    expect(new BigDecimal(new BigDecimal("1.5"), 40)._dump()).toBe("18:0.15e1");
+    expect(new BigDecimal("1.5", 40)._dump()).toBe("45:0.15e1");
+  });
+
+  it("_dump of a Float allots the words its padded digits fill", () => {
+    expect(
+      (
+        [
+          [1.5, 3],
+          [-1.5, 2],
+          [0.1, 5],
+          [0.1, 16],
+          [123.456, 4],
+          [1e20, 3],
+          [1e-5, 3],
+          [1e-9, 2],
+          [1e9, 2],
+          [3.14159, 16],
+          [0.0, 2],
+          [2.5, 0],
+          [0.5, 0],
+          [123456.789, 0],
+          [123456789012.5, 0],
+          [1e22, 0],
+          [1e-10, 0],
+          [NaN, 0],
+          [-Infinity, 0],
+        ] as const
+      ).map(([f, n]) => new BigDecimal(f, n)._dump()),
+    ).toEqual([
+      "18:0.15e1",
+      "18:-0.15e1",
+      "9:0.1e0",
+      "9:0.1e0",
+      "18:0.1235e3",
+      "9:0.1e21",
+      "9:0.1e-4",
+      "9:0.1e-8",
+      "9:0.1e10",
+      "18:0.314159e1",
+      "18:0.0",
+      "18:0.25e1",
+      "9:0.5e0",
+      "18:0.123456789e6",
+      "36:0.1234567890125e12",
+      "9:0.1e23",
+      "9:0.1e-9",
+      "9:NaN",
+      "9:-Infinity",
+    ]);
+  });
+
+  it("_dump of a Rational allots the division's quotient", () => {
+    expect(
+      (
+        [
+          [1n, 3n, 5],
+          [1n, 3n, 20],
+          [22n, 7n, 3],
+          [1n, 8n, 30],
+          [5n, 1n, 2],
+          [0n, 1n, 4],
+          [-1n, 3n, 12],
+          [10n ** 20n, 3n, 5],
+        ] as const
+      ).map(([numerator, denominator, n]) => new BigDecimal({ numerator, denominator }, n)._dump()),
+    ).toEqual([
+      "36:0.33333e0",
+      "54:0.33333333333333333333e0",
+      "36:0.314e1",
+      "63:0.125e0",
+      "36:0.5e1",
+      "36:0.0",
+      "45:-0.333333333333e0",
+      "36:0.33333e20",
+    ]);
+  });
+
+  it("_dump of a mult result allots both operands' words", () => {
+    expect(
+      [
+        ["1.5", "2.5"],
+        ["123", "456"],
+        ["0.1", "0.1"],
+        ["123456789.123456789", "2"],
+        ["1e20", "1e20"],
+        ["0", "5"],
+        ["1.23456789012345678901", "9.87654321"],
+        ["-3", "4"],
+        ["1e400", "3"],
+        ["Infinity", "2"],
+        ["Infinity", "0"],
+      ].map(([a, b]) => new BigDecimal(a).mult(new BigDecimal(b))._dump()),
+    ).toEqual([
+      "45:0.375e1",
+      "27:0.56088e5",
+      "27:0.1e-1",
+      "36:0.246913578246913578e9",
+      "27:0.1e41",
+      "27:0.0",
+      "63:0.121932631124828532112251181221e2",
+      "27:-0.12e2",
+      "27:0.3e401",
+      "27:Infinity",
+      "27:NaN",
+    ]);
+    expect(new BigDecimal(3n).mult(new BigDecimal(4n))._dump()).toBe("27:0.12e2");
+  });
+
+  it("_dump of a round result allots the receiver's words", () => {
+    expect(
+      (
+        [
+          ["1.2345", 2],
+          ["1.2345", 0],
+          ["123456789.987654321", 3],
+          ["15", -1],
+          ["0.000123", 4],
+          ["1.5", 5],
+          ["-2.675", 2],
+          ["123456789012345678901.5", 0],
+          ["0.5", 0],
+          ["12345", -9],
+          ["999999999.5", 0],
+          ["NaN", 2],
+        ] as const
+      ).map(([a, n]) => new BigDecimal(a).round(n, ":half_up")._dump()),
+    ).toEqual([
+      "27:0.123e1",
+      "27:0.1e1",
+      "27:0.123456789988e9",
+      "18:0.2e2",
+      "18:0.1e-3",
+      "27:0.15e1",
+      "27:-0.268e1",
+      "45:0.123456789012345678902e21",
+      "18:0.1e1",
+      "18:0.0",
+      "27:0.1e10",
+      "18:NaN",
+    ]);
+    expect(new BigDecimal(12345n).round(-2, ":half_up")._dump()).toBe("18:0.123e5");
+    expect(new BigDecimal(1.5, 3).round(0, ":half_up")._dump()).toBe("27:0.2e1");
+    expect(new BigDecimal("0.1").round(0, ":ceiling")._dump()).toBe("18:0.1e1");
+  });
+
+  it("_dump of an abs result allots the receiver's words", () => {
+    expect(
+      ["-1.5", "1.5", "-123456789012345678901.5", "-0", "0", "NaN", "-Infinity"].map((a) =>
+        new BigDecimal(a).abs()._dump(),
+      ),
+    ).toEqual([
+      "27:0.15e1",
+      "27:0.15e1",
+      "45:0.1234567890123456789015e21",
+      "18:0.0",
+      "18:0.0",
+      "18:NaN",
+      "18:Infinity",
+    ]);
+    expect(new BigDecimal(-5n).abs()._dump()).toBe("18:0.5e1");
+    expect(new BigDecimal(5n).abs()._dump()).toBe("18:0.5e1");
+  });
+
   it("encodes as a JSON string in fixed form", () => {
     expect(JSON.stringify(new BigDecimal("1.5"))).toBe('"1.5"');
     expect(JSON.stringify({ price: new BigDecimal("42") })).toBe('{"price":"42.0"}');
@@ -190,7 +423,7 @@ describe("BigDecimalTrails", () => {
     expect(bigger.compare(big)).toBe(1);
     expect(big.compare(new BigDecimal("1e10000000"))).toBe(0);
     expect(new BigDecimal("-1e10000000").compare(big)).toBe(-1);
-    expect(big.round(0)).toBe(big);
+    expect(big.round(0).compare(big)).toBe(0);
   });
 
   it("carries a Rational's exponent without expanding the digits", () => {

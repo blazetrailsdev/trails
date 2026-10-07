@@ -1,6 +1,18 @@
-import { EOFError, FrozenError, Hash, StandardError } from "@blazetrails/ruby-compat";
+import {
+  EOFError,
+  FrozenError,
+  Hash,
+  NoMethodError,
+  RangeError,
+  StandardError,
+  rbObjClassname,
+} from "@blazetrails/ruby-compat";
 
-export class MessagePackError extends StandardError {}
+export class UnpackError extends StandardError {}
+
+export class MalformedFormatError extends UnpackError {}
+
+export class UnknownExtTypeError extends UnpackError {}
 
 /** @internal */
 function isPlainObject(value: object): boolean {
@@ -155,7 +167,9 @@ export class Packer {
     }
     const registered = this.factory.typeFor(value);
     if (registered) return this.writeExt(registered, value);
-    throw new MessagePackError(`Cannot encode value of type ${typeof value}`);
+    throw new NoMethodError(
+      `undefined method \`to_msgpack' for an instance of ${rbObjClassname(value)}`,
+    );
   }
 
   /** @internal */
@@ -212,7 +226,11 @@ export class Packer {
       if (n >= -0x8000000000000000n) return this.pushBig(0xd3, n & 0xffffffffffffffffn);
     }
     const ext = this.factory.oversizedIntegerType();
-    if (!ext) throw new MessagePackError(`Integer ${n} requires the oversized-integer ext type`);
+    if (!ext) {
+      throw new RangeError(
+        `bignum too big to convert into \`${n >= 0n ? "unsigned long long" : "long long"}'`,
+      );
+    }
     this.writeExt(ext, n);
   }
 
@@ -287,7 +305,7 @@ export class Unpacker {
     const obj = this.read();
     const extra = this.buf.length - this.pos;
     if (extra > 0) {
-      throw new MessagePackError(`${extra} extra bytes after the deserialized object`);
+      throw new MalformedFormatError(`${extra} extra bytes after the deserialized object`);
     }
     this.reset();
     return obj;
@@ -365,6 +383,8 @@ export class Unpacker {
         return this.readExt(this.readUint(2));
       case 0xc9:
         return this.readExt(this.readUint(4));
+      case 0xca:
+        return this.readBytes(4).readFloatBE(0);
       case 0xcb:
         return this.readBytes(8).readDoubleBE(0);
       case 0xcc:
@@ -408,7 +428,7 @@ export class Unpacker {
       case 0xdf:
         return this.readMap(this.readUint(4));
       default:
-        throw new MessagePackError(`Unsupported MessagePack tag 0x${tag.toString(16)}`);
+        throw new MalformedFormatError("invalid byte");
     }
   }
 
@@ -424,9 +444,7 @@ export class Unpacker {
     const obj: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
     for (let i = 0; i < size; i++) {
       const key = this.read();
-      if (typeof key !== "string")
-        throw new MessagePackError("MessagePack map keys must be strings");
-      obj[key] = this.read();
+      obj[key as string] = this.read();
     }
     return obj;
   }
@@ -436,7 +454,7 @@ export class Unpacker {
     const type = this.readUint(1);
     const payload = this.readBytes(len);
     const registered = this.factory.typeById(type);
-    if (!registered) throw new MessagePackError(`Unregistered MessagePack ext type ${type}`);
+    if (!registered) throw new UnknownExtTypeError("unexpected extension type");
     return registered.recursive
       ? registered.unpacker(new Unpacker(payload, this.factory))
       : registered.unpacker(payload);

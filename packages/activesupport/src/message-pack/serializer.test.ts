@@ -7,7 +7,9 @@ import {
   Rational,
   RuntimeError,
   complex,
+  env as ENV,
   rational,
+  setEnv,
 } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
@@ -191,6 +193,22 @@ describe("MessagePackSerializerTest", () => {
     expect([...dump(new HashWithIndifferentAccess({ a: true, b: 2, c: "three" }))]).toEqual([
       204, 128, 199, 15, 17, 131, 161, 97, 195, 161, 98, 2, 161, 99, 165, 116, 104, 114, 101, 101,
     ]);
+  });
+
+  it("works with ENV['RAILS_MAX_THREADS']", () => {
+    const originalEnv = { ...ENV };
+    setEnv("RAILS_MAX_THREADS", "1");
+    try {
+      const serialized = dump("value");
+      expect(serialized).toBeInstanceOf(Buffer);
+
+      const deserialized = load(serialized);
+      expect(typeof deserialized).toBe("string");
+      expect(deserialized).toBe("value");
+    } finally {
+      for (const name of Object.keys(ENV)) if (!(name in originalEnv)) setEnv(name, undefined);
+      for (const [name, value] of Object.entries(originalEnv)) setEnv(name, value);
+    }
   });
 
   it("rejects input without the signature", () => {
