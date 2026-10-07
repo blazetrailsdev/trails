@@ -120,14 +120,11 @@ tester.run("rails-error-parity", rule, {
     { filename: baseFile, code: `class S { dump() { throw new ForbiddenClass(); } }\n` },
     // The same class with a message in a method Rails does not raise it bare in.
     { filename: baseFile, code: `class S { load() { throw new ForbiddenClass("no"); } }\n` },
-    // A class Rails names is read by its own rows: T raises bare in load, not dump.
     { filename: baseFile, code: `class T { dump() { throw new ForbiddenClass("no"); } }\n` },
-    // The rescued exception stands in for Ruby's `$!`; it is not a message.
     {
       filename: baseFile,
       code: `class S { dump() { try { f(); } catch (error) { throw new ForbiddenClass(error); } } }\n`,
     },
-    // A package enrolled for the inventedMessage arm only keeps its native throws.
     { filename: rackFile, code: `export function call() { throw new Error("no"); }\n` },
     // Throwing a ported error class is allowed.
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
@@ -228,7 +225,6 @@ tester.run("rails-error-parity", rule, {
       code: `class T { load() { throw new ForbiddenClass("no"); } }\n`,
       errors: [{ messageId: "inventedMessage" }],
     },
-    // A class Rails does not name falls back to what every owner agrees on.
     {
       filename: baseFile,
       code: `class U { dump() { throw new ForbiddenClass("no"); } }\n`,

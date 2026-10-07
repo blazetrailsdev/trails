@@ -92,11 +92,7 @@ function loadExclude() {
   return new Set(loadJson(excludePath(), []));
 }
 
-/**
- * Repo-relative path (POSIX) for the in-scope packages; null if out of scope.
- * The packages with no `PKG_NS` row are enrolled for the `inventedMessage` arm
- * only.
- */
+/** Repo-relative path (POSIX) for the in-scope packages; null if out of scope. */
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
   const m = norm.match(
@@ -159,7 +155,6 @@ function enclosingNames(node) {
   return names;
 }
 
-/** Name of the nearest class around `node`, or null for a module-level function. */
 function enclosingClassName(node) {
   for (let n = node.parent; n; n = n.parent) {
     if (n.type === "ClassDeclaration" || n.type === "ClassExpression") return n.id?.name ?? null;
@@ -167,10 +162,6 @@ function enclosingClassName(node) {
   return null;
 }
 
-/**
- * `new X(error)` inside the `catch (error)` it names: Ruby's `initialize` reads
- * `$!`, which JS has no implicit form of, so the rescued exception is passed.
- */
 function isRescuedException(node, args) {
   if (args.length !== 1 || args[0].type !== "Identifier") return false;
   for (let n = node.parent; n; n = n.parent) {

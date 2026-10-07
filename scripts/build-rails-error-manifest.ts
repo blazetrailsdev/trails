@@ -76,9 +76,6 @@ interface ErrorClass {
   rubyFile: string;
 }
 
-// Where each package's Ruby lives, for the bare-raise scan: vendored source, lib
-// dir, and the namespace segment its TS tree drops. The four packages above
-// carry the error-class inventory too; the rest are scanned for raises only.
 const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]> = {
   ...Object.fromEntries(
     PACKAGES.map((pkg) => [pkg, ["rails", `${PKG_GEM[pkg]}/lib`, PKG_NS[pkg]]]),

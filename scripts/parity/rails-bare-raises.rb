@@ -1,10 +1,5 @@
 # frozen_string_literal: true
 
-# Reads each Ruby file named in ARGV with Ripper and prints
-# `{ path => [[owner, method, class, "bare" | "message"], ...] }`: every `raise` /
-# `fail` naming a class, with the module or class and the `def` (or literal-named
-# `define_method`) it sits in. rails-bare-raises.ts folds the rows.
-
 require "json"
 require "ripper"
 

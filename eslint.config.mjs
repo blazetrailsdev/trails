@@ -493,8 +493,6 @@ export default defineConfig(
     },
   },
 
-  // The `inventedMessage` arm alone: the rule runs no class-hierarchy or
-  // native-throw check on a package outside its `PKG_NS`.
   {
     files: [
       "packages/actionpack/src/**/*.ts",
