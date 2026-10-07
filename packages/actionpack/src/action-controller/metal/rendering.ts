@@ -1,8 +1,6 @@
-import { htmlEscape, isPresent, Module } from "@blazetrails/activesupport";
+import { Concern, extend, htmlEscape, isPresent, Module } from "@blazetrails/activesupport";
 import {
   DoubleRenderError,
-  render as abstractRender,
-  renderToString as abstractRenderToString,
   type RenderingHost as AbstractRenderHost,
 } from "../../abstract-controller/rendering.js";
 import { Renderer } from "../renderer.js";
@@ -31,7 +29,10 @@ export function _normalizeText(options: Record<string, unknown>): void {
 }
 
 /** @internal */
-export function _normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
+export function _normalizeOptions(
+  this: object,
+  options: Record<string, unknown>,
+): Record<string, unknown> {
   _normalizeText(options);
   if (options.html != null && options.html !== false) {
     options.html = htmlEscape(options.html);
@@ -39,7 +40,7 @@ export function _normalizeOptions(options: Record<string, unknown>): Record<stri
   if (options.status != null && options.status !== false) {
     options.status = statusCode(options.status as number | string);
   }
-  return options;
+  return Rendering.superMethod(this, "_normalizeOptions")!(options) as Record<string, unknown>;
 }
 
 export interface RenderingHost {
@@ -97,7 +98,7 @@ export function _setVaryHeader(this: Pick<RenderingHost, "request" | "response">
 export function _processOptions(
   this: Pick<RenderingHost, "contentType" | "headers" | "urlFor"> & { status: number | string },
   options: Record<string, unknown>,
-): void {
+): unknown {
   if (options.status != null && options.status !== false) {
     this.status = options.status as number | string;
   }
@@ -107,138 +108,100 @@ export function _processOptions(
   if (options.location != null && options.location !== false) {
     this.headers.set("Location", this.urlFor(options.location));
   }
+  return Rendering.superMethod(this, "_processOptions")!(options);
 }
 
-export function renderToBody(options: Record<string, unknown> = {}): unknown {
-  const body = _renderInPriorities(options);
-  return body != null && body !== false ? body : " ";
+export function render(this: AbstractRenderHost, ...args: unknown[]): void | Promise<void> {
+  if (this.responseBody != null) throw new DoubleRenderError();
+  return Rendering.superMethod(this, "render")!(...args) as void | Promise<void>;
 }
 
-/** @internal */
-export function render<T extends { performed?: boolean } & AbstractRenderHost>(
-  this: T,
-  ...args: unknown[]
-): void | Promise<void> {
-  if (this.performed) throw new DoubleRenderError();
-  return abstractRender.call(this, ...args);
-}
-
-/** @internal */
-export function renderToString<T extends AbstractRenderHost>(this: T, ...args: unknown[]): unknown {
-  const result = abstractRenderToString.call(this, ...args);
+export function renderToString(this: AbstractRenderHost, ...args: unknown[]): unknown {
+  const result = Rendering.superMethod(this, "renderToString")!(...args);
   const toString = (result: unknown): unknown => {
     if (
-      result != null &&
-      typeof result === "object" &&
-      typeof (result as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function"
+      typeof (result as { [Symbol.iterator]?: unknown } | null)?.[Symbol.iterator] === "function" &&
+      typeof result !== "string"
     ) {
       let string = "";
-      for (const r of result as Iterable<unknown>) string += String(r);
+      for (const r of result as Iterable<unknown>) string += r;
       return string;
+    } else {
+      return result;
     }
-    return result;
   };
-  if (typeof (result as PromiseLike<unknown> | null)?.then === "function") {
-    return Promise.resolve(result).then(toString);
-  }
-  return toString(result);
+  return typeof (result as PromiseLike<unknown> | null)?.then === "function"
+    ? Promise.resolve(result).then(toString)
+    : toString(result);
 }
 
 /** @internal */
-export function processAction<
-  T extends {
-    request?: { formats?: Array<{ ref?: () => unknown } | { ref?: unknown }> | undefined };
+export function renderToBody(this: object, options: Record<string, unknown> = {}): unknown {
+  const orPriorities = (body: unknown): unknown => {
+    if (body != null && body !== false) return body;
+    const priority = _renderInPriorities(options);
+    return priority != null && priority !== false ? priority : " ";
+  };
+  const body = Rendering.superMethod(this, "renderToBody")!(options);
+  return typeof (body as PromiseLike<unknown> | null)?.then === "function"
+    ? Promise.resolve(body).then(orPriorities)
+    : orPriorities(body);
+}
+
+/** @internal */
+export function processAction(
+  this: {
+    request: { formats: Array<{ ref(): unknown }> };
     formats?: unknown;
   },
->(this: T, ..._args: unknown[]): void {
-  const reqFormats = this.request?.formats ?? [];
-  const out: unknown[] = [];
-  for (const f of reqFormats) {
-    const ref = (f as { ref?: unknown }).ref;
-    const v = typeof ref === "function" ? (ref as () => unknown).call(f) : ref;
-    if (v != null) out.push(v);
-  }
-  this.formats = out;
+  ...args: unknown[]
+): unknown {
+  this.formats = this.request.formats.map((f) => f.ref()).filter((ref) => ref != null);
+  return Rendering.superMethod(this, "processAction")!(...args);
 }
 
-type ControllerClass = abstract new (...args: unknown[]) => unknown;
-
-const _renderers = new WeakMap<object, Renderer>();
-
-export function renderer(controller: ControllerClass): Renderer {
-  let r = _renderers.get(controller);
-  if (!r) {
-    r = Renderer.for(controller);
-    _renderers.set(controller, r);
-  }
-  return r;
+export interface RenderingClassHost {
+  _renderer?: Renderer;
+  readonly renderer: Renderer;
+  setupRendererBang(): void;
 }
 
-export function setupRendererBang(controller: ControllerClass): void {
-  _renderers.set(controller, Renderer.for(controller));
+export function renderer(this: RenderingClassHost): Renderer {
+  if (!Object.prototype.hasOwnProperty.call(this, "_renderer")) this.setupRendererBang();
+  return this._renderer!;
 }
 
-export const Rendering: Module = new Module((mod) => {
-  mod.defineMethod("render", function (this: AbstractRenderHost, ...args: unknown[]) {
-    if (this.responseBody != null) throw new DoubleRenderError();
-    return mod.superMethod(this, "render")!(...args);
+/** @internal */
+export function setupRendererBang(this: RenderingClassHost): void {
+  this._renderer = Renderer.for(this);
+}
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("render", function (this: RenderingClassHost, ...args: unknown[]) {
+    return this.renderer.render(...(args as [Record<string, unknown>?]));
   });
 
-  mod.defineMethod("renderToString", function (this: AbstractRenderHost, ...args: unknown[]) {
-    const result = mod.superMethod(this, "renderToString")!(...args);
-    const toString = (result: unknown): unknown => {
-      if (
-        typeof (result as { [Symbol.iterator]?: unknown } | null)?.[Symbol.iterator] ===
-          "function" &&
-        typeof result !== "string"
-      ) {
-        let string = "";
-        for (const r of result as Iterable<unknown>) string += r;
-        return string;
-      } else {
-        return result;
-      }
-    };
-    return typeof (result as PromiseLike<unknown> | null)?.then === "function"
-      ? Promise.resolve(result).then(toString)
-      : toString(result);
+  mod.moduleEval((m) => {
+    Object.defineProperty(m, "renderer", { configurable: true, get: renderer });
   });
 
-  mod.defineMethod(
-    "renderToBody",
-    function (this: AbstractRenderHost, options: Record<string, unknown> = {}) {
-      const orPriorities = (body: unknown): unknown => {
-        if (body != null && body !== false) return body;
-        const priority = _renderInPriorities(options);
-        return priority != null && priority !== false ? priority : " ";
-      };
-      const body = mod.superMethod(this, "renderToBody")?.(options);
-      return typeof (body as PromiseLike<unknown> | null)?.then === "function"
-        ? Promise.resolve(body).then(orPriorities)
-        : orPriorities(body);
-    },
-  );
+  mod.defineMethod("setupRendererBang", setupRendererBang);
+});
 
-  mod.defineMethod("processAction", function (this: object, ...args: unknown[]) {
-    processAction.call(this as never);
-    return mod.superMethod(this, "processAction")!(...args);
-  });
+export const Rendering = new Module((mod) => {
+  extend(mod, Concern);
 
+  mod.defineMethod("render", render);
+  mod.defineMethod("renderToString", renderToString);
+  mod.defineMethod("renderToBody", renderToBody);
+  mod.defineMethod("processAction", processAction);
   mod.defineMethod("_processVariant", _processVariant);
   mod.defineMethod("_renderInPriorities", _renderInPriorities);
   mod.defineMethod("_setHtmlContentType", _setHtmlContentType);
   mod.defineMethod("_setRenderedContentType", _setRenderedContentType);
   mod.defineMethod("_setVaryHeader", _setVaryHeader);
-
-  mod.defineMethod("_normalizeOptions", function (this: object, options: Record<string, unknown>) {
-    _normalizeOptions(options);
-    return mod.superMethod(this, "_normalizeOptions")!(options);
-  });
-
+  mod.defineMethod("_normalizeOptions", _normalizeOptions);
   mod.defineMethod("_normalizeText", _normalizeText);
-
-  mod.defineMethod("_processOptions", function (this: object, options: Record<string, unknown>) {
-    _processOptions.call(this as never, options);
-    return mod.superMethod(this, "_processOptions")!(options);
-  });
-});
+  mod.defineMethod("_processOptions", _processOptions);
+}) as Module & { ClassMethods: Module };
+Rendering.ClassMethods = ClassMethods;

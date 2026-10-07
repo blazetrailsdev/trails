@@ -1,9 +1,14 @@
 import {
+  Concern,
+  Module,
   ToJsonWithActiveSupportEncoder,
+  classAttribute,
+  extend,
   isPresent,
+  removePossibleMethod,
   type ToJsonWithActiveSupportEncoderHost,
 } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 
 export class MissingRenderer extends Error {
@@ -22,59 +27,92 @@ export type RendererProc = (
 export interface RenderersHost {
   contentType: string | null;
   readonly mediaType: string | undefined;
-  _processOptions(options: Record<string, unknown>): void;
+  readonly _renderers: ReadonlySet<string>;
+  _processOptions(options: Record<string, unknown>): unknown;
+  _renderToBodyWithRenderer(options: Record<string, unknown>): unknown;
 }
 
-const RENDERERS = new Set<string>();
+export const RENDERERS = new Set<string>();
 
-export class Renderers {
-  /** @internal */
-  static _registry = new Map<string, RendererProc>();
+export function add(key: string, block: RendererProc): void {
+  Renderers.defineMethod(_renderWithRendererMethodName(key), block);
+  RENDERERS.add(key);
+}
 
-  static get RENDERERS(): ReadonlySet<string> {
-    return new Set(RENDERERS);
-  }
+export function remove(key: string): void {
+  RENDERERS.delete(key);
+  const methodName = _renderWithRendererMethodName(key);
+  removePossibleMethod.call(Renderers, methodName);
+}
 
-  static _renderWithRendererMethodName(key: string): string {
-    return `_render_with_renderer_${key}`;
-  }
+export function _renderWithRendererMethodName(key: string): string {
+  return `_render_with_renderer_${key}`;
+}
 
-  static add(key: string, block: RendererProc): void {
-    RENDERERS.add(key);
-    this._registry.set(this._renderWithRendererMethodName(key), block);
-  }
+export function useRenderers(this: { _renderers: ReadonlySet<string> }, ...args: string[]): void {
+  const renderers = new Set([...this._renderers, ...args]);
+  this._renderers = Object.freeze(renderers);
+}
 
-  static remove(key: string): void {
-    RENDERERS.delete(key);
-    this._registry.delete(this._renderWithRendererMethodName(key));
-  }
+export const ClassMethods = { useRenderers, useRenderer: useRenderers };
 
-  static get(key: string): RendererProc | undefined {
-    return this._registry.get(this._renderWithRendererMethodName(key));
-  }
-
-  static useRenderers(...args: string[]): void {
-    for (const name of args) {
-      RENDERERS.add(name);
-    }
-  }
+export function renderToBody(this: RenderersHost, options: Record<string, unknown>): unknown {
+  const body = this._renderToBodyWithRenderer(options);
+  return body != null && body !== false
+    ? body
+    : Renderers.superMethod(this, "renderToBody")!(options);
 }
 
 export function _renderToBodyWithRenderer(
   this: RenderersHost,
   options: Record<string, unknown>,
 ): unknown {
-  for (const name of RENDERERS) {
+  for (const name of this._renderers) {
     if (Object.hasOwn(options, name)) {
       this._processOptions(options);
       const methodName = Renderers._renderWithRendererMethodName(name);
       const value = options[name];
       delete options[name];
-      return Renderers._registry.get(methodName)!.call(this, value, options);
+      return rbFSend(this, methodName, value, options);
     }
   }
   return null;
 }
+
+type IncludedBlock = { included(base: null, block: (this: any) => void): void };
+
+export const Renderers = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as IncludedBlock).included(null, function () {
+    classAttribute.call(this, "_renderers", { default: Object.freeze(new Set<string>()) });
+  });
+
+  mod.defineMethod("renderToBody", renderToBody);
+  mod.defineMethod("_renderToBodyWithRenderer", _renderToBodyWithRenderer);
+}) as Module & {
+  RENDERERS: Set<string>;
+  All: Module;
+  ClassMethods: typeof ClassMethods;
+  add: typeof add;
+  remove: typeof remove;
+  _renderWithRendererMethodName: typeof _renderWithRendererMethodName;
+};
+Renderers.RENDERERS = RENDERERS;
+Renderers.ClassMethods = ClassMethods;
+Renderers.add = add;
+Renderers.remove = remove;
+Renderers._renderWithRendererMethodName = _renderWithRendererMethodName;
+
+export const All = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(Renderers);
+
+  (mod as unknown as IncludedBlock).included(null, function () {
+    this._renderers = RENDERERS;
+  });
+});
+Renderers.All = All;
 
 Renderers.add("json", function (json, options) {
   const {

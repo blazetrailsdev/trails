@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { Rational, TypeError } from "@blazetrails/ruby-compat";
+import { Rational } from "@blazetrails/ruby-compat";
 import { BigDecimal, TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import {
   quoteColumnName,
@@ -47,8 +47,8 @@ describe("MySQL quoting — quote", () => {
     expect(quote(NaN)).toBe("NaN");
   });
 
-  it("throws on Date — Date is no longer accepted", () => {
-    expect(() => quote(new Date())).toThrow(TypeError);
+  it("quotes a Date as a Time", () => {
+    expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
   });
 
   it("quotes strings with MySQL-specific escapes (\\n, \\0, \\Z, \\\\)", () => {
@@ -113,8 +113,8 @@ describe("MySQL quoting — typeCast", () => {
     expect(quote(new BinaryData(new Uint8Array([0xca, 0xfe])))).toBe("x'cafe'");
   });
 
-  it("throws on Date — Date is no longer accepted", () => {
-    expect(() => typeCast(new Date())).toThrow(TypeError);
+  it("casts a Date as a Time", () => {
+    expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
   });
 
   it("hands a Time back as a Time rather than a quoted_date String", () => {

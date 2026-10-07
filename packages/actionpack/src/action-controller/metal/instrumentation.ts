@@ -1,5 +1,6 @@
 import {
   attrInternal,
+  Benchmark,
   ExecutionContext,
   include,
   included,
@@ -31,6 +32,7 @@ export const Instrumentation: Module = new Module((mod) => {
 
   mod.moduleEval((carrier) => attrInternal.call(carrier, "viewRuntime"));
 
+  mod.defineMethod("render", render);
   mod.defineMethod("sendFile", sendFile);
   mod.defineMethod("sendData", sendData);
   mod.defineMethod("processAction", processAction);
@@ -44,6 +46,26 @@ interface InstrumentationHost {
   request: Request;
   response: Response;
   appendInfoToPayload(payload: Record<string, unknown>): void;
+}
+
+export function render(
+  this: { viewRuntime: number | null; cleanupViewRuntime<T>(block: () => T): T },
+  ...args: unknown[]
+): unknown {
+  let renderOutput: unknown = null;
+  const viewRuntime = this.cleanupViewRuntime(() =>
+    Benchmark.realtime(":float_millisecond", () => {
+      return (renderOutput = Instrumentation.superMethod(this, "render")!(...args));
+    }),
+  ) as number | Promise<number>;
+  if (typeof viewRuntime === "number") {
+    this.viewRuntime = viewRuntime;
+    return renderOutput;
+  }
+  return viewRuntime.then((viewRuntime) => {
+    this.viewRuntime = viewRuntime;
+    return renderOutput;
+  });
 }
 
 /** @internal */

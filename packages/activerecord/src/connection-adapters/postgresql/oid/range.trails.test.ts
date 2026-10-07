@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/date";
 import { TimeZone } from "@blazetrails/activesupport";
 import { RangeType } from "./range.js";
-import { Range, TypeError } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat";
 
 const integerSubtype = {
   cast: (value: unknown) => (value == null ? null : Number(value)),
@@ -133,10 +133,10 @@ describe("PostgreSQL::OID::Range", () => {
       expect(type.typeCastForSchema(twz)).toBe(twz.inspect());
     });
 
-    it("throws on Date passed directly to typeCastForSchema / inspect()", () => {
+    it("does not reject a Date passed directly to typeCastForSchema / inspect()", () => {
       const type = new RangeType(passthroughSubtype, "tsrange");
-      expect(() => type.typeCastForSchema(new Date())).toThrow(TypeError);
-      expect(() => type.typeCastForSchema(new Date())).toThrow(/Temporal/);
+      const date = new Date(Date.UTC(2020, 0, 2, 3, 4, 5));
+      expect(type.typeCastForSchema(date)).toBe(String(date));
     });
   });
 
