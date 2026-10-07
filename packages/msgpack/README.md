@@ -49,6 +49,11 @@ Each is tracked by a story in RFC 0184.
   (`ext/msgpack/factory_class.c:232-239`). `symbol.ts`'s
   `Symbol.from_msgpack_ext` unpacks one. Story:
   `msgpack-symbol-ext-packer-arm-and-extended-object-lookup`.
+- **An ext type registered on a `Uint8Array` subclass is not found.**
+  `rbObjClass` reads every `Uint8Array` as a plain String, where
+  `rb_class_of` answers a String subclass (`ext/msgpack/packer.c:174-178`), so
+  the value packs as `bin`. Story:
+  `rb-obj-class-reads-a-uint8array-subclass-as-plain-string` (RFC 0154).
 - **`write_array_header` / `write_map_header` take an integer.** `NUM2UINT`'s
   `FloatDomainError` for `NaN` is not ported.
 - **`StackError` is never raised**, unpacker options are ignored, IO-backed
