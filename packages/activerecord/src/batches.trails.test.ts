@@ -24,6 +24,42 @@ describe("BatchEnumerator (trails)", () => {
     expect(await idsOf()).toEqual(first);
   });
 
+  it("toA collects every batch relation", async () => {
+    const batches = await Post.inBatches({ of: 2 }).toA();
+    const ids: number[] = [];
+    for (const relation of batches) ids.push(...(await relation.pluck("id")).map(Number));
+    expect(ids).toEqual((await Post.order("id").pluck("id")).map(Number));
+  });
+
+  it("sum settles one batch's block before the next batch is fetched", async () => {
+    const events: string[] = [];
+    const subscription = Notifications.subscribe(
+      "sql.active_record",
+      (event: { payload: Record<string, unknown> }) => {
+        if (event.payload.name !== "SCHEMA") events.push("query");
+      },
+    );
+    let total: number;
+    try {
+      total = await Post.inBatches({ of: 1 }).sum(async () => {
+        events.push("enter");
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push("leave");
+        return 1;
+      });
+    } finally {
+      Notifications.unsubscribe(subscription);
+    }
+    expect(total).toBe(await Post.count());
+    expect(total).toBeGreaterThan(2);
+    expect(events.filter((event) => event !== "query").length).toBe(total * 2);
+    events.forEach((event, i) => {
+      if (event === "enter") expect(events[i + 1]).toBe("leave");
+    });
+    expect(events.indexOf("query")).toBeLessThan(events.indexOf("enter"));
+    expect(events.lastIndexOf("query")).toBeGreaterThan(events.indexOf("leave"));
+  });
+
   it("eachRecord honours the cursor it was built with", async () => {
     const records: Post[] = [];
     await Post.inBatches({ of: 1, cursor: "id", order: ":desc" }).eachRecord((post: Post) => {

@@ -31,7 +31,7 @@ export function sum<T>(
   const first = this.first();
   const last = this.last();
   if (block !== undefined || !(rbIntegerTypeP(first) && rbIntegerTypeP(last))) {
-    return enumerableSum(this, initialValue, block);
+    return enumerableSum(this, initialValue, ...(block === undefined ? [] : [block]));
   } else {
     const actualLast = this.excludeEnd ? BigInt(last) - 1n : BigInt(last);
     if (actualLast >= BigInt(first)) {
