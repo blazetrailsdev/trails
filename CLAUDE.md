@@ -1717,8 +1717,7 @@ JS builds an object with the `new` expression, and that is the only spelling
 trails has. **There is no static `Klass.new`.** `new Klass(attributes, block)`
 is Rails' `Klass.new(attributes, &block)`, so the body of
 `Inheritance::ClassMethods#new` runs in `Base`'s constructor
-(`packages/activerecord/src/base.ts`): the abstract raise
-(`_requireConcreteClass`), then the three `subclass_from_attributes` arms in
+(`packages/activerecord/src/base.ts`): the abstract raise, then the three `subclass_from_attributes` arms in
 Rails' order, then `new subclass(attributes, block)` or the rest of the
 constructor, which is `Class#new`.
 

@@ -633,15 +633,6 @@ export class Base extends Model {
     | undefined;
   declare static isSignedIdVerifierSecret: boolean;
 
-  static _requireConcreteClass(): void {
-    if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
-      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
-      throw new NotImplementedError(
-        `${rbModName(this)} is an abstract class and cannot be instantiated.`,
-      );
-    }
-  }
-
   declare static connectionClass: boolean;
 
   static isConnectionClass = _Core.isConnectionClass;
@@ -1603,36 +1594,40 @@ export class Base extends Model {
   ) {
     const allocating = _Core._allocation.klass === new.target;
     if (allocating) _Core._allocation.klass = null;
-    if (!allocating) (new.target as typeof Base | undefined)?._requireConcreteClass();
-    attributes ??= {};
-    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
-    if (
-      !allocating &&
-      (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
-        ?._suppressStiNewDispatch !== new.target
-    ) {
-      const klass = new.target;
-      let subclass: typeof Base | null = null;
-      if (klass._hasAttribute(klass.inheritanceColumn as string)) {
-        subclass = klass.subclassFromAttributes(attrs);
-
-        let scopeAttributes;
-        if (
-          subclass == null &&
-          (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
-        ) {
-          subclass = klass.subclassFromAttributes(scopeAttributes);
-        }
-
-        if (subclass == null && klass.isBaseClass()) {
-          subclass = klass.subclassFromAttributes(klass.columnDefaults);
-        }
+    if (!allocating) {
+      const klass = new.target as typeof Base & { _suppressStiNewDispatch?: unknown };
+      if ((klass.abstractClass || klass === Base) && !klass._suppressAbstractCheck) {
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
+        throw new NotImplementedError(
+          `${rbModName(klass)} is an abstract class and cannot be instantiated.`,
+        );
       }
 
-      if (subclass != null && subclass !== klass) {
-        return new subclass(attrs, initBlock);
+      if (klass._suppressStiNewDispatch !== klass) {
+        let subclass: typeof Base | null = null;
+        if (klass._hasAttribute(klass.inheritanceColumn as string)) {
+          subclass = klass.subclassFromAttributes(attributes as Record<string, unknown>);
+
+          let scopeAttributes;
+          if (
+            subclass == null &&
+            (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
+          ) {
+            subclass = klass.subclassFromAttributes(scopeAttributes);
+          }
+
+          if (subclass == null && klass.isBaseClass()) {
+            subclass = klass.subclassFromAttributes(klass.columnDefaults);
+          }
+        }
+
+        if (subclass != null && subclass !== klass) {
+          return new subclass(attributes, initBlock);
+        }
       }
     }
+    attributes ??= {};
+    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
     const ctor = new.target;
