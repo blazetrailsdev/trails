@@ -122,12 +122,12 @@ describe("PermissionsPolicyIntegrationTest", () => {
         f.gyroscope(":none");
       });
 
-      this.permissionsPolicy({ only: "sample_controller" }, (f) => {
+      this.permissionsPolicy({ only: "sampleController" }, (f) => {
         f.gyroscope(null);
         f.usb(":self");
       });
 
-      this.permissionsPolicy({ only: "multiple_directives" }, (f) => {
+      this.permissionsPolicy({ only: "multipleDirectives" }, (f) => {
         f.gyroscope(null);
         f.usb(":self");
         f.autoplay("https://example.com");
@@ -153,8 +153,8 @@ describe("PermissionsPolicyIntegrationTest", () => {
   ROUTES.draw(function () {
     this.scope({ module: "permissions_policy_integration_test" }, () => {
       this.get("/", { to: "policy#index" });
-      this.get("/sample_controller", { to: "policy#sample_controller" });
-      this.get("/multiple_directives", { to: "policy#multiple_directives" });
+      this.get("/sample_controller", { to: "policy#sampleController" });
+      this.get("/multiple_directives", { to: "policy#multipleDirectives" });
     });
   });
 

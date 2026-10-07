@@ -195,9 +195,7 @@ describe("HeadTest", () => {
   });
 
   it("head :switching_protocols (101) does not return a content-type header", async () => {
-    const headers = (
-      await HeadController.action("switching_protocols")(MockRequest.envFor("/"))
-    )[1];
+    const headers = (await HeadController.action("switchingProtocols")(MockRequest.envFor("/")))[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
@@ -209,45 +207,43 @@ describe("HeadTest", () => {
   });
 
   it("head :early_hints (103) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("early_hints")(MockRequest.envFor("/")))[1];
+    const headers = (await HeadController.action("earlyHints")(MockRequest.envFor("/")))[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :no_content (204) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("no_content")(MockRequest.envFor("/")))[1];
+    const headers = (await HeadController.action("noContent")(MockRequest.envFor("/")))[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :reset_content (205) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("reset_content")(MockRequest.envFor("/")))[1];
+    const headers = (await HeadController.action("resetContent")(MockRequest.envFor("/")))[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :not_modified (304) does not return a content-type header", async () => {
-    const headers = (await HeadController.action("not_modified")(MockRequest.envFor("/")))[1];
+    const headers = (await HeadController.action("notModified")(MockRequest.envFor("/")))[1];
     assertNil(headers["content-type"]);
     assertNil(headers["content-length"]);
   });
 
   it("head :no_content (204) does not return any content", async () => {
-    const content = await body(await HeadController.action("no_content")(MockRequest.envFor("/")));
+    const content = await body(await HeadController.action("noContent")(MockRequest.envFor("/")));
     assertEmpty(content);
   });
 
   it("head :reset_content (205) does not return any content", async () => {
     const content = await body(
-      await HeadController.action("reset_content")(MockRequest.envFor("/")),
+      await HeadController.action("resetContent")(MockRequest.envFor("/")),
     );
     assertEmpty(content);
   });
 
   it("head :not_modified (304) does not return any content", async () => {
-    const content = await body(
-      await HeadController.action("not_modified")(MockRequest.envFor("/")),
-    );
+    const content = await body(await HeadController.action("notModified")(MockRequest.envFor("/")));
     assertEmpty(content);
   });
 
@@ -258,7 +254,7 @@ describe("HeadTest", () => {
 
   it("head :switching_protocols (101) does not return any content", async () => {
     const content = await body(
-      await HeadController.action("switching_protocols")(MockRequest.envFor("/")),
+      await HeadController.action("switchingProtocols")(MockRequest.envFor("/")),
     );
     assertEmpty(content);
   });

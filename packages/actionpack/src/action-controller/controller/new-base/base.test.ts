@@ -83,14 +83,14 @@ describe("BaseTest", () => {
 
   it("directly modifying response body", async ({ task }) => {
     const t = new BaseTest(task.name);
-    await t.get("/dispatching/simple/modify_response_body");
+    await t.get("/dispatching/simple/modifyResponseBody");
 
     t.assertBody("success");
   });
 
   it("directly modifying response body twice", async ({ task }) => {
     const t = new BaseTest(task.name);
-    await t.get("/dispatching/simple/modify_response_body_twice");
+    await t.get("/dispatching/simple/modifyResponseBodyTwice");
 
     t.assertBody("success!");
   });
@@ -170,8 +170,8 @@ describe("BaseTest", () => {
       new Set([
         "index",
         "modifyResponseHeaders",
-        "modify_response_body_twice",
-        "modify_response_body",
+        "modifyResponseBodyTwice",
+        "modifyResponseBody",
         "showActions",
       ]),
       SimpleController.actionMethods(),

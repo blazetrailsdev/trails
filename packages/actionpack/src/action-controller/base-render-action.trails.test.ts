@@ -67,19 +67,19 @@ describe("ActionView::Rendering reaches ActionController::Base as an included mo
 
 describe("RenderAction::RenderActionTest", () => {
   it("rendering an action using '<action>'", async () => {
-    const c = await dispatch(new BasicController(), "hello_world_as_string");
+    const c = await dispatch(new BasicController(), "helloWorldAsString");
     expect(c.responseBody).toBe("Hello world!");
     expect(c.response.status).toBe(200);
   });
 
   it("rendering an action using '<action>' and options", async () => {
-    const c = await dispatch(new BasicController(), "hello_world_as_string_with_options");
+    const c = await dispatch(new BasicController(), "helloWorldAsStringWithOptions");
     expect(c.responseBody).toBe("Hello world!");
     expect(c.response.status).toBe(404);
   });
 
   it("render with a slash renders a template, per rendering.rb:161-163", async () => {
-    const c = await dispatch(new BasicController(), "hello_world_as_template_path");
+    const c = await dispatch(new BasicController(), "helloWorldAsTemplatePath");
     expect(c.responseBody).toBe("Hello world!");
   });
 });

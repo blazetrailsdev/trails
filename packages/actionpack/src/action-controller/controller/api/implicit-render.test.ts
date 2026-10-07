@@ -32,12 +32,12 @@ describe("ImplicitRenderAPITest", () => {
   });
 
   it("implicit no content response", async () => {
-    await tc.get("empty_action");
+    await tc.get("emptyAction");
     tc.assertResponse("no_content");
   });
 
   it("result independence", async () => {
-    await tc.get("returning_mock");
+    await tc.get("returningMock");
     tc.assertResponse("no_content");
   });
 });

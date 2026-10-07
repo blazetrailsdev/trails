@@ -59,8 +59,8 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
       this.withRoutes(function () {
         this.get("show", { to: `${LogSubscriberController.controllerPath()}#show` });
         this.get("zero", { to: `${LogSubscriberController.controllerPath()}#zero` });
-        this.get("db_after_render", {
-          to: `${LogSubscriberController.controllerPath()}#db_after_render`,
+        this.get("dbAfterRender", {
+          to: `${LogSubscriberController.controllerPath()}#dbAfterRender`,
         });
         this.get("redirect", { to: `${LogSubscriberController.controllerPath()}#redirect` });
         this.post("create", { to: `${LogSubscriberController.controllerPath()}#create` });
@@ -139,7 +139,7 @@ describe("ControllerRuntimeLogSubscriberTest", () => {
   });
 
   it("include time query time after rendering", async () => {
-    await tc.get("db_after_render");
+    await tc.get("dbAfterRender");
     tc.wait();
 
     assertEqual(2, tc.logger.logged(":info").length);

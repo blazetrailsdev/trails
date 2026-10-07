@@ -238,7 +238,7 @@ function assertKindOf(klass: StringConstructor, actual: unknown): void {
 
 describe("TestCaseTest", () => {
   const FILES_DIR = `${FIXTURE_LOAD_PATH}/multipart`;
-  const controllerInfo = { controller: "test_case_test/test", action: "test_params" };
+  const controllerInfo = { controller: "test_case_test/test", action: "testParams" };
   let tc: TestCaseTest;
   const assertGenerates = (...args: Parameters<TestCaseTest["assertGenerates"]>) =>
     tc.assertGenerates(...args);
@@ -259,14 +259,14 @@ describe("TestCaseTest", () => {
 
   it("url options reset", async () => {
     tc.controller = new DefaultUrlOptionsCachingController();
-    await tc.get("test_url_options_reset");
+    await tc.get("testUrlOptionsReset");
     assertNil(tc.request.params["dynamic_opt"]);
     assertMatch(/dynamic_opt=opt/, tc.response.body);
   });
 
   it("raw post handling", async () => {
     const params = { page: { name: "page name" }, "some key": 123 };
-    await tc.post("render_raw_post", { params: { ...params } });
+    await tc.post("renderRawPost", { params: { ...params } });
 
     assertEqual(toQuery(params), tc.response.body);
   });
@@ -280,7 +280,7 @@ describe("TestCaseTest", () => {
         ],
       },
     };
-    await tc.post("test_params", { params: { ...params } });
+    await tc.post("testParams", { params: { ...params } });
 
     assertEqual({ ...params, ...controllerInfo }, JSON.parse(tc.response.body));
   });
@@ -292,7 +292,7 @@ describe("TestCaseTest", () => {
       }
     };
 
-    await tc.post("test_params", { params: { foo: new klass() } });
+    await tc.post("testParams", { params: { foo: new klass() } });
 
     assertEqual("bar", JSON.parse(tc.response.body)["foo"]);
   });
@@ -300,7 +300,7 @@ describe("TestCaseTest", () => {
   it("body stream", async () => {
     const params = { page: { name: "page name" }, "some key": 123 };
 
-    await tc.post("render_body", { params: { ...params } });
+    await tc.post("renderBody", { params: { ...params } });
 
     assertEqual(toQuery(params), tc.response.body);
   });
@@ -309,55 +309,55 @@ describe("TestCaseTest", () => {
   it.skip("body stream is binary", () => {});
 
   it("document body and params with post", async () => {
-    await tc.post("test_params", { params: { id: 1 } });
+    await tc.post("testParams", { params: { id: 1 } });
     assertEqual({ id: "1", ...controllerInfo }, JSON.parse(tc.response.body));
   });
 
   it("document body with post", async () => {
-    await tc.post("render_body", { body: "document body" });
+    await tc.post("renderBody", { body: "document body" });
     assertEqual("document body", tc.response.body);
   });
 
   it("document body with put", async () => {
-    await tc.put("render_body", { body: "document body" });
+    await tc.put("renderBody", { body: "document body" });
     assertEqual("document body", tc.response.body);
   });
 
   it("head", async () => {
-    await tc.head("test_params");
+    await tc.head("testParams");
     assertEqual(200, tc.response.status);
   });
 
   it("process without flash", async () => {
-    await tc.process("set_flash");
+    await tc.process("setFlash");
     assertEqual("><", tc.flash().get("test"));
   });
 
   it("process with flash", async () => {
-    await tc.process("set_flash", { method: "GET", flash: { test: "value" } });
+    await tc.process("setFlash", { method: "GET", flash: { test: "value" } });
     assertEqual(">value<", tc.flash().get("test"));
   });
 
   it("process with flash now", async () => {
-    await tc.process("set_flash_now", { method: "GET", flash: { test_now: "value_now" } });
+    await tc.process("setFlashNow", { method: "GET", flash: { test_now: "value_now" } });
     assertEqual(">value_now<", tc.flash().get("test_now"));
   });
 
   it("process delete flash", async () => {
-    await tc.process("set_flash");
-    await tc.process("delete_flash");
+    await tc.process("setFlash");
+    await tc.process("deleteFlash");
     assertEmpty(tc.flash());
     assertEmpty(tc.session());
   });
 
   it("process with session", async () => {
-    await tc.process("set_session");
+    await tc.process("setSession");
     expect(tc.session().get("string")).toBe("A wonder");
     expect(tc.session().get("symbol")).toBe("it works");
   });
 
   it("process with session kwarg", async () => {
-    await tc.process("no_op", { method: "GET", session: { string: "value1", symbol: "value2" } });
+    await tc.process("noOp", { method: "GET", session: { string: "value1", symbol: "value2" } });
     assertEqual("value1", tc.session().get("string"));
     assertEqual("value1", tc.session().get("string"));
     assertEqual("value2", tc.session().get("symbol"));
@@ -366,80 +366,80 @@ describe("TestCaseTest", () => {
 
   it("process merges session arg", async () => {
     tc.session().set("foo", "bar");
-    await tc.get("no_op", { session: { bar: "baz" } });
+    await tc.get("noOp", { session: { bar: "baz" } });
     assertEqual("bar", tc.session().get("foo"));
     assertEqual("baz", tc.session().get("bar"));
   });
 
   it("merged session arg is retained across requests", async () => {
-    await tc.get("no_op", { session: { foo: "bar" } });
+    await tc.get("noOp", { session: { foo: "bar" } });
     assertEqual("bar", tc.session().get("foo"));
-    await tc.get("no_op");
+    await tc.get("noOp");
     assertEqual("bar", tc.session().get("foo"));
   });
 
   it("process overwrites existing session arg", async () => {
     tc.session().set("foo", "bar");
-    await tc.get("no_op", { session: { foo: "baz" } });
+    await tc.get("noOp", { session: { foo: "baz" } });
     assertEqual("baz", tc.session().get("foo"));
   });
 
   it("session is cleared from controller after reset session", async () => {
-    await tc.process("set_session");
-    await tc.process("reset_the_session");
+    await tc.process("setSession");
+    await tc.process("resetTheSession");
     assertEqual({}, tc.controller.session.toHash());
   });
 
   it("session is cleared from request after reset session", async () => {
-    await tc.process("set_session");
-    await tc.process("reset_the_session");
+    await tc.process("setSession");
+    await tc.process("resetTheSession");
     assertEqual({}, tc.request.session.toHash());
   });
 
   it("response and request have nice accessors", async () => {
-    await tc.process("no_op");
+    await tc.process("noOp");
     assertEqual(tc.response, tc.response);
     assertEqual(tc.request, tc.request);
   });
 
   it("process with request uri with no params", async () => {
-    await tc.process("test_uri");
-    assertEqual("/test_case_test/test/test_uri", tc.response.body);
+    await tc.process("testUri");
+    assertEqual("/test_case_test/test/testUri", tc.response.body);
   });
 
   it("process with symbol method", async () => {
-    await tc.process("test_uri", { method: "get" });
-    assertEqual("/test_case_test/test/test_uri", tc.response.body);
+    await tc.process("testUri", { method: "get" });
+    assertEqual("/test_case_test/test/testUri", tc.response.body);
   });
 
   it("process with request uri with params", async () => {
-    await tc.process("test_uri", { method: "GET", params: { id: 7 } });
+    await tc.process("testUri", { method: "GET", params: { id: 7 } });
 
-    assertEqual("/test_case_test/test/test_uri/7", tc.response.body);
+    assertEqual("/test_case_test/test/testUri/7", tc.response.body);
   });
 
   it("process with request uri with params with explicit uri", async () => {
     tc.request.env["PATH_INFO"] = "/explicit/uri";
-    await tc.process("test_uri", { method: "GET", params: { id: 7 } });
+    await tc.process("testUri", { method: "GET", params: { id: 7 } });
     assertEqual("/explicit/uri", tc.response.body);
   });
 
   it("process with query string", async () => {
-    await tc.process("test_query_string", { method: "GET", params: { q: "test" } });
+    await tc.process("testQueryString", { method: "GET", params: { q: "test" } });
     assertEqual("q=test", tc.response.body);
   });
 
   it("process with query string with explicit uri", async () => {
     tc.request.env["PATH_INFO"] = "/explicit/uri";
     tc.request.env["QUERY_STRING"] = "q=test?extra=question";
-    await tc.process("test_query_string");
+    await tc.process("testQueryString");
     assertEqual("q=test?extra=question", tc.response.body);
   });
 
   it("multiple calls", async () => {
-    await tc.process("test_only_one_param", { method: "GET", params: { left: true } });
+    await tc.process("testOnlyOneParam", { method: "GET", params: { left: true } });
     assertEqual("OK", tc.response.body);
-    await tc.process("test_only_one_param", { method: "GET", params: { right: true } });
+    await tc.process("testOnlyOneParam", { method: "GET", params: { right: true } });
     assertEqual("OK", tc.response.body);
   });
 
@@ -522,7 +522,7 @@ describe("TestCaseTest", () => {
   });
 
   it("params passing", async () => {
-    await tc.get("test_params", {
+    await tc.get("testParams", {
       params: { page: { name: "Page name", month: "4", year: "2004", day: "6" } },
     });
     const parsedParams = JSON.parse(tc.response.body);
@@ -533,25 +533,25 @@ describe("TestCaseTest", () => {
   });
 
   it("nil params", async () => {
-    await tc.get("test_params", { params: null });
+    await tc.get("testParams", { params: null });
     const parsedParams = JSON.parse(tc.response.body);
-    assertEqual({ action: "test_params", controller: "test_case_test/test" }, parsedParams);
+    assertEqual({ action: "testParams", controller: "test_case_test/test" }, parsedParams);
   });
 
   it("query param named action", async () => {
-    await tc.get("test_query_parameters", { params: { action: "foobar" } });
+    await tc.get("testQueryParameters", { params: { action: "foobar" } });
     const parsedParams = JSON.parse(tc.response.body);
     assertEqual({ action: "foobar" }, parsedParams);
   });
 
   it("request param named action", async () => {
-    await tc.post("test_request_parameters", { params: { action: "foobar" } });
+    await tc.post("testRequestParameters", { params: { action: "foobar" } });
     const parsedParams = JSON.parse(tc.response.body);
     assertEqual({ action: "foobar" }, parsedParams);
   });
 
   it("kwarg params passing with session and flash", async () => {
-    await tc.get("test_params", {
+    await tc.get("testParams", {
       params: { page: { name: "Page name", month: "4", year: "2004", day: "6" } },
       session: { foo: "bar" },
       flash: { notice: "created" },
@@ -568,7 +568,7 @@ describe("TestCaseTest", () => {
   });
 
   it("params passing with integer", async () => {
-    await tc.get("test_params", {
+    await tc.get("testParams", {
       params: { page: { name: "Page name", month: 4, year: 2004, day: 6 } },
     });
     const parsedParams = JSON.parse(tc.response.body);
@@ -579,20 +579,20 @@ describe("TestCaseTest", () => {
   });
 
   it("params passing with integers when not html request", async () => {
-    await tc.get("test_params", { params: { format: "json", count: 999 } });
+    await tc.get("testParams", { params: { format: "json", count: 999 } });
     const parsedParams = JSON.parse(tc.response.body);
     assertEqual({ ...controllerInfo, format: "json", count: "999" }, parsedParams);
   });
 
   it("params passing path parameter is string when not html request", async () => {
-    await tc.get("test_params", { params: { format: "json", id: 1 } });
+    await tc.get("testParams", { params: { format: "json", id: 1 } });
     const parsedParams = JSON.parse(tc.response.body);
     assertEqual({ ...controllerInfo, format: "json", id: "1" }, parsedParams);
   });
 
   it("params passing with frozen values", async () => {
     await assertNothingRaised(async () => {
-      await tc.get("test_params", {
+      await tc.get("testParams", {
         params: {
           frozen: "icy",
           frozens: Object.freeze(["icy"]),
@@ -609,14 +609,14 @@ describe("TestCaseTest", () => {
 
   it("params passing doesnt modify in place", async () => {
     const page = { name: "Page name", month: 4, year: 2004, day: 6 };
-    await tc.get("test_params", { params: { page } });
+    await tc.get("testParams", { params: { page } });
     assertEqual(2004, page.year);
   });
 
   it("set additional HTTP headers", async () => {
     tc.request.headers.set("Referer", "http://nohost.com/home");
     tc.request.headers.set("Content-Type", "application/rss+xml");
-    await tc.get("test_headers");
+    await tc.get("testHeaders");
     const parsedEnv = ActiveSupportJSON.decode(tc.response.body) as Record<string, unknown>;
     assertEqual("http://nohost.com/home", parsedEnv["HTTP_REFERER"]);
     assertEqual("application/rss+xml", parsedEnv["CONTENT_TYPE"]);
@@ -625,7 +625,7 @@ describe("TestCaseTest", () => {
   it("set additional env variables", async () => {
     tc.request.headers.set("HTTP_REFERER", "http://example.com/about");
     tc.request.headers.set("CONTENT_TYPE", "application/json");
-    await tc.get("test_headers");
+    await tc.get("testHeaders");
     const parsedEnv = ActiveSupportJSON.decode(tc.response.body) as Record<string, unknown>;
     assertEqual("http://example.com/about", parsedEnv["HTTP_REFERER"]);
     assertEqual("application/json", parsedEnv["CONTENT_TYPE"]);
@@ -635,19 +635,19 @@ describe("TestCaseTest", () => {
   it.skip("blank Content-Type header", async () => {
     tc.request.headers.set("Content-Type", "");
     await assertRaises([InvalidType], {}, async () => {
-      await tc.get("test_headers");
+      await tc.get("testHeaders");
     });
   });
 
   it("nil Content-Type header with post request", async () => {
     tc.request.headers.set("Content-Type", null);
     await assertRaises([Error], { match: /Unknown Content-Type/ }, async () => {
-      await tc.post("render_body");
+      await tc.post("renderBody");
     });
   });
 
   it("using as json sets request content type to json", async () => {
-    await tc.post("render_body", {
+    await tc.post("renderBody", {
       params: { bool_value: true, str_value: "string", num_value: 2 },
       as: "json",
     });
@@ -659,7 +659,7 @@ describe("TestCaseTest", () => {
   });
 
   it("using as json sets format json", async () => {
-    await tc.post("render_body", {
+    await tc.post("renderBody", {
       params: { bool_value: true, str_value: "string", num_value: 2 },
       as: "json",
     });
@@ -667,65 +667,65 @@ describe("TestCaseTest", () => {
   });
 
   it("using as json with empty params", async () => {
-    await tc.post("test_params", { params: { foo: { bar: [] } }, as: "json" });
+    await tc.post("testParams", { params: { foo: { bar: [] } }, as: "json" });
 
     assertEqual({ bar: [] }, JSON.parse(tc.response.body)["foo"]);
   });
 
   it("using as json with path parameters", async () => {
-    await tc.post("test_params", { params: { id: "12345" }, as: "json" });
+    await tc.post("testParams", { params: { id: "12345" }, as: "json" });
 
     assertEqual("12345", tc.request.pathParameters["id"]);
   });
 
   it("mutating content type headers for plain text files sets the header", async () => {
     tc.request.headers.set("Content-Type", "text/plain");
-    await tc.post("render_body", { params: { name: "foo.txt" } });
+    await tc.post("renderBody", { params: { name: "foo.txt" } });
 
     assertEqual("text/plain", tc.request.headers.get("Content-type"));
     assertEqual("foo.txt", tc.request.requestParameters["name"]);
-    assertEqual("render_body", tc.request.pathParameters["action"]);
+    assertEqual("renderBody", tc.request.pathParameters["action"]);
   });
 
   it("mutating content type headers for html files sets the header", async () => {
     tc.request.headers.set("Content-Type", "text/html");
-    await tc.post("render_body", { params: { name: "foo.html" } });
+    await tc.post("renderBody", { params: { name: "foo.html" } });
 
     assertEqual("text/html", tc.request.headers.get("Content-type"));
     assertEqual("foo.html", tc.request.requestParameters["name"]);
-    assertEqual("render_body", tc.request.pathParameters["action"]);
+    assertEqual("renderBody", tc.request.pathParameters["action"]);
   });
 
   it("mutating content type headers for non registered mime type raises an error", async () => {
     await assertRaises([Error], {}, async () => {
       tc.request.headers.set("Content-Type", "type/fake");
-      await tc.post("render_body", { params: { name: "foo.fake" } });
+      await tc.post("renderBody", { params: { name: "foo.fake" } });
     });
   });
 
   it("id converted to string", async () => {
-    await tc.get("test_params", { params: { id: 20, foo: new Object() } });
+    await tc.get("testParams", { params: { id: 20, foo: new Object() } });
     assertKindOf(String, tc.request.pathParameters["id"]);
   });
 
   it("array path parameter handled properly", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("file/*path", { to: "test_case_test/test#test_params" });
+        this.get("file/*path", { to: "test_case_test/test#testParams" });
 
         deprecator().silence(() => {
           this.get(":controller/:action");
         });
       });
 
-      await tc.get("test_params", { params: { path: ["hello", "world"] } });
+      await tc.get("testParams", { params: { path: ["hello", "world"] } });
       assertEqual(["hello", "world"], tc.request.pathParameters["path"]);
       assertEqual("hello/world", toParam(tc.request.pathParameters["path"]));
     });
   });
 
   it("assert realistic path parameters", async () => {
-    await tc.get("test_params", { params: { id: 20, foo: new Object() } });
+    await tc.get("testParams", { params: { id: 20, foo: new Object() } });
 
     for (const key of Object.keys(tc.request.pathParameters)) {
       assertKindOf(String, key);
@@ -750,28 +750,28 @@ describe("TestCaseTest", () => {
   });
 
   it("remote addr", async () => {
-    await tc.get("test_remote_addr");
+    await tc.get("testRemoteAddr");
     assertEqual("0.0.0.0", tc.response.body);
 
     tc.request.remoteAddr = "192.0.0.1";
-    await tc.get("test_remote_addr");
+    await tc.get("testRemoteAddr");
     assertEqual("192.0.0.1", tc.response.body);
   });
 
   it("header properly reset after remote http request", async () => {
-    await tc.get("test_params", { xhr: true });
+    await tc.get("testParams", { xhr: true });
     assertNil(tc.request.env["HTTP_X_REQUESTED_WITH"]);
     assertNil(tc.request.env["HTTP_ACCEPT"]);
   });
 
   it("xhr with params", async () => {
-    await tc.get("test_params", { params: { id: 1 }, xhr: true });
+    await tc.get("testParams", { params: { id: 1 }, xhr: true });
 
     assertEqual({ id: "1", ...controllerInfo }, JSON.parse(tc.response.body));
   });
 
   it("xhr with session", async () => {
-    await tc.get("set_session", { xhr: true });
+    await tc.get("setSession", { xhr: true });
 
     assertEqual(
       "A wonder",
@@ -796,93 +796,93 @@ describe("TestCaseTest", () => {
   });
 
   it("params reset between post requests", async () => {
-    await tc.post("no_op", { params: { foo: "bar" } });
+    await tc.post("noOp", { params: { foo: "bar" } });
     assertEqual("bar", tc.request.params["foo"]);
 
-    await tc.post("no_op");
+    await tc.post("noOp");
     assertPredicate(tc.request.params["foo"], isBlank);
   });
 
   it("filtered parameters reset between requests", async () => {
-    await tc.get("no_op", { params: { foo: "bar" } });
+    await tc.get("noOp", { params: { foo: "bar" } });
     assertEqual("bar", tc.request.filteredParameters()["foo"]);
 
-    await tc.get("no_op", { params: { foo: "baz" } });
+    await tc.get("noOp", { params: { foo: "baz" } });
     assertEqual("baz", tc.request.filteredParameters()["foo"]);
   });
 
   it("raw post reset between post requests", async () => {
-    await tc.post("no_op", { params: { foo: "bar" } });
+    await tc.post("noOp", { params: { foo: "bar" } });
     assertEqual("foo=bar", tc.request.rawPost);
 
-    await tc.post("no_op", { params: { foo: "baz" } });
+    await tc.post("noOp", { params: { foo: "baz" } });
     assertEqual("foo=baz", tc.request.rawPost);
   });
 
   it("content length reset after post request", async () => {
-    await tc.post("no_op", { params: { foo: "bar" } });
+    await tc.post("noOp", { params: { foo: "bar" } });
     assertNotEqual(0, tc.request.contentLength);
 
-    await tc.get("no_op");
+    await tc.get("noOp");
     assertEqual(0, tc.request.contentLength);
   });
 
   it("path is kept after the request", async () => {
-    await tc.get("test_params", { params: { id: "foo" } });
-    assertEqual("/test_case_test/test/test_params/foo", tc.request.path);
+    await tc.get("testParams", { params: { id: "foo" } });
+    assertEqual("/test_case_test/test/testParams/foo", tc.request.path);
   });
 
   it("path params reset between request", async () => {
-    await tc.get("test_params", { params: { id: "foo" } });
+    await tc.get("testParams", { params: { id: "foo" } });
     assertEqual("foo", tc.request.pathParameters["id"]);
 
-    await tc.get("test_params");
+    await tc.get("testParams");
     assertNil(tc.request.pathParameters["id"]);
   });
 
   it("request protocol is reset after request", async () => {
-    await tc.get("test_protocol");
+    await tc.get("testProtocol");
     assertEqual("http://", tc.response.body);
 
     tc.request.env["HTTPS"] = "on";
-    await tc.get("test_protocol");
+    await tc.get("testProtocol");
     assertEqual("https://", tc.response.body);
 
     delete tc.request.env["HTTPS"];
-    await tc.get("test_protocol");
+    await tc.get("testProtocol");
     assertEqual("http://", tc.response.body);
   });
 
   it("request format", async () => {
-    await tc.get("test_format", { params: { format: "html" } });
+    await tc.get("testFormat", { params: { format: "html" } });
     assertEqual("text/html", tc.response.body);
 
-    await tc.get("test_format", { params: { format: "json" } });
+    await tc.get("testFormat", { params: { format: "json" } });
     assertEqual("application/json", tc.response.body);
 
-    await tc.get("test_format", { params: { format: "xml" } });
+    await tc.get("testFormat", { params: { format: "xml" } });
     assertEqual("application/xml", tc.response.body);
 
-    await tc.get("test_format");
+    await tc.get("testFormat");
     assertEqual("text/html", tc.response.body);
   });
 
   it("request format kwarg", async () => {
-    await tc.get("test_format", { format: "html" });
+    await tc.get("testFormat", { format: "html" });
     assertEqual("text/html", tc.response.body);
 
-    await tc.get("test_format", { format: "json" });
+    await tc.get("testFormat", { format: "json" });
     assertEqual("application/json", tc.response.body);
 
-    await tc.get("test_format", { format: "xml" });
+    await tc.get("testFormat", { format: "xml" });
     assertEqual("application/xml", tc.response.body);
 
-    await tc.get("test_format");
+    await tc.get("testFormat");
     assertEqual("text/html", tc.response.body);
   });
 
   it("request format kwarg overrides params", async () => {
-    await tc.get("test_format", { format: "json", params: { format: "html" } });
+    await tc.get("testFormat", { format: "json", params: { format: "html" } });
     assertEqual("application/json", tc.response.body);
   });
 
@@ -890,33 +890,33 @@ describe("TestCaseTest", () => {
     const params = Object.freeze({ foo: "bar" });
 
     await assertNothingRaised(async () => {
-      await tc.get("test_format", { format: "json", params });
+      await tc.get("testFormat", { format: "json", params });
     });
   });
 
   it("should have knowledge of client side cookie state even if they are not set", async () => {
     tc.cookies().set("foo", "bar");
-    await tc.get("no_op");
+    await tc.get("noOp");
     assertEqual("bar", tc.cookies().get("foo"));
   });
 
   it("cookies should be escaped properly", async () => {
     tc.cookies().set("foo", "+");
-    await tc.get("render_cookie");
+    await tc.get("renderCookie");
     assertEqual("+", tc.response.body);
   });
 
   it("should detect if cookie is deleted", async () => {
     tc.cookies().set("foo", "bar");
-    await tc.get("delete_cookie");
+    await tc.get("deleteCookie");
     assertNil(tc.cookies().get("foo"));
   });
 
   it("multiple mixed method process should scrub rack input", async () => {
-    await tc.post("test_params", { params: { id: 1, foo: "an foo" } });
+    await tc.post("testParams", { params: { id: 1, foo: "an foo" } });
     assertEqual({ id: "1", foo: "an foo", ...controllerInfo }, JSON.parse(tc.response.body));
 
-    await tc.get("test_params", { params: { bar: "an bar" } });
+    await tc.get("testParams", { params: { bar: "an bar" } });
     assertEqual({ bar: "an bar", ...controllerInfo }, JSON.parse(tc.response.body));
   });
 
@@ -990,7 +990,7 @@ describe("TestCaseTest", () => {
   });
 
   it("fixture file upload", async () => {
-    await tc.post("test_file_upload", {
+    await tc.post("testFileUpload", {
       params: {
         file: tc.fixtureFileUpload(FILES_DIR + "/ruby_on_rails.jpg", "image/jpeg"),
       },
@@ -1024,7 +1024,7 @@ describe("TestCaseTest", () => {
   it("action dispatch uploaded file upload", async () => {
     const filename = "ruby_on_rails.jpg";
     const path = `${FILES_DIR}/${filename}`;
-    await tc.post("test_file_upload", {
+    await tc.post("testFileUpload", {
       params: { file: new UploadedFile(path, "image/jpeg", true) },
     });
     assertEqual("45142", tc.response.body);
@@ -1059,26 +1059,26 @@ describe("TestCaseTest", () => {
       await tc.process("boom", { method: "GET", params: { q: "test1" } });
     });
 
-    await tc.process("test_query_string", { method: "GET", params: { q: "test2" } });
+    await tc.process("testQueryString", { method: "GET", params: { q: "test2" } });
 
     assertEqual("q=test2", tc.response.body);
   });
 
   it("parsed body without as option", async () => {
-    await tc.post("render_json", { body: { foo: "heyo" } });
+    await tc.post("renderJson", { body: { foo: "heyo" } });
     assertEqual({ foo: "heyo" }, tc.response.parsedBody);
   });
 
   it("parsed body with as option", async () => {
-    await tc.post("render_json", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
+    await tc.post("renderJson", { body: JSON.stringify({ foo: "heyo" }), as: "json" });
     assertEqual({ foo: "heyo" }, tc.response.parsedBody);
   });
 
   it("reset instance variables after each request", async () => {
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
   });
 
@@ -1087,11 +1087,11 @@ describe("TestCaseTest", () => {
       assertNil(rbObjIvarGet(tc.controller, "@counter"));
     });
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
     assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
     assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
   });
@@ -1099,34 +1099,34 @@ describe("TestCaseTest", () => {
   it("ivars are not reset if they are given a value before any requests", async () => {
     rbObjIvarSet(tc.controller, "@counter", 3);
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("4", tc.response.body);
     assertEqual(4, rbObjIvarGet(tc.controller, "@counter"));
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("5", tc.response.body);
     assertEqual(5, rbObjIvarGet(tc.controller, "@counter"));
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("6", tc.response.body);
     assertEqual(6, rbObjIvarGet(tc.controller, "@counter"));
   });
 
   it("ivars are reset if they are given a value after some requests", async () => {
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
     assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
 
     rbObjIvarSet(tc.controller, "@counter", 3);
 
-    await tc.get("increment_count");
+    await tc.get("incrementCount");
     assertEqual("1", tc.response.body);
     assertEqual(1, rbObjIvarGet(tc.controller, "@counter"));
   });
 
   it("original fullpath doesnt change when path is changed", async () => {
-    await tc.get("original_fullpath");
-    assertEqual("/test_case_test/test/original_fullpath", tc.response.body);
+    await tc.get("originalFullpath");
+    assertEqual("/test_case_test/test/originalFullpath", tc.response.body);
   });
 });
 
@@ -1189,7 +1189,7 @@ describe("ResponseDefaultHeadersTest", () => {
   });
 
   it("response contains default headers", async () => {
-    await tc.get("leave_alone");
+    await tc.get("leaveAlone");
 
     const expectedHeaders = { ...tc.defaults, "Content-Type": "text/html" };
 
@@ -1199,7 +1199,7 @@ describe("ResponseDefaultHeadersTest", () => {
   });
 
   it("response deletes a default header", async () => {
-    await tc.get("remove_header", { params: { header: "A" } });
+    await tc.get("removeHeader", { params: { header: "A" } });
     tc.assertResponse("ok");
 
     assertNotIncludes(tc.response.headers, "A");

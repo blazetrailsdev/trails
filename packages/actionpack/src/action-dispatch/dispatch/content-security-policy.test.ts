@@ -446,19 +446,19 @@ CspIntegrationController.contentSecurityPolicy(
     p.defaultSrc("https://false.example.com");
   },
 );
-CspIntegrationController.contentSecurityPolicy({ only: ["report_only"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy({ only: ["reportOnly"] }, (p) => {
   p.reportUri("/violations");
 });
-CspIntegrationController.contentSecurityPolicyReportOnly({ only: ["report_only"] });
-CspIntegrationController.contentSecurityPolicy({ only: ["script_src"] }, (p) => {
+CspIntegrationController.contentSecurityPolicyReportOnly({ only: ["reportOnly"] });
+CspIntegrationController.contentSecurityPolicy({ only: ["scriptSrc"] }, (p) => {
   p.defaultSrc(false);
   p.scriptSrc(":self");
 });
-CspIntegrationController.contentSecurityPolicy({ only: ["style_src"] }, (p) => {
+CspIntegrationController.contentSecurityPolicy({ only: ["styleSrc"] }, (p) => {
   p.defaultSrc(false);
   p.styleSrc(":self");
 });
-CspIntegrationController.contentSecurityPolicy(false, { only: ["no_policy"] });
+CspIntegrationController.contentSecurityPolicy(false, { only: ["noPolicy"] });
 CspIntegrationController.contentSecurityPolicy({ only: ["api"] }, (p) => {
   p.defaultSrc(":none");
   p.frameAncestors(":none");
@@ -470,12 +470,12 @@ function buildCspApp() {
     this.get("/", { to: "csp#index" });
     this.get("/inline", { to: "csp#inline" });
     this.get("/conditional", { to: "csp#conditional" });
-    this.get("/report-only", { to: "csp#report_only" });
-    this.get("/script-src", { to: "csp#script_src" });
-    this.get("/style-src", { to: "csp#style_src" });
-    this.get("/no-policy", { to: "csp#no_policy" });
+    this.get("/report-only", { to: "csp#reportOnly" });
+    this.get("/script-src", { to: "csp#scriptSrc" });
+    this.get("/style-src", { to: "csp#styleSrc" });
+    this.get("/no-policy", { to: "csp#noPolicy" });
     this.get("/api", { to: "csp#api" });
-    this.get("/not-modified", { to: "csp#not_modified" });
+    this.get("/not-modified", { to: "csp#notModified" });
   });
   app.app = buildApp(app.routes);
   controllerConstants.set("csp", CspIntegrationController);

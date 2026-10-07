@@ -54,7 +54,7 @@ describe("WithHelpersTest", () => {
   });
 
   it("with helpers", async () => {
-    await tc.get("with_helpers");
+    await tc.get("withHelpers");
 
     assertEqual("helper", tc.response.body);
   });
@@ -78,7 +78,7 @@ describe("SubclassWithHelpersTest", () => {
   });
 
   it("with helpers", async () => {
-    await tc.get("with_helpers");
+    await tc.get("withHelpers");
 
     assertEqual("helper", tc.response.body);
   });

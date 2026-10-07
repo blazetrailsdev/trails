@@ -295,7 +295,7 @@ describe("SendFileTest", () => {
 
     const c = new C();
     const response = makeResponse();
-    await c.dispatch("file_from_before_action", makeRequest(), response);
+    await c.dispatch("fileFromBeforeAction", makeRequest(), response);
     expect(response.body).toBe(testFileData);
   });
 

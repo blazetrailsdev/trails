@@ -20,7 +20,7 @@ interface ViewPathRoot {
 }
 
 interface ControllerClass {
-  actionMethods(): string[];
+  prototype: object;
   viewPaths?: () => Iterable<unknown>;
 }
 
@@ -77,7 +77,7 @@ export class RouteInfo {
   /** @internal */
   private actionMissing(): boolean {
     if (this.controllerClass == null) return false;
-    return !this.controllerClass.actionMethods().includes(String(this.actionName));
+    return !(String(this.actionName) in this.controllerClass.prototype);
   }
 }
 

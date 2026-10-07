@@ -228,7 +228,7 @@ describe("HelperTest", () => {
   }
 
   it("helper for nested controller", async () => {
-    expect(body(await callController(Fun.GamesController, "render_hello_world"))).toBe(
+    expect(body(await callController(Fun.GamesController, "renderHelloWorld"))).toBe(
       "hello: Iz guuut!",
     );
   });

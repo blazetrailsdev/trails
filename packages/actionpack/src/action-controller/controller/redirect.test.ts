@@ -492,11 +492,11 @@ describe("RedirectTest", () => {
         });
       });
 
-      await tc.get("redirect_to_existing_record");
+      await tc.get("redirectToExistingRecord");
       assertEqual("http://test.host/workshops/5", tc.redirectToUrl());
       assertRedirectedTo(new Workshop(5));
 
-      await tc.get("redirect_to_new_record");
+      await tc.get("redirectToNewRecord");
       assertEqual("http://test.host/workshops", tc.redirectToUrl());
       assertRedirectedTo(new Workshop(null));
     });
@@ -514,7 +514,7 @@ describe("RedirectTest", () => {
         });
       });
 
-      await tc.get("redirect_to_polymorphic");
+      await tc.get("redirectToPolymorphic");
       assertEqual("http://test.host/internal/workshops/5", tc.redirectToUrl());
       assertRedirectedTo([":internal", new Workshop(5)]);
     });
@@ -533,7 +533,7 @@ describe("RedirectTest", () => {
       });
 
       const error = await assertRaises([ArgumentError], {}, async () => {
-        await tc.get("redirect_to_polymorphic_string_args");
+        await tc.get("redirectToPolymorphicStringArgs");
       });
       assertEqual("Please use symbols for polymorphic route arguments.", error.message);
     });
@@ -554,21 +554,21 @@ describe("RedirectTest", () => {
   });
 
   it("redirect to with block", async () => {
-    await tc.get("redirect_to_with_block");
+    await tc.get("redirectToWithBlock");
     assertResponse("redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to with block and assigns", async () => {
-    await tc.get("redirect_to_with_block_and_assigns");
+    await tc.get("redirectToWithBlockAndAssigns");
     assertResponse("redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to out of scope block", async () => {
-    await tc.get("redirect_to_out_of_scope_block");
+    await tc.get("redirectToOutOfScopeBlock");
     assertResponse("redirect");
-    assertRedirectedTo("http://test.host/redirect/redirect_to_out_of_scope_block");
+    assertRedirectedTo("http://test.host/redirect/redirectToOutOfScopeBlock");
   });
 
   it("redirect to with block and accepted options", async () => {
@@ -579,7 +579,7 @@ describe("RedirectTest", () => {
         });
       });
 
-      await tc.get("redirect_to_with_block_and_options");
+      await tc.get("redirectToWithBlockAndOptions");
 
       assertResponse("redirect");
       assertRedirectedTo("http://test.host/redirect/hello_world");
@@ -615,7 +615,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect with malformed url", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect_malformed");
+        await tc.get("unsafeRedirectMalformed");
       });
 
       assertEqual(
@@ -628,7 +628,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect with protocol relative double slash url", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect_protocol_relative_double_slash");
+        await tc.get("unsafeRedirectProtocolRelativeDoubleSlash");
       });
 
       assertEqual(
@@ -641,7 +641,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect with protocol relative triple slash url", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect_protocol_relative_triple_slash");
+        await tc.get("unsafeRedirectProtocolRelativeTripleSlash");
       });
 
       assertEqual(
@@ -654,7 +654,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect with illegal http header value character", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect_with_illegal_http_header_value_character");
+        await tc.get("unsafeRedirectWithIllegalHttpHeaderValueCharacter");
       });
 
       const msg =
@@ -675,7 +675,7 @@ describe("RedirectTest", () => {
 
   it("url from", async () => {
     await withRaiseOnOpenRedirects(async () => {
-      await tc.get("safe_redirect_with_fallback", {
+      await tc.get("safeRedirectWithFallback", {
         params: { redirect_url: "http://test.host/app" },
       });
       assertResponse("redirect");
@@ -685,13 +685,13 @@ describe("RedirectTest", () => {
 
   it("url from fallback", async () => {
     await withRaiseOnOpenRedirects(async () => {
-      await tc.get("safe_redirect_with_fallback", {
+      await tc.get("safeRedirectWithFallback", {
         params: { redirect_url: "http://www.rubyonrails.org/" },
       });
       assertResponse("redirect");
       assertRedirectedTo("http://test.host/fallback");
 
-      await tc.get("safe_redirect_with_fallback", { params: { redirect_url: "" } });
+      await tc.get("safeRedirectWithFallback", { params: { redirect_url: "" } });
       assertResponse("redirect");
       assertRedirectedTo("http://test.host/fallback");
     });
@@ -705,7 +705,7 @@ describe("RedirectTest", () => {
     };
 
     await Notifications.subscribed(subscriber, "redirect_to.action_controller", async () => {
-      await tc.get("simple_redirect");
+      await tc.get("simpleRedirect");
     });
 
     assertEqual(tc.request, payload!.request);

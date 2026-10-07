@@ -77,7 +77,7 @@ class WebServiceTest extends IntegrationTest {
   async withTestRouteSet(block: () => Promise<void>): Promise<void> {
     await this.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.match("/", { to: "web_service_test/test#assign_parameters", via: ":all" });
+        this.match("/", { to: "web_service_test/test#assignParameters", via: ":all" });
       });
       await block();
     });

@@ -1908,6 +1908,46 @@ about the application loader only: framework-internal call-time constant
 resolution (Ruby's `ActiveSupport::Autoload` / `Module#autoload` inside the gems)
 is § "Call-time constant resolution" above.
 
+## An action's name is its method's name (`AbstractController::Base#action_methods`)
+
+In Rails the action IS the method: `def next_bundle` defines the action
+`next_bundle`, and one string names both in a route, a test, a callback's
+`only:` list and a log line. A JS method is camelCase
+(`docs/ruby-ts-conventions.md`), so the method is `nextBundle`, and the port has
+to choose which spelling an action goes by.
+
+**The action goes by its method's name, and only that.** `action_methods`
+answers the method names as they are declared, `process` records the name it is
+given and looks up the method of exactly that name, and nothing on the dispatch
+path converts a spelling. So `to: "stories#nextBundle"`, `get("nextBundle")`,
+`only: "nextBundle"` and `action_name === "nextBundle"`. The underscored name
+`next_bundle` names no action unless a method is literally called that.
+
+This was briefly the other way (trails#8573 made `action_name` the Rails name
+and mapped it to the method); the repo owner reversed it. An application names
+its own methods, and should not have to name them in a spelling they do not
+have. Two spellings for one action, with a conversion between them somewhere,
+was the alternative, and was rejected in favour of one rule.
+
+The one thing that stays in Rails' spelling is a FILE: a template is looked up
+by the underscored action name, because the vendored fixtures and every Rails
+application's views are named `next_bundle.html.erb`. That conversion is made
+at the lookup sites and nowhere else, each carrying
+`@inventedArm underscore — PERMANENT`:
+
+- `ImplicitRender#defaultRender` and `#methodForAction`
+  (`action-controller/metal/implicit-render.ts`; `implicit_render.rb:38-64`)
+- `EtagWithTemplateDigest#pickTemplateForEtag`
+  (`action-controller/metal/etag-with-template-digest.ts`)
+- `ActionView::Rendering#_processRenderTemplateOptions`
+  (`actionview/src/rendering.ts`)
+
+Consequences for a ported test: where Rails' test says `get :hello_world`, the
+port says `get("helloWorld")`, and an assertion on a string that embeds the
+action name (a log line, a generated URL) expects the method's spelling.
+
+This is ratified repo-wide here by the repo owner.
+
 ## Trilogy is out of scope (`trilogy_adapter.rb`, `adapters/trilogy/`)
 
 Rails ships a second MySQL adapter over [Trilogy](https://github.com/trilogy-libraries/trilogy),

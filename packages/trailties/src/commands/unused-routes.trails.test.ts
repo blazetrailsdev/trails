@@ -1,10 +1,5 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
-import {
-  ActionController,
-  ActionView,
-  controllerConstants,
-  type Journey,
-} from "@blazetrails/actionpack";
+import { ActionView, controllerConstants, type Journey } from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
@@ -35,7 +30,7 @@ describe("UnusedRoutesCommand", () => {
   });
 
   it("RouteInfo is not unused when the controller defines the action", async () => {
-    class PostsController extends ActionController.Metal {
+    class PostsController {
       index(): void {}
     }
     controllerConstants.set("posts", PostsController as never);
@@ -43,29 +38,15 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(false);
   });
 
-  it("RouteInfo resolves the action through the controller's action methods", async () => {
-    class PostsController extends ActionController.Metal {
-      showHTML(): void {}
-      sekrit_data(): void {}
-    }
-    controllerConstants.set("posts", PostsController as never);
-    for (const action of ["show_html", "sekrit_data"]) {
-      const info = new RouteInfo(route({ controller: "posts", action }));
-      expect(await info.unused()).toBe(false);
-    }
-    const info = new RouteInfo(route({ controller: "posts", action: "showHTML" }));
-    expect(await info.unused()).toBe(true);
-  });
-
   it("RouteInfo is unused when the action and its template are both missing", async () => {
-    class PostsController extends ActionController.Metal {}
+    class PostsController {}
     controllerConstants.set("posts", PostsController as never);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(true);
   });
 
   it("RouteInfo is not unused when a template covers the missing action", async () => {
-    class PostsController extends ActionController.Metal {
+    class PostsController {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
           new ActionView.FileSystemResolver(

@@ -240,7 +240,7 @@ describe("ActionController::Instrumentation#redirect_to", () => {
     request.env["action_dispatch.redirect_filter"] = ["secret"];
     const controller = new RedirectorController();
     await controller.dispatch(
-      "filterable_redirector",
+      "filterableRedirector",
       request,
       RedirectorController.makeResponseBang(request),
     );

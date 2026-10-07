@@ -1,3 +1,4 @@
+import { underscore } from "@blazetrails/activesupport";
 import { Module, rbInspect as inspect } from "@blazetrails/ruby-compat";
 
 import { UnknownFormat, MissingExactTemplate } from "./exceptions.js";
@@ -31,18 +32,19 @@ export interface ImplicitRenderHost {
 
 /**
  * @missingRailsArgs inspect — PERMANENT
+ * @inventedArm underscore — PERMANENT
  * @internal
  */
 export function defaultRender(this: ImplicitRenderHost): void | Promise<void> {
   const name = this.constructor.name;
   if (
-    this.templateExists?.(String(this.actionName), this._prefixes?.(), false, [], {
+    this.templateExists?.(underscore(String(this.actionName)), this._prefixes?.(), false, [], {
       variants: variantsFor(this.request?.variant),
     })
   ) {
     return this.render();
   }
-  if (this.isAnyTemplates?.(String(this.actionName), this._prefixes?.())) {
+  if (this.isAnyTemplates?.(underscore(String(this.actionName)), this._prefixes?.())) {
     const message =
       `${name}#${this.actionName} is missing a template ` +
       "for this request format and variant.\n" +
@@ -65,13 +67,17 @@ function variantsFor(variant: unknown): readonly (string | symbol)[] {
   return Array.isArray(variant) ? [...(variant as readonly string[])] : [String(variant)];
 }
 
-/** @internal */
+/**
+ * @inventedArm underscore — PERMANENT
+ * @internal
+ */
 export function methodForAction(this: ImplicitRenderHost, actionName: string): string | undefined {
   const sup = ImplicitRender.superMethod(this, "methodForAction")!(actionName) as
     | string
     | undefined;
   if (sup) return sup;
-  if (this.templateExists?.(String(actionName), this._prefixes?.())) return "defaultRender";
+  if (this.templateExists?.(underscore(String(actionName)), this._prefixes?.()))
+    return "defaultRender";
   return undefined;
 }
 

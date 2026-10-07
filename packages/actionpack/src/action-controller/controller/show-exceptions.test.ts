@@ -17,7 +17,7 @@ class ShowExceptionsController extends Base {
       function (this: ShowExceptionsController) {
         this.request.env["action_dispatch.show_detailed_exceptions"] = true;
       },
-      { only: "another_boom" },
+      { only: "anotherBoom" },
     );
   }
 
@@ -65,7 +65,7 @@ describe("ShowExceptionsTest", () => {
 
   it("show diagnostics from a remote ip when env is already set", async ({ task }) => {
     const t = new IntegrationTest(task.name);
-    t.app = ShowExceptionsController.action("another_boom");
+    t.app = ShowExceptionsController.action("anotherBoom");
     t.remoteAddr = "208.77.188.166";
     await t.get("/");
     expect(t.body).toMatch(/boom/);
