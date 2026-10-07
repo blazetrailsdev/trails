@@ -6,16 +6,22 @@ import {
   Module,
   NoMethodError,
   RangeError,
+  TypeError,
+  isSymbol,
   rbAbsintSize,
+  rbBuiltinClassName,
   rbCString,
   rbClassInheritedP,
   rbClassOf,
   rbFSend,
   rbInspect,
+  rbModConstSet,
   rbObjClass,
   rbObjIsKindOf,
+  symbolToS,
 } from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
+import { MessagePack } from "./namespaces.js";
 
 export const MSGPACK_EXT_RECURSIVE = 0b0001;
 
@@ -93,18 +99,11 @@ export class Packer {
       }
     } else if (Array.isArray(v)) {
       if (rbClassOf(v) === Array || !this.tryWriteWithExtTypeLookup(v)) {
-        this.writeArrayHeader(v.length);
-        for (const e of v) this.write(e);
+        this.writeArrayValue(v);
       }
     } else if (rbObjIsKindOf(v, Hash)) {
       if (rbClassOf(v) === Hash || !this.tryWriteWithExtTypeLookup(v)) {
-        const pairs =
-          v instanceof Hash ? [...(v as Hash<unknown, unknown>)] : Object.entries(v as object);
-        this.writeMapHeader(pairs.length);
-        for (const [key, value] of pairs) {
-          this.write(key);
-          this.write(value);
-        }
+        this.writeHashValue(v);
       }
     } else if (v instanceof Number) {
       this.buffer.write(floatEncoder.encodeSharedRef(v.valueOf()));
@@ -112,6 +111,73 @@ export class Packer {
       this.writeBignumValue(v);
     } else if (!this.tryWriteWithExtTypeLookup(v)) {
       rbFSend(v, "toMsgpack", this);
+    }
+    return this;
+  }
+
+  writeNil(): this {
+    this.buffer.write(Uint8Array.of(0xc0));
+    return this;
+  }
+
+  writeTrue(): this {
+    this.buffer.write(Uint8Array.of(0xc3));
+    return this;
+  }
+
+  writeFalse(): this {
+    this.buffer.write(Uint8Array.of(0xc2));
+    return this;
+  }
+
+  writeFloat(obj: unknown): this {
+    if (typeof obj !== "number" && typeof obj !== "bigint" && !(obj instanceof Number)) {
+      throw new TypeError(`can't convert ${rbBuiltinClassName(obj)} into Float`);
+    }
+    this.buffer.write(floatEncoder.encodeSharedRef(Number(obj)));
+    return this;
+  }
+
+  writeString(obj: unknown): this {
+    if (typeof obj !== "string" && !(obj instanceof Uint8Array)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected String)`);
+    }
+    this.buffer.write(encoder.encodeSharedRef(obj));
+    return this;
+  }
+
+  writeArray(obj: unknown): this {
+    if (!Array.isArray(obj)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Array)`);
+    }
+    this.writeArrayValue(obj);
+    return this;
+  }
+
+  writeHash(obj: unknown): this {
+    if (!rbObjIsKindOf(obj, Hash)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Hash)`);
+    }
+    this.writeHashValue(obj);
+    return this;
+  }
+
+  writeSymbol(obj: unknown): this {
+    if (!isSymbol(obj)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Symbol)`);
+    }
+    this.buffer.write(encoder.encodeSharedRef(symbolToS(obj)));
+    return this;
+  }
+
+  writeInt(obj: unknown): this {
+    if (typeof obj === "number" && Number.isInteger(obj)) {
+      this.buffer.write(encoder.encodeSharedRef(obj));
+    } else {
+      if (typeof obj !== "bigint") {
+        throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Integer)`);
+      }
+      this.writeBignumValue(obj);
     }
     return this;
   }
@@ -185,6 +251,21 @@ export class Packer {
     this.extRegistryCache.clear();
     this.extRegistry.set(klass, [type, proc, 0]);
     return null;
+  }
+
+  private writeArrayValue(v: unknown[]): void {
+    this.writeArrayHeader(v.length);
+    for (const e of v) this.write(e);
+  }
+
+  private writeHashValue(v: unknown): void {
+    const pairs =
+      v instanceof Hash ? [...(v as Hash<unknown, unknown>)] : Object.entries(v as object);
+    this.writeMapHeader(pairs.length);
+    for (const [key, value] of pairs) {
+      this.write(key);
+      this.write(value);
+    }
   }
 
   private writeBignumValue(v: bigint): void {
@@ -297,3 +378,5 @@ export class Packer {
     return true;
   }
 }
+
+rbModConstSet(MessagePack, "Packer", Packer);

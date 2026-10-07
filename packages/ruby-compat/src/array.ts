@@ -5,6 +5,7 @@ import { cmp, rbCmpint } from "./comparable.js";
 import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
 import { warn } from "./kernel-warn.js";
+import { rbBigNorm } from "./numeric.js";
 import { conversionMismatch, rbBuiltinClassName } from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
@@ -73,8 +74,9 @@ function encodes(str: string[], s0: Uint8Array, len: number, tailLf: number): vo
  * packs codepoints with (`multibyte/chars.rb:136,144`) — and to the `C`, `E`,
  * `l<` and `@` directives `ActiveSupport::Cache::Coder` packs its header with
  * (`cache/coder.rb:44,77-82`), and the `L>` `MessagePack::Bigint` packs its
- * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`): `C`, `l` and `L` through `pack_integer`
- * (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
+ * words with (`vendor/msgpack/v1.8.0/lib/msgpack/bigint.rb:8`), and the `q>` `MessagePack::Timestamp`
+ * packs a timestamp96's seconds with (`vendor/msgpack/v1.8.0/lib/msgpack/timestamp.rb:65`): `C`, `l`,
+ * `L`, `q` and `Q` through `pack_integer` (`pack.c:477-551`), `E` (`pack.c:575-583`), and `@` growing or shrinking to
  * an absolute byte position (`pack.c:617-639`). Every other directive is a
  * separate port, so each reaches `unknown_directive` (`pack.c:761`) here, and
  * of the modifiers only `<` / `>` (`pack.c:268-277`) are ported.
@@ -155,8 +157,8 @@ export function pack(ary: ReadonlyArray<string | number | bigint>, fmt: string):
       }
       continue;
     }
-    if (type === "C" || type === "l" || type === "L") {
-      const integerSize = type === "C" ? 1 : 4;
+    if (type === "C" || type === "l" || type === "L" || type === "q" || type === "Q") {
+      const integerSize = type === "C" ? 1 : type === "q" || type === "Q" ? 8 : 4;
       const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       while (len-- > 0) {
         const from = nextfrom();
@@ -231,7 +233,7 @@ export function unpack1(
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
- * {@link pack} answers bytes for — `C`, `l` and `L` through `unpack_integer`
+ * {@link pack} answers bytes for — `C`, `l`, `L`, `q` and `Q` through `unpack_integer`
  * (`pack.c:1177-1281`), `E` (`pack.c:1306-1315`), and `@` moving to an
  * absolute byte position (`pack.c:1531-1535`) — plus the `<` / `>` modifiers
  * (`pack.c:1014-1023`). Every other directive reaches `unknown_directive`.
@@ -259,7 +261,7 @@ export function unpack1(
   { offset = 0 }: { offset?: number } = {},
 ): number | string | null {
   const ary = packUnpackInternal(str, fmt, UNPACK_1, offset);
-  return ary.length > 0 ? ary[0] : null;
+  return ary.length > 0 ? (ary[0] as number | string) : null;
 }
 
 /**
@@ -273,7 +275,7 @@ export function unpack(
   str: string | Uint8Array,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
-): (number | string)[] {
+): (number | bigint | string)[] {
   return packUnpackInternal(str, fmt, UNPACK_ARRAY, offset);
 }
 
@@ -286,8 +288,8 @@ function packUnpackInternal(
   fmt: string,
   mode: number,
   offset: number,
-): (number | string)[] {
-  const ary: (number | string)[] = [];
+): (number | bigint | string)[] {
+  const ary: (number | bigint | string)[] = [];
   if (offset < 0) throw new ArgumentError("offset can't be negative");
   const ptr = typeof str === "string" ? Uint8Array.from(str, (c) => c.charCodeAt(0) & 0xff) : str;
   const send = ptr.length;
@@ -330,9 +332,9 @@ function packUnpackInternal(
       len = type !== "@" ? 1 : 0;
     }
 
-    if (type === "C" || type === "l" || type === "L") {
-      const signedP = type === "l";
-      const integerSize = type === "C" ? 1 : 4;
+    if (type === "C" || type === "l" || type === "L" || type === "q" || type === "Q") {
+      const signedP = type === "l" || type === "q";
+      const integerSize = type === "C" ? 1 : type === "q" || type === "Q" ? 8 : 4;
       const bigendianP = explicitEndian ? explicitEndian === ">" : BIGENDIAN_P;
       if (len > Math.floor((send - s) / integerSize)) len = Math.floor((send - s) / integerSize);
       while (len-- > 0) {
@@ -341,7 +343,7 @@ function packUnpackInternal(
           const byte = BigInt(ptr[bigendianP ? s + i : s + integerSize - 1 - i]);
           val = (val << 8n) | byte;
         }
-        ary.push(Number(signedP ? BigInt.asIntN(integerSize * 8, val) : val));
+        ary.push(rbBigNorm(signedP ? BigInt.asIntN(integerSize * 8, val) : val));
         if (mode === UNPACK_1) return ary;
         s += integerSize;
       }

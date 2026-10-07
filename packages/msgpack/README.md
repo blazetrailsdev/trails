@@ -10,7 +10,20 @@ The gem is a C extension, so each file mirrors both halves: `packer.ts` is
 `packer_ext_registry.h`; `unpacker.ts` is `lib/msgpack/unpacker.rb` plus
 `ext/msgpack/unpacker_class.c`; `buffer.ts` is `ext/msgpack/buffer_class.c`;
 `bigint.ts` and `symbol.ts` are `lib/msgpack/bigint.rb` and
-`lib/msgpack/symbol.rb`.
+`lib/msgpack/symbol.rb`; `core-ext.ts`, `timestamp.ts` and `time.ts` are
+`lib/msgpack/core_ext.rb`, `timestamp.rb` and `time.rb`.
+
+`namespaces.ts` holds the `MessagePack` module and imports nothing at run
+time. Each constant is seated on it by the module that defines it, as the gem's
+files do (CLAUDE.md, "Call-time constant resolution").
+
+## `to_msgpack` on a core class
+
+`core_ext.rb` reopens `NilClass`, `Integer`, `String` and the rest to include
+`MessagePack::CoreExt`. A JS primitive has no class to reopen, so `core-ext.ts`
+exports one class per Ruby class, each carrying `CoreExt`'s `toMsgpack` and
+taking the receiver first, as ActiveSupport's `core_ext` ports do:
+`128.to_msgpack` is `Integer.toMsgpack(128)`.
 
 ## Where a JS value differs from the Ruby one
 
@@ -49,6 +62,13 @@ Each is tracked by a story in RFC 0184.
   (`ext/msgpack/factory_class.c:232-239`). `symbol.ts`'s
   `Symbol.from_msgpack_ext` unpacks one. Story:
   `msgpack-symbol-ext-packer-arm-and-extended-object-lookup`.
+- **`MessagePack::ExtensionValue` is unported**, so `core_ext.rb`'s
+  `ExtensionValue#to_msgpack` and `Packer#write_extension` are absent. Story:
+  `msgpack-packer-unpacker-remaining-c-surface`.
+- **A `Time` past ±10^8 days from the epoch cannot be built**: `Temporal.Instant`
+  holds no such value, so `timestamp_spec.rb`'s `Time.at(-2**63)` and
+  `Time.at(2**63 - 1)` examples are skipped, as the gem skips them on JRuby.
+  `Timestamp` itself carries the full int64 range.
 - **`write_array_header` / `write_map_header` take an integer.** `NUM2UINT`'s
   `FloatDomainError` for `NaN` is not ported.
 - **`StackError` is never raised**, unpacker options are ignored, IO-backed

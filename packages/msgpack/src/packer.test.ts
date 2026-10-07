@@ -1,5 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { Packer } from "./index.js";
+import { rbCString, rbObjClass } from "@blazetrails/ruby-compat";
+import {
+  Array as ArrayExt,
+  FalseClass,
+  Float,
+  Hash,
+  Integer,
+  MessagePack,
+  NilClass,
+  Packer,
+  String as StringExt,
+  TrueClass,
+} from "./index.js";
 
 class ValueOne {
   constructor(readonly num: number) {}
@@ -40,6 +52,54 @@ describe("MessagePack::Packer", () => {
   it("write_map_header 1", () => {
     packer.writeMapHeader(1);
     expect(packer.toS()).toEqual(Uint8Array.of(0x81));
+  });
+
+  it("to_msgpack returns String", () => {
+    expect(rbObjClass(NilClass.toMsgpack(null))).toBe(rbCString);
+    expect(rbObjClass(TrueClass.toMsgpack(true))).toBe(rbCString);
+    expect(rbObjClass(FalseClass.toMsgpack(false))).toBe(rbCString);
+    expect(rbObjClass(Integer.toMsgpack(1))).toBe(rbCString);
+    expect(rbObjClass(Float.toMsgpack(new Number(1.0)))).toBe(rbCString);
+    expect(rbObjClass(StringExt.toMsgpack(""))).toBe(rbCString);
+    expect(rbObjClass(Hash.toMsgpack({}))).toBe(rbCString);
+    expect(rbObjClass(ArrayExt.toMsgpack([]))).toBe(rbCString);
+  });
+
+  it("to_msgpack with packer equals to_msgpack", () => {
+    const toStr = (packer: unknown) => (packer as Packer).toStr();
+    expect(toStr(NilClass.toMsgpack(null, new Packer()))).toEqual(NilClass.toMsgpack(null));
+    expect(toStr(TrueClass.toMsgpack(true, new Packer()))).toEqual(TrueClass.toMsgpack(true));
+    expect(toStr(FalseClass.toMsgpack(false, new Packer()))).toEqual(FalseClass.toMsgpack(false));
+    expect(toStr(Integer.toMsgpack(1, new Packer()))).toEqual(Integer.toMsgpack(1));
+    expect(toStr(Float.toMsgpack(new Number(1.0), new Packer()))).toEqual(
+      Float.toMsgpack(new Number(1.0)),
+    );
+    expect(toStr(StringExt.toMsgpack("", new Packer()))).toEqual(StringExt.toMsgpack(""));
+    expect(toStr(Hash.toMsgpack({}, new Packer()))).toEqual(Hash.toMsgpack({}));
+    expect(toStr(ArrayExt.toMsgpack([], new Packer()))).toEqual(ArrayExt.toMsgpack([]));
+  });
+
+  class CustomPack01 {
+    toMsgpack(pk: unknown = null): unknown {
+      if (!(pk instanceof Packer)) return MessagePack.pack(this, pk);
+      pk.writeArrayHeader(2);
+      pk.write(1);
+      pk.write(2);
+      return pk;
+    }
+  }
+
+  class CustomPack02 {
+    toMsgpack(pk: unknown = null): unknown {
+      return ArrayExt.toMsgpack([1, 2], pk);
+    }
+  }
+
+  it("calls custom to_msgpack method", () => {
+    expect(MessagePack.pack(new CustomPack01())).toEqual(ArrayExt.toMsgpack([1, 2]));
+    expect(MessagePack.pack(new CustomPack02())).toEqual(ArrayExt.toMsgpack([1, 2]));
+    expect(new CustomPack01().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
+    expect(new CustomPack02().toMsgpack()).toEqual(ArrayExt.toMsgpack([1, 2]));
   });
 
   describe("#type_registered?", () => {

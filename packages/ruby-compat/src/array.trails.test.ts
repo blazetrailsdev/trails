@@ -166,6 +166,13 @@ describe("String#unpack", () => {
     expect(unpack(Uint8Array.of(7, 0, 0), "CL>*")).toEqual([7]);
     expect(unpack1(packed, "L>", { offset: 1 })).toBe(0xffffffff);
   });
+
+  it("packs q and Q as 64-bit integers, and unpacks one past 2**53 as a bigint", () => {
+    const packed = pack([-1, 2n ** 63n], "q>Q>");
+    expect(packed).toBe("\xff".repeat(8) + "\x80" + "\x00".repeat(7));
+    expect(unpack(packed, "q>Q>")).toEqual([-1, 2n ** 63n]);
+    expect(unpack(pack([1], "q<"), "q<")).toEqual([1]);
+  });
 });
 
 describe("String#unpack1", () => {

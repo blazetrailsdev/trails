@@ -6,11 +6,13 @@ import {
   Hash,
   RangeError,
   StandardError,
+  rbModConstSet,
   rbObjMethod,
   rbObjClass,
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
+import { MessagePack } from "./namespaces.js";
 import { MSGPACK_EXT_RECURSIVE } from "./packer.js";
 
 export class UnpackError extends StandardError {}
@@ -191,3 +193,10 @@ export class Unpacker {
     return null;
   }
 }
+
+rbModConstSet(MessagePack, "Unpacker", Unpacker);
+rbModConstSet(MessagePack, "UnpackError", UnpackError);
+rbModConstSet(MessagePack, "MalformedFormatError", MalformedFormatError);
+rbModConstSet(MessagePack, "StackError", StackError);
+rbModConstSet(MessagePack, "UnexpectedTypeError", UnexpectedTypeError);
+rbModConstSet(MessagePack, "UnknownExtTypeError", UnknownExtTypeError);
