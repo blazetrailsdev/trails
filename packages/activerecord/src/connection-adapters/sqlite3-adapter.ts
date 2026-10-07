@@ -98,6 +98,7 @@ import {
   quote as sqliteQuote,
   typeCast as sqliteTypeCast,
   quoteString as sqliteQuoteString,
+  quoteDefaultExpression as sqliteQuoteDefaultExpression,
   quoteTableName,
   quoteColumnName,
   quoteTableNameForAssignment as sqliteQuoteTableNameForAssignment,
@@ -1174,14 +1175,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
   private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
 
-  override quoteDefaultExpression(value: unknown, column: unknown): string {
-    if (typeof value === "function") {
-      const result = (value as () => unknown)() as string;
-      return /^\w+\(.*\)$/.test(result) ? `(${result})` : result;
-    }
-    return super.quoteDefaultExpression(value, column);
-  }
-
   private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
     if (!sqlType || !isStructuredDefault(value)) return value;
     const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
@@ -1327,6 +1320,7 @@ SQLite3Adapter.prototype.buildTruncateStatement = sqliteBuildTruncateStatement;
 SQLite3Adapter.prototype.returningColumnValues = sqliteReturningColumnValues;
 SQLite3Adapter.prototype.quote = sqliteQuote;
 SQLite3Adapter.prototype.quoteString = sqliteQuoteString;
+SQLite3Adapter.prototype.quoteDefaultExpression = sqliteQuoteDefaultExpression;
 SQLite3Adapter.prototype.quoteTableNameForAssignment = sqliteQuoteTableNameForAssignment;
 SQLite3Adapter.prototype.quotedBinary = sqliteQuotedBinary;
 SQLite3Adapter.prototype.quotedTrue = sqliteQuotedTrue;
@@ -1377,6 +1371,7 @@ export interface SQLite3Adapter {
   returningColumnValues: typeof sqliteReturningColumnValues;
   quote: typeof sqliteQuote;
   quoteString: typeof sqliteQuoteString;
+  quoteDefaultExpression: typeof sqliteQuoteDefaultExpression;
   quoteTableNameForAssignment: typeof sqliteQuoteTableNameForAssignment;
   quotedBinary: typeof sqliteQuotedBinary;
   quotedTrue: typeof sqliteQuotedTrue;

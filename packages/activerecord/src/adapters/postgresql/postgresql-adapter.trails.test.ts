@@ -376,7 +376,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       const other = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await other.execute("BEGIN");
-        expect((other as unknown as { _client: unknown })._client).toBeNull();
         expect(other._rawConnection!.transactionStatus()).not.toBe(0);
 
         const resetting = other.resetBang();

@@ -11,6 +11,7 @@ import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
+import { pgConnection } from "./postgresql/pg-connection.js";
 
 const UUID_OID = 2950;
 
@@ -236,7 +237,7 @@ describe("PostgreSQLAdapter#sqlKey", () => {
       adapter as unknown as {
         prepareStatement: (s: string, b: unknown[], c: unknown) => Promise<string>;
       }
-    ).prepareStatement(sql, [], client);
+    ).prepareStatement(sql, [], pgConnection(client as object));
 
   it("scopes the pool key to the current schema_search_path", () => {
     setMemo("schema_a, public");
