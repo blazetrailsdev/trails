@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { defineModule, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { defineModule, rbModDefineMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 
 import { Relation } from "../relation.js";
@@ -45,21 +45,19 @@ export function scope<T extends typeof Base>(
 
   const extension = block != null ? defineModule(block) : undefined;
 
-  let method: (this: any, ...args: any[]) => any;
   if (typeof body === "function") {
-    method = function (this: any, ...args: any[]) {
+    rbModDefineMethod({ prototype: modelClass }, name, function (this: any, ...args: any[]) {
       let scope = this.all()._execScope(...args, body);
       if (extension) scope = scope.extending(extension);
       return scope;
-    };
+    });
   } else {
-    method = function (this: any, ...args: any[]) {
+    rbModDefineMethod({ prototype: modelClass }, name, function (this: any, ...args: any[]) {
       let scope = (body as { call(...args: any[]): any }).call(...args) || this.all();
       if (extension) scope = scope.extending(extension);
       return scope;
-    };
+    });
   }
-  Object.defineProperty(modelClass, name, { value: method, writable: true, configurable: true });
 
   modelClass.generateRelationMethod(name);
 }
