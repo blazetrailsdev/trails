@@ -45,20 +45,33 @@ describe("NestedParametersPermitTest", () => {
     const permitted = params.permit({
       book: ["title", { authors: ["name"] }, { details: "pages" }, "id"],
     });
-    const book = permitted.get("book") as Parameters;
-    const authors = book.get("authors") as Parameters[];
 
     assertPredicate(permitted, (p) => p.permitted);
-    assertEqual("Romeo and Juliet", book.get("title"));
-    assertEqual("William Shakespeare", authors[0].get("name"));
-    assertEqual("Christopher Marlowe", authors[1].get("name"));
-    assertEqual(200, (book.get("details") as Parameters).get("pages"));
+    assertEqual("Romeo and Juliet", (permitted.get("book") as Parameters).get("title"));
+    assertEqual(
+      "William Shakespeare",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0].get("name"),
+    );
+    assertEqual(
+      "Christopher Marlowe",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[1].get("name"),
+    );
+    assertEqual(
+      200,
+      ((permitted.get("book") as Parameters).get("details") as Parameters).get("pages"),
+    );
 
     assertFilteredOut(permitted, "magazine");
-    assertFilteredOut(book, "id");
-    assertFilteredOut(book.get("details") as Parameters, "genre");
-    assertFilteredOut(authors[0], "born");
-    assertFilteredOut(authors[2], "name");
+    assertFilteredOut(permitted.get("book") as Parameters, "id");
+    assertFilteredOut((permitted.get("book") as Parameters).get("details") as Parameters, "genre");
+    assertFilteredOut(
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0],
+      "born",
+    );
+    assertFilteredOut(
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[2],
+      "name",
+    );
   });
 
   it("permitted nested parameters with a string or a symbol as a key", () => {
@@ -72,20 +85,42 @@ describe("NestedParametersPermitTest", () => {
     });
 
     let permitted = params.permit({ book: [{ authors: ["name"] }] });
-    let authors = (permitted.get("book") as Parameters).get("authors") as Parameters[];
 
-    assertEqual("William Shakespeare", authors[0].get("name"));
-    assertEqual("William Shakespeare", authors[0].get("name"));
-    assertEqual("Christopher Marlowe", authors[1].get("name"));
-    assertEqual("Christopher Marlowe", authors[1].get("name"));
+    assertEqual(
+      "William Shakespeare",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0].get("name"),
+    );
+    assertEqual(
+      "William Shakespeare",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0].get("name"),
+    );
+    assertEqual(
+      "Christopher Marlowe",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[1].get("name"),
+    );
+    assertEqual(
+      "Christopher Marlowe",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[1].get("name"),
+    );
 
     permitted = params.permit({ book: [{ authors: ["name"] }] });
-    authors = (permitted.get("book") as Parameters).get("authors") as Parameters[];
 
-    assertEqual("William Shakespeare", authors[0].get("name"));
-    assertEqual("William Shakespeare", authors[0].get("name"));
-    assertEqual("Christopher Marlowe", authors[1].get("name"));
-    assertEqual("Christopher Marlowe", authors[1].get("name"));
+    assertEqual(
+      "William Shakespeare",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0].get("name"),
+    );
+    assertEqual(
+      "William Shakespeare",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[0].get("name"),
+    );
+    assertEqual(
+      "Christopher Marlowe",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[1].get("name"),
+    );
+    assertEqual(
+      "Christopher Marlowe",
+      ((permitted.get("book") as Parameters).get("authors") as Parameters[])[1].get("name"),
+    );
   });
 
   it("nested arrays with strings", () => {
@@ -160,15 +195,34 @@ describe("NestedParametersPermitTest", () => {
       },
     });
     const permitted = params.permit({ book: { authors_attributes: ["name"] } });
-    const authorsAttributes = (permitted.get("book") as Parameters).get(
-      "authors_attributes",
-    ) as Parameters;
 
-    assertNotNil(authorsAttributes.get("0"));
-    assertNotNil(authorsAttributes.get("1"));
-    assertEmpty(authorsAttributes.get("2") as Parameters);
-    assertEqual("William Shakespeare", (authorsAttributes.get("0") as Parameters).get("name"));
-    assertEqual("Unattributed Assistant", (authorsAttributes.get("1") as Parameters).get("name"));
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("0"),
+    );
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("1"),
+    );
+    assertEmpty(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+        "2",
+      ) as Parameters,
+    );
+    assertEqual(
+      "William Shakespeare",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "0",
+        ) as Parameters
+      ).get("name"),
+    );
+    assertEqual(
+      "Unattributed Assistant",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "1",
+        ) as Parameters
+      ).get("name"),
+    );
 
     assertEqual(
       {
@@ -183,7 +237,12 @@ describe("NestedParametersPermitTest", () => {
       permitted.toH(),
     );
 
-    assertFilteredOut(authorsAttributes.get("0") as Parameters, "age_of_death");
+    assertFilteredOut(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+        "0",
+      ) as Parameters,
+      "age_of_death",
+    );
   });
 
   it("nested params with non_numeric keys", () => {
@@ -198,17 +257,38 @@ describe("NestedParametersPermitTest", () => {
       },
     });
     const permitted = params.permit({ book: { authors_attributes: ["name"] } });
-    const authorsAttributes = (permitted.get("book") as Parameters).get(
-      "authors_attributes",
-    ) as Parameters;
 
-    assertNotNil(authorsAttributes.get("0"));
-    assertNotNil(authorsAttributes.get("1"));
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("0"),
+    );
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("1"),
+    );
 
-    assertNil(authorsAttributes.get("2"));
-    assertNil(authorsAttributes.get("new_record"));
-    assertEqual("William Shakespeare", (authorsAttributes.get("0") as Parameters).get("name"));
-    assertEqual("Unattributed Assistant", (authorsAttributes.get("1") as Parameters).get("name"));
+    assertNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("2"),
+    );
+    assertNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+        "new_record",
+      ),
+    );
+    assertEqual(
+      "William Shakespeare",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "0",
+        ) as Parameters
+      ).get("name"),
+    );
+    assertEqual(
+      "Unattributed Assistant",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "1",
+        ) as Parameters
+      ).get("name"),
+    );
 
     assertEqual(
       {
@@ -233,16 +313,36 @@ describe("NestedParametersPermitTest", () => {
       },
     });
     const permitted = params.permit({ book: { authors_attributes: ["name"] } });
-    const authorsAttributes = (permitted.get("book") as Parameters).get(
-      "authors_attributes",
-    ) as Parameters;
 
-    assertNotNil(authorsAttributes.get("-1"));
-    assertNotNil(authorsAttributes.get("-2"));
-    assertEqual("William Shakespeare", (authorsAttributes.get("-1") as Parameters).get("name"));
-    assertEqual("Unattributed Assistant", (authorsAttributes.get("-2") as Parameters).get("name"));
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("-1"),
+    );
+    assertNotNil(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get("-2"),
+    );
+    assertEqual(
+      "William Shakespeare",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "-1",
+        ) as Parameters
+      ).get("name"),
+    );
+    assertEqual(
+      "Unattributed Assistant",
+      (
+        ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+          "-2",
+        ) as Parameters
+      ).get("name"),
+    );
 
-    assertFilteredOut(authorsAttributes.get("-1") as Parameters, "age_of_death");
+    assertFilteredOut(
+      ((permitted.get("book") as Parameters).get("authors_attributes") as Parameters).get(
+        "-1",
+      ) as Parameters,
+      "age_of_death",
+    );
   });
 
   it("nested params with numeric keys addressing individual numeric keys", () => {
