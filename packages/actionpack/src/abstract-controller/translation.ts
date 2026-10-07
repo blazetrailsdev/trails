@@ -1,5 +1,11 @@
 import { MissingTranslationData } from "@blazetrails/i18n";
-import { I18n, HtmlSafeTranslation, Module, htmlEscape } from "@blazetrails/activesupport";
+import {
+  I18n,
+  HtmlSafeTranslation,
+  Module,
+  htmlEscape,
+  underscore,
+} from "@blazetrails/activesupport";
 
 export interface TranslationHost {
   actionName: string;
@@ -11,6 +17,7 @@ export interface TranslateOptions {
   [key: string]: unknown;
 }
 
+/** @inventedArm underscore — PERMANENT */
 export function translate(
   this: TranslationHost,
   key: string,
@@ -34,7 +41,7 @@ export function translate(
 
   if (key.startsWith(".")) {
     const path = this.constructor.controllerPath().replace(/\//g, ".");
-    const scopedKey = `${path}.${this.actionName}${key}`;
+    const scopedKey = `${path}.${underscore(String(this.actionName))}${key}`;
     const fallbackKey = `${path}${key}`;
 
     const passOptions = { ...options } as Record<string, unknown>;

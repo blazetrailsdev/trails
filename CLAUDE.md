@@ -1929,10 +1929,11 @@ its own methods, and should not have to name them in a spelling they do not
 have. Two spellings for one action, with a conversion between them somewhere,
 was the alternative, and was rejected in favour of one rule.
 
-The one thing that stays in Rails' spelling is a FILE: a template is looked up
-by the underscored action name, because the vendored fixtures and every Rails
-application's views are named `next_bundle.html.erb`. That conversion is made
-at the lookup sites and nowhere else, each carrying
+What stays in Rails' spelling is what lives in a FILE: a template's name and a
+locale key. The vendored fixtures and every Rails application's views are named
+`next_bundle.html.erb`, and locale files key a lazy lookup by
+`controller.next_bundle.title`. So the action name is underscored where it is
+turned into one of those, and nowhere else, each site carrying
 `@inventedArm underscore — PERMANENT`:
 
 - `ImplicitRender#defaultRender` and `#methodForAction`
@@ -1940,7 +1941,17 @@ at the lookup sites and nowhere else, each carrying
 - `EtagWithTemplateDigest#pickTemplateForEtag`
   (`action-controller/metal/etag-with-template-digest.ts`)
 - `ActionView::Rendering#_processRenderTemplateOptions`
-  (`actionview/src/rendering.ts`)
+  (`actionview/src/rendering.ts`), which covers `render action:` and the action
+  name used as a partial's name
+- `AbstractController::Translation#translate`'s lazy-lookup scope
+  (`abstract-controller/translation.ts`)
+- `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
+
+The conversion is at these sites and not inside the template resolver, because
+the resolver is also handed names an application wrote out in full
+(`render template: "shared/lineItem"`, `render partial: "lineItem"`), which are
+not action names and must be looked up as written. Only the caller knows that
+the string in its hand is an action's name.
 
 Consequences for a ported test: where Rails' test says `get :hello_world`, the
 port says `get("helloWorld")`, and an assertion on a string that embeds the

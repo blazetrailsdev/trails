@@ -1,5 +1,10 @@
 import { describe, it, expect, afterEach, onTestFinished, vi } from "vitest";
-import { ActionView, controllerConstants, type Journey } from "@blazetrails/actionpack";
+import {
+  ActionController,
+  ActionView,
+  controllerConstants,
+  type Journey,
+} from "@blazetrails/actionpack";
 import { Base } from "@blazetrails/activerecord";
 import { BetterSQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js";
 import { env, getFs, getOsAsync, getPath, setEnv } from "@blazetrails/ruby-compat";
@@ -30,7 +35,7 @@ describe("UnusedRoutesCommand", () => {
   });
 
   it("RouteInfo is not unused when the controller defines the action", async () => {
-    class PostsController {
+    class PostsController extends ActionController.Metal {
       index(): void {}
     }
     controllerConstants.set("posts", PostsController as never);
@@ -38,15 +43,29 @@ describe("UnusedRoutesCommand", () => {
     expect(await info.unused()).toBe(false);
   });
 
+  it("RouteInfo resolves the action through the controller's action methods", async () => {
+    class PostsController extends ActionController.Metal {
+      showHTML(): void {}
+      sekrit_data(): void {}
+    }
+    controllerConstants.set("posts", PostsController as never);
+    for (const action of ["showHTML", "sekrit_data"]) {
+      const info = new RouteInfo(route({ controller: "posts", action }));
+      expect(await info.unused()).toBe(false);
+    }
+    const info = new RouteInfo(route({ controller: "posts", action: "show_html" }));
+    expect(await info.unused()).toBe(true);
+  });
+
   it("RouteInfo is unused when the action and its template are both missing", async () => {
-    class PostsController {}
+    class PostsController extends ActionController.Metal {}
     controllerConstants.set("posts", PostsController as never);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(true);
   });
 
   it("RouteInfo is not unused when a template covers the missing action", async () => {
-    class PostsController {
+    class PostsController extends ActionController.Metal {
       static viewPaths(): ActionView.PathSet {
         return new ActionView.PathSet([
           new ActionView.FileSystemResolver(
@@ -58,6 +77,34 @@ describe("UnusedRoutesCommand", () => {
     controllerConstants.set("posts", PostsController as never);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(false);
+  });
+
+  it("RouteInfo finds a camelCase action's template under its underscored file name", async () => {
+    class PostsController extends ActionController.Metal {
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
+      }
+    }
+    controllerConstants.set("posts", PostsController as never);
+
+    const covered = new RouteInfo(route({ controller: "posts", action: "recentPosts" }));
+    const uncovered = new RouteInfo(route({ controller: "posts", action: "oldPosts" }));
+
+    expect(await covered.unused()).toBe(false);
+    expect(await uncovered.unused()).toBe(true);
+  });
+
+  it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
+    class PostsController extends ActionController.Metal {}
+    controllerConstants.set("posts", PostsController as never);
+
+    const info = new RouteInfo(route({ controller: "posts", action: "process" }));
+
+    expect(await info.unused()).toBe(true);
   });
 
   it("lists a booted app's unused routes before anything has drawn them", async () => {
