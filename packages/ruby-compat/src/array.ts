@@ -363,11 +363,7 @@ export function unpack1(
  * `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`); an out-of-range start is nil.
  * @noRailsEquivalent PERMANENT
  */
-export function arySlice<T>(
-  ary: readonly T[],
-  arg: number | Range<number>,
-  length?: number,
-): T | T[] | null {
+export function arySlice<T>(ary: readonly T[], arg: unknown, length?: unknown): T | T[] | null {
   const argc = arguments.length - 1;
   if (argc < 1 || argc > 2) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);

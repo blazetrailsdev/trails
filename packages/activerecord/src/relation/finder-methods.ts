@@ -627,8 +627,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   }
   const result = await relation.toArray();
 
-  const limitValue = (this as any).limitValue;
-  const offsetValue = (this as any).offsetValue;
+  const limitValue = this.limitValue;
+  const offsetValue = this.offsetValue;
   let expectedSize: unknown;
   if (limitValue != null && rbCmpint(cmp(ids.length, limitValue), ids.length, limitValue) > 0) {
     expectedSize = limitValue;
@@ -656,9 +656,7 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
  */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   ids =
-    (arySlice(ids, (this as any).offsetValue ?? 0, (this as any).limitValue ?? ids.length) as
-      | unknown[]
-      | null) ?? [];
+    (arySlice(ids, this.offsetValue ?? 0, this.limitValue ?? ids.length) as unknown[] | null) ?? [];
 
   let relation = (this as any).except("limit", "offset");
   const pk = this.model.primaryKey;

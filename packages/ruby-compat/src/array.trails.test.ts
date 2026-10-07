@@ -390,6 +390,41 @@ describe("arySlice", () => {
   });
 });
 
+describe("arySlice index and length coercion", () => {
+  const ary = [1, 2, 3];
+  const slice = arySlice as (ary: unknown[], ...argv: unknown[]) => unknown;
+
+  it("raises rb_num2long's TypeError for nil", () => {
+    expect(() => slice(ary, null)).toThrow("no implicit conversion from nil to integer");
+    expect(() => slice(ary, 0, null)).toThrow("no implicit conversion from nil to integer");
+  });
+
+  it("raises a TypeError naming the operand's class", () => {
+    expect(() => slice(ary, "1")).toThrow(TypeError);
+    expect(() => slice(ary, "1")).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, "1", 2)).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, 0, "2")).toThrow("no implicit conversion of String into Integer");
+    expect(() => slice(ary, true)).toThrow("no implicit conversion of true into Integer");
+  });
+
+  it("truncates a Float toward zero", () => {
+    expect(slice(ary, 1.9)).toBe(2);
+    expect(slice(ary, -1.2)).toBe(3);
+    expect(slice(ary, 1.5, 1.9)).toEqual([2]);
+  });
+
+  it("takes an in-range bigint and raises RangeError past long", () => {
+    expect(slice(ary, 1n)).toBe(2);
+    expect(slice(ary, 2n ** 40n)).toBeNull();
+    expect(() => slice(ary, 2n ** 64n)).toThrow("bignum too big to convert into `long'");
+  });
+
+  it("answers nil for a start past the end and an empty array at the end", () => {
+    expect(slice(ary, 5, 1)).toBeNull();
+    expect(slice(ary, 3, 1)).toEqual([]);
+  });
+});
+
 describe("aryDeleteIf", () => {
   it("removes every element the block answers truthily for, in place", () => {
     const ary = [1, 2, 3, 4];
