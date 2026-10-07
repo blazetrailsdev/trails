@@ -292,11 +292,13 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
-export function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  await (this.constructor as typeof Base).ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
-export function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  await (this.constructor as typeof Base).ensureSchemaLoaded();
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
