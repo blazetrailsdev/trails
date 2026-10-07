@@ -136,6 +136,7 @@ export type ExplainOption = string;
 
 export interface DatabaseStatementsHost {
   _transactionManager?: TransactionManager;
+  readonly transactionManager?: TransactionManager;
   preparedStatements?: boolean;
   unpreparedStatement?<T>(fn: () => Promise<T> | T): Promise<T> | T;
   /** @internal */
@@ -441,58 +442,54 @@ export async function transaction<T>(
   }
 }
 
-export function transactionManager(this: DatabaseStatementsHost): TransactionManager | null {
-  return this._transactionManager ?? null;
-}
-
 export async function withinNewTransaction<T>(
   this: DatabaseStatementsHost,
   options: { isolation?: string | null; joinable?: boolean },
   block: (tx?: unknown) => Promise<T> | T,
 ): Promise<T> {
-  return transactionManager.call(this)!.withinNewTransaction(options, block as never);
+  return this.transactionManager!.withinNewTransaction(options, block as never);
 }
 
 export function openTransactions(this: DatabaseStatementsHost): number {
-  return transactionManager.call(this)!.openTransactions;
+  return this.transactionManager!.openTransactions;
 }
 
 export function currentTransaction(this: DatabaseStatementsHost): Transaction | NullTransaction {
-  return transactionManager.call(this)!.currentTransaction;
+  return this.transactionManager!.currentTransaction;
 }
 
 export async function beginTransaction(
   this: DatabaseStatementsHost,
   options: { isolation?: string | null; joinable?: boolean; _lazy?: boolean } = {},
 ): Promise<Transaction> {
-  return await transactionManager.call(this)!.beginTransaction(options);
+  return await this.transactionManager!.beginTransaction(options);
 }
 
 export async function commitTransaction(this: DatabaseStatementsHost): Promise<void> {
-  return transactionManager.call(this)!.commitTransaction();
+  return this.transactionManager!.commitTransaction();
 }
 
 export async function rollbackTransaction(
   this: DatabaseStatementsHost,
   transaction?: Transaction,
 ): Promise<void> {
-  return transactionManager.call(this)!.rollbackTransaction(transaction);
+  return this.transactionManager!.rollbackTransaction(transaction);
 }
 
 export async function materializeTransactions(this: DatabaseStatementsHost): Promise<void> {
-  return transactionManager.call(this)!.materializeTransactions();
+  return this.transactionManager!.materializeTransactions();
 }
 
 export async function disableLazyTransactionsBang(this: DatabaseStatementsHost): Promise<void> {
-  return transactionManager.call(this)!.disableLazyTransactionsBang();
+  return this.transactionManager!.disableLazyTransactionsBang();
 }
 
 export function enableLazyTransactionsBang(this: DatabaseStatementsHost): void {
-  transactionManager.call(this)!.enableLazyTransactionsBang();
+  this.transactionManager!.enableLazyTransactionsBang();
 }
 
 export function dirtyCurrentTransaction(this: DatabaseStatementsHost): void {
-  transactionManager.call(this)!.dirtyCurrentTransaction();
+  this.transactionManager!.dirtyCurrentTransaction();
 }
 
 export function markTransactionWrittenIfWrite(
@@ -997,7 +994,9 @@ export const DatabaseStatements = {
   explain,
   truncate,
   truncateTables,
-  transactionManager,
+  get transactionManager(): TransactionManager {
+    return (this as unknown as DatabaseStatementsHost)._transactionManager!;
+  },
   withinNewTransaction,
   openTransactions,
   currentTransaction,

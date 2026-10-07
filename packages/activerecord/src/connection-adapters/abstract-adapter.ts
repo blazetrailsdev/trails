@@ -66,11 +66,7 @@ import { SchemaCache, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
-import {
-  TransactionManager,
-  type Transaction,
-  type NullTransaction,
-} from "./abstract/transaction.js";
+import { type Transaction, type NullTransaction } from "./abstract/transaction.js";
 import {
   Store,
   queryCacheEnabled as queryCacheEnabledGet,
@@ -203,7 +199,7 @@ export class Version {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter
   extends
-    Required<Pick<DatabaseStatementsHost, "_transactionManager">>,
+    Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
     Pick<QueryCacheHost, "_queryCache"> {
   columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
@@ -2165,10 +2161,6 @@ export class AbstractAdapter implements Quoting {
     const reflection = this.pool.schemaReflection;
     if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
     return reflection.loadedCache;
-  }
-
-  get transactionManager(): TransactionManager {
-    return this._transactionManager;
   }
 
   async transaction<T>(
