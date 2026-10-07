@@ -132,25 +132,7 @@ function iterator<T>(this: Each<T>): IterableIterator<T> {
   return ary[Symbol.iterator]();
 }
 
-/**
- * `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`).
- * @noRailsEquivalent PERMANENT
- */
-export const Enumerable = {
-  findAll,
-  select: findAll,
-  map,
-  first,
-  isAny,
-  isInclude,
-  [Symbol.iterator]: iterator,
-};
-
-/**
- * `struct enum_sum_memo` (`vendor/ruby/v3.3.11/enum.c:4530`).
- * @noRailsEquivalent PERMANENT
- */
-export interface EnumSumMemo {
+interface EnumSumMemo {
   v: unknown;
   r: Rational | undefined;
   n: number;
@@ -222,13 +204,7 @@ function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
   memo.c = c;
 }
 
-/**
- * `sum_iter` (`vendor/ruby/v3.3.11/enum.c:4641`), below its `rb_yield`: an
- * async block's result has to be awaited before it is added, so the caller
- * yields and hands over the value.
- * @noRailsEquivalent PERMANENT
- */
-export function sumIter(i: unknown, memo: EnumSumMemo): void {
+function sumIter(i: unknown, memo: EnumSumMemo): void {
   if (memo.floatValue) {
     sumIterKahanBabuska(i, memo);
   } else if (rbIntegerTypeP(memo.v) || rbFloatTypeP(memo.v) || memo.v instanceof Rational) {
@@ -249,6 +225,71 @@ export function sumIter(i: unknown, memo: EnumSumMemo): void {
     sumIterSomeValue(i, memo);
   }
 }
+
+function enumSumMemo<T>(args: unknown[]): [EnumSumMemo, ((element: T) => unknown) | undefined] {
+  const block =
+    typeof args[args.length - 1] === "function"
+      ? (args.pop() as (element: T) => unknown)
+      : undefined;
+  if (args.length > 1) {
+    throw new ArgumentError(`wrong number of arguments (given ${args.length}, expected 0..1)`);
+  }
+  const memo: EnumSumMemo = {
+    v: args.length === 0 ? 0 : args[0],
+    blockGiven: block !== undefined,
+    n: 0,
+    r: undefined,
+    f: 0.0,
+    c: 0.0,
+    floatValue: false,
+  };
+
+  if ((memo.floatValue = rbFloatTypeP(memo.v))) {
+    memo.f = memo.v.valueOf();
+    memo.c = 0.0;
+  }
+  return [memo, block];
+}
+
+function enumSumValue(memo: EnumSumMemo): unknown {
+  if (memo.floatValue) {
+    return rbDbl2num(memo.f + memo.c);
+  } else {
+    if (memo.n !== 0) memo.v = numericPlus(memo.n, memo.v);
+    if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
+    return memo.v;
+  }
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#sum — `vendor/ruby/v3.3.11/enum.c:4753` `enum_sum`. The
+ * block is the trailing function argument, so a function cannot be the initial
+ * value. The Range arm (`int_range_sum`, `:4706`) is the caller's, and no
+ * includer is a Hash.
+ * @noRailsEquivalent PERMANENT
+ */
+function sum<T>(this: Each<T>, ...args: unknown[]): unknown {
+  const [memo, block] = enumSumMemo<T>(args);
+  rbBlockCall(this, (i) => {
+    sumIter(memo.blockGiven ? block!(i) : i, memo);
+  });
+  return enumSumValue(memo);
+}
+
+/**
+ * `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const Enumerable = {
+  findAll,
+  select: findAll,
+  map,
+  first,
+  isAny,
+  isInclude,
+  sum,
+  [Symbol.iterator]: iterator,
+};
 
 /** @noRailsEquivalent PERMANENT */
 export interface AsyncEach<T> {
@@ -276,40 +317,16 @@ export const AsyncEnumerable = {
   },
 
   /**
-   * Mirrors: Ruby's Enumerable#sum — `vendor/ruby/v3.3.11/enum.c:4753` `enum_sum`.
+   * Mirrors: Ruby's Enumerable#sum — `vendor/ruby/v3.3.11/enum.c:4753` `enum_sum`, awaiting
+   * the block's result before it is added (`sum_iter`'s `rb_yield`, `:4645`).
    * @noRailsEquivalent PERMANENT
    */
   async sum<T>(this: AsyncEach<T>, ...args: unknown[]): Promise<unknown> {
-    const block =
-      typeof args[args.length - 1] === "function"
-        ? (args.pop() as (element: T) => unknown)
-        : undefined;
-    const memo: EnumSumMemo = {
-      v: args.length === 0 ? 0 : args[0],
-      blockGiven: block !== undefined,
-      n: 0,
-      r: undefined,
-      f: 0.0,
-      c: 0.0,
-      floatValue: false,
-    };
-
-    if ((memo.floatValue = rbFloatTypeP(memo.v))) {
-      memo.f = memo.v.valueOf();
-      memo.c = 0.0;
-    }
-
+    const [memo, block] = enumSumMemo<T>(args);
     await this.each(async (i) => {
       sumIter(memo.blockGiven ? await block!(i) : i, memo);
     });
-
-    if (memo.floatValue) {
-      return rbDbl2num(memo.f + memo.c);
-    } else {
-      if (memo.n !== 0) memo.v = numericPlus(memo.n, memo.v);
-      if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
-      return memo.v;
-    }
+    return enumSumValue(memo);
   },
 
   /** @noRailsEquivalent PERMANENT */

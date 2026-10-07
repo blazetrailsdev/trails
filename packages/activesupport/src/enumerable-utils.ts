@@ -1,15 +1,13 @@
 import {
+  Enumerable,
   Hash,
   hashAref,
   numericPlus,
   rbBigNorm,
-  rbDbl2num,
   rbEqual,
   rbFloatTypeP,
   rbIntegerTypeP,
-  sumIter,
 } from "@blazetrails/ruby-compat";
-import type { EnumSumMemo } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
@@ -29,42 +27,21 @@ export function sum(collection: Iterable<number>): number;
 export function sum<T>(collection: Iterable<T>, block: (element: T) => number): number;
 export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): unknown;
 export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): unknown {
-  const block =
-    typeof args[args.length - 1] === "function"
-      ? (args.pop() as (element: T) => unknown)
-      : undefined;
-  const memo: EnumSumMemo = {
-    v: args.length === 0 ? 0 : args[0],
-    blockGiven: block !== undefined,
-    n: 0,
-    r: undefined,
-    f: 0.0,
-    c: 0.0,
-    floatValue: false,
-  };
-
-  if ((memo.floatValue = rbFloatTypeP(memo.v))) {
-    memo.f = memo.v.valueOf();
-    memo.c = 0.0;
-  }
-
   if (collection instanceof Range) {
     const { begin: beg, end, excludeEnd: excl } = collection as Range<unknown>;
-    if (!memo.blockGiven && !memo.floatValue && rbIntegerTypeP(beg) && rbIntegerTypeP(end)) {
-      return intRangeSum(beg, end, excl, memo.v);
+    const blockGiven = typeof args[args.length - 1] === "function";
+    if (!blockGiven && args.length <= 1 && !rbFloatTypeP(args[0])) {
+      if (rbIntegerTypeP(beg) && rbIntegerTypeP(end)) {
+        return intRangeSum(beg, end, excl, args.length === 0 ? 0 : args[0]);
+      }
     }
   }
 
-  const each = collection instanceof Range ? collection.each() : collection;
-  for (const element of each) sumIter(memo.blockGiven ? block!(element) : element, memo);
-
-  if (memo.floatValue) {
-    return rbDbl2num(memo.f + memo.c);
-  } else {
-    if (memo.n !== 0) memo.v = numericPlus(memo.n, memo.v);
-    if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
-    return memo.v;
-  }
+  const elements = collection instanceof Range ? collection.each() : collection;
+  const each = (block: (element: T) => void): void => {
+    for (const element of elements) block(element);
+  };
+  return Enumerable.sum.call({ each }, ...args);
 }
 
 export function indexBy<T, K extends string | number>(

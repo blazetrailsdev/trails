@@ -128,6 +128,14 @@ describe("AsyncEnumerable", () => {
     );
   });
 
+  it("sum rejects a second initial value", async () => {
+    await expect(AsyncEnumerable.sum.call(new AsyncBag([1]), 1, 2)).rejects.toThrow(
+      "wrong number of arguments (given 2, expected 0..1)",
+    );
+    expect(() => Enumerable.sum.call(new Bag([1]), 1, 2)).toThrow(ArgumentError);
+    expect(Enumerable.sum.call(new Bag([1, 2]), (i: unknown) => (i as number) * 2)).toBe(6);
+  });
+
   it("sum awaits the block before each yields the next element", async () => {
     const events: string[] = [];
     const total = await AsyncEnumerable.sum.call(new AsyncBag([1, 2]), async (i: unknown) => {

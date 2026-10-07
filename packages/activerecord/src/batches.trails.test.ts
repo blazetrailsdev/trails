@@ -33,14 +33,31 @@ describe("BatchEnumerator (trails)", () => {
 
   it("sum settles one batch's block before the next batch is fetched", async () => {
     const events: string[] = [];
-    const total = await Post.inBatches({ of: 1 }).sum(async (relation) => {
-      events.push("enter");
-      const count = await relation.count();
-      events.push("leave");
-      return count;
-    });
+    const subscription = Notifications.subscribe(
+      "sql.active_record",
+      (event: { payload: Record<string, unknown> }) => {
+        if (event.payload.name !== "SCHEMA") events.push("query");
+      },
+    );
+    let total: number;
+    try {
+      total = await Post.inBatches({ of: 1 }).sum(async () => {
+        events.push("enter");
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        events.push("leave");
+        return 1;
+      });
+    } finally {
+      Notifications.unsubscribe(subscription);
+    }
     expect(total).toBe(await Post.count());
-    expect(events).toEqual(Array.from({ length: total }, () => ["enter", "leave"]).flat());
+    expect(total).toBeGreaterThan(2);
+    expect(events.filter((event) => event !== "query").length).toBe(total * 2);
+    events.forEach((event, i) => {
+      if (event === "enter") expect(events[i + 1]).toBe("leave");
+    });
+    expect(events.indexOf("query")).toBeLessThan(events.indexOf("enter"));
+    expect(events.lastIndexOf("query")).toBeGreaterThan(events.indexOf("leave"));
   });
 
   it("eachRecord honours the cursor it was built with", async () => {
