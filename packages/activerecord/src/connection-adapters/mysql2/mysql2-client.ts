@@ -1,8 +1,8 @@
 import type mysql from "mysql2/promise";
 
-export interface Mysql2Client extends mysql.Connection {
+export type Mysql2Client = mysql.Connection & {
   automaticClose: boolean;
-}
+};
 
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
 
