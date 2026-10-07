@@ -3,6 +3,7 @@ import { rbAbsintSize } from "./numeric.js";
 import {
   rbCBasicObject,
   rbCInteger,
+  rbCString,
   rbClassOf,
   rbObjSingletonClass,
   rbCDate,
@@ -978,6 +979,13 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     expect(rbClassOf(obj)).toBe(singleton);
     expect(rbClassInheritedP(singleton, Base)).toBe(true);
     expect(rbClassOf(1)).toBe(rbCInteger);
+
+    class Blob extends Uint8Array {}
+    expect(rbClassOf(Uint8Array.of(1))).toBe(rbCString);
+    expect(rbClassOf(Blob.of(1))).toBe(Blob);
+    expect(rbObjIsKindOf(Blob.of(1), rbCString)).toBe(true);
+    expect(rbClassInheritedP(Blob, rbCString)).toBe(true);
+    expect(rbModAncestors(Blob)).toContain(rbCString);
   });
 
   it("counts the bytes of the absolute value and its leading zero bits", () => {

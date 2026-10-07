@@ -1041,6 +1041,10 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
       for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
     }
+    if (p === Uint8Array.prototype) {
+      for (const m of rbModAncestors(rbCString)) if (!ary.includes(m)) ary.push(m);
+      return ary;
+    }
     if (p === Object.prototype) ary.push(Kernel, rbCBasicObject);
   }
   return ary;
@@ -1098,6 +1102,7 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
+    if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;

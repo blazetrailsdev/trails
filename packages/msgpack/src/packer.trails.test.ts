@@ -164,6 +164,12 @@ describe("ext registry lookup", () => {
     expect(packer.write(string).fullPack()).toEqual(Uint8Array.of(0xd4, 4, 0x73));
     expect(packer.write(Uint8Array.of(1)).fullPack()).toEqual(Uint8Array.of(0xc4, 1, 1));
 
+    class Blob extends Uint8Array {}
+    packer.registerType(0x05, Blob, null, () => "b");
+    expect(packer.write(Blob.of(1)).fullPack()).toEqual(Uint8Array.of(0xd4, 5, 0x62));
+    class Plain extends Uint8Array {}
+    expect(packer.write(Plain.of(1)).fullPack()).toEqual(Uint8Array.of(0xc4, 1, 1));
+
     const extended = new Pair(1, 2);
     include(rbObjSingletonClass(extended), Mod);
     const other = new Packer();

@@ -25,7 +25,9 @@ type Klass = abstract new (...args: never) => unknown;
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a `Uint8Array` is the binary
- *  `String` seat; a Temporal value carrying an instant
+ *  `String` seat, and an instance of a `Uint8Array` subclass is an instance of
+ *  that String subclass, whose ancestry `class_search_ancestor` continues
+ *  into `String`'s at `Uint8Array.prototype`; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
@@ -44,7 +46,10 @@ export function rbObjClass(obj: unknown): Klass {
   if (typeof obj === "bigint") return rbCInteger;
   if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
   if (obj instanceof Number) return rbCFloat;
-  if (typeof obj === "string" || obj instanceof Uint8Array) return rbCString;
+  if (typeof obj === "string") return rbCString;
+  if (obj instanceof Uint8Array) {
+    return obj.constructor === Uint8Array ? rbCString : (obj.constructor as Klass);
+  }
   if (typeof obj === "function") {
     return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
       ? rbCClass
