@@ -53,7 +53,7 @@ export class DatabaseConfig {
     );
   }
 
-  /** @inventedArm load — PERMANENT */
+  /** @inventedArm load — CONVERGEABLE database-config-validate-bang-makes-no-adapter-load-call */
   async validateBang(): Promise<true> {
     if (this.adapter != null) {
       await ConnectionAdapters.load(this.adapter);
