@@ -12,8 +12,7 @@ import { DEFAULT_ENV } from "../connection-handling.js";
 import { readingRole, setWritingRole, writingRole } from "../active-record.js";
 
 function setupSharedConnectionPool(handlerArg: ConnectionHandler): void {
-  const managerMap: Map<string, any> = (handlerArg as any)._connectionNameToPoolManager;
-  for (const [, poolManager] of managerMap) {
+  for (const poolManager of (handlerArg as any)._connectionNameToPoolManager.values()) {
     for (const shardName of poolManager.shardNames as string[]) {
       const writingPoolConfig = poolManager.getPoolConfig(writingRole(), shardName);
       for (const role of poolManager.roleNames as string[]) {

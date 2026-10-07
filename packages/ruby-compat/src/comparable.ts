@@ -130,6 +130,17 @@ export function cmp(a: unknown, b: unknown): number | null {
           return a > 0 ? 1 : -1;
         }
       }
+      /* `rb_num_coerce_cmp` (`vendor/ruby/v3.3.11/numeric.c:484`) over
+         `do_coerce` (`:455`): an operand answering `coerce` is sent it, and
+         the pair it returns is compared. */
+      if (rbObjRespondTo(b, "coerce")) {
+        const ary = (b as { coerce(x: unknown): unknown }).coerce(a);
+        if (ary === null || ary === undefined) return null;
+        if (!Array.isArray(ary) || ary.length !== 2) {
+          throw new TypeError("coerce must return [x, y]");
+        }
+        return cmp(ary[0], ary[1]);
+      }
       return null;
     }
     if (Number.isNaN(b as number)) return null;

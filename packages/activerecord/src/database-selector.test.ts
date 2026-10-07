@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { currentPreventingWrites } from "./core.js";
 import { DatabaseSelector } from "./middleware/database-selector.js";
-import { TopLevel } from "@blazetrails/activesupport";
+import { seconds, TopLevel, type Duration } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session } from "./middleware/database-selector/resolver/session.js";
 import { Hash } from "@blazetrails/ruby-compat";
-import { Temporal } from "@blazetrails/date";
+import { Time } from "@blazetrails/date";
 
 class TestRequest {
   readonly method: string;
@@ -28,7 +28,7 @@ function isPreventingWrites() {
   return currentPreventingWrites.call(Base as any);
 }
 function fiveSecondsAgo() {
-  return Session.convertTimeToTimestamp(Temporal.Now.instant().subtract({ milliseconds: 5000 }));
+  return Session.convertTimeToTimestamp(Time.now().minus(seconds(5).toI()) as Time);
 }
 
 describe("DatabaseSelectorTest", () => {
@@ -41,15 +41,13 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("empty session", () => {
-    expect(session.lastWriteTimestamp().epochMilliseconds).toBe(0);
+    expect(session.lastWriteTimestamp().toF()).toBe(Time.at(0).toF());
   });
 
   it("writing the session timestamps", () => {
     expect(session.updateLastWriteTimestamp()).toBeTruthy();
     const session2 = new Session(sessionStore);
-    expect(session.lastWriteTimestamp().epochMilliseconds).toBe(
-      session2.lastWriteTimestamp().epochMilliseconds,
-    );
+    expect(session.lastWriteTimestamp().toF()).toBe(session2.lastWriteTimestamp().toF());
   });
 
   it("writing session time changes", async () => {
@@ -57,7 +55,7 @@ describe("DatabaseSelectorTest", () => {
     const before = session.lastWriteTimestamp();
     await new Promise((r) => setTimeout(r, 100));
     expect(session.updateLastWriteTimestamp()).toBeTruthy();
-    expect(session.lastWriteTimestamp().epochMilliseconds).not.toBe(before.epochMilliseconds);
+    expect(session.lastWriteTimestamp().toF()).not.toBe(before.toF());
   });
 
   it("read from replicas", async () => {
@@ -90,7 +88,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("read from primary", async () => {
-    sessionStore.set("lastWrite", Session.convertTimeToTimestamp(Temporal.Now.instant()));
+    sessionStore.set("lastWrite", Session.convertTimeToTimestamp(Time.now()));
     const resolver = new Resolver(session);
     let called = false;
     await resolver.read(async () => {
@@ -154,7 +152,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("read from primary with options", async () => {
-    const resolver = new Resolver(session, { delay: 5000 });
+    const resolver = new Resolver(session, { delay: seconds(5) });
     expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
@@ -172,7 +170,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("preventing writes turns off for primary write", async () => {
-    const resolver = new Resolver(session, { delay: 5000 });
+    const resolver = new Resolver(session, { delay: seconds(5) });
     expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
@@ -202,7 +200,7 @@ describe("DatabaseSelectorTest", () => {
   });
 
   it("read from replica with no delay", async () => {
-    const resolver = new Resolver(session, { delay: 0 });
+    const resolver = new Resolver(session, { delay: seconds(0) });
     expect(sessionStore.get("lastWrite")).toBeUndefined();
     let called = false;
     await resolver.write(async () => {
@@ -246,7 +244,7 @@ describe("DatabaseSelectorTest", () => {
   it("the middleware chooses reading role with POST request if resolver tells it to", async () => {
     class ReadonlyResolver extends Resolver {
       static override call(ctx: ResolverContext, opts: Record<string, unknown>): ReadonlyResolver {
-        return new ReadonlyResolver(ctx, opts as { delay?: number });
+        return new ReadonlyResolver(ctx, opts as { delay?: Duration });
       }
       override isReadingRequest(_r: { method: string }): boolean {
         return true;
