@@ -8,6 +8,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { rbEqual } from "./rb-equal.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface Each<T> {
@@ -94,6 +95,22 @@ function isAny<T>(this: Each<T>, block?: (i: T) => unknown): boolean {
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#include? — `vendor/ruby/v3.3.11/enum.c:2921` `enum_member`,
+ * whose `member_i` (`:2892`) asks `rb_equal(element, val)` and breaks on the first hit.
+ * @noRailsEquivalent PERMANENT
+ */
+function isInclude<T>(this: Each<T>, val: unknown): boolean {
+  let memo = false;
+  rbBlockCall(this, (i) => {
+    if (rbEqual(i, val)) {
+      memo = true;
+      throw iterBreak;
+    }
+  });
+  return memo;
+}
+
+/**
  * The JS spelling of what `for x in enum` / `*enum` read off `each`:
  * `vendor/ruby/v3.3.11/enum.c:711` `enum_to_a`, iterated.
  * @noRailsEquivalent PERMANENT
@@ -106,5 +123,16 @@ function iterator<T>(this: Each<T>): IterableIterator<T> {
   return ary[Symbol.iterator]();
 }
 
-/** @noRailsEquivalent PERMANENT */
-export const Enumerable = { findAll, map, first, isAny, [Symbol.iterator]: iterator };
+/**
+ * `select` is `enum_find_all` under a second name (`vendor/ruby/v3.3.11/enum.c:5076`).
+ * @noRailsEquivalent PERMANENT
+ */
+export const Enumerable = {
+  findAll,
+  select: findAll,
+  map,
+  first,
+  isAny,
+  isInclude,
+  [Symbol.iterator]: iterator,
+};

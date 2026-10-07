@@ -1,6 +1,8 @@
 import { registerDefaultMimeTypes } from "./mime-types.js";
 import {
   aryDelete,
+  Enumerable,
+  include,
   isSymbol,
   KERNEL_METHODS,
   KeyError,
@@ -12,6 +14,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { underscore } from "@blazetrails/activesupport";
 
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (`actionpack/lib/action_dispatch/http/mime_type.rb:11`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Mimes {
   /** @internal */
   private _mimes: MimeType[] = [];
@@ -55,12 +58,15 @@ export class Mimes {
   isValidSymbols(symbols: readonly unknown[]): boolean {
     return symbols.every((s) => this._symbolsSet.has(s as string));
   }
-
-  /** @internal */
-  select(predicate: (type: MimeType) => boolean): MimeType[] {
-    return this._mimes.filter(predicate);
-  }
 }
+
+export interface Mimes {
+  select(block: (i: MimeType) => unknown): MimeType[];
+  isInclude(val: unknown): boolean;
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+include(Mimes, Enumerable);
 
 /** @internal */
 export class AcceptItem {

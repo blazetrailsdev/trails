@@ -60,11 +60,11 @@ export class ActionNotFound extends Error {
   readonly action: string | null;
 
   constructor(
-    message: string,
+    message: string | null = null,
     controller: AbstractController | null = null,
     action: string | null = null,
   ) {
-    super(message);
+    super(message ?? "AbstractController::ActionNotFound");
     this.name = "AbstractController::ActionNotFound";
     this.controller = controller;
     this.action = action;
