@@ -1,4 +1,4 @@
-import { ArgumentError, hasKey } from "@blazetrails/ruby-compat";
+import { ArgumentError, hasKey, toS } from "@blazetrails/ruby-compat";
 import {
   CONTENT_LENGTH,
   CONTENT_TYPE,
@@ -208,17 +208,13 @@ export abstract class Helpers {
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        oldBody.each((part: string | Uint8Array) =>
-          this.append(part instanceof Uint8Array ? part : String(part)),
-        );
+        oldBody.each((part: unknown) => this.append(toS(part)));
       } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
         const oldBody = this._body;
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        for (const part of oldBody) {
-          this.append(part instanceof Uint8Array ? part : String(part));
-        }
+        for (const part of oldBody) this.append(toS(part));
       } else {
         this._buffered = false;
       }
@@ -227,7 +223,7 @@ export abstract class Helpers {
   }
 
   /** @internal */
-  append<T extends string | Uint8Array>(chunk: T): T {
+  append(chunk: string | Uint8Array): string | Uint8Array {
     this._body.push(chunk);
     if (this.length !== null) {
       this.length += Buffer.byteLength(chunk);
@@ -246,7 +242,7 @@ export class Response {
   length: number | null;
   private _buffered: boolean | null;
   private _block: ((self: Response) => void) | null;
-  private _writer: (chunk: string) => string;
+  private _writer: (chunk: string | Uint8Array) => string | Uint8Array;
 
   constructor(
     body: any = null,
