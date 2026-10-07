@@ -25,9 +25,10 @@ import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
 import type { CachingClassMethods } from "../../abstract-controller/caching.js";
 
-registerConstant("Another", { name: "Another" });
 import { FIXTURE_LOAD_PATH } from "../../test-helpers/abstract-unit.js";
 import { ActionNotFound } from "../../abstract-controller/base.js";
+
+registerConstant("Another", { name: "Another" });
 
 class SpecialException extends Exception {}
 
