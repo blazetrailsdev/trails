@@ -276,7 +276,6 @@ import * as _Core from "./core.js";
 import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
 import * as _DirtyModule from "./attribute-methods/dirty.js";
-import type { AsynchronousQueriesTracker, Session } from "./asynchronous-queries-tracker.js";
 import * as _Persistence from "./persistence.js";
 import * as _EnumModule from "./enum.js";
 import {
@@ -647,25 +646,15 @@ export class Base extends Model {
 
   static isConnectionClass = _Core.isConnectionClass;
 
-  static asynchronousQueriesSession(): Session {
-    return _Core.asynchronousQueriesSession();
-  }
+  static asynchronousQueriesSession = _Core.asynchronousQueriesSession;
 
-  static asynchronousQueriesTracker(): AsynchronousQueriesTracker {
-    return _Core.asynchronousQueriesTracker();
-  }
+  static asynchronousQueriesTracker = _Core.asynchronousQueriesTracker;
 
-  static currentPreventingWrites(): boolean {
-    return _Core.currentPreventingWrites.call(this);
-  }
+  static currentPreventingWrites = _Core.currentPreventingWrites;
 
-  static currentRole(): string {
-    return _Core.currentRole.call(this);
-  }
+  static currentRole = _Core.currentRole;
 
-  static currentShard(): string {
-    return _Core.currentShard.call(this);
-  }
+  static currentShard = _Core.currentShard;
 
   static connectionClassForSelf(): typeof Base {
     let klass: typeof Base = this;
@@ -739,15 +728,11 @@ export class Base extends Model {
     return hashAref(this.attributeTypes(), resolved) as ValueType | null;
   }
 
-  static get arelTable(): Table {
-    return _Core.arelTable.call(this);
-  }
+  declare static readonly arelTable: Table;
 
   static typeCaster = _Core.typeCaster;
 
-  static get predicateBuilder(): import("./relation/predicate-builder.js").PredicateBuilder {
-    return _Core.predicateBuilder.call(this);
-  }
+  declare static readonly predicateBuilder: import("./relation/predicate-builder.js").PredicateBuilder;
 
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
@@ -784,13 +769,7 @@ export class Base extends Model {
     return this.loadSchema();
   }
 
-  static get connectionHandler(): ConnectionHandler {
-    return _Core.connectionHandler.call(this);
-  }
-
-  static set connectionHandler(handler: ConnectionHandler) {
-    _Core.setConnectionHandler.call(this, handler);
-  }
+  declare static connectionHandler: ConnectionHandler;
 
   static async establishConnection(
     configOrEnv?:
@@ -2102,9 +2081,7 @@ export class Base extends Model {
     return ModelSchema.tableExists.call(this);
   }
 
-  static inspect(): string {
-    return _Core.ClassMethods.inspect.call(this);
-  }
+  declare static inspect: typeof _Core.ClassMethods.inspect;
 
   static hasAttribute(attrName: string): boolean {
     attrName = String(attrName);

@@ -125,6 +125,12 @@ export const Core = {
 
     (base as CoreHost).filterAttributes = [];
 
+    Object.defineProperty(base, "connectionHandler", {
+      configurable: true,
+      get: connectionHandler,
+      set: setConnectionHandler,
+    });
+
     Object.defineProperty(base, "connectionClass", {
       configurable: true,
       get: connectionClass,
@@ -219,6 +225,20 @@ export class ClassMethods {
     } else {
       return `${name}(Table doesn't exist)`;
     }
+  }
+
+  static get arelTable(): Table {
+    return new Table((this as any).tableName, { klass: this as any });
+  }
+
+  static get predicateBuilder(): PredicateBuilder {
+    const host = this as unknown as CoreHost;
+    return (
+      (Object.hasOwn(host, "_predicateBuilder") ? host._predicateBuilder : undefined) ||
+      (host._predicateBuilder = new PredicateBuilder(
+        new TableMetadata(this as any, (this as any).arelTable),
+      ))
+    );
   }
 }
 
@@ -697,13 +717,6 @@ export function generatedAssociationMethods(this: CoreHost): Module {
   );
 }
 
-export function predicateBuilder(this: CoreHost): PredicateBuilder {
-  return (
-    (Object.hasOwn(this, "_predicateBuilder") ? this._predicateBuilder : undefined) ||
-    (this._predicateBuilder = new PredicateBuilder(new TableMetadata(this as any, this.arelTable)))
-  );
-}
-
 export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
@@ -738,10 +751,6 @@ export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler)
 }
 
 const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
-
-export function arelTable(this: CoreHost): Table {
-  return new Table((this as any).tableName, { klass: this as any });
-}
 
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
