@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { FrozenError, NameError, TypeError } from "@blazetrails/ruby-compat";
+import { FrozenError, Module, NameError, TypeError } from "@blazetrails/ruby-compat";
 import { Factory } from "./index.js";
 
 class MyType {
@@ -13,6 +13,18 @@ class MyType {
 }
 
 describe("MessagePack::Factory", () => {
+  it("unpacks an ext type registered for a module through the module's from_msgpack_ext", () => {
+    const Mod = Object.assign(
+      new Module((mod) => mod.defineMethod("toMsgpackExt", () => "value_msgpacked")),
+      { fromMsgpackExt: (data: Uint8Array) => `unpacked ${new TextDecoder().decode(data)}` },
+    );
+    const factory = new Factory();
+    factory.registerType(0x01, Mod);
+
+    const src = Uint8Array.of(0xc7, 0x06, 0x01, ...new TextEncoder().encode("module"));
+    expect(factory.unpacker().feed(src).read()).toEqual("unpacked module");
+  });
+
   it("a frozen factory denies new registrations and a pool takes a frozen dup", () => {
     const factory = new Factory();
     factory.registerType(0x00, MyType);
