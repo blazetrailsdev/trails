@@ -239,7 +239,7 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `DEFAULT_ENV()`), and a `(callable || block).call`
  *   (`activerecord/lib/active_record/statement_cache.rb:133`) is credited by
  *   an invocation of either operand.
- * - `sleep` → `timer`: a `setTimeout(...)` call, the only way JS suspends —
+ * - `sleep` → `timer`: a `setTimeout(...)` call —
  *   `Kernel#sleep` (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`)
  *   suspends the thread and returns the seconds slept, and a JS port awaits
  *   `new Promise((resolve) => setTimeout(resolve, ms))`, which records no
