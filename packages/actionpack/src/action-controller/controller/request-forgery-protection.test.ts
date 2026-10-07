@@ -198,7 +198,7 @@ class PrependProtectForgeryBaseController extends Base {
   }
 
   /** @internal */
-  verifyAuthenticityToken(): void {
+  protected override verifyAuthenticityToken(): void {
     this.addCalledCallback("verify_authenticity_token");
   }
 }
@@ -331,6 +331,8 @@ class MockLogger {
   }
 }
 
+type CsrfPrivate = { formAuthenticityToken(): string };
+
 const TOKEN = Buffer.from("railstestrailstestrailstestrails").toString("base64url") + "=";
 
 function RequestForgeryProtectionTests(
@@ -462,7 +464,9 @@ function RequestForgeryProtectionTests(
 
   it("should allow post with token", async () => {
     initializeCsrfToken();
-    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    const stub = vi
+      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+      .mockReturnValue(TOKEN);
     await rbEnsure(
       () =>
         assertNotBlocked(() => tc.post("index", { params: { custom_authenticity_token: TOKEN } })),
@@ -475,7 +479,7 @@ function RequestForgeryProtectionTests(
     const tokenIncludingUrlUnsafeChars = "+/".padEnd(tokenLength, "A");
     initializeCsrfToken(tokenIncludingUrlUnsafeChars);
     const stub = vi
-      .spyOn(tc.controller as Base, "formAuthenticityToken")
+      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
       .mockReturnValue(tokenIncludingUrlUnsafeChars);
     await rbEnsure(
       () =>
@@ -488,7 +492,9 @@ function RequestForgeryProtectionTests(
 
   it("should allow patch with token", async () => {
     initializeCsrfToken();
-    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    const stub = vi
+      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+      .mockReturnValue(TOKEN);
     await rbEnsure(
       () =>
         assertNotBlocked(() => tc.patch("index", { params: { custom_authenticity_token: TOKEN } })),
@@ -498,7 +504,9 @@ function RequestForgeryProtectionTests(
 
   it("should allow put with token", async () => {
     initializeCsrfToken();
-    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    const stub = vi
+      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+      .mockReturnValue(TOKEN);
     await rbEnsure(
       () =>
         assertNotBlocked(() => tc.put("index", { params: { custom_authenticity_token: TOKEN } })),
@@ -508,7 +516,9 @@ function RequestForgeryProtectionTests(
 
   it("should allow delete with token", async () => {
     initializeCsrfToken();
-    const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+    const stub = vi
+      .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+      .mockReturnValue(TOKEN);
     await rbEnsure(
       () =>
         assertNotBlocked(() =>
@@ -545,7 +555,9 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and correct origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      const stub = vi
+        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+        .mockReturnValue(TOKEN);
       await rbEnsure(
         () =>
           assertNotBlocked(() => {
@@ -560,7 +572,9 @@ function RequestForgeryProtectionTests(
   it("should allow post with origin checking and no origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      const stub = vi
+        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+        .mockReturnValue(TOKEN);
       await rbEnsure(
         () =>
           assertNotBlocked(() =>
@@ -574,7 +588,9 @@ function RequestForgeryProtectionTests(
   it("should raise for post with null origin", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi.spyOn(tc.controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      const stub = vi
+        .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
+        .mockReturnValue(TOKEN);
       await rbEnsure(
         async () => {
           const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
@@ -596,7 +612,7 @@ function RequestForgeryProtectionTests(
       await forgeryProtectionOriginCheck(async () => {
         initializeCsrfToken();
         const stub = vi
-          .spyOn(tc.controller as Base, "formAuthenticityToken")
+          .spyOn(tc.controller as unknown as CsrfPrivate, "formAuthenticityToken")
           .mockReturnValue(TOKEN);
         await rbEnsure(
           () =>
@@ -842,7 +858,9 @@ describe("RequestForgeryProtectionControllerUsingExceptionTest", () => {
   it("raised exception message explains why it occurred", async () => {
     await forgeryProtectionOriginCheck(async () => {
       initializeCsrfToken();
-      const stub = vi.spyOn(t().controller as Base, "formAuthenticityToken").mockReturnValue(TOKEN);
+      const stub = vi
+        .spyOn(t().controller as unknown as CsrfPrivate, "formAuthenticityToken")
+        .mockReturnValue(TOKEN);
       await rbEnsure(
         async () => {
           const exception = await assertRaises([InvalidAuthenticityToken], {}, () => {
@@ -1411,7 +1429,9 @@ describe("CookieCsrfTokenStorageStrategyControllerTest", () => {
   const controller = () => tc().controller as CookieCsrfTokenStorageStrategyController;
 
   async function stubFormAuthenticityToken(block: () => Promise<unknown>): Promise<void> {
-    const stub = vi.spyOn(controller(), "formAuthenticityToken").mockReturnValue(TOKEN);
+    const stub = vi
+      .spyOn(controller() as unknown as CsrfPrivate, "formAuthenticityToken")
+      .mockReturnValue(TOKEN);
     try {
       await block();
     } finally {

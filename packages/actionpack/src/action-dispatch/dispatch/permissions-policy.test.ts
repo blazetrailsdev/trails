@@ -1,8 +1,25 @@
-import { describe, it, expect } from "vitest";
-import { PermissionsPolicy } from "../permissions-policy.js";
+import { afterAll, beforeEach, describe, it, expect } from "vitest";
+import { Module, assertEqual } from "@blazetrails/activesupport";
+import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import {
+  CONTENT_TYPE,
+  Lint,
+  bodyFromString,
+  type RackApp,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
+import { Base } from "../../action-controller/base.js";
+import { FEATURE_POLICY } from "../constants.js";
+import { controllerConstants } from "../http/request.js";
+import type { MiddlewareFactory } from "../middleware/stack.js";
+import { Middleware, PermissionsPolicy } from "../http/permissions-policy.js";
+import { RouteSet } from "../routing/route-set.js";
+import { IntegrationTest } from "../testing/integration.js";
+import "../../test-helpers/abstract-unit.js";
 
 describe("PermissionsPolicyTest", () => {
-  it("test_mappings", () => {
+  it("mappings", () => {
     const policy = new PermissionsPolicy();
     policy.midi(":self");
     expect(policy.build()).toBe("midi 'self'");
@@ -11,20 +28,20 @@ describe("PermissionsPolicyTest", () => {
     expect(policy.build()).toBe("midi 'none'");
   });
 
-  it("test_multiple_sources_for_a_single_directive", () => {
+  it("multiple sources for a single directive", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self", "https://example.com");
     expect(policy.build()).toBe("geolocation 'self' https://example.com");
   });
 
-  it("test_single_directive_for_multiple_directives", () => {
+  it("single directive for multiple directives", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self");
     policy.usb(":none");
     expect(policy.build()).toBe("geolocation 'self'; usb 'none'");
   });
 
-  it("test_multiple_directives_for_multiple_directives", () => {
+  it("multiple directives for multiple directives", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self", "https://example.com");
     policy.usb(":none", "https://example.com");
@@ -33,7 +50,7 @@ describe("PermissionsPolicyTest", () => {
     );
   });
 
-  it("test_invalid_directive_source", () => {
+  it("invalid directive source", () => {
     const policy = new PermissionsPolicy();
     expect(() => policy.geolocation([":non_existent"] as unknown as string)).toThrow(
       "Invalid HTTP permissions policy source: [:non_existent]",
@@ -42,57 +59,239 @@ describe("PermissionsPolicyTest", () => {
 });
 
 describe("PermissionsPolicyMiddlewareTest", () => {
-  it("html requests will set a policy", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":self");
-    expect(policy.build()).toBe("gyroscope 'self'");
+  const POLICY = new PermissionsPolicy((p) => {
+    p.gyroscope(":self");
   });
 
-  it("non-html requests will set a policy", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":self");
-    expect(policy.build()).toBe("gyroscope 'self'");
+  class PolicyConfigMiddleware {
+    constructor(private app: RackApp) {}
+
+    call(env: RackEnv): Promise<RackResponse> {
+      env["action_dispatch.permissions_policy"] = POLICY;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app(env);
+    }
+  }
+
+  function buildApp(app: RackApp): PolicyConfigMiddleware {
+    const inner = new Lint(app);
+    const middleware = new Middleware((env) => inner.call(env));
+    const outer = new Lint((env) => middleware.call(env));
+    return new PolicyConfigMiddleware((env) => outer.call(env));
+  }
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
   });
 
-  it("existing policies will not be overwritten", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":none");
-    expect(policy.build()).toBe("gyroscope 'none'");
+  it("html requests will set a policy", async () => {
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, bodyFromString("")]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'self'", t.response.headers.get(FEATURE_POLICY));
+  });
+
+  it("non-html requests will set a policy", async () => {
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, bodyFromString("")]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'self'", t.response.headers.get(FEATURE_POLICY));
+  });
+
+  it("existing policies will not be overwritten", async () => {
+    t.app = buildApp(async () => [
+      200,
+      { [FEATURE_POLICY]: "gyroscope 'none'" },
+      bodyFromString(""),
+    ]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'none'", t.response.headers.get(FEATURE_POLICY));
   });
 });
 
 describe("PermissionsPolicyIntegrationTest", () => {
-  it("test_generates_permissions_policy_header", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":none");
-    expect(policy.build()).toBe("gyroscope 'none'");
+  class PolicyController extends Base {
+    static {
+      this.permissionsPolicy({ only: "index" }, (f) => {
+        f.gyroscope(":none");
+      });
+
+      this.permissionsPolicy({ only: "sample_controller" }, (f) => {
+        f.gyroscope(null);
+        f.usb(":self");
+      });
+
+      this.permissionsPolicy({ only: "multiple_directives" }, (f) => {
+        f.gyroscope(null);
+        f.usb(":self");
+        f.autoplay("https://example.com");
+        f.payment("https://secure.example.com");
+      });
+    }
+
+    index(): void {
+      this.head("ok");
+    }
+
+    sampleController(): void {
+      this.head("ok");
+    }
+
+    multipleDirectives(): void {
+      this.head("ok");
+    }
+  }
+  controllerConstants.set("permissions_policy_integration_test/policy", PolicyController);
+
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "permissions_policy_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+      this.get("/sample_controller", { to: "policy#sample_controller" });
+      this.get("/multiple_directives", { to: "policy#multiple_directives" });
+    });
   });
 
-  it("test_generates_per_controller_permissions_policy_header", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(null);
-    policy.usb(":self");
-    expect(policy.build()).toBe("usb 'self'");
+  const POLICY = new PermissionsPolicy((p) => {
+    p.gyroscope(":self");
   });
 
-  it("test_generates_multiple_directives_permissions_policy_header", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(null);
-    policy.usb(":self");
-    policy.autoplay("https://example.com");
-    policy.payment("https://secure.example.com");
-    expect(policy.build()).toBe(
-      "usb 'self'; autoplay https://example.com; payment https://secure.example.com",
-    );
+  class PolicyConfigMiddleware {
+    constructor(private app: RackApp) {}
+
+    call(env: RackEnv): Promise<RackResponse> {
+      env["action_dispatch.permissions_policy"] = POLICY;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
+    middleware.use(Middleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
+  });
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  function assertPolicy(expected: string): void {
+    t.assertResponse("success");
+    assertEqual(expected, t.response.headers.get("Feature-Policy"));
+  }
+
+  it("generates permissions policy header", async () => {
+    await t.get("/");
+    assertPolicy("gyroscope 'none'");
+  });
+
+  it("generates per controller permissions policy header", async () => {
+    await t.get("/sample_controller");
+    assertPolicy("usb 'self'");
+  });
+
+  it("generates multiple directives permissions policy header", async () => {
+    await t.get("/multiple_directives");
+    assertPolicy("usb 'self'; autoplay https://example.com; payment https://secure.example.com");
   });
 });
 
 describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
-  it("test_generates_permissions_policy_header", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":none");
-    policy.usb(":self");
-    expect(policy.build()).toBe("gyroscope 'none'; usb 'self'");
+  const ApplicationHelper = new Module().include({
+    isPigsCanFly(): boolean {
+      return false;
+    },
+  });
+
+  const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
+  registerConstant(helperName, ApplicationHelper);
+  afterAll(() => unregisterConstant(helperName, ApplicationHelper));
+
+  class ApplicationController extends Base {
+    static override name = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationController";
+
+    static {
+      this.helperMethod("isSkyIsBlue");
+    }
+    isSkyIsBlue(): boolean {
+      return true;
+    }
+  }
+
+  class PolicyController extends ApplicationController {
+    static {
+      this.permissionsPolicy({}, function (this: PolicyController, f) {
+        const helpers = this.helpers() as unknown as Helpers;
+        if (!helpers.isPigsCanFly()) f.gyroscope(":none");
+        if (helpers.isSkyIsBlue()) f.usb(":self");
+      });
+    }
+
+    index(): void {
+      this.head("ok");
+    }
+  }
+  type Helpers = { isPigsCanFly(): boolean; isSkyIsBlue(): boolean };
+
+  const ROUTES = new RouteSet();
+  ROUTES.draw(function () {
+    this.scope({ module: "permissions_policy_with_helpers_integration_test" }, () => {
+      this.get("/", { to: "policy#index" });
+    });
+  });
+
+  const POLICY = new PermissionsPolicy((p) => {
+    p.gyroscope(":self");
+  });
+
+  class PolicyConfigMiddleware {
+    constructor(private app: RackApp) {}
+
+    call(env: RackEnv): Promise<RackResponse> {
+      env["action_dispatch.permissions_policy"] = POLICY;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app(env);
+    }
+  }
+
+  const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
+    middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
+    middleware.use(Middleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
+  });
+
+  controllerConstants.set(
+    "permissions_policy_with_helpers_integration_test/policy",
+    PolicyController,
+  );
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
+    t.app = APP;
+  });
+
+  function assertPolicy(expected: string): void {
+    t.assertResponse("success");
+    assertEqual(expected, t.response.headers.get(FEATURE_POLICY));
+  }
+
+  it("generates permissions policy header", async () => {
+    await t.get("/");
+    assertPolicy("gyroscope 'none'; usb 'self'");
   });
 });
 

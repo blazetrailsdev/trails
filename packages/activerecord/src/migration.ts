@@ -12,7 +12,6 @@ import {
   symbolizeKeys,
   Autoload,
   Benchmark,
-  TopLevel,
   extend,
   type Extended,
   wrap,

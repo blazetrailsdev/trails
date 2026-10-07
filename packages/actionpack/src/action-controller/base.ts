@@ -309,12 +309,26 @@ export const PROTECTED_IVARS: readonly string[] = [
   "_renderedFormat",
 ];
 
+declare class RequestForgeryProtectionPrivate {
+  /** @internal */
+  protected verifyAuthenticityToken(): void;
+  /** @internal */
+  protected verifySameOriginRequest(): void;
+  /** @internal */
+  protected formAuthenticityToken(options?: {
+    formOptions?: { action?: string; method?: string };
+  }): string;
+  /** @internal */
+  protected isProtectAgainstForgery(): boolean;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base
   extends
     Included<typeof HttpAuthentication.Basic.ControllerMethods>,
     Included<typeof HttpAuthentication.Digest.ControllerMethods>,
-    Included<typeof HttpAuthentication.Token.ControllerMethods> {
+    Included<typeof HttpAuthentication.Token.ControllerMethods>,
+    RequestForgeryProtectionPrivate {
   render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void>;
   /** @internal */
   renderToBody(options?: Record<string, unknown>): unknown;
@@ -335,13 +349,9 @@ export interface Base
   redirectBackOrTo: typeof redirectBackOrTo;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
-  isProtectAgainstForgery(): boolean;
-  verifyAuthenticityToken(): void;
-  formAuthenticityToken(options?: { formOptions?: { action?: string; method?: string } }): string;
   csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
   resetCsrfToken: typeof resetCsrfToken;
   commitCsrfToken: typeof commitCsrfToken;
-  verifySameOriginRequest(): void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

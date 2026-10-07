@@ -19,7 +19,6 @@ export class ThroughAssociation extends Association {
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
 
-  /** @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop */
   async preloadedRecords(): Promise<Base[]> {
     return (this._throughPreloadedRecords ??= await (async () => {
       const records: Base[] = [];
@@ -66,7 +65,6 @@ export class ThroughAssociation extends Association {
     return result;
   }
 
-  /** @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop */
   async runnableLoaders(): Promise<Association[]> {
     if (await this.dataAvailable()) {
       return [this];
@@ -81,7 +79,6 @@ export class ThroughAssociation extends Association {
     }
   }
 
-  /** @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop */
   async futureClasses(): Promise<(typeof Base)[]> {
     if (this.isRun()) {
       return [];

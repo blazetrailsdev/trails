@@ -1787,6 +1787,48 @@ describe("body call capture", () => {
           }
           return msgs;
         }
+        async cast(attributes: unknown[]) {
+          const records: object[] = [];
+          for (const attr of attributes) records.push((await this.create(attr)) as object);
+          return records;
+        }
+        async spread(loaders: unknown[]) {
+          const records: unknown[] = [];
+          for (const l of loaders) records.push(...(await this.create(l)));
+          return records;
+        }
+        syncSpread(loaders: unknown[]) {
+          const records: unknown[] = [];
+          for (const l of loaders) records.push(...this.build(l));
+          return records;
+        }
+        async any(sources: unknown[]) {
+          for (const source of sources) {
+            const target = await this.clause(source);
+            if (target ? this.render(target) : false) {
+              return true;
+            }
+          }
+          return false;
+        }
+        syncAny(sources: unknown[]) {
+          for (const source of sources) {
+            if (this.render(source)) return true;
+          }
+          return false;
+        }
+        async streamed(sources: AsyncIterable<unknown>) {
+          for await (const source of sources) {
+            if (await this.clause(source)) return true;
+          }
+          return false;
+        }
+        async finding(sources: unknown[]) {
+          for (const source of sources) {
+            if (await this.clause(source)) return source;
+          }
+          return null;
+        }
       }`,
     );
     const skeleton = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.skeleton;
@@ -1797,6 +1839,19 @@ describe("body call capture", () => {
     expect(skeleton("block")).toEqual(["loop:collect", "ref:clause", "if", "ref:render"]);
     expect(skeleton("skipping")).toEqual(["loop", "if", "ref:clause", "ref:push"]);
     expect(skeleton("syncBlock")).toEqual(["loop", "ref:render", "ref:push"]);
+    expect(skeleton("cast")).toEqual(["ref:map", "ref:create"]);
+    expect(skeleton("spread")).toEqual(["loop:collect", "ref:create"]);
+    expect(skeleton("syncSpread")).toEqual(["loop", "ref:push", "ref:build"]);
+    expect(skeleton("any")).toEqual([
+      "loop:predicate",
+      "ref:clause",
+      "if:predicate",
+      "if",
+      "ref:render",
+    ]);
+    expect(skeleton("syncAny")).toEqual(["loop", "if", "ref:render"]);
+    expect(skeleton("finding")).toEqual(["loop", "if", "ref:clause"]);
+    expect(skeleton("streamed")).toEqual(["loop", "if", "ref:clause"]);
   });
 
   it("reads a for-of that keeps its element on an awaited test as a filter", () => {

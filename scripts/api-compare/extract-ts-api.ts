@@ -5145,7 +5145,10 @@ function isRetryLoop(statement: ts.ForStatement | ts.WhileStatement): boolean {
  * concurrently. The body ends by pushing the block's value onto a local, and
  * nothing in it leaves an iteration early (a `continue` would make it a
  * `filter_map`, a `break` a `take_while`). A one-statement body must push the
- * awaited value itself, and is the `map`. A longer one must await somewhere,
+ * awaited value itself, cast or not, and is the `map`. One that spreads the
+ * awaited value is `block` too: it is a `flat_map`
+ * (`activerecord/lib/active_record/associations/preloader/through_association.rb:8`)
+ * or an `each` that `concat`s. A longer one must await somewhere,
  * and is `block`: Ruby spells the same loop `each` with a `<<`
  * (`activerecord/lib/active_record/connection_handling.rb:98-104`), so it is
  * marked `loop:collect` and compare.ts#foldSkeletonTokens reads it against the
@@ -5171,7 +5174,10 @@ function awaitedCollect(
     return undefined;
   }
   if (statements.length === 0) {
-    return ts.isAwaitExpression(pushed) ? { nodes: [pushed.expression], block: false } : undefined;
+    const value = ts.isSpreadElement(pushed) ? pushed.expression : pushed;
+    const awaited = unwrapTsExpression(value);
+    if (!ts.isAwaitExpression(awaited)) return undefined;
+    return { nodes: [awaited.expression], block: ts.isSpreadElement(pushed) };
   }
   let awaits = false;
   let exits = false;
@@ -5185,6 +5191,47 @@ function awaitedCollect(
   };
   [...statements, pushed].forEach(scan);
   return awaits && !exits ? { nodes: [...statements, pushed], block: true } : undefined;
+}
+
+/**
+ * The parts of a `for … of` that is an awaiting `any?` / `all?` / `none?`:
+ * `assoc.reader.any? { |source| … }`
+ * (`activerecord/lib/active_record/associations/collection_association.rb:508-516`)
+ * whose block awaits in the port, so `Array#some` cannot carry it: a
+ * callback's promise is always truthy. The body ends in an `if` with no
+ * `else` whose only statement returns a boolean literal, it awaits before or
+ * inside that test, and nothing else leaves an iteration early. What follows
+ * the loop is not constrained: that `any?` is the left operand of a `||`, so
+ * its port falls through to the right one. A `for await … of` walks an async
+ * iterable, not an Array, and is not one. The loop and
+ * that `if` are marked `loop:predicate` / `if:predicate`, and
+ * compare.ts#foldSkeletonTokens reads them against the Ruby stream.
+ */
+function awaitedPredicate(
+  statement: ts.ForOfStatement,
+): { statements: ts.Statement[]; test: ts.Expression } | undefined {
+  if (statement.awaitModifier !== undefined) return undefined;
+  const body = statement.statement;
+  const statements = ts.isBlock(body) ? [...body.statements] : [body];
+  const last = statements.pop();
+  if (!last || !ts.isIfStatement(last) || last.elseStatement !== undefined) return undefined;
+  const then = last.thenStatement;
+  const returned = ts.isBlock(then) && then.statements.length === 1 ? then.statements[0] : then;
+  if (!ts.isReturnStatement(returned) || returned.expression === undefined) return undefined;
+  const kind = returned.expression.kind;
+  if (kind !== ts.SyntaxKind.TrueKeyword && kind !== ts.SyntaxKind.FalseKeyword) return undefined;
+  let awaits = false;
+  let exits = false;
+  const scan = (n: ts.Node): void => {
+    if (ts.isFunctionLike(n)) return;
+    if (ts.isAwaitExpression(n)) awaits = true;
+    if (ts.isContinueStatement(n) || ts.isBreakStatement(n) || ts.isReturnStatement(n)) {
+      exits = true;
+    }
+    ts.forEachChild(n, scan);
+  };
+  [...statements, last.expression].forEach(scan);
+  return awaits && !exits ? { statements, test: last.expression } : undefined;
 }
 
 /**
@@ -5968,6 +6015,15 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           visit((n as ts.ForOfStatement).expression);
           tokens.push(collected.block ? "loop:collect" : "ref:map");
           collected.nodes.forEach(visit);
+          return;
+        }
+        const some = awaitedPredicate(n as ts.ForOfStatement);
+        if (some !== undefined) {
+          visit((n as ts.ForOfStatement).expression);
+          tokens.push("loop:predicate");
+          some.statements.forEach(visit);
+          tokens.push("if:predicate");
+          visit(some.test);
           return;
         }
         const predicate = awaitedFilter(n as ts.ForOfStatement);
