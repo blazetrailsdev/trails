@@ -1,6 +1,6 @@
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import { fetch, merge } from "@blazetrails/ruby-compat";
-import { asJson, getEnv, onLoad } from "@blazetrails/activesupport";
+import { asJson, classAttribute, getEnv, included, onLoad } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { UnknownPrimaryKey } from "./errors.js";
@@ -17,6 +17,20 @@ onLoad("active_record", function (this: typeof Base) {
   const secret = resolveSecret();
   this.generatedTokenVerifier ??= secret === null ? null : new MessageVerifier(secret);
 });
+
+export const TokenFor = {
+  [included](base: object): void {
+    classAttribute.call(base, "tokenDefinitions", {
+      instanceAccessor: false,
+      instancePredicate: false,
+      default: {},
+    });
+    classAttribute.call(base, "generatedTokenVerifier", {
+      instanceAccessor: false,
+      instancePredicate: false,
+    });
+  },
+};
 
 export class TokenDefinition {
   readonly definingClass: typeof Base;

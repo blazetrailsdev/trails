@@ -1,6 +1,12 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { Rational, max } from "@blazetrails/ruby-compat";
-import { currentTimeInstant, filterMap, indexWith } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  currentTimeInstant,
+  filterMap,
+  included,
+  indexWith,
+} from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { defaultTimezone } from "./active-record.js";
 
@@ -36,7 +42,7 @@ interface TimestampInstanceHost {
   clearAttributeChange?(name: string): void;
   hasChangesToSave?: boolean;
   id?: unknown;
-  recordTimestamps?: boolean;
+  recordTimestamps: boolean;
   timestampAttributesForUpdateInModel(): readonly string[];
   allTimestampAttributesInModel(): readonly string[];
   currentTimeFromProperTimezone(): RubyTime;
@@ -132,7 +138,7 @@ export async function _createRecord(
   this: TimestampInstanceHost,
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
-  if ((this.recordTimestamps ?? this.constructor.recordTimestamps) !== false) {
+  if (this.recordTimestamps) {
     const currentTime = this.currentTimeFromProperTimezone();
 
     for (const column of this.allTimestampAttributesInModel()) {
@@ -184,9 +190,8 @@ export async function recordUpdateTimestamps<T>(
 
 /** @internal */
 export function shouldRecordTimestamps(this: TimestampInstanceHost): boolean {
-  const recordTs = this.recordTimestamps ?? this.constructor.recordTimestamps;
   return (
-    recordTs !== false && (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
+    this.recordTimestamps && (!this.constructor.partialUpdates || this.hasChangesToSave !== false)
   );
 }
 
@@ -209,6 +214,9 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
 }
 
 export const Timestamp = {
+  [included](base: object): void {
+    classAttribute.call(base, "recordTimestamps", { default: true });
+  },
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): readonly string[] {

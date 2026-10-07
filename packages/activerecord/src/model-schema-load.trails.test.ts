@@ -86,7 +86,9 @@ describe("loadSchemaFromAdapter", () => {
 
   it("reflects on a concrete subclass of an abstract parent", async () => {
     class ApplicationRecord extends Base {
-      static override _abstractClass = true;
+      static {
+        this.abstractClass = true;
+      }
     }
     class Post extends ApplicationRecord {
       static override tableName = "posts";

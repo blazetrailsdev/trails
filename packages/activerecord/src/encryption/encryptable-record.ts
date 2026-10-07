@@ -1,7 +1,13 @@
 import { Scheme, type SchemeOptions } from "./scheme.js";
 import { Configuration } from "./errors.js";
 import { type ValueType } from "@blazetrails/activemodel";
-import { extractOptionsBang, filterMap, kernelArray as Array } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  extractOptionsBang,
+  filterMap,
+  included,
+  kernelArray as Array,
+} from "@blazetrails/activesupport";
 import { Module, include } from "@blazetrails/ruby-compat";
 import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
@@ -33,6 +39,15 @@ function schemeFor(options: SchemeOptions): Scheme {
 const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
 export class EncryptableRecord {
+  static [included](base: any): void {
+    classAttribute.call(base, "encryptedAttributes");
+
+    base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
+      if: (record: any) =>
+        hasEncryptedAttributes.call(record) && Encryption.context.frozenEncryption,
+    });
+  }
+
   /**
    * @internal
    * @noRailsEquivalent CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection

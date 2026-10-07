@@ -38,6 +38,8 @@ export function methodMissing(
   }
 }
 
+export const DynamicMatchers = { respondToMissing, methodMissing };
+
 export class Method {
   static matchers: (typeof Method)[] = [];
 
