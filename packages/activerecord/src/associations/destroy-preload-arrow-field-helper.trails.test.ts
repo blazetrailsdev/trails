@@ -10,6 +10,7 @@ import {
   Client,
 } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
+import { captureSql } from "../testing/sql-capture.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 class ArrowFieldAccount extends Base {
@@ -65,6 +66,31 @@ interface ProtoHelperAccount {
   set firm(value: Company | null);
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class ReentrantDestroyAccount extends Base {
+  static _tableName = "accounts";
+  declare firm_id: number;
+
+  static _reentrantResult: unknown = undefined;
+
+  static {
+    this.belongsTo("firm", { className: "Company" });
+    this.beforeDestroy(async function (
+      this: ReentrantDestroyAccount,
+      record?: ReentrantDestroyAccount,
+    ) {
+      const account = record ?? this;
+      void account.firm;
+      ReentrantDestroyAccount._reentrantResult = await account.destroy();
+    });
+  }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface ReentrantDestroyAccount {
+  get firm(): Company | null | Promise<Company | null>;
+  set firm(value: Company | null);
+}
+
 describe("destroy belongs_to preload through arrow-field helper", () => {
   const { accounts } = fixtures(["companies", "accounts"]);
 
@@ -85,9 +111,11 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     registerSubclass(Client);
     registerModel("ArrowFieldAccount", ArrowFieldAccount);
     registerModel("ProtoHelperAccount", ProtoHelperAccount);
+    registerModel("ReentrantDestroyAccount", ReentrantDestroyAccount);
     await Company.loadSchema();
     await ArrowFieldAccount.loadSchema();
     await ProtoHelperAccount.loadSchema();
+    await ReentrantDestroyAccount.loadSchema();
   });
 
   it("preloads the belongs_to a destroy callback reads through an arrow-field helper", async () => {
@@ -112,5 +140,18 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
 
     expect(ProtoHelperAccount._seenFirmIsThenable).toBe(false);
     expect(ProtoHelperAccount._seenFirmId).toBe(account.firm_id);
+  });
+
+  it("a re-entrant destroy answers true and does not load the belongs_to again", async () => {
+    ReentrantDestroyAccount._reentrantResult = undefined;
+    const account = await ReentrantDestroyAccount.find(
+      (accounts("signals37") as { id: number }).id,
+    );
+
+    const sqls = await captureSql(() => account.destroy());
+
+    expect(ReentrantDestroyAccount._reentrantResult).toBe(true);
+    expect(sqls.filter((sql) => /^SELECT\b.*\bcompanies\b/i.test(sql))).toHaveLength(1);
+    expect(account.isDestroyed()).toBe(true);
   });
 });
