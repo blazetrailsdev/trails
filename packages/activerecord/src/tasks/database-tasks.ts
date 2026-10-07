@@ -40,6 +40,8 @@ import { ActiveRecord } from "../namespaces.js";
 
 export class DatabaseNotSupported extends StandardError {}
 
+DatabaseNotSupported.prototype.name = "ActiveRecord::Tasks::DatabaseNotSupported";
+
 export type SchemaFormat = "ruby" | "sql";
 
 export class DatabaseTasks {

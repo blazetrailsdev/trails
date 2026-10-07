@@ -1,12 +1,13 @@
 import {
   getChildProcessAsync,
+  merge,
   rbEqq,
   RuntimeError,
   stderr,
   stdout,
   type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
-import { kernelArray, merge } from "@blazetrails/activesupport";
+import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";

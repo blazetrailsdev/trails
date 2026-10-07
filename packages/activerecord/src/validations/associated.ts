@@ -1,5 +1,6 @@
 import { EachValidator } from "@blazetrails/activemodel";
-import { any, kernelArray, merge } from "@blazetrails/activesupport";
+import { any, kernelArray } from "@blazetrails/activesupport";
+import { merge } from "@blazetrails/ruby-compat";
 
 export function validatesAssociated(
   this: {

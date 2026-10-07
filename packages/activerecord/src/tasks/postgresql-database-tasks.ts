@@ -1,8 +1,9 @@
-import { isBlank, kernelArray, merge, Tempfile } from "@blazetrails/activesupport";
+import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
   getChildProcessAsync,
+  merge,
   rbEqq,
   RuntimeError,
   stderr,
