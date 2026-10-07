@@ -308,6 +308,8 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
 }
 
 function yearOf(value: TemporalDateLike): number {
+  // boundary: a JS Date is a Ruby Time (ruby-compat's rbClassOf), which quote admits.
+  if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
   if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
   return value.year;
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import type { Base } from "../base.js";
-import { _normalizeOptions } from "./rendering.js";
+import { include } from "@blazetrails/activesupport";
+import { Rendering } from "./rendering.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 
 declare module "@blazetrails/actionview" {
@@ -8,6 +9,14 @@ declare module "@blazetrails/actionview" {
     "render_types/post": { post: string; highlight?: boolean };
   }
 }
+
+class Host {
+  declare _normalizeOptions: (options: Record<string, unknown>) => Record<string, unknown>;
+}
+Object.setPrototypeOf(Host.prototype, { _normalizeOptions: (options: unknown) => options });
+include(Host, Rendering);
+const _normalizeOptions = (options: Record<string, unknown>): Record<string, unknown> =>
+  new Host()._normalizeOptions(options);
 
 describe("Rendering#_normalize_options status", () => {
   it("maps both spellings of a Rack status symbol that RenderOptions admits", () => {

@@ -7,11 +7,9 @@
  *   so the dispatcher branches on runtime shape.
  *
  *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
- *   accepts Ruby's native time objects; trails' analogue is Temporal, not JS
- *   `Date` — #939 ("close the dual-typed window") made Temporal the sole
- *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
- *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
- *   branches via the `quoted_date` self-send.
+ *   accepts Ruby's native time objects; trails' analogues are the Temporal
+ *   types, `Time`, `TimeWithZone`, and a JS `Date`, which ruby-compat classes
+ *   as `Time` (`rbClassOf`).
  *
  *   Rails' `when nil, Numeric, String then value` (quoting.rb:102) hands a
  *   Float to the driver unchanged. trails' whole-valued Float is a boxed
@@ -52,12 +50,12 @@ export type QuotedTimeValue = TimeValue | TimeWithZone | RubyTime;
 export type TemporalDateLike =
   | TimeWithZone
   | RubyTime
+  | Date
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
   | Temporal.PlainDate;
 
-/** @inventedArm if — CONVERGEABLE quoting-js-date-guard-arms-have-no-rails-counterpart */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "string" || value instanceof Chars) {
     return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
@@ -80,21 +78,17 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.ZonedDateTime
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Date
   ) {
     return `'${this.quotedDate(value)}'`;
   }
-  if (value instanceof Date)
-    throw new TypeError(
-      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
   if (typeof value === "function" && value.name) {
     return `'${value.name}'`;
   }
   throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
-/** @inventedArm if — CONVERGEABLE quoting-js-date-guard-arms-have-no-rails-counterpart */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof Chars) return value.toS();
   if (value instanceof BinaryData) return value.toString();
@@ -111,14 +105,11 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     value instanceof Temporal.Instant ||
     value instanceof Temporal.PlainDateTime ||
     value instanceof Temporal.PlainDate ||
-    value instanceof Temporal.ZonedDateTime
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Date
   ) {
     return this.quotedDate(value);
   }
-  if (value instanceof Date)
-    throw new TypeError(
-      "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
-    );
   throw new TypeError(`can't cast ${rbObjClassname(value)}`);
 }
 
@@ -229,7 +220,7 @@ export function typeCastedBinds(
   });
 }
 
-type TimeLike = TimeWithZone | RubyTime | Temporal.Instant | Temporal.ZonedDateTime;
+type TimeLike = TimeWithZone | RubyTime | Date | Temporal.Instant | Temporal.ZonedDateTime;
 
 /** @internal */
 export function lookupCastType(
@@ -251,6 +242,7 @@ function actsLikeTime(value: unknown): value is TimeLike {
   return (
     value instanceof TimeWithZone ||
     value instanceof RubyTime ||
+    value instanceof Date ||
     value instanceof Temporal.Instant ||
     value instanceof Temporal.ZonedDateTime
   );
@@ -259,6 +251,7 @@ function actsLikeTime(value: unknown): value is TimeLike {
 function instantOf(value: TimeLike): Temporal.Instant {
   if (value instanceof TimeWithZone) value = value.utc();
   if (value instanceof RubyTime) return value.toZonedDateTime().toInstant();
+  if (value instanceof Date) return Temporal.Instant.fromEpochMilliseconds(value.getTime());
   if (value instanceof Temporal.ZonedDateTime) return value.toInstant();
   return value;
 }
@@ -284,6 +277,7 @@ function toFsDb(value: TemporalDateLike): string {
   if (
     value instanceof TimeWithZone ||
     value instanceof RubyTime ||
+    value instanceof Date ||
     value instanceof Temporal.Instant
   ) {
     value = getutc(value);

@@ -513,85 +513,8 @@
   {
     "package": "actioncontroller",
     "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_normalize_options",
-    "digest": "271b5c69ec854b31",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_normalize_text",
-    "digest": "cdeaf81c9378b79f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_process_options",
-    "digest": "40e852079cb768b1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_process_variant",
-    "digest": "5367879b2fce514b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_render_in_priorities",
-    "digest": "b56d9152d3418829",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_set_html_content_type",
-    "digest": "49613a7137ff7b7f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_set_rendered_content_type",
-    "digest": "02d6b0333214e09b",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "_set_vary_header",
-    "digest": "fa24b042e4aeb84f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "process_action",
-    "digest": "267e83f1a7f29b00",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "render",
-    "digest": "115cc5659b81e077",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
     "rubyName": "render_to_body",
     "digest": "04efee3599017c31",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "api/api_rendering.rb",
-    "rubyName": "render_to_string",
-    "digest": "01c82edf8e6b62c2",
     "ref": "v8.0.2"
   },
   {
@@ -809,20 +732,6 @@
     "rubyFile": "base.rb",
     "rubyName": "rate_limiting",
     "digest": "895ca33f785077d2",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "render",
-    "digest": "115cc5659b81e077",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "actioncontroller",
-    "rubyFile": "base.rb",
-    "rubyName": "render_to_body",
-    "digest": "eb7737d8e28a5525",
     "ref": "v8.0.2"
   },
   {

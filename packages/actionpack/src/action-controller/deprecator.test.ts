@@ -26,13 +26,13 @@ describe("ActionController.addRenderer / removeRenderer", () => {
     const block = (value: unknown) => String(value);
     addRenderer(KEY, block);
     expect(Renderers.RENDERERS.has(KEY)).toBe(true);
-    expect(Renderers.get(KEY)).toBe(block);
+    expect(Renderers.instanceMethod(`_render_with_renderer_${KEY}`)!.value).toBe(block);
   });
 
   it("removeRenderer deregisters via Renderers.remove", () => {
     addRenderer(KEY, () => "");
     removeRenderer(KEY);
     expect(Renderers.RENDERERS.has(KEY)).toBe(false);
-    expect(Renderers.get(KEY)).toBeUndefined();
+    expect(Renderers.isMethodDefined(`_render_with_renderer_${KEY}`)).toBe(false);
   });
 });

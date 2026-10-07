@@ -1,5 +1,4 @@
 import {
-  Benchmark,
   SafeBuffer,
   classAttribute,
   mattrAccessor,
@@ -176,7 +175,8 @@ import {
   Rendering,
   renderToString,
 } from "./metal/rendering.js";
-import { _renderToBodyWithRenderer } from "./metal/renderers.js";
+import type { Renderer } from "./renderer.js";
+import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
 import { urlOptions } from "./metal/url-for.js";
 import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
 import type {
@@ -319,6 +319,9 @@ export interface Base
     Included<typeof HttpAuthentication.Basic.ControllerMethods>,
     Included<typeof HttpAuthentication.Digest.ControllerMethods>,
     Included<typeof HttpAuthentication.Token.ControllerMethods> {
+  render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void>;
+  /** @internal */
+  renderToBody(options?: Record<string, unknown>): unknown;
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   viewRuntime: number | null;
@@ -457,25 +460,6 @@ export class Base extends Metal {
     return PROTECTED_IVARS;
   }
 
-  render<P extends string = string>(...args: RenderArgs<P>): void | Promise<void> {
-    let renderOutput: void | Promise<void>;
-    const viewRuntime = this.cleanupViewRuntime(() =>
-      Benchmark.realtime(":float_millisecond", () => {
-        if (this.responseBody != null) throw new DoubleRenderError();
-        return (renderOutput = (
-          super["render" as never] as (...args: unknown[]) => void | Promise<void>
-        ).call(this, ...args));
-      }),
-    ) as number | Promise<number>;
-    if (typeof viewRuntime === "number") {
-      this.viewRuntime = viewRuntime;
-      return renderOutput!;
-    }
-    return viewRuntime.then((ms) => {
-      this.viewRuntime = ms;
-    });
-  }
-
   /** @internal */
   _prefixes = _prefixes;
 
@@ -513,18 +497,6 @@ export class Base extends Metal {
   isAnyTemplates = isAnyTemplates;
 
   declare defaultRender: typeof defaultRender;
-
-  /** @internal */
-  renderToBody(options: Record<string, unknown> = {}): unknown {
-    const renderer = this._renderToBodyWithRenderer(options);
-    if (renderer != null && renderer !== false) return renderer;
-    const body = (
-      super["renderToBody" as never] as (options: Record<string, unknown>) => unknown
-    ).call(this, options);
-    return typeof (body as PromiseLike<unknown> | null)?.then === "function"
-      ? Promise.resolve(body).then((body) => this.drainStreamingBody(body))
-      : body;
-  }
 
   /**
    * @internal
@@ -587,6 +559,8 @@ export class Base extends Metal {
 
   static logAt = logAt;
   static logProcessAction = logProcessAction;
+  declare static renderer: Renderer;
+  declare static setupRendererBang: () => void;
 
   static defaultFormBuilder = defaultFormBuilder;
 
@@ -775,7 +749,7 @@ classAttribute.call(Base, "_layoutConditions", {
 });
 Base._writeLayoutMethod();
 include(Base, Rendering);
-Base.prototype._renderToBodyWithRenderer = _renderToBodyWithRenderer;
+include(Base, Renderers.All);
 include(Base, ConditionalGet);
 include(Base, EtagWithTemplateDigest);
 include(Base, EtagWithFlash);
@@ -799,6 +773,7 @@ extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Rescue);
 include(Base, Instrumentation);
 Base.prototype.redirectTo = _instrumentRedirectTo;
+Base.setupRendererBang();
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);

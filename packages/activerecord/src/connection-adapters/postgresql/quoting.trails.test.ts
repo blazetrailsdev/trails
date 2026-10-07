@@ -27,7 +27,7 @@ import {
   typeCast as typeCastFn,
   unescapeBytea,
 } from "./quoting.js";
-import { Range, TypeError } from "@blazetrails/ruby-compat";
+import { Range } from "@blazetrails/ruby-compat";
 
 const HOST = quotingHost({ quotedDate, quotedBinary });
 const quote = (value: unknown): string | null => quoteFn.call(HOST, value);
@@ -274,9 +274,8 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     });
   });
 
-  it("quote(new Date()) throws — Date is no longer accepted", () => {
-    expect(() => quote(new Date())).toThrow(TypeError);
-    expect(() => quote(new Date())).toThrow(/Temporal/);
+  it("quote(new Date()) quotes it as a Time", () => {
+    expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
   });
 
   it("quoted_date suffixes BC for proleptic years <= 0", () => {
@@ -333,8 +332,7 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     expect(typeCast(DateNegativeInfinity)).toBe("-infinity");
   });
 
-  it("typeCast(new Date()) throws — Date is no longer accepted", () => {
-    expect(() => typeCast(new Date())).toThrow(TypeError);
-    expect(() => typeCast(new Date())).toThrow(/Temporal/);
+  it("typeCast(new Date()) casts it as a Time", () => {
+    expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
   });
 });

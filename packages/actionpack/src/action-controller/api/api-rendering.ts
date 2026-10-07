@@ -1,29 +1,26 @@
-import * as rendering from "../metal/rendering.js";
+import { Concern, extend, include, Module } from "@blazetrails/activesupport";
+import { Rendering } from "../metal/rendering.js";
 
-/** @internal */
-export const renderToBody = rendering.renderToBody;
-/** @internal */
-export const render = rendering.render;
-/** @internal */
-export const renderToString = rendering.renderToString;
-/** @internal */
-export const processAction = rendering.processAction;
-/** @internal */
-export const _processVariant = rendering._processVariant;
-/** @internal */
-export const _renderInPriorities = rendering._renderInPriorities;
-/** @internal */
-export const _setHtmlContentType = rendering._setHtmlContentType;
-/** @internal */
-export const _setRenderedContentType = rendering._setRenderedContentType;
-/** @internal */
-export const _setVaryHeader = rendering._setVaryHeader;
-/** @internal */
-export const _normalizeOptions = rendering._normalizeOptions;
-/** @internal */
-export const _normalizeText = rendering._normalizeText;
-/** @internal */
-export const _processOptions = rendering._processOptions;
+export function renderToBody(
+  this: { _processOptions(options: Record<string, unknown>): unknown },
+  options: Record<string, unknown> = {},
+): unknown {
+  this._processOptions(options);
+  return ApiRendering.superMethod(this, "renderToBody")!(options);
+}
+
+export const ApiRendering = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      include(this, Rendering);
+    },
+  );
+
+  mod.defineMethod("renderToBody", renderToBody);
+});
 
 function resolveContentType(options: Record<string, unknown>, fallback: string): string {
   return typeof options.contentType === "string" ? options.contentType : fallback;

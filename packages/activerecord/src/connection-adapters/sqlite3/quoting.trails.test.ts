@@ -279,14 +279,14 @@ describe("SQLite3::Quoting", () => {
       expect(() => typeCast({})).toThrow(TypeError);
     });
 
-    it("throws on Date — Date is no longer accepted", () => {
-      expect(() => typeCast(new Date())).toThrow(TypeError);
+    it("casts a Date as a Time", () => {
+      expect(typeCast(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("2020-01-02 03:04:05");
     });
   });
 
   describe("quote(Date)", () => {
-    it("throws — Date is no longer accepted", () => {
-      expect(() => quote(new Date())).toThrow(TypeError);
+    it("quotes it as a Time", () => {
+      expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
     });
   });
 
