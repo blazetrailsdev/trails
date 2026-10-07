@@ -20,7 +20,7 @@ import type { Request } from "../../action-dispatch/http/request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-compat";
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
-import { Flash } from "./flash.js";
+import type { redirectTo as flashRedirectTo } from "./flash.js";
 
 export const Instrumentation = new Module((mod) => {
   extend(mod, Concern);
@@ -39,6 +39,7 @@ export const Instrumentation = new Module((mod) => {
   mod.defineMethod("render", render);
   mod.defineMethod("sendFile", sendFile);
   mod.defineMethod("sendData", sendData);
+  mod.defineMethod("redirectTo", redirectTo);
   mod.defineMethod("processAction", processAction);
   mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
   mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
@@ -137,13 +138,13 @@ export function sendData(
 
 export function redirectTo(
   this: InstrumentationHost,
-  ...args: Parameters<Flash["redirectTo"]>
+  ...args: Parameters<typeof flashRedirectTo>
 ): number {
   return Notifications.instrument(
     "redirect_to.action_controller",
     { request: this.request },
     (payload) => {
-      const result = Flash.prototype.redirectTo.call(this as never, ...args);
+      const result = Instrumentation.superMethod(this, "redirectTo")!(...args) as number;
       payload.status = this.response.status;
       payload.location = this.response.filteredLocation();
       return result;

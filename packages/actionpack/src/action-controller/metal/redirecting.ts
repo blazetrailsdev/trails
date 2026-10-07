@@ -4,14 +4,16 @@ import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
 import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
-import { include, included } from "@blazetrails/activesupport";
+import {
+  Concern,
+  Module,
+  extend,
+  include,
+  included,
+  mattrAccessor,
+} from "@blazetrails/activesupport";
 import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
-
-export class Redirecting {
-  static [included](base: LoggerIncludingClass): void {
-    include(base, Logger);
-  }
-}
+import { UrlFor } from "./url-for.js";
 
 export class UnsafeRedirectError extends Error {
   constructor(message?: string) {
@@ -214,3 +216,36 @@ export function _ensureUrlIsHttpHeaderSafe(this: unknown, url: string): void {
     );
   }
 }
+
+type IncludedBlock = { included(base: null, block: (this: object) => void): void };
+
+export const Redirecting: Module<{
+  redirectTo: typeof redirectTo;
+  redirectBack: typeof redirectBack;
+  redirectBackOrTo: typeof redirectBackOrTo;
+  _computeRedirectToLocation: typeof _computeRedirectToLocation;
+  urlFrom: typeof urlFrom;
+}> & { _computeRedirectToLocation: typeof _computeRedirectToLocation } = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as Record<symbol, unknown>)[included] = (base: LoggerIncludingClass): void => {
+    include(base, Logger);
+  };
+  include(mod, UrlFor);
+
+  (mod as unknown as IncludedBlock).included(null, function (this: object) {
+    mattrAccessor.call(this, "raiseOnOpenRedirects", { default: false });
+  });
+
+  mod.defineMethod("redirectTo", redirectTo);
+  mod.defineMethod("redirectBack", redirectBack);
+  mod.defineMethod("redirectBackOrTo", redirectBackOrTo);
+  mod.defineMethod("_computeRedirectToLocation", _computeRedirectToLocation);
+  mod.defineMethod("urlFrom", urlFrom);
+  mod.defineMethod("_allowOtherHost", _allowOtherHost);
+  mod.defineMethod("_extractRedirectToStatus", _extractRedirectToStatus);
+  mod.defineMethod("_enforceOpenRedirectProtection", _enforceOpenRedirectProtection);
+  mod.defineMethod("_urlHostAllowed", _urlHostAllowed);
+  mod.defineMethod("_ensureUrlIsHttpHeaderSafe", _ensureUrlIsHttpHeaderSafe);
+}) as never;
+Redirecting._computeRedirectToLocation = _computeRedirectToLocation;

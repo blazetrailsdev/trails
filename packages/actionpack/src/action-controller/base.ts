@@ -1,7 +1,6 @@
 import {
   SafeBuffer,
   classAttribute,
-  mattrAccessor,
   extend,
   include,
   type Included,
@@ -45,12 +44,12 @@ import {
   Flash,
   type RedirectToResponseOptionsAndFlash,
 } from "./metal/flash.js";
-import {
+import type {
   _computeRedirectToLocation,
   redirectBack,
   redirectBackOrTo,
   urlFrom,
-  type RedirectToOptions,
+  RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
@@ -115,7 +114,7 @@ import {
   RateLimiting,
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
-import { logAt } from "./metal/logging.js";
+import { Logging, type logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
 import { AssetPaths } from "../abstract-controller/asset-paths.js";
 import { Instrumentation, type logProcessAction } from "./metal/instrumentation.js";
@@ -174,8 +173,8 @@ import {
 } from "./metal/rendering.js";
 import type { Renderer } from "./renderer.js";
 import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
-import { urlOptions } from "./metal/url-for.js";
-import { UrlFor, type UrlForOptions } from "../action-dispatch/routing/url-for.js";
+import { UrlFor, type urlOptions } from "./metal/url-for.js";
+import type { UrlForOptions } from "../action-dispatch/routing/url-for.js";
 import type {
   PolymorphicArg,
   PolymorphicOptions,
@@ -185,7 +184,6 @@ import {
   appendInfoToPayload,
   cleanupViewRuntime,
   haltedCallbackHook,
-  redirectTo as _instrumentRedirectTo,
   sendData,
   sendFile,
 } from "./metal/instrumentation.js";
@@ -431,7 +429,6 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
-    this._urlOptions = null;
     this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
@@ -566,7 +563,7 @@ export class Base extends Metal {
 
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
-  static logAt = logAt;
+  declare static logAt: OmitThisParameter<typeof logAt>;
   declare static logProcessAction: typeof logProcessAction;
   declare static renderer: Renderer;
   declare static setupRendererBang: () => void;
@@ -711,13 +708,7 @@ classAttribute.call(Base, "helpersPath", { default: [] });
 classAttribute.call(Base, "includeAllHelpers", { default: true });
 Base.prototype.helpers = helpers;
 include(Base, UrlFor);
-Base.prototype.urlOptions = urlOptions;
 include(Base, Redirecting);
-mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
-Base.prototype.redirectBack = redirectBack;
-Base.prototype.redirectBackOrTo = redirectBackOrTo;
-Base.prototype.urlFrom = urlFrom;
-Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, ActionViewRendering);
 extend(Base, ViewPathsClassMethods);
 Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
@@ -755,11 +746,11 @@ include(Base, DataStreaming);
 include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);
-extend(Base, DefaultHeaders.ClassMethods);
+include(Base, DefaultHeaders);
+include(Base, Logging);
 include(Base, Rescue);
 include(Base, Instrumentation);
 include(Base, ParamsWrapper);
-Base.prototype.redirectTo = _instrumentRedirectTo;
 Base.setupRendererBang();
 
 runLoadHooks("action_controller_base", Base);

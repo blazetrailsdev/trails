@@ -1,5 +1,5 @@
 import type { Request } from "../../action-dispatch/http/request.js";
-import { Concern, Module, extend } from "@blazetrails/activesupport";
+import { Concern, Module, extend, initialize } from "@blazetrails/activesupport";
 import {
   UrlFor as AbstractControllerUrlFor,
   urlOptions as routingUrlOptions,
@@ -49,6 +49,10 @@ export function urlOptions(this: UrlForHost): Record<string, unknown> {
 export const UrlFor: Module<{ urlOptions: typeof urlOptions }> = new Module((mod) => {
   extend(mod, Concern);
   mod.include(AbstractControllerUrlFor);
+
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: UrlForHost): void {
+    this._urlOptions = null;
+  };
 
   mod.defineMethod("urlOptions", urlOptions);
 });

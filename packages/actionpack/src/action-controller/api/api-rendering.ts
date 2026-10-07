@@ -21,31 +21,3 @@ export const ApiRendering = new Module((mod) => {
 
   mod.defineMethod("renderToBody", renderToBody);
 });
-
-function resolveContentType(options: Record<string, unknown>, fallback: string): string {
-  return typeof options.contentType === "string" ? options.contentType : fallback;
-}
-
-export function renderForApi(options: Record<string, unknown>): {
-  body: string;
-  contentType: string;
-} {
-  if (options.json !== undefined) {
-    const body =
-      typeof options.json === "string" ? options.json : (JSON.stringify(options.json) ?? "null");
-    return { body, contentType: resolveContentType(options, "application/json; charset=utf-8") };
-  }
-  if (options.plain !== undefined) {
-    return {
-      body: String(options.plain),
-      contentType: resolveContentType(options, "text/plain; charset=utf-8"),
-    };
-  }
-  if (options.body !== undefined) {
-    return {
-      body: String(options.body),
-      contentType: resolveContentType(options, "application/octet-stream"),
-    };
-  }
-  return { body: "", contentType: resolveContentType(options, "application/json; charset=utf-8") };
-}
