@@ -11,7 +11,8 @@ import { defaultTimezone } from "../../active-record.js";
 export class Timezone {
   declare _timezone?: "utc" | "local";
 
-  static [initialize](this: Timezone, { timezone }: TimezoneOptions = {}): void {
+  static *[initialize](this: Timezone, { timezone }: TimezoneOptions = {}): Generator {
+    yield;
     this._timezone = timezone;
   }
 
