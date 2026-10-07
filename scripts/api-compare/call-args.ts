@@ -763,6 +763,22 @@ function stripBlockTailPadding(
   return tsArgs.slice(0, rubyArgs.length);
 }
 
+function stripKwargsLeadPadding(
+  rubyArgs: string[],
+  tsArgs: string[],
+  calleeSigs: ParamInfo[][] | undefined,
+): string[] {
+  if (tsArgs.length <= rubyArgs.length) return tsArgs;
+  if (!rubyArgs.at(-1)?.startsWith("kwargs{") || !tsArgs.at(-1)?.startsWith("kwargs{")) {
+    return tsArgs;
+  }
+  const from = rubyArgs.length - 1;
+  const to = tsArgs.length - 1;
+  if (!tsArgs.slice(from, to).every((arg) => arg === "nil")) return tsArgs;
+  if (!padsDefaultedParams(calleeSigs, from, to)) return tsArgs;
+  return [...tsArgs.slice(0, from), tsArgs[to]];
+}
+
 function stripForwardedLiteralBlock(
   ruby: CallSite,
   ts: CallSite,
@@ -1369,7 +1385,13 @@ export function compareCallArgs(
     ruby,
     ts,
     rubyArgs,
-    stripBlockTailPadding(ruby, ts, rubyArgs, normalizedTs, calleeSigs),
+    stripBlockTailPadding(
+      ruby,
+      ts,
+      rubyArgs,
+      stripKwargsLeadPadding(rubyArgs, normalizedTs, calleeSigs),
+      calleeSigs,
+    ),
     calleeSigs,
   );
 

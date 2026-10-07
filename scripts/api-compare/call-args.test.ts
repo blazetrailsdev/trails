@@ -488,6 +488,38 @@ describe("compareCallArgs ported-private receiver argument", () => {
   });
 });
 
+describe("compareCallArgs kwargs-lead nil padding", () => {
+  const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
+  const required = (name: string): ParamInfo => ({ name, kind: "required" });
+  const rubyCall = site("data_source_sql", ["kwargs{type=str:BASE TABLE}"]);
+  const tsCall = site("dataSourceSql", ["nil", "kwargs{type=str:BASE TABLE}"]);
+  const sig = [optional("name"), optional("options")];
+
+  it("ignores the padding when the callee declares the skipped positional optional", () => {
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [sig]).verdict).toBe("match");
+  });
+
+  it("still flags the padding when the callee requires the padded parameter", () => {
+    const valued = [required("name"), optional("options")];
+    expect(compareCallArgs(rubyCall, tsCall, undefined, [valued]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire without a callee signature to prove the padding inert", () => {
+    expect(compareCallArgs(rubyCall, tsCall).verdict).toBe("mismatch");
+  });
+
+  it("does not fire for a non-nil argument ahead of the kwargs", () => {
+    const valued = site("dataSourceSql", ["id:name", "kwargs{type=str:BASE TABLE}"]);
+    expect(compareCallArgs(rubyCall, valued, undefined, [sig]).verdict).toBe("mismatch");
+  });
+
+  it("does not fire when Ruby passes no kwargs", () => {
+    expect(compareCallArgs(site("data_source_sql", []), tsCall, undefined, [sig]).verdict).toBe(
+      "mismatch",
+    );
+  });
+});
+
 describe("compareCallArgs block-tail nil padding", () => {
   const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
   const required = (name: string): ParamInfo => ({ name, kind: "required" });

@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { pack } from "./array.js";
+import { chomp } from "./string/chomp.js";
 import { trTrans } from "./string/tr.js";
 
 const B64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -120,6 +121,24 @@ export class Base64 {
       if (c & 0x3) throw new ArgumentError("invalid base64");
     }
     return res;
+  }
+
+  /**
+   * `Base64.urlsafe_encode64` (`vendor/ruby/v3.3.11/lib/base64.rb:328`): the
+   * strict encoding with the URL-safe alphabet, and without its padding when
+   * `padding` is false.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.urlsafe_encode64`
+   * (`vendor/ruby/v3.3.11/lib/base64.rb:328`).
+   */
+  static urlsafeEncode64(bin: string, { padding = true }: { padding?: boolean } = {}): string {
+    let str = Base64.strictEncode64(bin);
+    if (!padding) {
+      const chomped = chomp(str, "==");
+      str = chomped !== str ? chomped : chomp(str, "=");
+    }
+    str = trTrans(str, "+/", "-_", false);
+    return str;
   }
 
   /**

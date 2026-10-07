@@ -42,6 +42,8 @@ import { Base } from "../base.js";
 const methods = requestForgeryProtection as unknown as Omit<CsrfController, "request">;
 
 const verbs = {
+  path: "/",
+  requestMethod: "POST",
   isGet(this: { method: string }): boolean {
     return this.method === "GET";
   },
@@ -421,6 +423,15 @@ describe("P20b/P20c smoke", () => {
     expect(
       maskedAuthenticityToken.call(c, { formOptions: { action: "/posts", method: "POST" } }),
     ).toBeTruthy();
+  });
+
+  it("compareWith{Global,Real}Token and isValidPerFormCsrfToken raise on a length mismatch", () => {
+    const c = tokenC({ perFormCsrfTokens: true });
+    const short = realCsrfToken.call(c).subarray(0, 8);
+    expect(() => compareWithRealToken.call(c, short)).toThrow("string length mismatch.");
+    expect(() => compareWithGlobalToken.call(c, short)).toThrow("string length mismatch.");
+    expect(() => isValidPerFormCsrfToken.call(c, short)).toThrow("string length mismatch.");
+    expect(isValidPerFormCsrfToken.call({ ...c, perFormCsrfTokens: false }, short)).toBe(false);
   });
 
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {

@@ -2143,8 +2143,6 @@ export interface PostgreSQLAdapter {
 
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
 
   /** @internal */
   fetchTypeMetadata(

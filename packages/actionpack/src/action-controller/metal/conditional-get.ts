@@ -109,7 +109,6 @@ export function expiresNow(this: ConditionalGetHost): void {
   hashReplace(this.response.cacheControl, { noCache: true });
 }
 
-/** @missingRailsArgs stale? — PERMANENT */
 export async function httpCacheForever(
   this: ConditionalGetHost,
   { public: public_ = false }: { public?: boolean } = {},

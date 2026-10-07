@@ -916,7 +916,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   async foreignTables(): Promise<string[]> {
-    const names = await this.queryValues(this.dataSourceSql({ type: "FOREIGN TABLE" }), "SCHEMA");
+    const names = await this.queryValues(
+      this.dataSourceSql(undefined, { type: "FOREIGN TABLE" }),
+      "SCHEMA",
+    );
     return names as string[];
   }
 
@@ -1546,18 +1549,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    name: string | null | { type?: string } = null,
-    options: { type?: string } = {},
-  ): string {
-    if (typeof name === "object" && name !== null) {
-      options = name;
-      name = null;
-    }
+  dataSourceSql(name: string | null = null, options: { type?: string } = {}): string {
     const scope = this.quotedScope(name, { type: options.type });
     scope.type ||= "'r','v','m','p','f'";
 

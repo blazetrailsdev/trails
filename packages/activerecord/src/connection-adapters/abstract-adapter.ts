@@ -424,8 +424,6 @@ export interface AbstractAdapter
   viewExists(viewName: string): Promise<boolean | null>;
   /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
   tableComment(tableName: string): Promise<string | null>;

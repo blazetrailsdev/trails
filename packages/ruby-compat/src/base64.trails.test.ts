@@ -40,6 +40,19 @@ describe("Base64", () => {
     }
   });
 
+  it("urlsafe_encode64 maps the URL-safe alphabet and drops padding on request", () => {
+    expect(Base64.urlsafeEncode64("\xfb\xef\xbe")).toBe("----");
+    expect(Base64.urlsafeEncode64("\xff\xff\xff")).toBe("____");
+    expect(Base64.urlsafeEncode64("*")).toBe("Kg==");
+    expect(Base64.urlsafeEncode64("*", { padding: false })).toBe("Kg");
+    expect(Base64.urlsafeEncode64("12345", { padding: false })).toBe("MTIzNDU");
+    expect(Base64.urlsafeEncode64("123", { padding: false })).toBe("MTIz");
+    expect(Base64.urlsafeEncode64("12345")).toBe("MTIzNDU=");
+    expect(Base64.urlsafeEncode64("\x00\x7f\x80\xff")).toBe("AH-A_w==");
+    expect(Base64.urlsafeEncode64("\x00\x7f\x80\xff", { padding: false })).toBe("AH-A_w");
+    expect(Base64.urlsafeEncode64("\x80\xff\xfe\xfd\xfc", { padding: false })).toBe("gP_-_fw");
+  });
+
   it("urlsafe_decode64 pads unpadded input and maps the URL-safe alphabet", () => {
     expect(Base64.urlsafeDecode64("AH-A_w")).toBe("\x00\x7f\x80\xff");
     expect(Base64.urlsafeDecode64("AH-A_w==")).toBe("\x00\x7f\x80\xff");

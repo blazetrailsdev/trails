@@ -63,20 +63,20 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
 }
 
 export async function indexes(
-  adapter: DatabaseAdapter,
+  this: SQLite3SchemaAdapter,
   tableName: string,
 ): Promise<IndexDefinition[]> {
   const rows = (
-    await adapter.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
+    await this.internalExecQuery(`PRAGMA index_list(${quoteTableName(tableName)})`, "SCHEMA")
   ).toArray() as Array<{ name: string; unique: number; origin: string }>;
   const result: IndexDefinition[] = [];
   for (const idx of rows) {
     if (idx.name.startsWith("sqlite_")) continue;
 
-    const indexSql = (await adapter.queryValue(
-      `SELECT sql FROM sqlite_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index' ` +
+    const indexSql = (await this.queryValue(
+      `SELECT sql FROM sqlite_master WHERE name = ${this.quote(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
-        `SELECT sql FROM sqlite_temp_master WHERE name = ${adapter.quote(idx.name)} AND type = 'index'`,
+        `SELECT sql FROM sqlite_temp_master WHERE name = ${this.quote(idx.name)} AND type = 'index'`,
       "SCHEMA",
     )) as string | null | undefined;
     const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
@@ -85,7 +85,7 @@ export async function indexes(
     if (where != null) where = where.replace(/\s*\/\*.*\*\/$/, "");
 
     const cols = (
-      await adapter.internalExecQuery(`PRAGMA index_info(${adapter.quote(idx.name)})`, "SCHEMA")
+      await this.internalExecQuery(`PRAGMA index_info(${this.quote(idx.name)})`, "SCHEMA")
     ).toArray() as Array<{ name: string | null }>;
     const columnNames = cols.map((c) => c.name);
 
@@ -346,14 +346,9 @@ export function isColumnTheRowid(
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
-  name?: string | null | { type?: string },
-  options: { type?: string } = {},
+  name: string | null = null,
+  { type }: { type?: string } = {},
 ): string {
-  if (name != null && typeof name === "object") {
-    options = name;
-    name = null;
-  }
-  const { type } = options;
   const scope = quotedScope.call(this, name ?? undefined, { type });
   if (!scope.type) scope.type = "'table','view'";
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
