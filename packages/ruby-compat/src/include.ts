@@ -1533,6 +1533,8 @@ export function rbObjAlloc<T>(klass: { prototype: T }): T {
  * constructor can fill and that `initialize_copy` cannot write afterwards (a
  * `RegExp`'s source, a `Date`'s time value), so those are built from `obj`
  * here, where MRI's allocator and `init_copy` are two steps.
+ *
+ * @noRailsEquivalent PERMANENT
  */
 function allocLike(obj: object, proto: object | null): object {
   const klass = (proto as { constructor?: unknown } | null)?.constructor;
