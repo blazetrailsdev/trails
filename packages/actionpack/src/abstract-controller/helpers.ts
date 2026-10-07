@@ -74,13 +74,11 @@ export function modulesForHelpers(
   });
 }
 
-export function allHelpersFromPath(path: string | readonly string[]): string[] {
-  const helpers = kernelArray(path as string | string[]).flatMap((_path) => {
+/** @inventedArm replaceAll — PERMANENT */
+export function allHelpersFromPath(path: string | string[]): string[] {
+  const helpers = kernelArray(path).flatMap((_path) => {
     const names = Dir.glob(`${_path}/**/*{-,_}helper.{ts,js,rb}`).map((file) =>
-      file
-        .slice(String(_path).length + 1)
-        .replace(/[-_]helper\.(ts|js|rb)$/, "")
-        .replaceAll("-", "_"),
+      file.slice(String(_path).length + 1, -"_helper.rb".length).replaceAll("-", "_"),
     );
     return names.sort();
   });
@@ -90,9 +88,9 @@ export function allHelpersFromPath(path: string | readonly string[]): string[] {
 export function helperModulesFromPaths(
   this: {
     modulesForHelpers(modulesOrHelperPrefixes: HelperArgument[]): HelperMethodsModule[];
-    allHelpersFromPath(path: string | readonly string[]): string[];
+    allHelpersFromPath(path: string | string[]): string[];
   },
-  paths: string | readonly string[],
+  paths: string | string[],
 ): HelperMethodsModule[] {
   return this.modulesForHelpers(this.allHelpersFromPath(paths));
 }
@@ -132,9 +130,13 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
         )(rbFSend, attr, writer),
       );
       if (method !== attr) {
-        mod[method] = function (this: { controller: object }, ...args: unknown[]): unknown {
-          return rbFSend(this.controller, method, ...args);
-        };
+        Object.defineProperty(mod, method, {
+          value(this: { controller: object }, ...args: unknown[]): unknown {
+            return rbFSend(this.controller, method, ...args);
+          },
+          writable: true,
+          configurable: true,
+        });
       }
     });
   }

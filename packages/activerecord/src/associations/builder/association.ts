@@ -218,7 +218,7 @@ export class Association {
           Object.defineProperty(m, "_afterCommitJobs", {
             get(this: any) {
               return (
-                rbObjIvarGet(this, "@_after_commit_jobs") ||
+                rbObjIvarGet(this, "@_after_commit_jobs") ??
                 rbObjIvarSet(this, "@_after_commit_jobs", [])
               );
             },
