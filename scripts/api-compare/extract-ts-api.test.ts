@@ -12,6 +12,7 @@ import * as path from "path";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import {
+  loopedIncludeModules,
   resolveRelModule,
   declaringFile,
   extractClass,
@@ -123,6 +124,53 @@ function objectLiteralMethods(source: string): MethodInfo[] {
   });
   return out;
 }
+
+describe("loopedIncludeModules", () => {
+  function includeModArgs(source: string): string[][] {
+    const { sourceFile, checker } = compile(source);
+    const out: string[][] = [];
+    const walk = (node: ts.Node): void => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === "include"
+      ) {
+        const modArg = node.arguments[1];
+        out.push((loopedIncludeModules(modArg, checker) ?? [modArg]).map((e) => e.getText()));
+      }
+      ts.forEachChild(node, walk);
+    };
+    walk(sourceFile);
+    return out;
+  }
+
+  it("unrolls an include looped over a static array of modules", () => {
+    expect(
+      includeModArgs(`
+        declare function include(klass: unknown, mod: unknown): void;
+        declare const UrlFor: object, Renderers: { All: object };
+        class API {
+          static MODULES: object[] = [UrlFor, Renderers.All];
+        }
+        for (const mod of API.MODULES) {
+          include(API, mod);
+        }
+      `),
+    ).toEqual([["UrlFor", "Renderers.All"]]);
+  });
+
+  it("leaves a direct include and a loop over a non-literal alone", () => {
+    expect(
+      includeModArgs(`
+        declare function include(klass: unknown, mod: unknown): void;
+        declare const UrlFor: object, modules: object[];
+        class API {}
+        include(API, UrlFor);
+        for (const mod of modules) include(API, mod);
+      `),
+    ).toEqual([["UrlFor"], ["mod"]]);
+  });
+});
 
 describe("harvestObjectLiteralMethods", () => {
   it("reads a method whose name is a string literal", () => {
