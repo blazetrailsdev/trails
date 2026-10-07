@@ -9,6 +9,7 @@ import {
   RangeError,
   rbCInteger,
   rbCSymbol,
+  rbEqual,
 } from "@blazetrails/ruby-compat";
 import { Factory, MessagePack, Packer, UnknownExtTypeError, Unpacker } from "./index.js";
 
@@ -455,10 +456,10 @@ describe("MessagePack::Factory", () => {
       const t = Time.now();
 
       const dm1 = new DummyTimeStamp1(t.toI(), t.usec);
-      expect(MessagePack.unpack(MessagePack.pack(dm1))).toEqual(dm1);
+      expect(rbEqual(MessagePack.unpack(MessagePack.pack(dm1)), dm1)).toBe(true);
 
       const dm2 = new DummyTimeStamp1(t.toI(), t.usec);
-      expect(MessagePack.unpack(MessagePack.pack(dm2))).toEqual(dm2);
+      expect(rbEqual(MessagePack.unpack(MessagePack.pack(dm2)), dm2)).toBe(true);
     });
   });
 
