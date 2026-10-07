@@ -464,7 +464,7 @@ describe("SQLite adapter driver binding", () => {
     expect(isClosed()).toBe(true);
   });
 
-  it("pool drainPendingCloses drains a checkout-failure swap discard", async () => {
+  it("pool drains a checkout-failure swap discard", async () => {
     const { driver, release, isClosed } = gatedCloseDriver();
     let failCheckout = false;
     const pool = new ConnectionPool(

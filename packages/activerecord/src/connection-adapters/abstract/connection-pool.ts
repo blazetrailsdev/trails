@@ -731,7 +731,7 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   * @noRailsEquivalent CONVERGEABLE with-connection-sync-is-a-lease-no-claude-md-section-ratifies
    */
   withConnectionSync<T>(
     fn: (conn: DatabaseAdapter) => T,

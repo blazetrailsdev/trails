@@ -1131,7 +1131,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   return this;
 }
 
-/** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
+/** @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
   return (this._arel ??= this.model
     .connectionPool()

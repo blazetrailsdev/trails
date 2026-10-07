@@ -2109,7 +2109,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @noRailsEquivalent CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   * @noRailsEquivalent PERMANENT
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this.pool.schemaReflection;
