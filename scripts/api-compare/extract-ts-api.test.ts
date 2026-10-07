@@ -2079,7 +2079,7 @@ describe("body call capture", () => {
     expect(lazy.calls ?? []).not.toContain("@import");
   });
 
-  it("marks setTimeout as the native form of Kernel#sleep, and setInterval not at all", () => {
+  it("marks only a promise-settling setTimeout as the native form of Kernel#sleep", () => {
     const cls = extractFromSource(
       `class Foo {
         backoff(counter: number): Promise<void> {
@@ -2088,12 +2088,20 @@ describe("body call capture", () => {
         poll(): void {
           setInterval(() => this.backoff(1), 1000);
         }
+        deadline(): void {
+          setTimeout(() => this.reap(), 1000);
+        }
+        schedule(tick: () => void): void {
+          setTimeout(tick, 1000);
+        }
+        reap(): void {}
       }`,
     );
-    const backoff = cls.instanceMethods.find((m) => m.name === "backoff")!;
-    expect(backoff.calls).toContain("@timer");
-    const poll = cls.instanceMethods.find((m) => m.name === "poll")!;
-    expect(poll.calls ?? []).not.toContain("@timer");
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
+    expect(calls("backoff")).toContain("@timer");
+    expect(calls("poll")).not.toContain("@timer");
+    expect(calls("deadline")).not.toContain("@timer");
+    expect(calls("schedule")).not.toContain("@timer");
   });
 
   it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {

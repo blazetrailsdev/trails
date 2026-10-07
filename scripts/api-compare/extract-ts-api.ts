@@ -6480,6 +6480,42 @@ function isFunctionArgument(node: ts.Node): boolean {
   return ts.isExpression(node) && isMarkedBlockArg(node);
 }
 
+/**
+ * The settle parameter of `new Promise((resolve) => …)` — the name a
+ * suspension's timer callback must be, for {@link isSuspensionTimer}. A
+ * `Promise` constructed with anything but a single function argument, or whose
+ * executor takes no named first parameter, has no settler.
+ */
+function promiseSettlerName(n: ts.NewExpression): string | undefined {
+  if (!ts.isIdentifier(n.expression) || n.expression.text !== "Promise") return undefined;
+  const args = n.arguments ?? [];
+  if (args.length !== 1) return undefined;
+  const executor = args[0];
+  if (!ts.isArrowFunction(executor) && !ts.isFunctionExpression(executor)) return undefined;
+  const settle = executor.parameters[0]?.name;
+  return settle !== undefined && ts.isIdentifier(settle) ? settle.text : undefined;
+}
+
+/**
+ * Whether a call is the one-shot SUSPENSION that ports `Kernel#sleep` — a
+ * `setTimeout` whose callback is the settle parameter of an enclosing
+ * `new Promise`, the whole of `new Promise((resolve) => setTimeout(resolve, ms))`.
+ * A `setTimeout` that schedules work (a deadline, a retry, a callback) is not
+ * a suspension and credits nothing, which is what keeps the `sleep` row in
+ * {@link NATIVE_FORM_ANALOGUES} scoped to the form its rationale covers.
+ */
+function isSuspensionTimer(
+  callee: string,
+  n: ts.CallExpression,
+  promiseSettlers: readonly string[],
+): boolean {
+  if (callee !== "setTimeout") return false;
+  const callback = n.arguments[0];
+  return (
+    callback !== undefined && ts.isIdentifier(callback) && promiseSettlers.includes(callback.text)
+  );
+}
+
 function collectCalls(
   node: ts.Node | undefined,
   skipHoistedClosures = false,
@@ -6520,6 +6556,7 @@ function collectCalls(
   const tally = (map: Map<string, number>, name: string): void => {
     map.set(name, (map.get(name) ?? 0) + 1);
   };
+  const promiseSettlers: string[] = [];
   const visit = (n: ts.Node): void => {
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
@@ -6537,7 +6574,10 @@ function collectCalls(
         names.add("constructor");
         tally(occurrences, "constructor");
       }
+      const settler = promiseSettlerName(n);
+      if (settler !== undefined) promiseSettlers.push(settler);
       for (const block of blocks) visit(block);
+      if (settler !== undefined) promiseSettlers.pop();
       return;
     } else if (ts.isCallExpression(n)) {
       // Receiver, then the ARGUMENTS, then the call itself — Ruby's EVALUATION
@@ -6564,7 +6604,7 @@ function collectCalls(
         if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
           names.add(`${NATIVE_FORM_PREFIX}String`);
         }
-        if (!skipHoistedClosures && callee.text === "setTimeout") {
+        if (!skipHoistedClosures && isSuspensionTimer(callee.text, n, promiseSettlers)) {
           names.add(`${NATIVE_FORM_PREFIX}timer`);
         }
       } else if (ts.isPropertyAccessExpression(callee)) {

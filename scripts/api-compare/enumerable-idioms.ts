@@ -239,13 +239,19 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `DEFAULT_ENV()`), and a `(callable || block).call`
  *   (`activerecord/lib/active_record/statement_cache.rb:133`) is credited by
  *   an invocation of either operand.
- * - `sleep` → `timer`: a `setTimeout(...)` call —
- *   `Kernel#sleep` (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`)
- *   suspends the thread and returns the seconds slept, and a JS port awaits
- *   `new Promise((resolve) => setTimeout(resolve, ms))`, which records no
- *   callee named `sleep`. `setInterval` is NOT marked: it repeats where
- *   `sleep` suspends once, so a repeating timer must not credit a one-shot
- *   wait. Admitted only for an implicit-self receiver, the one shape
+ * - `sleep` → `timer`: the one-shot SUSPENSION
+ *   `new Promise((resolve) => setTimeout(resolve, ms))` — `Kernel#sleep`
+ *   (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`) suspends the thread
+ *   and returns the seconds slept, and that awaited promise is its whole port,
+ *   recording no callee named `sleep`. The mark is deliberately NOT every
+ *   `setTimeout`: a timer that schedules work rather than settling an
+ *   enclosing promise is a deadline or a callback, not a suspension, and must
+ *   not satisfy a Rails `sleep` — `Reaper#spawn_thread`'s
+ *   `setTimeout(tick, frequency * 1000)`
+ *   (`connection_adapters/abstract/connection_pool/reaper.ts`) is the case in
+ *   point. `isSuspensionTimer` (extract-ts-api.ts) is the discriminator, and
+ *   `setInterval` is excluded by the same reasoning: it repeats where `sleep`
+ *   suspends once. Admitted only for an implicit-self receiver, the one shape
  *   `Kernel#sleep` takes (`rb_define_global_function`, `process.c:9125`), so
  *   an `x.sleep` site still flags. What this gives up is the INTERVAL: the
  *   Ruby call leaves significance, so its call-argument row goes with it and
