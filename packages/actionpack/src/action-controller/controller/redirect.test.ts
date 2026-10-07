@@ -13,6 +13,7 @@ import {
   ArgumentError,
   Module,
   rbModConstSet,
+  rbObjSingletonClass,
   registerConstant,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -169,11 +170,13 @@ class RedirectController extends Base {
   }
 
   redirectToUrlWithStringlike() {
-    const stringlike = {
+    const stringlike = {};
+
+    Object.assign(rbObjSingletonClass(stringlike).prototype, {
       toStr() {
         return "http://www.rubyonrails.org/";
       },
-    };
+    });
 
     this.redirectTo(stringlike);
   }

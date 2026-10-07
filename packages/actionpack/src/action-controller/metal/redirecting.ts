@@ -122,9 +122,8 @@ export function _computeRedirectToLocation(
   options: unknown,
 ): string {
   let result: string;
-  const str = rbCheckStringType(options);
-  if (str !== null && SCHEME_OR_PROTOCOL_RELATIVE_RE.test(str)) {
-    result = str;
+  if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(rbCheckStringType(options) ?? "")) {
+    result = rbCheckStringType(options)!;
   } else if (typeof options === "string") {
     result = `${request.protocol ?? ""}${request.hostWithPort?.() ?? ""}${options}`;
   } else if (typeof options === "function") {
