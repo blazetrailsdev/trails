@@ -4,6 +4,7 @@ import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
 import type { TemplateAssertions } from "./action-controller/template-assertions.js";
+import type { Testing } from "./action-controller/metal/testing.js";
 import type { TestCase, TestRequest } from "./action-controller/test-case.js";
 import type { Request } from "./action-dispatch/http/request.js";
 import type { Assertions } from "./action-dispatch/testing/assertions.js";
@@ -14,6 +15,7 @@ import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "action_controller/metal/testing": () => import("./action-controller/metal/testing.js"),
   "action_controller/test_case": () => import("./action-controller/test-case.js"),
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
   "action_dispatch/testing/assertions": () => import("./action-dispatch/testing/assertions.js"),
@@ -62,8 +64,12 @@ export const ActionController = { name: "ActionController", loadPath } as Autolo
   TestCase: typeof TestCase;
   TestRequest: typeof TestRequest;
   TemplateAssertions: typeof TemplateAssertions;
+  Testing: typeof Testing;
 };
 extend(ActionController, Autoload);
+ActionController.autoloadUnder("metal", () => {
+  ActionController.autoload("Testing");
+});
 ActionController.autoloadAt("action_controller/test_case", () => {
   ActionController.autoload("TestCase");
   ActionController.autoload("TestRequest");
