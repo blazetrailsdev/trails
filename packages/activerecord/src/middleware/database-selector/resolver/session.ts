@@ -13,7 +13,7 @@ export class Session {
   }
 
   static convertTimeToTimestamp(time: Time): number {
-    return time.toI() * 1000 + Math.trunc(time.usec / 1000);
+    return time.toI() * 1000 + fixDiv(time.usec, 1000);
   }
 
   static convertTimestampToTime(timestamp: number | null | undefined): Time {

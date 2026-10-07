@@ -53,6 +53,7 @@ export class Map<K, V> {
   }
 
   /**
+   * `Concurrent::Map#[]=` (concurrent-ruby, not vendored), over
    * `NonConcurrentMapBackend#[]=` (`vendor/ruby/v3.3.11/hash.c:2941` `rb_hash_aset`).
    *
    * @noRailsEquivalent PERMANENT
@@ -98,7 +99,7 @@ export class Map<K, V> {
   }
 
   /**
-   * `Concurrent::Map#keys`: each key `each_pair` yields, collected
+   * `Concurrent::Map#keys` (concurrent-ruby, not vendored): each key `each_pair` yields, collected
    * (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair` over the backend).
    *
    * @noRailsEquivalent PERMANENT
@@ -109,20 +110,33 @@ export class Map<K, V> {
     return arr;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * `Concurrent::Map#values` (concurrent-ruby, not vendored): each value
+   * `each_pair` yields, collected (`vendor/ruby/v3.3.11/hash.c:3149`
+   * `rb_hash_each_pair` over the backend).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   values(): V[] {
     const arr: V[] = [];
     this.eachPair((_k, v) => arr.push(v));
     return arr;
   }
 
-  /** @noRailsEquivalent PERMANENT */
+  /**
+   * `Concurrent::Map#each_value` (concurrent-ruby, not vendored): yields each
+   * value `each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`
+   * `rb_hash_each_pair` over the backend).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
   eachValue(block: (value: V) => unknown): this {
     return this.eachPair((_k, v) => block(v));
   }
 
   /**
-   * `Concurrent::Map#each_pair`, over `NonConcurrentMapBackend#each_pair`: it
+   * `Concurrent::Map#each_pair` (concurrent-ruby, not vendored), over
+   * `NonConcurrentMapBackend#each_pair`: it
    * walks a `dupped_backend`, so a write made by the block does not reach the
    * walk (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair`).
    *

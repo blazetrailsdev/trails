@@ -154,10 +154,6 @@ export class HasManyAssociation extends CollectionAssociation {
     return records;
   }
 
-  protected override computeNullifiedOwnerAttributes(): Record<string, null> {
-    return this.nullifiedOwnerAttributes();
-  }
-
   /** @internal */
   protected override async deleteOrNullifyAllRecords(method?: string): Promise<number> {
     const count = await this.deleteCount(method ?? "", (this as any).scope());
