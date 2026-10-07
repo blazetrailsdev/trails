@@ -34600,13 +34600,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "query",
-    "digest": "2912d6a7b9a2b4f5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "quote",
     "digest": "3ef6307c01017495",
     "ref": "v8.0.2"

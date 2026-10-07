@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
-import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import pg from "pg";
+import { pgConnection } from "../../connection-adapters/postgresql/pg-connection.js";
+import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
 
@@ -52,5 +54,33 @@ describeIfPg("PostgreSQL bytea round trip", () => {
     expect(executed[0].payload).toBe("\\x5c5c");
     const rows = await connection.query("SELECT payload FROM bytea_data_type");
     expect(rows).toEqual([[Buffer.from([0x5c, 0x5c])]]);
+  });
+
+  it("reads back a bytea[] holding backslash bytes unchanged", async () => {
+    const result = await connection.execQuery(
+      "SELECT ARRAY['\\x5c5c'::bytea, '\\x5c313334'::bytea, '\\x5c7836383639'::bytea] AS payloads",
+    );
+    const [payloads] = result.castValues() as Uint8Array[][];
+    expect(payloads.map((payload) => Buffer.from(payload))).toEqual([
+      Buffer.from([0x5c, 0x5c]),
+      Buffer.from("\\134"),
+      Buffer.from("\\x6869"),
+    ]);
+  });
+
+  it("hands back bytea as text on a client the caller built with its own parsers", async () => {
+    const client = pgConnection(
+      new pg.Client({
+        connectionString: PG_TEST_URL,
+        types: { getTypeParser: () => () => "parsed by the caller" } as never,
+      }),
+    );
+    await client.connect();
+    try {
+      const result = await client.asyncExec("SELECT '\\x5c5c'::bytea, ARRAY['\\x5c5c'::bytea], 1");
+      expect(result.values()).toEqual([["\\x5c5c", '{"\\\\x5c5c"}', "parsed by the caller"]]);
+    } finally {
+      await client.end();
+    }
   });
 });

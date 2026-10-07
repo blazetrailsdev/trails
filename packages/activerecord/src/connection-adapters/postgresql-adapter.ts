@@ -1874,6 +1874,8 @@ export interface PostgreSQLAdapter {
 
   unescapeBytea: typeof quotingUnescapeBytea;
 
+  query(sql: string, name?: string | null): Promise<unknown[][]>;
+
   execute(
     sql: string | null,
     name?: string | null,
@@ -2318,7 +2320,7 @@ function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
-(PostgreSQLAdapter.prototype as any).query = pgQuery;
+PostgreSQLAdapter.prototype.query = pgQuery;
 PostgreSQLAdapter.prototype.unescapeBytea = quotingUnescapeBytea;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
 PostgreSQLAdapter.prototype.execute = pgExecute;
