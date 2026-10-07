@@ -24,7 +24,7 @@ class NumericData extends Base {
 
 describe("NumericDataTest", () => {
   it("big decimal conditions", async () => {
-    const m = NumericData.new({
+    const m = new NumericData({
       bank_balance: 1586.43,
       big_bank_balance: "1000234000567.95",
       world_population: 6000000000,
@@ -35,7 +35,7 @@ describe("NumericDataTest", () => {
   });
 
   it("numeric fields", async () => {
-    const m = NumericData.new({
+    const m = new NumericData({
       bank_balance: 1586.43,
       big_bank_balance: "1000234000567.95",
       world_population: 2n ** 62n,
@@ -62,7 +62,7 @@ describe("NumericDataTest", () => {
   });
 
   it("numeric fields with scale", async () => {
-    const m = NumericData.new({
+    const m = new NumericData({
       bank_balance: 1586.43122334,
       big_bank_balance: "234000567.952344",
       world_population: 2n ** 62n,
@@ -89,7 +89,7 @@ describe("NumericDataTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {
-    const m = NumericData.new({
+    const m = new NumericData({
       bank_balance: BigDecimal.NAN,
       big_bank_balance: BigDecimal.NAN,
       world_population: 2n ** 62n,

@@ -69,8 +69,8 @@ export function defineDelegatedTypeMethods(
     this.prototype,
     `build${camelize(role, true)}`,
     function (this: Base, ...params: unknown[]): Base {
-      const klass = rbFPublicSend(this, `${role}Class`) as { "new"(...params: unknown[]): Base };
-      const record = klass.new(...params);
+      const klass = rbFPublicSend(this, `${role}Class`) as new (...params: unknown[]) => Base;
+      const record = new klass(...params);
       rbFPublicSend(this, `${role}=`, record);
       return record;
     },

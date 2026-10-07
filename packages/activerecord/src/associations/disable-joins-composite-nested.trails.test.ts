@@ -169,7 +169,7 @@ describe("DJAS composite-key + nested-through", () => {
     })) as any;
     await CknTag.create({ ckn_line_item_id: orphanLi.id, value: "orphan-tag" });
 
-    const unsaved = CknShop.new({ name: "unsaved" });
+    const unsaved = new CknShop({ name: "unsaved" });
     const tags = await (unsaved as any).cknLineItemTags.toArray();
     expect(tags).toEqual([]);
     expect(tags.map((t: any) => t.value)).not.toContain("orphan-tag");

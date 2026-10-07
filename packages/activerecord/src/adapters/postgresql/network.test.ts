@@ -89,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("invalid network address", async () => {
-      const invalidAddress = PostgresqlNetworkAddress.new({
+      const invalidAddress = new PostgresqlNetworkAddress({
         cidr_address: "invalid addr",
         inet_address: "invalid addr",
       }) as any;

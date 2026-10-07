@@ -1109,19 +1109,19 @@ describe("CalculationsTest", () => {
   });
 
   it("maximum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").maximum("developer_id")).toBe(7);
   });
 
   it("minimum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").minimum("developer_id")).toBe(7);
   });
 
   it("sum with not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
 
     expect(await Company.includes(":contracts").sum("developer_id")).toBe(7);
   });
@@ -1273,14 +1273,14 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck auto table name prefix", async () => {
-    const c = await Company.createBang({ name: "test", contracts: [Contract.new()] });
+    const c = await Company.createBang({ name: "test", contracts: [new Contract()] });
     expect(await Company.joins(":contracts").pluck("id")).toEqual([c.id]);
   });
 
   it("pluck if table included", async () => {
     const c = await Company.createBang({
       name: "test",
-      contracts: [Contract.new({ developer_id: 7 })],
+      contracts: [new Contract({ developer_id: 7 })],
     });
     expect(
       await Company.includes(":contracts")
@@ -1292,7 +1292,7 @@ describe("CalculationsTest", () => {
   it("pluck not auto table name prefix if column joined", async () => {
     const company = await Company.createBang({
       name: "test",
-      contracts: [Contract.new({ developer_id: 7 })],
+      contracts: [new Contract({ developer_id: 7 })],
     });
     const metadata = (await company.contracts.first())!.metadata;
     expect(await Company.joins(":contracts").pluck("metadata")).toEqual([metadata]);
@@ -1644,7 +1644,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck not auto table name prefix if column included", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
     const ids = await Company.includes(":contracts").pluck("developer_id");
     expect(ids.length).toEqual(await Company.count());
     expect(ids.filter((id) => id != null)).toEqual([7]);
@@ -1690,7 +1690,7 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with multiple columns and includes", async () => {
-    await Company.createBang({ name: "test", contracts: [Contract.new({ developer_id: 7 })] });
+    await Company.createBang({ name: "test", contracts: [new Contract({ developer_id: 7 })] });
     const companiesAndDevelopers = await Company.order("companies.id")
       .includes(":contracts")
       .pluck("name", "developer_id");

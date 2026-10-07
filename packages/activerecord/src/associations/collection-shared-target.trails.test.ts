@@ -59,7 +59,7 @@ describe("collection association and CollectionProxy share one target", () => {
     const proxy = author.posts;
     const assoc = author.association("posts");
 
-    const built = Post.new({ title: "shared", body: "target" });
+    const built = new Post({ title: "shared", body: "target" });
     assoc.addToTarget(built);
 
     expect(proxy.target).toContain(built);

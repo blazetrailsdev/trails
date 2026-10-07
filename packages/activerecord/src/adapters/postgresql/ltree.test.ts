@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      const ltree = Ltree.new({ path: "1.2.3.4" });
+      const ltree = new Ltree({ path: "1.2.3.4" });
       expect(await ltree.saveBang()).toBeTruthy();
     });
 

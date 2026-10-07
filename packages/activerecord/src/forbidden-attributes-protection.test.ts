@@ -34,13 +34,13 @@ describe("ForbiddenAttributesProtectionTest", () => {
 
   it("forbidden attributes cannot be used for sti inheritance column", () => {
     const params = new ProtectedParams({ type: "Client" });
-    expect(() => Company.new(params)).toThrow(ForbiddenAttributesError);
+    expect(() => new Company(params)).toThrow(ForbiddenAttributesError);
   });
 
   it("permitted attributes can be used for sti inheritance column", () => {
     const params = new ProtectedParams({ type: "Client" });
     params.permitBang();
-    const person = Company.new(params);
+    const person = new Company(params);
 
     expect(person.constructor).toBe(Client);
   });

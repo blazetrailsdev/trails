@@ -133,7 +133,7 @@ describe("AttributeMethodsTest", () => {
 
   // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
   it.skip("attribute keys on a new instance", async () => {
-    const t = CanonicalTopic.new() as any;
+    const t = new CanonicalTopic() as any;
     expect(t.title).toBeNull();
     await assertRaises([NoMethodError], {}, () => t.title2);
   });
@@ -146,23 +146,23 @@ describe("AttributeMethodsTest", () => {
         this.attribute("count", "integer");
       }
     }
-    const p = Post.new({ count: null }) as any;
+    const p = new Post({ count: null }) as any;
     expect(p.count).toBeNull();
   });
 
   it("attribute_present with booleans", async () => {
-    const b1 = BooleanModel.new() as any;
+    const b1 = new BooleanModel() as any;
     b1.value = false;
     expect(b1.attributePresent("value")).toBeTruthy();
 
-    const b2 = BooleanModel.new() as any;
+    const b2 = new BooleanModel() as any;
     b2.value = true;
     expect(b2.attributePresent("value")).toBeTruthy();
 
-    const b3 = BooleanModel.new() as any;
+    const b3 = new BooleanModel() as any;
     expect(b3.attributePresent("value")).toBeFalsy();
 
-    const b4 = BooleanModel.new() as any;
+    const b4 = new BooleanModel() as any;
     b4.value = false;
     await b4.saveBang();
     expect(((await BooleanModel.find(b4.id)) as any).attributePresent("value")).toBeTruthy();
@@ -176,12 +176,12 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    const p = Post.new({ title: "test" }) as any;
+    const p = new Post({ title: "test" }) as any;
     expect(p.title).toBe("test");
   });
 
   it("hash content", async () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
     topic.content = { one: 1, two: 2 };
     await topic.save();
 
@@ -200,7 +200,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("attributes_for_database", async () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
     topic.content = { one: 1, two: 2 };
 
     const dbAttributes = (CanonicalTopic.instantiate(topic.attributesForDatabase()) as any)
@@ -276,7 +276,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("overridden write_attribute", async () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
     topic.writeAttribute = function (attrName: string, value: unknown) {
       CanonicalTopic.prototype.writeAttribute.call(this, attrName, String(value).toLowerCase());
     };
@@ -337,7 +337,7 @@ describe("AttributeMethodsTest", () => {
     const tz = "Pacific Time (US & Canada)";
 
     await inTimeZone(tz, async () => {
-      const record = target.new() as any;
+      const record = new target() as any;
 
       const dateString = "2011-03-24";
       const time = zone()!.parse(dateString);
@@ -367,7 +367,7 @@ describe("AttributeMethodsTest", () => {
 
     expect(klass.isInstanceMethodAlreadyImplemented("system")).toBeFalsy();
     expect(subklass.isInstanceMethodAlreadyImplemented("system")).toBeFalsy();
-    const computer = subklass.new() as any;
+    const computer = new subklass() as any;
     expect(computer.system).toBeNull();
   });
 
@@ -452,7 +452,7 @@ describe("AttributeMethodsTest", () => {
   });
   // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
   it.skip("undeclared attribute method does not affect respond_to? and method_missing", async () => {
-    const topic = target.new({ title: "Budget" }) as any;
+    const topic = new target({ title: "Budget" }) as any;
     assertRespondTo(topic, "title");
     expect(topic.title).toBe("Budget");
     assertNotRespondTo(topic, "title_hello_world");
@@ -557,7 +557,7 @@ describe("AttributeMethodsTest", () => {
     for (let timezoneOffset = -11; timezoneOffset <= 13; timezoneOffset++) {
       const timeString = new TimeWithZone(utcTime, TimeZone.find(timezoneOffset)!).toString();
       await inTimeZone("Pacific Time (US & Canada)", () => {
-        const record = target.new({}) as any;
+        const record = new target({}) as any;
         record.written_on = timeString;
         expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
           zone()!.parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
@@ -587,7 +587,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware attribute to a blank string returns nil", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new({}) as any;
+      const record = new target({}) as any;
       record.written_on = " ";
       expect(record.written_on).toBeNull();
       expect(record.get("written_on")).toBeNull();
@@ -597,7 +597,7 @@ describe("AttributeMethodsTest", () => {
     const timeString = "Tue Jan 01 00:00:00 2008";
     for (let timezoneOffset = -11; timezoneOffset <= 13; timezoneOffset++) {
       await inTimeZone(timezoneOffset, () => {
-        const record = target.new({}) as any;
+        const record = new target({}) as any;
         record.written_on = timeString;
         expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
           zone()!.parse(timeString)!.utc().toZonedDateTime().epochNanoseconds,
@@ -617,7 +617,7 @@ describe("AttributeMethodsTest", () => {
   it("setting a time zone-aware datetime in the current time zone", async () => {
     const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new({}) as any;
+      const record = new target({}) as any;
       record.written_on = new TimeWithZone(utcTime, zone()!);
       expect(record.written_on.utc().toZonedDateTime().epochNanoseconds).toBe(
         utcTime.epochNanoseconds,
@@ -635,7 +635,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting a time zone-aware time in the current time zone", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new({}) as any;
+      const record = new target({}) as any;
       const timeString = "10:00:00";
       const expectedTime = zone()!.parse(`2000-01-01 ${timeString}`)!;
 
@@ -652,7 +652,7 @@ describe("AttributeMethodsTest", () => {
   it("setting a time zone-aware time with DST", async () => {
     await inTimeZone("Pacific Time (US & Canada)", async () => {
       const currentTime = zone()!.local(2014, 6, 15, 10);
-      const record = target.new({ bonus_time: currentTime }) as any;
+      const record = new target({ bonus_time: currentTime }) as any;
       const timeBeforeSave = record.bonus_time;
 
       await record.save();
@@ -666,7 +666,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("setting invalid string to a zone-aware time attribute", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new({}) as any;
+      const record = new target({}) as any;
       const timeString = "ABC";
 
       record.bonus_time = timeString;
@@ -676,7 +676,7 @@ describe("AttributeMethodsTest", () => {
   it("removing time zone-aware types", async () => {
     await withTimeZoneAwareTypes(["datetime"], async () => {
       await inTimeZone("Pacific Time (US & Canada)", () => {
-        const record = target.new({ bonus_time: "10:00:00" }) as any;
+        const record = new target({ bonus_time: "10:00:00" }) as any;
         const expectedTime = RubyTime.utc(2000, 1, 1, 10);
 
         expect(record.bonus_time).toEqual(expectedTime);
@@ -691,11 +691,11 @@ describe("AttributeMethodsTest", () => {
     expect(type).toBeInstanceOf(TimeType);
 
     let invalidTime: unknown = [];
-    let record = model.new({ bonus_time: invalidTime }) as any;
+    let record = new model({ bonus_time: invalidTime }) as any;
     expect(record.bonus_time).toEqual(invalidTime);
 
     invalidTime = Math.trunc(Date.now() / 1000);
-    record = model.new({ bonus_time: invalidTime }) as any;
+    record = new model({ bonus_time: invalidTime }) as any;
     expect(record.bonus_time).toEqual(invalidTime);
 
     await inTimeZone("Pacific Time (US & Canada)", () => {
@@ -705,11 +705,11 @@ describe("AttributeMethodsTest", () => {
       expect(type).toBeInstanceOf(TimeZoneConverter);
 
       invalidTime = [];
-      record = model.new({ bonus_time: invalidTime }) as any;
+      record = new model({ bonus_time: invalidTime }) as any;
       expect(record.bonus_time).toEqual(invalidTime);
 
       invalidTime = Math.trunc(Date.now() / 1000);
-      record = model.new({ bonus_time: invalidTime }) as any;
+      record = new model({ bonus_time: invalidTime }) as any;
       expect(record.bonus_time).toEqual(invalidTime);
     });
   });
@@ -767,7 +767,7 @@ describe("AttributeMethodsTest", () => {
         return "I'm private";
       }
     }
-    const topic = Target.new({ title: "Isaac Newton's pants" }) as any;
+    const topic = new Target({ title: "Isaac Newton's pants" }) as any;
     assertNotRespondTo(topic, "title?");
     const exception = await assertRaises([NoMethodError], {}, () => topic["title?"]);
     assertIncludes(exception.message, "private method");
@@ -782,11 +782,13 @@ describe("AttributeMethodsTest", () => {
       }
       private set title(_value: string) {}
     }
-    await assertRaises([UnknownAttributeError], {}, () =>
-      Target.new({ title: "Rants about pants" } as any),
+    await assertRaises(
+      [UnknownAttributeError],
+      {},
+      () => new Target({ title: "Rants about pants" } as any),
     );
     await assertRaises([UnknownAttributeError], {}, () => {
-      (Target.new() as any).attributes = { title: "Ants in pants" };
+      (new Target() as any).attributes = { title: "Ants in pants" };
     });
   });
   it("#undefine_attribute_methods undefines alias attribute methods", () => {
@@ -1170,7 +1172,7 @@ describe("AttributeMethodsTest", () => {
     );
   });
   it("attribute_present", () => {
-    const t = CanonicalTopic.new() as any;
+    const t = new CanonicalTopic() as any;
     t.title = "hello there!";
     t.written_on = Temporal.Now.instant();
     t.author_name = "";
@@ -1218,7 +1220,7 @@ describe("AttributeMethodsTest", () => {
     expect(keyboard.readAttributeBeforeTypeCast("key_number")).toBe("10");
   });
   it("read attributes_before_type_cast", () => {
-    const category = Category.new({ name: "Test category", type: null }) as any;
+    const category = new Category({ name: "Test category", type: null }) as any;
     const categoryAttrs = {
       name: "Test category",
       id: null,
@@ -1232,7 +1234,7 @@ describe("AttributeMethodsTest", () => {
     expect(hashAref((await bool.reload()).attributesBeforeTypeCast(), "value")).toBe(0);
   });
   it("read overridden attribute with predicate respects override", () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
 
     topic.approved = true;
 
@@ -1242,7 +1244,7 @@ describe("AttributeMethodsTest", () => {
   });
   it("write time to date attribute", async () => {
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new() as any;
+      const record = new target() as any;
       record.last_read = RubyTime.utc(2010, 1, 1, 10);
       expect(record.last_read).toEqual(new Temporal.PlainDate(2010, 1, 1));
     });
@@ -1250,7 +1252,7 @@ describe("AttributeMethodsTest", () => {
   it("setting a time zone-aware attribute to UTC", async () => {
     const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
     await inTimeZone("Pacific Time (US & Canada)", () => {
-      const record = target.new() as unknown as { written_on: TimeWithZone };
+      const record = new target() as unknown as { written_on: TimeWithZone };
       record.written_on = utcTime as unknown as TimeWithZone;
       const wo = record.written_on;
       expect(wo.utc().toZonedDateTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
@@ -1265,7 +1267,7 @@ describe("AttributeMethodsTest", () => {
         this.tableName = "topics";
       }
     }
-    const model = Target.new() as any;
+    const model = new Target() as any;
 
     expect(model.attributeNames()).toEqual(Target.columnNames());
   });
@@ -1371,7 +1373,7 @@ describe("AttributeMethodsTest", () => {
 
   // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
   it.skip("non-attribute read and write", async () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
     assertNotRespondTo(topic, "mumbo");
     await assertRaises([NoMethodError], {}, () => topic.mumbo);
     await assertRaises([NoMethodError], {}, () => (topic.mumbo = 5));
@@ -1381,8 +1383,8 @@ describe("AttributeMethodsTest", () => {
     const klass = class extends Base {};
     klass.tableName = "developers_projects";
 
-    expect(Object.keys((klass.new() as any).attributes)).toEqual(klass.columnNames());
-    expect((klass.new() as any).hasAttribute("id")).toBeFalsy();
+    expect(Object.keys((new klass() as any).attributes)).toEqual(klass.columnNames());
+    expect((new klass() as any).hasAttribute("id")).toBeFalsy();
   });
 
   it("time attributes are retrieved in the current time zone", async () => {
@@ -1393,7 +1395,7 @@ describe("AttributeMethodsTest", () => {
         }
       }
       const utcTime = Temporal.Instant.from("2008-01-01T00:00:00Z");
-      const record = Topic.new({}) as unknown as {
+      const record = new Topic({}) as unknown as {
         writeAttribute(name: string, value: unknown): void;
         written_on: TimeWithZone;
       };
@@ -1416,7 +1418,7 @@ describe("AttributeMethodsTest", () => {
           this.attribute("written_on", "datetime");
         }
       }
-      const record = Topic.new({}) as unknown as { written_on: TimeWithZone };
+      const record = new Topic({}) as unknown as { written_on: TimeWithZone };
       record.written_on = cstTime;
       const wo = record.written_on;
       expect(wo.utc().toZonedDateTime().epochNanoseconds).toBe(utcTime.epochNanoseconds);
@@ -1500,7 +1502,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    const t = Topic.new({ title: null }) as any;
+    const t = new Topic({ title: null }) as any;
     expect(t.readAttribute("title")).toBeNull();
   });
 
@@ -1532,7 +1534,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("title", "string");
       }
     }
-    const t = Topic.new({ title: "Stop changing the topic" }) as any;
+    const t = new Topic({ title: "Stop changing the topic" }) as any;
     const superReadAttribute = t.readAttribute.bind(t);
     t.readAttribute = (attrName: string, block?: (name: string) => unknown) =>
       String(superReadAttribute(attrName, block)).toUpperCase();
@@ -1587,12 +1589,12 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("set attributes without a hash", async () => {
-    const topic = CanonicalTopic.new() as any;
+    const topic = new CanonicalTopic() as any;
     expect(() => topic.setAttributes("")).toThrow(ArgumentError);
   });
 
   it("set attributes with a block", async () => {
-    const topic = CanonicalTopic.new({}, (t: any) => {
+    const topic = new CanonicalTopic({}, (t: any) => {
       t.title = "Budget";
       t.author_name = "Jason";
     }) as any;
@@ -1656,7 +1658,7 @@ describe("AttributeMethodsTest", () => {
     klass.tableName = "computers";
 
     expect(klass.isInstanceMethodAlreadyImplemented("system")).toBeFalsy();
-    const computer = klass.new() as any;
+    const computer = new klass() as any;
     expect(computer.system).toBeNull();
   });
 
@@ -1702,7 +1704,7 @@ describe("AttributeMethodsTest", () => {
     (Topic as any).defineAttributeMethods();
     (SubTopic as any).defineAttributeMethods();
 
-    const t = SubTopic.new({}) as any;
+    const t = new SubTopic({}) as any;
     expect(t.title).toBe("omg");
     t.title = "lol";
     expect(t.authorName).toBe("lol");
@@ -1746,7 +1748,7 @@ describe("AttributeMethodsTest", () => {
       }
       private set title(_value: string) {}
     }
-    const topic = Target.new() as any;
+    const topic = new Target() as any;
     assertNotRespondTo(topic, "title=");
     const exception = await assertRaises([NoMethodError], {}, () => {
       topic.title = "Pants";
@@ -1786,7 +1788,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("published_at", "date");
       }
     }
-    const t = Topic.new({ published_at: "2024-01-01" }) as any;
+    const t = new Topic({ published_at: "2024-01-01" }) as any;
     expect(t.published_at).toBeTruthy();
   });
 
@@ -1796,7 +1798,7 @@ describe("AttributeMethodsTest", () => {
         this.attribute("updated_at", "datetime");
       }
     }
-    const t = Topic.new({ updated_at: Temporal.Now.instant() }) as any;
+    const t = new Topic({ updated_at: Temporal.Now.instant() }) as any;
     expect(t.updated_at).toBeTruthy();
   });
 
@@ -1824,7 +1826,7 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("update array content", async () => {
-    let topic = CanonicalTopic.new() as any;
+    let topic = new CanonicalTopic() as any;
     topic.content = ["one", "two", "three"];
 
     topic.content.push("four");

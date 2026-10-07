@@ -46,7 +46,7 @@ function postgresqlJsonSharedTestCases(columnType: string): void {
   });
 
   it("deserialize with array", async () => {
-    const x = klass.new({ objects: [{ foo: "bar" }] }) as any;
+    const x = new klass({ objects: [{ foo: "bar" }] }) as any;
     expect(x.objects).toEqual([{ foo: "bar" }]);
     await x.saveBang();
     expect(x.objects).toEqual([{ foo: "bar" }]);

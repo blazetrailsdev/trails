@@ -727,7 +727,7 @@ export class NewlyContractedCompany extends Company {
 
     this.beforeSave(async function (this: NewlyContractedCompany) {
       const { NewContract } = await import("./contract.js");
-      await this.newContracts.push(NewContract.new());
+      await this.newContracts.push(new NewContract());
     });
   }
 }

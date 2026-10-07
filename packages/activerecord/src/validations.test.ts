@@ -152,7 +152,7 @@ describe("ValidationsTest", () => {
       static name = "Topic";
     }
     Klass.validatesAcceptanceOf("approved");
-    const topic = Klass.new({ approved: true });
+    const topic = new Klass({ approved: true });
     Klass.undefineAttributeMethods();
     expect(topic.readAttribute("approved")).toBeTruthy();
   });
@@ -180,7 +180,7 @@ describe("ValidationsTest", () => {
     Klass.attribute("wibble", "string");
     Klass.validatesNumericalityOf("wibble", { onlyInteger: true });
 
-    const topic = Klass.new({ wibble: "123-4567" });
+    const topic = new Klass({ wibble: "123-4567" });
     topic.writeAttribute("wibble", String(topic.readAttribute("wibble")).replaceAll("-", ""));
 
     expect(await topic.isValid()).toBeTruthy();
@@ -194,13 +194,13 @@ describe("ValidationsTest", () => {
     Klass.validatesNumericalityOf("wibble", { greaterThanOrEqualTo: new BigDecimal("97.18") });
 
     for (const rawValue of ["97.179", 97.179, new BigDecimal("97.179")]) {
-      const subject = Klass.new({ wibble: rawValue });
+      const subject = new Klass({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.18");
       expect(await subject.isValid()).toBeTruthy();
     }
 
     for (const rawValue of ["97.174", 97.174, new BigDecimal("97.174")]) {
-      const subject = Klass.new({ wibble: rawValue });
+      const subject = new Klass({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.17");
       expect(await subject.isValid()).toBeFalsy();
     }

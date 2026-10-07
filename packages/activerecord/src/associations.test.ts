@@ -1781,12 +1781,12 @@ describe("AssociationsTest", () => {
   });
 
   it("should construct new finder sql after create", async () => {
-    const person = Person.new({ first_name: "clark" });
+    const person = new Person({ first_name: "clark" });
     expect(await association(person, "readers")).toEqual([]);
     await person.save();
     const reader = await Reader.create({
       person,
-      post: Post.new({ title: "foo", body: "bar" }),
+      post: new Post({ title: "foo", body: "bar" }),
     });
     expect(await association(person, "readers").find((reader as any).id)).toBeTruthy();
   });

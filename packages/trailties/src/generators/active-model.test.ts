@@ -9,7 +9,7 @@ describe("ActiveModel", () => {
       ActiveModel.find("Foo"),
       ActiveModel.build("Foo", "x"),
       ActiveModel.build("Foo"),
-    ]).toEqual(["Foo.all()", "Foo.find(params[:id])", "Foo.find()", "Foo.new(x)", "Foo.new()"]);
+    ]).toEqual(["Foo.all()", "Foo.find(params[:id])", "Foo.find()", "new Foo(x)", "new Foo()"]);
     const m = new ActiveModel("@foo");
     expect([m.save(), m.update("x"), m.errors(), m.destroy()]).toEqual([
       "@foo.save()",

@@ -343,7 +343,7 @@ describe("DelegationTest", () => {
       const reloaded = await Comment.find(records[0].id);
       expect(await Comment.all().isIntersect([reloaded])).toBe(true);
       expect(await Comment.all().isIntersect([])).toBe(false);
-      expect(await Comment.all().isIntersect([Comment.new()])).toBe(false);
+      expect(await Comment.all().isIntersect([new Comment()])).toBe(false);
     });
 
     it("intersect? is delegated on a CollectionProxy too", async () => {
@@ -351,7 +351,7 @@ describe("DelegationTest", () => {
       const proxy = (post as any).comments;
       const comments = await proxy.toArray();
       expect(await proxy.isIntersect(comments.slice(0, 1))).toBe(true);
-      expect(await proxy.isIntersect([Comment.new()])).toBe(false);
+      expect(await proxy.isIntersect([new Comment()])).toBe(false);
     });
 
     it("to_fs(:db) joins the record ids", async () => {

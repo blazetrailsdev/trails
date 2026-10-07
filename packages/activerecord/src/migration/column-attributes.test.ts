@@ -27,7 +27,7 @@ describe("Migration", () => {
       void TestModel.resetColumnInformation();
       await TestModel.loadSchema();
 
-      expect(TestModel.new().command).toBe(string);
+      expect(new TestModel().command).toBe(string);
     });
 
     it("add remove single field using string arguments", async () => {

@@ -343,7 +343,7 @@ describe("BelongsToAssociationsTest", () => {
       (client as any).firm = null;
     }).toThrow(/frozen/i);
     expect(() => {
-      (client as any).firm = Firm.new({ name: "Firm" });
+      (client as any).firm = new Firm({ name: "Firm" });
     }).toThrow(/frozen/i);
   });
 
@@ -697,7 +697,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("creating the belonging object from new record", async () => {
-    const citibank = Account.new({ credit_limit: 10 });
+    const citibank = new Account({ credit_limit: 10 });
     const apple = await (citibank as any).createFirm({ name: "Apple" });
     expect((citibank as any).firm_id).toBe(Number(apple.id));
     await citibank.save();
@@ -742,9 +742,9 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("belongs to with inverse association for composite primary key", async () => {
-    const author = CpkAuthor.new({ name: "John" });
+    const author = new CpkAuthor({ name: "John" });
     const book = (author as any).books.build({ id: [null, 1], title: "The Rails Way" });
-    const order = CpkOrder.new({ book, status: "paid" });
+    const order = new CpkOrder({ book, status: "paid" });
     await author.save();
     const [, orderId] = order.id as [number, number];
     expect(orderId).toBeTruthy();
@@ -762,30 +762,30 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("building the belonging object with implicit sti base class", async () => {
-    const account = Account.new({});
+    const account = new Account({});
     const company = (account as any).buildFirm();
     expect(company).toBeInstanceOf(Company);
   });
 
   it("building the belonging object with explicit sti base class", async () => {
-    const account = Account.new({});
+    const account = new Account({});
     const company = (account as any).buildFirm({ type: "Company" });
     expect(company).toBeInstanceOf(Company);
   });
 
   it("building the belonging object with sti subclass", async () => {
-    const account = Account.new({});
+    const account = new Account({});
     const company = (account as any).buildFirm({ type: "Firm" });
     expect(company).toBeInstanceOf(Firm);
   });
 
   it("building the belonging object with an invalid type", async () => {
-    const account = Account.new({});
+    const account = new Account({});
     expect(() => (account as any).buildFirm({ type: "InvalidType" })).toThrow(SubclassNotFound);
   });
 
   it("building the belonging object with an unrelated type", async () => {
-    const account = Account.new({});
+    const account = new Account({});
     expect(() => (account as any).buildFirm({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
@@ -907,7 +907,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("polymorphic association class", async () => {
-    const sponsor = Sponsor.new({});
+    const sponsor = new Sponsor({});
     expect(sponsor.association("sponsorable").klass).toBeNull();
     await sponsor.association("sponsorable").reload();
     expect(await (sponsor as any).sponsorable).toBeNull();
@@ -917,7 +917,7 @@ describe("BelongsToAssociationsTest", () => {
     await sponsor.association("sponsorable").reload();
     expect(await (sponsor as any).sponsorable).toBeNull();
 
-    (sponsor as any).sponsorable = Member.new({ name: "Bert" });
+    (sponsor as any).sponsorable = new Member({ name: "Bert" });
     expect(sponsor.association("sponsorable").klass).toBe(Member);
   });
 
@@ -962,7 +962,7 @@ describe("BelongsToAssociationsTest", () => {
       async () => (await ship.reload()).treasures_count as number,
       "treasures_count should not be changed unless counter_cache is given on the relation",
       async () => {
-        const treasure = Treasure.new({ name: "Gold", ship });
+        const treasure = new Treasure({ name: "Gold", ship });
         await treasure.save();
       },
     );
@@ -1063,7 +1063,7 @@ describe("BelongsToAssociationsTest", () => {
   it("belongs to counter with reassigning", async () => {
     const topic1 = await Topic.create({ title: "t1" });
     const topic2 = await Topic.create({ title: "t2" });
-    const reply1 = Reply.new({ title: "r1", content: "r1" });
+    const reply1 = new Reply({ title: "r1", content: "r1" });
     (reply1 as any).topic = topic1;
 
     assert(await reply1.save());
@@ -1101,7 +1101,7 @@ describe("BelongsToAssociationsTest", () => {
   it("belongs to reassign with namespaced models and counters", async () => {
     const topic1 = await WebTopic.create({ title: "t1" });
     const topic2 = await WebTopic.create({ title: "t2" });
-    const reply1 = WebReply.new({ title: "r1", content: "r1" });
+    const reply1 = new WebReply({ title: "r1", content: "r1" });
     (reply1 as any).topic = topic1;
 
     assert(await reply1.save());
@@ -1307,7 +1307,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("assignment before child saved", async () => {
-    const finalCut = Client.new({ name: "Final Cut" });
+    const finalCut = new Client({ name: "Final Cut" });
     const firm = await Firm.find(1);
     (finalCut as any).firm = firm;
     assertNotPredicate(finalCut, (r) => r.isPersisted());
@@ -1320,7 +1320,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("assignment before child saved with primary key", async () => {
-    const finalCut = Client.new({ name: "Final Cut" });
+    const finalCut = new Client({ name: "Final Cut" });
     const firm = await Firm.find(1);
     (finalCut as any).firmWithPrimaryKey = firm;
     assertNotPredicate(finalCut, (r) => r.isPersisted());
@@ -1333,20 +1333,20 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("new record with foreign key but no object", async () => {
-    const client = Client.new({ firm_id: 1 });
+    const client = new Client({ firm_id: 1 });
     const firmBasicId = await client.firmWithBasicId;
     expect(firmBasicId!.id).toBe((await Firm.first())!.id);
   });
 
   it("setting foreign key after nil target loaded", async () => {
-    const client = Client.new({});
+    const client = new Client({});
     await client.firmWithBasicId;
     (client as any).firm_id = 1;
     expect((await client.firmWithBasicId)!.id).toBe(companies("first_firm").id);
   });
 
   it("polymorphic setting foreign key after nil target loaded", async () => {
-    const sponsor = Sponsor.new({});
+    const sponsor = new Sponsor({});
     await (sponsor as any).sponsorable;
     (sponsor as any).sponsorable_id = 1;
     (sponsor as any).sponsorable_type = "Member";
@@ -1380,7 +1380,7 @@ describe("BelongsToAssociationsTest", () => {
     const topic = await Topic.create({ title: "Zoom-zoom-zoom" });
     expect(topic.readAttribute("replies_count")).toBe(0);
 
-    const reply = Reply.new({ title: "re: zoom", content: "speedy quick!" });
+    const reply = new Reply({ title: "re: zoom", content: "speedy quick!" });
     (reply as any).topic = topic;
     await reply.save();
 
@@ -1435,7 +1435,7 @@ describe("BelongsToAssociationsTest", () => {
     const reply = await Reply.create({ title: "re: zoom", content: "speedy quick!" });
     expect(reply.readAttribute("replies_count")).toBe(0);
 
-    const silly = SillyReply.new({ title: "gaga", content: "boo-boo" });
+    const silly = new SillyReply({ title: "gaga", content: "boo-boo" });
     (silly as any).reply = reply;
     await silly.save();
 
@@ -1500,33 +1500,33 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("polymorphic assignment foreign type field updating", async () => {
-    const sponsor = Sponsor.new({});
+    const sponsor = new Sponsor({});
     const member = await Member.create({});
     (sponsor as any).sponsorable = member;
     expect((sponsor as any).sponsorable_type).toBe("Member");
 
-    const sponsor2 = Sponsor.new({});
-    const memberNew = Member.new({});
+    const sponsor2 = new Sponsor({});
+    const memberNew = new Member({});
     (sponsor2 as any).sponsorable = memberNew;
     expect((sponsor2 as any).sponsorable_type).toBe("Member");
   });
 
   it("polymorphic assignment with primary key foreign type field updating", async () => {
-    const essay = Essay.new({});
+    const essay = new Essay({});
     const writer = await Author.create({ name: "David" });
     (essay as any).writer = writer;
     expect((essay as any).writer_type).toBe("Author");
 
-    const essay2 = Essay.new({});
-    const writerNew = Author.new({});
+    const essay2 = new Essay({});
+    const writerNew = new Author({});
     (essay2 as any).writer = writerNew;
     expect((essay2 as any).writer_type).toBe("Author");
   });
 
   it("polymorphic assignment updates foreign id field for new and saved records", async () => {
-    const sponsor = Sponsor.new({});
+    const sponsor = new Sponsor({});
     const savedMember = await Member.create({});
-    const newMember = Member.new({});
+    const newMember = new Member({});
 
     (sponsor as any).sponsorable = savedMember;
     expect((sponsor as any).sponsorable_id).toBe(Number(savedMember.id));
@@ -1536,9 +1536,9 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("assignment updates foreign id field for new and saved records", async () => {
-    const client = Client.new({});
+    const client = new Client({});
     const savedFirm = await Firm.create({ name: "Saved" });
-    const newFirm = Firm.new({});
+    const newFirm = new Firm({});
 
     (client as any).firm = savedFirm;
     expect(Number((client as any).client_of)).toBe(Number(savedFirm.id));
@@ -1548,9 +1548,9 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("polymorphic assignment with primary key updates foreign id field for new and saved records", async () => {
-    const essay = Essay.new({});
+    const essay = new Essay({});
     const savedWriter = await Author.create({ name: "David" });
-    const newWriter = Author.new({});
+    const newWriter = new Author({});
 
     (essay as any).writer = savedWriter;
     expect((essay as any).writer_id).toBe(savedWriter.name);
@@ -1560,7 +1560,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("polymorphic assignment with nil", async () => {
-    const essay = Essay.new({});
+    const essay = new Essay({});
     expect((essay as any).writer_id).toBeNull();
     expect((essay as any).writer_type).toBeNull();
 
@@ -1938,7 +1938,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("should set foreign key on create association with unpersisted owner", async () => {
-    const tagging = Tagging.new({});
+    const tagging = new Tagging({});
     const tag = await (tagging as any).createTag();
 
     assertNotPredicate(tagging, (r) => r.isPersisted());
@@ -1989,7 +1989,7 @@ describe("BelongsToAssociationsTest", () => {
       }
     }
 
-    const author = Temp.new();
+    const author = new Temp();
     author.writeAttribute("author_address_id", 9223372036854775808n);
 
     expect(await (author as any).authorAddress).toBeNull();
@@ -2064,7 +2064,7 @@ describe("BelongsToAssociationsTest", () => {
 
   it("reflect the most recent change", async () => {
     const [author1, author2] = await Author.limit(2);
-    const post = Post.new({ title: "foo", body: "bar" });
+    const post = new Post({ title: "foo", body: "bar" });
 
     (post as any).author = author1;
     (post as any).author_id = author2.id;
@@ -2146,7 +2146,7 @@ describe("BelongsToAssociationsTest", () => {
     assertNot((node as any).parentChanged());
     assertNot((node as any).parentPreviouslyChanged());
 
-    const newNode = Node.new({ tree_id: nodes("grandparent").tree_id, name: "Child three" });
+    const newNode = new Node({ tree_id: nodes("grandparent").tree_id, name: "Child three" });
     (node as any).parent = newNode;
     assertPredicate(node, (n: any) => n.parentChanged());
     assertNot((node as any).parentPreviouslyChanged());
@@ -2192,7 +2192,7 @@ describe("BelongsToAssociationsTest", () => {
     assertNot((node as any).parentChanged());
     assertNot((node as any).parentPreviouslyChanged());
 
-    (node as any).parent = Node.new({ tree_id: node.tree_id, name: "Great-grandparent" });
+    (node as any).parent = new Node({ tree_id: node.tree_id, name: "Great-grandparent" });
     assertPredicate(node, (n: any) => n.parentChanged());
     assertNot((node as any).parentPreviouslyChanged());
 
@@ -2319,7 +2319,7 @@ describe("BelongsToAssociationsTest", () => {
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
       const book = new CpkBrokenBook({
         title: "Some book",
-        order: CpkOrder.new({ id: [1, 2] as any }),
+        order: new CpkOrder({ id: [1, 2] as any }),
       });
       await (book as any).saveBang();
     });
@@ -2333,7 +2333,7 @@ describe("BelongsToAssociationsTest", () => {
     const error = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
       const book = new CpkBrokenBookWithNonCpkOrder({
         title: "Some book",
-        order: CpkNonCpkOrder.new({ id: 1 }),
+        order: new CpkNonCpkOrder({ id: 1 }),
       });
       await (book as any).saveBang();
     });
@@ -2344,7 +2344,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("association with query constraints assigns id on replacement", async () => {
-    const newOrder = CpkNonCpkOrder.new({});
+    const newOrder = new CpkNonCpkOrder({});
     const book = await CpkNonCpkBook.create({
       title: "book",
       author_id: 2,

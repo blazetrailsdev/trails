@@ -16,8 +16,8 @@ describe("CollectionSyncRemovalChain", () => {
   fixtures(["authors", "posts"]);
 
   it("concat on a new owner buffers the record before the next statement", () => {
-    const author = Author.new({ name: "Kelly" });
-    const post = Post.new({ title: "Welcome", body: "hi" });
+    const author = new Author({ name: "Kelly" });
+    const post = new Post({ title: "Welcome", body: "hi" });
     const assoc = postsAssociation(author);
 
     const result = assoc.concat(post);
@@ -27,8 +27,8 @@ describe("CollectionSyncRemovalChain", () => {
   });
 
   it("delete on a new owner prunes the record before the next statement", () => {
-    const author = Author.new({ name: "Kelly" });
-    const post = Post.new({ title: "Welcome", body: "hi" });
+    const author = new Author({ name: "Kelly" });
+    const post = new Post({ title: "Welcome", body: "hi" });
     const assoc = postsAssociation(author);
     void assoc.concat(post);
 
@@ -40,8 +40,8 @@ describe("CollectionSyncRemovalChain", () => {
 
   it("buffers every record after an async insert fails", async () => {
     const author = await Author.create({ name: "Kelly" });
-    const first = Post.new({ title: "First", body: "hi" });
-    const second = Post.new({ title: "Second", body: "hi" });
+    const first = new Post({ title: "First", body: "hi" });
+    const second = new Post({ title: "Second", body: "hi" });
     const assoc = postsAssociation(author);
     (assoc as unknown as { insertRecord(): Promise<boolean> }).insertRecord = () =>
       Promise.resolve(false);

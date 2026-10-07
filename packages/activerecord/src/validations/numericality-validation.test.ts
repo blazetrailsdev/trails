@@ -24,7 +24,7 @@ describe("NumericalityValidationTest", () => {
       equalTo: 10_000_000.12,
     });
 
-    const subject = modelClassVar.new({ unscaled_bank_balance: 10_000_000.121 });
+    const subject = new modelClassVar({ unscaled_bank_balance: 10_000_000.121 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -35,7 +35,7 @@ describe("NumericalityValidationTest", () => {
       equalTo: 10_000_000.3,
     });
 
-    const subject = modelClassVar.new({ decimal_number_big_precision: 10_000_000.3 });
+    const subject = new modelClassVar({ decimal_number_big_precision: 10_000_000.3 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -44,7 +44,7 @@ describe("NumericalityValidationTest", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 10 });
 
-    const subject = modelClassVar.new({ bank_balance: 10.001 });
+    const subject = new modelClassVar({ bank_balance: 10.001 });
 
     expect(await subject.isValid()).toBeFalsy();
   });
@@ -55,7 +55,7 @@ describe("NumericalityValidationTest", () => {
       equalTo: 1_000_000_000.123454,
     });
 
-    const subject = modelClassVar.new({ decimal_number: 1_000_000_000.1234545 });
+    const subject = new modelClassVar({ decimal_number: 1_000_000_000.1234545 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -67,7 +67,7 @@ describe("NumericalityValidationTest", () => {
       equalTo: 1_000_000_000.123454,
     });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 1_000_000_000.1234545 });
+    const subject = new modelClassVar({ virtual_decimal_number: 1_000_000_000.1234545 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -84,7 +84,7 @@ describe("NumericalityValidationTest", () => {
       static _tableName = "numeric_data";
       static name = "MyClass";
     }
-    const subject = MyClass.new({ bank_balance: 10_000_000.12 });
+    const subject = new MyClass({ bank_balance: 10_000_000.12 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -96,7 +96,7 @@ describe("NumericalityValidationTest", () => {
       equalTo: new BigDecimal("65.6"),
     });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 65.6 });
+    const subject = new modelClassVar({ virtual_decimal_number: 65.6 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -106,7 +106,7 @@ describe("NumericalityValidationTest", () => {
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 123.454 });
+    const subject = new modelClassVar({ virtual_decimal_number: 123.454 });
 
     expect(await subject.isValid()).toBeTruthy();
   });
@@ -116,7 +116,7 @@ describe("NumericalityValidationTest", () => {
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 123.455 });
+    const subject = new modelClassVar({ virtual_decimal_number: 123.455 });
 
     expect(await subject.isValid()).toBeFalsy();
   });
@@ -126,7 +126,7 @@ describe("NumericalityValidationTest", () => {
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ precision: 5 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { equalTo: 123.45 });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 123.456 });
+    const subject = new modelClassVar({ virtual_decimal_number: 123.456 });
 
     expect(await subject.isValid()).toBeFalsy();
   });
@@ -136,7 +136,7 @@ describe("NumericalityValidationTest", () => {
     modelClassVar.attribute("virtual_decimal_number", new DecimalType({ scale: 2 }));
     modelClassVar.validatesNumericalityOf("virtual_decimal_number", { greaterThan: 1 });
 
-    const subject = modelClassVar.new({ virtual_decimal_number: 1.001 });
+    const subject = new modelClassVar({ virtual_decimal_number: 1.001 });
 
     expect(await subject.isValid()).toBeFalsy();
   });
@@ -149,7 +149,7 @@ describe("NumericalityValidationTest", () => {
     });
 
     for (const rawValue of ["99.994", 99.994, new BigDecimal("99.994")]) {
-      const subject = modelClassVar.new({ virtual_decimal_number: rawValue });
+      const subject = new modelClassVar({ virtual_decimal_number: rawValue });
       expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
         new BigDecimal("99.99").toString("F"),
       );
@@ -157,7 +157,7 @@ describe("NumericalityValidationTest", () => {
     }
 
     for (const rawValue of ["99.999", 99.999, new BigDecimal("99.999")]) {
-      const subject = modelClassVar.new({ virtual_decimal_number: rawValue });
+      const subject = new modelClassVar({ virtual_decimal_number: rawValue });
       expect((subject.virtual_decimal_number as BigDecimal).toString("F")).toBe(
         new BigDecimal("100.00").toString("F"),
       );
@@ -169,7 +169,7 @@ describe("NumericalityValidationTest", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("new_bank_balance", { greaterOrEqualThan: 0 });
 
-    const subject = modelClassVar.new({ new_bank_balance: "abcd" });
+    const subject = new modelClassVar({ new_bank_balance: "abcd" });
 
     expect(await subject.isValid()).toBeFalsy();
   });
@@ -178,7 +178,7 @@ describe("NumericalityValidationTest", () => {
     const modelClassVar = modelClass();
     modelClassVar.validatesNumericalityOf("bank_balance", { greaterThan: 0, allowNil: true });
 
-    const subject = modelClassVar.new({ bank_balance: "" });
+    const subject = new modelClassVar({ bank_balance: "" });
 
     expect(await subject.isValid()).toBeTruthy();
   });

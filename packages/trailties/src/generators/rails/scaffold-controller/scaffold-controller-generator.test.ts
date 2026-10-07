@@ -52,13 +52,13 @@ describe("ScaffoldControllerGeneratorTest", () => {
         await assertInstanceMethod("show", content);
 
         await assertInstanceMethod("new", content, (m) => {
-          assertMatch(/this\.user = User\.new\(\)/, m);
+          assertMatch(/this\.user = new User\(\)/, m);
         });
 
         await assertInstanceMethod("edit", content);
 
         await assertInstanceMethod("create", content, (m) => {
-          assertMatch(/this\.user = User\.new\(this\.userParams\(\)\)/, m);
+          assertMatch(/this\.user = new User\(this\.userParams\(\)\)/, m);
           assertMatch(/this\.user\.save\(\)/, m);
           assertMatch(/this\.redirectTo\(this\.user/, m);
         });

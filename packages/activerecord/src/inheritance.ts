@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import { registerModelConstant } from "./associations.js";
-import { ActiveRecordError, NameError, NotImplementedError, SubclassNotFound } from "./errors.js";
+import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { IndexedRow } from "./result.js";
 import {
@@ -135,39 +135,6 @@ export function baseClass(this: typeof Base): typeof Base {
 }
 
 export class ClassMethods {
-  static new<T extends typeof Base>(
-    this: T,
-    attributes: ConstructorParameters<typeof Base>[0] | null = null,
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T> {
-    if (this.abstractClass || this === ActiveRecord.Base) {
-      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
-      throw new NotImplementedError(
-        `${rbModName(this)} is an abstract class and cannot be instantiated.`,
-      );
-    }
-
-    let subclass: typeof Base | null = null;
-    if (this._hasAttribute(this.inheritanceColumn as string)) {
-      subclass = this.subclassFromAttributes(attributes as Record<string, unknown> | null);
-
-      let scopeAttributes;
-      if (subclass == null && (scopeAttributes = this.currentScope()?.scopeForCreate()) != null) {
-        subclass = this.subclassFromAttributes(scopeAttributes);
-      }
-
-      if (subclass == null && this.isBaseClass()) {
-        subclass = this.subclassFromAttributes(this.columnDefaults);
-      }
-    }
-
-    if (subclass != null && subclass !== this) {
-      return subclass.new(attributes, block as never) as InstanceType<T>;
-    } else {
-      return new this(attributes ?? undefined, block as never) as InstanceType<T>;
-    }
-  }
-
   static get abstractClass(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
       ? (this as any)._abstractClass

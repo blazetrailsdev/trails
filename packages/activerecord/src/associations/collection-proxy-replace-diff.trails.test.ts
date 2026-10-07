@@ -111,8 +111,8 @@ describe("collection replace diffs instead of clearing", () => {
 
   it("rolls the whole replace back when one of the new records cannot be saved", async () => {
     const firm = await Firm.find(companies("first_firm").id);
-    const good = Client.new({ name: "Good" });
-    const bad = Client.new({ name: "Bad" });
+    const good = new Client({ name: "Good" });
+    const bad = new Client({ name: "Bad" });
     bad.raiseOnSave = true;
 
     const beforeIds = (await firm.clientsOfFirm).map((c) => c.id);

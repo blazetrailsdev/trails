@@ -129,7 +129,7 @@ export abstract class AbstractReflection {
     attributes: Record<string, unknown> = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): InstanceType<typeof Base> {
-    return (this.klass as any).new(attributes, block);
+    return new (this.klass as any)(attributes, block);
   }
 
   get className(): string {

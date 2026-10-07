@@ -11,7 +11,7 @@ import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
-import { Company, Firm } from "./test-helpers/models/company.js";
+import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -82,21 +82,11 @@ describe("PersistenceTest (trails)", () => {
     expect([initialized, yielded]).toEqual([1, 1]);
   });
 
-  it("a bare new is Class#new: it skips the abstract check and the STI dispatch", () => {
-    class Abstract extends Topic {
-      static override abstractClass = true;
-    }
-    expect(new Abstract()).toBeInstanceOf(Abstract);
-    expect(() => Abstract.new()).toThrow("is an abstract class and cannot be instantiated.");
-    expect(new Company({ type: "Firm" }).constructor).toBe(Company);
-    expect(Company.new({ type: "Firm" }).constructor).toBe(Firm);
-  });
-
   it("create inside a scope keeps an explicit attribute over the scope's", async () => {
     const scope = Topic.where({ title: "scoped", author_name: "Scope" });
     const topic = await scope.scoping(() => Topic.create({ title: "explicit" }));
     expect([topic.title, topic.author_name]).toEqual(["explicit", "Scope"]);
-    const built = scope.scoping(() => Topic.new({ title: "explicit" }));
+    const built = scope.scoping(() => new Topic({ title: "explicit" }));
     expect([built.title, built.author_name]).toEqual(["explicit", "Scope"]);
   });
 
@@ -163,7 +153,7 @@ describe("PersistenceTest (trails)", () => {
   });
 
   it("save! runs validations before the destroyed guard", async () => {
-    const developer = CanonicalDeveloper.new({ name: "DC", salary: 1_000_000 });
+    const developer = new CanonicalDeveloper({ name: "DC", salary: 1_000_000 });
     (developer as unknown as { _destroyed: boolean })._destroyed = true;
     await expect(developer.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -378,7 +368,7 @@ describe("PersistenceTest (trails)", () => {
   it("new and create inside a scope on an association take the scope's foreign key", async () => {
     const post = await CanonicalPost.first();
     const scope = Comment.where({ post });
-    const built = scope.scoping(() => Comment.new({ body: "built" }));
+    const built = scope.scoping(() => new Comment({ body: "built" }));
     expect(built.post_id).toBe(post!.id);
     const created = await scope.scoping(() => Comment.create({ body: "created" }));
     expect((await Comment.find(created.id)).post_id).toBe(post!.id);

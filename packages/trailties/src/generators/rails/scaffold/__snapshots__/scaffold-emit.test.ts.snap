@@ -22,13 +22,13 @@ export class PostsController extends ApplicationController {
   async show(): Promise<void> {}
 
   async new(): Promise<void> {
-    this.post = Post.new();
+    this.post = new Post();
   }
 
   async edit(): Promise<void> {}
 
   async create(): Promise<void> {
-    this.post = Post.new(this.postParams());
+    this.post = new Post(this.postParams());
 
     if (await this.post.save()) {
       this.redirectTo(this.post, { notice: "Post was successfully created." });

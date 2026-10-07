@@ -52,7 +52,7 @@ describe("DateTest", () => {
     ];
 
     for (const [y, m, d] of validDates) {
-      const topic = Topic.new({
+      const topic = new Topic({
         "last_read(1i)": String(y),
         "last_read(2i)": String(m),
         "last_read(3i)": String(d),
@@ -62,7 +62,7 @@ describe("DateTest", () => {
 
     for (const [[y, m, d], [ey, em, ed]] of invalidDates) {
       expect(() => {
-        const topic = Topic.new({
+        const topic = new Topic({
           "last_read(1i)": String(y),
           "last_read(2i)": String(m),
           "last_read(3i)": String(d),

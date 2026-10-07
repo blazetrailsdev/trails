@@ -123,7 +123,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         users: "read",
         articles: "write",
       });
-      expect((Hstore.new() as any).permissions).toEqual({ users: "read", articles: "write" });
+      expect((new Hstore() as any).permissions).toEqual({ users: "read", articles: "write" });
     });
 
     it("change table supports hstore", async () => {
@@ -158,7 +158,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("cast value on write", async () => {
-      const x = Hstore.new({ tags: { bool: true, number: 5 } });
+      const x = new Hstore({ tags: { bool: true, number: 5 } });
       expect((x as any).tagsBeforeTypeCast).toEqual({ bool: true, number: 5 });
       expect((x as any).tags).toEqual({ bool: "true", number: "5" });
       await (x as any).save();
@@ -174,7 +174,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("with store accessors", async () => {
-      const x = Hstore.new({ language: "fr", timezone: "GMT" });
+      const x = new Hstore({ language: "fr", timezone: "GMT" });
       expect((x as any).language).toBe("fr");
       expect((x as any).timezone).toBe("GMT");
 
@@ -192,7 +192,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("duplication with store accessors", async () => {
-      const x = Hstore.new({ language: "fr", timezone: "GMT" });
+      const x = new Hstore({ language: "fr", timezone: "GMT" });
       expect((x as any).language).toBe("fr");
       expect((x as any).timezone).toBe("GMT");
 
@@ -202,19 +202,19 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("yaml round trip with store accessors", () => {
-      const x = Hstore.new({ language: "fr", timezone: "GMT" });
+      const x = new Hstore({ language: "fr", timezone: "GMT" });
       expect((x as any).language).toBe("fr");
       expect((x as any).timezone).toBe("GMT");
 
       const payload = yamlStringify((x as any).serializableHash());
       const data = yamlParse(payload) as Record<string, unknown>;
-      const y = Hstore.new(data);
+      const y = new Hstore(data);
       expect((y as any).language).toBe("fr");
       expect((y as any).timezone).toBe("GMT");
     });
 
     it("changes with store accessors", async () => {
-      const x = Hstore.new({ language: "de" });
+      const x = new Hstore({ language: "de" });
       expect((x as any).languageChanged()).toBeTruthy();
       expect((x as any).languageWas()).toBeNull();
       expect((x as any).languageChange()).toEqual([null, "de"]);

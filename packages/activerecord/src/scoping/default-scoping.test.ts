@@ -92,7 +92,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope as class method runs on create", async () => {
-    expect((ClassMethodDeveloperCalledDavid.new() as any).name).toBe("David");
+    expect((new ClassMethodDeveloperCalledDavid() as any).name).toBe("David");
     const dev = (await ClassMethodDeveloperCalledDavid.create()) as any;
     expect(dev.name).toBe("David");
   });
@@ -675,7 +675,7 @@ describe("DefaultScopingTest", () => {
   });
 
   it("default scope attribute", () => {
-    const jamis = PoorDeveloperCalledJamis.new({ name: "David" }) as any;
+    const jamis = new PoorDeveloperCalledJamis({ name: "David" }) as any;
     expect(jamis.salary).toBe(50000);
   });
 

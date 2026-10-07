@@ -1705,6 +1705,43 @@ body reaches a class's singleton class keeps working on the class itself, and
 `ClassAttribute.redefine` does not port its `attached_object.is_a?(Module)`
 arm.
 
+## A record is built with `new Klass` only (`Inheritance::ClassMethods#new`)
+
+Ruby has one way to build a record, `Klass.new(attributes, &block)`, and
+`Inheritance::ClassMethods#new`
+(`activerecord/lib/active_record/inheritance.rb:56-78`) overrides it: it raises
+`NotImplementedError` for an abstract class or `Base`, resolves an STI subclass
+through `subclass_from_attributes`, and calls `subclass.new` or `super`.
+
+JS builds an object with the `new` expression, and that is the only spelling
+trails has. **There is no static `Klass.new`.** `new Klass(attributes, block)`
+is Rails' `Klass.new(attributes, &block)`, so the body of
+`Inheritance::ClassMethods#new` runs in `Base`'s constructor
+(`packages/activerecord/src/base.ts`): the abstract raise
+(`_requireConcreteClass`), then the three `subclass_from_attributes` arms in
+Rails' order, then `new subclass(attributes, block)` or the rest of the
+constructor, which is `Class#new`.
+
+A static `new` beside the constructor was tried on trails#8659 and rejected by
+the repo owner. It leaves two spellings for one operation, and either the bare
+`new` silently skips the abstract check and the STI dispatch, or the
+constructor has to re-enter the static method through a marker and run twice.
+
+As a consequence:
+
+- A Rails `klass.new(attributes, &block)` ports as
+  `new klass(attributes, block)`, in source and in tests. Generated application
+  code says `new Post(params)` too (`trailties/src/generators/active-model.ts`).
+- `inheritance.rb`'s `new` has no member in `inheritance.ts`. Do not add one,
+  and do not file a story to move the body out of the constructor.
+- `Persistence#becomes` (`persistence.rb:487-500`) is `klass.allocate` +
+  `initialize`, which skips `Inheritance::ClassMethods#new`. It reaches the
+  constructor with `_suppressAbstractCheck` and `_suppressStiNewDispatch` set.
+- `Relation#new` and `CollectionProxy#new` are instance methods with no `new`
+  expression to stand in for them, and stay.
+
+This is ratified repo-wide here by the repo owner.
+
 ## A create path awaits its block before saving (`create`'s `&block`)
 
 Rails' create paths yield the caller's block synchronously while building the

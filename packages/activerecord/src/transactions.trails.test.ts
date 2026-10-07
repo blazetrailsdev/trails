@@ -452,7 +452,7 @@ describe("aborting before_validation halts before the validators run", () => {
   fixtures({});
 
   const newInvalidReply = () =>
-    WrongReply.new({ title: "a reply", content: "" }) as unknown as {
+    new WrongReply({ title: "a reply", content: "" }) as unknown as {
       save(): Promise<boolean | undefined>;
       errors: { isAny(): boolean };
       beforeValidationForTransaction: () => Promise<void>;

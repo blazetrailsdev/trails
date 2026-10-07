@@ -2065,7 +2065,7 @@ describe("FinderTest", () => {
     const post = await Post.createBang({
       title: "Post",
       body: "default",
-      taggings: [Tagging.new({ comment: "tagging comment" })],
+      taggings: [new Tagging({ comment: "tagging comment" })],
     });
     const relation = Post.taggedWithComment("tagging comment");
 

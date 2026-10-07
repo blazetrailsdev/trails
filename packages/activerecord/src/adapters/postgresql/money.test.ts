@@ -50,8 +50,8 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("default", async () => {
       expect((PostgresqlMoney.columnDefaults["depth"] as BigDecimal).toString("F")).toBe("150.55");
-      expect(((PostgresqlMoney.new() as any).depth as BigDecimal).toString("F")).toBe("150.55");
-      expect((PostgresqlMoney.new() as any).depthBeforeTypeCast).toBe("150.55");
+      expect(((new PostgresqlMoney() as any).depth as BigDecimal).toString("F")).toBe("150.55");
+      expect((new PostgresqlMoney() as any).depthBeforeTypeCast).toBe("150.55");
     });
 
     it("money values", async () => {

@@ -1237,7 +1237,7 @@ describe("PersistenceTest", () => {
   });
 
   it("update columns not equal attributes", async () => {
-    const topic = Topic.new();
+    const topic = new Topic();
     (topic as any).title = "Still another topic";
     await topic.save();
 
@@ -1444,7 +1444,7 @@ describe("PersistenceTest", () => {
   });
 
   it("find via reload", async () => {
-    const post = Post.new();
+    const post = new Post();
     expect(post.isNewRecord()).toBeTruthy();
 
     (post as any).id = 1;

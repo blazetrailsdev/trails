@@ -444,7 +444,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build from association should respect scope", async () => {
-    const author = HmAuthor.new() as any;
+    const author = new HmAuthor() as any;
     const post = author.thinkingPosts.build();
     expect(post.title).toBe("So I was thinking");
   });
@@ -460,7 +460,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build from association sets inverse instance", async () => {
-    const car = Car.new({ name: "honda" }) as any;
+    const car = new Car({ name: "honda" }) as any;
     const bulb = car.bulbs.build();
     expect(await bulb.car).toBe(car);
   });
@@ -748,7 +748,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build the association with an array", async () => {
-    const speedometer = Speedometer.new({ speedometer_id: "a" }) as any;
+    const speedometer = new Speedometer({ speedometer_id: "a" }) as any;
     const data = [{ name: "first" }, { name: "second" }];
     speedometer.minivans.where({ color: "blue" }).build(data);
 
@@ -763,7 +763,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("new the association with an array", async () => {
-    const speedometer = Speedometer.new({ speedometer_id: "a" }) as any;
+    const speedometer = new Speedometer({ speedometer_id: "a" }) as any;
     const data = [{ name: "first" }, { name: "second" }];
     speedometer.minivans.where({ color: "blue" }).new(data);
 
@@ -1003,9 +1003,9 @@ describe("HasManyAssociationsTest", () => {
   it("update all respects association scope", async () => {
     registerModel(HmPerson);
     registerModel(HmReference);
-    const person = HmPerson.new() as any;
+    const person = new HmPerson() as any;
     person.first_name = "Naruto";
-    await person.references.push(HmReference.new());
+    await person.references.push(new HmReference());
     await person.saveBang();
     expect(await person.references.updateAll({ favorite: true })).toBe(1);
   });
@@ -1013,9 +1013,9 @@ describe("HasManyAssociationsTest", () => {
   it("exists respects association scope", async () => {
     registerModel(HmPerson);
     registerModel(HmReference);
-    const person = HmPerson.new() as any;
+    const person = new HmPerson() as any;
     person.first_name = "Sasuke";
-    await person.references.push(HmReference.new());
+    await person.references.push(new HmReference());
     await person.saveBang();
     expect(await person.references.isExists()).toBeTruthy();
   });
@@ -1254,7 +1254,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("belongs to with new object", async () => {
-    const c = Client.new() as any;
+    const c = new Client() as any;
     expect(await c.firm).toBeNull();
   });
 
@@ -1532,7 +1532,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
 
-    const natural = Client.new({ name: "Natural Company" });
+    const natural = new Client({ name: "Natural Company" });
     await (companies("first_firm") as any).clientsOfFirm.concat(natural);
     expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(3);
     await (companies("first_firm") as any).clientsOfFirm.reload();
@@ -1578,7 +1578,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("create with bang on habtm when parent is new raises", async () => {
-    const developer = Developer.new({ name: "Aredridel" });
+    const developer = new Developer({ name: "Aredridel" });
     const error = (await assertRaise([RecordNotSaved], {}, async () => {
       await association(developer, "projects").createBang({});
     })) as any;
@@ -1606,8 +1606,8 @@ describe("HasManyAssociationsTest", () => {
     expect(firm.clientsOfFirm.loaded).toBeTruthy();
 
     const result = await firm.clientsOfFirm.concat([
-      Client.new({ name: "Natural Company" }),
-      Client.new({ name: "Apple" }),
+      new Client({ name: "Natural Company" }),
+      new Client({ name: "Apple" }),
     ]);
     expect(await firm.clientsOfFirm.size()).toBe(4);
     expect(await (await firm.clientsOfFirm.reload()).size()).toBe(4);
@@ -1615,8 +1615,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transactions when adding to persisted", async () => {
-    const good = Client.new({ name: "Good" }) as any;
-    const bad = Client.new({ name: "Bad" }) as any;
+    const good = new Client({ name: "Good" }) as any;
+    const bad = new Client({ name: "Bad" }) as any;
     bad.raiseOnSave = true;
 
     const firstFirm = companies("first_firm") as any;
@@ -1631,14 +1631,14 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transactions when adding to new record", async () => {
-    const firm = HmFirm.new() as any;
+    const firm = new HmFirm() as any;
     await assertQueriesCount(0, false, async () => {
-      await firm.clientsOfFirm.concat(Client.new({ name: "Natural Company" }));
+      await firm.clientsOfFirm.concat(new Client({ name: "Natural Company" }));
     });
   });
 
   it("adding buffers a record whose save fails into the target", async () => {
-    const bad = Client.new({ name: "Bad" }) as any;
+    const bad = new Client({ name: "Bad" }) as any;
     bad.throwOnSave = true;
 
     const firstFirm = companies("first_firm") as any;
@@ -1867,7 +1867,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("deleting before save", async () => {
-    const newFirm = HmFirm.new({ name: "A New Firm, Inc." }) as any;
+    const newFirm = new HmFirm({ name: "A New Firm, Inc." }) as any;
     const newClient = newFirm.clientsOfFirm.build({ name: "Another Client" });
     expect(await newFirm.clientsOfFirm.size()).toBe(1);
     await newFirm.clientsOfFirm.delete(newClient);
@@ -2222,8 +2222,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transaction when deleting persisted", async () => {
-    const good = Client.new({ name: "Good" }) as any;
-    const bad = Client.new({ name: "Bad" }) as any;
+    const good = new Client({ name: "Good" }) as any;
+    const bad = new Client({ name: "Bad" }) as any;
     bad.raiseOnDestroy = true;
 
     const firstFirm = companies("first_firm") as any;
@@ -2240,9 +2240,9 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transaction when deleting new record", async () => {
-    const firm = HmFirm.new() as any;
+    const firm = new HmFirm() as any;
     await assertQueriesCount(0, false, async () => {
-      const client = Client.new({ name: "New Client" });
+      const client = new Client({ name: "New Client" });
       await firm.clientsOfFirm.concat(client);
       await firm.clientsOfFirm.destroy(client);
     });
@@ -2769,7 +2769,7 @@ describe("HasManyAssociationsTest", () => {
   it("included in collection for new records", async () => {
     const client = (await Client.create({ name: "Persisted" })) as any;
     expect(client.client_of).toBeNull();
-    expect(await (HmFirm.new() as any).clientsOfFirm.isInclude(client)).toBe(false);
+    expect(await (new HmFirm() as any).clientsOfFirm.isInclude(client)).toBe(false);
   });
 
   it("adding array and collection", async () => {
@@ -2800,7 +2800,7 @@ describe("HasManyAssociationsTest", () => {
     const firm = (await HmFirm.first()) as any;
     await firm
       .association("clients")
-      .writer([companies("second_client"), Client.new({ name: "New Client" })]);
+      .writer([companies("second_client"), new Client({ name: "New Client" })]);
     await firm.save();
     await firm.reload();
     const clients = await firm.clients;
@@ -2810,7 +2810,7 @@ describe("HasManyAssociationsTest", () => {
 
   it("replace failure", async () => {
     const firm = companies("first_firm") as any;
-    const account = Account.new();
+    const account = new Account();
     const origAccounts = await firm.accounts.toArray();
 
     assertNot(await account.isValid());
@@ -2856,7 +2856,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("transactions when replacing on new record", async () => {
-    const firm = HmFirm.new() as any;
+    const firm = new HmFirm() as any;
     await assertQueriesCount(0, false, async () => {
       await firm.clientsOfFirm.replace([new Client({ name: "New Client" })]);
     });
@@ -2999,7 +2999,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("get ids for association on new record does not try to find records", async () => {
-    const company = Company.new() as any;
+    const company = new Company() as any;
     await assertQueriesCount(0, false, async () => {
       await company.contractIds;
     });
@@ -3011,7 +3011,7 @@ describe("HasManyAssociationsTest", () => {
     const contractA = await Contract.createBang();
     const contractB = await Contract.createBang();
     await Contract.createBang();
-    const company = Company.new({ name: "Some Company" }) as any;
+    const company = new Company({ name: "Some Company" }) as any;
 
     await company.association("contracts").idsWriter([contractA.id, contractB.id]);
     expect(await company.contractIds).toEqual([contractA.id, contractB.id]);
@@ -3200,7 +3200,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("calling first nth or last on new record should not run queries", async () => {
-    const firm = HmFirm.new() as any;
+    const firm = new HmFirm() as any;
 
     await assertNoQueries(false, async () => {
       await firm.clients.first();
@@ -3437,7 +3437,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("include method in has many association should return true for instance added with build", async () => {
-    const post = HmPost.new();
+    const post = new HmPost();
     const comments = (post as any).comments;
     const comment = comments.build();
     expect(await comments.isInclude(comment)).toBe(true);
@@ -3498,7 +3498,7 @@ describe("HasManyAssociationsTest", () => {
     registerModel(MergeAuthor);
     registerModel(MergePost);
     const author = await MergeAuthor.create({ name: "Alice" });
-    const post = MergePost.new({ author_id: author.id });
+    const post = new MergePost({ author_id: author.id });
     post.title = "Merged";
     expect((post as any).title).toBe("Merged");
     expect((post as any).author_id).toBe(Number(author.id));
@@ -3524,7 +3524,7 @@ describe("HasManyAssociationsTest", () => {
   it("joining through a polymorphic association with a where clause", async () => {
     const writer = humans("gordon");
     const category = categories("general");
-    const essay = TypedEssay.new();
+    const essay = new TypedEssay();
     essay.category = category;
     essay.writer = writer;
     await essay.save();
@@ -3541,7 +3541,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("build from polymorphic association sets inverse instance", async () => {
-    const post = HmPost.new();
+    const post = new HmPost();
     const tagging = post.taggings.build();
 
     expect(await tagging.taggable).toBe(post);
@@ -3565,13 +3565,13 @@ describe("HasManyAssociationsTest", () => {
   it("attributes are set when initialized from has many null relationship", async () => {
     registerModel(HmCar);
     registerModel(HmBulb);
-    const car = HmCar.new({ name: "honda" }) as any;
+    const car = new HmCar({ name: "honda" }) as any;
     const bulb = await car.bulbs.where({ name: "headlight" }).firstOrInitialize();
     expect(bulb.name).toBe("headlight");
   });
 
   it("attributes are set when initialized from polymorphic has many null relationship", async () => {
-    const post = HmPost.new({ title: "title", body: "bar" });
+    const post = new HmPost({ title: "title", body: "bar" });
     const tag = await HmTag.create({ name: "foo" });
 
     const tagging = await post.taggings.where({ tag }).firstOrInitialize();
@@ -3655,7 +3655,7 @@ describe("HasManyAssociationsTest", () => {
     const author = await FoiAuthor.create({ name: "Alice" });
     const posts = await author.foi_posts;
     expect(posts.length).toBe(0);
-    const post = FoiPost.new({ author_id: author.id, title: "Initialized" });
+    const post = new FoiPost({ author_id: author.id, title: "Initialized" });
     expect(post.isNewRecord()).toBe(true);
     expect((post as any).author_id).toBe(Number(author.id));
   });
@@ -3702,7 +3702,7 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("has many associations on new records use null relations", async () => {
-    const post = HmPost.new() as any;
+    const post = new HmPost() as any;
 
     await assertNoQueries(false, async () => {
       expect(await post.comments.toArray()).toEqual([]);
@@ -3874,8 +3874,8 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("passes custom context validation to validate children", async () => {
-    const pirate = FamousPirate.new() as any;
-    const ship = FamousShip.new() as any;
+    const pirate = new FamousPirate() as any;
+    const ship = new FamousShip() as any;
     await pirate.famousShips.push(ship);
 
     expect(await pirate.isValid()).toBeTruthy();
@@ -3981,7 +3981,7 @@ describe("HasManyAssociationsTest", () => {
   it("reattach to new objects replaces inverse association and foreign key", async () => {
     const bulb = (await HmBulb.createBang({ car: await HmCar.createBang() })) as any;
     expect(bulb.car_id).toBeTruthy();
-    const car = HmCar.new() as any;
+    const car = new HmCar() as any;
     await car.bulbs.push(bulb);
     expect(await bulb.car).toBe(car);
     expect(bulb.car_id).toBeNull();
@@ -4278,9 +4278,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("composite primary key malformed association class", async () => {
     const error: any = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
-      const order = CpkBrokenOrder.new({
+      const order = new CpkBrokenOrder({
         id: [1, 2],
-        books: [CpkBook.new({ title: "Some book" })],
+        books: [new CpkBook({ title: "Some book" })],
       });
       await order.saveBang();
     });
@@ -4292,9 +4292,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("composite primary key malformed association owner class", async () => {
     const error: any = await assertRaises([CompositePrimaryKeyMismatchError], {}, async () => {
-      const order = CpkBrokenOrderWithNonCpkBooks.new({
+      const order = new CpkBrokenOrderWithNonCpkBooks({
         id: [1, 2],
-        books: [CpkNonCpkBook.new({ title: "Some book" })],
+        books: [new CpkNonCpkBook({ title: "Some book" })],
       });
       await order.saveBang();
     });

@@ -10,7 +10,7 @@ registerModel(Post);
 describe("CollectionProxy to: :records delegates share one loader", () => {
   fixtures(["authors", "posts"]);
 
-  const newOwner = () => Author.new({ name: "unsaved" });
+  const newOwner = () => new Author({ name: "unsaved" });
 
   it("a Rails-named delegate marks the proxy loaded", async () => {
     const author = newOwner();

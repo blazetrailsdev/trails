@@ -50,7 +50,7 @@ describe("CollectionAssociation#size arms", () => {
     const assoc = association(author, "posts");
     const persisted = await Post.where({ author_id: author.id }).count();
 
-    assoc.addToTarget(Post.new({ title: "unsaved", body: "unsaved" }));
+    assoc.addToTarget(new Post({ title: "unsaved", body: "unsaved" }));
 
     expect(assoc.isLoaded()).toBe(false);
     expect(await assoc.size()).toBe(persisted + 1);

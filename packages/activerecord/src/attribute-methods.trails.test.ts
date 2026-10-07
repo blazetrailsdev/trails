@@ -571,7 +571,7 @@ describe("ActiveRecord attribute read/write surface lives on Base, not Model", (
     ["slice", (t: TrackingTopic) => t.slice("title")],
     ["valuesAt", (t: TrackingTopic) => t.valuesAt("title")],
   ] as const)("marks the field accessed when read through %s", (_label, read) => {
-    const t = AccessTopic.new({ title: "access-test", body: "hello" }) as TrackingTopic;
+    const t = new AccessTopic({ title: "access-test", body: "hello" }) as TrackingTopic;
     expect(t.accessedFields()).toEqual([]);
     read(t);
     expect(t.accessedFields()).toEqual(["title"]);

@@ -63,7 +63,7 @@ export async function create(
   }
   await this.ensureSchemaLoaded();
   let yielded: unknown;
-  const record = (this as any).new(
+  const record = new this(
     attributes,
     block &&
       ((record: any) => {
@@ -87,7 +87,7 @@ export async function createBang(
   }
   await this.ensureSchemaLoaded();
   let yielded: unknown;
-  const record = (this as any).new(
+  const record = new this(
     attributes,
     block &&
       ((record: any) => {
@@ -107,7 +107,7 @@ export function build(
   if (Array.isArray(attributes)) {
     return attributes.map((attr) => build.call(this, attr, block));
   } else {
-    return (this as any).new(attributes, block);
+    return new this(attributes, block);
   }
 }
 
@@ -601,14 +601,33 @@ export function becomes<
     initBlock?: (record: BecomesRecord) => void,
   ) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
-  return new klass({}, (becoming) => {
-    this._attributes.reverseMergeBang(becoming._attributes);
-    becoming._attributes = this._attributes;
-    becoming._newRecord = this._newRecord;
-    becoming._destroyed = this._destroyed;
-    becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
-    becoming.errors.copyBang(this.errors);
-  }) as InstanceType<K>;
+  const ctor = klass as unknown as {
+    _suppressStiNewDispatch?: unknown;
+    _suppressAbstractCheck?: boolean;
+  };
+  const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
+  const prev = ctor._suppressStiNewDispatch;
+  ctor._suppressStiNewDispatch = klass;
+  const hadOwnAbstract = Object.prototype.hasOwnProperty.call(ctor, "_suppressAbstractCheck");
+  const prevAbstract = ctor._suppressAbstractCheck;
+  ctor._suppressAbstractCheck = true;
+  let instance: InstanceType<K>;
+  try {
+    instance = new klass({}, (becoming) => {
+      this._attributes.reverseMergeBang(becoming._attributes);
+      becoming._attributes = this._attributes;
+      becoming._newRecord = this._newRecord;
+      becoming._destroyed = this._destroyed;
+      becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
+      becoming.errors.copyBang(this.errors);
+    }) as InstanceType<K>;
+  } finally {
+    if (hadOwn) ctor._suppressStiNewDispatch = prev;
+    else delete ctor._suppressStiNewDispatch;
+    if (hadOwnAbstract) ctor._suppressAbstractCheck = prevAbstract;
+    else delete ctor._suppressAbstractCheck;
+  }
+  return instance;
 }
 
 export function becomesBang<
