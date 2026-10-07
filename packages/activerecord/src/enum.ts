@@ -8,7 +8,14 @@ import {
   presence,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
-import { Module, include, rbInspect, registerConstant, toS } from "@blazetrails/ruby-compat";
+import {
+  Module,
+  include,
+  rbInspect,
+  rbModDefineMethod,
+  registerConstant,
+  toS,
+} from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
   isDangerousAttributeMethod,
@@ -189,10 +196,7 @@ function enumMethod(
 
 export { enumMethod as enum };
 
-/**
- * @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat
- * @internal
- */
+/** @internal */
 export function _enum(
   this: typeof import("./base.js").Base,
   name: string,
@@ -387,11 +391,10 @@ export function _enum(
   }
 
   const frozenMapping = Object.freeze({ ...mapping });
-  Object.defineProperty(this, pluralize(name), {
+  rbModDefineMethod({ prototype: this }, pluralize(name), {
     get() {
       return frozenMapping;
     },
-    configurable: true,
   });
 }
 

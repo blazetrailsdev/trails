@@ -1,6 +1,6 @@
 import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { NoMethodError, rbObjAsString } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,
@@ -94,13 +94,12 @@ export const Integration = {
 };
 
 export const ClassMethods = {
-  /** @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat */
   toParam(this: { name: string; prototype: any }, methodName?: string): string | undefined {
     if (methodName == null) {
       return this.name;
     }
     const klass = this;
-    klass.prototype.toParam = function (this: any): string | null {
+    rbModDefineMethod(klass, "toParam", function (this: any): string | null {
       let default_: string | null;
       let result: string;
       let param: string;
@@ -115,7 +114,7 @@ export const ClassMethods = {
       } else {
         return default_;
       }
-    };
+    });
     return undefined;
   },
 };

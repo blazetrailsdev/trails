@@ -3,6 +3,7 @@ import {
   rbEnsure,
   rbEqual,
   rbFSend,
+  rbModDefineMethod,
   rbModMethodDefined,
   zip,
 } from "@blazetrails/ruby-compat";
@@ -485,14 +486,11 @@ export function _ensureNoDuplicateErrors(this: AutosaveAssociationHost): void {
   this.errors.uniqBang();
 }
 
-/**
- * @internal
- * @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat
- */
+/** @internal */
 export function defineNonCyclicMethod(this: any, name: string, block: (this: any) => any): void {
-  if (Object.prototype.hasOwnProperty.call(this.prototype, name)) return;
+  if (rbModMethodDefined(this, name, false)) return;
 
-  this.prototype[name] = function (this: any) {
+  rbModDefineMethod(this, name, function (this: any) {
     let result: any = true;
     this._alreadyCalled ||= {};
     if (!this._alreadyCalled[name]) {
@@ -508,7 +506,7 @@ export function defineNonCyclicMethod(this: any, name: string, block: (this: any
     }
 
     return result;
-  };
+  });
 }
 
 /** @internal */
