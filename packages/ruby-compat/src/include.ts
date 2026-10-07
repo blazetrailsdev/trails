@@ -22,6 +22,7 @@
 
 import { ArgumentError } from "./argument-error.js";
 import { NameError } from "./name-error.js";
+import { isRegisteredConstant, registeredConstant } from "./variable.js";
 import { temporalTag } from "./temporal-tag.js";
 import { Enumerable } from "./enumerable.js";
 import { Hash } from "./hash.js";
@@ -118,7 +119,9 @@ export function rbModConstSet<T>(
  * `rb_mod_const_defined`, which raises `NameError` for a name that is not a
  * constant name and otherwise answers `rb_const_defined`: the constant on the
  * module or one of its ancestors, or on the module alone when `recur` is
- * false. Trails passes one name, never a `::` path.
+ * false. A `::` path is walked a segment at a time, each
+ * later segment read from the namespace before it alone, and the first also
+ * from the top-level table `registerConstant` fills.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -127,10 +130,22 @@ export function rbModConstDefined(
   name: string,
   recur: boolean = true,
 ): boolean {
-  if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(name)) {
-    throw new NameError(`wrong constant name ${name}`, name);
+  if (recur && isRegisteredConstant(name)) return true;
+  let c: unknown = mod;
+  for (const [i, part] of name.split("::").entries()) {
+    if (!/^[\p{Lu}\p{Lt}](?:\w|\P{ASCII})*$/u.test(part)) {
+      throw new NameError(`wrong constant name ${name}`, name);
+    }
+    if (c === null || (typeof c !== "object" && typeof c !== "function")) return false;
+    if (i === 0 && recur ? part in c : Object.prototype.hasOwnProperty.call(c, part)) {
+      c = (c as Record<string, unknown>)[part];
+    } else if (i === 0 && recur && isRegisteredConstant(part)) {
+      c = registeredConstant(part);
+    } else {
+      return false;
+    }
   }
-  return recur ? name in mod : Object.prototype.hasOwnProperty.call(mod, name);
+  return true;
 }
 
 /**

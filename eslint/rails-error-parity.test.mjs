@@ -45,10 +45,16 @@ const manifest = {
 
 manifest.bareRaises = {
   activerecord: {
-    "base.ts": { dump: ["ForbiddenClass"] },
-    "excluded.ts": { dump: ["ForbiddenClass"] },
+    "base.ts": {
+      "*": { dump: ["ForbiddenClass"] },
+      S: { dump: ["ForbiddenClass"], restore: ["RestoreError"] },
+      T: { load: ["ForbiddenClass"] },
+    },
+    "excluded.ts": { "*": { dump: ["ForbiddenClass"] } },
   },
+  rack: { "response.ts": { "*": { getHeader: ["ArgumentError"] } } },
 };
+manifest.errinfo = { activerecord: ["RestoreError"] };
 
 const excludedRel = "packages/activerecord/src/excluded.ts";
 
@@ -69,6 +75,7 @@ const { default: rule } = await import("./rails-error-parity.mjs");
 const errorsFile = path.join(REPO_ROOT, "packages/activerecord/src/errors.ts");
 const baseFile = path.join(REPO_ROOT, "packages/activerecord/src/base.ts");
 const excludedFile = path.join(REPO_ROOT, excludedRel);
+const rackFile = path.join(REPO_ROOT, "packages/rack/src/response.ts");
 const asErrorsFile = path.join(REPO_ROOT, "packages/activesupport/src/errors.ts");
 const asBaseFile = path.join(REPO_ROOT, "packages/activesupport/src/duration.ts");
 // Scattered (non-errors.ts) file: DelegationError maps here via delegation.rb.
@@ -114,6 +121,11 @@ tester.run("rails-error-parity", rule, {
     { filename: baseFile, code: `class S { dump() { throw new ForbiddenClass(); } }\n` },
     // The same class with a message in a method Rails does not raise it bare in.
     { filename: baseFile, code: `class S { load() { throw new ForbiddenClass("no"); } }\n` },
+    {
+      filename: baseFile,
+      code: `class S { restore() { try { f(); } catch (error) { throw new RestoreError(error); } } }\n`,
+    },
+    { filename: rackFile, code: `export function call() { throw new Error("no"); }\n` },
     // Throwing a ported error class is allowed.
     { filename: baseFile, code: `throw new RecordNotFound("nope");\n` },
     // An imported name shadows the global of the same spelling, so a ported
@@ -206,6 +218,31 @@ tester.run("rails-error-parity", rule, {
     {
       filename: baseFile,
       code: `export function _dump() { [1].forEach(() => { throw new Errors.ForbiddenClass("no"); }); }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class T { load() { throw new ForbiddenClass("no"); } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class U { dump() { throw new ForbiddenClass("no"); } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class S { dump() { try { f(); } catch (error) { throw new ForbiddenClass(error); } } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class T { dump() { throw new ForbiddenClass("no"); } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: rackFile,
+      code: `export function getHeader() { throw new ArgumentError("no"); }\n`,
       errors: [{ messageId: "inventedMessage" }],
     },
     // The exclude list grandfathers native throws only, never an invented message.

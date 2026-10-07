@@ -181,7 +181,7 @@ export function rbConstMissing(klass: object): void {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModConstMissing(klass: { name?: string } | null, name: string): never {
-  if (klass != null && klass !== globalThis) {
+  if (klass != null && klass !== globalThis && klass !== Object) {
     throw new NameError(`uninitialized constant ${klass.name}::${name}`, name);
   } else {
     throw new NameError(`uninitialized constant ${name}`, name);

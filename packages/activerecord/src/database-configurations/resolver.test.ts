@@ -22,7 +22,7 @@ describe("PoolConfig", () => {
       );
 
       expect(error.message).toMatch(
-        /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter package to your package\.json if it's not in the list of available adapters\.$/,
+        /^Database configuration specifies nonexistent 'ridiculous' adapter\. Available adapters are: .+\. Ensure that the adapter is spelled correctly in config\/database\.yml and that you've added the necessary adapter gem to your Gemfile if it's not in the list of available adapters\.$/,
       );
     });
 

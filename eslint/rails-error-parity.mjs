@@ -16,8 +16,9 @@
  *   3. Everywhere in scope, the exclude list included: `throw new X(message)`
  *      where the Rails file this one mirrors raises `X` with no message
  *      (`raise X` / `raise X unless …`) is flagged. The manifest's
- *      `bareRaises` lists, per TS file, the classes each Rails method raises
- *      bare and never with a message.
+ *      `bareRaises` lists, per TS file and per owning class (`*` for a
+ *      function with no class around it, or a class Rails does not name), the
+ *      classes each Rails method raises bare and never with a message.
  *      This arm has no baseline: it starts from zero.
  *
  * Pre-existing violators are grandfathered via the ratchet baseline
@@ -95,7 +96,7 @@ function loadExclude() {
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
   const m = norm.match(
-    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel)\/src\/.+\.ts)$/,
+    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel|actionpack|actionview|rack|trailties)\/src\/.+\.ts)$/,
   );
   return m ? { rel: m[1], pkg: m[2] } : null;
 }
@@ -152,6 +153,21 @@ function enclosingNames(node) {
     else if (id?.type === "PrivateIdentifier") names.push(id.name);
   }
   return names;
+}
+
+function enclosingClassName(node) {
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.type === "ClassDeclaration" || n.type === "ClassExpression") return n.id?.name ?? null;
+  }
+  return null;
+}
+
+function isRescuedException(node, args) {
+  if (args.length !== 1 || args[0].type !== "Identifier") return false;
+  for (let n = node.parent; n; n = n.parent) {
+    if (n.type === "CatchClause" && n.param?.name === args[0].name) return true;
+  }
+  return false;
 }
 
 function checkParity(context, exportedClasses, rubyCompatImports) {
@@ -229,23 +245,24 @@ const rule = {
     if (!scope) return {};
     const bareRaises =
       loadManifest().bareRaises?.[scope.pkg]?.[scope.rel.replace(/^packages\/[^/]+\/src\//, "")];
+    const errinfo = loadManifest().errinfo?.[scope.pkg] ?? [];
     const inventedMessage = {
       ThrowStatement(node) {
         const arg = node.argument;
         if (!bareRaises || arg?.type !== "NewExpression" || arg.arguments.length === 0) return;
         const name =
           arg.callee.type === "MemberExpression" ? arg.callee.property?.name : arg.callee.name;
-        if (
-          !enclosingNames(node).some(
-            (fn) => Object.hasOwn(bareRaises, fn) && bareRaises[fn].includes(name),
-          )
-        ) {
-          return;
-        }
+        const owned = bareRaises[enclosingClassName(node)];
+        const classes = enclosingNames(node).flatMap((fn) => [
+          ...(owned && Object.hasOwn(owned, fn) ? owned[fn] : []),
+          ...(bareRaises["*"] && Object.hasOwn(bareRaises["*"], fn) ? bareRaises["*"][fn] : []),
+        ]);
+        if (!classes.includes(name)) return;
+        if (errinfo.includes(name) && isRescuedException(node, arg.arguments)) return;
         context.report({ node: arg, messageId: "inventedMessage", data: { name } });
       },
     };
-    if (loadExclude().has(scope.rel)) return inventedMessage;
+    if (!PKG_NS[scope.pkg] || loadExclude().has(scope.rel)) return inventedMessage;
 
     const exportedClasses = new Map();
     // A name bound by an `import` shadows the global of the same spelling, so

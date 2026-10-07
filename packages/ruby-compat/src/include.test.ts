@@ -1,6 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
+import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
 import { Hash } from "./hash.js";
 import { rbCBasicObject, rbObjClass, rbModName, rbModToS, rbObjSingletonClass } from "./object.js";
 import {
@@ -1474,6 +1475,23 @@ describe("Module#const_defined?", () => {
     expect(rbModConstDefined(Reply, "Generated")).toBe(true);
     expect(rbModConstDefined(mod, "ATTR_d697")).toBe(true);
     expect(rbModConstDefined(mod, "Generated")).toBe(false);
+  });
+
+  it("rbModConstDefined walks a :: path from the top-level table", () => {
+    const db = { Adapters: { Mega: class {} } };
+    registerConstant("ConstDefinedTrailsDb", db);
+    try {
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb")).toBe(true);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Mega")).toBe(true);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb::Adapters::Nope")).toBe(false);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsNope::Adapters")).toBe(false);
+      expect(rbModConstDefined(Object, "ConstDefinedTrailsDb", false)).toBe(false);
+      expect(() => rbModConstGet(Object, "ConstDefinedTrailsNope")).toThrow(
+        "uninitialized constant ConstDefinedTrailsNope",
+      );
+    } finally {
+      unregisterConstant("ConstDefinedTrailsDb", db);
+    }
   });
 
   it("looks at the module alone when recur is false", () => {

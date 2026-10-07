@@ -1,42 +1,44 @@
 /**
  * The classes each Ruby method raises with no message argument (`raise Klass`,
  * `raise Klass unless …`, `raise Klass.new`) and never with one, keyed by the
- * method's TS spellings. A line scan keyed by method name alone: two classes in
- * one file that define the same method are read as one, so a class either of
- * them raises with a message is left out. It under-reports and never
- * over-reports. scripts/build-rails-error-manifest.ts writes the result for
+ * last segment of the module or class that owns the method and by the method's
+ * TS spellings. rails-bare-raises.rb reads the raises from Ripper, so a
+ * construction spanning lines, a heredoc message and a literal-named
+ * `define_method` body are all classified. The `*` owner holds what every owner
+ * in the file agrees on, for a TS function with no class around it.
+ * scripts/build-rails-error-manifest.ts writes the result for
  * `blazetrails/rails-error-parity`'s `inventedMessage` arm.
  */
+import { execFile } from "child_process";
+import * as path from "path";
+import { fileURLToPath } from "url";
+import { promisify } from "util";
 import { rubyMethodToTsIgnoringSkip } from "./conventions.js";
 
+export type RaiseRow = [owner: string | null, method: string, klass: string, kind: string];
 export type BareRaises = Record<string, string[]>;
+export type OwnedBareRaises = Record<string, BareRaises>;
 
-const DEF_RE = /^\s*def\s+(?:self\.)?([a-z_]\w*[?!=]?)/;
-const RAISE_RE = /\b(?:raise|fail)\s*\(?\s*(?:::)?((?:[A-Z]\w*::)*[A-Z]\w*[a-z]\w*)(\.new\b)?(.*)$/;
+export const ANY_OWNER = "*";
 
-/** `bare`, `message`, or null when the raise names no class this scan reads. */
-function raiseKind(construction: string | undefined, rest: string): "bare" | "message" | null {
-  const tail = rest.trim();
-  if (tail.startsWith(",")) return "message";
-  if (construction !== undefined && /^\(\s*\)/.test(tail)) return "bare";
-  if (construction !== undefined && tail !== "" && !/^(?:if|unless)\b/.test(tail)) return "message";
-  return tail === "" || /^(?:\)|\}|;|#|(?:if|unless|end|rescue)\b)/.test(tail) ? "bare" : null;
+const SCANNER = path.join(path.dirname(fileURLToPath(import.meta.url)), "rails-bare-raises.rb");
+
+/** Every class-naming raise in `files`, by file. */
+export async function scanRaises(files: string[]): Promise<Record<string, RaiseRow[]>> {
+  if (files.length === 0) return {};
+  const { stdout } = await promisify(execFile)("ruby", [SCANNER, ...files], {
+    maxBuffer: 1 << 28,
+  });
+  return JSON.parse(stdout);
 }
 
-export function scanBareRaises(text: string): BareRaises {
+function foldMethods(rows: RaiseRow[]): BareRaises {
   const byMethod = new Map<string, { bare: Set<string>; message: Set<string> }>();
-  let method: string | null = null;
-  for (const line of text.split("\n")) {
-    if (/^\s*#/.test(line)) continue;
-    method = DEF_RE.exec(line)?.[1] ?? method;
-    const m = RAISE_RE.exec(line);
-    if (!m) continue;
-    const kind = raiseKind(m[2], m[3]);
-    if (kind === null) continue;
-    if (method === null) continue;
+  for (const [, method, klass, kind] of rows) {
+    if (kind === "errinfo") continue;
     const sets = byMethod.get(method) ?? { bare: new Set(), message: new Set() };
     byMethod.set(method, sets);
-    sets[kind].add(m[1].split("::").pop()!);
+    sets[kind === "bare" ? "bare" : "message"].add(klass);
   }
   const methods: BareRaises = {};
   for (const [rubyName, sets] of byMethod) {
@@ -48,4 +50,24 @@ export function scanBareRaises(text: string): BareRaises {
     }
   }
   return methods;
+}
+
+/** The classes whose `initialize` reads `$!`, so a port passes the rescued exception. */
+export function errinfoClasses(rows: RaiseRow[]): string[] {
+  return rows.filter(([, , , kind]) => kind === "errinfo").map(([, , klass]) => klass);
+}
+
+export function foldBareRaises(rows: RaiseRow[]): OwnedBareRaises {
+  const byOwner = new Map<string, RaiseRow[]>([[ANY_OWNER, rows]]);
+  for (const row of rows) {
+    const owner = row[0]?.split("::").pop();
+    if (owner === undefined) continue;
+    byOwner.set(owner, [...(byOwner.get(owner) ?? []), row]);
+  }
+  const out: OwnedBareRaises = {};
+  for (const owner of [...byOwner.keys()].sort()) {
+    const methods = foldMethods(byOwner.get(owner)!);
+    if (Object.keys(methods).length > 0) out[owner] = methods;
+  }
+  return out;
 }

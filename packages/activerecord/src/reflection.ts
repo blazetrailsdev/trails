@@ -1609,33 +1609,6 @@ export class RuntimeReflection extends AbstractReflection {
   allIncludes(callback: () => any): any {
     return callback();
   }
-
-  override isThroughReflection(): boolean {
-    return this._reflection.isThroughReflection();
-  }
-
-  override isCollection(): boolean {
-    return this._reflection.isCollection();
-  }
-
-  override isPolymorphic(): boolean {
-    return this._reflection.isPolymorphic();
-  }
-
-  scopeFor(relation: unknown, owner?: unknown): unknown {
-    return asConcrete(this._reflection).scopeFor?.(relation, owner) ?? relation;
-  }
-
-  override get chain(): AbstractReflection[] {
-    return this._reflection.chain;
-  }
-
-  get sourceReflection(): AbstractReflection | null {
-    return (
-      (this._reflection as unknown as { sourceReflection?: AbstractReflection | null })
-        .sourceReflection ?? null
-    );
-  }
 }
 
 /** @internal */

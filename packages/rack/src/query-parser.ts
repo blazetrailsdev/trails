@@ -17,7 +17,7 @@ export class InvalidParameterError extends ArgumentError {
 include(InvalidParameterError, BadRequest);
 
 export class QueryLimitError extends RangeError {
-  constructor(message: string) {
+  constructor(message: string = "Rack::QueryParser::QueryLimitError") {
     super(message);
     this.name = "QueryLimitError";
   }
@@ -193,7 +193,7 @@ export class QueryParser {
   }
 
   private _normalizeParams(params: any, name: string | null, v: unknown, depth: number): any {
-    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
+    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError();
 
     let k: string;
     let after: string;

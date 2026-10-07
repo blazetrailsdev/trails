@@ -1,3 +1,4 @@
+import { ConnectionAdapters } from "../namespaces.js";
 import { prepend, type PrependMethod } from "@blazetrails/activesupport";
 import mysql from "mysql2/promise";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -9,7 +10,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { rbObjRespondTo, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjRespondTo, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -619,3 +620,5 @@ Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
 Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
 
 prepend(Mysql2Adapter.prototype, { selectAll: mysql2SelectAll as PrependMethod });
+
+rbModConstSet(ConnectionAdapters, "Mysql2Adapter", Mysql2Adapter);

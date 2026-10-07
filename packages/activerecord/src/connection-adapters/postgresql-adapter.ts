@@ -1,9 +1,17 @@
+import { ConnectionAdapters } from "../namespaces.js";
 import type {
   DatabaseConfig,
   DatabaseConfigOptions,
 } from "../database-configurations/database-config.js";
 import pg from "pg";
-import { block, excSetupMessage, fetch, setEnv, valuesAt } from "@blazetrails/ruby-compat";
+import {
+  block,
+  excSetupMessage,
+  fetch,
+  rbModConstSet,
+  setEnv,
+  valuesAt,
+} from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
@@ -2368,5 +2376,7 @@ Type.register("legacy_point", LegacyPoint, { adapter: "postgresql" });
 Type.register("uuid", Uuid, { adapter: "postgresql" });
 Type.register("vector", Vector, { adapter: "postgresql" });
 Type.register("xml", Xml, { adapter: "postgresql" });
+
+rbModConstSet(ConnectionAdapters, "PostgreSQLAdapter", PostgreSQLAdapter);
 
 runLoadHooks("active_record_postgresqladapter", PostgreSQLAdapter);

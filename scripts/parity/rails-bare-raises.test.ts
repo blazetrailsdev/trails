@@ -1,74 +1,113 @@
-import { describe, expect, it } from "vitest";
-import { scanBareRaises } from "./rails-bare-raises.js";
+import { mkdtemp, rm, writeFile } from "fs/promises";
+import { tmpdir } from "os";
+import * as path from "path";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { foldBareRaises, scanRaises } from "./rails-bare-raises.js";
 
-describe("scanBareRaises", () => {
-  it("records a bare raise under the method's TS spellings", () => {
+describe("bare raises", () => {
+  let dir: string;
+  beforeAll(async () => {
+    dir = await mkdtemp(path.join(tmpdir(), "rails-bare-raises-"));
+  });
+  afterAll(() => rm(dir, { recursive: true, force: true }));
+
+  async function scan(ruby: string) {
+    const file = path.join(dir, "scanned.rb");
+    await writeFile(file, ruby);
+    return foldBareRaises((await scanRaises([file]))[file] ?? []);
+  }
+
+  it("records a bare raise under the method's TS spellings", async () => {
     const ruby = `
-      def dump(message)
-        raise Errors::ForbiddenClass unless message.is_a?(Message)
-      end
+      module Coders
+        def dump(message)
+          raise Errors::ForbiddenClass unless message.is_a?(Message)
+        end
 
-      def table_exists?
-        raise(NotImplementedError)
-      end
+        def table_exists?
+          raise(NotImplementedError)
+        end
 
-      def check!
-        raise ArgumentError.new
+        def check!
+          raise ArgumentError.new
+        end
       end
     `;
-    expect(scanBareRaises(ruby)).toEqual({
+    const methods = {
       dump: ["ForbiddenClass"],
       isTableExists: ["NotImplementedError"],
       tableExists: ["NotImplementedError"],
       checkBang: ["ArgumentError"],
-    });
+    };
+    expect(await scan(ruby)).toEqual({ "*": methods, Coders: methods });
   });
 
-  it("leaves out a raise that carries a message", () => {
+  it("leaves out a raise that carries a message, on one line or several", async () => {
     const ruby = `
       def a
         raise ArgumentError, "no"
       end
 
       def b
-        raise ArgumentError.new("no")
+        raise ArgumentError.new(
+          "no"
+        )
       end
 
       def c
-        raise ArgumentError,
-          "no"
+        raise ArgumentError, <<~MSG.squish
+          no
+        MSG
       end
 
       def d
         raise "no"
       end
     `;
-    expect(scanBareRaises(ruby)).toEqual({});
+    expect(await scan(ruby)).toEqual({});
   });
 
-  it("leaves out a class one method raises both ways, and same-named methods of two classes", () => {
+  it("keys same-named methods of two classes by their owner", async () => {
     const ruby = `
-      class TypeMap
-        def register_type(key)
-          raise ::ArgumentError unless key
-          raise KeyError
+      module Type
+        class TypeMap
+          def register_type(key)
+            raise ::ArgumentError unless key
+            raise KeyError
+          end
         end
-      end
 
-      class HashLookupTypeMap
-        def register_type(key)
-          raise ::ArgumentError, "key is required" unless key
+        class HashLookupTypeMap
+          def register_type(key)
+            raise ::ArgumentError, "key is required" unless key
+          end
         end
       end
     `;
-    expect(scanBareRaises(ruby)).toEqual({ registerType: ["KeyError"] });
+    expect(await scan(ruby)).toEqual({
+      "*": { registerType: ["KeyError"] },
+      TypeMap: { registerType: ["ArgumentError", "KeyError"] },
+    });
   });
 
-  it("skips comments and raises outside a method", () => {
+  it("reads a define_method body, and skips comments and raises outside a method", async () => {
     const ruby = `
-      # raise ArgumentError
-      raise LoadError unless defined?(Foo)
+      class Railtie
+        # raise ArgumentError
+        raise LoadError unless defined?(Foo)
+
+        define_method(:abstract_railtie?) { raise NotImplementedError }
+
+        def self.generate(name)
+          define_method("#{name}=") { raise FrozenError }
+        end
+      end
     `;
-    expect(scanBareRaises(ruby)).toEqual({});
+    const methods = {
+      isAbstractRailtie: ["NotImplementedError"],
+      abstractRailtie: ["NotImplementedError"],
+      generate: ["FrozenError"],
+    };
+    expect(await scan(ruby)).toEqual({ "*": methods, Railtie: methods });
   });
 });
