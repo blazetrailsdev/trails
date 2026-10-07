@@ -53,6 +53,7 @@ export class DatabaseConfig {
     );
   }
 
+  /** @inventedArm load — PERMANENT */
   async validateBang(): Promise<true> {
     if (this.adapter != null) {
       await ConnectionAdapters.load(this.adapter);
