@@ -245,8 +245,23 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     };
     const column = { oid: 23, fmod: -1, sqlType: "integer" };
 
-    expect(lookupCastTypeFromColumn.call({ typeMap }, column)).toBe(sentinel);
+    expect(lookupCastTypeFromColumn.call({ typeMap, verifyBang: async () => {} }, column)).toBe(
+      sentinel,
+    );
     expect(calls).toEqual([[23, -1, "integer"]]);
+  });
+
+  it("lookupCastTypeFromColumn starts verify! when no type map is built", () => {
+    let verified = 0;
+    const host = {
+      typeMap: null,
+      async verifyBang() {
+        verified += 1;
+      },
+    };
+
+    expect(() => lookupCastTypeFromColumn.call(host, { oid: 23, fmod: -1 })).toThrow(TypeError);
+    expect(verified).toBe(1);
   });
 
   describe("columnNameWithOrderMatcher", () => {
@@ -327,9 +342,9 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     expect(quoteFn.call(quotingHost({ quotedDate }), v)).toBe("'0044-03-15 BC'");
   });
 
-  it("typeCast maps the infinity sentinels to the PG wire strings", () => {
-    expect(typeCast(DateInfinity)).toBe("infinity");
-    expect(typeCast(DateNegativeInfinity)).toBe("-infinity");
+  it("typeCast hands the infinity sentinels to super as Numerics", () => {
+    expect(typeCast(DateInfinity)).toBe(Infinity);
+    expect(typeCast(DateNegativeInfinity)).toBe(-Infinity);
   });
 
   it("typeCast(new Date()) casts it as a Time", () => {

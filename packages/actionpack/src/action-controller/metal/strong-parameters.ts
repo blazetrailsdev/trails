@@ -147,7 +147,8 @@ export interface Parameters {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Parameters {
-  private _data: HashWithIndifferentAccess<unknown>;
+  /** @internal */
+  protected parameters: HashWithIndifferentAccess<unknown>;
   private _permitted: boolean;
   private loggingContext: Record<string, unknown>;
   private _convertedArrays?: Set<string>;
@@ -167,10 +168,10 @@ export class Parameters {
   }
 
   constructor(
-    data: Record<string, unknown> | Hash<string, unknown> = {},
+    parameters: Record<string, unknown> | Hash<string, unknown> = {},
     loggingContext: Record<string, unknown> = {},
   ) {
-    this._data = withIndifferentAccess(data);
+    this.parameters = withIndifferentAccess(parameters);
     this.loggingContext = loggingContext;
     this._permitted = Parameters.permitAllParameters;
   }
@@ -216,7 +217,7 @@ export class Parameters {
     if (value === false || (value !== null && value !== undefined && !isBlank(value))) {
       return value;
     }
-    throw new ParameterMissing(key, [...this._data.keys()]);
+    throw new ParameterMissing(key, [...this.parameters.keys()]);
   }
 
   declare required: Parameters["require"];
@@ -249,11 +250,11 @@ export class Parameters {
   }
 
   get(key: string): unknown {
-    return this._convertHashesToParameters(key, this._data.get(key));
+    return this._convertHashesToParameters(key, this.parameters.get(key));
   }
 
   set(key: string, value: unknown): void {
-    this._data.set(key, value);
+    this.parameters.set(key, value);
   }
 
   hasValue(value: unknown): boolean {
@@ -262,7 +263,7 @@ export class Parameters {
   }
 
   include(key: string): boolean {
-    return this._data.include(key);
+    return this.parameters.include(key);
   }
 
   declare hasKey: Parameters["include"];
@@ -270,11 +271,11 @@ export class Parameters {
   declare member: Parameters["include"];
 
   exclude(key: string): boolean {
-    return !this._data.include(key);
+    return !this.parameters.include(key);
   }
 
   get keys(): string[] {
-    return [...this._data.keys()];
+    return [...this.parameters.keys()];
   }
 
   get values(): unknown[] {
@@ -284,36 +285,36 @@ export class Parameters {
   }
 
   isEmpty(): boolean {
-    return isEmpty(this._data);
+    return isEmpty(this.parameters);
   }
 
   except(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this._data.except(...keys));
+    return this._newWithInheritedPermitted(this.parameters.except(...keys));
   }
 
   declare without: Parameters["except"];
 
   slice(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this._data.slice(...keys));
+    return this._newWithInheritedPermitted(this.parameters.slice(...keys));
   }
 
   sliceBang(...keys: string[]): this {
-    this._data.sliceBang(...keys);
+    this.parameters.sliceBang(...keys);
     return this;
   }
 
   extractBang(...keys: string[]): Parameters {
-    return this._newWithInheritedPermitted(this._data.extractBang(...keys));
+    return this._newWithInheritedPermitted(this.parameters.extractBang(...keys));
   }
 
   merge(otherHash: Parameters | Record<string, unknown>): Parameters {
     const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    return this._newWithInheritedPermitted(this._data.merge(otherData));
+    return this._newWithInheritedPermitted(this.parameters.merge(otherData));
   }
 
   mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    this._data.mergeBang(otherData, ...(block ? [block] : []));
+    this.parameters.mergeBang(otherData, ...(block ? [block] : []));
     return this;
   }
 
@@ -329,69 +330,69 @@ export class Parameters {
 
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
     const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    return this._newWithInheritedPermitted(withIndifferentAccess(otherData).merge(this._data));
+    return this._newWithInheritedPermitted(withIndifferentAccess(otherData).merge(this.parameters));
   }
 
   declare withDefaults: Parameters["reverseMerge"];
 
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
     const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    this._data.mergeBang(otherData, (_key: string, left: unknown, _right: unknown) => left);
+    this.parameters.mergeBang(otherData, (_key: string, left: unknown, _right: unknown) => left);
     return this;
   }
 
   declare withDefaultsBang: Parameters["reverseMergeBang"];
 
   transformKeys(fn: (key: string) => string): Parameters {
-    return this._newWithInheritedPermitted(this._data.transformKeys(fn));
+    return this._newWithInheritedPermitted(this.parameters.transformKeys(fn));
   }
 
   transformKeysBang(fn: (key: string) => string): this {
-    this._data.transformKeysBang(fn);
+    this.parameters.transformKeysBang(fn);
     return this;
   }
 
   deepTransformKeys(fn: (key: string) => string): Parameters {
     return this._newWithInheritedPermitted(
-      (this._deepTransformKeysInObject(this._data, fn) as Parameters).toUnsafeH(),
+      (this._deepTransformKeysInObject(this.parameters, fn) as Parameters).toUnsafeH(),
     );
   }
 
   deepTransformKeysBang(fn: (key: string) => string): this {
-    this._data = withIndifferentAccess(
-      (this._deepTransformKeysInObject(this._data, fn) as Parameters).toUnsafeH(),
+    this.parameters = withIndifferentAccess(
+      (this._deepTransformKeysInObject(this.parameters, fn) as Parameters).toUnsafeH(),
     );
     return this;
   }
 
   transformValues(fn: (value: unknown) => unknown): Parameters {
     return this._newWithInheritedPermitted(
-      this._data.transformValues((v) => fn(this._convertValueToParameters(v))),
+      this.parameters.transformValues((v) => fn(this._convertValueToParameters(v))),
     );
   }
 
   transformValuesBang(fn: (value: unknown) => unknown): this {
-    this._data.transformValuesBang((v) => fn(this._convertValueToParameters(v)));
+    this.parameters.transformValuesBang((v) => fn(this._convertValueToParameters(v)));
     return this;
   }
 
   select(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this._data.select(fn));
+    return this._newWithInheritedPermitted(this.parameters.select(fn));
   }
 
   selectBang(fn: (key: string, value: unknown) => boolean): this {
-    this._data.selectBang(fn);
+    this.parameters.selectBang(fn);
     return this;
   }
 
   declare keepIf: Parameters["selectBang"];
 
   reject(fn: (key: string, value: unknown) => boolean): Parameters {
-    return this._newWithInheritedPermitted(this._data.reject(fn));
+    return this._newWithInheritedPermitted(this.parameters.reject(fn));
   }
 
   rejectBang(fn: (key: string, value: unknown) => boolean): this {
-    this._data.rejectBang(fn);
+    this.parameters.rejectBang(fn);
     return this;
   }
 
@@ -399,12 +400,12 @@ export class Parameters {
 
   compact(): Parameters {
     return this._newWithInheritedPermitted(
-      this._data.compact() as HashWithIndifferentAccess<unknown>,
+      this.parameters.compact() as HashWithIndifferentAccess<unknown>,
     );
   }
 
   compactBang(): this | null {
-    return this._data.compactBang() ? this : null;
+    return this.parameters.compactBang() ? this : null;
   }
 
   compactBlank(): Parameters {
@@ -416,11 +417,11 @@ export class Parameters {
   }
 
   valuesAt(...keys: string[]): unknown[] {
-    return this._convertValueToParameters(this._data.valuesAt(...keys)) as unknown[];
+    return this._convertValueToParameters(this.parameters.valuesAt(...keys)) as unknown[];
   }
 
   eachPair(fn: (key: string, value: unknown) => void): this {
-    for (const [key, value] of this._data) {
+    for (const [key, value] of this.parameters) {
       fn(key, this._convertHashesToParameters(key, value));
     }
     return this;
@@ -429,14 +430,14 @@ export class Parameters {
   declare each: Parameters["eachPair"];
 
   eachValue(fn: (value: unknown) => void): this {
-    eachPair(this._data, (key, value) => {
+    eachPair(this.parameters, (key, value) => {
       fn(this._convertHashesToParameters(key, value));
     });
     return this;
   }
 
   eachKey(fn: (key: string) => void): this {
-    for (const k of this._data.keys()) {
+    for (const k of this.parameters.keys()) {
       fn(k);
     }
     return this;
@@ -445,7 +446,7 @@ export class Parameters {
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
     return this._convertValueToParameters(
-      this._data.fetch(key, () => {
+      this.parameters.fetch(key, () => {
         if (blockGiven) {
           return blockGiven();
         } else {
@@ -453,7 +454,7 @@ export class Parameters {
             args,
             0,
             blockOf(() => {
-              throw new ParameterMissing(key, [...this._data.keys()]);
+              throw new ParameterMissing(key, [...this.parameters.keys()]);
             }),
           );
         }
@@ -465,13 +466,13 @@ export class Parameters {
     if (keys.length === 0) {
       throw new Error("wrong number of arguments (given 0, expected 1+)");
     }
-    this._convertHashesToParameters(keys[0], this._data.get(keys[0]));
-    return this._data.dig(...(keys as [string, ...string[]]));
+    this._convertHashesToParameters(keys[0], this.parameters.get(keys[0]));
+    return this.parameters.dig(...(keys as [string, ...string[]]));
   }
 
   delete(key: string, ...args: unknown[]): unknown {
-    if (this._data.has(key)) {
-      return this._convertValueToParameters(this._data.delete(key));
+    if (this.parameters.has(key)) {
+      return this._convertValueToParameters(this.parameters.delete(key));
     }
     if (typeof args[0] === "function") {
       return (args[0] as (key: string) => unknown)(key);
@@ -483,7 +484,7 @@ export class Parameters {
     if (!this._permitted) {
       throw new UnfilteredParameters();
     }
-    const result = this._convertParametersToHashes(this._data, "toH");
+    const result = this._convertParametersToHashes(this.parameters, "toH");
     if (block) {
       const transformed: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(result as Record<string, unknown>)) {
@@ -497,17 +498,17 @@ export class Parameters {
 
   toHash(): Record<string, unknown> {
     if (this._permitted) {
-      return this._convertParametersToHashes(this._data, "toHash") as Record<string, unknown>;
+      return this._convertParametersToHashes(this.parameters, "toHash") as Record<string, unknown>;
     }
     throw new UnfilteredParameters();
   }
 
   asJson(options: Record<string, unknown> | null = null): Record<string, unknown> {
-    return asJson(this._data, options) as Record<string, unknown>;
+    return asJson(this.parameters, options) as Record<string, unknown>;
   }
 
   toUnsafeH(): Record<string, unknown> {
-    return this._convertParametersToHashes(this._data, "toUnsafeH") as Record<string, unknown>;
+    return this._convertParametersToHashes(this.parameters, "toUnsafeH") as Record<string, unknown>;
   }
 
   declare toUnsafeHash: Parameters["toUnsafeH"];
@@ -547,42 +548,42 @@ export class Parameters {
   }
 
   hash(): number {
-    return rbHash([this.constructor, this._data, this._permitted]);
+    return rbHash([this.constructor, this.parameters, this._permitted]);
   }
 
   toString(): string {
-    return rbInspect(this._data);
+    return rbInspect(this.parameters);
   }
 
   inspect(): string {
-    return `#<${rbModName(rbObjClass(this))} ${rbInspect(this._data)} permitted: ${this._permitted}>`;
+    return `#<${rbModName(rbObjClass(this))} ${rbInspect(this.parameters)} permitted: ${this._permitted}>`;
   }
 
   initWith(coder: Psych.Coder): void {
     switch (coder[coderTag]) {
       case "!ruby/hash:ActionController::Parameters":
-        this._data = withIndifferentAccess({ ...coder });
+        this.parameters = withIndifferentAccess({ ...coder });
         this._permitted = false;
         break;
       case "!ruby/hash-with-ivars:ActionController::Parameters":
-        this._data = withIndifferentAccess(coder["elements"] as Record<string, unknown>);
+        this.parameters = withIndifferentAccess(coder["elements"] as Record<string, unknown>);
         this._permitted = (coder["ivars"] as Record<string, boolean>)[":@permitted"];
         break;
       case "!ruby/object:ActionController::Parameters":
-        this._data = coder["parameters"] as HashWithIndifferentAccess<unknown>;
+        this.parameters = coder["parameters"] as HashWithIndifferentAccess<unknown>;
         this._permitted = coder["permitted"] as boolean;
         break;
     }
   }
 
   encodeWith(coder: Psych.Coder): void {
-    coder["parameters"] = this._data;
+    coder["parameters"] = this.parameters;
     coder["permitted"] = this._permitted;
   }
 
   deepDup(): Parameters {
     const duplicate = new (this.constructor as typeof Parameters)(
-      deepDup(this._data),
+      deepDup(this.parameters),
       this.loggingContext,
     );
     duplicate._permitted = this._permitted;
@@ -591,14 +592,14 @@ export class Parameters {
 
   /** @missingRailsArgs split — PERMANENT */
   extractValue(key: string, delimiter = "_"): string[] | null {
-    const val = this._data.get(key);
+    const val = this.parameters.get(key);
     if (val === null || val === undefined) return null;
     return String(val).split(delimiter);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    if (this.hasKey(permittedKey) && isPermittedScalar(this._data.get(permittedKey))) {
-      params._data.set(permittedKey, this._data.get(permittedKey));
+    if (this.hasKey(permittedKey) && isPermittedScalar(this.parameters.get(permittedKey))) {
+      params.parameters.set(permittedKey, this.parameters.get(permittedKey));
     }
     const re = /\(\d+[if]?\)$/;
     this.eachKey((key) => {
@@ -606,7 +607,8 @@ export class Parameters {
       if (!m) return;
       const preMatch = key.slice(0, m.index);
       if (preMatch !== permittedKey) return;
-      if (isPermittedScalar(this._data.get(key))) params._data.set(key, this._data.get(key));
+      if (isPermittedScalar(this.parameters.get(key)))
+        params.parameters.set(key, this.parameters.get(key));
     });
   }
 
@@ -664,7 +666,7 @@ export class Parameters {
   private _convertHashesToParameters(key: string, value: unknown): unknown {
     const converted = this._convertValueToParameters(value);
     if (converted !== value) {
-      this._data.set(key, converted);
+      this.parameters.set(key, converted);
     }
     return converted;
   }
@@ -691,13 +693,8 @@ export class Parameters {
   }
 
   /** @internal */
-  get parameters(): HashWithIndifferentAccess<unknown> {
-    return this._data;
-  }
-
-  /** @internal */
   isNestedAttributes(): boolean {
-    return this._data.any(([k, v]) => Parameters.nestedAttribute(k, v));
+    return this.parameters.any(([k, v]) => Parameters.nestedAttribute(k, v));
   }
 
   /** @internal */
@@ -762,7 +759,7 @@ export class Parameters {
       return object;
     }
     if (object instanceof Parameters) {
-      this._deepTransformKeysInObjectBang(object._data, fn);
+      this._deepTransformKeysInObjectBang(object.parameters, fn);
       return object;
     }
     if (isPlainObject(object)) {
@@ -992,7 +989,7 @@ export class Parameters {
       return result;
     }
     if (object instanceof Parameters) {
-      const result = this._deepTransformKeysInObject(object._data, fn) as Parameters;
+      const result = this._deepTransformKeysInObject(object.parameters, fn) as Parameters;
       result._permitted = object._permitted;
       return result;
     }
@@ -1011,7 +1008,7 @@ export class Parameters {
 
   /** @internal */
   protected initializeCopy(_source: this): void {
-    this._data = this._data.dup();
+    this.parameters = this.parameters.dup();
   }
 }
 
