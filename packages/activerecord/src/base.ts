@@ -1586,7 +1586,6 @@ export class Base extends Model {
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
 
-  /** @inventedArm new — CONVERGEABLE base-constructor-enters-inheritance-new-for-a-bare-new */
   constructor(
     attributes: Record<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,

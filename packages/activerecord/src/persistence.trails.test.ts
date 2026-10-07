@@ -67,6 +67,43 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(topic.id)).title).toBe("after");
   });
 
+  it("a bare new runs the block and the initialize callbacks once", () => {
+    class Counted extends Topic {}
+    let initialized = 0;
+    Counted.afterInitialize(() => {
+      initialized += 1;
+    });
+    let yielded = 0;
+    const topic = new Counted({ title: "a" }, () => {
+      yielded += 1;
+    });
+    expect(topic).toBeInstanceOf(Counted);
+    expect([initialized, yielded]).toEqual([1, 1]);
+  });
+
+  it("a constructor that throws before super leaves the next bare new on Inheritance#new", () => {
+    let failing = true;
+    class Throwing extends Topic {
+      static override abstractClass = false;
+      constructor(...args: ConstructorParameters<typeof Topic>) {
+        if (failing) throw new Error("before super");
+        super(...args);
+      }
+    }
+    expect(() => Throwing.new()).toThrow("before super");
+    failing = false;
+    Throwing.abstractClass = true;
+    expect(() => new Throwing()).toThrow("is an abstract class and cannot be instantiated.");
+  });
+
+  it("create inside a scope keeps an explicit attribute over the scope's", async () => {
+    const scope = Topic.where({ title: "scoped", author_name: "Scope" });
+    const topic = await scope.scoping(() => Topic.create({ title: "explicit" }));
+    expect([topic.title, topic.author_name]).toEqual(["explicit", "Scope"]);
+    const built = scope.scoping(() => Topic.new({ title: "explicit" }));
+    expect([built.title, built.author_name]).toEqual(["explicit", "Scope"]);
+  });
+
   it("create with an array recurses and returns an array of records", async () => {
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);

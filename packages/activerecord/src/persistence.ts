@@ -594,7 +594,10 @@ interface BecomesRecord {
   errors: { copyBang(other: unknown): unknown };
 }
 
-/** @missingRailsName instanceVariableGet — PERMANENT */
+/**
+ * @missingRailsName instanceVariableGet — PERMANENT
+ * @inventedArm try — CONVERGEABLE base-constructor-enters-inheritance-new-for-a-bare-new
+ */
 export function becomes<
   T extends BecomesRecord,
   K extends new (
@@ -603,15 +606,18 @@ export function becomes<
   ) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
   _instantiation.klass = klass;
-  const instance = new klass({}, (becoming) => {
-    this._attributes.reverseMergeBang(becoming._attributes);
-    becoming._attributes = this._attributes;
-    becoming._newRecord = this._newRecord;
-    becoming._destroyed = this._destroyed;
-    becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
-    becoming.errors.copyBang(this.errors);
-  }) as InstanceType<K>;
-  return instance;
+  try {
+    return new klass({}, (becoming) => {
+      this._attributes.reverseMergeBang(becoming._attributes);
+      becoming._attributes = this._attributes;
+      becoming._newRecord = this._newRecord;
+      becoming._destroyed = this._destroyed;
+      becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
+      becoming.errors.copyBang(this.errors);
+    }) as InstanceType<K>;
+  } finally {
+    _instantiation.klass = null;
+  }
 }
 
 export function becomesBang<
