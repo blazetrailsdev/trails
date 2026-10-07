@@ -7,6 +7,7 @@ import {
   assertNoDifference,
   assertRaises,
   assertInDelta,
+  Logger,
 } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -16,7 +17,6 @@ import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName } from "./support/quote-regex.js";
 import { regexpEscape, StringIO } from "@blazetrails/ruby-compat";
-import { Logger } from "@blazetrails/activesupport";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
