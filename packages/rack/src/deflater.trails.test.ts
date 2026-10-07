@@ -119,3 +119,12 @@ it("finishes a synchronous generic body only after its sync flushes", async () =
   expect(log).toEqual(["flushed", "flushed", "finish"]);
   expect(getZlib().gunzip(Buffer.concat(written)).toString()).toBe("onetwo");
 });
+
+it("gzips a byte part untouched and a String part as its UTF-8 bytes", async () => {
+  const bytes = Uint8Array.from([0x00, 0x80, 0xe2, 0xff, 0x41]);
+  const written: Uint8Array[] = [];
+  await new GzipStream([bytes, "café —"], null, true).each((data) => written.push(data));
+
+  const inflated = Buffer.from(getZlib().gunzip(Buffer.concat(written)));
+  expect(inflated.equals(Buffer.concat([bytes, Buffer.from("café —", "utf8")]))).toBe(true);
+});

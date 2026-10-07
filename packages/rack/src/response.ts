@@ -199,7 +199,7 @@ export abstract class Helpers {
       if (Array.isArray(this._body)) {
         this._body = this._body.filter((p: any) => p !== null && p !== undefined);
         this.length = this._body.reduce(
-          (s: number, p: string) => s + Buffer.byteLength(String(p)),
+          (s: number, p: string | Uint8Array) => s + Buffer.byteLength(p),
           0,
         );
         this._buffered = true;
@@ -208,13 +208,13 @@ export abstract class Helpers {
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        oldBody.each((part: unknown) => this.append(toS(part)));
+        oldBody.each((part: string | Uint8Array) => this.append(toS(part)));
       } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
         const oldBody = this._body;
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        for (const part of oldBody) this.append(toS(part));
+        for (const part of oldBody as Iterable<string | Uint8Array>) this.append(toS(part));
       } else {
         this._buffered = false;
       }
@@ -273,7 +273,7 @@ export class Response {
     } else if (Array.isArray(body)) {
       this._body = body;
       this._buffered = true;
-      this.length = body.reduce((s: number, p: string) => s + Buffer.byteLength(String(p)), 0);
+      this.length = body.reduce((s: number, p: string | Uint8Array) => s + Buffer.byteLength(p), 0);
     } else {
       this._body = body;
       this._buffered = null;
@@ -359,13 +359,13 @@ export class Response {
     }
   }
 
-  write(chunk: string): void {
+  write(chunk: string | Uint8Array): void {
     this.bufferedBodyBang();
     if (this._buffered && Array.isArray(this._body) && !this._bodyCloned) {
       this._body = [...this._body];
       this._bodyCloned = true;
     }
-    this._writer(String(chunk));
+    this._writer(toS(chunk));
   }
   private _bodyCloned = false;
 
