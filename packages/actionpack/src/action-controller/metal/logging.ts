@@ -3,7 +3,7 @@ import {
   type ActionCallbackHost,
   type CallbackOptions,
 } from "../../abstract-controller/callbacks.js";
-import type { LogLevel } from "@blazetrails/activesupport";
+import { Concern, Module, extend, type LogLevel } from "@blazetrails/activesupport";
 
 interface LoggedController {
   logger: { logAt(level: number | LogLevel, fn: () => void): void };
@@ -20,3 +20,10 @@ export function logAt(
     options,
   );
 }
+
+export const ClassMethods = { logAt };
+
+export const Logging = new Module((mod) => {
+  extend(mod, Concern);
+}) as Module & { ClassMethods: typeof ClassMethods };
+Logging.ClassMethods = ClassMethods;

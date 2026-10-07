@@ -24,6 +24,7 @@ import type { TimeZoneConversion } from "./attribute-methods/time-zone-conversio
 import type { Write } from "./attribute-methods/write.js";
 import type { Base } from "./base.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
@@ -293,6 +294,7 @@ export const ConnectionAdapters = {
   loadPath,
 } as AutoloadModule & {
   ConnectionPool: typeof ConnectionPool;
+  PostgreSQLAdapter: typeof PostgreSQLAdapter;
   register: typeof register;
   load: typeof load;
   resolve: typeof resolve;

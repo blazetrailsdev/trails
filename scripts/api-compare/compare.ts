@@ -3515,7 +3515,10 @@ export function mixinMethodCreditedToOwnFile(
   const tsFile = rubyFileToTs(mixinFile, pkg);
   const mixinTsMethods = tsMethodsByFile.get(tsFile);
   if (mixinTsMethods === undefined) return null;
-  const tsName = candidates.find((c) => mixinTsMethods.has(c));
+  const tsName =
+    rm.rubyName === "initialize" && mixinTsMethods.has(MODULE_INITIALIZE_HOOK)
+      ? MODULE_INITIALIZE_HOOK
+      : candidates.find((c) => mixinTsMethods.has(c));
   return tsName === undefined ? null : { tsName, tsFile };
 }
 

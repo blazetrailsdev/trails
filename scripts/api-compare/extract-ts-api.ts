@@ -1462,7 +1462,7 @@ export function extractFromProgram(
 
     forEachCallNamed(sourceFile, "include", (call) => {
       if (call.arguments.length < 2) return;
-      const [hostArg, modArg] = call.arguments;
+      const [hostArg, modArg0] = call.arguments;
       if (!ts.isIdentifier(hostArg)) return;
 
       const hostSym0 = checker.getSymbolAtLocation(hostArg);
@@ -1501,67 +1501,70 @@ export function extractFromProgram(
         }
       };
 
-      // Inline object literal: `include(Host, { foo() {...}, bar: ... })`.
-      // No module name to reference — push methods straight onto the host.
-      if (ts.isObjectLiteralExpression(modArg)) {
-        pushMethods(harvestObjectLiteralMethods(modArg, checker, hostInfo.file ?? ""));
-        return;
-      }
-
-      // Property access: `include(Host, NS.InstanceMethods)`. The bare
-      // name "InstanceMethods" collides heavily across files (every
-      // concern declares one), so we can't push it onto host.extends
-      // and rely on path-proximity resolution. Resolve the property
-      // symbol back to its declaration and push its methods directly.
-      if (ts.isPropertyAccessExpression(modArg) && ts.isIdentifier(modArg.name)) {
-        const sym0 = checker.getSymbolAtLocation(modArg);
-        const resolved =
-          sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-        const propDecl = resolved?.valueDeclaration ?? resolved?.declarations?.[0];
-        if (
-          propDecl &&
-          ts.isVariableDeclaration(propDecl) &&
-          propDecl.initializer &&
-          ts.isObjectLiteralExpression(propDecl.initializer)
-        ) {
-          pushMethods(
-            harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
-          );
-        }
-        return;
-      }
-
-      // Bare identifier: `include(Host, Mod)`. Two sub-cases:
-      //
-      // (a) Mod is a class / interface — push its name onto host.extends so
-      //     compare.ts's getInherited() walker resolves it via tsByShort.
-      //     Imports may rebind (`import { Math as MathMixin }`), so follow
-      //     the alias to the original symbol's name.
-      //
-      // (b) Mod is a `const` object literal (e.g. `export const QueryMethods
-      //     = { foo, bar } as const`). The extractor never creates a class/module
-      //     entry for plain objects, so pushing the name to extends would leave
-      //     it unresolvable. Instead, harvest the object's method keys directly
-      //     onto the host — same treatment as the inline-object and
-      //     property-access branches above.
-      //     `defineModule(...)` (activesupport/include.ts) composes one such
-      //     module out of its sections, so its arguments are harvested instead.
-      if (ts.isIdentifier(modArg)) {
-        const sym0 = checker.getSymbolAtLocation(modArg);
-        const sym =
-          sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
-
-        // (b): const object literal → harvest directly, then fall through to
-        // also push the name onto extends for compare.ts resolution.
-        for (const literal of moduleObjectLiterals(sym, checker)) {
-          pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+      const includeOne = (modArg: ts.Expression): void => {
+        // Inline object literal: `include(Host, { foo() {...}, bar: ... })`.
+        // No module name to reference — push methods straight onto the host.
+        if (ts.isObjectLiteralExpression(modArg)) {
+          pushMethods(harvestObjectLiteralMethods(modArg, checker, hostInfo.file ?? ""));
+          return;
         }
 
-        // (a): class / interface / module — push name for later resolution.
-        const modName = extendsModuleName(sym, modArg);
-        if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
-        recordExtendsFile(hostInfo, modName, sym, srcDir);
-      }
+        // Property access: `include(Host, NS.InstanceMethods)`. The bare
+        // name "InstanceMethods" collides heavily across files (every
+        // concern declares one), so we can't push it onto host.extends
+        // and rely on path-proximity resolution. Resolve the property
+        // symbol back to its declaration and push its methods directly.
+        if (ts.isPropertyAccessExpression(modArg) && ts.isIdentifier(modArg.name)) {
+          const sym0 = checker.getSymbolAtLocation(modArg);
+          const resolved =
+            sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+          const propDecl = resolved?.valueDeclaration ?? resolved?.declarations?.[0];
+          if (
+            propDecl &&
+            ts.isVariableDeclaration(propDecl) &&
+            propDecl.initializer &&
+            ts.isObjectLiteralExpression(propDecl.initializer)
+          ) {
+            pushMethods(
+              harvestObjectLiteralMethods(propDecl.initializer, checker, hostInfo.file ?? ""),
+            );
+          }
+          return;
+        }
+
+        // Bare identifier: `include(Host, Mod)`. Two sub-cases:
+        //
+        // (a) Mod is a class / interface — push its name onto host.extends so
+        //     compare.ts's getInherited() walker resolves it via tsByShort.
+        //     Imports may rebind (`import { Math as MathMixin }`), so follow
+        //     the alias to the original symbol's name.
+        //
+        // (b) Mod is a `const` object literal (e.g. `export const QueryMethods
+        //     = { foo, bar } as const`). The extractor never creates a class/module
+        //     entry for plain objects, so pushing the name to extends would leave
+        //     it unresolvable. Instead, harvest the object's method keys directly
+        //     onto the host — same treatment as the inline-object and
+        //     property-access branches above.
+        //     `defineModule(...)` (activesupport/include.ts) composes one such
+        //     module out of its sections, so its arguments are harvested instead.
+        if (ts.isIdentifier(modArg)) {
+          const sym0 = checker.getSymbolAtLocation(modArg);
+          const sym =
+            sym0 && sym0.flags & ts.SymbolFlags.Alias ? checker.getAliasedSymbol(sym0) : sym0;
+
+          // (b): const object literal → harvest directly, then fall through to
+          // also push the name onto extends for compare.ts resolution.
+          for (const literal of moduleObjectLiterals(sym, checker)) {
+            pushMethods(harvestObjectLiteralMethods(literal, checker, hostInfo.file ?? ""));
+          }
+
+          // (a): class / interface / module — push name for later resolution.
+          const modName = extendsModuleName(sym, modArg);
+          if (!hostInfo.extends.includes(modName)) hostInfo.extends.push(modName);
+          recordExtendsFile(hostInfo, modName, sym, srcDir);
+        }
+      };
+      for (const modArg of loopedIncludeModules(modArg0, checker) ?? [modArg0]) includeOne(modArg);
     });
   }
 
@@ -1739,6 +1742,31 @@ export function extractFromProgram(
   }
 
   return info;
+}
+
+/**
+ * The modules a looped `include` hands over: for
+ * `for (const mod of API.MODULES) include(API, mod)`, the elements of the array
+ * literal `MODULES` is initialized with. Rails writes the same loop
+ * (`MODULES.each do |mod| include mod end`, action_controller/api.rb:148-150),
+ * which `extract-ruby-api.rb` unrolls on its side. Undefined when `modArg` is
+ * not such a loop variable.
+ */
+export function loopedIncludeModules(
+  modArg: ts.Expression,
+  checker: ts.TypeChecker,
+): readonly ts.Expression[] | undefined {
+  if (!ts.isIdentifier(modArg)) return undefined;
+  const decl = checker.getSymbolAtLocation(modArg)?.valueDeclaration;
+  if (!decl || !ts.isVariableDeclaration(decl)) return undefined;
+  const loop = decl.parent.parent;
+  if (!ts.isForOfStatement(loop) || loop.initializer !== decl.parent) return undefined;
+  const list = checker.getSymbolAtLocation(loop.expression)?.valueDeclaration;
+  if (!list || !(ts.isPropertyDeclaration(list) || ts.isVariableDeclaration(list))) {
+    return undefined;
+  }
+  const init = list.initializer && unwrapAssertions(list.initializer);
+  return init && ts.isArrayLiteralExpression(init) ? init.elements : undefined;
 }
 
 /**

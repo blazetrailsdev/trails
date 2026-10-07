@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import type { Base } from "../base.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
-import { Flash } from "./flash.js";
+import type { redirectTo as flashRedirectTo } from "./flash.js";
 import { redirectBackOrTo, type RedirectingHost } from "./redirecting.js";
 
 describe("Redirecting#redirect_back_or_to", () => {
@@ -42,7 +42,7 @@ describe("Redirecting#redirect_to types", () => {
       // @ts-expect-error a flash type the controller did not name
       controller.redirectTo("/posts", { warning: "Careful" });
       expectTypeOf(controller.redirectTo).returns.toEqualTypeOf<number>();
-      const flash = controller as unknown as Flash & { flash: never };
+      const flash = controller as unknown as { redirectTo: typeof flashRedirectTo; flash: never };
       // @ts-expect-error a misspelled response option on Flash#redirect_to itself
       flash.redirectTo("/posts", { statsu: "see_other" });
       const host = controller as unknown as RedirectingHost;

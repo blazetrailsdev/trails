@@ -1,13 +1,9 @@
-import { classAttribute, extend, included } from "@blazetrails/activesupport";
+import { classAttribute, Concern, extend, Module } from "@blazetrails/activesupport";
 import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { AbstractController } from "../../abstract-controller/base.js";
 import type { helperMethod, HelpersClassMethods } from "../../abstract-controller/helpers.js";
 import type { FlashHash } from "../../action-dispatch/middleware/flash.js";
-import {
-  redirectTo as redirectingRedirectTo,
-  type RedirectToOptions,
-  type RedirectToResponseOptions,
-} from "./redirecting.js";
+import type { RedirectToOptions, RedirectToResponseOptions } from "./redirecting.js";
 
 export type RedirectToResponseOptionsAndFlash<FlashType extends string = never> =
   RedirectToResponseOptions & {
@@ -24,41 +20,30 @@ export interface FlashClassHost extends HelpersClassMethods {
   methodAdded(name: string): void;
 }
 
-export class Flash {
-  static ClassMethods = { addFlashTypes, actionMethods };
+export function flash(this: { request: { flash: FlashHash | null } }): FlashHash | null {
+  return this.request.flash;
+}
 
-  static [included](base: FlashClassHost): void {
-    extend(base, Flash.ClassMethods);
-    classAttribute.call(base, "_flashTypes", { instanceAccessor: false, default: [] });
-
-    (base as FlashClassHost & typeof Flash.ClassMethods).addFlashTypes("alert", "notice");
-  }
-
-  get flash(): FlashHash | null {
-    return (this as unknown as { request: { flash: FlashHash | null } }).request.flash;
-  }
-
-  redirectTo<FlashType extends string = never>(
-    this: { constructor: unknown; flash: FlashHash },
-    options: RedirectToOptions = {},
-    responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<FlashType> = {},
-  ): number {
-    for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
-      const type = (responseOptionsAndFlash as Record<string, unknown>)[flashType];
-      delete (responseOptionsAndFlash as Record<string, unknown>)[flashType];
-      if (type != null && type !== false) {
-        this.flash.set(flashType, type);
-      }
+export function redirectTo<FlashType extends string = never>(
+  this: { constructor: unknown; flash: FlashHash },
+  options: RedirectToOptions = {},
+  responseOptionsAndFlash: RedirectToResponseOptionsAndFlash<FlashType> = {},
+): number {
+  for (const flashType of (this.constructor as FlashClassHost)._flashTypes) {
+    const type = (responseOptionsAndFlash as Record<string, unknown>)[flashType];
+    delete (responseOptionsAndFlash as Record<string, unknown>)[flashType];
+    if (type != null && type !== false) {
+      this.flash.set(flashType, type);
     }
-
-    const otherFlashes = responseOptionsAndFlash.flash;
-    delete responseOptionsAndFlash.flash;
-    if (otherFlashes != null && (otherFlashes as unknown) !== false) {
-      this.flash.update(otherFlashes);
-    }
-
-    return redirectingRedirectTo.call(this as never, options, responseOptionsAndFlash);
   }
+
+  const otherFlashes = responseOptionsAndFlash.flash;
+  delete responseOptionsAndFlash.flash;
+  if (otherFlashes != null && (otherFlashes as unknown) !== false) {
+    this.flash.update(otherFlashes);
+  }
+
+  return Flash.superMethod(this, "redirectTo")!(options, responseOptionsAndFlash) as number;
 }
 
 export function addFlashTypes(this: FlashClassHost, ...types: string[]): void {
@@ -94,3 +79,21 @@ export function actionMethods(this: FlashClassHost): string[] {
   }
   return [...host._actionMethodCache.keys()];
 }
+
+export const ClassMethods = { addFlashTypes, actionMethods };
+
+export const Flash = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as { included(base: null, block: (this: FlashClassHost) => void): void }
+  ).included(null, function (this: FlashClassHost) {
+    classAttribute.call(this, "_flashTypes", { instanceAccessor: false, default: [] });
+
+    Object.defineProperty(this.prototype, "flash", { get: flash, configurable: true });
+    (this as FlashClassHost & typeof ClassMethods).addFlashTypes("alert", "notice");
+  });
+
+  mod.defineMethod("redirectTo", redirectTo);
+}) as Module<{ redirectTo: typeof redirectTo }> & { ClassMethods: typeof ClassMethods };
+Flash.ClassMethods = ClassMethods;
