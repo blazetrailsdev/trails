@@ -478,7 +478,7 @@ describe("ActionController sendData", () => {
     }
     const c = new C();
     await c.dispatch("download", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe("binary");
+    expect(c.responseBody).toEqual(Buffer.from("binary"));
   });
 
   it("marks action as performed", async () => {
