@@ -17,6 +17,7 @@ import { Rescue } from "./metal/rescue.js";
 import { Instrumentation } from "./metal/instrumentation.js";
 import {
   Options as ParamsWrapperOptions,
+  ParamsWrapper,
   _performParameterWrapping,
   _setWrapperOptions,
   _wrapperEnabled,
@@ -103,3 +104,4 @@ include(API, Caching);
 include(API, DataStreaming);
 include(API, Rescue);
 include(API, Instrumentation);
+include(API, ParamsWrapper);
