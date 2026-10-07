@@ -2,7 +2,6 @@ import { chomp, classAttribute } from "@blazetrails/activesupport";
 import { rbEqual } from "@blazetrails/ruby-compat";
 import {
   compileJs,
-  hyphenPragma,
   type EmitJsOptions,
   type EmitResult,
   type HyphenOptions,
@@ -60,10 +59,12 @@ export class Tse implements TemplateHandler {
   }
 
   translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
-    const ctor = this.constructor as typeof Tse;
-    const pragma = hyphenPragma(source);
-    const hyphenNames = pragma === undefined ? ctor.hyphenNames : pragma;
-    return translateLocationImpl(spot, backtraceLocation, source, hyphenNames);
+    return translateLocationImpl(
+      spot,
+      backtraceLocation,
+      source,
+      (this.constructor as typeof Tse).hyphenNames ?? undefined,
+    );
   }
 
   /** @missingRailsCall include? — PERMANENT */
