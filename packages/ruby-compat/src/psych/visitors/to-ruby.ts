@@ -11,7 +11,6 @@ import { ScalarScanner } from "../scalar-scanner.js";
 type RubyClass = { prototype: object; allocate?: () => object };
 
 function allocate(klass: RubyClass): object {
-  if (klass.prototype instanceof Map) return new (klass as unknown as new () => object)();
   return klass.allocate?.() ?? (Object.create(klass.prototype) as object);
 }
 
@@ -137,15 +136,21 @@ export class ToRuby {
   }
 
   private reviveHash(hash: Record<string, unknown>, o: YAMLMap): Record<string, unknown> {
+    const aset = (key: string, val: unknown) => {
+      if (hash instanceof Map) hash.set(key, val);
+      else hash[key] = val;
+    };
+    const mergeBang = (val: object) => {
+      for (const [k, v] of val instanceof Map ? val : Object.entries(val)) aset(String(k), v);
+    };
     for (const { key: k, value: v } of o.items as { key: ParsedNode; value: ParsedNode }[]) {
       const key = String(this.accept(k));
       const val = this.accept(v);
       if (key === "<<" && k.tag !== "tag:yaml.org,2002:str") {
-        if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") Object.assign(hash, val);
-        else if (yaml.isSeq(v)) Object.assign(hash, ...(val as object[]).slice().reverse());
-        else hash[key] = val;
-      } else if (hash instanceof Map) hash.set(key, val);
-      else hash[key] = val;
+        if ((yaml.isAlias(v) || yaml.isMap(v)) && typeof val === "object") mergeBang(val as object);
+        else if (yaml.isSeq(v)) (val as object[]).slice().reverse().forEach(mergeBang);
+        else aset(key, val);
+      } else aset(key, val);
     }
     return hash;
   }

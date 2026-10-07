@@ -10,10 +10,12 @@ import {
   StringIO,
   KeyError,
   aryFetch,
+  aryIncludes,
   block as blockOf,
   type ConflictBlock,
   eachPair,
   isEmpty,
+  isModuleIncluded,
   rbBlockGivenP,
   rbEql,
   rbEqual,
@@ -29,6 +31,7 @@ import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import {
   BigDecimal,
+  DeepMergeable,
   type HashWithIndifferentAccess,
   Notifications,
   cattrAccessor,
@@ -138,6 +141,8 @@ function isPermittedScalar(value: unknown): boolean {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (json.rb:47-49); the class/interface merge is how `include()` surfaces on the type side.
 export interface Parameters {
   toJSON: Included<typeof ToJsonWithActiveSupportEncoder>["toJSON"];
+  deepMerge(other: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this;
+  deepMergeBang(other: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -252,7 +257,8 @@ export class Parameters {
   }
 
   hasValue(value: unknown): boolean {
-    return [...this._data.values()].includes(value);
+    const converted = this._convertValueToParameters(value);
+    return aryIncludes(this.values, converted);
   }
 
   include(key: string): boolean {
@@ -272,7 +278,9 @@ export class Parameters {
   }
 
   get values(): unknown[] {
-    return [...this._data.values()];
+    const values: unknown[] = [];
+    this.eachValue((value) => values.push(value));
+    return values;
   }
 
   isEmpty(): boolean {
@@ -310,31 +318,11 @@ export class Parameters {
   }
 
   isDeepMerge(otherHash: unknown): boolean {
-    return otherHash instanceof Parameters || otherHash instanceof Hash || isPlainObject(otherHash);
-  }
-
-  deepMerge(
-    other: Parameters | Record<string, unknown>,
-    block?: ConflictBlock<unknown>,
-  ): Parameters {
-    return rbObjDup(this).deepMergeBang(other, block);
-  }
-
-  deepMergeBang(other: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
-    return this.mergeBang(
-      other,
-      blockOf((key: string, thisVal: unknown, otherVal: unknown) => {
-        if (
-          (thisVal instanceof Parameters || thisVal instanceof Hash) &&
-          (thisVal as Parameters).isDeepMerge(otherVal)
-        ) {
-          return (thisVal as Parameters).deepMerge(otherVal as Parameters, block);
-        } else if (block) {
-          return block(key, thisVal, otherVal);
-        } else {
-          return otherVal;
-        }
-      }),
+    return (
+      isPlainObject(otherHash) ||
+      (typeof otherHash === "object" &&
+        otherHash !== null &&
+        isModuleIncluded(otherHash.constructor as { prototype: object }, DeepMergeable))
     );
   }
 
@@ -1043,6 +1031,7 @@ Parameters.prototype.deleteIf = Parameters.prototype.rejectBang;
 Parameters.prototype.withDefaults = Parameters.prototype.reverseMerge;
 Parameters.prototype.withDefaultsBang = Parameters.prototype.reverseMergeBang;
 
+include(Parameters, DeepMergeable);
 include(Parameters, ToJsonWithActiveSupportEncoder);
 
 interface StrongParametersHost {

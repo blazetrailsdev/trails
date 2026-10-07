@@ -34,4 +34,34 @@ describe("ParamsWrapper.inherited", () => {
 
     expect(AdminsController._wrapperOptions).toBe(Base._wrapperOptions);
   });
+
+  it("runs before a subclass's own wrap_parameters, which keeps the inherited format", () => {
+    class UsersController extends Base {}
+    UsersController.wrapParameters({ format: [":json"] });
+    class AdminsController extends UsersController {}
+    AdminsController.wrapParameters({ include: ["username"] });
+
+    expect(AdminsController._wrapperOptions.format).toEqual([":json"]);
+    expect(AdminsController._wrapperOptions.klass).toBe(AdminsController);
+    expect(AdminsController._wrapperOptions.name).toBe("admin");
+  });
+
+  it("is a no-op for a subclass read before its parent enables wrapping", () => {
+    class UsersController extends Base {}
+    class AdminsController extends UsersController {}
+    expect(AdminsController._wrapperOptions.format).toEqual([]);
+    UsersController.wrapParameters({ format: [":json"] });
+
+    expect(AdminsController._wrapperOptions).toBe(UsersController._wrapperOptions);
+    expect(AdminsController._wrapperOptions.name).toBe("user");
+  });
+
+  it("runs at a subclass's first read when its parent enabled wrapping after it was defined", () => {
+    class UsersController extends Base {}
+    class AdminsController extends UsersController {}
+    UsersController.wrapParameters({ format: [":json"] });
+
+    expect(AdminsController._wrapperOptions.klass).toBe(AdminsController);
+    expect(AdminsController._wrapperOptions.name).toBe("admin");
+  });
 });

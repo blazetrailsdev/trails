@@ -1,5 +1,6 @@
 import { deepSymbolizeKeysBang, isPlainObject, symbolizeKeysBang } from "./hash-utils.js";
 import { nestedUnderIndifferentAccess } from "./core-ext/hash/indifferent-access.js";
+import { DeepMergeable } from "./deep-mergeable.js";
 import { ActiveSupport } from "./namespaces.js";
 import {
   ArgumentError,
@@ -8,6 +9,7 @@ import {
   KeyError,
   TypeError,
   eachPair,
+  include,
   isSymbol,
   rbModConstSet,
   rbObjClassname,
@@ -668,4 +670,5 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 }
 
+include(HashWithIndifferentAccess, DeepMergeable);
 rbModConstSet(ActiveSupport, "HashWithIndifferentAccess", HashWithIndifferentAccess);

@@ -936,6 +936,13 @@ export class Hash<K, V> extends Map<K, V> {
   #iterLev = 0;
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Class#allocate` (`vendor/ruby/v3.3.11/object.c:2066`).
+   */
+  static allocate<T>(this: new () => T): T {
+    return new this();
+  }
+
+  /**
    * `Hash.new` (`vendor/ruby/v3.3.11/hash.c:1782` `rb_hash_initialize`): a block is
    * the default_proc, an argument the default value, neither is `nil`. A block
    * is a single trailing function argument, the spelling `fetch` uses.
