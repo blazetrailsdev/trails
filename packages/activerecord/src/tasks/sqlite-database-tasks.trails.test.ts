@@ -95,7 +95,7 @@ describe("SQLiteDatabaseTasks", () => {
       await (seedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
 
       await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
-        await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath);
+        await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath, null);
       });
 
       const dumped = fs.readFileSync(dumpPath, "utf8");
@@ -109,7 +109,7 @@ describe("SQLiteDatabaseTasks", () => {
       });
       fs.writeFileSync(loadDbPath, "");
       await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
-        await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath);
+        await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath, null);
       });
 
       const loadedAdapter = new BetterSQLite3Adapter({ database: loadDbPath });
@@ -221,6 +221,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
     await new SQLiteDatabaseTasks(configuration).structureLoad(
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
+      null,
     );
 
     const tables = (await pool().withConnection((conn) =>

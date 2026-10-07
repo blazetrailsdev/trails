@@ -63,29 +63,32 @@ export class SQLiteDatabaseTasks {
     return ((await this.connection()) as SQLite3Adapter).encoding;
   }
 
-  async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureDump(filename: string, extraFlags: string | string[] | null): Promise<void> {
     const args: string[] = [];
     if (extraFlags != null) args.push(...kernelArray(extraFlags));
     args.push(this.dbConfig.database as string);
 
-    const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    let ignoreTables = SchemaDumper.ignoreTables;
+    const { SchemaDumper } = await import("../schema-dumper.js");
+    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
-      const connection = await this.connection();
-      ignoreTables = (await connection.dataSources()).filter((table) =>
+      ignoreTables = (await (await this.connection()).dataSources()).filter((table) =>
         ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
-      const condition = ignoreTables.map((table) => connection.quote(table)).join(", ");
+      const condition = (
+        await Promise.all(
+          ignoreTables.map(async (table) => (await this.connection()).quote(table as string)),
+        )
+      ).join(", ");
       args.push(
         `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`,
       );
     } else {
       args.push(".schema --nosys");
     }
-    await runCmd("sqlite3", args, filename);
+    await this.runCmd("sqlite3", args, filename);
   }
 
-  async structureLoad(filename: string, extraFlags?: string[] | null): Promise<void> {
+  async structureLoad(filename: string, extraFlags: string[] | null): Promise<void> {
     let flags: string | undefined;
     if (extraFlags != null) flags = extraFlags.join(" ");
     const childProcess = await getChildProcessAsync();
@@ -104,22 +107,20 @@ export class SQLiteDatabaseTasks {
     await Base.establishConnection(config);
     return await (await this.connection()).connectBang();
   }
-}
 
-/** @internal */
-export async function runCmd(cmd: string, args: string[], out: string): Promise<void> {
-  const childProcess = await getChildProcessAsync();
-  if (childProcess.spawnSync(cmd, args, { encoding: "utf8", out }).status !== 0) {
-    throw new RuntimeError(runCmdError(cmd, args));
+  private async runCmd(cmd: string, args: string[], out: string): Promise<void> {
+    const childProcess = await getChildProcessAsync();
+    if (childProcess.spawnSync(cmd, args, { encoding: "utf8", out }).status !== 0) {
+      throw new RuntimeError(this.runCmdError(cmd, args));
+    }
   }
-}
 
-/** @internal */
-export function runCmdError(cmd: string, args: string[]): string {
-  let msg = "failed to execute:\n";
-  msg += `${cmd} ${args.join(" ")}\n\n`;
-  msg += `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`;
-  return msg;
+  private runCmdError(cmd: string, args: string[]): string {
+    let msg = "failed to execute:\n";
+    msg += `${cmd} ${args.join(" ")}\n\n`;
+    msg += `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`;
+    return msg;
+  }
 }
 
 DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);

@@ -3,7 +3,13 @@ import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
-import { runCmd } from "./sqlite-database-tasks.js";
+import { HashConfig } from "../database-configurations/hash-config.js";
+import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
+
+const tasks = new SQLiteDatabaseTasks(
+  new HashConfig("development", "primary", { adapter: "sqlite3", database: ":memory:" }),
+) as unknown as { runCmd(cmd: string, args: string[], out: string): Promise<void> };
+const runCmd = (cmd: string, args: string[], out: string) => tasks.runCmd(cmd, args, out);
 
 describe("SQLiteDatabaseTasks run_cmd output redirect", () => {
   const created: string[] = [];
