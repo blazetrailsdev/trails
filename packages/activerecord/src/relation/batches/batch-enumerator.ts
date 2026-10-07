@@ -17,7 +17,7 @@ export class BatchEnumerator<T extends BatchRelation> {
   readonly finish: unknown;
   readonly relation: any;
   private _cursor: string[];
-  private _order: "asc" | "desc" | ("asc" | "desc")[];
+  private _order: ":asc" | ":desc" | (":asc" | ":desc")[];
   private _useRanges: boolean | null;
   /** @internal */
   _generator!: () => AsyncGenerator<T>;
@@ -28,7 +28,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     finish = null,
     relation,
     cursor,
-    order = "asc",
+    order = ":asc",
     useRanges = null,
   }: {
     of?: number;
@@ -36,7 +36,7 @@ export class BatchEnumerator<T extends BatchRelation> {
     finish?: unknown;
     relation: any;
     cursor: string[];
-    order?: "asc" | "desc" | ("asc" | "desc")[];
+    order?: ":asc" | ":desc" | (":asc" | ":desc")[];
     useRanges?: boolean | null;
   }) {
     this._of = of;

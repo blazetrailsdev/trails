@@ -214,7 +214,7 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        for await (const batch of Post.findInBatches({ batchSize: 1, order: "desc" })) {
+        for await (const batch of Post.findInBatches({ batchSize: 1, order: ":desc" })) {
           expect(batch).toBeInstanceOf(Array);
           expect(batch[0]).toBeInstanceOf(Post);
         }
@@ -226,7 +226,7 @@ describe("EachTest", () => {
     await expect(async () => {
       for await (const _post of Post.select("title").findEach({
         batchSize: 1,
-        order: "invalid" as any,
+        order: ":invalid" as any,
       })) {
         throw new Error("should not call this block");
       }
@@ -235,7 +235,7 @@ describe("EachTest", () => {
 
   it("in batches without block should raise if order is invalid", async () => {
     await expect(async () => {
-      for await (const _rel of Post.select("title").inBatches({ order: "invalid" as any })) {
+      for await (const _rel of Post.select("title").inBatches({ order: ":invalid" as any })) {
       }
     }).rejects.toThrow();
   });
@@ -573,7 +573,7 @@ describe("EachTest", () => {
     let batchCount = 0;
     let lastId = Math.max(...(await allPosts).map((p: any) => p.id));
     await assertQueriesCount(0, false, async () => {
-      for await (const relation of allPosts.inBatches({ of: 1, order: "desc" })) {
+      for await (const relation of allPosts.inBatches({ of: 1, order: ":desc" })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
         const ids = (await relation.toArray()).map((p: any) => p.id);
@@ -614,7 +614,7 @@ describe("EachTest", () => {
         of: 1,
         start: startId,
         finish: finishId,
-        order: "desc",
+        order: ":desc",
       })) {
         batchCount++;
         expect(relation).toBeInstanceOf(Relation);
@@ -650,7 +650,7 @@ describe("EachTest", () => {
         batchSize: 1,
         start: startId,
         finish: finishId,
-        order: ["desc", "asc"] as any,
+        order: [":desc", ":asc"] as any,
       })) {
         collected.push(order);
       }
@@ -672,7 +672,7 @@ describe("EachTest", () => {
       const collected: any[] = [];
       await assertNoQueries(false, async () => {
         for await (const post of orderedPosts
-          .inBatches({ of: 1, cursor: "id", order: "desc" })
+          .inBatches({ of: 1, cursor: "id", order: ":desc" })
           .eachRecord()) {
           collected.push(post);
         }
@@ -828,7 +828,7 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        for await (const relation of Post.inBatches({ of: 1, order: "desc" })) {
+        for await (const relation of Post.inBatches({ of: 1, order: ":desc" })) {
           expect(relation).toBeInstanceOf(Relation);
           expect(await relation.first()).toBeInstanceOf(Post);
           break;
@@ -844,7 +844,7 @@ describe("EachTest", () => {
       false,
       async () => {
         let first: any = null;
-        for await (const rel of Post.inBatches({ of: 1, order: "desc" })) {
+        for await (const rel of Post.inBatches({ of: 1, order: ":desc" })) {
           first = rel;
           break;
         }
@@ -860,7 +860,7 @@ describe("EachTest", () => {
       undefined,
       false,
       async () => {
-        for await (const record of Post.inBatches({ of: 1, order: "desc" }).eachRecord()) {
+        for await (const record of Post.inBatches({ of: 1, order: ":desc" }).eachRecord()) {
           expect(record).toBeInstanceOf(Post);
         }
       },
@@ -1045,7 +1045,7 @@ describe("EachTest", () => {
       for await (const post of Post.inBatches({
         of: 1,
         cursor: "id",
-        order: "desc",
+        order: ":desc",
       }).eachRecord()) {
         collected.push(post);
       }
@@ -1127,7 +1127,7 @@ describe("EachTest", () => {
   it(".find_each respects table alias", async () => {
     await assertQueriesCount(1, false, async () => {
       const tableAlias = Post.arelTable.alias("omg_posts");
-      const postRel = new Relation(Post, tableAlias as any);
+      const postRel = new Relation(Post, { table: tableAlias as any });
       for await (const _post of postRel.findEach({})) {
       }
     });
@@ -1267,7 +1267,7 @@ describe("EachTest", () => {
     const books = await CpkBook.order({ author_id: "asc", id: "desc" });
     const bookIds = books.map((b: any) => JSON.stringify(b.id));
     let index = 0;
-    for await (const book of CpkBook.findEach({ batchSize: 1, order: ["asc", "desc"] as any })) {
+    for await (const book of CpkBook.findEach({ batchSize: 1, order: [":asc", ":desc"] as any })) {
       expect(JSON.stringify((book as any).id)).toBe(bookIds[index]);
       index++;
     }
@@ -1283,7 +1283,7 @@ describe("EachTest", () => {
     for await (const rel of CpkBook.inBatches({
       of: 1,
       start: (secondBook as any).id,
-      order: ["asc", "desc"] as any,
+      order: [":asc", ":desc"] as any,
     })) {
       firstRelation = rel;
       break;
@@ -1301,7 +1301,7 @@ describe("EachTest", () => {
     for await (const rel of CpkBook.inBatches({
       of: 1,
       finish: (secondBook as any).id,
-      order: ["asc", "desc"] as any,
+      order: [":asc", ":desc"] as any,
     })) {
       batches.push(rel);
     }
@@ -1319,7 +1319,7 @@ describe("EachTest", () => {
     let firstRelation: any = null;
     for await (const rel of CpkBook.where("author_id >= ? AND id < ?", authorId, id).inBatches({
       of: 1,
-      order: ["asc", "desc"] as any,
+      order: [":asc", ":desc"] as any,
     })) {
       firstRelation = rel;
       break;

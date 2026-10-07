@@ -9,7 +9,7 @@ describe("BatchEnumerator (trails)", () => {
   fixtures(["posts", "books"] as const);
 
   it("re-enumerating honours the order it was built with", async () => {
-    const enumerator = Post.inBatches({ of: 1, order: "desc" });
+    const enumerator = Post.inBatches({ of: 1, order: ":desc" });
     const idsOf = async () => {
       const ids: number[] = [];
       for await (const relation of enumerator) {
@@ -26,7 +26,7 @@ describe("BatchEnumerator (trails)", () => {
 
   it("eachRecord honours the cursor it was built with", async () => {
     const records: Post[] = [];
-    await Post.inBatches({ of: 1, cursor: "id", order: "desc" }).eachRecord((post: Post) => {
+    await Post.inBatches({ of: 1, cursor: "id", order: ":desc" }).eachRecord((post: Post) => {
       records.push(post);
     });
     const expected = (await Post.order({ id: "desc" })).map((p) => Number(p.id));
@@ -35,7 +35,7 @@ describe("BatchEnumerator (trails)", () => {
 
   it("an invalid order raises the ArgumentError batches.rb:324 raises", async () => {
     await expect(
-      Post.inBatches({ of: 1, order: "invalid" as "asc" }).eachRecord(() => {}),
+      Post.inBatches({ of: 1, order: ":invalid" as ":asc" }).eachRecord(() => {}),
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got :invalid",
     );
@@ -51,9 +51,11 @@ describe("BatchEnumerator (trails)", () => {
 
   it("an invalid order inside an array raises with the array inspected", async () => {
     await expect(
-      Post.inBatches({ of: 1, cursor: ["id"], order: ["asc", "sideways"] as "asc"[] }).eachRecord(
-        () => {},
-      ),
+      Post.inBatches({
+        of: 1,
+        cursor: ["id"],
+        order: [":asc", ":sideways"] as ":asc"[],
+      }).eachRecord(() => {}),
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
     );
@@ -84,7 +86,7 @@ describe("BatchEnumerator (trails)", () => {
   it("an error raised while batching reaches the blockless consumer", async () => {
     await expect(
       (async () => {
-        for await (const _ of Post.inBatches({ of: 1, order: "sideways" as "asc" })) {
+        for await (const _ of Post.inBatches({ of: 1, order: "sideways" as ":asc" })) {
         }
       })(),
     ).rejects.toThrow(/:order must be :asc or :desc/);

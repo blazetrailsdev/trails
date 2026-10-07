@@ -96,7 +96,7 @@ function loadExclude() {
 function repoRel(filename) {
   const norm = filename.replace(/\\/g, "/");
   const m = norm.match(
-    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel|actionpack|actionview|rack|trailties)\/src\/.+\.ts)$/,
+    /(?:^|\/)(packages\/(activerecord|activemodel|activesupport|arel|actionpack|actionview|rack|trailties|activejob|bcrypt|date|did-you-mean|globalid|i18n|msgpack|rack-session|rack-test)\/src\/.+\.ts)$/,
   );
   return m ? { rel: m[1], pkg: m[2] } : null;
 }

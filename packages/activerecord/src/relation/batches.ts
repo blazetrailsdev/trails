@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { eachSlice, kernelArray as Array } from "@blazetrails/activesupport";
-import { cmp, isEmpty, rbCmpint, rtest, slice } from "@blazetrails/ruby-compat";
+import { eachSlice, kernelArray as Array, pluck } from "@blazetrails/activesupport";
+import { cmp, isEmpty, rbCmpint, rbInspect, rtest, slice } from "@blazetrails/ruby-compat";
 import { stripThenable } from "./thenable.js";
 import { BatchEnumerator } from "./batches/batch-enumerator.js";
 import type { Base } from "../base.js";
@@ -148,7 +148,13 @@ export class Batches {
     }
 
     const run = async (block: (relation: any) => unknown): Promise<null> => {
-      await ensureValidOptionsForBatchingBang(self, cursor, start, finish, (order ?? "asc") as any);
+      await ensureValidOptionsForBatchingBang(
+        self,
+        cursor,
+        start,
+        finish,
+        (order ?? ":asc") as any,
+      );
 
       let batchLimit = of;
       let remaining: number | null = null;
@@ -165,7 +171,7 @@ export class Batches {
             start,
             finish,
             cursor,
-            order: (order ?? "asc") as any,
+            order: (order ?? ":asc") as any,
             batchLimit,
           },
           block,
@@ -179,7 +185,7 @@ export class Batches {
             finish,
             load,
             cursor,
-            order: (order ?? "asc") as any,
+            order: (order ?? ":asc") as any,
             useRanges,
             remaining,
             batchLimit,
@@ -259,16 +265,13 @@ export class Batches {
   }
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue
- */
+/** @internal */
 export async function ensureValidOptionsForBatchingBang(
   relation: any,
   cursor: string[],
   start: unknown,
   finish: unknown,
-  order: "asc" | "desc" | ("asc" | "desc")[],
+  order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): Promise<void> {
   if (rtest(start) && Array(start).length !== cursor.length) {
     throw new ArgumentError(":start must contain one value per cursor column");
@@ -296,12 +299,9 @@ export async function ensureValidOptionsForBatchingBang(
     }
   }
 
-  if (Array(order).filter((o) => !["asc", "desc"].includes(o)).length > 0) {
-    const inspected = globalThis.Array.isArray(order)
-      ? `[${order.map((o) => `:${o}`).join(", ")}]`
-      : `:${order}`;
+  if (Array(order).filter((o) => ![":asc", ":desc"].includes(o)).length > 0) {
     throw new ArgumentError(
-      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${inspected}`,
+      `:order must be :asc or :desc or an array consisting of :asc or :desc, got ${rbInspect(order)}`,
     );
   }
 }
@@ -312,7 +312,7 @@ export function applyLimits(
   cursor: string[],
   start: unknown,
   finish: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
   if (start !== undefined && start !== null) {
     relation = applyStartLimit(relation, cursor, start, batchOrders);
@@ -328,9 +328,9 @@ export function applyStartLimit(
   relation: any,
   cursor: string[],
   start: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
-  const operators = batchOrders.map(([, order]) => (order === "desc" ? "lteq" : "gteq"));
+  const operators = batchOrders.map(([, order]) => (order === ":desc" ? "lteq" : "gteq"));
   return batchCondition(relation, cursor, start, operators);
 }
 
@@ -339,9 +339,9 @@ export function applyFinishLimit(
   relation: any,
   cursor: string[],
   finish: unknown,
-  batchOrders: [string, "asc" | "desc"][],
+  batchOrders: [string, ":asc" | ":desc"][],
 ): any {
-  const operators = batchOrders.map(([, order]) => (order === "desc" ? "gteq" : "lteq"));
+  const operators = batchOrders.map(([, order]) => (order === ":desc" ? "gteq" : "lteq"));
   return batchCondition(relation, cursor, finish, operators);
 }
 
@@ -370,9 +370,9 @@ export function batchCondition(
 /** @internal */
 export function buildBatchOrders(
   cursor: string[],
-  order: "asc" | "desc" | ("asc" | "desc")[] | undefined,
-): [string, "asc" | "desc"][] {
-  return cursor.map((column, i) => [column, Array(order)[i] ?? "asc"]);
+  order: ":asc" | ":desc" | (":asc" | ":desc")[] | undefined,
+): [string, ":asc" | ":desc"][] {
+  return cursor.map((column, i) => [column, Array(order)[i] ?? ":asc"]);
 }
 
 /** @internal */
@@ -389,7 +389,7 @@ export async function batchOnLoadedRelation(
     start: unknown;
     finish: unknown;
     cursor: string[];
-    order: "asc" | "desc" | ("asc" | "desc")[];
+    order: ":asc" | ":desc" | (":asc" | ":desc")[];
     batchLimit: number;
   },
   block: (subrelation: any) => unknown,
@@ -433,23 +433,20 @@ export function recordCursorValues(record: any, cursor: string[]): unknown[] {
 export function compareValuesForOrder(
   values1: unknown[],
   values2: unknown[],
-  order: ("asc" | "desc")[],
+  order: (":asc" | ":desc")[],
 ): number {
   for (const [index, element1] of values1.entries()) {
     const element2 = values2[index];
     const direction = order[index];
     let comparison = cmp(element1, element2) as number;
-    if (direction === "desc") comparison = -comparison;
+    if (direction === ":desc") comparison = -comparison;
     if (comparison !== 0) return comparison;
   }
 
   return 0;
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue
- */
+/** @internal */
 export async function batchOnUnloadedRelation(
   this: any,
   opts: {
@@ -458,7 +455,7 @@ export async function batchOnUnloadedRelation(
     finish: unknown;
     load: boolean;
     cursor: string[];
-    order: "asc" | "desc" | ("asc" | "desc")[];
+    order: ":asc" | ":desc" | (":asc" | ":desc")[];
     useRanges: boolean | null | undefined;
     remaining: number | null;
     batchLimit: number;
@@ -479,9 +476,7 @@ export async function batchOnUnloadedRelation(
     let yieldedRelation: any;
     if (load) {
       const records = await batchRelation.records();
-      values = records.map((record: any) =>
-        cursor.length > 1 ? cursor.map((key) => record.get(key)) : record.get(cursor[0]),
-      );
+      values = pluck<any, any>(records, ...cursor);
       yieldedRelation = this.where(new Map([[cursor, values]]));
       yieldedRelation.loadRecords(records);
     } else if ((emptyScope && useRanges !== false) || useRanges) {
@@ -524,9 +519,9 @@ export async function batchOnUnloadedRelation(
     const batchOrdersCopy = [...batchOrders];
     const [, lastOrder] = batchOrdersCopy.pop()!;
     const operators: string[] = batchOrdersCopy.map(([, order]) =>
-      order === "desc" ? "lteq" : "gteq",
+      order === ":desc" ? "lteq" : "gteq",
     );
-    operators.push(lastOrder === "desc" ? "lt" : "gt");
+    operators.push(lastOrder === ":desc" ? "lt" : "gt");
 
     const cursorValue = values[values.length - 1];
     batchRelation = batchCondition(relation, cursor, cursorValue, operators);

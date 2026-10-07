@@ -1290,8 +1290,116 @@
         "TestUnitReporter": {
           "record": ["Interrupt"]
         }
+      },
+      "thor/base.ts": {
+        "*": {
+          "dispatch": ["NotImplementedError"]
+        },
+        "ClassMethods": {
+          "dispatch": ["NotImplementedError"]
+        }
+      },
+      "thor/shell/basic.ts": {
+        "*": {
+          "fileCollision": ["SystemExit"]
+        },
+        "Basic": {
+          "fileCollision": ["SystemExit"]
+        }
       }
-    }
+    },
+    "activejob": {
+      "arguments.ts": {
+        "*": {
+          "deserialize": ["DeserializationError"]
+        },
+        "Arguments": {
+          "deserialize": ["DeserializationError"]
+        }
+      },
+      "execution.ts": {
+        "*": {
+          "perform": ["NotImplementedError"]
+        },
+        "Execution": {
+          "perform": ["NotImplementedError"]
+        }
+      },
+      "queue-adapter.ts": {
+        "*": {
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
+        },
+        "ClassMethods": {
+          "queueAdapter": ["ArgumentError"],
+          "setQueueAdapter": ["ArgumentError"]
+        }
+      },
+      "queue-adapters/abstract-adapter.ts": {
+        "*": {
+          "enqueue": ["NotImplementedError"],
+          "enqueueAt": ["NotImplementedError"]
+        },
+        "AbstractAdapter": {
+          "enqueue": ["NotImplementedError"],
+          "enqueueAt": ["NotImplementedError"]
+        }
+      },
+      "serializers/object-serializer.ts": {
+        "*": {
+          "deserialize": ["NotImplementedError"],
+          "klass": ["NotImplementedError"]
+        },
+        "ObjectSerializer": {
+          "deserialize": ["NotImplementedError"],
+          "klass": ["NotImplementedError"]
+        }
+      }
+    },
+    "bcrypt": {
+      "password.ts": {
+        "*": {
+          "create": ["ArgumentError"]
+        },
+        "Password": {
+          "create": ["ArgumentError"]
+        }
+      }
+    },
+    "date": {},
+    "did-you-mean": {},
+    "globalid": {},
+    "i18n": {
+      "i18n.ts": {
+        "*": {
+          "interpolationKeys": ["ArgumentError"],
+          "isExists": ["ArgumentError"],
+          "exists": ["ArgumentError"]
+        },
+        "Base": {
+          "interpolationKeys": ["ArgumentError"],
+          "isExists": ["ArgumentError"],
+          "exists": ["ArgumentError"]
+        }
+      },
+      "backend/base.ts": {
+        "*": {
+          "storeTranslations": ["NotImplementedError"],
+          "translate": ["ArgumentError"],
+          "availableLocales": ["NotImplementedError"],
+          "lookup": ["NotImplementedError"]
+        },
+        "Base": {
+          "storeTranslations": ["NotImplementedError"],
+          "translate": ["ArgumentError"],
+          "availableLocales": ["NotImplementedError"],
+          "lookup": ["NotImplementedError"]
+        }
+      }
+    },
+    "msgpack": {},
+    "rack-session": {},
+    "rack-test": {}
   },
   "errinfo": {
     "activerecord": ["StatementInvalid"],
@@ -1301,6 +1409,15 @@
     "actionpack": ["BadRequest", "ParseError", "SessionRestoreError"],
     "actionview": ["Error"],
     "rack": [],
-    "trailties": []
+    "trailties": [],
+    "activejob": ["DeserializationError"],
+    "bcrypt": [],
+    "date": [],
+    "did-you-mean": [],
+    "globalid": [],
+    "i18n": [],
+    "msgpack": [],
+    "rack-session": [],
+    "rack-test": []
   }
 }

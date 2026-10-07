@@ -95,14 +95,14 @@ export type FindEachOptions = {
   batchSize?: number;
   errorOnIgnore?: boolean;
   cursor?: string | string[];
-  order?: "asc" | "desc" | ("asc" | "desc")[];
+  order?: ":asc" | ":desc" | (":asc" | ":desc")[];
 };
 
 export type InBatchesOptions = {
   of?: number;
   start?: unknown;
   finish?: unknown;
-  order?: "asc" | "desc" | ("asc" | "desc")[];
+  order?: ":asc" | ":desc" | (":asc" | ":desc")[];
   cursor?: string | string[];
   errorOnIgnore?: boolean;
   load?: boolean;
@@ -378,9 +378,15 @@ export class Relation<T extends Base, G extends boolean = false> {
   /** @inventedArm if — PERMANENT */
   constructor(
     model: typeof Base,
-    table?: Table | Nodes.TableAlias,
-    predicateBuilder?: PredicateBuilder,
-    values: ValuesHash = {},
+    {
+      table = null,
+      predicateBuilder = null,
+      values = {},
+    }: {
+      table?: Table | Nodes.TableAlias | null;
+      predicateBuilder?: PredicateBuilder | null;
+      values?: ValuesHash;
+    } = {},
   ) {
     if (table) {
       predicateBuilder ||= model.predicateBuilder.with(new TableMetadata(model, table as Table));

@@ -1,6 +1,7 @@
 import {
   Hash,
   Rational,
+  hashAref,
   numericPlus,
   rbBigNorm,
   rbDbl2num,
@@ -199,10 +200,10 @@ export function groupBy<T, K>(collection: T[], fn: (item: T) => K): Map<K, T[]> 
 
 export function pluck<T, K extends keyof T>(collection: T[], ...keys: K[]): T[K][] | T[K][][] {
   if (keys.length > 1) {
-    return collection.map((element) => keys.map((key) => element[key]));
+    return collection.map((element) => keys.map((key) => hashAref(element as object, key) as T[K]));
   } else {
     const key = keys[0];
-    return collection.map((element) => element[key]);
+    return collection.map((element) => hashAref(element as object, key) as T[K]);
   }
 }
 
