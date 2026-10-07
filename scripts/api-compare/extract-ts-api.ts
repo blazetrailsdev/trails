@@ -1745,13 +1745,6 @@ export function extractFromProgram(
 }
 
 /**
- * Recursively visit every `name(...)` call expression under `root` where the
- * callee is a bare identifier equal to `name`. Used by the include/extend
- * detection passes so calls nested inside a module-level helper function
- * (not just top-level expression statements) are still attributed to the host
- * class — see the include-detection pass for the abstract-adapter.ts case.
- */
-/**
  * The modules a looped `include` hands over: for
  * `for (const mod of API.MODULES) include(API, mod)`, the elements of the array
  * literal `MODULES` is initialized with. Rails writes the same loop
@@ -1776,6 +1769,13 @@ export function loopedIncludeModules(
   return init && ts.isArrayLiteralExpression(init) ? init.elements : undefined;
 }
 
+/**
+ * Recursively visit every `name(...)` call expression under `root` where the
+ * callee is a bare identifier equal to `name`. Used by the include/extend
+ * detection passes so calls nested inside a module-level helper function
+ * (not just top-level expression statements) are still attributed to the host
+ * class — see the include-detection pass for the abstract-adapter.ts case.
+ */
 function forEachCallNamed(
   root: ts.Node,
   name: string,
