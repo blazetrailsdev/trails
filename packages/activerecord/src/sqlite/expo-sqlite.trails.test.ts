@@ -225,6 +225,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
         executeForRawResultAsync: async () => {
           throw native;
         },
+        getColumnNamesAsync: async () => [],
         finalizeAsync: async () => {},
       }),
       execAsync: async () => {
@@ -332,6 +333,7 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
             prepared.push(sql);
             return {
               executeAsync: async () => ({ changes: 0, lastInsertRowId: 0 }),
+              getColumnNamesAsync: async () => [],
               finalizeAsync: async () => {},
             };
           },
@@ -358,6 +360,62 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       'CREATE TEMP TRIGGER t AFTER INSERT ON widgets BEGIN UPDATE widgets SET qty = 1; DELETE FROM "x;y"; END;',
       "/* block; comment */ SELECT [a;b] FROM widgets",
     ]);
+  });
+
+  it("reader is the prepared statement's column count, not its text", async () => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async (sql: string) => ({
+            getColumnNamesAsync: async () => (sql.includes("RETURNING") ? [] : ["id"]),
+            finalizeAsync: async () => {},
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      expect((await conn.prepare("INSERT INTO widgets (name) VALUES ('a')")).reader).toBe(true);
+      expect((await conn.prepare("SELECT 1 /* RETURNING */")).reader).toBe(false);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("prepare finalizes the statement when its column names cannot be read", async () => {
+    let finalized = 0;
+    const native = new Error("Error code 1: SQL logic error");
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {
+              finalized++;
+            },
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      const error = await Promise.resolve(conn.prepare("SELECT 1")).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(finalized).toBe(1);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
   });
 
   it("a closed statement raises SQLite3::Exception, and reads its own text for reader", async () => {

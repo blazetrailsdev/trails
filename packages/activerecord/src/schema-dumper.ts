@@ -362,14 +362,6 @@ export abstract class SchemaDumper {
     return table.replace(new RegExp(`^${prefix}(.+)${suffix}$`), "$1");
   }
 
-  /**
-   * @internal Used by `dumpTableSchema` and external callers.
-   * @noRailsEquivalent CONVERGEABLE the per-table body of SchemaDumper#tables (schema_dumper.rb:134), extracted so dumpTableSchema shares it.
-   */
-  async dumpTable(stream: IO | StringIO, tableName: string): Promise<void> {
-    await this.table(tableName, stream);
-  }
-
   /** @internal */
   async table(table: string, stream: IO | StringIO): Promise<void> {
     const adapter = this._adapter();

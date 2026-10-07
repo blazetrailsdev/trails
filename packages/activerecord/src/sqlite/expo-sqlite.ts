@@ -12,7 +12,6 @@ import {
   SQLite3Constants,
   type SqliteStatement,
 } from "../sqlite-adapter.js";
-import { statementIsReader } from "./statement-reader.js";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { ConfigurationError } from "../errors.js";
 import { Exception, rbSqlite3Raise, rbSqlite3RaiseWithSql } from "./errors.js";
@@ -23,6 +22,7 @@ interface ExpoSQLiteStatement {
   executeForRawResultAsync(
     params?: unknown[] | Record<string, unknown>,
   ): Promise<ExpoSQLiteExecuteResult>;
+  getColumnNamesAsync(): Promise<string[]>;
   finalizeAsync(): Promise<void>;
 }
 /** @internal */
@@ -135,10 +135,10 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   constructor(
     private readonly stmt: ExpoSQLiteStatement | null,
-    sql: string,
+    columnCount: number,
     readonly remainder: string,
   ) {
-    this.reader = statementIsReader(sql);
+    this.reader = columnCount !== 0;
     this._closed = stmt === null;
   }
 
@@ -247,7 +247,16 @@ class ExpoSqliteConnection implements SqliteConnection {
     try {
       sql = sql.slice(0, tail);
       const stmt = empty ? null : await this.raw.prepareAsync(sql);
-      return new ExpoSqliteStatement(stmt, sql, remainder);
+      let columnCount = 0;
+      if (stmt !== null) {
+        try {
+          columnCount = (await stmt.getColumnNamesAsync()).length;
+        } catch (e) {
+          await stmt.finalizeAsync();
+          throw e;
+        }
+      }
+      return new ExpoSqliteStatement(stmt, columnCount, remainder);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql);
     }

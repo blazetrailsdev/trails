@@ -34,16 +34,8 @@ const ORIGINAL_ATTRIBUTE_PREFIX = "original_";
 
 export class EncryptableRecord {
   /**
-   * Raise when a preserved (`ignore_case`) attribute's `original_<name>` column
-   * is absent and `supportUnencryptedData` is false — mirrors Rails
-   * encryptable_record.rb:101–103. Checked at declaration time against the
-   * columns known then. Rails' `column_names` forces a schema load so the set is
-   * always complete; ours can be empty at Base.encrypts static-init (the adapter
-   * isn't connected yet), so an empty list means "unknown" and we defer rather
-   * than raise a false positive — the same fail-open-when-unknown behavior the
-   * scheme-based path shipped with.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE the missing-original-column raise of encrypts (encryption/encryptable_record.rb:101-103), split out for the deferred re-check.
+   * @noRailsEquivalent CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
    */
   static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
     if (Encryption.config.supportUnencryptedData) return;
@@ -55,16 +47,8 @@ export class EncryptableRecord {
   }
 
   /**
-   * Re-run the `original_<name>` missing-column requirement for every
-   * ignoreCase-preserved attribute against the authoritative column set
-   * reflected from the real adapter schema. Driven from schema reflection
-   * (`applyColumnsHash`), which runs only once the DB columns are known — so
-   * unlike the eager `columnNames()` partial-load path, `reflectedColumnNames`
-   * distinguishes "schema reflected, column absent" (fail-closed, raise) from
-   * "declaration in progress" (never reaches here). Mirrors Rails' fail-closed
-   * `preserve_original_encrypted`, whose `column_names` is always complete.
    * @internal
-   * @noRailsEquivalent CONVERGEABLE re-runs that same raise once the schema is reflected (encryption/encryptable_record.rb:101-103); Ruby's column_names is always complete.
+   * @noRailsEquivalent CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
    */
   static requireOriginalColumnsAfterReflection(
     modelClass: any,

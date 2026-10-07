@@ -13,19 +13,8 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 }
 
 /**
- * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
- * query strings) and `:memory:` aliases. Returns `null` for memory databases,
- * otherwise the decoded filesystem path.
- *
- * Shared by the URI-aware SQLite drivers — node:sqlite and libsql both enable
- * `SQLITE_OPEN_URI`, so (unlike better-sqlite3, whose build doesn't set it and
- * opens the string literally) they open a rootless `file:foo.db` relative to
- * the cwd, not as a literal file named `file:foo.db`. So this resolver
- * preserves relative `file:` paths (returning `foo.db`, not `/foo.db`) so
- * `databaseExists()` checks the path `open()` actually uses; only `file:/...`
- * / `file://host/...` is absolute.
  * @internal
- * @noRailsEquivalent CONVERGEABLE the file:/:memory: handling Ruby leaves to SQLITE_OPEN_URI in SQLite3Adapter.new_client (sqlite3_adapter.rb:34).
+ * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
  */
 export function resolveUriDatabasePath(database: string): string | null {
   if (database === ":memory:") return null;

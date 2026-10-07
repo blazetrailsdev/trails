@@ -133,7 +133,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE UNIQUE INDEX "ex_idx_both_i" ON "ex_idx_both" ("n") INCLUDE ("d") NULLS NOT DISTINCT`,
       );
       const lines = new StringIO();
-      await adapter.createSchemaDumper({}).dumpTable(lines, "ex_idx_both");
+      await adapter.createSchemaDumper({}).table("ex_idx_both", lines);
       const indexLine = lines
         .string()
         .split("\n")
