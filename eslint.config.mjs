@@ -493,6 +493,21 @@ export default defineConfig(
     },
   },
 
+  // The `inventedMessage` arm alone: the rule runs no class-hierarchy or
+  // native-throw check on a package outside its `PKG_NS`.
+  {
+    files: [
+      "packages/actionpack/src/**/*.ts",
+      "packages/actionview/src/**/*.ts",
+      "packages/rack/src/**/*.ts",
+      "packages/trailties/src/**/*.ts",
+    ],
+    ignores: ["**/*.test.ts", "**/test-helpers/**"],
+    rules: {
+      "blazetrails/rails-error-parity": "error",
+    },
+  },
+
   // ── rails-callback-invocations: a ported ActiveRecord method whose Rails
   //    counterpart fires lifecycle callbacks (`_run_<event>_callbacks` /
   //    `run_callbacks(:event)`) must keep firing them via

@@ -117,7 +117,7 @@ export class ParamBuilder {
     depth: number,
     encodingTemplate: EncodingTemplate | false | null = null,
   ): ParamValue {
-    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError("param depth limit exceeded");
+    if (depth >= this.paramDepthLimit) throw new ParamsTooDeepError();
 
     let k: string;
     let after: string;

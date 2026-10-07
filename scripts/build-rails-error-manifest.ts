@@ -10,8 +10,8 @@
  *
  * It also records, under `bareRaises`, every class Rails raises with no message
  * argument (`raise Klass` / `raise Klass unless …` / `raise Klass.new`), keyed
- * by package, TS source file and TS method name. A class a method raises both
- * ways is left out. The rule's `inventedMessage` arm reads it.
+ * by package, TS source file, owning class and TS method name. A class a method
+ * raises both ways is left out. The rule's `inventedMessage` arm reads it.
  *
  *   pnpm tsx scripts/build-rails-error-manifest.ts
  */
@@ -21,7 +21,7 @@ import { fileURLToPath } from "url";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { resolveSourcePath } from "../vendor/sources.js";
 import { rubyFileToTs } from "./parity/conventions.js";
-import { scanBareRaises, type BareRaises } from "./parity/rails-bare-raises.js";
+import { foldBareRaises, scanRaises, type OwnedBareRaises } from "./parity/rails-bare-raises.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -76,15 +76,32 @@ interface ErrorClass {
   rubyFile: string;
 }
 
-async function scanPackageBareRaises(pkg: Pkg): Promise<Record<string, BareRaises>> {
-  const libDir = resolveSourcePath("rails", `${PKG_GEM[pkg]}/lib`);
-  const out: Record<string, BareRaises> = {};
+// Where each package's Ruby lives, for the bare-raise scan: vendored source, lib
+// dir, and the namespace segment its TS tree drops. The four packages above
+// carry the error-class inventory too; the rest are scanned for raises only.
+const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]> = {
+  ...Object.fromEntries(
+    PACKAGES.map((pkg) => [pkg, ["rails", `${PKG_GEM[pkg]}/lib`, PKG_NS[pkg]]]),
+  ),
+  actionpack: ["rails", "actionpack/lib", ""],
+  actionview: ["rails", "actionview/lib", "action_view/"],
+  rack: ["rack", "lib", "rack/"],
+  trailties: ["rails", "railties/lib", "rails/"],
+};
+
+async function scanPackageBareRaises(pkg: string): Promise<Record<string, OwnedBareRaises>> {
+  const [source, lib, ns] = BARE_RAISE_LIBS[pkg];
+  const libDir = resolveSourcePath(source, lib);
+  const rels = new Map<string, string>();
   for (const file of (await walkRubyFiles(libDir)).sort()) {
     const rel = path.relative(libDir, file).split(path.sep).join("/");
-    if (!rel.startsWith(PKG_NS[pkg]) || rel.includes("generators/")) continue;
-    const scanned = scanBareRaises(await readFile(file, "utf8"));
+    if (rel.startsWith(ns) && !rel.includes("generators/")) rels.set(file, rel);
+  }
+  const out: Record<string, OwnedBareRaises> = {};
+  for (const [file, rows] of Object.entries(await scanRaises([...rels.keys()]))) {
+    const scanned = foldBareRaises(rows);
     if (Object.keys(scanned).length === 0) continue;
-    out[rubyFileToTs(rel.slice(PKG_NS[pkg].length), pkg)] = scanned;
+    out[rubyFileToTs(rels.get(file)!.slice(ns.length), pkg)] = scanned;
   }
   return out;
 }
@@ -197,8 +214,9 @@ async function main() {
 
   // `generatedAt` is fixed (not Date.now()) so the committed manifest is
   // reproducible and only changes when the Rails source does.
-  const bareRaises: Record<string, Record<string, BareRaises>> = {};
-  for (const pkg of PACKAGES) bareRaises[pkg] = await scanPackageBareRaises(pkg);
+  const bareRaises: Record<string, Record<string, OwnedBareRaises>> = {};
+  for (const pkg of Object.keys(BARE_RAISE_LIBS))
+    bareRaises[pkg] = await scanPackageBareRaises(pkg);
   const manifest = { generatedAt: "vendored", packages, bareRaises };
   writeJsonManifest(OUT, manifest);
 

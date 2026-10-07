@@ -1,3 +1,4 @@
+import { underscore } from "@blazetrails/activesupport";
 import { LoadError } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
@@ -12,8 +13,8 @@ const resolveErrors = new Map<string, unknown>();
 export function register(
   name: string,
   className: string,
-  path: string,
-  loader: AdapterLoader,
+  path: string = underscore(className),
+  loader: AdapterLoader = async () => (await import(path))[className],
 ): void {
   adapters.set(name, [className, path, loader]);
   resolved.delete(name);
@@ -42,7 +43,7 @@ export function resolve(adapterName: string | undefined): AdapterClass {
       `Database configuration specifies nonexistent '${adapterName ?? ""}' adapter. ` +
         `Available adapters are: ${[...adapters.keys()].sort().join(", ")}. ` +
         `Ensure that the adapter is spelled correctly in config/database.yml and that you've added the necessary ` +
-        `adapter package to your package.json if it's not in the list of available adapters.`,
+        `adapter gem to your Gemfile if it's not in the list of available adapters.`,
     );
   }
 

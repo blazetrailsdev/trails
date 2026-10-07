@@ -23,6 +23,7 @@ import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.j
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { Column } from "./connection-adapters/column.js";
 import type { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { Column as MysqlColumn } from "./connection-adapters/mysql/column.js";
 import { Migration, InvalidMigrationTimestampError } from "./migration.js";
 import { GiveMeBigNumbers } from "./test-helpers/migrations/decimal/1_give_me_big_numbers.js";
@@ -768,7 +769,7 @@ describe("MigrationTest", () => {
   });
 
   it("create table with force true does not drop nonexisting table", async () => {
-    const pool = (await Base.leaseConnection()).pool;
+    const pool = (await Base.leaseConnection()).pool as ConnectionPool;
     const tempConn = await pool.checkout();
     try {
       expect(tempConn).not.toBe(await Base.leaseConnection());

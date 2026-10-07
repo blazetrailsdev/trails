@@ -146,10 +146,6 @@ export class NullPool implements AbstractPool {
     return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
   }
 
-  checkout(): never {
-    throw new ConnectionNotEstablished("NullPool does not support checkout");
-  }
-
   disconnect(): void {}
 }
 
