@@ -12,6 +12,7 @@ import {
   symbolizeKeys,
   Autoload,
   Benchmark,
+  TopLevel,
   extend,
   type Extended,
   wrap,
@@ -228,8 +229,12 @@ export class EnvironmentMismatchError extends ActiveRecordError {
     let msg = `You are attempting to modify a database that was last run in \`${stored ?? ""}\` environment.\n`;
     msg += `You are running in \`${current ?? ""}\` environment. `;
     msg += `If you are sure you want to continue, first set the environment using:\n\n`;
-    msg += `        trails db environment:set`;
-    super(`${msg}\n\n`);
+    msg += `        bin/trails db environment:set`;
+    if (TopLevel.Trails !== undefined) {
+      super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}\n\n`);
+    } else {
+      super(`${msg}\n\n`);
+    }
     this.name = "ActiveRecord::EnvironmentMismatchError";
   }
 }

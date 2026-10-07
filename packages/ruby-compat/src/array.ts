@@ -373,13 +373,11 @@ export function arySlice<T>(
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
   const alen = ary.length;
-  if (arg == null || (argc === 2 && length == null)) {
-    throw new TypeError("no implicit conversion from nil to integer");
-  }
   if (argc === 2) {
-    let beg = arg as number;
+    let beg = num2long(arg);
+    const len = num2long(length);
     if (beg < 0) beg += alen;
-    return subseq(ary, beg, length!);
+    return subseq(ary, beg, len);
   }
   if (arg instanceof Range) {
     let beg = arg.begin ?? 0;
@@ -392,7 +390,8 @@ export function arySlice<T>(
     if (arg.end !== null && !arg.excludeEnd) end += 1;
     return subseq(ary, beg, Math.max(0, end - beg));
   }
-  const index = arg < 0 ? arg + alen : arg;
+  const offset = num2long(arg);
+  const index = offset < 0 ? offset + alen : offset;
   return index >= 0 && index < alen ? ary[index] : null;
 }
 

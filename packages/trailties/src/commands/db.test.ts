@@ -1274,9 +1274,13 @@ export class CreatePosts extends Migration {
     const previous = DatabaseTasks.databaseConfiguration;
     DatabaseTasks.databaseConfiguration = configurations;
     try {
-      await expect(
-        DatabaseTasks.checkProtectedEnvironmentsBang("development"),
-      ).rejects.toBeInstanceOf(EnvironmentMismatchError);
+      const error = await DatabaseTasks.checkProtectedEnvironmentsBang("development").catch(
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(EnvironmentMismatchError);
+      expect((error as Error).message).toMatch(
+        new RegExp(`        bin/trails db environment:set TRAILS_ENV=${Trails.env}\n\n$`),
+      );
     } finally {
       DatabaseTasks.databaseConfiguration = previous;
     }
