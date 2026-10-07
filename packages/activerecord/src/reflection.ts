@@ -28,7 +28,13 @@ import {
   included,
   kernelArray,
 } from "@blazetrails/activesupport";
-import { RuntimeError, except, mergeBang } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  RuntimeError,
+  except,
+  mergeBang,
+  toS,
+} from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
@@ -93,7 +99,8 @@ function arrayLen(value: string | string[]): number {
   return Array.isArray(value) ? value.length : 1;
 }
 
-export class AbstractReflection {
+export abstract class AbstractReflection {
+  private _className?: string;
   /** @internal */
   private _counterCacheColumn?: string | null;
   private _inverseWhichUpdatesCounterCacheDefined?: boolean;
@@ -126,12 +133,13 @@ export class AbstractReflection {
   }
 
   get className(): string {
-    throw new Error("Subclass must implement className");
+    return (this._className ??= toS(
+      this._concrete().options.className ??
+        (this as unknown as { deriveClassName(): string }).deriveClassName(),
+    ));
   }
 
-  get klass(): typeof Base {
-    throw new Error("Subclass must implement klass");
-  }
+  abstract get klass(): typeof Base;
 
   get scopes(): Array<(...args: any[]) => any> {
     return this.scope ? [this.scope] : [];
@@ -419,11 +427,6 @@ export class MacroReflection extends AbstractReflection {
     return this._scope;
   }
 
-  get className(): string {
-    if (this.options.className) return this.options.className as string;
-    return camelize(singularize(this.nameString));
-  }
-
   get klass(): typeof Base {
     if (this._klassCache) return this._klassCache;
     const resolved = this.options.anonymousClass
@@ -546,7 +549,8 @@ export class AssociationReflection extends MacroReflection {
   }
 
   get macro(): MacroType {
-    throw new Error("Subclass must implement macro");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/reflection.rb:691
+    throw new NotImplementedError();
   }
 
   foreignKey({ inferFromInverseOf = true }: { inferFromInverseOf?: boolean } = {}):
@@ -890,7 +894,8 @@ export class AssociationReflection extends MacroReflection {
     | typeof BelongsToAssociation
     | typeof HasManyAssociation
     | typeof HasOneAssociation {
-    throw new Error("Subclass must implement associationClass");
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/reflection.rb:719
+    throw new NotImplementedError();
   }
 
   polymorphicName(): string {
@@ -973,12 +978,11 @@ export class AssociationReflection extends MacroReflection {
     return !!this.options.strictLoading;
   }
 
-  get className(): string {
-    if (this.options.className) return this.options.className as string;
-    if (this.isCollection()) {
-      return camelize(singularize(this.nameString));
-    }
-    return camelize(this.nameString);
+  /** @internal */
+  protected override deriveClassName(): string {
+    let className = this.nameString;
+    if (this.isCollection()) className = singularize(className);
+    return camelize(className);
   }
 
   /** @internal */
@@ -1186,14 +1190,6 @@ export class ThroughReflection extends AbstractReflection {
 
   get scope(): ((...args: any[]) => any) | null {
     return this.delegateReflection.scope;
-  }
-
-  get className(): string {
-    return (
-      (this.options.className as string | undefined) ||
-      this.deriveClassName() ||
-      this.delegateReflection.className
-    );
   }
 
   get klass(): typeof Base {
@@ -1483,7 +1479,7 @@ export class ThroughReflection extends AbstractReflection {
 
   /** @internal */
   protected deriveClassName(): string {
-    return (this.options.sourceType as string) || (this.sourceReflection as any)?.className || "";
+    return (this.options.sourceType as string | undefined) ?? this.sourceReflection!.className;
   }
 
   /** @internal */

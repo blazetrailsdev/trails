@@ -871,13 +871,17 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   if (typeof obj.methodMissing === "function") {
     return (obj.methodMissing as AnyFunction).call(recv, mid, ...args);
   }
-  throw new NoMethodError(
-    `undefined method '${mid}' for an instance of ${rbObjClassname(recv)}`,
-    mid,
-    {
-      receiver: recv,
-    },
-  );
+  const d =
+    recv == null
+      ? "nil"
+      : recv === true
+        ? "true"
+        : recv === false
+          ? "false"
+          : `an instance of ${rbObjClassname(recv)}`;
+  throw new NoMethodError(`undefined method '${mid}' for ${d}`, mid, args, false, {
+    receiver: recv,
+  });
 }
 
 type AnyFunction = (...args: unknown[]) => unknown;

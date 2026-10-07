@@ -396,6 +396,25 @@ describe("rbFPublicSend include?", () => {
 });
 
 describe("rbFSend", () => {
+  it("raises NoMethodError carrying the receiver and args for an undefined method", () => {
+    for (const [recv, d] of [
+      [null, "nil"],
+      [true, "true"],
+      [false, "false"],
+    ] as const) {
+      let error: NoMethodError | undefined;
+      try {
+        rbFSend(recv, "nope", 1, 2);
+      } catch (e) {
+        error = e as NoMethodError;
+      }
+      expect(error).toBeInstanceOf(NoMethodError);
+      expect(error!.message).toBe(`undefined method 'nope' for ${d}`);
+      expect(error!.receiver()).toBe(recv);
+      expect(error!.args()).toEqual([1, 2]);
+    }
+  });
+
   it("sends a writer to a setName method, the conventions table's other writer spelling", () => {
     class Host {
       static log: unknown[] = [];

@@ -25,6 +25,8 @@ import {
   Module,
   include,
   rbInspect,
+  RuntimeError,
+  TypeError,
   rbModConstSet,
   rbModName,
   registerConstant,
@@ -130,7 +132,7 @@ function frameworkBase(model: typeof Base): typeof Base | null {
 /** @internal */
 function assertActiveRecordBase(model: typeof Base): void {
   if (!frameworkBase(model)) {
-    throw new Error(
+    throw new ArgumentError(
       `registerModel expects an ActiveRecord::Base subclass, got ${String(model?.name ?? model)}`,
     );
   }
@@ -140,7 +142,7 @@ function assertActiveRecordBase(model: typeof Base): void {
 function guardCanonicalNameShadow(name: string, model: typeof Base): void {
   const canonical = canonicalModelAutoloadIndex?.get(name);
   if (canonical && canonical !== model) {
-    throw new Error(
+    throw new RuntimeError(
       `Registering a class under ${JSON.stringify(name)} would shadow the canonical model of the ` +
         `same name in the global registry, poisoning every later test that resolves it as an ` +
         `association target. Use the canonical model, or a distinct non-canonical name.`,
@@ -176,7 +178,7 @@ export function registerModel(
     return;
   }
   if (typeof nameOrModel === "string") {
-    if (!model) throw new Error("registerModel(name, model) requires a model class");
+    if (!model) throw new ArgumentError("registerModel(name, model) requires a model class");
     assertActiveRecordBase(model);
     modelRegistry.set(nameOrModel, model);
     const keys: string[] = model._registryKeys ?? [];

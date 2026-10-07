@@ -6,7 +6,7 @@ import type { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfig } from "./database-configurations/database-config.js";
 import { NotImplementedError, ActiveRecordError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbEnsure } from "@blazetrails/ruby-compat";
+import { rbEnsure, RuntimeError } from "@blazetrails/ruby-compat";
 import {
   connectedToStack,
   currentRole as coreCurrentRole,
@@ -440,7 +440,7 @@ export function resolveConfigForConnection(
   this: typeof Base,
   configOrEnv: unknown,
 ): HashConfig | null {
-  if (!this.name) throw new Error("Anonymous class is not allowed.");
+  if (!this.name) throw new RuntimeError("Anonymous class is not allowed.");
   (this as any)._connectionSpecificationName = isPrimaryClass.call(this)
     ? "ActiveRecord::Base"
     : this.name;

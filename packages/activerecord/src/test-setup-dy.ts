@@ -1,5 +1,6 @@
 import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 
@@ -46,7 +47,7 @@ for (const t of ["accounts", "topics", "posts", "defaults"]) {
   if (!(await _conn.tableExists(t))) missingTables.push(t);
 }
 if (missingTables.length > 0) {
-  throw new Error(
+  throw new RuntimeError(
     `[test-setup-dy] schema load incomplete — missing tables: ${missingTables.join(", ")}`,
   );
 }

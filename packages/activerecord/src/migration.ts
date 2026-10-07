@@ -36,7 +36,7 @@ import {
   StandardError,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbFSend, rbObjClassname, Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -212,14 +212,18 @@ export class NoEnvironmentInSchemaError extends MigrationError {
   }
 }
 
-export class ProtectedEnvironmentError extends MigrationError {
-  constructor(env: string) {
-    super(`You are attempting to run a destructive action against your '${env}' database.`);
+export class ProtectedEnvironmentError extends ActiveRecordError {
+  constructor(env = "production") {
+    let msg = `You are attempting to run a destructive action against your '${env}' database.\n`;
+    msg +=
+      "If you are sure you want to continue, run the same command with the environment variable:\n";
+    msg += "DISABLE_DATABASE_ENVIRONMENT_CHECK=1";
+    super(msg);
     this.name = "ActiveRecord::ProtectedEnvironmentError";
   }
 }
 
-export class EnvironmentMismatchError extends MigrationError {
+export class EnvironmentMismatchError extends ActiveRecordError {
   constructor({ current, stored }: { current?: string; stored?: string } = {}) {
     let msg = `You are attempting to modify a database that was last run in \`${stored ?? ""}\` environment.\n`;
     msg += `You are running in \`${current ?? ""}\` environment. `;
@@ -230,9 +234,12 @@ export class EnvironmentMismatchError extends MigrationError {
   }
 }
 
-export class EnvironmentStorageError extends MigrationError {
-  constructor(message = "Cannot store environment data.") {
-    super(message);
+export class EnvironmentStorageError extends ActiveRecordError {
+  constructor() {
+    let msg =
+      "You are attempting to store the environment in a database where metadata is disabled.\n";
+    msg += "Check your database configuration to see if this is intended.";
+    super(msg);
     this.name = "ActiveRecord::EnvironmentStorageError";
   }
 }
@@ -1173,11 +1180,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   static methodMissing(name: string, ...args: unknown[]): unknown {
-    const delegate = this.nearestDelegate as unknown as Record<string, unknown> | null;
-    if (delegate !== null && typeof delegate[name] === "function") {
-      return (delegate[name] as (...a: unknown[]) => unknown).apply(delegate, args);
-    }
-    throw new TypeError(`undefined method '${name}' for ${this.name}`);
+    return rbFSend(this.nearestDelegate, name, ...args);
   }
 
   async methodMissing(name: string, ...args: unknown[]): Promise<unknown> {
@@ -1202,7 +1205,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         methodMissing?: (name: string, ...args: unknown[]) => unknown;
       };
       if ((await strategy.respondToMissing?.(name)) !== true) {
-        throw new TypeError(`undefined method '${name}' for ${conn.constructor.name}`);
+        throw new NoMethodError(
+          `undefined method '${name}' for an instance of ${rbObjClassname(this)}`,
+          name,
+          args,
+          false,
+          { receiver: this },
+        );
       }
       if (block !== undefined) args.push(block);
       return await strategy.methodMissing?.(name, ...args);

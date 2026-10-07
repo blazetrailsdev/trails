@@ -1,5 +1,6 @@
 import {
   STDOUT,
+  StandardError,
   StringIO,
   partition,
   rbEqq,
@@ -424,7 +425,9 @@ export abstract class SchemaDumper {
 
       for (const column of columns) {
         if (!this.validType(column.type))
-          throw new Error(`Unknown type '${column.sqlType ?? ""}' for column '${column.name}'`);
+          throw new StandardError(
+            `Unknown type '${column.sqlType ?? ""}' for column '${column.name}'`,
+          );
         if (column.name === pk) continue;
 
         const [type, colspec] = await this.columnSpec(column);

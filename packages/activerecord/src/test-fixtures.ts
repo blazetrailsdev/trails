@@ -70,7 +70,9 @@ export const ClassMethods = {
   fixtures(this: TestFixturesClassHost, ...fixtureSetNames: unknown[]): void {
     if (fixtureSetNames[0] === ":all") {
       if (isBlank(this.fixturePaths))
-        throw new Error(`No fixture path found. Please set \`${this.name}.fixturePaths\`.`);
+        throw new StandardError(
+          `No fixture path found. Please set \`${this.name}.fixture_paths\`.`,
+        );
       fixtureSetNames = [
         ...new Set(
           this.fixturePaths.flatMap((path) => {
@@ -190,7 +192,7 @@ export async function resolveFixtureNames(
   for (const name of names) {
     const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
     if (!entry) {
-      throw new Error(
+      throw new StandardError(
         `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
       );
     }
@@ -754,7 +756,7 @@ function registerFixtureHooks(klass: TestCaseClass): void {
 function fixtureAccessor(fixtureSetName: string) {
   const accessor = (...fixtureNames: unknown[]) => {
     if (currentTestCase === null) {
-      throw new Error(
+      throw new RuntimeError(
         `useFixtures: fixture set "${fixtureSetName}" not loaded — call inside a test`,
       );
     }
@@ -791,7 +793,7 @@ export function fixtures(
   if (Array.isArray(fixturesOrNames)) {
     for (const name of fixturesOrNames as readonly FixtureName[]) {
       if (!(name in fixtureRegistry)) {
-        throw new Error(
+        throw new StandardError(
           `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
         );
       }
