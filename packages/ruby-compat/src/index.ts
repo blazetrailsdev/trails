@@ -360,7 +360,7 @@ export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
 export { rbStrPartition } from "./string/sub.js";
-export { rbStrSNew, stringValue, strlen } from "./string/support.js";
+export { rbCheckStringType, rbStrSNew, stringValue, strlen } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
