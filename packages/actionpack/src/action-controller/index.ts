@@ -67,12 +67,5 @@ export { defaultFormBuilder } from "./form-builder.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { type HelpersPathControllerClass } from "./trailties/helpers.js";
-export {
-  helperAttr,
-  helpersPath,
-  setHelpersPath,
-  setApplicationHelpers,
-  loadApplicationHelperNames,
-  modulesForHelpers,
-} from "./metal/helpers.js";
+export { helperAttr, helpersPath, setHelpersPath, modulesForHelpers } from "./metal/helpers.js";
 export { ParameterEncoding } from "./metal/parameter-encoding.js";

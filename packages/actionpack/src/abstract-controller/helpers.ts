@@ -6,10 +6,12 @@ import {
   constantize,
   extend,
   isAnonymous,
+  kernelArray,
   NameError,
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  Dir,
   isSymbol,
   Module,
   rbClassSuperclass,
@@ -72,27 +74,25 @@ export function modulesForHelpers(
   });
 }
 
-export async function allHelpersFromPath(path: string | readonly string[]): Promise<string[]> {
-  const modName = ["@blazetrails", "activesupport", "glob"].join("/");
-  const { glob } = (await import(modName)) as typeof import("@blazetrails/activesupport/glob");
-  const helpers: string[] = [];
-  for (const _path of typeof path === "string" ? [path] : path) {
-    const names = (await glob("**/*{-,_}helper.{ts,js,rb}", { cwd: _path })).map((file) =>
-      file.replace(/[-_]helper\.(ts|js|rb)$/, "").replaceAll("-", "_"),
+/** @inventedArm replaceAll — PERMANENT */
+export function allHelpersFromPath(path: string | string[]): string[] {
+  const helpers = kernelArray(path).flatMap((_path) => {
+    const names = Dir.glob(`${_path}/**/*{-,_}helper.{ts,js,rb}`).map((file) =>
+      file.slice(String(_path).length + 1, -"_helper.rb".length).replaceAll("-", "_"),
     );
-    helpers.push(...names.sort());
-  }
+    return names.sort();
+  });
   return [...new Set(helpers)];
 }
 
-export async function helperModulesFromPaths(
+export function helperModulesFromPaths(
   this: {
     modulesForHelpers(modulesOrHelperPrefixes: HelperArgument[]): HelperMethodsModule[];
-    allHelpersFromPath(path: string | readonly string[]): Promise<string[]>;
+    allHelpersFromPath(path: string | string[]): string[];
   },
-  paths: string | readonly string[],
-): Promise<HelperMethodsModule[]> {
-  return this.modulesForHelpers(await this.allHelpersFromPath(paths));
+  paths: string | string[],
+): HelperMethodsModule[] {
+  return this.modulesForHelpers(this.allHelpersFromPath(paths));
 }
 
 export const Resolution = { modulesForHelpers, allHelpersFromPath, helperModulesFromPaths };
@@ -129,6 +129,15 @@ export function helperMethod(this: HelpersClass, ...methods: HelperMethodNameLis
             (file ? `\n//# sourceURL=${file.replace(/[\r\n\u2028\u2029]/g, "")}` : ""),
         )(rbFSend, attr, writer),
       );
+      if (method !== attr) {
+        Object.defineProperty(mod, method, {
+          value(this: { controller: object }, ...args: unknown[]): unknown {
+            return rbFSend(this.controller, method, ...args);
+          },
+          writable: true,
+          configurable: true,
+        });
+      }
     });
   }
 }

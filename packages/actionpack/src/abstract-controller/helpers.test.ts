@@ -143,7 +143,7 @@ describe("helperMethod", () => {
     const child = Object.create(parent) as HelpersClass;
     helperMethod.call(child, "fromChild");
 
-    expect(child._helpers.instanceMethods()).toEqual(["fromChild"]);
+    expect(child._helpers.instanceMethods(false)).toEqual(["fromChild"]);
     expect("fromParent" in view(child)).toBe(true);
     expect(parent._helpers.instanceMethods()).toEqual(["fromParent"]);
     expect(parent._helperMethods).toEqual(["fromParent"]);
@@ -321,7 +321,7 @@ describe("_helpersForModification", () => {
     const mod = child._helpersForModification();
     expect(mod).not.toBe(parent._helpers);
     expect(mod.isInclude(parent._helpers)).toBe(true);
-    expect(mod.instanceMethods()).toEqual([]);
+    expect(mod.instanceMethods(false)).toEqual([]);
     expect("fromParent" in view(child)).toBe(true);
 
     expect(child._helpersForModification()).toBe(mod);

@@ -7,7 +7,7 @@ import {
   type InheritableOptions,
 } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
-import { aryDelete, rbObjIvarGet, rbObjIvarSet, registerConstant } from "@blazetrails/ruby-compat";
+import { aryDelete, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import {
   Helpers as AbstractHelpers,
   Resolution,
@@ -26,23 +26,6 @@ export function setHelpersPath(paths: string[]): void {
   _helpersPath = paths;
 }
 
-let _applicationHelpers: string[] = [];
-
-/** @noRailsEquivalent PERMANENT */
-export function setApplicationHelpers(
-  names: string[],
-  constants: Map<string, HelperMethodsModule>,
-): void {
-  _applicationHelpers = names;
-  for (const [name, mod] of constants) registerConstant(name, mod);
-}
-
-/** @noRailsEquivalent PERMANENT */
-export async function loadApplicationHelperNames(): Promise<string[]> {
-  _applicationHelpers = await Resolution.allHelpersFromPath(_helpersPath);
-  return _applicationHelpers;
-}
-
 export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[]): void {
   ((attrs as readonly unknown[]).flat(Infinity) as string[]).forEach((attr) =>
     this.helperMethod(attr, `${attr}=`),
@@ -51,7 +34,11 @@ export function helperAttr(this: HelpersClass, ...attrs: HelperMethodNameList[])
 
 type ConfigReceiver = { config(): InheritableOptions };
 
-type HelpersClassHost = HelpersClass & { allApplicationHelpers(): string[] };
+type HelpersClassHost = HelpersClass & {
+  helpersPath: string | string[];
+  allHelpersFromPath: (typeof Resolution)["allHelpersFromPath"];
+  allApplicationHelpers(): string[];
+};
 
 export function modulesForHelpers(
   this: HelpersClassHost,
@@ -63,13 +50,9 @@ export function modulesForHelpers(
   return ClassMethods.superMethod(this, "modulesForHelpers")!(args) as HelperMethodsModule[];
 }
 
-/**
- * @internal
- * @missingRailsCall all_helpers_from_path — CONVERGEABLE action-controller-helpers-all-application-helpers-and-helper-method-accessor-arm
- * @missingRailsCall helpers_path — CONVERGEABLE action-controller-helpers-all-application-helpers-and-helper-method-accessor-arm
- */
-function allApplicationHelpers(): string[] {
-  return _applicationHelpers;
+/** @internal */
+function allApplicationHelpers(this: HelpersClassHost): string[] {
+  return this.allHelpersFromPath(this.helpersPath);
 }
 
 export const ClassMethods: Module = new Module((mod) => {

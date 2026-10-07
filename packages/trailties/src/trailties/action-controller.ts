@@ -20,6 +20,7 @@ import {
   rbFSend,
   rbObjIsKindOf,
   rbObjRespondTo,
+  registerConstant,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { Root } from "../paths.js";
@@ -93,8 +94,7 @@ export class Trailtie extends BaseTrailtie {
         const helpersPaths = (app as TrailtieApp).config.helpersPaths;
         ActionController.setHelpersPath(helpersPaths);
 
-        const names = await ActionController.loadApplicationHelperNames();
-        ActionController.setApplicationHelpers(names, await helperConstants(helpersPaths));
+        for (const [name, mod] of await helperConstants(helpersPaths)) registerConstant(name, mod);
 
         onLoad("action_controller", (base: unknown) => {
           (base as ActionController.HelpersPathControllerClass).helpersPath =

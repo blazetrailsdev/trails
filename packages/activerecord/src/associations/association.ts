@@ -112,18 +112,20 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     }
   }
 
+  /** @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies */
   reload(force = false): this | null | Promise<this | null> {
-    if (force) {
-      this.klass.connectionPool().clearQueryCache();
-    }
+    if (force && this.klass) this.klass.connectionPool().clearQueryCache();
     this.reset();
     this.resetScope();
     const loaded = this.loadTarget();
-    return loaded instanceof Promise
-      ? loaded.then(() => (this.target == null ? null : this))
-      : this.target == null
-        ? null
-        : this;
+    if (loaded instanceof Promise) {
+      return loaded.then(() => {
+        if (this.target != null) return this;
+        return null;
+      });
+    }
+    if (this.target != null) return this;
+    return null;
   }
 
   setTarget(target: Base | Base[] | null): void {
@@ -467,9 +469,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   protected enqueueDestroyAssociation(options: Record<string, unknown>): void {
     const jobClass = (this.owner.constructor as any).destroyAssociationAsyncJob;
     if (jobClass) {
-      const ownerAny = this.owner as any;
-      ownerAny._afterCommitJobs ??= [];
-      ownerAny._afterCommitJobs.push([jobClass, options]);
+      (this.owner as any)._afterCommitJobs.push([jobClass, options]);
     }
   }
 }

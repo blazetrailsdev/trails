@@ -402,7 +402,7 @@ export class Base extends Metal {
   declare isEtagWithTemplateDigest: boolean;
   declare static etag: OmitThisParameter<(typeof ConditionalGetClassMethods)["etag"]>;
 
-  declare static helpersPath: string[];
+  declare static helpersPath: string | string[];
   declare static isHelpersPath: boolean;
   declare static includeAllHelpers: boolean;
   declare static raiseOnOpenRedirects: boolean;
