@@ -1,7 +1,9 @@
 import {
   attrInternal,
   Benchmark,
+  Concern,
   ExecutionContext,
+  extend,
   include,
   included,
   initialize,
@@ -20,7 +22,9 @@ import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-c
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import { Flash } from "./flash.js";
 
-export const Instrumentation: Module = new Module((mod) => {
+export const Instrumentation = new Module((mod) => {
+  extend(mod, Concern);
+
   (mod as unknown as Record<symbol, unknown>)[included] = (base: LoggerIncludingClass): void => {
     include(base, Logger);
   };
@@ -39,7 +43,7 @@ export const Instrumentation: Module = new Module((mod) => {
   mod.defineMethod("haltedCallbackHook", haltedCallbackHook);
   mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
   mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
-});
+}) as Module & { ClassMethods: Module };
 
 interface InstrumentationHost {
   actionName?: string;
@@ -177,3 +181,9 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
   }
   return messages;
 }
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("logProcessAction", logProcessAction);
+});
+
+Instrumentation.ClassMethods = ClassMethods;

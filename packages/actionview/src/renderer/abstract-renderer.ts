@@ -24,14 +24,14 @@ export interface RenderableTemplate {
     buffer?: null,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | Promise<string | SafeBuffer>;
+  ): string | SafeBuffer | Uint8Array | Promise<string | SafeBuffer>;
   render(
     view: ViewContext,
     locals: Record<string, unknown>,
     buffer: unknown,
     options?: { implicitLocals?: readonly string[]; addToStack?: boolean },
     block?: (...name: unknown[]) => unknown,
-  ): string | SafeBuffer | null | Promise<string | SafeBuffer | null>;
+  ): string | SafeBuffer | Uint8Array | null | Promise<string | SafeBuffer | null>;
 }
 
 export interface ViewContext {

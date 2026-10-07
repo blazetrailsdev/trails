@@ -70,14 +70,15 @@ describe("SendFileTest", () => {
   });
 
   it("data", async () => {
+    const fileData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80, 0xc3, 0x28]);
     class C extends Base {
       async data() {
-        await this.sendData(testFileData);
+        await this.sendData(fileData);
       }
     }
     const c = new C();
     await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.responseBody).toBe(testFileData);
+    expect(c.response.bodyParts()).toEqual([fileData]);
   });
 
   it("headers after send shouldnt include charset", async () => {

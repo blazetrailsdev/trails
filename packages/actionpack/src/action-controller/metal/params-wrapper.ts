@@ -16,9 +16,12 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import {
+  Concern,
+  Module,
   any,
   classify,
   demodulize,
+  extend,
   isAnonymous,
   isPlainObject,
   safeConstantize,
@@ -172,6 +175,12 @@ export interface ParamsWrapperHost {
     parameters: Record<string, unknown>;
   };
   _wrapperOptions: Options;
+  _wrapperKey(): string | null;
+  _wrapperFormats(): string[];
+  _wrapParameters(parameters: Record<string, unknown>): Record<string, unknown>;
+  _extractParameters(parameters: Record<string, unknown>): Record<string, unknown>;
+  _wrapperEnabled(): boolean;
+  _performParameterWrapping(): void;
 }
 
 /** @internal */
@@ -246,6 +255,12 @@ export function deferInherited(this: WrapperHostClass): void {
 }
 
 /** @internal */
+export async function processAction(this: ParamsWrapperHost, ...args: unknown[]): Promise<unknown> {
+  if (this._wrapperEnabled()) this._performParameterWrapping();
+  return await ParamsWrapper.superMethod(this, "processAction")!(...args);
+}
+
+/** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;
 }
@@ -276,7 +291,7 @@ export function _wrapParameters(
   this: ParamsWrapperHost,
   parameters: Record<string, unknown>,
 ): Record<string, unknown> {
-  return { [_wrapperKey.call(this)!]: _extractParameters.call(this, parameters) };
+  return { [this._wrapperKey()!]: this._extractParameters(parameters) };
 }
 
 /** @internal */
@@ -287,9 +302,9 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
     const ref = this.request.contentMimeType!.ref();
 
     return (
-      _wrapperFormats.call(this).includes(ref!) &&
-      _wrapperKey.call(this) != null &&
-      !hasKey(this.request.parameters, _wrapperKey.call(this)!)
+      this._wrapperFormats().includes(ref!) &&
+      this._wrapperKey() != null &&
+      !hasKey(this.request.parameters, this._wrapperKey()!)
     );
   } catch (err) {
     if (err instanceof ParseError) return false;
@@ -299,10 +314,9 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
 
 /** @internal */
 export function _performParameterWrapping(this: ParamsWrapperHost): void {
-  const wrappedHash = _wrapParameters.call(this, this.request.requestParameters);
+  const wrappedHash = this._wrapParameters(this.request.requestParameters);
   const wrappedKeys = Object.keys(this.request.requestParameters);
-  const wrappedFilteredHash = _wrapParameters.call(
-    this,
+  const wrappedFilteredHash = this._wrapParameters(
     slice(this.request.filteredParameters(), ...wrappedKeys),
   );
 
@@ -311,3 +325,15 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
 
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
 }
+
+export const ParamsWrapper: Module = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod("processAction", processAction);
+  mod.defineMethod("_wrapperKey", _wrapperKey);
+  mod.defineMethod("_wrapperFormats", _wrapperFormats);
+  mod.defineMethod("_wrapParameters", _wrapParameters);
+  mod.defineMethod("_extractParameters", _extractParameters);
+  mod.defineMethod("_wrapperEnabled", _wrapperEnabled);
+  mod.defineMethod("_performParameterWrapping", _performParameterWrapping);
+});

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { extend } from "@blazetrails/activesupport";
 import {
   EXCLUDE_PARAMETERS,
   Options,
+  ParamsWrapper,
   _extractParameters,
   _performParameterWrapping,
   _setWrapperOptions,
@@ -33,7 +35,7 @@ function makeHost(
     parameters: {},
     ...requestOverrides,
   };
-  return { _wrapperOptions: merged, request };
+  return extend({ _wrapperOptions: merged, request }, ParamsWrapper) as ParamsWrapperHost;
 }
 
 describe("ParamsWrapper privates", () => {

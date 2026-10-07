@@ -316,13 +316,13 @@ export class Response {
     return (this.stream as { body: string }).body;
   }
 
-  set body(value: string | { toPath(): string }) {
+  set body(value: string | Buffer | { toPath(): string }) {
     if (typeof (value as { toPath?: unknown }).toPath === "function") {
       this.stream = value;
       return;
     }
     this.stream = this.buildBuffer(this, this.mungeBodyObject(value));
-    this.setHeader("content-length", String(Buffer.byteLength(value as string, "utf-8")));
+    this.setHeader("content-length", String(Buffer.byteLength(value as string | Buffer, "utf-8")));
   }
 
   get contentLength(): number | undefined {
@@ -582,7 +582,8 @@ export class Response {
     if (
       body != null &&
       typeof (body as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function" &&
-      typeof body !== "string"
+      typeof body !== "string" &&
+      !(body instanceof Uint8Array)
     ) {
       return Array.from(body as Iterable<unknown>);
     }

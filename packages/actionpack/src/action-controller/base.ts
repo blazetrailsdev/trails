@@ -117,7 +117,7 @@ import {
 import { logAt } from "./metal/logging.js";
 import type { LoggerHost } from "../abstract-controller/logger.js";
 import { AssetPaths } from "../abstract-controller/asset-paths.js";
-import { Instrumentation, logProcessAction } from "./metal/instrumentation.js";
+import { Instrumentation, type logProcessAction } from "./metal/instrumentation.js";
 import { Redirecting } from "./metal/redirecting.js";
 import {
   contentSecurityPolicy,
@@ -157,13 +157,11 @@ import { HttpAuthentication } from "./metal/http-authentication.js";
 import { DataStreaming, type sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
-  _performParameterWrapping,
+  ParamsWrapper,
   _setWrapperOptions,
-  _wrapperEnabled,
   deferInherited,
   inheritedParamsWrapper,
   wrapParameters,
-  type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import {
   _processOptions,
@@ -212,7 +210,7 @@ export interface RenderOptions {
   xml?: unknown;
   plain?: string | number | boolean | null;
   html?: string | SafeBuffer;
-  body?: string;
+  body?: string | Buffer;
   action?: string;
   template?: string;
   file?: string;
@@ -558,7 +556,7 @@ export class Base extends Metal {
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
   static logAt = logAt;
-  static logProcessAction = logProcessAction;
+  declare static logProcessAction: typeof logProcessAction;
   declare static renderer: Renderer;
   declare static setupRendererBang: () => void;
 
@@ -616,18 +614,6 @@ export class Base extends Metal {
   declare static handlerForRescue: OmitThisParameter<
     typeof Rescuable.ClassMethods.handlerForRescue
   >;
-
-  /** @internal */
-  async processAction(action: string, ...args: unknown[]): Promise<void> {
-    if (this.request && _wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
-      _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-      this.params = new StrongParameters({
-        ...this.request.params,
-        ...this.request.pathParameters,
-      });
-    }
-    await super.processAction(action, ...args);
-  }
 
   declare freshWhen: typeof freshWhen;
   declare isStale: typeof isStale;
@@ -772,6 +758,7 @@ include(Base, HttpAuthentication.Token.ControllerMethods);
 extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Rescue);
 include(Base, Instrumentation);
+include(Base, ParamsWrapper);
 Base.prototype.redirectTo = _instrumentRedirectTo;
 Base.setupRendererBang();
 

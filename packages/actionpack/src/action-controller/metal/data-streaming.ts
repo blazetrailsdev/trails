@@ -63,9 +63,7 @@ export function sendData(
 ): void | Promise<void> {
   this.sendFileHeadersBang(options);
   return this.render(
-    merge(slice(options as Record<string, unknown>, "status", "contentType"), {
-      body: Buffer.isBuffer(data) ? data.toString("latin1") : data,
-    }),
+    merge(slice(options as Record<string, unknown>, "status", "contentType"), { body: data }),
   );
 }
 
