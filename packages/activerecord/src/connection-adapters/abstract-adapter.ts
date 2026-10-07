@@ -66,11 +66,7 @@ import { SchemaCache, BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
-import {
-  TransactionManager,
-  type Transaction,
-  type NullTransaction,
-} from "./abstract/transaction.js";
+import { type Transaction, type NullTransaction } from "./abstract/transaction.js";
 import {
   Store,
   queryCacheEnabled as queryCacheEnabledGet,
@@ -87,6 +83,7 @@ import {
 } from "./abstract/query-cache.js";
 import {
   DatabaseStatements,
+  type DatabaseStatementsHost,
   transaction as dbStatementsTransaction,
 } from "./abstract/database-statements.js";
 import {
@@ -200,7 +197,10 @@ export class Version {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface AbstractAdapter {
+export interface AbstractAdapter
+  extends
+    Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
+    Pick<QueryCacheHost, "_queryCache"> {
   columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
     tableName: string,
@@ -812,10 +812,6 @@ export class AbstractAdapter implements Quoting {
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;
   protected _advisoryLocksEnabled: unknown = true;
-  _transactionManager!: TransactionManager;
-
-  _queryCache: Store | null = null;
-
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
   lock: ThreadLoadInterlockAwareMonitor | LoadInterlockAwareMonitor | NullLock =
@@ -2165,10 +2161,6 @@ export class AbstractAdapter implements Quoting {
     const reflection = this.pool.schemaReflection;
     if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
     return reflection.loadedCache;
-  }
-
-  get transactionManager(): TransactionManager {
-    return this._transactionManager;
   }
 
   async transaction<T>(
