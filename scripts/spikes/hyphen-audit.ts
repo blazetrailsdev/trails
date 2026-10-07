@@ -1,7 +1,3 @@
-// SPIKE (do not merge): measures what the hyphen-name whitespace rule would
-// reinterpret or reject in existing code. See docs/spikes/hyphen-case-properties.md.
-//
-//   pnpm tsx scripts/spikes/hyphen-audit.ts [extra-tse-root ...]
 import { execFileSync } from "node:child_process";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
