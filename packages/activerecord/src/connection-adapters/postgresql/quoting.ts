@@ -308,8 +308,8 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
 }
 
 function yearOf(value: TemporalDateLike): number {
-  // boundary: JS Date
-  if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
-  if (value instanceof Temporal.Instant) return value.toZonedDateTimeISO(defaultSqlTimezone()).year;
-  return value.year;
+  if ("year" in value) return value.year;
+  const instant =
+    value instanceof Temporal.Instant ? value : Temporal.Instant.fromEpochMilliseconds(+value);
+  return instant.toZonedDateTimeISO(defaultSqlTimezone()).year;
 }

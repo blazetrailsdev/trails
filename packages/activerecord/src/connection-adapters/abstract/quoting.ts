@@ -288,7 +288,7 @@ function toFsDb(value: TemporalDateLike): string {
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
   if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
   throw new TypeError(
-    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value} — use a Temporal type`,
+    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value}`,
   );
 }
 

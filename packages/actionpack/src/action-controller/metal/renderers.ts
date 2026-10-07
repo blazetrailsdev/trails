@@ -5,6 +5,7 @@ import {
   classAttribute,
   extend,
   isPresent,
+  removePossibleMethod,
   type ToJsonWithActiveSupportEncoderHost,
 } from "@blazetrails/activesupport";
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -41,7 +42,7 @@ export function add(key: string, block: RendererProc): void {
 export function remove(key: string): void {
   RENDERERS.delete(key);
   const methodName = _renderWithRendererMethodName(key);
-  if (Renderers.isMethodDefined(methodName)) Renderers.undefMethod(methodName);
+  removePossibleMethod.call(Renderers, methodName);
 }
 
 export function _renderWithRendererMethodName(key: string): string {
