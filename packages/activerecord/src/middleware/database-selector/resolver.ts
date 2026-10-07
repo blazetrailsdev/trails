@@ -15,12 +15,17 @@ const SEND_TO_REPLICA_DELAY = seconds(2);
 
 export class Resolver {
   readonly context: ResolverContext;
+  private readonly options: { delay?: Duration | number | null } | null;
   readonly delay: Duration | number;
   readonly instrumenter: typeof Notifications;
 
   constructor(context: ResolverContext, options: { delay?: Duration | number | null } | null = {}) {
     this.context = context;
-    this.delay = options != null && options.delay != null ? options.delay : SEND_TO_REPLICA_DELAY;
+    this.options = options;
+    this.delay =
+      this.options != null && this.options.delay != null
+        ? this.options.delay
+        : SEND_TO_REPLICA_DELAY;
     this.instrumenter = Notifications;
   }
 

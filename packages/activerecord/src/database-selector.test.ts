@@ -28,7 +28,7 @@ function isPreventingWrites() {
   return currentPreventingWrites.call(Base as any);
 }
 function fiveSecondsAgo() {
-  return Session.convertTimeToTimestamp(Time.now().minus(seconds(5).toI()) as Time);
+  return Session.convertTimeToTimestamp(Time.now().minusWithDuration(seconds(5)) as Time);
 }
 
 describe("DatabaseSelectorTest", () => {
