@@ -7,7 +7,13 @@ import {
   TemplateHandlers,
 } from "@blazetrails/actionview";
 import { Model } from "@blazetrails/activemodel";
-import { extend, Module, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  Module,
+  rbObjRespondTo,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
 
@@ -120,6 +126,7 @@ describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)
     registerConstant("SeatedController", seated);
     expect(() => new seated()).not.toThrow();
     expect(seated.controllerName()).toBe("seated");
+    unregisterConstant("SeatedController", seated);
   });
 });
 
