@@ -15,6 +15,7 @@ import {
   Module,
   rbBlockGivenP,
   rbFPublicSend,
+  rbFSend,
   rbModConstSet,
   rbModMethodDefined,
   rbModSingletonP,
@@ -45,7 +46,7 @@ import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { WithValidator } from "./validations/with.js";
-import { ArgumentError, NoMethodError } from "./attribute-assignment.js";
+import { ArgumentError } from "./attribute-assignment.js";
 import type { CallbackConditions } from "./callbacks.js";
 import {
   Callbacks,
@@ -155,12 +156,7 @@ export class Validations {
   }
 
   readAttributeForValidation(this: ReadAttributeForValidationHost, attribute: string): unknown {
-    if (!(attribute in this)) {
-      const klass = (this.constructor as { name?: string } | undefined)?.name ?? "object";
-      throw new NoMethodError(`undefined method '${attribute}' for an instance of ${klass}`);
-    }
-    const reader = this[attribute];
-    return typeof reader === "function" ? (reader as () => unknown).call(this) : reader;
+    return rbFSend(this, attribute);
   }
 
   get validationContext(): string | string[] | null {

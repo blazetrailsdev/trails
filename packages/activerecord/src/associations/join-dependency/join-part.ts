@@ -4,11 +4,10 @@ import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
 import type { JoinAssociation } from "./join-association.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
   readonly children: JoinAssociation[] = [];
-
-  declare [Symbol.iterator]: () => IterableIterator<JoinPart>;
 
   constructor(baseKlass: typeof Base, children?: JoinAssociation[]) {
     this.baseKlass = baseKlass;
@@ -44,10 +43,6 @@ export abstract class JoinPart {
     for (const child of this.children) child.each(block);
   }
 
-  drop(n: number): JoinPart[] {
-    return [...this].slice(n);
-  }
-
   eachChildren(fn: (parent: JoinPart, child: JoinPart) => void): void {
     for (const child of this.children) {
       fn(this, child);
@@ -81,6 +76,12 @@ export abstract class JoinPart {
   ): Base {
     return this.baseKlass.instantiate(this.extractRecord(row, aliases), columnTypes, block);
   }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface JoinPart {
+  [Symbol.iterator](): IterableIterator<JoinPart>;
+  drop(n: number): JoinPart[];
 }
 
 include(JoinPart, Enumerable);

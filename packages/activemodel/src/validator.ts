@@ -44,7 +44,11 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
 
   async validate(record: ValidatableRecord<TBase>): Promise<readonly string[]> {
     for (const attribute of this.attributes) {
-      let value = await this.readAttributeForValidation(record, attribute);
+      let value = await (
+        record as ValidatableRecord<TBase> & {
+          readAttributeForValidation(attribute: string): unknown;
+        }
+      ).readAttributeForValidation(attribute);
       if (
         (value == null && this.options.allowNil === true) ||
         (isBlank(value) && this.options.allowBlank === true)
@@ -77,20 +81,6 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     _attrName: string,
   ): unknown {
     return value;
-  }
-
-  protected readAttributeForValidation(
-    record: ValidatableRecord<TBase>,
-    attribute: string,
-  ): unknown {
-    const rec = record as unknown as Record<string, unknown>;
-    if (typeof rec.readAttributeForValidation === "function") {
-      return (rec.readAttributeForValidation as (a: string) => unknown)(attribute);
-    }
-    if (typeof rec._readAttribute === "function") {
-      return (rec._readAttribute as (a: string) => unknown)(attribute);
-    }
-    return rec[attribute];
   }
 }
 
