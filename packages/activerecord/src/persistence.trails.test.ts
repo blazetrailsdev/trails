@@ -92,12 +92,6 @@ describe("PersistenceTest (trails)", () => {
     expect(many.every((t) => t.isNewRecord())).toBe(true);
   });
 
-  it("new with an array returns unsaved records", () => {
-    const result = Topic.new([{ title: "a" }, { title: "b" }]);
-    expect(result).toHaveLength(2);
-    expect(result.every((t) => t.isNewRecord())).toBe(true);
-  });
-
   it("create yields to block before save", async () => {
     const t = await Topic.create({ title: "a" }, (record) => {
       record.title = "mutated-by-block";

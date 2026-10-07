@@ -32,6 +32,7 @@ import { attributesForUpdate, attributesWithValues } from "./attribute-methods.j
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isDefaultScopes } from "./scoping/default.js";
 import { RecordInvalid } from "./validations.js";
+import { _instantiation } from "./inheritance.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
@@ -62,10 +63,9 @@ export async function create(
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
-  const record = new this(
-    mergedAttrs,
+  const record = (this as any).new(
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);
@@ -87,10 +87,9 @@ export async function createBang(
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
-  const record = new this(
-    mergedAttrs,
+  const record = (this as any).new(
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);
@@ -109,7 +108,7 @@ export function build(
   if (Array.isArray(attributes)) {
     return attributes.map((attr) => build.call(this, attr, block));
   } else {
-    return new this(attributes, block);
+    return (this as any).new(attributes, block);
   }
 }
 
@@ -603,32 +602,15 @@ export function becomes<
     initBlock?: (record: BecomesRecord) => void,
   ) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
-  const ctor = klass as unknown as {
-    _suppressStiNewDispatch?: unknown;
-    _suppressAbstractCheck?: boolean;
-  };
-  const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
-  const prev = ctor._suppressStiNewDispatch;
-  ctor._suppressStiNewDispatch = klass;
-  const hadOwnAbstract = Object.prototype.hasOwnProperty.call(ctor, "_suppressAbstractCheck");
-  const prevAbstract = ctor._suppressAbstractCheck;
-  ctor._suppressAbstractCheck = true;
-  let instance: InstanceType<K>;
-  try {
-    instance = new klass({}, (becoming) => {
-      this._attributes.reverseMergeBang(becoming._attributes);
-      becoming._attributes = this._attributes;
-      becoming._newRecord = this._newRecord;
-      becoming._destroyed = this._destroyed;
-      becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
-      becoming.errors.copyBang(this.errors);
-    }) as InstanceType<K>;
-  } finally {
-    if (hadOwn) ctor._suppressStiNewDispatch = prev;
-    else delete ctor._suppressStiNewDispatch;
-    if (hadOwnAbstract) ctor._suppressAbstractCheck = prevAbstract;
-    else delete ctor._suppressAbstractCheck;
-  }
+  _instantiation.klass = klass;
+  const instance = new klass({}, (becoming) => {
+    this._attributes.reverseMergeBang(becoming._attributes);
+    becoming._attributes = this._attributes;
+    becoming._newRecord = this._newRecord;
+    becoming._destroyed = this._destroyed;
+    becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
+    becoming.errors.copyBang(this.errors);
+  }) as InstanceType<K>;
   return instance;
 }
 

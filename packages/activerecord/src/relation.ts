@@ -1665,7 +1665,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   protected _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
-    return new (this.model as any)(attributes, block) as T;
+    return (this.model as any).new(attributes, block) as T;
   }
 
   protected _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {

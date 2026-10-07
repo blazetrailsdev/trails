@@ -185,7 +185,7 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
         nesting = true;
         nested = new Reply({ title: "Nested" });
       });
-    const requireConcreteClass = vi.spyOn(Reply, "_requireConcreteClass");
+    const requireConcreteClass = vi.spyOn(Reply, "new");
     let concreteChecks: number;
     try {
       Reply.allocate();
