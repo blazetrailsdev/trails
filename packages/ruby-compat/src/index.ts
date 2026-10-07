@@ -186,6 +186,7 @@ export {
   last,
   pack,
   partition,
+  aryReject,
   sort,
   take,
   toA,

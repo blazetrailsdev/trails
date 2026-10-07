@@ -5,6 +5,7 @@ import { ArgumentError } from "./argument-error.js";
 import { TypeError } from "./type-error.js";
 import {
   aryCount,
+  aryReject,
   rbFArray,
   toH,
   zip,
@@ -307,6 +308,25 @@ describe("Array#to_h", () => {
 
   it("raises ArgumentError for a pair of the wrong length", () => {
     expect(() => toH([["a", 1, 2]])).toThrow("wrong array length at 0 (expected 2, was 3)");
+  });
+});
+
+describe("Array#reject", () => {
+  it("keeps the elements the block does not answer truthily for", async () => {
+    expect(await aryReject([1, 2, 3, 4], (i) => i % 2 === 0)).toEqual([1, 3]);
+    expect(await aryReject([0, "", null, false], (i) => i)).toEqual([null, false]);
+  });
+
+  it("awaits each block result before yielding the next element", async () => {
+    const order: string[] = [];
+    const rejected = await aryReject([1, 2, 3], async (i) => {
+      order.push(`enter ${i}`);
+      await Promise.resolve();
+      order.push(`leave ${i}`);
+      return i !== 2;
+    });
+    expect(rejected).toEqual([2]);
+    expect(order).toEqual(["enter 1", "leave 1", "enter 2", "leave 2", "enter 3", "leave 3"]);
   });
 });
 

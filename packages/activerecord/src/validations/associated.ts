@@ -1,6 +1,6 @@
 import { EachValidator } from "@blazetrails/activemodel";
 import { any, kernelArray } from "@blazetrails/activesupport";
-import { merge } from "@blazetrails/ruby-compat";
+import { aryReject as reject, merge } from "@blazetrails/ruby-compat";
 
 export function validatesAssociated(
   this: {
@@ -13,15 +13,12 @@ export function validatesAssociated(
 }
 
 export class AssociatedValidator extends EachValidator {
-  /** @missingRailsCall reject — CONVERGEABLE associated-validator-rejects-through-an-awaiting-reject */
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
-    const rejected: unknown[] = [];
-    for (const association of kernelArray(value)) {
-      if (!(await isValidObject(association, context))) rejected.push(association);
-    }
 
-    if (any(rejected)) {
+    if (
+      any(await reject(kernelArray(value), (association) => isValidObject(association, context)))
+    ) {
       record.errors.add(attribute, ":invalid", merge(this.options, { value }));
     }
   }
