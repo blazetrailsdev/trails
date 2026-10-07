@@ -365,7 +365,7 @@ import {
   writeStoreAttribute as _writeStoreAttribute,
   storeAccessorFor as _storeAccessorFor,
 } from "./store.js";
-import { methodMissing, respondToMissing } from "./dynamic-matchers.js";
+import { DynamicMatchers } from "./dynamic-matchers.js";
 
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
@@ -2227,16 +2227,12 @@ extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
   cachedFindByStatement: _Core.cachedFindByStatement,
 });
-extend(Base, { respondToMissing, methodMissing });
-type DynamicMatchersClass = {
-  respondToMissing: OmitThisParameter<typeof respondToMissing>;
-  methodMissing: OmitThisParameter<typeof methodMissing>;
-};
+extend(Base, DynamicMatchers);
 extend(Base, Querying);
 Object.setPrototypeOf(
   Base,
   new Proxy(Object.getPrototypeOf(Base) as object, {
-    get(target, prop, receiver: typeof Base) {
+    get(target, prop, receiver: typeof Base & typeof DynamicMatchers) {
       const value = Reflect.get(target, prop, receiver);
       if (
         value !== undefined ||
@@ -2246,9 +2242,8 @@ Object.setPrototypeOf(
       ) {
         return value;
       }
-      const matchers = receiver as unknown as DynamicMatchersClass;
-      if (matchers.respondToMissing(prop, false)) {
-        return (...args: unknown[]) => matchers.methodMissing(prop, ...args);
+      if (receiver.respondToMissing(prop, false)) {
+        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
       }
       return value;
     },
