@@ -57,7 +57,7 @@ const PARTS_IN_SECONDS: Record<keyof DurationParts, number> = {
   years: SECONDS_PER_YEAR,
 };
 
-const PARTS: (keyof DurationParts)[] = [
+const PARTS: readonly (keyof DurationParts)[] = Object.freeze([
   "years",
   "months",
   "weeks",
@@ -65,7 +65,7 @@ const PARTS: (keyof DurationParts)[] = [
   "hours",
   "minutes",
   "seconds",
-];
+]);
 
 const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
 
@@ -88,6 +88,8 @@ function mergeParts(
 
 export class Duration {
   static ISO8601Parser = ISO8601Parser;
+
+  static readonly PARTS = PARTS;
 
   readonly parts: DurationParts;
 

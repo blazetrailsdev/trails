@@ -11,6 +11,7 @@ import {
   rational,
   setEnv,
 } from "@blazetrails/ruby-compat";
+import { days, hours, minutes, months, seconds, weeks, years } from "../duration.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
@@ -66,6 +67,7 @@ describe("MessagePackSerializerTest", () => {
       7: "Time",
       8: "ActiveSupport::TimeWithZone",
       9: "ActiveSupport::TimeZone",
+      10: "ActiveSupport::Duration",
       12: "Set",
       17: "ActiveSupport::HashWithIndifferentAccess",
       127: "Object",
@@ -159,6 +161,19 @@ describe("MessagePackSerializerTest", () => {
   it("roundtrips ActiveSupport::TimeZone", () => {
     const zone = TimeZone.find("Eastern Time (US & Canada)")!;
     expect((roundtrip(zone) as TimeZone).name).toBe(zone.name);
+  });
+
+  it("roundtrips ActiveSupport::Duration", () => {
+    const duration = years(1)
+      .plus(months(2))
+      .plus(weeks(3))
+      .plus(days(4))
+      .plus(hours(5))
+      .plus(minutes(6))
+      .plus(seconds(7));
+    expect(duration.eql(roundtrip(duration))).toBe(true);
+    const monthAndDay = months(1).plus(days(1));
+    expect(monthAndDay.eql(roundtrip(monthAndDay))).toBe(true);
   });
 
   it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {

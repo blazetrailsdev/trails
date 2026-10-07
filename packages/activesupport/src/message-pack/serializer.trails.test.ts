@@ -8,10 +8,108 @@ import {
   StandardError,
 } from "@blazetrails/ruby-compat";
 
+import { Temporal, Time } from "@blazetrails/date";
+
+import { Duration, days, hours, minutes, months, seconds, weeks, years } from "../duration.js";
+import { TimeWithZone } from "../time-with-zone.js";
+import { TimeZone } from "../values/time-zone.js";
 import { Factory, MalformedFormatError, UnknownExtTypeError, UnpackError } from "./factory.js";
 import { Serializer } from "./serializer.js";
 
 describe("MessagePackSerializerTrailsTest", () => {
+  it("dumps Duration bytes identical to real Rails MessagePack", () => {
+    const serializer = new Serializer();
+    const duration = years(1)
+      .plus(months(2))
+      .plus(weeks(3))
+      .plus(days(4))
+      .plus(hours(5))
+      .plus(minutes(6))
+      .plus(seconds(7));
+    expect([...serializer.dump(duration)]).toEqual([
+      204, 128, 199, 13, 10, 206, 2, 83, 3, 123, 151, 1, 2, 3, 4, 5, 6, 7,
+    ]);
+    expect([...serializer.dump(months(1).plus(days(1)))]).toEqual([
+      204, 128, 199, 13, 10, 206, 0, 41, 113, 242, 151, 192, 1, 192, 1, 192, 192, 192,
+    ]);
+    expect([...serializer.dump(seconds(1.5))]).toEqual([
+      204, 128, 199, 25, 10, 203, 63, 248, 0, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 192, 192, 203,
+      63, 248, 0, 0, 0, 0, 0, 0,
+    ]);
+    expect([...serializer.dump(seconds(0))]).toEqual([
+      204, 128, 199, 9, 10, 0, 151, 192, 192, 192, 192, 192, 192, 0,
+    ]);
+  });
+
+  it("loads a Duration with the parts and variability it was dumped with", () => {
+    const serializer = new Serializer();
+    const roundtrip = (duration: Duration) =>
+      serializer.load(serializer.dump(duration)) as Duration;
+
+    const monthAndDay = roundtrip(months(1).plus(days(1)));
+    expect(monthAndDay).toBeInstanceOf(Duration);
+    expect(monthAndDay.value).toBe(2629746 + 86400);
+    expect(monthAndDay._parts()).toEqual({ months: 1, days: 1 });
+    expect(monthAndDay.isVariable()).toBe(true);
+
+    const zero = roundtrip(seconds(0));
+    expect(zero._parts()).toEqual({ seconds: 0 });
+    expect(zero.isVariable()).toBe(false);
+
+    expect(roundtrip(hours(1.5).negate())._parts()).toEqual({ hours: -1.5 });
+  });
+
+  it("dumps nanosecond temporal bytes identical to real Rails MessagePack", () => {
+    const serializer = new Serializer();
+    const time = Time.at(946686896, 123456789, "nanosecond", { in: "-12:00" });
+    expect([...serializer.dump(time)]).toEqual([
+      204, 128, 199, 15, 7, 206, 56, 109, 75, 176, 206, 7, 91, 205, 21, 210, 255, 255, 87, 64,
+    ]);
+    const loadedTime = serializer.load(serializer.dump(time)) as Time;
+    expect(loadedTime.tvNsec).toBe(123456789);
+    expect(loadedTime.utcOffset).toBe(-43200);
+
+    const twz = new TimeWithZone(
+      Time.at(954000000, 123456789, "nanosecond", { in: "UTC" }),
+      TimeZone.find("Australia/Lord_Howe")!,
+    );
+    expect([...serializer.dump(twz)]).toEqual([
+      204,
+      128,
+      199,
+      31,
+      8,
+      206,
+      56,
+      220,
+      226,
+      128,
+      206,
+      7,
+      91,
+      205,
+      21,
+      0,
+      179,
+      ...Buffer.from("Australia/Lord_Howe"),
+    ]);
+    const loadedTwz = serializer.load(serializer.dump(twz)) as TimeWithZone;
+    expect(loadedTwz.utc().tvNsec).toBe(123456789);
+    expect(loadedTwz.timeZone.name).toBe("Australia/Lord_Howe");
+    expect(loadedTwz.utcOffset).toBe(twz.utcOffset);
+
+    const datetime = Temporal.PlainDateTime.from("1999-12-31T12:34:56.123456789");
+    expect([...serializer.dump(datetime)]).toEqual([
+      204, 128, 199, 19, 5, 206, 0, 37, 104, 88, 12, 34, 56, 206, 7, 91, 205, 21, 206, 59, 154, 202,
+      0, 0,
+    ]);
+    expect(serializer.load(serializer.dump(datetime))).toEqual(datetime);
+
+    expect([...serializer.dump(Temporal.PlainDate.from("1999-12-31"))]).toEqual([
+      204, 128, 199, 5, 6, 206, 0, 37, 104, 88,
+    ]);
+  });
+
   it("dumps BigDecimal bytes identical to real Rails MessagePack", () => {
     const serializer = new Serializer();
     expect([...serializer.dump(new BigDecimal("9876543210.0123456789"))]).toEqual([
