@@ -33,11 +33,11 @@ describe("DatabaseConfigurations", () => {
         adapter: "trails_broken_adapter",
       });
       await expect(config.validateBang()).rejects.toThrow(
-        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
+        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? Cannot find module 'pg'",
       );
 
       expect(() => resolve("trails_broken_adapter")).toThrow(
-        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
+        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? Cannot find module 'pg'",
       );
       await expect(config.validateBang()).rejects.toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter.",
@@ -67,7 +67,7 @@ describe("DatabaseConfigurations", () => {
       );
       await load("trails_mispathed_adapter");
       expect(() => resolve("trails_mispathed_adapter")).toThrow(
-        "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+        "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter gem is correct.",
       );
     });
 
@@ -83,7 +83,7 @@ describe("DatabaseConfigurations", () => {
       );
       await load("trails_unpackaged_adapter");
       expect(() => resolve("trails_unpackaged_adapter")).toThrow(
-        "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+        "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter gem is correct.",
       );
     });
 
@@ -102,7 +102,7 @@ describe("DatabaseConfigurations", () => {
       );
       await load("trails_depless_adapter");
       expect(() => resolve("trails_depless_adapter")).toThrow(
-        "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a package it depends on? Cannot find package 'mysql2'",
+        "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a gem it depends on? Cannot find package 'mysql2'",
       );
     });
 
@@ -122,13 +122,14 @@ describe("DatabaseConfigurations", () => {
       expect(config.adapterClass()).toBe(TrailsUnloadedAdapter);
     });
 
-    it("validate! keeps a memoized adapter class", async () => {
+    it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
       class TrailsFirstAdapter {}
       class TrailsSecondAdapter {}
       register("trails_memo_adapter", "TrailsTestAdapter", "./trails-memo-adapter.js", () =>
         Promise.resolve(TrailsFirstAdapter as never),
       );
       const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
+      expect(() => config.adapterClass()).toThrow(AdapterNotFound);
       await config.validateBang();
       expect(config.adapterClass()).toBe(TrailsFirstAdapter);
 

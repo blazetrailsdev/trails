@@ -64,12 +64,12 @@ export function resolve(adapterName: string | undefined): AdapterClass {
           : errorPath === pathToAdapter || pathToAdapter.startsWith(`${errorPath}/`))
       ) {
         throw new LoadError(
-          `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
+          `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter gem is correct. ${message}`,
           { cause: error },
         );
       } else {
         throw new LoadError(
-          `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a package it depends on? ${message}`,
+          `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a gem it depends on? ${message}`,
           { cause: error },
         );
       }
