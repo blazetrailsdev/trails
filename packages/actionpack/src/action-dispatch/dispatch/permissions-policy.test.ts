@@ -19,7 +19,7 @@ import { IntegrationTest } from "../testing/integration.js";
 import "../../test-helpers/abstract-unit.js";
 
 describe("PermissionsPolicyTest", () => {
-  it("test_mappings", () => {
+  it("mappings", () => {
     const policy = new PermissionsPolicy();
     policy.midi(":self");
     expect(policy.build()).toBe("midi 'self'");
@@ -28,20 +28,20 @@ describe("PermissionsPolicyTest", () => {
     expect(policy.build()).toBe("midi 'none'");
   });
 
-  it("test_multiple_sources_for_a_single_directive", () => {
+  it("multiple sources for a single directive", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self", "https://example.com");
     expect(policy.build()).toBe("geolocation 'self' https://example.com");
   });
 
-  it("test_single_directive_for_multiple_directives", () => {
+  it("single directive for multiple directives", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self");
     policy.usb(":none");
     expect(policy.build()).toBe("geolocation 'self'; usb 'none'");
   });
 
-  it("test_multiple_directives_for_multiple_directives", () => {
+  it("multiple directives for multiple directives", () => {
     const policy = new PermissionsPolicy();
     policy.geolocation(":self", "https://example.com");
     policy.usb(":none", "https://example.com");
@@ -50,7 +50,7 @@ describe("PermissionsPolicyTest", () => {
     );
   });
 
-  it("test_invalid_directive_source", () => {
+  it("invalid directive source", () => {
     const policy = new PermissionsPolicy();
     expect(() => policy.geolocation([":non_existent"] as unknown as string)).toThrow(
       "Invalid HTTP permissions policy source: [:non_existent]",
@@ -191,17 +191,17 @@ describe("PermissionsPolicyIntegrationTest", () => {
     assertEqual(expected, t.response.headers.get("Feature-Policy"));
   }
 
-  it("test_generates_permissions_policy_header", async () => {
+  it("generates permissions policy header", async () => {
     await t.get("/");
     assertPolicy("gyroscope 'none'");
   });
 
-  it("test_generates_per_controller_permissions_policy_header", async () => {
+  it("generates per controller permissions policy header", async () => {
     await t.get("/sample_controller");
     assertPolicy("usb 'self'");
   });
 
-  it("test_generates_multiple_directives_permissions_policy_header", async () => {
+  it("generates multiple directives permissions policy header", async () => {
     await t.get("/multiple_directives");
     assertPolicy("usb 'self'; autoplay https://example.com; payment https://secure.example.com");
   });
@@ -289,7 +289,7 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     assertEqual(expected, t.response.headers.get(FEATURE_POLICY));
   }
 
-  it("test_generates_permissions_policy_header", async () => {
+  it("generates permissions policy header", async () => {
     await t.get("/");
     assertPolicy("gyroscope 'none'; usb 'self'");
   });
