@@ -997,7 +997,11 @@ export class Base extends Model {
 
   static _suppressInitializeCallback = false;
 
+  /** @noRailsEquivalent CONVERGEABLE persistence-becomes-allocates-then-initializes-without-suppress-flags */
   static _suppressAbstractCheck = false;
+
+  /** @noRailsEquivalent CONVERGEABLE persistence-becomes-allocates-then-initializes-without-suppress-flags */
+  declare static _suppressStiNewDispatch?: unknown;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1595,7 +1599,7 @@ export class Base extends Model {
     const allocating = _Core._allocation.klass === new.target;
     if (allocating) _Core._allocation.klass = null;
     if (!allocating) {
-      const klass = new.target as typeof Base & { _suppressStiNewDispatch?: unknown };
+      const klass = new.target;
       if ((klass.abstractClass || klass === Base) && !klass._suppressAbstractCheck) {
         // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
         throw new NotImplementedError(
