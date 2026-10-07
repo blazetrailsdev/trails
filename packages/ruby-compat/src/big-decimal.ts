@@ -350,22 +350,12 @@ export class BigDecimal {
     return Math.max(this.digits.length - this.exp, 0);
   }
 
-  /**
-   * `Real#Prec` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.h:185`): the
-   * `BASE` words the fraction occupies once it is aligned on its word exponent.
-   */
   private prec(): number {
     if (this.nonFinite !== null || this.digits === "") return 1;
     const nlz10 = Math.ceil(this.exp / BASE_FIG) * BASE_FIG - this.exp;
     return roomof(nlz10 + this.digits.length, BASE_FIG);
   }
 
-  /**
-   * `NewZeroWrapLimited(1, mx)` then `VpAsgn(c, a, 1)`
-   * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:2401-2402`): a copy whose
-   * `MaxPrec` is the `mx` decimal digits the operation allots
-   * (`rbd_calculate_internal_digits`, `bigdecimal.c:167-182`).
-   */
   private vpAsgn(mx: number): BigDecimal {
     const c = new BigDecimal(this);
     c.#maxPrec = roomof(mx, BASE_FIG);
@@ -509,13 +499,6 @@ function roomof(x: number, y: number): number {
   return Math.ceil(x / y);
 }
 
-/**
- * The `MaxPrec` of an Integer: `rb_uint64_convert_to_BigDecimal`
- * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:3303-3351`) allots the
- * words the value fills, and `rb_big_convert_to_BigDecimal`'s last arm
- * (`bigdecimal.c:3396-3402`) parses the decimal string with
- * `mx = RSTRING_LEN(str) + BASE_FIG + 1`.
- */
 function inumMaxPrec(val: bigint): number {
   const negative = val < 0n;
   let uval = negative ? -val : val;
@@ -530,11 +513,6 @@ function inumMaxPrec(val: bigint): number {
   return Math.max(maxPrec(uval.toString().length, 0), roomof(str.length + BASE_FIG + 1, BASE_FIG));
 }
 
-/**
- * The `MaxPrec` of a Float: `rb_float_convert_to_BigDecimal`
- * (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:3460-3567`) pads the
- * `dtoa` digits out to whole `BASE` words and converts that Integer.
- */
 function floatMaxPrec(digits: string, decpt: number): number {
   let buf = digits.slice(0, BIGDECIMAL_DOUBLE_FIGURES);
   const len10 = buf.length;
