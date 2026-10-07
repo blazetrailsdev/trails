@@ -55,7 +55,6 @@ import {
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
   subclassFromAttributes as _subclassFromAttributes,
-  subclassFromAttributesForNew,
   findStiClass as _findStiClass,
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
@@ -1651,9 +1650,26 @@ export class Base extends Model {
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
     ) {
-      const stiTarget = subclassFromAttributesForNew(new.target, attrs);
-      if (stiTarget && stiTarget !== new.target) {
-        return new stiTarget(attrs, initBlock);
+      const klass = new.target;
+      let subclass: typeof Base | null = null;
+      if (klass._hasAttribute(klass.inheritanceColumn as string)) {
+        subclass = klass.subclassFromAttributes(attrs);
+
+        let scopeAttributes;
+        if (
+          subclass == null &&
+          (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
+        ) {
+          subclass = klass.subclassFromAttributes(scopeAttributes);
+        }
+
+        if (subclass == null && klass.isBaseClass()) {
+          subclass = klass.subclassFromAttributes(klass.columnDefaults);
+        }
+      }
+
+      if (subclass != null && subclass !== klass) {
+        return new subclass(attrs, initBlock);
       }
     }
     let assocPending = _extractAssociationAttrs(new.target, attrs);
