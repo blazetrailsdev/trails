@@ -128,6 +128,10 @@ which is what the VM does for the Ruby method, and everything downstream asks
 `rbHashSRuby2KeywordsHashP` exactly where Rails asks
 `Hash.ruby2_keywords_hash?`.
 
+This rule is recorded here by story `port-ruby-compat-ruby2-keywords-hash-flag`
+(RFC 0169, the ActiveJob port), which assigns it to this README. Its callers
+are `port-activejob-core` and `port-activejob-enqueuing-and-configured-job`.
+
 The flag is membership in a module-private `WeakSet`, as MRI's is a bit in the
 hash's own header (`RHASH_PASS_AS_KEYWORDS`, `internal/hash.h:23`). It is not a
 property, so `Object.keys`, a spread and `JSON.stringify` never see it, and a
