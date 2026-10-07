@@ -239,6 +239,19 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `DEFAULT_ENV()`), and a `(callable || block).call`
  *   (`activerecord/lib/active_record/statement_cache.rb:133`) is credited by
  *   an invocation of either operand.
+ * - `sleep` → `timer`: the one-shot SUSPENSION
+ *   `new Promise((resolve) => setTimeout(resolve, ms))` — `Kernel#sleep`
+ *   (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`) suspends the thread
+ *   and returns the seconds slept, and that awaited promise is its whole port,
+ *   recording no callee named `sleep`. `isSuspensionTimer` (extract-ts-api.ts)
+ *   is the discriminator: a timer that schedules work rather than settling an
+ *   enclosing promise is a deadline or a callback, not a suspension, and
+ *   `setInterval` repeats where `sleep` suspends once. Admitted only for an
+ *   implicit-self receiver, the one shape `Kernel#sleep` takes
+ *   (`rb_define_global_function`, `process.c:9125`), so an `x.sleep` site
+ *   still flags. The INTERVAL goes unchecked: the Ruby call leaves
+ *   significance, so its call-argument row goes with it
+ *   (`sleep-row-drops-call-argument-parity-for-the-interval`).
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
@@ -253,6 +266,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["prepend", { form: "unshift", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
+  ["sleep", { form: "timer", receivers: "implicit-self" }],
 ]);
 
 /**

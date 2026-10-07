@@ -2079,6 +2079,31 @@ describe("body call capture", () => {
     expect(lazy.calls ?? []).not.toContain("@import");
   });
 
+  it("marks only a promise-settling setTimeout as the native form of Kernel#sleep", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        backoff(counter: number): Promise<void> {
+          return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
+        }
+        poll(): void {
+          setInterval(() => this.backoff(1), 1000);
+        }
+        deadline(): void {
+          setTimeout(() => this.reap(), 1000);
+        }
+        schedule(tick: () => void): void {
+          setTimeout(tick, 1000);
+        }
+        reap(): void {}
+      }`,
+    );
+    const calls = (name: string) => cls.instanceMethods.find((m) => m.name === name)!.calls ?? [];
+    expect(calls("backoff")).toContain("@timer");
+    expect(calls("poll")).not.toContain("@timer");
+    expect(calls("deadline")).not.toContain("@timer");
+    expect(calls("schedule")).not.toContain("@timer");
+  });
+
   it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {

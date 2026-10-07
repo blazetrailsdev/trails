@@ -1769,12 +1769,9 @@ export class AbstractAdapter implements Quoting {
     return exception instanceof Deadlocked || exception instanceof LockWaitTimeout;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall sleep — CONVERGEABLE adapter-backoff-sleeps-through-a-ruby-compat-kernel-sleep
-   */
+  /** @internal */
   backoff(counter: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, 100 * counter));
+    return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
   }
 
   /** @internal */
