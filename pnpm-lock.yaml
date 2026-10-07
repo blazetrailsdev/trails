@@ -377,7 +377,11 @@ importers:
         specifier: ^0.5.1
         version: 0.5.1
 
-  packages/did-you-mean: {}
+  packages/did-you-mean:
+    dependencies:
+      '@blazetrails/ruby-compat':
+        specifier: workspace:*
+        version: link:../ruby-compat
 
   packages/globalid:
     dependencies:

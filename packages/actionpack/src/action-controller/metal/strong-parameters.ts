@@ -1,6 +1,6 @@
 /** @internal */
 
-import { SpellChecker } from "@blazetrails/did-you-mean";
+import { Correctable, SpellChecker } from "@blazetrails/did-you-mean";
 import { Time, actsLikeDate, actsLikeTime } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
 import {
@@ -51,6 +51,7 @@ import { ActionController } from "../../namespaces.js";
 export class ParameterMissing extends KeyError {
   readonly param: string;
   readonly keys: string[] | null;
+  declare originalMessage: () => string;
   #cachedCorrections?: string[];
 
   constructor(param: string, keys: string[] | null = null) {
@@ -70,6 +71,8 @@ export class ParameterMissing extends KeyError {
     return this.#cachedCorrections;
   }
 }
+
+include(ParameterMissing, Correctable);
 
 export class ExpectedParameterMissing extends ParameterMissing {
   constructor(param: string, keys: string[] | null = null) {

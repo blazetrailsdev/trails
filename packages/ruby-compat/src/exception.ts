@@ -10,7 +10,14 @@
  * @noRailsEquivalent PERMANENT — Ruby core `Exception`, which Rails inherits
  * rather than defines.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Exception extends Error {}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Exception {
+  /** @noRailsEquivalent PERMANENT */
+  detailedMessage(opt?: { highlight?: boolean | null } | null): string;
+}
 
 Exception.prototype.name = "Exception";
 

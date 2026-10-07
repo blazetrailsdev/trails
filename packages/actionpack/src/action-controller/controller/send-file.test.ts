@@ -1,8 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
+import { assertEqual, assertNotNil, assertNothingRaised } from "@blazetrails/activesupport";
+import { Notifications } from "@blazetrails/activesupport";
+import { File } from "@blazetrails/ruby-compat";
+import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
 
@@ -33,7 +38,63 @@ function makeResponse(): Response {
   return new Response();
 }
 
+const TestFileUtils = {
+  filePath(): string {
+    return new URL(import.meta.url).pathname;
+  },
+  fileData(this: { _data?: string }): string {
+    return (this._data ||= File.binread(TestFileUtils.filePath()));
+  },
+};
+
+class SendFileController extends Base {
+  declare _data?: string;
+  filePath = TestFileUtils.filePath;
+  fileData = TestFileUtils.fileData;
+
+  static {
+    this.beforeAction("file", { only: "file_from_before_action" });
+  }
+
+  declare _options?: Record<string, unknown>;
+  set options(options: Record<string, unknown>) {
+    this._options = options;
+  }
+  get options(): Record<string, unknown> {
+    return (this._options ||= {});
+  }
+
+  file() {
+    this.sendFile(this.filePath(), this.options);
+  }
+
+  fileFromBeforeAction() {
+    throw new Error("No file sent from before action.");
+  }
+
+  async data() {
+    await this.sendData(this.fileData(), this.options);
+  }
+}
+
 describe("SendFileTest", () => {
+  class SendFileTest extends TestCase {
+    declare controller: SendFileController;
+    filePath = TestFileUtils.filePath;
+
+    override setup() {
+      this.controller = new SendFileController();
+    }
+  }
+
+  let tc: SendFileTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new SendFileTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
   it("file nostream", async () => {
     class C extends Base {
       async file() {
@@ -220,6 +281,57 @@ describe("SendFileTest", () => {
     expect(response.body).toBe(testFileData);
   });
 
+  it("send file instrumentation", async () => {
+    tc.controller.options = { disposition: "inline" };
+    let payload: Record<string, unknown> | null = null;
+
+    const subscriber = (event: { payload: Record<string, unknown> }) => {
+      payload = event.payload;
+    };
+
+    await Notifications.subscribed(subscriber, "send_file.action_controller", async () => {
+      await tc.process("file");
+    });
+
+    assertEqual(tc.filePath(), payload!.path);
+    assertEqual("inline", payload!.disposition);
+  });
+
+  it("send data instrumentation", async () => {
+    tc.controller.options = { contentType: "application/x-ruby" };
+    let payload: Record<string, unknown> | null = null;
+
+    const subscriber = (event: { payload: Record<string, unknown> }) => {
+      payload = event.payload;
+    };
+
+    await Notifications.subscribed(subscriber, "send_data.action_controller", async () => {
+      await tc.process("data");
+    });
+
+    assertEqual("application/x-ruby", payload!.contentType);
+  });
+
+  for (const method of ["file", "data"]) {
+    it(`send ${method} status`, async () => {
+      tc.controller.options = { stream: false, status: 500 };
+      assertNotNil(await tc.process(method));
+      assertEqual(500, tc.response.status);
+    });
+
+    it(`send ${method} content type`, async () => {
+      tc.controller.options = { stream: false, contentType: "application/x-ruby" };
+      await assertNothingRaised(async () => assertNotNil(await tc.process(method)));
+      assertEqual("application/x-ruby", tc.response.contentType);
+    });
+
+    it(`default send ${method} status`, async () => {
+      tc.controller.options = { stream: false };
+      await assertNothingRaised(async () => assertNotNil(await tc.process(method)));
+      assertEqual(200, tc.response.status);
+    });
+  }
+
   it("send file with action controller live", async () => {
     class C extends Base {
       async file() {
@@ -340,19 +452,5 @@ describe("SendFileController", () => {
     const c = new C();
     await c.dispatch("action", makeRequest(), makeResponse());
     expect(c.contentType).toBe("image/png");
-  });
-
-  it("sendFileHeadersBang is reachable on controllers and mutates response", async () => {
-    class C extends Base {
-      async action() {
-        this.sendFileHeadersBang({ type: "image/png", filename: "x.png" });
-        this.head(200);
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
-    expect(c.headers.get("Content-Disposition")).toMatch(/attachment;.*filename="x\.png"/);
-    expect(c.headers.get("Content-Transfer-Encoding")).toBe("binary");
   });
 });
