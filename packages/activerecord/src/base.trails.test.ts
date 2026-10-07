@@ -130,7 +130,7 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
 
     const rel = ScopeStiVehicle.where({ type: "ScopeStiVehicle" });
     await rel.scoping(async () => {
-      expect(() => new ScopeStiCar({})).toThrow(
+      expect(() => ScopeStiCar.new({})).toThrow(
         new SubclassNotFound(
           "Invalid single-table inheritance type: ScopeStiVehicle is not a subclass of ScopeStiCar",
         ),
