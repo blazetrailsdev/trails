@@ -425,6 +425,15 @@ describe("P20b/P20c smoke", () => {
     ).toBeTruthy();
   });
 
+  it("compareWith{Global,Real}Token and isValidPerFormCsrfToken raise on a length mismatch", () => {
+    const c = tokenC({ perFormCsrfTokens: true });
+    const short = realCsrfToken.call(c).subarray(0, 8);
+    expect(() => compareWithRealToken.call(c, short)).toThrow("string length mismatch.");
+    expect(() => compareWithGlobalToken.call(c, short)).toThrow("string length mismatch.");
+    expect(() => isValidPerFormCsrfToken.call(c, short)).toThrow("string length mismatch.");
+    expect(isValidPerFormCsrfToken.call({ ...c, perFormCsrfTokens: false }, short)).toBe(false);
+  });
+
   it("requestAuthenticityTokens + formAuthenticityParam honor custom token name", () => {
     const c = tokenC({
       params: { get: (key: string) => ({ my: "p" })[key] },

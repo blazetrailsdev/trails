@@ -2142,7 +2142,7 @@ export interface PostgreSQLAdapter {
   ): Promise<Array<string | (() => Promise<void>)>>;
 
   /** @internal */
-  dataSourceSql(name?: string | null, { type }?: { type?: string }): string;
+  dataSourceSql(name?: string | null, options?: { type?: string }): string;
 
   /** @internal */
   fetchTypeMetadata(

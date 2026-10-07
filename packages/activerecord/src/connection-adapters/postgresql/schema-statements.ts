@@ -1549,8 +1549,8 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(name: string | null = null, { type }: { type?: string } = {}): string {
-    const scope = this.quotedScope(name, { type });
+  dataSourceSql(name: string | null = null, options: { type?: string } = {}): string {
+    const scope = this.quotedScope(name, { type: options.type });
     scope.type ||= "'r','v','m','p','f'";
 
     let sql = "SELECT c.relname FROM pg_class c LEFT JOIN pg_namespace n ON n.oid = c.relnamespace";
