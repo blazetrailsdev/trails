@@ -474,7 +474,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   /**
-   * @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073
+   * @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites
    * @missingRailsCall load — CONVERGEABLE load-async-disabled-arm-calls-load-and-dedupes-in-flight-load
    */
   loadAsync(): Relation<T, G> {
@@ -696,7 +696,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     });
   }
 
-  /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
+  /** @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites */
   private execMainQuery(async = false): Result | Promise<Result> | FutureResult | Complete {
     if (this._isNone) {
       if (async) {
