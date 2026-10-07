@@ -69,15 +69,13 @@ export class SQLiteDatabaseTasks {
     args.push(this.dbConfig.database as string);
 
     const { SchemaDumper } = await import("../schema-dumper.js");
-    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    let ignoreTables = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
       ignoreTables = (await (await this.connection()).dataSources()).filter((table) =>
         ignoreTables.some((pattern) => rbEqq(pattern, table)),
       );
       const condition = (
-        await Promise.all(
-          ignoreTables.map(async (table) => (await this.connection()).quote(table as string)),
-        )
+        await Promise.all(ignoreTables.map(async (table) => (await this.connection()).quote(table)))
       ).join(", ");
       args.push(
         `SELECT sql || ';' FROM sqlite_master WHERE tbl_name NOT IN (${condition}) ORDER BY tbl_name, type DESC, name`,
