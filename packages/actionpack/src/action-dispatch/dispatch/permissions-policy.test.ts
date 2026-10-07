@@ -1,7 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, it, expect } from "vitest";
 import { Module, assertEqual } from "@blazetrails/activesupport";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
-import type { RackApp, RackEnv, RackResponse } from "@blazetrails/rack";
+import {
+  CONTENT_TYPE,
+  Lint,
+  bodyFromString,
+  type RackApp,
+  type RackEnv,
+  type RackResponse,
+} from "@blazetrails/rack";
 import { Base } from "../../action-controller/base.js";
 import { FEATURE_POLICY } from "../constants.js";
 import { controllerConstants } from "../http/request.js";
@@ -52,22 +59,59 @@ describe("PermissionsPolicyTest", () => {
 });
 
 describe("PermissionsPolicyMiddlewareTest", () => {
-  it("html requests will set a policy", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":self");
-    expect(policy.build()).toBe("gyroscope 'self'");
+  const POLICY = new PermissionsPolicy((p) => {
+    p.gyroscope(":self");
   });
 
-  it("non-html requests will set a policy", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":self");
-    expect(policy.build()).toBe("gyroscope 'self'");
+  class PolicyConfigMiddleware {
+    constructor(private app: RackApp) {}
+
+    call(env: RackEnv): Promise<RackResponse> {
+      env["action_dispatch.permissions_policy"] = POLICY;
+      env["action_dispatch.show_exceptions"] = ":none";
+
+      return this.app(env);
+    }
+  }
+
+  function buildApp(app: RackApp): PolicyConfigMiddleware {
+    const inner = new Lint(app);
+    const middleware = new Middleware((env) => inner.call(env));
+    const outer = new Lint((env) => middleware.call(env));
+    return new PolicyConfigMiddleware((env) => outer.call(env));
+  }
+
+  let t: IntegrationTest;
+  beforeEach(({ task }) => {
+    t = new IntegrationTest(task.name);
   });
 
-  it("existing policies will not be overwritten", () => {
-    const policy = new PermissionsPolicy();
-    policy.gyroscope(":none");
-    expect(policy.build()).toBe("gyroscope 'none'");
+  it("html requests will set a policy", async () => {
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "text/html" }, bodyFromString("")]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'self'", t.response.headers.get(FEATURE_POLICY));
+  });
+
+  it("non-html requests will set a policy", async () => {
+    t.app = buildApp(async () => [200, { [CONTENT_TYPE]: "application/json" }, bodyFromString("")]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'self'", t.response.headers.get(FEATURE_POLICY));
+  });
+
+  it("existing policies will not be overwritten", async () => {
+    t.app = buildApp(async () => [
+      200,
+      { [FEATURE_POLICY]: "gyroscope 'none'" },
+      bodyFromString(""),
+    ]);
+
+    await t.get("/index");
+
+    assertEqual("gyroscope 'none'", t.response.headers.get(FEATURE_POLICY));
   });
 });
 
@@ -131,7 +175,9 @@ describe("PermissionsPolicyIntegrationTest", () => {
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
     middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
     middleware.use(Middleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
   });
 
   let t: IntegrationTest;
@@ -216,7 +262,9 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
 
   const APP = IntegrationTest.buildApp(ROUTES, (middleware) => {
     middleware.use(PolicyConfigMiddleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
     middleware.use(Middleware as MiddlewareFactory);
+    middleware.use(Lint as MiddlewareFactory);
   });
 
   const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
