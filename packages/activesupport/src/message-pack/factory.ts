@@ -163,7 +163,7 @@ export class Packer {
       return this.writeMap(value as Record<string, unknown>);
     }
     if (value instanceof Hash && value.constructor === Hash) {
-      return this.writeMap(value as Hash<string, unknown>);
+      return this.writeMap(value as Hash<unknown, unknown>);
     }
     const registered = this.factory.typeFor(value);
     if (registered) return this.writeExt(registered, value);
@@ -250,14 +250,14 @@ export class Packer {
   }
 
   /** @internal */
-  private writeMap(obj: Record<string, unknown> | Hash<string, unknown>): void {
+  private writeMap(obj: Record<string, unknown> | Hash<unknown, unknown>): void {
     const entries = obj instanceof Hash ? [...obj] : Object.entries(obj);
     const len = entries.length;
     if (len < 16) this.out.push(0x80 | len);
     else if (len < 0x10000) this.pushSized(0xde, len, 2);
     else this.pushSized(0xdf, len, 4);
     for (const [key, value] of entries) {
-      this.writeStr(key);
+      this.write(key);
       this.write(value);
     }
   }
@@ -440,13 +440,20 @@ export class Unpacker {
   }
 
   /** @internal */
-  private readMap(size: number): Record<string, unknown> {
-    const obj: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+  private readMap(size: number): Record<string, unknown> | Hash<unknown, unknown> {
+    const pairs: [unknown, unknown][] = [];
     for (let i = 0; i < size; i++) {
       const key = this.read();
-      obj[key as string] = this.read();
+      pairs.push([key, this.read()]);
     }
-    return obj;
+    if (pairs.every(([key]) => typeof key === "string")) {
+      const obj: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
+      for (const [key, value] of pairs) obj[key as string] = value;
+      return obj;
+    }
+    const hash = new Hash<unknown, unknown>();
+    for (const [key, value] of pairs) hash.set(key, value);
+    return hash;
   }
 
   /** @internal */

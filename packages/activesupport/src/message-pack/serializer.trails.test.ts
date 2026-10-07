@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   BigDecimal,
   FrozenError,
+  Hash,
   NoMethodError,
   RangeError,
   StandardError,
@@ -95,7 +96,12 @@ describe("MessagePackSerializerTrailsTest", () => {
   it("reads a float 32 and a map keyed by a non-String, as the msgpack gem does", () => {
     const factory = new Factory();
     expect(factory.load("\xca\x3f\xc0\x00\x00")).toBe(1.5);
-    expect(factory.load("\x81\x01\x02")).toEqual({ 1: 2 });
+    const loaded = factory.load("\x82\x01\x02\x91\x01\x03") as Hash<unknown, unknown>;
+    expect(loaded).toBeInstanceOf(Hash);
+    expect(loaded.get(1)).toBe(2);
+    expect([...loaded.keys()]).toEqual([1, [1]]);
+    expect([...factory.dump(loaded)]).toEqual([0x82, 0x01, 0x02, 0x91, 0x01, 0x03]);
+    expect(factory.load("\x81\xa1a\x02")).toEqual({ a: 2 });
   });
 
   it("raises RangeError for an Integer past 64 bits with no oversized-integer ext type", () => {
