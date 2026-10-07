@@ -622,70 +622,20 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
-  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
-    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
-  }
-
-  override columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string {
-    const visitor = this.visitor;
-    const orderColumns = compactBlank(
-      compactBlank(orders ?? []).map((s) => {
-        s = typeof s === "string" ? s : visitor.compile(s);
-        return s.replace(/\s+(?:ASC|DESC)\b/gi, "").replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "");
-      }),
-    ).map((column, i) => `${column} AS alias_${i}`);
-
-    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])]
-      .flat(Infinity)
-      .join(", ");
-  }
-
-  override typeToSql(
-    type: string,
-    options: {
-      limit?: number;
-      precision?: number;
-      scale?: number;
-      array?: boolean;
-      enumType?: string;
+  override async addColumn(
+    tableName: string,
+    columnName: string,
+    type: ColumnType,
+    options: ColumnOptions & {
+      comment?: string | null;
+      ifNotExists?: boolean;
     } = {},
-  ): string {
-    const { limit, array, enumType } = options;
-    let sql: string;
-    switch (String(type ?? "")) {
-      case "binary":
-        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
-          throw new ArgumentError(
-            `No binary type has byte size ${limit}. The limit on binary can be at most 1GB - 1byte.`,
-          );
-        }
-        sql = super.typeToSql(type as ColumnType, {});
-        break;
-      case "text":
-        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
-          throw new ArgumentError(
-            `No text type has byte size ${limit}. The limit on text can be at most 1GB - 1byte.`,
-          );
-        }
-        sql = super.typeToSql(type as ColumnType, {});
-        break;
-      case "integer":
-        if (limit === 1 || limit === 2) sql = "smallint";
-        else if (limit == null || (limit >= 3 && limit <= 4)) sql = "integer";
-        else if (limit >= 5 && limit <= 8) sql = "bigint";
-        else
-          throw new ArgumentError(
-            `No integer type has byte size ${limit}. Use a numeric with scale 0 instead.`,
-          );
-        break;
-      case "enum":
-        if (enumType == null) throw new ArgumentError("enum_type is required for enums");
-        sql = enumType;
-        break;
-      default:
-        sql = super.typeToSql(type as ColumnType, options);
+  ): Promise<unknown> {
+    await this.clearCacheBang();
+    await super.addColumn(tableName, columnName, type, options);
+    if ("comment" in options) {
+      return this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
-    return array && type !== "primary_key" ? `${sql}[]` : sql;
   }
 
   override async changeColumn(
@@ -702,20 +652,81 @@ export class SchemaStatements extends AbstractSchemaStatements {
     for (const proc of procs) await proc();
   }
 
-  override async addColumn(
+  buildChangeColumnDefinition(
     tableName: string,
     columnName: string,
     type: ColumnType,
-    options: ColumnOptions & {
-      comment?: string | null;
-      ifNotExists?: boolean;
-    } = {},
-  ): Promise<unknown> {
+    options: ColumnOptions & { using?: string; castAs?: string } = {},
+  ): ChangeColumnDefinition {
+    const td = this.createTableDefinition(tableName);
+    const cd = td.newColumnDefinition(columnName, type, options);
+    return new ChangeColumnDefinition(cd, columnName);
+  }
+
+  override async changeColumnDefault(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<void> {
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
+    );
+  }
+
+  override async buildChangeColumnDefaultDefinition(
+    tableName: string,
+    columnName: string,
+    defaultOrChanges: unknown,
+  ): Promise<ChangeColumnDefaultDefinition | undefined> {
+    const column = await this.columnFor(tableName, columnName);
+    if (column == null) return;
+
+    const default_ = this.extractNewDefaultValue(defaultOrChanges);
+    return new ChangeColumnDefaultDefinition(column, default_);
+  }
+
+  override async changeColumnNull(
+    tableName: string,
+    columnName: string,
+    null_: boolean,
+    default_: unknown = null,
+  ): Promise<void> {
+    this.validateChangeColumnNullArgumentBang(null_);
+
     await this.clearCacheBang();
-    await super.addColumn(tableName, columnName, type, options);
-    if ("comment" in options) {
-      return this.changeColumnComment(tableName, columnName, options.comment ?? null);
+    if (!(null_ || default_ == null)) {
+      const column = await this.columnFor(tableName, columnName);
+      if (column)
+        await this.execute(
+          `UPDATE ${this.quoteTableName(tableName)} SET ${this.quoteColumnName(columnName)}=${await this.quoteDefaultExpression(default_, column)} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
+        );
     }
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`,
+    );
+  }
+
+  override async changeColumnComment(
+    tableName: string,
+    columnName: string,
+    commentOrChanges: CommentOrChanges,
+  ): Promise<void> {
+    await this.clearCacheBang();
+    const comment = this.extractNewCommentValue(commentOrChanges);
+    await this.execute(
+      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.quote(comment)}`,
+    );
+  }
+
+  override async changeTableComment(
+    tableName: string,
+    commentOrChanges: CommentOrChanges,
+  ): Promise<void> {
+    await this.clearCacheBang();
+    const comment = this.extractNewCommentValue(commentOrChanges);
+    await this.execute(
+      `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`,
+    );
   }
 
   override async renameColumn(
@@ -837,152 +848,13 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return super.indexName(table, options);
   }
 
-  override async changeColumnDefault(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<void> {
-    await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
-    );
-  }
-
-  buildChangeColumnDefinition(
-    tableName: string,
-    columnName: string,
-    type: ColumnType,
-    options: ColumnOptions & { using?: string; castAs?: string } = {},
-  ): ChangeColumnDefinition {
-    const td = this.createTableDefinition(tableName);
-    const cd = td.newColumnDefinition(columnName, type, options);
-    return new ChangeColumnDefinition(cd, columnName);
-  }
-
-  override async buildChangeColumnDefaultDefinition(
-    tableName: string,
-    columnName: string,
-    defaultOrChanges: unknown,
-  ): Promise<ChangeColumnDefaultDefinition | undefined> {
-    const column = await this.columnFor(tableName, columnName);
-    if (column == null) return;
-
-    const default_ = this.extractNewDefaultValue(defaultOrChanges);
-    return new ChangeColumnDefaultDefinition(column, default_);
-  }
-
-  override async changeColumnNull(
-    tableName: string,
-    columnName: string,
-    null_: boolean,
-    default_: unknown = null,
-  ): Promise<void> {
-    this.validateChangeColumnNullArgumentBang(null_);
-
-    await this.clearCacheBang();
-    if (!(null_ || default_ == null)) {
-      const column = await this.columnFor(tableName, columnName);
-      if (column)
-        await this.execute(
-          `UPDATE ${this.quoteTableName(tableName)} SET ${this.quoteColumnName(columnName)}=${await this.quoteDefaultExpression(default_, column)} WHERE ${this.quoteColumnName(columnName)} IS NULL`,
-        );
-    }
-    await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} ALTER COLUMN ${this.quoteColumnName(columnName)} ${null_ ? "DROP" : "SET"} NOT NULL`,
-    );
-  }
-
-  override async changeColumnComment(
-    tableName: string,
-    columnName: string,
-    commentOrChanges: CommentOrChanges,
-  ): Promise<void> {
-    await this.clearCacheBang();
-    const comment = this.extractNewCommentValue(commentOrChanges);
-    await this.execute(
-      `COMMENT ON COLUMN ${this.quoteTableName(tableName)}.${this.quoteColumnName(columnName)} IS ${this.quote(comment)}`,
-    );
-  }
-
-  override async changeTableComment(
-    tableName: string,
-    commentOrChanges: CommentOrChanges,
-  ): Promise<void> {
-    await this.clearCacheBang();
-    const comment = this.extractNewCommentValue(commentOrChanges);
-    await this.execute(
-      `COMMENT ON TABLE ${this.quoteTableName(tableName)} IS ${this.quote(comment)}`,
-    );
-  }
-
-  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
-    return PgSchemaDumper.create(
-      this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
-      options,
-    );
-  }
-
-  async validateConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
-    const at = this.createAlterTable(tableName);
-    at.validateConstraint(constraintName);
-    await this.execute(await this.schemaCreation.accept(at));
-  }
-
-  /** @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms */
-  async validateCheckConstraint(
-    tableName: string,
-    options: string | { name: string; expression?: string },
-  ): Promise<void> {
-    const opts = typeof options === "string" ? { name: options } : options;
-    const chkNameToValidate = (await this.checkConstraintForBang(tableName, opts)).name;
-    await this.validateConstraint(tableName, chkNameToValidate);
-  }
-
-  async validateForeignKey(
+  override async addForeignKey(
     fromTable: string,
-    toTable?: string,
-    options: ForeignKeyLookupOptions = {},
+    toTable: string,
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
-    const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
-      .name;
-    await this.validateConstraint(fromTable, fkNameToValidate);
-  }
-
-  override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    const [, table] = this.extractSchemaQualifiedName(tableName);
-    return `${singularize(table)}_${columnName}`;
-  }
-
-  async addIndexOptions(
-    tableName: string,
-    columnName: string | string[],
-    options: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2] = {},
-  ): Promise<[IndexDefinition, string | undefined, boolean]> {
-    options = { ...options };
-    const where = options.where;
-    if (
-      typeof where === "string" &&
-      (await this.tableExists(tableName)) &&
-      (await this.columnExists(tableName, where))
-    ) {
-      options.where = this.quoteColumnName(where);
-    }
-    return super.addIndexOptions(tableName, columnName, options);
-  }
-
-  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
-    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
-
-    const quotedColumns = new Map<string, string>();
-    for (const name of columnNames) {
-      quotedColumns.set(name, this.quoteColumnName(name));
-    }
-    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
-  }
-
-  get schemaCreation(): PgSchemaCreation {
-    return new PgSchemaCreation(
-      this as unknown as ConstructorParameters<typeof PgSchemaCreation>[0],
-    );
+    this.assertValidDeferrable(options.deferrable);
+    await super.addForeignKey(fromTable, toTable, options);
   }
 
   /** @missingRailsCall order:unquoteIdentifier,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
@@ -1056,15 +928,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
   }
 
-  override async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
-  ): Promise<void> {
-    this.assertValidDeferrable(options.deferrable);
-    await super.addForeignKey(fromTable, toTable, options);
-  }
-
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
     const checkInfo = await this.internalExecQuery(
@@ -1088,46 +951,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
       return new CheckConstraintDefinition(tableName, expression, options);
     });
-  }
-
-  /** @inventedArm compact — PERMANENT */
-  exclusionConstraintOptions(
-    tableName: string,
-    expression: string,
-    options: Record<string, unknown>,
-  ): Record<string, unknown> {
-    this.assertValidDeferrable(options.deferrable);
-
-    options = compact({ ...options });
-    options.name ||= this.exclusionConstraintName(tableName, { expression, ...options });
-    return options;
-  }
-
-  async addExclusionConstraint(
-    tableName: string,
-    expression: string,
-    options: ExclusionConstraintOptions = {},
-  ): Promise<void> {
-    options = this.exclusionConstraintOptions(tableName, expression, options);
-    const at = this.createAlterTable(tableName);
-    at.addExclusionConstraint(expression, options);
-    await this.execute(await this.schemaCreation.accept(at));
-  }
-
-  async removeExclusionConstraint(
-    tableName: string,
-    expression: string | Record<string, unknown> | null = null,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (typeof expression === "object" && expression !== null) {
-      options = expression;
-      expression = null;
-    }
-    const exclNameToDelete = (
-      await this.exclusionConstraintForBang(tableName, { expression, ...options })
-    ).name;
-
-    await this.removeConstraint(tableName, exclNameToDelete);
   }
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {
@@ -1168,49 +991,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
   }
 
-  /** @inventedArm compact — PERMANENT */
-  uniqueConstraintOptions(
-    tableName: string,
-    columnName: string | string[] | null | undefined,
-    options: Record<string, unknown>,
-  ): Record<string, unknown> {
-    this.assertValidDeferrable(options.deferrable);
-    if (columnName && options.usingIndex) {
-      throw new ArgumentError("Cannot specify both column_name and :using_index options.");
-    }
-
-    options = compact({ ...options });
-    options.name ||= this.uniqueConstraintName(tableName, { column: columnName, ...options });
-    return options;
-  }
-
-  async addUniqueConstraint(
-    tableName: string,
-    columnName?: string | string[] | null,
-    options: UniqueConstraintOptions = {},
-  ): Promise<void> {
-    options = this.uniqueConstraintOptions(tableName, columnName, options);
-    const at = this.createAlterTable(tableName);
-    at.addUniqueConstraint(columnName as string | string[], options);
-    await this.execute(await this.schemaCreation.accept(at));
-  }
-
-  async removeUniqueConstraint(
-    tableName: string,
-    columnName: string | string[] | Record<string, unknown> | null = null,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)) {
-      options = columnName;
-      columnName = null;
-    }
-    const uniqueNameToDelete = (
-      await this.uniqueConstraintForBang(tableName, { column: columnName, ...options })
-    ).name;
-
-    await this.removeConstraint(tableName, uniqueNameToDelete);
-  }
-
   /** @missingRailsCall order:split,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
   async uniqueConstraints(tableName: string): Promise<UniqueConstraintDefinition[]> {
     const scope = this.quotedScope(tableName);
@@ -1248,6 +1028,226 @@ export class SchemaStatements extends AbstractSchemaStatements {
       );
     }
     return uniqueConstraints;
+  }
+
+  async addExclusionConstraint(
+    tableName: string,
+    expression: string,
+    options: ExclusionConstraintOptions = {},
+  ): Promise<void> {
+    options = this.exclusionConstraintOptions(tableName, expression, options);
+    const at = this.createAlterTable(tableName);
+    at.addExclusionConstraint(expression, options);
+    await this.execute(await this.schemaCreation.accept(at));
+  }
+
+  /** @inventedArm compact — PERMANENT */
+  exclusionConstraintOptions(
+    tableName: string,
+    expression: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown> {
+    this.assertValidDeferrable(options.deferrable);
+
+    options = compact({ ...options });
+    options.name ||= this.exclusionConstraintName(tableName, { expression, ...options });
+    return options;
+  }
+
+  async removeExclusionConstraint(
+    tableName: string,
+    expression: string | Record<string, unknown> | null = null,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (typeof expression === "object" && expression !== null) {
+      options = expression;
+      expression = null;
+    }
+    const exclNameToDelete = (
+      await this.exclusionConstraintForBang(tableName, { expression, ...options })
+    ).name;
+
+    await this.removeConstraint(tableName, exclNameToDelete);
+  }
+
+  async addUniqueConstraint(
+    tableName: string,
+    columnName?: string | string[] | null,
+    options: UniqueConstraintOptions = {},
+  ): Promise<void> {
+    options = this.uniqueConstraintOptions(tableName, columnName, options);
+    const at = this.createAlterTable(tableName);
+    at.addUniqueConstraint(columnName as string | string[], options);
+    await this.execute(await this.schemaCreation.accept(at));
+  }
+
+  /** @inventedArm compact — PERMANENT */
+  uniqueConstraintOptions(
+    tableName: string,
+    columnName: string | string[] | null | undefined,
+    options: Record<string, unknown>,
+  ): Record<string, unknown> {
+    this.assertValidDeferrable(options.deferrable);
+    if (columnName && options.usingIndex) {
+      throw new ArgumentError("Cannot specify both column_name and :using_index options.");
+    }
+
+    options = compact({ ...options });
+    options.name ||= this.uniqueConstraintName(tableName, { column: columnName, ...options });
+    return options;
+  }
+
+  async removeUniqueConstraint(
+    tableName: string,
+    columnName: string | string[] | Record<string, unknown> | null = null,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (typeof columnName === "object" && columnName !== null && !Array.isArray(columnName)) {
+      options = columnName;
+      columnName = null;
+    }
+    const uniqueNameToDelete = (
+      await this.uniqueConstraintForBang(tableName, { column: columnName, ...options })
+    ).name;
+
+    await this.removeConstraint(tableName, uniqueNameToDelete);
+  }
+
+  override typeToSql(
+    type: string,
+    options: {
+      limit?: number;
+      precision?: number;
+      scale?: number;
+      array?: boolean;
+      enumType?: string;
+    } = {},
+  ): string {
+    const { limit, array, enumType } = options;
+    let sql: string;
+    switch (String(type ?? "")) {
+      case "binary":
+        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
+          throw new ArgumentError(
+            `No binary type has byte size ${limit}. The limit on binary can be at most 1GB - 1byte.`,
+          );
+        }
+        sql = super.typeToSql(type as ColumnType, {});
+        break;
+      case "text":
+        if (limit != null && (limit < 0 || limit > 0x3fffffff)) {
+          throw new ArgumentError(
+            `No text type has byte size ${limit}. The limit on text can be at most 1GB - 1byte.`,
+          );
+        }
+        sql = super.typeToSql(type as ColumnType, {});
+        break;
+      case "integer":
+        if (limit === 1 || limit === 2) sql = "smallint";
+        else if (limit == null || (limit >= 3 && limit <= 4)) sql = "integer";
+        else if (limit >= 5 && limit <= 8) sql = "bigint";
+        else
+          throw new ArgumentError(
+            `No integer type has byte size ${limit}. Use a numeric with scale 0 instead.`,
+          );
+        break;
+      case "enum":
+        if (enumType == null) throw new ArgumentError("enum_type is required for enums");
+        sql = enumType;
+        break;
+      default:
+        sql = super.typeToSql(type as ColumnType, options);
+    }
+    return array && type !== "primary_key" ? `${sql}[]` : sql;
+  }
+
+  override columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string {
+    const visitor = this.visitor;
+    const orderColumns = compactBlank(
+      compactBlank(orders ?? []).map((s) => {
+        s = typeof s === "string" ? s : visitor.compile(s);
+        return s.replace(/\s+(?:ASC|DESC)\b/gi, "").replace(/\s+NULLS\s+(?:FIRST|LAST)\b/gi, "");
+      }),
+    ).map((column, i) => `${column} AS alias_${i}`);
+
+    return [...orderColumns, super.columnsForDistinct(columns, orders as string[])]
+      .flat(Infinity)
+      .join(", ");
+  }
+
+  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
+    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
+  }
+
+  createSchemaDumper(options: Record<string, unknown>): PgSchemaDumper {
+    return PgSchemaDumper.create(
+      this as unknown as Parameters<typeof PgSchemaDumper.create>[0],
+      options,
+    );
+  }
+
+  async validateConstraint(tableName: string, constraintName: string | undefined): Promise<void> {
+    const at = this.createAlterTable(tableName);
+    at.validateConstraint(constraintName);
+    await this.execute(await this.schemaCreation.accept(at));
+  }
+
+  async validateForeignKey(
+    fromTable: string,
+    toTable?: string,
+    options: ForeignKeyLookupOptions = {},
+  ): Promise<void> {
+    const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
+      .name;
+    await this.validateConstraint(fromTable, fkNameToValidate);
+  }
+
+  /** @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms */
+  async validateCheckConstraint(
+    tableName: string,
+    options: string | { name: string; expression?: string },
+  ): Promise<void> {
+    const opts = typeof options === "string" ? { name: options } : options;
+    const chkNameToValidate = (await this.checkConstraintForBang(tableName, opts)).name;
+    await this.validateConstraint(tableName, chkNameToValidate);
+  }
+
+  override foreignKeyColumnFor(tableName: string, columnName = "id"): string {
+    const [, table] = this.extractSchemaQualifiedName(tableName);
+    return `${singularize(table)}_${columnName}`;
+  }
+
+  async addIndexOptions(
+    tableName: string,
+    columnName: string | string[],
+    options: Parameters<AbstractSchemaStatements["addIndexOptions"]>[2] = {},
+  ): Promise<[IndexDefinition, string | undefined, boolean]> {
+    options = { ...options };
+    const where = options.where;
+    if (
+      typeof where === "string" &&
+      (await this.tableExists(tableName)) &&
+      (await this.columnExists(tableName, where))
+    ) {
+      options.where = this.quoteColumnName(where);
+    }
+    return super.addIndexOptions(tableName, columnName, options);
+  }
+
+  async quotedIncludeColumnsForIndex(columnNames: string | string[]): Promise<string> {
+    if (typeof columnNames === "string") return this.quoteColumnName(columnNames);
+
+    const quotedColumns = new Map<string, string>();
+    for (const name of columnNames) {
+      quotedColumns.set(name, this.quoteColumnName(name));
+    }
+    return Array.from((await this.addOptionsForIndexColumns(quotedColumns)).values()).join(", ");
+  }
+
+  get schemaCreation(): PgSchemaCreation {
+    return new PgSchemaCreation(
+      this as unknown as ConstructorParameters<typeof PgSchemaCreation>[0],
+    );
   }
 
   /** @internal */
