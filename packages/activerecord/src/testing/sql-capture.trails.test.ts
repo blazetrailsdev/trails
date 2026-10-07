@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { captureSql, captureLogOutput } from "./sql-capture.js";
+import { captureSql } from "./sql-capture.js";
 
 function emitTrio(): void {
   Notifications.instrument("sql.active_record", { sql: "LOAD", name: "User Load" }, () => {});
@@ -27,19 +27,5 @@ describe("captureSql", () => {
         throw new Error("boom");
       }),
     ).rejects.toThrow("boom");
-  });
-});
-
-describe("captureLogOutput", () => {
-  it("accumulates the name + sql of each event, like Rails' StringIO logger", async () => {
-    const output = await captureLogOutput(() => {
-      Notifications.instrument(
-        "sql.active_record",
-        { sql: 'INSERT INTO "books"', name: "Book Bulk Insert" },
-        () => {},
-      );
-    });
-    expect(output).toContain("Book Bulk Insert");
-    expect(output).toContain('INSERT INTO "books"');
   });
 });

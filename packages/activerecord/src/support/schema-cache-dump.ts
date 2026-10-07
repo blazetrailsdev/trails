@@ -5,7 +5,8 @@ import type {
   AbstractAdapter as DatabaseAdapter,
   AdapterName,
 } from "../connection-adapters/abstract-adapter.js";
-import { SchemaCache, type Pool } from "../connection-adapters/schema-cache.js";
+import { NullPool, type ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import { SchemaCache, SchemaReflection, type Pool } from "../connection-adapters/schema-cache.js";
 import { BOOKKEEPING_TABLE_NAMES } from "./drop-all-tables.js";
 import { supportsExpressionIndex } from "./schema-types.js";
 import { TEMP_DB_PREFIX } from "./sqlite-template.js";
@@ -143,3 +144,30 @@ export async function templateSchemaCache(): Promise<SchemaCache | null> {
 }
 
 let loaded: SchemaCache | null | undefined;
+
+export async function eagerWarmSchemaCache(adapter: DatabaseAdapter): Promise<void> {
+  const sc = adapter.internalSchemaCache;
+  const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
+  if (!sc || pool === null) return;
+  try {
+    const dumped = await templateSchemaCache();
+    if (dumped && (await replaySchemaCacheDump(adapter, pool, dumped))) return;
+    await sc.addAll(pool);
+  } catch {}
+}
+
+async function replaySchemaCacheDump(
+  adapter: DatabaseAdapter,
+  pool: ConnectionPool,
+  dumped: SchemaCache,
+): Promise<boolean> {
+  const cached = dumpedTables(dumped.marshalDump());
+  const shapes = await schemaShapes(adapter);
+  if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
+  pool.schemaReflection = new SchemaReflection(null, dumped.initializeDup());
+  const sc = adapter.internalSchemaCache;
+  for (const table of shapes.keys()) {
+    if (!cached.has(table)) await sc.add(pool, table);
+  }
+  return true;
+}
