@@ -49,11 +49,11 @@ describe("UnusedRoutesCommand", () => {
       sekrit_data(): void {}
     }
     controllerConstants.set("posts", PostsController as never);
-    for (const action of ["show_html", "sekrit_data"]) {
+    for (const action of ["showHTML", "sekrit_data"]) {
       const info = new RouteInfo(route({ controller: "posts", action }));
       expect(await info.unused()).toBe(false);
     }
-    const info = new RouteInfo(route({ controller: "posts", action: "showHTML" }));
+    const info = new RouteInfo(route({ controller: "posts", action: "show_html" }));
     expect(await info.unused()).toBe(true);
   });
 
@@ -77,6 +77,34 @@ describe("UnusedRoutesCommand", () => {
     controllerConstants.set("posts", PostsController as never);
     const info = new RouteInfo(route({ controller: "posts", action: "index" }));
     expect(await info.unused()).toBe(false);
+  });
+
+  it("RouteInfo finds a camelCase action's template under its underscored file name", async () => {
+    class PostsController extends ActionController.Metal {
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
+      }
+    }
+    controllerConstants.set("posts", PostsController as never);
+
+    const covered = new RouteInfo(route({ controller: "posts", action: "recentPosts" }));
+    const uncovered = new RouteInfo(route({ controller: "posts", action: "oldPosts" }));
+
+    expect(await covered.unused()).toBe(false);
+    expect(await uncovered.unused()).toBe(true);
+  });
+
+  it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
+    class PostsController extends ActionController.Metal {}
+    controllerConstants.set("posts", PostsController as never);
+
+    const info = new RouteInfo(route({ controller: "posts", action: "process" }));
+
+    expect(await info.unused()).toBe(true);
   });
 
   it("lists a booted app's unused routes before anything has drawn them", async () => {

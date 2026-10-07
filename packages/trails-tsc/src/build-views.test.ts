@@ -697,6 +697,29 @@ describe("runCli", () => {
     expect(show).toContain("      : never;");
   }, 30_000);
 
+  it("types the underscored template a camelCase action renders, named implicitly or by action:", async () => {
+    const cwd = mkScratch();
+    write(
+      cwd,
+      "app/controllers/posts-controller.ts",
+      [
+        "export class PostsController {",
+        "  render(..._args: unknown[]): void {}",
+        "  recentPosts(): void { this.render({ locals: { foo: 1 } }); }",
+        '  edit(): void { this.render({ action: "recentPosts", locals: { bar: true } }); }',
+        "}",
+      ].join("\n"),
+    );
+    write(cwd, "app/views/posts/recent_posts.html.tse", "<%= foo %><%= bar %>");
+    await buildViews({ cwd });
+    const view = fs.readFileSync(
+      path.join(cwd, ".trails/views/posts/recent_posts.html.tse.ts"),
+      "utf8",
+    );
+    expect(view).toContain("foo: number | undefined");
+    expect(view).toContain("bar: boolean | undefined");
+  }, 30_000);
+
   it("declares the object, counter and iteration locals of collection:, object: and as: renders", async () => {
     const cwd = mkScratch();
     write(

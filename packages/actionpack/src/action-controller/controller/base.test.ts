@@ -270,14 +270,14 @@ describe("UrlOptionsTest", () => {
   it("url options override", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("from_view", { to: "url_options#from_view", as: "from_view" });
+        this.get("from_view", { to: "url_options#fromView", as: "from_view" });
 
         actionDispatchDeprecator().silence(() => {
           this.get(":controller/:action");
         });
       });
 
-      await tc.get("from_view", { params: { route: "fromViewUrl()" } });
+      await tc.get("fromView", { params: { route: "fromViewUrl()" } });
 
       assertEqual("http://www.override.com/from_view", tc.response.body);
       assertEqual("http://www.override.com/from_view", controller().fromViewUrl());
@@ -316,14 +316,14 @@ describe("DefaultUrlOptionsTest", () => {
   it("default url options override", async () => {
     await tc.withRouting(async (set: RouteSet) => {
       set.draw(function () {
-        this.get("from_view", { to: "default_url_options#from_view", as: "from_view" });
+        this.get("from_view", { to: "default_url_options#fromView", as: "from_view" });
 
         actionDispatchDeprecator().silence(() => {
           this.get(":controller/:action");
         });
       });
 
-      await tc.get("from_view", { params: { route: "fromViewUrl()" } });
+      await tc.get("fromView", { params: { route: "fromViewUrl()" } });
 
       assertEqual("http://www.override.com/from_view?locale=en", tc.response.body);
       assertEqual("http://www.override.com/from_view?locale=en", controller().fromViewUrl());
@@ -346,7 +346,7 @@ describe("DefaultUrlOptionsTest", () => {
         });
       });
 
-      await tc.get("from_view", { params: { route: "descriptionPath(1)" } });
+      await tc.get("fromView", { params: { route: "descriptionPath(1)" } });
 
       assertEqual("/en/descriptions/1", tc.response.body);
       assertEqual("/en/descriptions", controller().descriptionsPath());
@@ -390,9 +390,9 @@ describe("EmptyUrlOptionsTest", () => {
   });
 
   it("ensure url for works as expected when called with no options if default url options is not set", async () => {
-    await tc.get("public_action");
+    await tc.get("publicAction");
     assertEqual(
-      "http://www.example.com/non_empty/public_action",
+      "http://www.example.com/non_empty/publicAction",
       (tc.controller as NonEmptyController).urlFor(),
     );
   });

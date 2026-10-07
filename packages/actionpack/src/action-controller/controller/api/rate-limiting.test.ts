@@ -10,7 +10,7 @@ type CacheStoreHost = { cacheStore: MemoryStore };
 class ApiRateLimitedController extends API {
   static {
     (this as unknown as CacheStoreHost).cacheStore = new MemoryStore();
-    this.rateLimit({ to: 2, within: Duration.seconds(2), only: "limited_to_two" });
+    this.rateLimit({ to: 2, within: Duration.seconds(2), only: "limitedToTwo" });
   }
 
   limitedToTwo() {
@@ -36,21 +36,21 @@ describe("ApiRateLimitingTest", () => {
   });
 
   it("exceeding basic limit", async () => {
-    await tc.get("limited_to_two");
-    await tc.get("limited_to_two");
+    await tc.get("limitedToTwo");
+    await tc.get("limitedToTwo");
     assertResponse("ok");
 
-    await tc.get("limited_to_two");
+    await tc.get("limitedToTwo");
     assertResponse("too_many_requests");
   });
 
   it("limit resets after time", async () => {
-    await tc.get("limited_to_two");
-    await tc.get("limited_to_two");
+    await tc.get("limitedToTwo");
+    await tc.get("limitedToTwo");
     assertResponse("ok");
 
     await travelTo(Time.now().plus(3), {}, async () => {
-      await tc.get("limited_to_two");
+      await tc.get("limitedToTwo");
       assertResponse("ok");
     });
   });

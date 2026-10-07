@@ -12,7 +12,7 @@ class DummyController extends Base {
     this.beforeAction("authenticate", { only: "index" });
     this.beforeAction("authenticateWithRequest", { only: "display" });
     this.beforeAction("authenticateLongCredentials", { only: "show" });
-    this.beforeAction("authWithSpecialChars", { only: "special_creds" });
+    this.beforeAction("authWithSpecialChars", { only: "specialCreds" });
 
     this.httpBasicAuthenticateWith({ name: "David", password: "Goliath", only: "search" });
   }
@@ -201,7 +201,7 @@ describe("HttpBasicAuthenticationTest", () => {
 
   it("authentication request with no required password", async () => {
     tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${Base64.encode64("George")}`;
-    await tc.get("no_password");
+    await tc.get("noPassword");
 
     assertResponse("success");
     expect(tc.response.body).toBe("Hello George (password: nil)");
@@ -220,7 +220,7 @@ describe("HttpBasicAuthenticationTest", () => {
       "login!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t",
       "pwd:!@#$%^&*()_+{}[];\"',./<>?`~ \\n\\r\\t",
     );
-    await tc.get("special_creds");
+    await tc.get("specialCreds");
 
     assertResponse("success");
     expect(tc.response.body).toBe("Only for special credentials");

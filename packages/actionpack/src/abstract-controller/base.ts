@@ -142,7 +142,7 @@ export class AbstractController {
     "rateLimiting",
   ]);
 
-  private static _actionMethodCache?: Map<string, string>;
+  private static _actionMethodCache?: Set<string>;
 
   protected static _abstract: boolean = false;
 
@@ -202,8 +202,7 @@ export class AbstractController {
 
   /** @internal */
   static clearActionMethodsBang(): void {
-    (this as unknown as { _actionMethodCache?: Map<string, string> })._actionMethodCache =
-      undefined;
+    (this as unknown as { _actionMethodCache?: Set<string> })._actionMethodCache = undefined;
   }
 
   /** @internal */
@@ -226,15 +225,9 @@ export class AbstractController {
         (name) => !internalMethods.has(name),
       );
       methods.push(...ownPublicMethodNames(this.prototype));
-      this._actionMethodCache = new Map();
-      for (const name of methods) {
-        const actionName = underscore(name);
-        if (name === actionName || !this._actionMethodCache.has(actionName)) {
-          this._actionMethodCache.set(actionName, name);
-        }
-      }
+      this._actionMethodCache = new Set(methods);
     }
-    return [...this._actionMethodCache.keys()];
+    return [...this._actionMethodCache];
   }
 
   /** @internal */
@@ -319,9 +312,7 @@ export class AbstractController {
 
   /** @internal */
   methodForAction(actionName: string): string | undefined {
-    if (this.isActionMethod(actionName)) {
-      return (this.constructor as typeof AbstractController)._actionMethodCache!.get(actionName);
-    }
+    if (this.isActionMethod(actionName)) return actionName;
     if (typeof (this as any).actionMissing === "function") return "_handleActionMissing";
     return undefined;
   }

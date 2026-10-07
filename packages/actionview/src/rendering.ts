@@ -1,6 +1,12 @@
 /** @internal */
 
-import { Concern, extend, isPlainObject, type SafeBuffer } from "@blazetrails/activesupport";
+import {
+  Concern,
+  extend,
+  isPlainObject,
+  type SafeBuffer,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { include, Module } from "@blazetrails/ruby-compat/include";
 import { Base } from "./base.js";
@@ -222,20 +228,23 @@ export function _normalizeArgs(
   return options;
 }
 
-/** @internal */
+/**
+ * @inventedArm underscore — PERMANENT
+ * @internal
+ */
 export function _processRenderTemplateOptions(
   this: { actionName: string; _prefixes(): string[] },
   options: Record<string, unknown>,
 ): void {
   if (options["partial"] === true) {
-    options["partial"] = this.actionName;
+    options["partial"] = underscore(this.actionName);
   }
 
   if (!["partial", "file", "template"].some((k) => k in options)) {
     options["prefixes"] ??= this._prefixes();
   }
 
-  options["template"] ??= String(options["action"] ?? this.actionName);
+  options["template"] ??= underscore(String(options["action"] ?? this.actionName));
 }
 
 export const ClassMethods = {

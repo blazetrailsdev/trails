@@ -56,18 +56,18 @@ describe("RenderTest", () => {
   });
 
   test("rendered format without format", async () => {
-    await testCase.get("inline_rendered_format_without_format");
+    await testCase.get("inlineRenderedFormatWithoutFormat");
     expect(testCase.response.body).toBe("test");
     expect(testCase.response.mediaType).toBe("text/html");
   });
 
   test("accessing params in template", async () => {
-    await testCase.get("accessing_params_in_template", { params: { name: "David" } });
+    await testCase.get("accessingParamsInTemplate", { params: { name: "David" } });
     expect(testCase.response.body).toBe("Hello: David");
   });
 
   test("accessing local assigns in inline template", async () => {
-    await testCase.get("accessing_local_assigns_in_inline_template", {
+    await testCase.get("accessingLocalAssignsInInlineTemplate", {
       params: { local_name: "Local David" },
     });
     expect(testCase.response.body).toBe("Goodbye, Local David");

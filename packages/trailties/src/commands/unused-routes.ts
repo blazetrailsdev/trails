@@ -52,10 +52,13 @@ export class RouteInfo {
     );
   }
 
-  /** @internal */
+  /**
+   * @inventedArm underscore — PERMANENT
+   * @internal
+   */
   private async viewPath(root: ViewPathRoot): Promise<string> {
     const path = getPath();
-    return path.join(root.path, String(this.controllerName), String(this.actionName));
+    return path.join(root.path, String(this.controllerName), underscore(String(this.actionName)));
   }
 
   /** @internal */

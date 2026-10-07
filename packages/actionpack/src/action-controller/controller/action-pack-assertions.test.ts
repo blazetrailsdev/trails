@@ -149,25 +149,25 @@ describe("ActionPackAssertionsControllerTest", () => {
   it.skip("render file relative path", () => {});
 
   it("get request", async () => {
-    await expect(tc.get("raise_exception_on_get")).rejects.toThrow("get");
-    await tc.get("raise_exception_on_post");
+    await expect(tc.get("raiseExceptionOnGet")).rejects.toThrow("get");
+    await tc.get("raiseExceptionOnPost");
     expect(tc.response.body).toContain("GET");
   });
 
   it("post request", async () => {
-    await expect(tc.post("raise_exception_on_post")).rejects.toThrow("post");
-    await tc.post("raise_exception_on_get");
+    await expect(tc.post("raiseExceptionOnPost")).rejects.toThrow("post");
+    await tc.post("raiseExceptionOnGet");
     expect(tc.response.body).toContain("POST");
   });
 
   it("get post request switch", async () => {
-    await tc.post("raise_exception_on_get");
+    await tc.post("raiseExceptionOnGet");
     expect(tc.response.body).toContain("POST");
-    await tc.get("raise_exception_on_post");
+    await tc.get("raiseExceptionOnPost");
     expect(tc.response.body).toContain("GET");
-    await tc.post("raise_exception_on_get");
+    await tc.post("raiseExceptionOnGet");
     expect(tc.response.body).toContain("POST");
-    await tc.get("raise_exception_on_post");
+    await tc.get("raiseExceptionOnPost");
     expect(tc.response.body).toContain("GET");
   });
 
@@ -197,7 +197,7 @@ describe("ActionPackAssertionsControllerTest", () => {
           this.get(":controller/:action");
         });
       });
-      await tc.process("redirect_to_named_route");
+      await tc.process("redirectToNamedRoute");
       await assertRaise([Assertion], {}, () => {
         assertRedirectedTo("http://test.host/route_two");
       });
@@ -227,7 +227,7 @@ describe("ActionPackAssertionsControllerTest", () => {
           this.get(":controller/:action");
         });
       });
-      await tc.process("redirect_to_index");
+      await tc.process("redirectToIndex");
       assertRedirectedTo(tc.adminInnerModulePath());
     });
   });
@@ -246,7 +246,7 @@ describe("ActionPackAssertionsControllerTest", () => {
           this.get(":controller/:action");
         });
       });
-      await tc.process("redirect_to_top_level_named_route");
+      await tc.process("redirectToTopLevelNamedRoute");
       assertRedirectedTo("/action_pack_assertions/foo");
       assertRedirectedTo(/\/action_pack_assertions\/foo/);
     });
@@ -263,13 +263,13 @@ describe("ActionPackAssertionsControllerTest", () => {
           this.get(":controller/:action");
         });
       });
-      await tc.process("redirect_to_top_level_named_route");
+      await tc.process("redirectToTopLevelNamedRoute");
       assertRedirectedTo(tc.topLevelPath("foo"));
     });
   });
   it("assert redirect failure message with protocol relative url", async () => {
     try {
-      await tc.process("redirect_external_protocol_relative");
+      await tc.process("redirectExternalProtocolRelative");
       assertRedirectedTo("/foo");
     } catch (ex) {
       if (!(ex instanceof Assertion)) throw ex;
@@ -281,7 +281,7 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("template objects exist", async () => {
-    await tc.get("assign_this");
+    await tc.get("assignThis");
     expect((tc.controller as any).howdy).toBe("ho");
   });
 
@@ -291,12 +291,12 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("empty flash", async () => {
-    await tc.get("flash_me_naked");
+    await tc.get("flashMeNaked");
     expect(tc.flash().isEmpty()).toBe(true);
   });
 
   it("flash exist", async () => {
-    await tc.get("flash_me");
+    await tc.get("flashMe");
     expect(tc.flash().isEmpty()).toBe(false);
     expect(tc.flash().get("hello")).toBeTruthy();
   });
@@ -307,16 +307,16 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("session exist", async () => {
-    await tc.get("session_stuffing");
+    await tc.get("sessionStuffing");
     expect(tc.session().get("xmas")).toBe("turkey");
   });
 
   it("redirection location", async () => {
-    await tc.get("redirect_internal");
+    await tc.get("redirectInternal");
     expect(tc.response.redirectUrl).toBe("http://test.host/nothing");
-    await tc.get("redirect_external");
+    await tc.get("redirectExternal");
     expect(tc.response.redirectUrl).toBe("http://www.rubyonrails.org");
-    await tc.get("redirect_external_protocol_relative");
+    await tc.get("redirectExternalProtocolRelative");
     expect(tc.response.redirectUrl).toBe("//www.rubyonrails.org");
   });
 
@@ -345,16 +345,16 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("redirect url match", async () => {
-    await tc.get("redirect_external");
+    await tc.get("redirectExternal");
     expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toMatch(/rubyonrails/);
     expect(tc.response.redirectUrl).not.toMatch(/perloffrails/);
   });
 
   it("redirection", async () => {
-    await tc.get("redirect_internal");
+    await tc.get("redirectInternal");
     expect(tc.response.isRedirection).toBe(true);
-    await tc.get("redirect_external");
+    await tc.get("redirectExternal");
     expect(tc.response.isRedirection).toBe(true);
     await tc.get("nothing");
     expect(tc.response.isRedirection).toBe(false);
@@ -371,45 +371,45 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("render based on parameters", async () => {
-    await tc.get("render_based_on_parameters", { params: { name: "David" } });
+    await tc.get("renderBasedOnParameters", { params: { name: "David" } });
     expect(tc.response.body).toBe("Mr. David");
   });
 
   it("assert redirection fails with incorrect controller", async () => {
-    await tc.get("redirect_to_controller");
+    await tc.get("redirectToController");
     expect(() =>
       tc.assertRedirectedTo("http://test.host/action_pack_assertions/flash_me"),
     ).toThrow();
   });
 
   it("assert redirection with extra controller option", async () => {
-    await tc.get("redirect_to_action");
+    await tc.get("redirectToAction");
     expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("flash_me");
   });
 
   it("redirected to url leading slash", async () => {
-    await tc.get("redirect_to_path");
+    await tc.get("redirectToPath");
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 
   it("redirected to url no leading slash fails", async () => {
-    await tc.get("redirect_to_path");
+    await tc.get("redirectToPath");
     expect(() => tc.assertRedirectedTo("some/path")).toThrow();
   });
 
   it("redirect invalid external route", async () => {
-    await tc.get("redirect_invalid_external_route");
+    await tc.get("redirectInvalidExternalRoute");
     expect(tc.response.redirectUrl).toBe("http://test.hostht_tp://www.rubyonrails.org");
   });
 
   it("redirected to url full url", async () => {
-    await tc.get("redirect_to_path");
+    await tc.get("redirectToPath");
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 
   it("assert redirection with symbol", async () => {
-    await tc.get("redirect_to_controller_with_symbol");
+    await tc.get("redirectToControllerWithSymbol");
     expect(tc.response.isRedirection).toBe(true);
     expect(tc.response.redirectUrl).toContain("elsewhere");
   });
@@ -423,20 +423,20 @@ describe("ActionPackAssertionsControllerTest", () => {
   });
 
   it("assert redirection with status", async () => {
-    await tc.get("redirect_to_path");
+    await tc.get("redirectToPath");
     expect(tc.response.statusCode).toBe(302);
     tc.assertRedirectedTo("http://test.host/some/path");
-    await tc.get("redirect_permanently");
+    await tc.get("redirectPermanently");
     expect(tc.response.statusCode).toBe(301);
     tc.assertRedirectedTo("http://test.host/some/path");
   });
 
   it("redirected to with nested controller", async () => {
     tc.controller = new Admin.InnerModuleController();
-    await tc.get("redirect_to_absolute_controller");
+    await tc.get("redirectToAbsoluteController");
     assertRedirectedTo({ controller: "/content" });
 
-    await tc.get("redirect_to_fellow_controller");
+    await tc.get("redirectToFellowController");
     assertRedirectedTo({ controller: "admin/user" });
   });
 
@@ -471,7 +471,7 @@ describe("ActionPackHeaderTest", () => {
   it.skip("rendering xml respects content type when set in the header", () => {});
 
   it("render text with custom content type", async () => {
-    await tc.get("render_text_with_custom_content_type");
+    await tc.get("renderTextWithCustomContentType");
     expect(tc.response.getHeader("Content-Type")).toContain("application/rss+xml");
   });
 });

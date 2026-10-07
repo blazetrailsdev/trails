@@ -213,11 +213,11 @@ class RespondToController extends Base {
     await this.respondTo((type) => {
       type.html(() => {
         this.type = "Firefox";
-        return this.render({ action: "iphone_with_html_response_type" });
+        return this.render({ action: "iphoneWithHtmlResponseType" });
       });
       type.iphone(() => {
         this.type = "iPhone";
-        return this.render({ action: "iphone_with_html_response_type" });
+        return this.render({ action: "iphoneWithHtmlResponseType" });
       });
     });
   }
@@ -326,10 +326,10 @@ class RespondToController extends Base {
 
   private setLayout(): string | undefined {
     switch (this.actionName) {
-      case "all_types_with_layout":
-      case "iphone_with_html_response_type":
+      case "allTypesWithLayout":
+      case "iphoneWithHtmlResponseType":
         return "respond_to/layouts/standard";
-      case "iphone_with_html_response_type_without_layout":
+      case "iphoneWithHtmlResponseTypeWithoutLayout":
         return "respond_to/layouts/missing";
     }
   }
@@ -361,7 +361,7 @@ class MockLogger extends Logger {
 RespondToController.layout(":setLayout");
 
 const NO_CONTENT_WARNING =
-  "No template found for RespondToController#variant_without_implicit_template_rendering, rendering head :no_content";
+  "No template found for RespondToController#variantWithoutImplicitTemplateRendering, rendering head :no_content";
 
 describe("RespondToControllerTest", () => {
   let tc: TestCase;
@@ -388,72 +388,72 @@ describe("RespondToControllerTest", () => {
 
   it("html fragment", async () => {
     tc.request.accept = "text/html; fragment";
-    await tc.get("my_html_fragment");
+    await tc.get("myHtmlFragment");
     expect(tc.response.headers.get("Content-Type")).toBe("text/html; fragment; charset=utf-8");
     expect(tc.response.body).toBe("neat");
   });
 
   it("html", async () => {
     tc.request.accept = "text/html";
-    await tc.get("js_or_html");
+    await tc.get("jsOrHtml");
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("html_or_xml");
+    await tc.get("htmlOrXml");
     expect(tc.response.body).toBe("HTML");
 
-    await expect(tc.get("just_xml")).rejects.toThrow(UnknownFormat);
+    await expect(tc.get("justXml")).rejects.toThrow(UnknownFormat);
   });
 
   it("all", async () => {
     tc.request.accept = "*/*";
-    await tc.get("js_or_html");
+    await tc.get("jsOrHtml");
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("html_or_xml");
+    await tc.get("htmlOrXml");
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("just_xml");
+    await tc.get("justXml");
     expect(tc.response.body).toBe("XML");
   });
 
   it("xml", async () => {
     tc.request.accept = "application/xml";
-    await tc.get("html_xml_or_rss");
+    await tc.get("htmlXmlOrRss");
     expect(tc.response.body).toBe("XML");
   });
 
   it("js or html", async () => {
     tc.request.accept = "text/javascript, text/html";
-    await tc.get("js_or_html", { xhr: true });
+    await tc.get("jsOrHtml", { xhr: true });
     expect(tc.response.body).toBe("JS");
 
     tc.request.accept = "text/javascript, text/html";
-    await tc.get("html_or_xml", { xhr: true });
+    await tc.get("htmlOrXml", { xhr: true });
     expect(tc.response.body).toBe("HTML");
 
     tc.request.accept = "text/javascript, text/html";
 
-    await expect(tc.get("just_xml", { xhr: true })).rejects.toThrow(UnknownFormat);
+    await expect(tc.get("justXml", { xhr: true })).rejects.toThrow(UnknownFormat);
   });
 
   it("json or yaml with leading star star", async () => {
     tc.request.accept = "*/*, application/json";
-    await tc.get("json_xml_or_html");
+    await tc.get("jsonXmlOrHtml");
     expect(tc.response.body).toBe("HTML");
 
     tc.request.accept = "*/* , application/json";
-    await tc.get("json_xml_or_html");
+    await tc.get("jsonXmlOrHtml");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("json or yaml", async () => {
-    await tc.get("json_or_yaml", { xhr: true });
+    await tc.get("jsonOrYaml", { xhr: true });
     expect(tc.response.body).toBe("JSON");
 
-    await tc.get("json_or_yaml", { params: { format: "json" } });
+    await tc.get("jsonOrYaml", { params: { format: "json" } });
     expect(tc.response.body).toBe("JSON");
 
-    await tc.get("json_or_yaml", { params: { format: "yaml" } });
+    await tc.get("jsonOrYaml", { params: { format: "yaml" } });
     expect(tc.response.body).toBe("YAML");
 
     for (const [body, contentTypes] of [
@@ -462,7 +462,7 @@ describe("RespondToControllerTest", () => {
     ] as const) {
       for (const contentType of contentTypes) {
         tc.request.accept = contentType;
-        await tc.get("json_or_yaml");
+        await tc.get("jsonOrYaml");
         expect(tc.response.body).toBe(body);
       }
     }
@@ -470,64 +470,64 @@ describe("RespondToControllerTest", () => {
 
   it("js or anything", async () => {
     tc.request.accept = "text/javascript, */*";
-    await tc.get("js_or_html", { xhr: true });
+    await tc.get("jsOrHtml", { xhr: true });
     expect(tc.response.body).toBe("JS");
 
-    await tc.get("html_or_xml", { xhr: true });
+    await tc.get("htmlOrXml", { xhr: true });
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("just_xml", { xhr: true });
+    await tc.get("justXml", { xhr: true });
     expect(tc.response.body).toBe("XML");
   });
 
   it("using defaults", async () => {
     tc.request.accept = "*/*";
-    await tc.get("using_defaults");
+    await tc.get("usingDefaults");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("Hello world!");
 
     tc.request.accept = "application/xml";
-    await tc.get("using_defaults");
+    await tc.get("usingDefaults");
     expect(tc.response.mediaType).toBe("application/xml");
     expect(tc.response.body).toBe("<p>Hello world!</p>\n");
   });
 
   it("using defaults with all", async () => {
     tc.request.accept = "*/*";
-    await tc.get("using_defaults_with_all");
+    await tc.get("usingDefaultsWithAll");
     expect(tc.response.body.trim()).toBe("HTML!");
 
     tc.request.accept = "text/html";
-    await tc.get("using_defaults_with_all");
+    await tc.get("usingDefaultsWithAll");
     expect(tc.response.body.trim()).toBe("HTML!");
 
     tc.request.accept = "application/json";
-    await tc.get("using_defaults_with_all");
+    await tc.get("usingDefaultsWithAll");
     expect(tc.response.body).toBe("ALL");
   });
 
   it("using defaults with type list", async () => {
     tc.request.accept = "*/*";
-    await tc.get("using_defaults_with_type_list");
+    await tc.get("usingDefaultsWithTypeList");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("Hello world!");
 
     tc.request.accept = "application/xml";
-    await tc.get("using_defaults_with_type_list");
+    await tc.get("usingDefaultsWithTypeList");
     expect(tc.response.mediaType).toBe("application/xml");
     expect(tc.response.body).toBe("<p>Hello world!</p>\n");
   });
 
   it("using conflicting nested js then html", async () => {
     tc.request.accept = "*/*";
-    await expect(tc.get("using_conflicting_nested_js_then_html")).rejects.toThrow(
+    await expect(tc.get("usingConflictingNestedJsThenHtml")).rejects.toThrow(
       RespondToMismatchError,
     );
   });
 
   it("using non conflicting nested js then js", async () => {
     tc.request.accept = "*/*";
-    await tc.get("using_non_conflicting_nested_js_then_js");
+    await tc.get("usingNonConflictingNestedJsThenJs");
     expect(tc.response.mediaType).toBe("text/javascript");
     expect(tc.response.body).toBe("JS");
   });
@@ -535,126 +535,126 @@ describe("RespondToControllerTest", () => {
   it("with atom content type", async () => {
     tc.request.accept = "";
     tc.request.env["CONTENT_TYPE"] = "application/atom+xml";
-    await tc.get("made_for_content_type", { xhr: true });
+    await tc.get("madeForContentType", { xhr: true });
     expect(tc.response.body).toBe("ATOM");
   });
 
   it("with rss content type", async () => {
     tc.request.accept = "";
     tc.request.env["CONTENT_TYPE"] = "application/rss+xml";
-    await tc.get("made_for_content_type", { xhr: true });
+    await tc.get("madeForContentType", { xhr: true });
     expect(tc.response.body).toBe("RSS");
   });
 
   it("synonyms", async () => {
     tc.request.accept = "application/javascript";
-    await tc.get("js_or_html");
+    await tc.get("jsOrHtml");
     expect(tc.response.body).toBe("JS");
 
     tc.request.accept = "application/x-xml";
-    await tc.get("html_xml_or_rss");
+    await tc.get("htmlXmlOrRss");
     expect(tc.response.body).toBe("XML");
   });
 
   it("custom types", async () => {
     tc.request.accept = "application/fancy-xml";
-    await tc.get("custom_type_handling");
+    await tc.get("customTypeHandling");
     expect(tc.response.mediaType).toBe("application/fancy-xml");
     expect(tc.response.body).toBe("Fancy XML");
 
     tc.request.accept = "text/html";
-    await tc.get("custom_type_handling");
+    await tc.get("customTypeHandling");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("xhtml alias", async () => {
     tc.request.accept = "application/xhtml+xml,application/xml";
-    await tc.get("html_or_xml");
+    await tc.get("htmlOrXml");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("firefox simulation", async () => {
     tc.request.accept =
       "text/xml,application/xml,application/xhtml+xml,text/html;q=0.9,text/plain;q=0.8,image/png,*/*;q=0.5";
-    await tc.get("html_or_xml");
+    await tc.get("htmlOrXml");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("handle any", async () => {
     tc.request.accept = "*/*";
-    await tc.get("handle_any");
+    await tc.get("handleAny");
     expect(tc.response.body).toBe("HTML");
 
     tc.request.accept = "text/javascript";
-    await tc.get("handle_any");
+    await tc.get("handleAny");
     expect(tc.response.body).toBe("Either JS or XML");
 
     tc.request.accept = "text/xml";
-    await tc.get("handle_any");
+    await tc.get("handleAny");
     expect(tc.response.body).toBe("Either JS or XML");
   });
 
   it("handle any doesnt set request content type", async () => {
     tc.request.accept = "text/csv";
-    await tc.get("handle_any_doesnt_set_request_content_type");
+    await tc.get("handleAnyDoesntSetRequestContentType");
     expect(tc.response.mediaType).toBe("application/json");
   });
 
   it("handle any any", async () => {
     tc.request.accept = "*/*";
-    await tc.get("handle_any_any");
+    await tc.get("handleAnyAny");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("handle any any parameter format", async () => {
-    await tc.get("handle_any_any", { params: { format: "html" } });
+    await tc.get("handleAnyAny", { params: { format: "html" } });
     expect(tc.response.body).toBe("HTML");
   });
 
   it("handle any any explicit html", async () => {
     tc.request.accept = "text/html";
-    await tc.get("handle_any_any");
+    await tc.get("handleAnyAny");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("handle any any javascript", async () => {
     tc.request.accept = "text/javascript";
-    await tc.get("handle_any_any");
+    await tc.get("handleAnyAny");
     expect(tc.response.body).toBe("Whatever you ask for, I got it");
   });
 
   it("handle any any xml", async () => {
     tc.request.accept = "text/xml";
-    await tc.get("handle_any_any");
+    await tc.get("handleAnyAny");
     expect(tc.response.body).toBe("Whatever you ask for, I got it");
   });
 
   it("handle any any unknown format", async () => {
-    await tc.get("handle_any_any", { params: { format: "php" } });
+    await tc.get("handleAnyAny", { params: { format: "php" } });
     expect(tc.response.body).toBe("Whatever you ask for, I got it");
   });
 
   it("browser check with any any", async () => {
     tc.request.accept = "application/json, application/xml";
-    await tc.get("json_xml_or_html");
+    await tc.get("jsonXmlOrHtml");
     expect(tc.response.body).toBe("JSON");
 
     tc.request.accept = "application/json, application/xml, */*";
-    await tc.get("json_xml_or_html");
+    await tc.get("jsonXmlOrHtml");
     expect(tc.response.body).toBe("HTML");
   });
 
   it("handle any with template", async () => {
     tc.request.accept = "*/*";
 
-    await tc.get("handle_any_with_template");
+    await tc.get("handleAnyWithTemplate");
     expect(tc.response.body).toBe("Hello world!");
   });
 
   it("html type with layout", async () => {
     tc.request.accept = "text/html";
-    await tc.get("all_types_with_layout");
+    await tc.get("allTypesWithLayout");
     expect(tc.response.body).toBe(
       '<html><div id="html">HTML for all_types_with_layout</div></html>',
     );
@@ -662,52 +662,52 @@ describe("RespondToControllerTest", () => {
 
   it("json with callback sets javascript content type", async () => {
     tc.request.accept = "application/json";
-    await tc.get("json_with_callback");
+    await tc.get("jsonWithCallback");
     expect(tc.response.body).toBe("/**/alert(JS)");
     expect(tc.response.mediaType).toBe("text/javascript");
   });
 
   it("xhr", async () => {
-    await tc.get("js_or_html", { xhr: true });
+    await tc.get("jsOrHtml", { xhr: true });
     expect(tc.response.body).toBe("JS");
   });
 
   it("custom constant", async () => {
-    await tc.get("custom_constant_handling", { params: { format: "mobile" } });
+    await tc.get("customConstantHandling", { params: { format: "mobile" } });
     expect(tc.response.mediaType).toBe("text/x-mobile");
     expect(tc.response.body).toBe("Mobile");
   });
 
   it("custom constant handling without block", async () => {
-    await tc.get("custom_constant_handling_without_block", { params: { format: "mobile" } });
+    await tc.get("customConstantHandlingWithoutBlock", { params: { format: "mobile" } });
     expect(tc.response.mediaType).toBe("text/x-mobile");
     expect(tc.response.body).toBe("Mobile");
   });
 
   it("forced format", async () => {
-    await tc.get("html_xml_or_rss");
+    await tc.get("htmlXmlOrRss");
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("html_xml_or_rss", { params: { format: "html" } });
+    await tc.get("htmlXmlOrRss", { params: { format: "html" } });
     expect(tc.response.body).toBe("HTML");
 
-    await tc.get("html_xml_or_rss", { params: { format: "xml" } });
+    await tc.get("htmlXmlOrRss", { params: { format: "xml" } });
     expect(tc.response.body).toBe("XML");
 
-    await tc.get("html_xml_or_rss", { params: { format: "rss" } });
+    await tc.get("htmlXmlOrRss", { params: { format: "rss" } });
     expect(tc.response.body).toBe("RSS");
   });
 
   it("internally forced format", async () => {
-    await tc.get("forced_xml");
+    await tc.get("forcedXml");
     expect(tc.response.body).toBe("XML");
 
-    await tc.get("forced_xml", { format: "html" });
+    await tc.get("forcedXml", { format: "html" });
     expect(tc.response.body).toBe("XML");
   });
 
   it("extension synonyms", async () => {
-    await tc.get("html_xml_or_rss", { params: { format: "xhtml" } });
+    await tc.get("htmlXmlOrRss", { params: { format: "xhtml" } });
     expect(tc.response.body).toBe("HTML");
   });
 
@@ -720,18 +720,18 @@ describe("RespondToControllerTest", () => {
       this.response.body = `${this.action} - ${rbInspect(this.formats)}`;
     };
 
-    await tc.get("using_defaults");
-    expect(tc.response.body).toBe(`using_defaults - ${rbInspect([":html"])}`);
+    await tc.get("usingDefaults");
+    expect(tc.response.body).toBe(`usingDefaults - ${rbInspect([":html"])}`);
 
-    await tc.get("using_defaults", { format: "xml" });
-    expect(tc.response.body).toBe(`using_defaults - ${rbInspect([":xml"])}`);
+    await tc.get("usingDefaults", { format: "xml" });
+    expect(tc.response.body).toBe(`usingDefaults - ${rbInspect([":xml"])}`);
   });
 
   it("format with custom response type", async () => {
-    await tc.get("iphone_with_html_response_type");
+    await tc.get("iphoneWithHtmlResponseType");
     expect(tc.response.body).toBe('<html><div id="html">Hello future from Firefox!</div></html>');
 
-    await tc.get("iphone_with_html_response_type", { format: "iphone" });
+    await tc.get("iphoneWithHtmlResponseType", { format: "iphone" });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe(
       '<html><div id="iphone">Hello iPhone future from iPhone!</div></html>',
@@ -740,7 +740,7 @@ describe("RespondToControllerTest", () => {
 
   it("format with custom response type and request headers", async () => {
     tc.request.accept = "text/iphone";
-    await tc.get("iphone_with_html_response_type");
+    await tc.get("iphoneWithHtmlResponseType");
     expect(tc.response.body).toBe(
       '<html><div id="iphone">Hello iPhone future from iPhone!</div></html>',
     );
@@ -748,42 +748,42 @@ describe("RespondToControllerTest", () => {
   });
 
   it("invalid format", async () => {
-    await expect(tc.get("using_defaults", { params: { format: "invalidformat" } })).rejects.toThrow(
+    await expect(tc.get("usingDefaults", { params: { format: "invalidformat" } })).rejects.toThrow(
       UnknownFormat,
     );
   });
 
   it("missing templates", async () => {
-    await tc.get("missing_templates", { format: "json" });
+    await tc.get("missingTemplates", { format: "json" });
     tc.assertResponse("no_content");
-    await tc.get("missing_templates", { format: "xml" });
+    await tc.get("missingTemplates", { format: "xml" });
     tc.assertResponse("no_content");
   });
 
   it("invalid variant", async () => {
     await expect(
-      tc.get("variant_with_implicit_template_rendering", { params: { v: "invalid" } }),
+      tc.get("variantWithImplicitTemplateRendering", { params: { v: "invalid" } }),
     ).rejects.toThrow(UnknownFormat);
   });
 
   it("variant not set regular unknown format", async () => {
-    await expect(tc.get("variant_with_implicit_template_rendering")).rejects.toThrow(UnknownFormat);
+    await expect(tc.get("variantWithImplicitTemplateRendering")).rejects.toThrow(UnknownFormat);
   });
 
   it("variant with implicit template rendering", async () => {
-    await tc.get("variant_with_implicit_template_rendering", { params: { v: "mobile" } });
+    await tc.get("variantWithImplicitTemplateRendering", { params: { v: "mobile" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("mobile");
   });
 
   it("variant without implicit rendering from browser", async () => {
     await expect(
-      tc.get("variant_without_implicit_template_rendering", { params: { v: "does_not_matter" } }),
+      tc.get("variantWithoutImplicitTemplateRendering", { params: { v: "does_not_matter" } }),
     ).rejects.toThrow(MissingExactTemplate);
   });
 
   it("variant variant not set and without implicit rendering from browser", async () => {
-    await expect(tc.get("variant_without_implicit_template_rendering")).rejects.toThrow(
+    await expect(tc.get("variantWithoutImplicitTemplateRendering")).rejects.toThrow(
       MissingExactTemplate,
     );
   });
@@ -793,7 +793,7 @@ describe("RespondToControllerTest", () => {
     const oldLogger = Base.logger;
     Base.logger = logger;
     try {
-      await tc.get("variant_without_implicit_template_rendering", {
+      await tc.get("variantWithoutImplicitTemplateRendering", {
         xhr: true,
         params: { v: "does_not_matter" },
       });
@@ -810,7 +810,7 @@ describe("RespondToControllerTest", () => {
     const oldLogger = Base.logger;
     Base.logger = logger;
     try {
-      await tc.get("variant_without_implicit_template_rendering", {
+      await tc.get("variantWithoutImplicitTemplateRendering", {
         format: "json",
         params: { v: "does_not_matter" },
       });
@@ -827,7 +827,7 @@ describe("RespondToControllerTest", () => {
     const oldLogger = Base.logger;
     Base.logger = logger;
     try {
-      await tc.get("variant_without_implicit_template_rendering", { xhr: true });
+      await tc.get("variantWithoutImplicitTemplateRendering", { xhr: true });
       tc.assertResponse("no_content");
 
       expect(logger.logged("info").filter((s) => s === NO_CONTENT_WARNING).length).toBe(1);
@@ -837,137 +837,137 @@ describe("RespondToControllerTest", () => {
   });
 
   it("variant with format and custom render", async () => {
-    await tc.get("variant_with_format_and_custom_render", { params: { v: "phone" } });
+    await tc.get("variantWithFormatAndCustomRender", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("mobile");
   });
 
   it("multiple variants for format", async () => {
-    await tc.get("multiple_variants_for_format", { params: { v: "tablet" } });
+    await tc.get("multipleVariantsForFormat", { params: { v: "tablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("tablet");
   });
 
   it("no variant in variant setup", async () => {
-    await tc.get("variant_plus_none_for_format");
+    await tc.get("variantPlusNoneForFormat");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("none");
   });
 
   it("variant inline syntax", async () => {
-    await tc.get("variant_inline_syntax");
+    await tc.get("variantInlineSyntax");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("none");
 
-    await tc.get("variant_inline_syntax", { params: { v: "phone" } });
+    await tc.get("variantInlineSyntax", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
   });
 
   it("variant inline syntax with format", async () => {
-    await tc.get("variant_inline_syntax", { format: "js" });
+    await tc.get("variantInlineSyntax", { format: "js" });
     expect(tc.response.mediaType).toBe("text/javascript");
     expect(tc.response.body).toBe("js");
   });
 
   it("variant inline syntax without block", async () => {
-    await tc.get("variant_inline_syntax_without_block", { params: { v: "phone" } });
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
   });
 
   it("variant any", async () => {
-    await tc.get("variant_any", { params: { v: "phone" } });
+    await tc.get("variantAny", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
 
-    await tc.get("variant_any", { params: { v: "tablet" } });
+    await tc.get("variantAny", { params: { v: "tablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
 
-    await tc.get("variant_any", { params: { v: "phablet" } });
+    await tc.get("variantAny", { params: { v: "phablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
   });
 
   it("variant any any", async () => {
-    await tc.get("variant_any_any");
+    await tc.get("variantAnyAny");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
 
-    await tc.get("variant_any_any", { params: { v: "phone" } });
+    await tc.get("variantAnyAny", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
 
-    await tc.get("variant_any_any", { params: { v: "yolo" } });
+    await tc.get("variantAnyAny", { params: { v: "yolo" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
   });
 
   it("variant inline any", async () => {
-    await tc.get("variant_any", { params: { v: "phone" } });
+    await tc.get("variantAny", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
 
-    await tc.get("variant_inline_any", { params: { v: "tablet" } });
+    await tc.get("variantInlineAny", { params: { v: "tablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
 
-    await tc.get("variant_inline_any", { params: { v: "phablet" } });
+    await tc.get("variantInlineAny", { params: { v: "phablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
   });
 
   it("variant inline any any", async () => {
-    await tc.get("variant_inline_any_any", { params: { v: "phone" } });
+    await tc.get("variantInlineAnyAny", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
 
-    await tc.get("variant_inline_any_any", { params: { v: "yolo" } });
+    await tc.get("variantInlineAnyAny", { params: { v: "yolo" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("any");
   });
 
   it("variant any implicit render", async () => {
-    await tc.get("variant_any_implicit_render", { params: { v: "tablet" } });
+    await tc.get("variantAnyImplicitRender", { params: { v: "tablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("tablet");
 
-    await tc.get("variant_any_implicit_render", { params: { v: "phablet" } });
+    await tc.get("variantAnyImplicitRender", { params: { v: "phablet" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phablet");
   });
 
   it("variant any with none", async () => {
-    await tc.get("variant_any_with_none");
+    await tc.get("variantAnyWithNone");
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("none or phone");
 
-    await tc.get("variant_any_with_none", { params: { v: "phone" } });
+    await tc.get("variantAnyWithNone", { params: { v: "phone" } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("none or phone");
   });
 
   it("format any variant any", async () => {
-    await tc.get("format_any_variant_any", { format: "js", params: { v: "tablet" } });
+    await tc.get("formatAnyVariantAny", { format: "js", params: { v: "tablet" } });
     expect(tc.response.mediaType).toBe("text/javascript");
     expect(tc.response.body).toBe("tablet");
   });
 
   it("variant negotiation inline syntax", async () => {
-    await tc.get("variant_inline_syntax_without_block", { params: { v: ["tablet", "phone"] } });
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: ["tablet", "phone"] } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
   });
 
   it("variant negotiation block syntax", async () => {
-    await tc.get("variant_plus_none_for_format", { params: { v: ["tablet", "phone"] } });
+    await tc.get("variantPlusNoneForFormat", { params: { v: ["tablet", "phone"] } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
   });
 
   it("variant negotiation without block", async () => {
-    await tc.get("variant_inline_syntax_without_block", { params: { v: ["tablet", "phone"] } });
+    await tc.get("variantInlineSyntaxWithoutBlock", { params: { v: ["tablet", "phone"] } });
     expect(tc.response.mediaType).toBe("text/html");
     expect(tc.response.body).toBe("phone");
   });

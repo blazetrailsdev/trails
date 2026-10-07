@@ -242,4 +242,14 @@ describe("AbstractController::Translation — trails-only", () => {
     const host = makeHost("admin/users", "show");
     expect(translate.call(host, ".foo")).toBe("admin users show foo");
   });
+
+  it("scopes a lazy lookup by the underscored form of a camelCase action", () => {
+    I18n.backend().storeTranslations("en", {
+      abstract_controller: { testing: { translation: { recent_posts: { title: "Recent" } } } },
+    });
+    const controller = new TranslationController();
+    controller.actionName = "recentPosts";
+
+    expect(controller.translate(".title")).toBe("Recent");
+  });
 });

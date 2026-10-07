@@ -27,7 +27,7 @@ class RateLimitedController extends Base {
       with(this: RateLimitedController) {
         this.head("forbidden");
       },
-      only: "limited_with",
+      only: "limitedWith",
     });
   }
 
@@ -88,19 +88,19 @@ describe("RateLimitingTest", () => {
   });
 
   it("limit by", async () => {
-    await tc.get("limited_with");
-    await tc.get("limited_with");
-    await tc.get("limited_with");
+    await tc.get("limitedWith");
+    await tc.get("limitedWith");
+    await tc.get("limitedWith");
     assertResponse("forbidden");
 
-    await tc.get("limited_with", { params: { rate_limit_key: "other" } });
+    await tc.get("limitedWith", { params: { rate_limit_key: "other" } });
     assertResponse("ok");
   });
 
   it("limited with", async () => {
-    await tc.get("limited_with");
-    await tc.get("limited_with");
-    await tc.get("limited_with");
+    await tc.get("limitedWith");
+    await tc.get("limitedWith");
+    await tc.get("limitedWith");
     assertResponse("forbidden");
   });
 });

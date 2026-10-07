@@ -54,33 +54,33 @@ describe("ParameterEncodingTest", () => {
   });
 
   it("properly transcodes undeclared parameters into UTF-8 encodings", async () => {
-    await tc.post("test_undeclared_parameter", { params: { foo: "foo" } });
+    await tc.post("testUndeclaredParameter", { params: { foo: "foo" } });
 
     assertResponse("success");
     expect(tc.response.body).toBe("UTF-8");
   });
 
   it("properly transcodes parameters of the action specified by skip_parameter_encoding to ASCII_8BIT", async () => {
-    await tc.post("test_skip_parameter_encoding", { params: { bar: "bar" } });
+    await tc.post("testSkipParameterEncoding", { params: { bar: "bar" } });
 
     assertResponse("success");
   });
 
   it("properly transcodes declared parameters into specified encodings", async () => {
-    await tc.post("test_param_encoding", { params: { baz: "baz", qux: "qux" } });
+    await tc.post("testParamEncoding", { params: { baz: "baz", qux: "qux" } });
 
     assertResponse("success");
     expect(JSON.parse(tc.response.body)["qux"]).toBe("UTF-8");
   });
 
   it("properly encodes all ASCII_8BIT parameters into binary", async () => {
-    await tc.post("test_all_values_encoding", { params: { foo: "foo", bar: "bar", baz: "baz" } });
+    await tc.post("testAllValuesEncoding", { params: { foo: "foo", bar: "bar", baz: "baz" } });
 
     assertResponse("success");
   });
 
   it("does not raise an error when passed a param declared as ASCII-8BIT that contains invalid bytes", async () => {
-    await tc.get("test_skip_parameter_encoding", {
+    await tc.get("testSkipParameterEncoding", {
       params: { bar: RFC2396_PARSER.escape(b("bar\xE2baz")) },
     });
 

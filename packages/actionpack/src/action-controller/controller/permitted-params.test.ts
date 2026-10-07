@@ -35,7 +35,7 @@ describe("ActionControllerPermittedParamsTest", () => {
   });
 
   it("parameters can be permitted and are then not forbidden", async () => {
-    await tc.post("create_with_permit", { params: { person: { name: "Mjallo!" } } });
+    await tc.post("createWithPermit", { params: { person: { name: "Mjallo!" } } });
     expect(tc.response.body).toBe("permitted");
   });
 });
