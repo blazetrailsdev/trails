@@ -763,6 +763,19 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  * (`abstract_controller/base.rb`), so it has no `super` site to hook and a
  * mixin included there is seated by whichever subclass root does.
  *
+ * A class module's generator `initialize`, included into a class that has a
+ * superclass, is instead spliced between that class and its superclass, where
+ * `rb_include_module` puts the module: a `super(...)` call, and the implicit
+ * one of a class that declares no constructor, resolves its target through the
+ * class's prototype when it runs. So `ActiveRecord::Type::Internal::Timezone#initialize`
+ * (activerecord/lib/active_record/type/internal/timezone.rb:7-10) wraps its
+ * includer's construction. The value the generator yields is the argument list
+ * of an explicit `super(...)`, and a bare `yield` forwards the arguments it was
+ * called with. `this` is the instance once the superclass constructor has
+ * returned, and unreadable before it, which is why a `Module`'s `initialize`
+ * that writes to `self` ahead of `super` (thor/actions.rb:72-85) stays on the
+ * root's `super` site.
+ *
  * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
  * lifecycle name, and a string-named TS method spelled that way is drift.
  *
@@ -871,16 +884,6 @@ function trackInstanceInitializer(
   list!.push(initializer);
 }
 
-/**
- * Splice a class module's generator `initialize` between `klass` and its
- * superclass, where `rb_include_module` (vendor/ruby/v3.3.11/class.c:1179)
- * puts the module: a `super(...)` in `klass`'s constructor, or the implicit
- * one of a class that declares none, resolves its target through `klass`'s
- * prototype when it runs, so the link constructs in between. The value the
- * generator yields is the argument list of an explicit `super(...)`; a bare
- * `yield` forwards the arguments it was called with. `this` is the instance
- * once the superclass constructor has returned, and unreadable before it.
- */
 function spliceInstanceInitializer(
   klass: AnyClass,
   mod: object,
