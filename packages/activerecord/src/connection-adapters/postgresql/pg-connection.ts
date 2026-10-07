@@ -15,9 +15,6 @@ type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>
 const PREPARED = new WeakMap<object, Map<string, string>>();
 
 function prepare(this: pg.Client, stmtName: string, sql: string): Promise<void> {
-  let prepared = PREPARED.get(this);
-  if (!prepared) PREPARED.set(this, (prepared = new Map()));
-  prepared.set(stmtName, sql);
   return new Promise((resolve, reject) => {
     const submittable = {
       name: stmtName,
@@ -28,7 +25,12 @@ function prepare(this: pg.Client, stmtName: string, sql: string): Promise<void> 
         return null;
       },
       handleError: reject,
-      handleReadyForQuery: () => resolve(),
+      handleReadyForQuery: () => {
+        let prepared = PREPARED.get(this);
+        if (!prepared) PREPARED.set(this, (prepared = new Map()));
+        prepared.set(stmtName, sql);
+        resolve();
+      },
     };
     (this.query as unknown as (s: object) => unknown)(submittable);
   });

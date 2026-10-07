@@ -15,6 +15,9 @@ const OID_TIMESTAMP_ARRAY = 1115;
 const OID_TIMESTAMPTZ_ARRAY = 1185;
 const OID_TIMETZ_ARRAY = 1270;
 
+const OID_BYTEA = 17;
+const OID_BYTEA_ARRAY = 1001;
+
 const OID_INT8 = 20;
 const OID_CIRCLE = 718;
 
@@ -36,6 +39,8 @@ const CONNECTION_PARSERS: ReadonlyMap<number, PgParser> = new Map<number, PgPars
   [OID_TIMESTAMP, (v) => timeFromInstant(parsePostgresTimestampAsInstant(v as string))],
   [OID_DATE, (v) => parsePostgresDate(v as string)],
   [OID_INT8, parseInt8],
+  [OID_BYTEA, passthrough],
+  [OID_BYTEA_ARRAY, passthrough],
   [OID_CIRCLE, passthrough],
   [OID_DATE_ARRAY, passthrough],
   [OID_TIME_ARRAY, passthrough],

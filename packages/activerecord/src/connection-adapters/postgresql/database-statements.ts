@@ -73,6 +73,22 @@ interface ExecuteHost extends PerformQueryHost {
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): Promise<unknown>;
 }
 
+/** @internal */
+interface QueryHost {
+  internalExecute(sql: string, name?: string | null): Promise<unknown>;
+  /** @internal */
+  _typeMapForResults: Map<number, (value: string) => unknown>;
+}
+
+export async function query(
+  this: QueryHost,
+  sql: string,
+  name: string | null = null,
+): Promise<unknown[][]> {
+  const result = (await this.internalExecute(sql, name)) as PGResult;
+  return result.mapTypesBang(this._typeMapForResults).values();
+}
+
 export function isWriteQuery(sql: string | null): boolean {
   try {
     return !READ_QUERY.test(sql as string);

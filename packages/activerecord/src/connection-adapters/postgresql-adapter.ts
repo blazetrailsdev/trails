@@ -38,6 +38,7 @@ import {
   quoteDefaultExpression as pgQuoteDefaultExpression,
   type DefaultExpressionColumn,
   quotedBinary as pgQuotedBinary,
+  unescapeBytea as quotingUnescapeBytea,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
   lookupCastType as pgLookupCastType,
@@ -57,7 +58,11 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { pgConnection, type PGConnection } from "./postgresql/pg-connection.js";
+import {
+  pgConnection,
+  unescapeBytea as pgUnescapeBytea,
+  type PGConnection,
+} from "./postgresql/pg-connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -156,6 +161,7 @@ import {
   performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
   explain as pgExplain,
+  query as pgQuery,
   isWriteQuery as pgIsWriteQuery,
   execute as pgExecute,
   execInsert as pgExecInsert,
@@ -412,6 +418,8 @@ export class PostgreSQLAdapter
 
   private _pgClientOptions: pg.ClientConfig | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
+  /** @internal */
+  _typeMapForResults = new Map<number, (value: string) => unknown>([[17, pgUnescapeBytea]]);
 
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();
@@ -1864,6 +1872,8 @@ export interface PostgreSQLAdapter {
 
   isWriteQuery(sql: string | null): boolean;
 
+  unescapeBytea: typeof quotingUnescapeBytea;
+
   execute(
     sql: string | null,
     name?: string | null,
@@ -2308,6 +2318,8 @@ function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
+(PostgreSQLAdapter.prototype as any).query = pgQuery;
+PostgreSQLAdapter.prototype.unescapeBytea = quotingUnescapeBytea;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
 PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;
