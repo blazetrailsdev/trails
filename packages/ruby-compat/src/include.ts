@@ -38,6 +38,7 @@ import {
   rbAnyToS,
   rbCBasicObject,
   rbCClass,
+  rbClassSuperclass,
   rbCDate,
   rbCNumeric,
   rbObjClass,
@@ -870,6 +871,52 @@ function trackInstanceInitializer(
   list!.push(initializer);
 }
 
+/**
+ * Splice a class module's generator `initialize` between `klass` and its
+ * superclass, where `rb_include_module` (vendor/ruby/v3.3.11/class.c:1179)
+ * puts the module: a `super(...)` in `klass`'s constructor, or the implicit
+ * one of a class that declares none, resolves its target through `klass`'s
+ * prototype when it runs, so the link constructs in between. The value the
+ * generator yields is the argument list of an explicit `super(...)`; a bare
+ * `yield` forwards the arguments it was called with. `this` is the instance
+ * once the superclass constructor has returned, and unreadable before it.
+ */
+function spliceInstanceInitializer(
+  klass: AnyClass,
+  mod: object,
+  initializer: (this: object, ...args: never[]) => void | Generator,
+): void {
+  const superclass = Object.getPrototypeOf(klass) as new (...args: unknown[]) => object;
+  const link = class extends superclass {
+    constructor(...args: unknown[]) {
+      const allocated: { instance?: object } = {};
+      const body = initializer.call(
+        new Proxy(Object.create(null) as object, {
+          get: (_target, key) => Reflect.get(allocated.instance!, key),
+          set: (_target, key, value) => Reflect.set(allocated.instance!, key, value),
+          has: (_target, key) => Reflect.has(allocated.instance!, key),
+          getPrototypeOf: () => Reflect.getPrototypeOf(allocated.instance!),
+        }),
+        ...(args as never[]),
+      ) as Generator<unknown[] | undefined>;
+      const zsuper = body.next();
+      try {
+        super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
+      } catch (error) {
+        body.return(undefined);
+        throw error;
+      }
+      allocated.instance = this;
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
+    }
+  };
+  Object.defineProperty(link, T_ICLASS, { value: mod });
+  Object.setPrototypeOf(klass, link);
+}
+
 const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
@@ -1209,6 +1256,12 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
+/** @noRailsEquivalent PERMANENT */
+export type Initialized<K extends abstract new (...args: never[]) => object, M> = (new (
+  ...args: M extends { [initialize]: (...args: infer A) => unknown } ? A : never
+) => InstanceType<K>) &
+  Pick<K, keyof K>;
+
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
@@ -1260,7 +1313,15 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
-    trackInstanceInitializer(klass.prototype, instanceInitializer);
+    if (
+      typeof mod === "function" &&
+      Object.getPrototypeOf(instanceInitializer) === GeneratorFunction &&
+      rbClassSuperclass(klass) !== null
+    ) {
+      spliceInstanceInitializer(klass, mod, instanceInitializer);
+    } else {
+      trackInstanceInitializer(klass.prototype, instanceInitializer);
+    }
   }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);

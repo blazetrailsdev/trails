@@ -3,7 +3,14 @@ import * as EnsureNamespace from "./ensure.js";
 import { NameError } from "./name-error.js";
 import { rbModConstGet, registerConstant, unregisterConstant } from "./variable.js";
 import { Hash } from "./hash.js";
-import { rbCBasicObject, rbObjClass, rbModName, rbModToS, rbObjSingletonClass } from "./object.js";
+import {
+  rbCBasicObject,
+  rbClassSuperclass,
+  rbObjClass,
+  rbModName,
+  rbModToS,
+  rbObjSingletonClass,
+} from "./object.js";
 import {
   include,
   rbModConstDefined,
@@ -25,6 +32,7 @@ import {
   publicInstanceMethods,
   type ModuleVisibility,
   type Included,
+  type Initialized,
   type Extended,
 } from "./include.js";
 
@@ -100,6 +108,82 @@ describe("initializeIncludedModules", () => {
     include(Root, Twice);
 
     expect(() => new Root()).toThrow(/yields once/);
+  });
+
+  it("wraps the includer's construction in a class module's generator initializer", () => {
+    const calls: string[] = [];
+    class Root {
+      seen: unknown;
+      constructor(kwargs: Record<string, unknown> = {}) {
+        initializeIncludedModules(this);
+        this.seen = kwargs;
+        calls.push("root");
+      }
+    }
+    class Zoned {
+      declare zone?: string;
+      static *[initialize](
+        this: Zoned,
+        { zone, ...kwargs }: { zone?: string; limit?: number } = {},
+      ): Generator<[typeof kwargs]> {
+        yield [kwargs];
+        calls.push("zoned");
+        this.zone = zone;
+      }
+    }
+    class Sub extends (Root as Initialized<typeof Root, typeof Zoned>) {}
+    include(Sub, Zoned);
+
+    const sub = new Sub({ zone: "utc", limit: 3 });
+    expect(calls).toEqual(["root", "zoned"]);
+    expect(sub.seen).toEqual({ limit: 3 });
+    expect((sub as unknown as Zoned).zone).toBe("utc");
+    expect(sub).toBeInstanceOf(Root);
+    expect(rbClassSuperclass(Sub)).toBe(Root);
+    expect(Object.getPrototypeOf(new (class extends Sub {})())).toBeInstanceOf(Sub);
+  });
+
+  it("forwards its own arguments when a spliced generator initializer yields none", () => {
+    class Root {
+      constructor(public a?: number) {}
+    }
+    class Bare {
+      declare after?: boolean;
+      static *[initialize](this: Bare): Generator {
+        yield;
+        this.after = true;
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, Bare);
+
+    const sub = new Sub(4);
+    expect(sub.a).toBe(4);
+    expect((sub as unknown as Bare).after).toBe(true);
+  });
+
+  it("closes a spliced generator initializer when the superclass constructor raises", () => {
+    const calls: string[] = [];
+    class Root {
+      constructor() {
+        throw new TypeError("root");
+      }
+    }
+    class Ensured {
+      static *[initialize](): Generator {
+        try {
+          yield;
+          calls.push("after");
+        } finally {
+          calls.push("ensure");
+        }
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, Ensured);
+
+    expect(() => new Sub()).toThrow(TypeError);
+    expect(calls).toEqual(["ensure"]);
   });
 
   it("seats a module's per-instance state as an own property at construction", () => {

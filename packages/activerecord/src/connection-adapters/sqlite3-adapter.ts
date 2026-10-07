@@ -39,7 +39,8 @@ import { type TableDefinition as SQLite3TableDefinition } from "./sqlite3/schema
 import {
   dataSourceSql as sqliteDataSourceSql,
   indexes as sqliteIndexes,
-  newColumnFromField,
+  newColumnFromField as sqliteNewColumnFromField,
+  createSchemaDumper as sqliteCreateSchemaDumper,
   validTableDefinitionOptions as sqliteValidTableDefinitionOptions,
   validateIndexLengthBang as sqliteValidateIndexLengthBang,
   addForeignKey as sqliteAddForeignKey,
@@ -114,12 +115,9 @@ import {
   type AddForeignKeyOptions,
   type ColumnType,
   type ColumnOptions,
-  type RemoveForeignKeyOptions,
   type IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import { Column } from "./column.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { SchemaDumper as Sqlite3SchemaDumper } from "./sqlite3/schema-dumper.js";
 import { databaseCli } from "../active-record.js";
 
 function isStructuredDefault(value: unknown): boolean {
@@ -1133,11 +1131,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return this._strict;
   }
 
-  /** @internal */
-  affectedRows(result?: unknown): number {
-    return sqliteAffectedRows.call(this, result);
-  }
-
   async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {
     const stmt = await rawConnection.prepare(sql);
     this._maybeEnableReadBigInts(sql, stmt);
@@ -1183,21 +1176,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     }
   }
 
-  override quote(value: unknown): string {
-    return sqliteQuote.call(this, value);
-  }
-
   private static readonly FK_REGEX =
     /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
   private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
-
-  quotedTime(value: Parameters<typeof sqliteQuotedTime>[0]): string {
-    return sqliteQuotedTime.call(this, value);
-  }
-
-  override typeCast(value: unknown): unknown {
-    return sqliteTypeCast.call(this, value);
-  }
 
   override quoteString(s: string): string {
     return sqliteQuoteString(s);
@@ -1247,20 +1228,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   }
 
   /** @internal */
-  override async executeBatch(
-    statements: string[],
-    name?: string | null,
-    kwargs?: { allowRetry?: boolean; materializeTransactions?: boolean },
-  ): Promise<void> {
-    return sqliteExecuteBatch.call(this, statements, name, kwargs);
-  }
-
-  /** @internal */
-  override buildTruncateStatement(tableName: string): string {
-    return sqliteBuildTruncateStatement.call(this, tableName);
-  }
-
-  /** @internal */
   castResult(result: Result): Result {
     return sqliteCastResult(result);
   }
@@ -1274,14 +1241,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   private static readonly UNQUOTED_OPEN_PARENS_REGEX = /\((?![^'"]*['"][^'"]*$)/;
   private static readonly FINAL_CLOSE_PARENS_REGEX = /\);*$/;
 
-  createSchemaDumper(options: Record<string, unknown>): Sqlite3SchemaDumper {
-    return Sqlite3SchemaDumper.create(this, options);
-  }
-
-  async virtualTableExists(tableName: string): Promise<boolean> {
-    return sqliteVirtualTableExists.call(this, tableName);
-  }
-
   private quoteDefault(value: unknown): string {
     if (value === null) return "NULL";
     if (typeof value === "string") return `'${sqliteQuoteString(value)}'`;
@@ -1294,85 +1253,8 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return `'${sqliteQuoteString(String(value))}'`;
   }
 
-  /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    return sqliteDataSourceSql.call(this, name ?? undefined, { type: opts.type });
-  }
-
-  /** @internal */
-  private newColumnFromField(
-    tableName: string,
-    field: Record<string, unknown>,
-    definitions: Record<string, unknown>[],
-  ): Column {
-    return newColumnFromField(this, tableName, field, definitions);
-  }
-
   async indexes(tableName: string): Promise<IndexDefinition[]> {
     return sqliteIndexes(this, tableName);
-  }
-
-  /** @internal */
-  validTableDefinitionOptions(): string[] {
-    return sqliteValidTableDefinitionOptions.call(this);
-  }
-
-  /** @internal */
-  override validateIndexLengthBang(tableName: string, newName: string, internal = false): void {
-    sqliteValidateIndexLengthBang.call(this, tableName, newName, internal);
-  }
-
-  async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
-    return sqliteCheckConstraints.call(this, tableName);
-  }
-
-  async addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options: AddForeignKeyOptions = {},
-  ): Promise<void> {
-    return sqliteAddForeignKey.call(this, fromTable, toTable, options);
-  }
-
-  async removeForeignKey(
-    fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
-    options: RemoveForeignKeyOptions = {},
-  ): Promise<void> {
-    return sqliteRemoveForeignKey.call(this, fromTable, toTable, options);
-  }
-
-  async addCheckConstraint(
-    tableName: string,
-    expression: string,
-    options: { name?: string; validate?: boolean } = {},
-  ): Promise<void> {
-    return sqliteAddCheckConstraint.call(this, tableName, expression, options);
-  }
-
-  async removeCheckConstraint(
-    tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options: {
-      name?: string;
-      expression?: string;
-      validate?: boolean;
-      ifExists?: boolean;
-    } = {},
-  ): Promise<void> {
-    return sqliteRemoveCheckConstraint.call(this, tableName, expression, options);
   }
 
   /** @internal */
@@ -1486,6 +1368,23 @@ SQLite3Adapter.prototype.isWriteQuery = sqliteIsWriteQuery;
 
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
 SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
+SQLite3Adapter.prototype.affectedRows = sqliteAffectedRows;
+SQLite3Adapter.prototype.executeBatch = sqliteExecuteBatch;
+SQLite3Adapter.prototype.buildTruncateStatement = sqliteBuildTruncateStatement;
+SQLite3Adapter.prototype.quote = sqliteQuote;
+SQLite3Adapter.prototype.quotedTime = sqliteQuotedTime;
+SQLite3Adapter.prototype.typeCast = sqliteTypeCast;
+SQLite3Adapter.prototype.createSchemaDumper = sqliteCreateSchemaDumper;
+SQLite3Adapter.prototype.virtualTableExists = sqliteVirtualTableExists;
+SQLite3Adapter.prototype.dataSourceSql = sqliteDataSourceSql;
+SQLite3Adapter.prototype.newColumnFromField = sqliteNewColumnFromField;
+SQLite3Adapter.prototype.validTableDefinitionOptions = sqliteValidTableDefinitionOptions;
+SQLite3Adapter.prototype.validateIndexLengthBang = sqliteValidateIndexLengthBang;
+SQLite3Adapter.prototype.checkConstraints = sqliteCheckConstraints;
+SQLite3Adapter.prototype.addForeignKey = sqliteAddForeignKey;
+SQLite3Adapter.prototype.removeForeignKey = sqliteRemoveForeignKey;
+SQLite3Adapter.prototype.addCheckConstraint = sqliteAddCheckConstraint;
+SQLite3Adapter.prototype.removeCheckConstraint = sqliteRemoveCheckConstraint;
 
 /* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
@@ -1504,6 +1403,30 @@ export interface SQLite3Adapter {
   defaultInsertValue: typeof sqliteDefaultInsertValue;
   explain: typeof sqliteExplain;
   isWriteQuery: typeof sqliteIsWriteQuery;
+  /** @internal */
+  affectedRows: typeof sqliteAffectedRows;
+  /** @internal */
+  executeBatch: typeof sqliteExecuteBatch;
+  /** @internal */
+  buildTruncateStatement: typeof sqliteBuildTruncateStatement;
+  quote: typeof sqliteQuote;
+  quotedTime: typeof sqliteQuotedTime;
+  typeCast: typeof sqliteTypeCast;
+  createSchemaDumper: typeof sqliteCreateSchemaDumper;
+  virtualTableExists: typeof sqliteVirtualTableExists;
+  /** @internal */
+  dataSourceSql: typeof sqliteDataSourceSql;
+  /** @internal */
+  newColumnFromField: typeof sqliteNewColumnFromField;
+  /** @internal */
+  validTableDefinitionOptions: typeof sqliteValidTableDefinitionOptions;
+  /** @internal */
+  validateIndexLengthBang: typeof sqliteValidateIndexLengthBang;
+  checkConstraints: typeof sqliteCheckConstraints;
+  addForeignKey: typeof sqliteAddForeignKey;
+  removeForeignKey: typeof sqliteRemoveForeignKey;
+  addCheckConstraint: typeof sqliteAddCheckConstraint;
+  removeCheckConstraint: typeof sqliteRemoveCheckConstraint;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 

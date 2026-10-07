@@ -85,10 +85,11 @@ export function helpers(this: {
 export const Helpers = new Module((mod) => {
   extend(mod, Concern);
 
+  include(mod, AbstractHelpers);
+
   (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
     null,
     function (this: object) {
-      include(this as HelpersClass, AbstractHelpers);
       classAttribute.call(this, "helpersPath", { default: [] });
       classAttribute.call(this, "includeAllHelpers", { default: true });
     },

@@ -103,7 +103,7 @@ describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, a
         "INSERT INTO widgets (name) VALUES ('cog') RETURNING id, name",
       );
       expect(rows).toEqual([{ id: 1, name: "cog" }]);
-      expect(adapter.affectedRows()).toBe(1);
+      expect(adapter.affectedRows(null)).toBe(1);
     } finally {
       await adapter.execute('DROP TABLE IF EXISTS "widgets"');
       await adapter.disconnectBang();

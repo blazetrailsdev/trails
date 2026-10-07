@@ -127,17 +127,8 @@ import {
   currentContentSecurityPolicy,
   isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
-import {
-  Helpers as AbstractHelpers,
-  type Resolution,
-  type HelpersClass,
-} from "../abstract-controller/helpers.js";
-import {
-  ClassMethods as HelpersClassMethods,
-  helpers,
-  type helperAttr,
-  type modulesForHelpers,
-} from "./metal/helpers.js";
+import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
+import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
 import { defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
@@ -705,11 +696,7 @@ export class Base extends Metal {
 
 include(Base, AbstractControllerRendering);
 include(Base, AssetPaths);
-include(Base, AbstractHelpers);
-extend(Base, HelpersClassMethods);
-classAttribute.call(Base, "helpersPath", { default: [] });
-classAttribute.call(Base, "includeAllHelpers", { default: true });
-Base.prototype.helpers = helpers;
+include(Base, Helpers);
 include(Base, UrlFor);
 Base.prototype.urlOptions = urlOptions;
 include(Base, Redirecting);
