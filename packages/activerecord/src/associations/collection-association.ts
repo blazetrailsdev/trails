@@ -83,11 +83,14 @@ export abstract class CollectionAssociation extends Association {
 
   async idsReader(): Promise<unknown[]> {
     if (this.isLoaded()) {
-      return pluck<any, any>(this.target, ...kernelArray(this.reflection.associationPrimaryKey()));
+      return pluck(
+        this.target,
+        ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
+      );
     } else if (!isEmpty(this.target)) {
-      return pluck<any, any>(
+      return pluck(
         await this.loadTarget(),
-        ...kernelArray(this.reflection.associationPrimaryKey()),
+        ...(kernelArray(this.reflection.associationPrimaryKey()) as (keyof Base)[]),
       );
     } else {
       return (this._associationIds ??= await this.scope().pluck(

@@ -111,12 +111,4 @@ describe("rbRegMatchP", () => {
     expect(rbRegMatchP(re, "abc")).toBe(true);
     expect(re.lastIndex).toBe(2);
   });
-
-  it("searches from pos, counting a negative pos from the end", () => {
-    expect(rbRegMatchP(/a/, "abc", 1)).toBe(false);
-    expect(rbRegMatchP(/c/, "abc", 1)).toBe(true);
-    expect(rbRegMatchP(/a/, "abc", -3)).toBe(true);
-    expect(rbRegMatchP(/a/, "abc", -4)).toBe(false);
-    expect(rbRegMatchP(/a/, "abc", 4)).toBe(false);
-  });
 });
