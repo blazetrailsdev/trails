@@ -19,12 +19,5 @@
     "rubyName": "send_early_hints",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "xml_http_request?",
-    "call": "match?",
-    "reason": "Verified per-site (RFC 0106): `/XMLHttpRequest/i.match?(get_header(\"HTTP_X_REQUESTED_WITH\"))` (request.rb:301) is spelled as a case-insensitive equality on the header value; a `Regexp#match?` against a literal-only pattern has no separate JS call form the gate credits."
   }
 ]

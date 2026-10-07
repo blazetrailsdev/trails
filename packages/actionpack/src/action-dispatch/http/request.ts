@@ -1,5 +1,5 @@
 import { camelize, NameError, presence, toSentence, underscore } from "@blazetrails/activesupport";
-import { rbStrDump, toI } from "@blazetrails/ruby-compat";
+import { rbRegMatchP, rbStrDump, toI } from "@blazetrails/ruby-compat";
 import type { RackBody, RackEnv, RackResponse } from "@blazetrails/rack";
 import {
   parseNestedQuery,
@@ -407,7 +407,10 @@ export class Request {
   }
 
   get isXmlHttpRequest(): boolean {
-    return (this.getHeader("HTTP_X_REQUESTED_WITH") as string)?.toLowerCase() === "xmlhttprequest";
+    return rbRegMatchP(
+      /XMLHttpRequest/i,
+      this.getHeader("HTTP_X_REQUESTED_WITH") as string | null | undefined,
+    );
   }
 
   get xhr(): boolean {
