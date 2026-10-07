@@ -1,4 +1,10 @@
-import { classAttribute, humanize, deepDup, isPlainObject } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  humanize,
+  deepDup,
+  isPlainObject,
+  underscore,
+} from "@blazetrails/activesupport";
 import {
   except,
   isSymbol,
@@ -127,7 +133,9 @@ export class Error {
     defaults.push(":errors.format");
     defaults.push("%{attribute} %{message}");
 
-    let attrName: string = humanize(attribute.replace(/\.base$/, "").replace(/\./g, "_"));
+    let attrName: string = humanize(
+      underscore(attribute.replace(/\.base$/, "").replace(/\./g, "_")),
+    );
     attrName = baseClass.humanAttributeName(attribute, {
       default: attrName,
       base,

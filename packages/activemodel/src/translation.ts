@@ -1,4 +1,4 @@
-import { humanize, isPresent } from "@blazetrails/activesupport";
+import { humanize, isPresent, underscore } from "@blazetrails/activesupport";
 import type { TranslateKey } from "@blazetrails/i18n";
 import { I18n } from "./i18n.js";
 import { Naming, type ModelName } from "./naming.js";
@@ -103,7 +103,7 @@ export function humanAttributeName(
     default: defaults,
   });
   if (translation === MISSING_TRANSLATION) {
-    translation = isPresent(attribute) ? humanize(attribute) : humanize(namespace);
+    translation = isPresent(attribute) ? humanize(underscore(attribute)) : humanize(namespace);
   }
   return translation as string;
 }

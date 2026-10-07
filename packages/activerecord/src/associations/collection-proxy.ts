@@ -134,7 +134,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE association-symbol-iterators-come-from-ruby-compat-enumerable */
+  /** @noRailsEquivalent CONVERGEABLE relation-includes-enumerable-over-an-async-each */
   [Symbol.iterator](): IterableIterator<T> {
     return this.target[Symbol.iterator]();
   }

@@ -9,9 +9,6 @@ import { LengthValidator } from "./validations/length.js";
 import { NumericalityValidator } from "./validations/numericality.js";
 import { PresenceValidator } from "./validations/presence.js";
 import { UniquenessValidator, validatesUniquenessOf } from "./validations/uniqueness.js";
-import { associationInstanceGet } from "./associations.js";
-import type { Association } from "./associations/association.js";
-import type { Base } from "./base.js";
 
 export {
   AbsenceValidator,
@@ -114,24 +111,6 @@ export async function performValidations(
   options: { validate?: boolean; context?: string } = {},
 ): Promise<boolean> {
   return options.validate === false || (await this.isValid(options.context));
-}
-
-/** @noRailsEquivalent CONVERGEABLE ar-read-attribute-for-validation-is-not-send */
-export function readAttributeForValidation(this: ValidationsHost, attribute: string): unknown {
-  if (typeof this.association === "function") {
-    try {
-      const assoc = this.association(attribute);
-      if (assoc && (assoc.loaded === true || assoc.target != null)) return assoc.target;
-    } catch {}
-  }
-  const holder = associationInstanceGet.call(
-    this as unknown as Base,
-    attribute,
-  ) as Association | null;
-  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    return holder.target ?? null;
-  }
-  return this.readAttribute(attribute);
 }
 
 /** @internal */

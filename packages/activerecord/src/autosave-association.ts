@@ -13,7 +13,7 @@ import { NestedError as AssociationsNestedError } from "./associations/nested-er
 import { associationInstanceGet } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import { isCompositePrimaryKey } from "./attribute-methods/primary-key.js";
-import { kernelArray, underscore, wrap } from "@blazetrails/activesupport";
+import { kernelArray, wrap } from "@blazetrails/activesupport";
 
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
 const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor");
@@ -37,7 +37,7 @@ interface AutosaveAssociationHost {
   get(attrName: string): unknown;
   set(attrName: string, value: unknown): void;
   errors: {
-    add(attr: string, type: string, opts?: Record<string, unknown>): void;
+    add(attr: string, type?: string, opts?: Record<string, unknown>): void;
     uniqBang(): void;
   };
   constructor: { primaryKey?: string | string[]; name: string; _reflections: object };
@@ -170,7 +170,7 @@ export async function saveCollectionAssociation(
           const associationSaved = !!(await association.insertRecord(record));
 
           if (reflection.options?.validate !== false) {
-            if (!associationSaved) propagateErrors(this as unknown as Base, reflection.name);
+            if (!associationSaved) this.errors.add(reflection.name);
             saved = associationSaved;
           }
         }
@@ -267,10 +267,6 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
       if (autosave) return saved;
     }
   }
-}
-
-function propagateErrors(parent: Base, reflectionName: string): void {
-  parent.errors.add(underscore(reflectionName));
 }
 
 /** @internal */

@@ -2514,7 +2514,6 @@ prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
 include(Base, {
-  readAttributeForValidation: _Validations.readAttributeForValidation,
   validate: _Validations.validate,
   customValidationContext: _Validations.customValidationContext,
 });

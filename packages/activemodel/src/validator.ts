@@ -44,7 +44,7 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
 
   async validate(record: ValidatableRecord<TBase>): Promise<readonly string[]> {
     for (const attribute of this.attributes) {
-      let value = this.readAttributeForValidation(record, attribute);
+      let value = await this.readAttributeForValidation(record, attribute);
       if (
         (value == null && this.options.allowNil === true) ||
         (isBlank(value) && this.options.allowBlank === true)
