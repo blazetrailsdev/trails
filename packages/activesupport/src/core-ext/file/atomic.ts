@@ -7,14 +7,10 @@ export function atomicWrite<T>(fileName: string, block: AtomicWriteBlock<Promise
 export function atomicWrite<T>(fileName: string, block: AtomicWriteBlock<T>): T;
 export function atomicWrite<T>(
   fileName: string,
-  tempDir: string | undefined,
+  tempDir: string,
   block: AtomicWriteBlock<Promise<T>>,
 ): Promise<T>;
-export function atomicWrite<T>(
-  fileName: string,
-  tempDir: string | undefined,
-  block: AtomicWriteBlock<T>,
-): T;
+export function atomicWrite<T>(fileName: string, tempDir: string, block: AtomicWriteBlock<T>): T;
 export function atomicWrite<T>(
   fileName: string,
   tempDir: string | undefined | AtomicWriteBlock<T>,

@@ -574,15 +574,14 @@ function camelized(name: string): string {
 function checkDefinitionVisibility(
   mod: { prototype: object },
   mid: string,
-  includeSuper?: boolean,
+  inherit = true,
 ): boolean {
-  const incSuper = includeSuper === undefined ? true : includeSuper;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
-    o = incSuper ? (Object.getPrototypeOf(o) as object | null) : null
+    o = inherit ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
     if (me) return typeof me.value === "function" || me.get !== undefined;
@@ -602,7 +601,7 @@ function checkDefinitionVisibility(
  * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
  * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
  * answered by a JS accessor's setter or a `setName` method, the entries
- * {@link rbFSend} dispatches to. A false `includeSuper` answers for `mod`'s
+ * {@link rbFSend} dispatches to. A false `inherit` answers for `mod`'s
  * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
  *
  * @noRailsEquivalent PERMANENT
@@ -610,9 +609,9 @@ function checkDefinitionVisibility(
 export function rbModMethodDefined(
   mod: { prototype: object },
   mid: string,
-  includeSuper?: boolean,
+  inherit = true,
 ): boolean {
-  return checkDefinitionVisibility(mod, mid, includeSuper);
+  return checkDefinitionVisibility(mod, mid, inherit);
 }
 
 /**
