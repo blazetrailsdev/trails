@@ -34,7 +34,7 @@ export function head(
     for (const [key, value] of Object.entries(options)) {
       this.headers.set(
         key
-          .split(/[-_]/)
+          .split(/[-_]|(?<=[a-z\d])(?=[A-Z])/)
           .map((v) => v[0].toUpperCase() + v.slice(1))
           .join("-"),
         rbObjAsString(value),

@@ -1,5 +1,7 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import type { Base } from "../base.js";
+import { Base } from "../base.js";
+import { Request } from "../../action-dispatch/http/request.js";
+import { Response } from "../../action-dispatch/http/response.js";
 import { include } from "@blazetrails/activesupport";
 import { Rendering } from "./rendering.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
@@ -23,6 +25,27 @@ describe("Rendering#_normalize_options status", () => {
     expect(_normalizeOptions({ status: "unprocessable_entity" }).status).toBe(422);
     expect(_normalizeOptions({ status: ":created" }).status).toBe(201);
     expect(_normalizeOptions({ status: "404 Not Found" }).status).toBe(404);
+  });
+});
+
+describe("Head#head option keys (head.rb:33-35)", () => {
+  it("sends the dashed header name for a camelCase, snake_case or dashed key", async () => {
+    for (const key of ["xCustomHeader", "x_custom_header", "x-custom-header"]) {
+      class KeyController extends Base {
+        async show(): Promise<void> {
+          this.head("ok", { [key]: "1", ETag: "e", "WWW-Authenticate": "w" });
+        }
+      }
+      const controller = new KeyController();
+      await controller.dispatch(
+        "show",
+        new Request({ REQUEST_METHOD: "GET", PATH_INFO: "/", HTTP_HOST: "localhost" }),
+        new Response(),
+      );
+      expect(controller.response.headers.get("X-Custom-Header")).toBe("1");
+      expect(controller.response.headers.get("ETag")).toBe("e");
+      expect(controller.response.headers.get("WWW-Authenticate")).toBe("w");
+    }
   });
 });
 

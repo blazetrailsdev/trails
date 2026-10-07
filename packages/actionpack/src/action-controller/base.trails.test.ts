@@ -107,6 +107,22 @@ describe("ActionController::Cookies#cookies", () => {
   });
 });
 
+describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)", () => {
+  it("constructs a controller class bound to a lowercase local", () => {
+    const klass = class extends Base {};
+    expect(klass.name).toBe("klass");
+    expect(() => new klass()).not.toThrow();
+    expect(klass.controllerName()).toBeNull();
+  });
+
+  it("names a class expression a constant seat paths", () => {
+    const seated = class extends Base {};
+    registerConstant("SeatedController", seated);
+    expect(() => new seated()).not.toThrow();
+    expect(seated.controllerName()).toBe("seated");
+  });
+});
+
 describe("ActionController::Base#respond_to?", () => {
   class BackController extends ApplicationController {
     back = "";

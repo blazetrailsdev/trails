@@ -60,7 +60,8 @@ export {
 } from "./metal/live.js";
 export { HttpAuthentication } from "./metal/http-authentication.js";
 export { Renderer } from "./renderer.js";
-export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
+export { Deprecator, deprecator } from "./deprecator.js";
+export { addRenderer, removeRenderer } from "./metal/renderers.js";
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
 export { defaultFormBuilder } from "./form-builder.js";
