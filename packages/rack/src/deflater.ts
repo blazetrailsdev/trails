@@ -141,9 +141,9 @@ export class GzipStream {
         }
       } else {
         let flushed: Promise<void> | undefined;
-        const block = (part: string): Promise<void> | undefined => {
+        const block = (part: string | Uint8Array): Promise<void> | undefined => {
           if (part.length === 0) return;
-          gzip.write(Buffer.from(String(part), "binary"));
+          gzip.write(part instanceof Uint8Array ? part : Buffer.from(String(part), "binary"));
           if (this.sync) return (flushed = gzip.flush());
         };
         if (Symbol.asyncIterator in this.body || Symbol.iterator in this.body) {

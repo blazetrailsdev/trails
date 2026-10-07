@@ -208,13 +208,17 @@ export abstract class Helpers {
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        oldBody.each((part: string) => this.append(String(part)));
+        oldBody.each((part: string | Uint8Array) =>
+          this.append(part instanceof Uint8Array ? part : String(part)),
+        );
       } else if (this._body && typeof this._body[Symbol.iterator] === "function") {
         const oldBody = this._body;
         this._body = [];
         this._buffered = true;
         this.length = 0;
-        for (const part of oldBody) this.append(String(part));
+        for (const part of oldBody) {
+          this.append(part instanceof Uint8Array ? part : String(part));
+        }
       } else {
         this._buffered = false;
       }
@@ -223,7 +227,7 @@ export abstract class Helpers {
   }
 
   /** @internal */
-  append(chunk: string): string {
+  append<T extends string | Uint8Array>(chunk: T): T {
     this._body.push(chunk);
     if (this.length !== null) {
       this.length += Buffer.byteLength(chunk);

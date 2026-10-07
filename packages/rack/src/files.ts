@@ -24,7 +24,7 @@ export class BaseIterator {
     this.options = { mimeType: options.mimeType, size: options.size };
   }
 
-  each(cb: (chunk: string) => void): void {
+  each(cb: (chunk: string | Uint8Array) => void): void {
     File.open(this.path, "rb", (file) => {
       for (const range of this.ranges) {
         if (this.multipart()) cb(this.multipartHeading(range));
@@ -34,8 +34,8 @@ export class BaseIterator {
     });
   }
 
-  *[Symbol.iterator](): Generator<string> {
-    const chunks: string[] = [];
+  *[Symbol.iterator](): Generator<string | Uint8Array> {
+    const chunks: (string | Uint8Array)[] = [];
     this.each((chunk) => chunks.push(chunk));
     yield* chunks;
   }
@@ -68,15 +68,16 @@ export class BaseIterator {
   }
 
   /** @internal */
-  private eachRangePart(file: IO, range: [number, number], cb: (chunk: string) => void): void {
+  private eachRangePart(file: IO, range: [number, number], cb: (chunk: Uint8Array) => void): void {
     file.seek(range[0]);
     let remainingLen = range[1] - range[0] + 1;
     while (remainingLen > 0) {
-      const part = file.read(Math.min(8192, remainingLen));
+      const str = new Uint8Array(Math.min(8192, remainingLen));
+      const part = file.read(str.length, str);
       if (part === null) break;
       remainingLen -= part.length;
 
-      cb(part);
+      cb(str.subarray(0, part.length));
     }
   }
 }

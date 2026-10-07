@@ -62,7 +62,11 @@ export class MockResponse extends Response {
     let buffer = "";
 
     for (const chunk of this._body) {
-      buffer += String(chunk);
+      if (chunk instanceof Uint8Array) {
+        for (const byte of chunk) buffer += String.fromCharCode(byte);
+      } else {
+        buffer += String(chunk);
+      }
     }
     this._bufferedBody = buffer;
 
