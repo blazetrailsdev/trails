@@ -70,12 +70,6 @@ import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
 import { type Transaction, type NullTransaction } from "./abstract/transaction.js";
 import {
   Store,
-  queryCacheEnabled as queryCacheEnabledGet,
-  cache as cacheMixin,
-  enableQueryCacheBang as enableQueryCacheBangMixin,
-  uncached as uncachedMixin,
-  disableQueryCacheBang as disableQueryCacheBangMixin,
-  clearQueryCache as clearQueryCacheMixin,
   checkVersion as checkVersionMixin,
   selectAll as querySelectAll,
   dirtiesQueryCache,
@@ -202,6 +196,13 @@ export interface AbstractAdapter
   extends
     Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
     Pick<QueryCacheHost, "_queryCache"> {
+  queryCache: Store | null;
+  readonly queryCacheEnabled: boolean;
+  cache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  enableQueryCacheBang(): void;
+  uncached<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
+  disableQueryCacheBang(): void;
+  clearQueryCache(): void;
   columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
     tableName: string,
@@ -2046,49 +2047,6 @@ export class AbstractAdapter implements Quoting {
 
   sanitizeAsSqlComment(value: unknown): string {
     return abstractSanitizeAsSqlComment(value);
-  }
-
-  private _ensureQueryCache(): Store {
-    if (!this._queryCache) {
-      this._queryCache = new Store();
-    }
-    return this._queryCache;
-  }
-
-  get queryCache(): Store | null {
-    return this._queryCache;
-  }
-
-  set queryCache(value: Store | null) {
-    this._queryCache = value;
-  }
-
-  get queryCacheEnabled(): boolean {
-    return queryCacheEnabledGet.call(this as unknown as QueryCacheHost);
-  }
-
-  cache<T>(fn: () => T | Promise<T>): T | Promise<T> {
-    this._ensureQueryCache();
-    return cacheMixin.call(this as unknown as QueryCacheHost, fn) as T | Promise<T>;
-  }
-
-  enableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    enableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  async uncached<T>(fn: () => T | Promise<T>, options: { dirties?: boolean } = {}): Promise<T> {
-    this._ensureQueryCache();
-    return uncachedMixin.call(this as unknown as QueryCacheHost, fn, options) as Promise<T>;
-  }
-
-  disableQueryCacheBang(): void {
-    this._ensureQueryCache();
-    disableQueryCacheBangMixin.call(this as unknown as QueryCacheHost);
-  }
-
-  clearQueryCache(): void {
-    clearQueryCacheMixin.call(this as unknown as QueryCacheHost);
   }
 
   static setCallback(

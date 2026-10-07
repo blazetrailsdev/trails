@@ -484,6 +484,7 @@ interface CoreHost {
   destroyAssociationAsyncJob?: any;
   _findByStatementCache?: FindByStatementCache;
   initializeFindByCache(): FindByStatementCache;
+  isBaseClass(): boolean;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
   arelTable?: any;
@@ -672,29 +673,17 @@ export function initializeGeneratedModules(this: CoreHost): void {
   generatedAssociationMethods.call(this);
 }
 
-/**
- * @inventedArm if — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
- * @inventedArm initializeGeneratedModules — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
- */
 export function generatedAssociationMethods(this: CoreHost): Module {
-  if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
-    (this as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
-  }
-  return (
-    (Object.hasOwn(this, "_generatedAssociationMethods")
-      ? this._generatedAssociationMethods
-      : undefined) ||
-    (this._generatedAssociationMethods = (() => {
-      const mod = rbModConstSet(
-        this as unknown as new (...args: unknown[]) => unknown,
-        "GeneratedAssociationMethods",
-        new Module(),
-      );
-      include(this as unknown as new (...args: unknown[]) => unknown, mod);
+  return (this._generatedAssociationMethods ||= (() => {
+    const mod = rbModConstSet(
+      this as unknown as new (...args: unknown[]) => unknown,
+      "GeneratedAssociationMethods",
+      new Module(),
+    );
+    include(this as unknown as new (...args: unknown[]) => unknown, mod);
 
-      return mod;
-    })())
-  );
+    return mod;
+  })());
 }
 
 export function predicateBuilder(this: CoreHost): PredicateBuilder {
@@ -708,18 +697,52 @@ export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
 
-/** @inventedArm initializeFindByCache — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers */
 export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
   key: unknown,
   block: (params: any) => any,
 ): any {
-  const cache = (
-    (Object.hasOwn(this, "_findByStatementCache") ? this._findByStatementCache : undefined) ||
-    this.initializeFindByCache()
-  ).get(connection.preparedStatements)!;
+  const cache = this._findByStatementCache!.get(connection.preparedStatements)!;
   return cache.computeIfAbsent(key, () => StatementCache.create(connection, block));
+}
+
+function inherited(this: CoreHost, subclass: CoreHost): void {
+  (subclass as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
+
+  subclass.initializeFindByCache();
+  if (!subclass.isBaseClass()) {
+    let klass = this;
+    while (!klass.isBaseClass()) {
+      klass.initializeFindByCache();
+      klass = Object.getPrototypeOf(klass);
+    }
+  }
+}
+
+const INHERITED = Symbol("inherited");
+
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function deferInherited(this: CoreHost): void {
+  const base = this;
+  for (const ivar of ["_findByStatementCache", "_generatedAssociationMethods"]) {
+    const value = Symbol(ivar);
+    Object.defineProperty(base, ivar, {
+      get(this: CoreHost & Record<symbol, unknown>) {
+        if (this !== base && !Object.hasOwn(this, INHERITED) && !rbModSingletonP(this)) {
+          Object.defineProperty(this, INHERITED, { value: true });
+          inherited.call(Object.getPrototypeOf(this), this);
+        }
+        return Object.hasOwn(this, value) ? this[value] : undefined;
+      },
+      set(this: Record<symbol, unknown>, v: unknown) {
+        this[value] = v;
+      },
+    });
+  }
 }
 
 export function inspectionFilter(this: { constructor: CoreHost }): ParameterFilter {

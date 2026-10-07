@@ -1516,7 +1516,7 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
     } catch {}
 
     expect(writeSpy).toHaveBeenCalledWith(
-      "awesome-file.sql doesn't exist yet. Run `bin/rails db:migrate` to create it, then try again.\n",
+      "awesome-file.sql doesn't exist yet. Run `bin/trails db migrate` to create it, then try again.\n",
     );
   });
 });

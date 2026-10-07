@@ -257,14 +257,6 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
   }
 }
 
-export function queryCache(this: QueryCacheHost): Store | null {
-  return this._queryCache;
-}
-
-export function queryCacheEnabled(this: QueryCacheHost): boolean {
-  return this._queryCache?.enabled ?? false;
-}
-
 export function cache<T>(this: QueryCacheHost, fn: () => T | Promise<T>): T | Promise<T> {
   return this.pool.enableQueryCache(fn);
 }
@@ -455,6 +447,20 @@ export const QueryCache = {
   [initialize](this: QueryCacheHost): void {
     this._queryCache = null;
   },
+  get queryCache(): Store | null {
+    return (this as unknown as QueryCacheHost)._queryCache;
+  },
+  set queryCache(value: Store | null) {
+    (this as unknown as QueryCacheHost)._queryCache = value;
+  },
+  get queryCacheEnabled(): boolean {
+    return (this as unknown as QueryCacheHost)._queryCache?.enabled ?? false;
+  },
+  cache,
+  enableQueryCacheBang,
+  uncached,
+  disableQueryCacheBang,
+  clearQueryCache,
   unsetQueryCacheBang,
   lookupSqlCache,
   cacheSql,

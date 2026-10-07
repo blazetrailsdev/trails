@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { TopLevel } from "@blazetrails/activesupport";
+import { EnvironmentInquirer, TopLevel } from "@blazetrails/activesupport";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -9,6 +9,7 @@ import { Base } from "../base.js";
 import {
   EnvironmentMismatchError,
   NoEnvironmentInSchemaError,
+  PendingMigrationError,
   ProtectedEnvironmentError,
 } from "../migration.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
@@ -244,5 +245,59 @@ describe("EnvironmentMismatchError message", () => {
     TopLevel.Trails = { env: "development" } as unknown as typeof TopLevel.Trails;
     const error = new EnvironmentMismatchError({ current: "development", stored: "staging" });
     expect(error.message).toBe(`${msg} TRAILS_ENV=development\n\n`);
+  });
+});
+
+describe("NoEnvironmentInSchemaError message", () => {
+  const msg =
+    "Environment data not found in the schema. To resolve this issue, run: \n\n" +
+    "        bin/trails db environment:set";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    expect(new NoEnvironmentInSchemaError().message).toBe(msg);
+  });
+
+  it("appends the TRAILS_ENV assignment when Trails.env is defined", () => {
+    TopLevel.Trails = { env: "development" } as unknown as typeof TopLevel.Trails;
+    expect(new NoEnvironmentInSchemaError().message).toBe(`${msg} TRAILS_ENV=development`);
+  });
+});
+
+describe("PendingMigrationError message", () => {
+  const pendingMigrations = [{ filename: "db/migrate/1_create_people.ts" }] as never;
+  const command =
+    "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
+  const tail = "\n\nYou have 1 pending migration:\n\ndb/migrate/1_create_people.ts\n";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(`${command}${tail}`);
+  });
+
+  it("ends at the command in a local environment", () => {
+    TopLevel.Trails = {
+      env: new EnvironmentInquirer("development"),
+    } as unknown as typeof TopLevel.Trails;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(`${command}${tail}`);
+  });
+
+  it("appends the TRAILS_ENV assignment outside a local environment", () => {
+    TopLevel.Trails = {
+      env: new EnvironmentInquirer("production"),
+    } as unknown as typeof TopLevel.Trails;
+    expect(new PendingMigrationError({ pendingMigrations }).message).toBe(
+      `${command} TRAILS_ENV=production${tail}`,
+    );
   });
 });

@@ -292,6 +292,14 @@ export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
+export function save<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
+export function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
 export function touch(
   this: Base,
   args: unknown[],

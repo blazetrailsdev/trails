@@ -69,6 +69,22 @@ interface ValidationsHost {
   readAttribute(name: string): unknown;
 }
 
+export async function save<T>(
+  this: ValidationsHost,
+  options: { validate?: boolean; context?: string } | undefined,
+  superFn: () => Promise<T>,
+): Promise<T | false> {
+  return (await performValidations.call(this, options)) ? superFn() : false;
+}
+
+export async function saveBang<T>(
+  this: ValidationsHost,
+  options: { validate?: boolean; context?: string } | undefined,
+  superFn: () => Promise<T>,
+): Promise<T> {
+  return (await performValidations.call(this, options)) ? superFn() : raiseValidationError(this);
+}
+
 export async function isValid(
   this: ValidationsHost,
   context: ValidationContextArg = null,

@@ -28762,13 +28762,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "cache",
-    "digest": "d1e4cc200a803a7f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "can_perform_case_insensitive_comparison_for?",
     "digest": "357b923f2251ef17",
     "ref": "v8.0.2"
@@ -28855,13 +28848,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "clear_cache!",
     "digest": "f3eda3d015993cb4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "clear_query_cache",
-    "digest": "6fabc96234469531",
     "ref": "v8.0.2"
   },
   {
@@ -29021,13 +29007,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "disable_query_cache!",
-    "digest": "35d4755f4203aa94",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "disable_referential_integrity",
     "digest": "0a252ca5c7e40056",
     "ref": "v8.0.2"
@@ -29072,13 +29051,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "enable_extension",
     "digest": "c379738c3a38aa9c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "enable_query_cache!",
-    "digest": "a198c3a194d093c6",
     "ref": "v8.0.2"
   },
   {
@@ -30031,13 +30003,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "type_map",
     "digest": "2a890de04b82df21",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "uncached",
-    "digest": "625d3f0f4e6724af",
     "ref": "v8.0.2"
   },
   {
