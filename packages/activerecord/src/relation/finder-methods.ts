@@ -636,11 +636,11 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
     expectedSize = ids.length;
   }
 
-  if (offsetValue != null) {
-    const remaining = numericMinus(ids.length, offsetValue);
-    if (rbCmpint(cmp(remaining, expectedSize), remaining, expectedSize) < 0) {
-      expectedSize = numericMinus(ids.length, offsetValue);
-    }
+  if (
+    offsetValue != null &&
+    rbCmpint(cmp(numericMinus(ids.length, offsetValue), expectedSize), ids.length, expectedSize) < 0
+  ) {
+    expectedSize = numericMinus(ids.length, offsetValue);
   }
 
   if (result.length === expectedSize) {
