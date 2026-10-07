@@ -13,6 +13,8 @@ import {
   except,
   fetch,
   rbBlockGivenP,
+  rbHashSRuby2KeywordsHash,
+  rbHashSRuby2KeywordsHashP,
   hasKey,
   hashAref,
   hashAset,
@@ -1121,5 +1123,44 @@ describe("block (a marked `&block`)", () => {
     expect(hashAref(hash, "missing")).toBe(7);
     expect(hashAref(new Hash<string, string>((_h, key) => `no ${key}`), "x")).toBe("no x");
     expect(hashAref(new Hash<string, string | undefined>(() => undefined), "x")).toBe(null);
+  });
+
+  it("rbHashSRuby2KeywordsHash returns a flagged copy and leaves its argument unflagged", () => {
+    const h = { k: 1 };
+    const flagged = rbHashSRuby2KeywordsHash(h);
+    expect(flagged).not.toBe(h);
+    expect({ ...flagged }).toEqual({ k: 1 });
+    expect(rbHashSRuby2KeywordsHashP(flagged)).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(h)).toBe(false);
+    expect(rbHashSRuby2KeywordsHashP({ k: 1 })).toBe(false);
+    expect(rbHashSRuby2KeywordsHashP(dup(flagged))).toBe(false);
+  });
+
+  it("the ruby2_keywords flag is invisible to key enumeration and JSON", () => {
+    const flagged = rbHashSRuby2KeywordsHash({ k: 1 });
+    expect(Object.keys(flagged)).toEqual(["k"]);
+    expect(Reflect.ownKeys(flagged)).toEqual(["k"]);
+    expect(JSON.stringify(flagged)).toBe('{"k":1}');
+  });
+
+  it("rbHashSRuby2KeywordsHash flags a Hash, keeping its class and compare_by_identity", () => {
+    const hash = new Hash<string, number>();
+    hash.set("k", 1);
+    const flagged = rbHashSRuby2KeywordsHash(hash);
+    expect(flagged).toBeInstanceOf(Hash);
+    expect(flagged.get("k")).toBe(1);
+    expect(rbHashSRuby2KeywordsHashP(flagged)).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(hash)).toBe(false);
+    const empty = new Hash<string, number>().compareByIdentity();
+    expect(rbHashSRuby2KeywordsHash(empty).isCompareByIdentity()).toBe(true);
+  });
+
+  it("the ruby2_keywords functions raise TypeError for a non-Hash", () => {
+    expect(() => rbHashSRuby2KeywordsHashP([] as object)).toThrow(
+      new TypeError("wrong argument type Array (expected Hash)"),
+    );
+    expect(() => rbHashSRuby2KeywordsHash(null as unknown as object)).toThrow(
+      new TypeError("wrong argument type nil (expected Hash)"),
+    );
   });
 });

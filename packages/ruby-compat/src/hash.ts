@@ -1,7 +1,7 @@
 import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
-import { rbInspect } from "./object.js";
+import { rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
 import { rbEql } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
@@ -870,6 +870,47 @@ export function dup(
     return Object.assign(Object.create(null) as Record<string, unknown>, hash);
   }
   return hashDup(hash, hash.constructor as new () => Hash<unknown, unknown>);
+}
+
+/**
+ * `RHASH_PASS_AS_KEYWORDS` (`vendor/ruby/v3.3.11/internal/hash.h:23`), a bit in
+ * the hash's own `basic.flags`: the hashes that carry it. Membership is per
+ * object and is no property of the hash, so no key enumeration or serializer
+ * sees it.
+ */
+const RHASH_PASS_AS_KEYWORDS = new WeakSet<object>();
+
+/**
+ * Ruby `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`
+ * `rb_hash_s_ruby2_keywords_hash_p`): whether this hash object is flagged to
+ * be passed as keywords.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`).
+ */
+export function rbHashSRuby2KeywordsHashP(hash: object): boolean {
+  const klass: unknown = rbObjClass(hash);
+  if (klass !== Hash && !(typeof klass === "function" && klass.prototype instanceof Hash)) {
+    throw new TypeError(`wrong argument type ${rbBuiltinClassName(hash)} (expected Hash)`);
+  }
+  return RHASH_PASS_AS_KEYWORDS.has(hash);
+}
+
+/**
+ * Ruby `Hash.ruby2_keywords_hash` (`vendor/ruby/v3.3.11/hash.c:1974`
+ * `rb_hash_s_ruby2_keywords_hash`): a duplicate of the hash carrying the
+ * flag. The argument itself is left as it was.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash.ruby2_keywords_hash` (`vendor/ruby/v3.3.11/hash.c:1974`).
+ */
+export function rbHashSRuby2KeywordsHash<H extends object>(hash: H): H {
+  const klass: unknown = rbObjClass(hash);
+  if (klass !== Hash && !(typeof klass === "function" && klass.prototype instanceof Hash)) {
+    throw new TypeError(`wrong argument type ${rbBuiltinClassName(hash)} (expected Hash)`);
+  }
+  const tmp = dup(hash as Hash<string, unknown> | Record<string, unknown>);
+  if (hash instanceof Hash && hash.size === 0 && hash.isCompareByIdentity()) {
+    if (tmp instanceof Hash) tmp.compareByIdentity();
+  }
+  RHASH_PASS_AS_KEYWORDS.add(tmp);
+  return tmp as H;
 }
 
 /**
