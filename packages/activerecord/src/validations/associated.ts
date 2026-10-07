@@ -1,5 +1,5 @@
 import { EachValidator } from "@blazetrails/activemodel";
-import { any, kernelArray } from "@blazetrails/activesupport";
+import { any, kernelArray, merge } from "@blazetrails/activesupport";
 
 export function validatesAssociated(
   this: {
@@ -12,10 +12,7 @@ export function validatesAssociated(
 }
 
 export class AssociatedValidator extends EachValidator {
-  /**
-   * @missingRailsCall merge — PERMANENT
-   * @missingRailsCall reject — PERMANENT
-   */
+  /** @missingRailsCall reject — CONVERGEABLE associated-validator-rejects-through-an-awaiting-reject */
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
     const rejected: unknown[] = [];
@@ -24,7 +21,7 @@ export class AssociatedValidator extends EachValidator {
     }
 
     if (any(rejected)) {
-      record.errors.add(attribute, ":invalid", { ...this.options, value });
+      record.errors.add(attribute, ":invalid", merge(this.options, { value }));
     }
   }
 }

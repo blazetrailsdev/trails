@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 import * as ts from "typescript/unstable/ast";
 import { getPath } from "@blazetrails/ruby-compat";
 import { walk, type ClassInfo } from "./walker.js";

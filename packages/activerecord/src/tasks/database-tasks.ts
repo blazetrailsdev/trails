@@ -17,6 +17,9 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
+  first,
+  isEmpty,
+  StandardError,
   rbFSend,
   rbStrToI,
   sort,
@@ -35,13 +38,7 @@ import type { Base } from "../base.js";
 import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
 
-export class DatabaseNotSupported extends Error {
-  /** @noRailsEquivalent PERMANENT */
-  constructor(message: string) {
-    super(message);
-    this.name = "ActiveRecord::Tasks::DatabaseNotSupported";
-  }
-}
+export class DatabaseNotSupported extends StandardError {}
 
 export type SchemaFormat = "ruby" | "sql";
 
@@ -72,16 +69,16 @@ export class DatabaseTasks {
 
   private static _dbDir: string | null = null;
 
-  /**
-   * @missingRailsCall first — PERMANENT
-   * @inventedArm if — CONVERGEABLE database-tasks-env-root-db-dir-standalone-fallback-arms
-   */
+  /** @inventedArm if — CONVERGEABLE database-tasks-env-root-db-dir-standalone-fallback-arms */
   static get dbDir(): string {
     if (this._dbDir !== null) return this._dbDir;
     const application = TopLevel.Trails?.application;
     const root = application?.config.root;
     if (!application || root == null) return "db";
-    return (this._dbDir = File.expandPath(application.config.paths().get("db")!.toAry()[0], root));
+    return (this._dbDir = File.expandPath(
+      first(application.config.paths().get("db")!.toAry())!,
+      root,
+    ));
   }
 
   static set dbDir(value: string) {
@@ -335,10 +332,9 @@ export class DatabaseTasks {
     return this.collation(dbConfig!);
   }
 
-  /** @missingRailsCall empty? — PERMANENT */
   static targetVersion(): number | null {
     const version = getEnv("VERSION");
-    if (version !== undefined && version !== "") return Number(rbStrToI(version));
+    if (version !== undefined && !isEmpty(version)) return Number(rbStrToI(version));
     return null;
   }
 

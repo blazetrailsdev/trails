@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 import * as ts from "typescript/unstable/ast";
 import { camelize, pluralize, underscore } from "@blazetrails/activesupport";
 import { resolveAssociationTarget, stripQuotes } from "./resolve-target.js";

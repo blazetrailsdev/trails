@@ -1,4 +1,4 @@
-import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
+import { isBlank, kernelArray, merge, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
@@ -40,16 +40,15 @@ export class PostgreSQLDatabaseTasks {
     this.configurationHash = { ...dbConfig.configurationHash };
   }
 
-  /** @missingRailsCall merge — PERMANENT */
   async create(connectionAlreadyEstablished = false): Promise<ConnectionPool> {
     if (!connectionAlreadyEstablished) {
       await this.establishConnection(this.publicSchemaConfig());
     }
     const conn = await this.connection();
-    await conn.createDatabase(this.dbConfig.database as string, {
-      ...this.configurationHash,
-      encoding: this.encoding(),
-    });
+    await conn.createDatabase(
+      this.dbConfig.database as string,
+      merge(this.configurationHash, { encoding: this.encoding() }),
+    );
     return await this.establishConnection();
   }
 
@@ -185,12 +184,9 @@ export class PostgreSQLDatabaseTasks {
     return await Base.establishConnection(config ?? this.dbConfig);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private publicSchemaConfig(): ConfigHash {
-    return { ...this.configurationHash, database: "postgres", schemaSearchPath: "public" };
+    return merge(this.configurationHash, { database: "postgres", schemaSearchPath: "public" });
   }
 }
 

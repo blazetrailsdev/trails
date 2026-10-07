@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 import { classify, singularize } from "@blazetrails/activesupport";
 import type { AssociationCall } from "./walker.js";
 
