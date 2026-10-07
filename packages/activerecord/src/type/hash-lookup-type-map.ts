@@ -33,7 +33,7 @@ export class HashLookupTypeMap {
     block?: (lookupKey: string | number, ...args: unknown[]) => ValueType,
   ): void {
     if (value == null && block == null) {
-      throw new ArgumentError("registerType requires a value or block");
+      throw new ArgumentError();
     }
     if (block) {
       this.mapping.set(key, block);

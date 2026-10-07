@@ -1,3 +1,4 @@
+import { LoadError } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -5,7 +6,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
 const adapters = new Map<string, [string, string, AdapterLoader]>();
-const resolved = new Map<string, AdapterClass | Promise<AdapterClass>>();
+const resolved = new Map<string, AdapterClass>();
 const resolveErrors = new Map<string, unknown>();
 
 export function register(
@@ -19,11 +20,22 @@ export function register(
   resolveErrors.delete(name);
 }
 
-export function resolve(adapterName: string | undefined): AdapterClass | Promise<AdapterClass> {
-  const cached = resolved.get(adapterName ?? "");
-  if (cached) return cached;
+/** @noRailsEquivalent PERMANENT */
+export async function load(adapterName: string | undefined): Promise<void> {
+  const [, , loader] = adapters.get(adapterName ?? "") ?? [];
+  if (!loader || resolved.has(adapterName ?? "")) return;
 
-  const [className, pathToAdapter, loader] = adapters.get(adapterName ?? "") ?? [];
+  resolveErrors.delete(adapterName ?? "");
+  try {
+    const klass = await loader();
+    if (klass !== undefined) resolved.set(adapterName ?? "", klass);
+  } catch (error) {
+    resolveErrors.set(adapterName ?? "", error);
+  }
+}
+
+export function resolve(adapterName: string | undefined): AdapterClass {
+  const [className, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
 
   if (!className) {
     throw new AdapterNotFound(
@@ -34,55 +46,44 @@ export function resolve(adapterName: string | undefined): AdapterClass | Promise
     );
   }
 
-  const loadError = resolveErrors.get(adapterName ?? "");
-  if (loadError !== undefined) throw loadError;
-
-  const promise = loader!().then(
-    (klass) => {
-      if (klass === undefined) {
-        resolveErrors.set(
-          adapterName ?? "",
-          new AdapterNotFound(
-            `Could not load the ${className} Active Record adapter (uninitialized constant ${className}).`,
-          ),
-        );
-        resolved.delete(adapterName ?? "");
-        throw resolveErrors.get(adapterName ?? "");
-      }
-      resolved.set(adapterName ?? "", klass);
-      return klass;
-    },
-    (err) => {
-      resolved.delete(adapterName ?? "");
-      const message = err instanceof Error ? err.message : String(err);
+  const klass = resolved.get(adapterName ?? "");
+  if (!klass) {
+    const error = resolveErrors.get(adapterName ?? "");
+    if (error !== undefined) {
+      const message = error instanceof Error ? error.message : String(error);
       const errorPath =
-        typeof (err as { url?: unknown }).url === "string"
-          ? (err as { url: string }).url
+        typeof (error as { url?: unknown }).url === "string"
+          ? (error as { url: string }).url
           : (/^Cannot find (?:module|package) '([^']+)'/.exec(message)?.[1] ?? null);
-      const loadError =
-        (err as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
+      if (
+        (error as { code?: unknown }).code === "ERR_MODULE_NOT_FOUND" &&
         errorPath !== null &&
         pathToAdapter !== undefined &&
         (errorPath.startsWith("file:")
           ? new URL(errorPath).pathname.endsWith(pathToAdapter.replace(/^\.+/, ""))
           : errorPath === pathToAdapter || pathToAdapter.startsWith(`${errorPath}/`))
-          ? new Error(
-              `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter package is correct. ${message}`,
-              { cause: err },
-            )
-          : new Error(
-              `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a package it depends on? ${message}`,
-              { cause: err },
-            );
-      resolveErrors.set(adapterName ?? "", loadError);
-      throw loadError;
-    },
-  );
-  resolved.set(adapterName ?? "", promise);
-  return promise;
+      ) {
+        throw new LoadError(
+          `Error loading the '${adapterName ?? ""}' Active Record adapter. Ensure that the path registered by the adapter gem is correct. ${message}`,
+          { cause: error },
+        );
+      } else {
+        throw new LoadError(
+          `Error loading the '${adapterName ?? ""}' Active Record adapter. Missing a gem it depends on? ${message}`,
+          { cause: error },
+        );
+      }
+    }
+
+    throw new AdapterNotFound(
+      `Could not load the ${className} Active Record adapter (uninitialized constant ${className}).`,
+    );
+  }
+  return klass;
 }
 
 ConnectionAdapters.register = register;
+ConnectionAdapters.load = load;
 ConnectionAdapters.resolve = resolve;
 ActiveRecord.ConnectionAdapters = ConnectionAdapters;
 

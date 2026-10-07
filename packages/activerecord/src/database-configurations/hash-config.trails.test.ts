@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { HashConfig } from "./hash-config.js";
-import { register, resolve } from "../connection-adapters.js";
+import { load, register, resolve } from "../connection-adapters.js";
+import { LoadError } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
 
@@ -32,11 +33,11 @@ describe("DatabaseConfigurations", () => {
         adapter: "trails_broken_adapter",
       });
       await expect(config.validateBang()).rejects.toThrow(
-        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
+        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? Cannot find module 'pg'",
       );
 
       expect(() => resolve("trails_broken_adapter")).toThrow(
-        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a package it depends on? Cannot find module 'pg'",
+        "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? Cannot find module 'pg'",
       );
       await expect(config.validateBang()).rejects.toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter.",
@@ -47,9 +48,9 @@ describe("DatabaseConfigurations", () => {
       register("trails_nameless_adapter", "NoSuchAdapter", "./trails-nameless-adapter.js", () =>
         Promise.resolve(undefined as never),
       );
-      const error = await Promise.resolve(resolve("trails_nameless_adapter")).catch((e) => e);
-      expect(error).toBeInstanceOf(AdapterNotFound);
-      expect(error.message).toBe(
+      await load("trails_nameless_adapter");
+      expect(() => resolve("trails_nameless_adapter")).toThrow(AdapterNotFound);
+      expect(() => resolve("trails_nameless_adapter")).toThrow(
         "Could not load the NoSuchAdapter Active Record adapter (uninitialized constant NoSuchAdapter).",
       );
     });
@@ -64,8 +65,9 @@ describe("DatabaseConfigurations", () => {
           return null as never;
         },
       );
-      await expect(resolve("trails_mispathed_adapter")).rejects.toThrow(
-        "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+      await load("trails_mispathed_adapter");
+      expect(() => resolve("trails_mispathed_adapter")).toThrow(
+        "Error loading the 'trails_mispathed_adapter' Active Record adapter. Ensure that the path registered by the adapter gem is correct.",
       );
     });
 
@@ -79,8 +81,9 @@ describe("DatabaseConfigurations", () => {
           return null as never;
         },
       );
-      await expect(resolve("trails_unpackaged_adapter")).rejects.toThrow(
-        "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter package is correct.",
+      await load("trails_unpackaged_adapter");
+      expect(() => resolve("trails_unpackaged_adapter")).toThrow(
+        "Error loading the 'trails_unpackaged_adapter' Active Record adapter. Ensure that the path registered by the adapter gem is correct.",
       );
     });
 
@@ -97,9 +100,26 @@ describe("DatabaseConfigurations", () => {
           );
         },
       );
-      await expect(resolve("trails_depless_adapter")).rejects.toThrow(
-        "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a package it depends on? Cannot find package 'mysql2'",
+      await load("trails_depless_adapter");
+      expect(() => resolve("trails_depless_adapter")).toThrow(
+        "Error loading the 'trails_depless_adapter' Active Record adapter. Missing a gem it depends on? Cannot find package 'mysql2'",
       );
+    });
+
+    it("adapter_class raises rather than answering a Promise before the adapter is loaded", async () => {
+      class TrailsUnloadedAdapter {}
+      register("trails_unloaded_adapter", "TrailsTestAdapter", "./trails-unloaded-adapter.js", () =>
+        Promise.resolve(TrailsUnloadedAdapter as never),
+      );
+      const config = new HashConfig("default_env", "primary", {
+        adapter: "trails_unloaded_adapter",
+      });
+      expect(() => config.adapterClass()).toThrow(AdapterNotFound);
+      expect(() => config.adapterClass()).toThrow(
+        "Could not load the TrailsTestAdapter Active Record adapter (uninitialized constant TrailsTestAdapter).",
+      );
+      await config.validateBang();
+      expect(config.adapterClass()).toBe(TrailsUnloadedAdapter);
     });
 
     it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
@@ -109,7 +129,7 @@ describe("DatabaseConfigurations", () => {
         Promise.resolve(TrailsFirstAdapter as never),
       );
       const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
-      config.adapterClass();
+      expect(() => config.adapterClass()).toThrow(AdapterNotFound);
       await config.validateBang();
       expect(config.adapterClass()).toBe(TrailsFirstAdapter);
 
@@ -144,7 +164,8 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_refixed_adapter",
       });
-      await expect(resolve("trails_refixed_adapter")).rejects.toThrow();
+      await load("trails_refixed_adapter");
+      expect(() => resolve("trails_refixed_adapter")).toThrow(LoadError);
       await expect(config.validateBang()).rejects.toThrow();
 
       register(

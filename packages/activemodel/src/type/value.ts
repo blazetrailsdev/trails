@@ -125,7 +125,7 @@ export class ValueType<T = unknown> {
   }
 
   asJson(): never {
-    throw new NoMethodError("Unimplemented");
+    throw new NoMethodError();
   }
 
   /** @internal */

@@ -897,7 +897,7 @@ export class AbstractAdapter implements Quoting {
 
   static dbconsole(_config?: DatabaseConfig, _options?: Record<string, unknown>): unknown {
     // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_adapter.rb:121
-    throw new NotImplementedError("dbconsole");
+    throw new NotImplementedError();
   }
 
   /** @missingRailsName config — PERMANENT */

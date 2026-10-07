@@ -714,5 +714,193 @@
         "rubyFile": "arel/visitors/to_sql.rb"
       }
     ]
+  },
+  "bareRaises": {
+    "activerecord": {
+      "aggregations.ts": {
+        "writerMethod": ["ArgumentError"]
+      },
+      "associations/belongs-to-association.ts": {
+        "handleDependency": ["Rollback"]
+      },
+      "associations/builder/association.ts": {
+        "macro": ["NotImplementedError"],
+        "validDependentOptions": ["NotImplementedError"]
+      },
+      "associations/collection-association.ts": {
+        "_createRecord": ["Rollback"],
+        "deleteRecords": ["NotImplementedError"],
+        "concatRecords": ["Rollback"]
+      },
+      "associations/join-dependency/join-part.ts": {
+        "table": ["NotImplementedError"]
+      },
+      "autosave-association.ts": {
+        "saveHasOneAssociation": ["Rollback"]
+      },
+      "connection-adapters/abstract/connection-pool.ts": {
+        "checkoutNewConnection": ["ConnectionNotEstablished"]
+      },
+      "connection-adapters/abstract/database-statements.ts": {
+        "isWriteQuery": ["NotImplementedError"],
+        "writeQuery": ["NotImplementedError"],
+        "explain": ["NotImplementedError"],
+        "performQuery": ["NotImplementedError"],
+        "castResult": ["NotImplementedError"],
+        "affectedRows": ["NotImplementedError"]
+      },
+      "connection-adapters/abstract/quoting.ts": {
+        "quoteColumnName": ["NotImplementedError"]
+      },
+      "connection-adapters/abstract/schema-statements.ts": {
+        "checkConstraints": ["NotImplementedError"],
+        "dataSourceSql": ["NotImplementedError"],
+        "quotedScope": ["NotImplementedError"]
+      },
+      "connection-adapters/abstract-adapter.ts": {
+        "dbconsole": ["NotImplementedError"],
+        "reconnect": ["NotImplementedError"]
+      },
+      "connection-adapters/abstract-mysql-adapter.ts": {
+        "errorNumber": ["NotImplementedError"],
+        "foreignKeys": ["ArgumentError"],
+        "checkConstraints": ["NotImplementedError"],
+        "primaryKeys": ["ArgumentError"]
+      },
+      "connection-adapters/sqlite3-adapter.ts": {
+        "newClient": ["NoDatabaseError"]
+      },
+      "connection-adapters/statement-pool.ts": {
+        "dealloc": ["NotImplementedError"]
+      },
+      "core.ts": {
+        "cachedFindBy": ["StatementInvalid"]
+      },
+      "database-configurations/database-config.ts": {
+        "host": ["NotImplementedError"],
+        "database": ["NotImplementedError"],
+        "_database": ["NotImplementedError"],
+        "adapter": ["NotImplementedError"],
+        "pool": ["NotImplementedError"],
+        "minThreads": ["NotImplementedError"],
+        "maxThreads": ["NotImplementedError"],
+        "maxQueue": ["NotImplementedError"],
+        "queryCache": ["NotImplementedError"],
+        "checkoutTimeout": ["NotImplementedError"],
+        "reapingFrequency": ["NotImplementedError"],
+        "idleTimeout": ["NotImplementedError"],
+        "isReplica": ["NotImplementedError"],
+        "replica": ["NotImplementedError"],
+        "migrationsPaths": ["NotImplementedError"],
+        "schemaCachePath": ["NotImplementedError"],
+        "isUseMetadataTable": ["NotImplementedError"],
+        "useMetadataTable": ["NotImplementedError"],
+        "isSeeds": ["NotImplementedError"],
+        "seeds": ["NotImplementedError"],
+        "hasSeeds": ["NotImplementedError"]
+      },
+      "dynamic-matchers.ts": {
+        "prefix": ["NotImplementedError"],
+        "finder": ["NotImplementedError"]
+      },
+      "encryption/cipher/aes256-gcm.ts": {
+        "decrypt": ["Decryption", "EncryptedContentIntegrity"]
+      },
+      "encryption/encryptor.ts": {
+        "decrypt": ["Decryption"],
+        "deserializeMessage": ["Encoding"]
+      },
+      "encryption/message-pack-message-serializer.ts": {
+        "dump": ["ForbiddenClass"],
+        "load": ["Decryption"]
+      },
+      "encryption/message-serializer.ts": {
+        "load": ["Encoding"],
+        "dump": ["ForbiddenClass"],
+        "decodeIfNeeded": ["Encoding"]
+      },
+      "future-result.ts": {
+        "result": ["Canceled"]
+      },
+      "migration.ts": {
+        "lastStoredEnvironment": ["NoEnvironmentInSchemaError"]
+      },
+      "reflection.ts": {
+        "macro": ["NotImplementedError"],
+        "associationClass": ["NotImplementedError"]
+      },
+      "relation/query-methods.ts": {
+        "assertModifiableBang": ["UnmodifiableRelation"]
+      },
+      "tasks/sqlite-database-tasks.ts": {
+        "create": ["DatabaseAlreadyExists"]
+      },
+      "token-for.ts": {
+        "findByTokenForBang": ["InvalidSignature"]
+      },
+      "transactions.ts": {
+        "withTransactionReturningStatus": ["Rollback"]
+      },
+      "type/hash-lookup-type-map.ts": {
+        "registerType": ["ArgumentError"]
+      },
+      "type/type-map.ts": {
+        "registerType": ["ArgumentError"]
+      }
+    },
+    "activemodel": {
+      "attribute.ts": {
+        "typeCast": ["NotImplementedError"]
+      },
+      "forbidden-attributes-protection.ts": {
+        "sanitizeForMassAssignment": ["ForbiddenAttributesError"]
+      },
+      "type/value.ts": {
+        "asJson": ["NoMethodError"]
+      }
+    },
+    "activesupport": {
+      "cache.ts": {
+        "readEntry": ["NotImplementedError"],
+        "writeEntry": ["NotImplementedError"],
+        "deleteEntry": ["NotImplementedError"]
+      },
+      "callbacks.ts": {
+        "expand": ["ArgumentError"],
+        "makeLambda": ["ArgumentError"],
+        "invertedLambda": ["ArgumentError"]
+      },
+      "concern.ts": {
+        "included": ["MultipleIncludedBlocks"],
+        "prepended": ["MultiplePrependBlocks"]
+      },
+      "core-ext/range/overlap.ts": {
+        "isOverlap": ["TypeError"],
+        "overlap": ["TypeError"]
+      },
+      "core-ext/string/output-safety.ts": {
+        "safeConcat": ["SafeConcatError"]
+      },
+      "encrypted-file.ts": {
+        "checkKeyLength": ["InvalidKeyLengthError"]
+      },
+      "messages/rotation-coordinator.ts": {
+        "build": ["NotImplementedError"]
+      },
+      "secure-compare-rotator.ts": {
+        "secureCompareBang": ["InvalidMatch"]
+      },
+      "testing/parallelization/server.ts": {
+        "record": ["DRbConnError"]
+      }
+    },
+    "arel": {
+      "select-manager.ts": {
+        "join": ["EmptyJoinError"]
+      },
+      "table.ts": {
+        "join": ["EmptyJoinError"]
+      }
+    }
   }
 }

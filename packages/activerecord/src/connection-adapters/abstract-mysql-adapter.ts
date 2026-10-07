@@ -658,7 +658,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
-    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+    if (!isPresent(tableName)) throw new ArgumentError();
 
     const scope = quotedScope.call(this, tableName);
 
@@ -715,7 +715,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
     if (!(await this.supportsCheckConstraints())) {
       // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/abstract_mysql_adapter.rb:545
-      throw new NotImplementedError("check constraints are not supported by this database");
+      throw new NotImplementedError();
     }
     const scope = quotedScope.call(this, tableName);
 
@@ -794,7 +794,7 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   async primaryKeys(tableName: string): Promise<string[]> {
-    if (!isPresent(tableName)) throw new ArgumentError("ArgumentError");
+    if (!isPresent(tableName)) throw new ArgumentError();
 
     const scope = quotedScope.call(this, tableName);
 

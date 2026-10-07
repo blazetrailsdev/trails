@@ -40,7 +40,8 @@ describe("RegistrationTest", () => {
       async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter,
     );
 
-    expect((await ConnectionAdapters.resolve("fake")).name).toBe("FakeActiveRecordAdapter");
+    await ConnectionAdapters.load("fake");
+    expect(ConnectionAdapters.resolve("fake").name).toBe("FakeActiveRecordAdapter");
   });
 
   it("#register allows for symbol key", async () => {
@@ -59,7 +60,8 @@ describe("RegistrationTest", () => {
       async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter,
     );
 
-    expect((await ConnectionAdapters.resolve("fake")).name).toBe("FakeActiveRecordAdapter");
+    await ConnectionAdapters.load("fake");
+    expect(ConnectionAdapters.resolve("fake").name).toBe("FakeActiveRecordAdapter");
   });
 
   it("#resolve allows for symbol key", async () => {
@@ -78,7 +80,8 @@ describe("RegistrationTest", () => {
       async () => FakeActiveRecordAdapter as unknown as new () => AbstractAdapter,
     );
 
-    expect((await ConnectionAdapters.resolve("fake")).name).toBe("FakeActiveRecordAdapter");
+    await ConnectionAdapters.load("fake");
+    expect(ConnectionAdapters.resolve("fake").name).toBe("FakeActiveRecordAdapter");
   });
 });
 

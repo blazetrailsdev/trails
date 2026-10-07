@@ -64,7 +64,7 @@ async function establishMigrationConnection(
         return adapter;
       } as never,
   );
-  await ConnectionAdapters.resolve(adapterName);
+  await ConnectionAdapters.load(adapterName);
   const config = new HashConfig("test", "primary", {
     adapter: adapterName,
     database,

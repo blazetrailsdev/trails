@@ -1,12 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { FakeActiveRecordAdapter } from "./fake-adapter.js";
-import { resolve } from "../connection-adapters.js";
+import { load, resolve } from "../connection-adapters.js";
 
 describe("FakeActiveRecordAdapter", () => {
   it("is registered under the name fake", async () => {
-    await expect(resolve("fake")).resolves.toBe(
-      FakeActiveRecordAdapter as unknown as Awaited<ReturnType<typeof resolve>>,
-    );
+    await load("fake");
+    expect(resolve("fake")).toBe(FakeActiveRecordAdapter as unknown as ReturnType<typeof resolve>);
   });
 
   it("primary_key falls back to id", () => {
