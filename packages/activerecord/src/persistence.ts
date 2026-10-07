@@ -29,16 +29,9 @@ import {
 } from "@blazetrails/arel";
 import { ActiveRecordError, ReadOnlyRecord, RecordNotDestroyed, RecordNotSaved } from "./errors.js";
 import { attributesForUpdate, attributesWithValues } from "./attribute-methods.js";
-import { getStiBase, isStiSubclass } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
-import { registry } from "./suppressor.js";
 import { isDefaultScopes } from "./scoping/default.js";
-import {
-  performValidations,
-  raiseValidationError,
-  RecordInvalid,
-  type ValidationContextArg,
-} from "./validations.js";
+import { RecordInvalid } from "./validations.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
@@ -423,72 +416,31 @@ async function deleteRow<T extends DeleteRecord>(this: T): Promise<T> {
 export { deleteRow as delete };
 
 interface SaveRecord {
-  _destroyed: boolean;
-  _readonly: boolean;
-  _newRecord: boolean;
-  _attributes: { writeCastValue(key: string, val: unknown): void };
-  readAttribute(name: string): unknown;
-  _readAttribute(name: string): unknown;
-  errors: { isAny(): boolean; isEmpty(): boolean };
-  isValid(context?: ValidationContextArg): Promise<boolean>;
-  constructor: {
-    name: string;
-  };
+  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
 }
 
-export async function save<T extends SaveRecord>(
-  this: T,
+export async function save(
+  this: SaveRecord,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: T) => void,
-): Promise<boolean | undefined> {
-  if (registry()[(this.constructor as { name: string }).name]) {
-    return true;
-  }
-  await (
-    this.constructor as unknown as { ensureSchemaLoaded(): Promise<void> }
-  ).ensureSchemaLoaded();
-  const self = this as any;
-  const ctor = this.constructor;
-
+  block?: (record: any) => void,
+): Promise<boolean> {
   try {
-    return (await withTransactionReturningStatus.call(self, async () => {
-      const validationsPassed = await performValidations.call(this, options);
-      if (!validationsPassed) return false;
-      if (this._newRecord && isStiSubclass(ctor)) {
-        const col = getStiBase(ctor).inheritanceColumn;
-        if (col && !this._readAttribute(col)) {
-          this._attributes.writeCastValue(col, this.constructor.name);
-        }
-      }
-
-      return self.createOrUpdate(options?.touch ?? true, block);
-    })) as boolean | undefined;
+    return await this.createOrUpdate(options?.touch ?? true, block);
   } catch (e) {
     if (e instanceof RecordInvalid) return false;
     throw e;
   }
 }
 
-export async function saveBang<
-  T extends SaveRecord & {
-    save(
-      o?: { validate?: boolean; touch?: boolean },
-      block?: (record: T) => void,
-    ): Promise<boolean | undefined>;
-  },
->(
-  this: T,
+export async function saveBang(
+  this: SaveRecord,
   options?: { validate?: boolean; touch?: boolean },
-  block?: (record: T) => void,
-): Promise<true | undefined> {
-  const result = await this.save(options, block);
-  if (result === false) {
-    if ((this as unknown as { errors: { isAny(): boolean } }).errors.isAny()) {
-      raiseValidationError(this);
-    }
+  block?: (record: any) => void,
+): Promise<true> {
+  if (!(await this.createOrUpdate(options?.touch ?? true, block))) {
     throw new RecordNotSaved("Failed to save the record", this as unknown as object);
   }
-  return result;
+  return true;
 }
 
 interface DestroyRecord {

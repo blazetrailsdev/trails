@@ -26,3 +26,11 @@ export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise
     registry()[name] = previousState;
   }
 }
+
+export async function save<T>(this: Base, superFn: () => Promise<T>): Promise<T | true> {
+  return registry()[this.constructor.name] ? true : superFn();
+}
+
+export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promise<T | true> {
+  return registry()[this.constructor.name] ? true : superFn();
+}

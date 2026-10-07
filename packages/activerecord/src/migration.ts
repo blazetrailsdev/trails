@@ -184,10 +184,11 @@ export class PendingMigrationError extends MigrationError {
 
   /** @internal */
   detailedMigrationMessage(pendingMigrations: Array<{ filename?: string }>): string {
-    const env = Migration.env();
     let message =
-      "Migrations are pending. To resolve this issue, run:\n\n        bin/rails db:migrate";
-    if (env !== "development" && env !== "test") message += ` RAILS_ENV=${env}`;
+      "Migrations are pending. To resolve this issue, run:\n\n        bin/trails db migrate";
+    if (TopLevel.Trails !== undefined && !TopLevel.Trails.env["local?"]()) {
+      message += ` TRAILS_ENV=${TopLevel.Trails.env}`;
+    }
     message += "\n\n";
     message += `You have ${pendingMigrations.length} pending ${pendingMigrations.length > 1 ? "migrations:" : "migration:"}\n\n`;
     for (const pendingMigration of pendingMigrations) {
@@ -209,9 +210,9 @@ export class ConcurrentMigrationError extends MigrationError {
 export class NoEnvironmentInSchemaError extends MigrationError {
   constructor() {
     const msg =
-      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/rails db:environment:set";
-    if (TopLevel.Trails?.env !== undefined) {
-      super(`${msg} RAILS_ENV=${TopLevel.Trails.env}`);
+      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/trails db environment:set";
+    if (TopLevel.Trails !== undefined) {
+      super(`${msg} TRAILS_ENV=${TopLevel.Trails.env}`);
     } else {
       super(msg);
     }

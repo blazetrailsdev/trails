@@ -263,6 +263,7 @@ import * as _NoTouching from "./no-touching.js";
 import * as _Transactions from "./transactions.js";
 import * as _Callbacks from "./callbacks.js";
 import { suppress as _suppressBlock } from "./suppressor.js";
+import * as _Suppressor from "./suppressor.js";
 import {
   inspect as _inspect,
   equals as _equals,
@@ -2147,6 +2148,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<boolean | undefined>;
+  /** @internal */
+  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
   saveBang(
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
@@ -2427,8 +2430,6 @@ include(Base, {
   incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
-  save: _Persistence.save,
-  saveBang: _Persistence.saveBang,
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
@@ -2625,6 +2626,36 @@ include(Base, {
 });
 
 for (const [name, fn] of [
+  [
+    "save",
+    function (
+      this: Base,
+      options?: { validate?: boolean; touch?: boolean },
+      block?: (record: Base) => void,
+    ): Promise<boolean | undefined> {
+      return _Suppressor.save.call(this, () =>
+        _Transactions.save.call(this, () =>
+          _Validations.save.call(this, options, () => _Persistence.save.call(this, options, block)),
+        ),
+      ) as Promise<boolean | undefined>;
+    },
+  ],
+  [
+    "saveBang",
+    function (
+      this: Base,
+      options?: { validate?: boolean; touch?: boolean },
+      block?: (record: Base) => void,
+    ): Promise<true | undefined> {
+      return _Suppressor.saveBang.call(this, () =>
+        _Transactions.saveBang.call(this, () =>
+          _Validations.saveBang.call(this, options, () =>
+            _Persistence.saveBang.call(this, options, block),
+          ),
+        ),
+      ) as Promise<true | undefined>;
+    },
+  ],
   [
     "createOrUpdate",
     function (this: Base, touch = true, block?: (record: Base) => void): Promise<boolean> {

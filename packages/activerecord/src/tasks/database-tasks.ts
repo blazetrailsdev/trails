@@ -351,7 +351,7 @@ export class DatabaseTasks {
 
   static checkSchemaFile(filename: string): void {
     if (!File.isExist(filename)) {
-      let message = `${filename} doesn't exist yet. Run \`bin/rails db:migrate\` to create it, then try again.`;
+      let message = `${filename} doesn't exist yet. Run \`bin/trails db migrate\` to create it, then try again.`;
       const root = trailsRoot();
       if (root != null) {
         message += ` If you do not intend to use a database, you should instead alter ${root}/config/application.rb to limit the frameworks that will be loaded.`;
