@@ -365,7 +365,6 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _take?: T | null;
   protected _offsets?: Map<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
@@ -1400,10 +1399,6 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._model;
   }
 
-  get name(): RelationName {
-    return this.model.name;
-  }
-
   get loaded(): boolean {
     return this._loaded;
   }
@@ -1756,6 +1751,8 @@ export interface Relation<T extends Base, G extends boolean = false> extends Rel
   ): Promise<T[] | TResult>;
   /** @noRailsEquivalent PERMANENT */
   finally(onfinally?: (() => void) | null): Promise<T[]>;
+  /** @internal */
+  _take?: T | null;
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {
@@ -2022,6 +2019,7 @@ export interface Relation<T extends Base, G extends boolean = false> {
   get connection(): DatabaseAdapter;
   get primaryKey(): string | string[];
   get tableName(): string;
+  get name(): RelationName;
   withConnection<R>(
     fn: (conn: DatabaseAdapter) => R | Promise<R>,
     options?: { preventPermanentCheckout?: boolean; checkoutTimeout?: number },

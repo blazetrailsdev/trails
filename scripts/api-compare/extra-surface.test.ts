@@ -4541,6 +4541,60 @@ describe("inlinedModuleMembers", () => {
     ]);
   });
 
+  describe("an includer's own `_name` method beside a module's `name`", () => {
+    const delegationModules = {
+      "ActiveRecord::Delegation": rubyClass({
+        name: "Delegation",
+        file: "relation/delegation.rb",
+        klass: [method("create")],
+      }),
+    };
+    const delegationShort = new Map([["Delegation", ["ActiveRecord::Delegation"]]]);
+    const bodied = new Map([
+      ["relation.ts", new Set(["create", "_create"])],
+      ["relation/delegation.ts", new Set(["create"])],
+    ]);
+    const relation = (instance: MethodInfo[]) => ({
+      "ActiveRecord::Relation": rubyClass({
+        name: "Relation",
+        file: "relation.rb",
+        includes: ["Delegation"],
+        instance,
+      }),
+    });
+
+    it("leaves the body that ports the includer's own method alone", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          relation([method("create"), method("_create")]),
+          delegationModules,
+          delegationShort,
+          bodied,
+        ),
+      ).toEqual([]);
+    });
+
+    it("still reports the underscored body of an includer with no such method", () => {
+      expect(
+        inlinedModuleMembers(
+          "activerecord",
+          relation([method("create")]),
+          delegationModules,
+          delegationShort,
+          bodied,
+        ),
+      ).toEqual([
+        {
+          tsFile: "relation.ts",
+          tsName: "_create",
+          moduleRubyFile: "relation/delegation.rb",
+          rubyName: "create",
+        },
+      ]);
+    });
+  });
+
   describe("a module `new` override beside the includer's constructor", () => {
     const dedupModules = {
       "ActiveRecord::ConnectionAdapters::Deduplicable": rubyClass({

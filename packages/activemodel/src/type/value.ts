@@ -35,16 +35,15 @@ export class ValueType<T = unknown> {
     return this.__limit;
   }
 
-  constructor({
-    precision = null,
-    limit = null,
-    scale = null,
-  }: {
-    precision?: number | null;
-    limit?: number | null;
-    scale?: number | null;
-  } = {}) {
-    initializeIncludedModules(this);
+  constructor(
+    kwargs: {
+      precision?: number | null;
+      limit?: number | null;
+      scale?: number | null;
+    } = {},
+  ) {
+    const { precision = null, limit = null, scale = null } = kwargs;
+    initializeIncludedModules(this, kwargs);
     this._precision = precision;
     this._scale = scale;
     this.__limit = limit;
