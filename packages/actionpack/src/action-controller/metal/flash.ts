@@ -97,4 +97,3 @@ export const Flash = new Module((mod) => {
   mod.defineMethod("redirectTo", redirectTo);
 }) as Module<{ redirectTo: typeof redirectTo }> & { ClassMethods: typeof ClassMethods };
 Flash.ClassMethods = ClassMethods;
-export type Flash = { redirectTo: typeof redirectTo };

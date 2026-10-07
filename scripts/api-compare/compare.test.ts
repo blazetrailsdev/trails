@@ -3487,9 +3487,6 @@ describe("mixinMethodCreditedToOwnFile", () => {
   });
 
   it("credits an includer's inherited initialize to the mixin file's [initialize] hook", () => {
-    // ActionController::API defines no `initialize`; it inherits
-    // `UrlFor#initialize` (metal/url_for.rb:32-35) through MODULES, and the
-    // port is the module's hook, which `Metal`'s constructor runs.
     expect(
       mixinMethodCreditedToOwnFile(
         { rubyName: "initialize", rubyModule: "Host", mixinFile: "metal/url_for.rb" },

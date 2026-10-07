@@ -51,6 +51,32 @@ export class API extends Metal {
     return this;
   }
 
+  static MODULES: Array<Parameters<typeof include>[1]> = [
+    AbstractControllerRendering,
+
+    UrlFor,
+    Redirecting,
+    ApiRendering,
+    Renderers.All,
+    ConditionalGet,
+    BasicImplicitRender,
+    StrongParameters,
+    RateLimiting,
+    Caching,
+
+    DataStreaming,
+    DefaultHeaders,
+    Logging,
+
+    Callbacks,
+
+    Rescue,
+
+    Instrumentation,
+
+    ParamsWrapper,
+  ];
+
   declare static raiseOnOpenRedirects: boolean;
 
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
@@ -64,20 +90,6 @@ export class API extends Metal {
   declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
 }
 
-include(API, AbstractControllerRendering);
-include(API, UrlFor);
-include(API, Redirecting);
-include(API, ApiRendering);
-include(API, Renderers.All);
-include(API, ConditionalGet);
-include(API, BasicImplicitRender);
-include(API, StrongParameters);
-include(API, RateLimiting);
-include(API, Caching);
-include(API, DataStreaming);
-include(API, DefaultHeaders);
-include(API, Logging);
-include(API, Callbacks);
-include(API, Rescue);
-include(API, Instrumentation);
-include(API, ParamsWrapper);
+for (const mod of API.MODULES) {
+  include(API, mod);
+}
