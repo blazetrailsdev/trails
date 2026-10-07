@@ -7,16 +7,7 @@ export interface PGConnection extends pg.Client {
   asyncExec(sql: string | null): Promise<PGResult>;
   execParams(sql: string | null, params: unknown[]): Promise<PGResult>;
   unescapeBytea(value: string | Uint8Array): Buffer;
-  socketIo(): SocketIO | null;
-}
-
-interface Socket {
-  removeAllListeners?(): unknown;
-  unref?(): unknown;
-}
-
-interface SocketIO {
-  reopen(path: string): void;
+  socketIo(): { reopen(path: string): void } | null;
 }
 
 type QueryConfig = string | Record<string, unknown> | null;
@@ -134,8 +125,12 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
   return Buffer.from(bytes);
 }
 
-function socketIo(this: pg.Client): SocketIO | null {
-  const stream = (this as unknown as { connection?: { stream?: Socket } }).connection?.stream;
+function socketIo(this: pg.Client): { reopen(path: string): void } | null {
+  const stream = (
+    this as unknown as {
+      connection?: { stream?: { removeAllListeners?(): unknown; unref?(): unknown } };
+    }
+  ).connection?.stream;
   if (!stream) return null;
   return {
     reopen(_path: string): void {

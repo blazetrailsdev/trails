@@ -1525,10 +1525,20 @@ export function rbObjAlloc<T>(klass: { prototype: T }): T {
   return Object.create(klass.prototype as object) as T;
 }
 
+/**
+ * The allocation step of `rb_obj_clone2` / `rb_obj_dup`
+ * (`vendor/ruby/v3.3.11/object.c:531,598`): `rb_obj_alloc(rb_obj_class(obj))`,
+ * re-seated on `proto`, which is the singleton class when a clone keeps one.
+ * A JS built-in holds its content in internal slots that only its own
+ * constructor can fill and that `initialize_copy` cannot write afterwards (a
+ * `RegExp`'s source, a `Date`'s time value), so those are built from `obj`
+ * here, where MRI's allocator and `init_copy` are two steps.
+ */
 function allocLike(obj: object, proto: object | null): object {
   const klass = (proto as { constructor?: unknown } | null)?.constructor;
-  const allocator = rbGetAllocFunc(klass);
-  if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
+  if (rbGetAllocFunc(klass)) {
+    return Object.setPrototypeOf(rbObjAlloc(klass as { prototype: object }), proto);
+  }
   if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
   if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
   if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);

@@ -160,6 +160,29 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(Object.keys(record)).toEqual([]);
     expect([ownState(Reply), ownState(Topic)]).toEqual(before);
   });
+
+  it("a loaded record holds what init_with_attributes assigns, and runs no field initializer", async () => {
+    class Flagged extends Topic {
+      seated = true;
+    }
+    const source = await Topic.create({ title: "Dana" });
+    const handed = (
+      source as unknown as { _attributes: { deepDup(): unknown } }
+    )._attributes.deepDup();
+    const loaded = (
+      rbObjAlloc(Flagged) as Flagged & { initWithAttributes(attributes: unknown): Flagged }
+    ).initWithAttributes(handed);
+    expect(Object.hasOwn(loaded, "seated")).toBe(false);
+    expect(new Flagged().seated).toBe(true);
+    const state = loaded as unknown as Record<string, unknown>;
+    expect(state._readonly).toBe(false);
+    expect(state._destroyed).toBe(false);
+    expect(state._previouslyNewRecord).toBe(false);
+    expect(state._mutationsBeforeLastSave).toBeNull();
+    expect(loaded.isNewRecord()).toBe(false);
+    expect(loaded.errors.isEmpty()).toBe(true);
+    expect(loaded.hasChangesToSave).toBe(false);
+  });
 });
 
 describe("DatabaseConfigurations.new given a DatabaseConfigurations", () => {

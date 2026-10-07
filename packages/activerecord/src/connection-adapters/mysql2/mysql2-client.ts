@@ -4,11 +4,6 @@ export interface Mysql2Client extends mysql.Connection {
   automaticClose: boolean;
 }
 
-interface Socket {
-  removeAllListeners?(): unknown;
-  unref?(): unknown;
-}
-
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
 
 const automaticClose: PropertyDescriptor = {
@@ -16,10 +11,13 @@ const automaticClose: PropertyDescriptor = {
   get(this: object): boolean {
     return AUTOMATIC_CLOSE.get(this) ?? true;
   },
-  set(this: { stream?: Socket; connection?: { stream?: Socket } }, value: boolean) {
+  set(
+    this: { connection?: { stream?: { removeAllListeners?(): unknown; unref?(): unknown } } },
+    value: boolean,
+  ) {
     AUTOMATIC_CLOSE.set(this, value);
     if (value) return;
-    const stream = this.connection?.stream ?? this.stream;
+    const stream = this.connection?.stream;
     stream?.removeAllListeners?.();
     stream?.unref?.();
   },

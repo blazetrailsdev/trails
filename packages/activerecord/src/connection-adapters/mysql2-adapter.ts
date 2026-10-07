@@ -329,14 +329,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   override discardBang(): void {
-    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
-      this._discardedConnectGenerations.add(this._connectGeneration);
-    }
-    this._connectGeneration++;
-    this._connectionConfigured = false;
-    this._statements = null;
     void this.lock.synchronize(() => {
       super.discardBang();
+      if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
+        this._discardedConnectGenerations.add(this._connectGeneration);
+      }
+      this._connectGeneration++;
+      this._connectionConfigured = false;
+      this._statements = null;
       if (this._rawConnection) this._rawConnection.automaticClose = false;
       this._rawConnection = null;
     });
