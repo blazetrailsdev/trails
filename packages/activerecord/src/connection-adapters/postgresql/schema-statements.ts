@@ -626,20 +626,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
-  /** @internal */
-  async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {
-    if (columnNumbers.length === 0) return [];
-    const rows = await this.query(
-      `SELECT a.attnum, a.attname
-       FROM pg_attribute a
-       WHERE a.attrelid = ${tableOid}
-       AND a.attnum IN (${columnNumbers.join(", ")})`,
-      "SCHEMA",
-    );
-    const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
-    return valuesAt(map, ...columnNumbers).filter((name): name is string => name != null);
-  }
-
   override columnsForDistinct(columns: string | string[], orders?: (string | ArelNode)[]): string {
     const visitor = this.visitor;
     const orderColumns = compactBlank(
@@ -999,44 +985,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     );
   }
 
-  /** @internal */
-  assertValidDeferrable(deferrable: unknown): void {
-    if (
-      deferrable == null ||
-      deferrable === false ||
-      deferrable === "immediate" ||
-      deferrable === "deferred"
-    )
-      return;
-    throw new ArgumentError(
-      `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${rbInspect(deferrable)}\``,
-    );
-  }
-
-  /** @internal */
-  override extractForeignKeyAction(
-    specifier: string,
-  ): "cascade" | "nullify" | "restrict" | undefined {
-    switch (specifier) {
-      case "c":
-        return "cascade";
-      case "n":
-        return "nullify";
-      case "r":
-        return "restrict";
-      default:
-        return undefined;
-    }
-  }
-
-  /** @internal */
-  extractConstraintDeferrable(
-    deferrable: boolean,
-    deferred: boolean,
-  ): "deferred" | "immediate" | false {
-    return deferrable && (deferred ? "deferred" : "immediate");
-  }
-
   /** @missingRailsCall order:unquoteIdentifier,map — CONVERGEABLE pg-schema-statements-reflection-maps-rows-through-an-awaiting-map */
   override async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const scope = this.quotedScope(tableName);
@@ -1220,44 +1168,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     });
   }
 
-  /** @internal */
-  exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    return fetch<string>(
-      options as Record<string, string>,
-      "name",
-      block(() => {
-        const expression = fetch<unknown>(symbolizeKeys(options), ":expression");
-        const identifier = `${tableName}_${toS(expression)}_excl`;
-        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
-
-        return `excl_rails_${hashedIdentifier}`;
-      }),
-    );
-  }
-
-  /** @internal */
-  async exclusionConstraintFor(
-    tableName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<ExclusionConstraintDefinition | undefined> {
-    const exclName = this.exclusionConstraintName(tableName, options);
-    return (await this.exclusionConstraints(tableName)).find((excl) => excl.name === exclName);
-  }
-
-  /** @internal */
-  async exclusionConstraintForBang(
-    tableName: string,
-    { expression = null, ...options }: Record<string, unknown>,
-  ): Promise<ExclusionConstraintDefinition> {
-    const excl = await this.exclusionConstraintFor(tableName, { expression, ...options });
-    if (!rtest(excl)) {
-      throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(expression ?? symbolizeKeys(options))}`,
-      );
-    }
-    return excl!;
-  }
-
   /** @inventedArm compact — PERMANENT */
   uniqueConstraintOptions(
     tableName: string,
@@ -1338,54 +1248,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       );
     }
     return uniqueConstraints;
-  }
-
-  /** @internal */
-  uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
-    return fetch<string>(
-      options as Record<string, string>,
-      "name",
-      block(() => {
-        const columnOrIndex = wrap(options.column || options.usingIndex).map(toS);
-        const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
-        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
-
-        return `uniq_rails_${hashedIdentifier}`;
-      }),
-    );
-  }
-
-  /** @internal */
-  async uniqueConstraintFor(
-    tableName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
-    const constraints = await this.uniqueConstraints(tableName);
-    return constraints.find((c) => c.definedFor({ name, ...options }));
-  }
-
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
-   */
-  async uniqueConstraintForBang(
-    tableName: string,
-    { column = null, ...options }: Record<string, unknown>,
-  ): Promise<UniqueConstraintDefinition> {
-    const uniqueConstraint = await this.uniqueConstraintFor(tableName, { column, ...options });
-    if (!rtest(uniqueConstraint)) {
-      const columnToS =
-        column == null
-          ? rbInspect(symbolizeKeys(options))
-          : Array.isArray(column)
-            ? `[${(column as string[])
-                .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))
-                .join(", ")}]`
-            : String(column).replace(/^:/, "");
-      throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
-    }
-    return uniqueConstraint!;
   }
 
   /** @internal */
@@ -1484,6 +1346,44 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
+  override extractForeignKeyAction(
+    specifier: string,
+  ): "cascade" | "nullify" | "restrict" | undefined {
+    switch (specifier) {
+      case "c":
+        return "cascade";
+      case "n":
+        return "nullify";
+      case "r":
+        return "restrict";
+      default:
+        return undefined;
+    }
+  }
+
+  /** @internal */
+  assertValidDeferrable(deferrable: unknown): void {
+    if (
+      deferrable == null ||
+      deferrable === false ||
+      deferrable === "immediate" ||
+      deferrable === "deferred"
+    )
+      return;
+    throw new ArgumentError(
+      `deferrable must be \`:immediate\` or \`:deferred\`, got: \`${rbInspect(deferrable)}\``,
+    );
+  }
+
+  /** @internal */
+  extractConstraintDeferrable(
+    deferrable: boolean,
+    deferred: boolean,
+  ): "deferred" | "immediate" | false {
+    return deferrable && (deferred ? "deferred" : "immediate");
+  }
+
+  /** @internal */
   referenceNameForTable(tableName: string): string {
     const [, table] = this.extractSchemaQualifiedName(tableName);
     return singularize(table);
@@ -1560,6 +1460,92 @@ export class SchemaStatements extends AbstractSchemaStatements {
   }
 
   /** @internal */
+  exclusionConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
+    return fetch<string>(
+      options as Record<string, string>,
+      "name",
+      block(() => {
+        const expression = fetch<unknown>(symbolizeKeys(options), ":expression");
+        const identifier = `${tableName}_${toS(expression)}_excl`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+
+        return `excl_rails_${hashedIdentifier}`;
+      }),
+    );
+  }
+
+  /** @internal */
+  async exclusionConstraintFor(
+    tableName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<ExclusionConstraintDefinition | undefined> {
+    const exclName = this.exclusionConstraintName(tableName, options);
+    return (await this.exclusionConstraints(tableName)).find((excl) => excl.name === exclName);
+  }
+
+  /** @internal */
+  async exclusionConstraintForBang(
+    tableName: string,
+    { expression = null, ...options }: Record<string, unknown>,
+  ): Promise<ExclusionConstraintDefinition> {
+    const excl = await this.exclusionConstraintFor(tableName, { expression, ...options });
+    if (!rtest(excl)) {
+      throw new ArgumentError(
+        `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(expression ?? symbolizeKeys(options))}`,
+      );
+    }
+    return excl!;
+  }
+
+  /** @internal */
+  uniqueConstraintName(tableName: string, options: Record<string, unknown> = {}): string {
+    return fetch<string>(
+      options as Record<string, string>,
+      "name",
+      block(() => {
+        const columnOrIndex = wrap(options.column || options.usingIndex).map(toS);
+        const identifier = `${tableName}_${columnOrIndex.join("_and_")}_unique`;
+        const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
+
+        return `uniq_rails_${hashedIdentifier}`;
+      }),
+    );
+  }
+
+  /** @internal */
+  async uniqueConstraintFor(
+    tableName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<UniqueConstraintDefinition | undefined> {
+    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
+    const constraints = await this.uniqueConstraints(tableName);
+    return constraints.find((c) => c.definedFor({ name, ...options }));
+  }
+
+  /**
+   * @internal
+   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
+   */
+  async uniqueConstraintForBang(
+    tableName: string,
+    { column = null, ...options }: Record<string, unknown>,
+  ): Promise<UniqueConstraintDefinition> {
+    const uniqueConstraint = await this.uniqueConstraintFor(tableName, { column, ...options });
+    if (!rtest(uniqueConstraint)) {
+      const columnToS =
+        column == null
+          ? rbInspect(symbolizeKeys(options))
+          : Array.isArray(column)
+            ? `[${(column as string[])
+                .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))
+                .join(", ")}]`
+            : String(column).replace(/^:/, "");
+      throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
+    }
+    return uniqueConstraint!;
+  }
+
+  /** @internal */
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   /** @internal */
   dataSourceSql(options: { type?: string }): string;
@@ -1612,6 +1598,20 @@ export class SchemaStatements extends AbstractSchemaStatements {
   extractSchemaQualifiedName(string: string): [string | null, string] {
     const name = Utils.extractSchemaQualifiedName(string);
     return [name.schema, name.identifier];
+  }
+
+  /** @internal */
+  async columnNamesFromColumnNumbers(tableOid: number, columnNumbers: number[]): Promise<string[]> {
+    if (columnNumbers.length === 0) return [];
+    const rows = await this.query(
+      `SELECT a.attnum, a.attname
+       FROM pg_attribute a
+       WHERE a.attrelid = ${tableOid}
+       AND a.attnum IN (${columnNumbers.join(", ")})`,
+      "SCHEMA",
+    );
+    const map = new Map(rows.map((r) => [Number(r[0]), r[1] as string]));
+    return valuesAt(map, ...columnNumbers).filter((name): name is string => name != null);
   }
 }
 
