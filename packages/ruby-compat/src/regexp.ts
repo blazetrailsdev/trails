@@ -26,16 +26,56 @@ export function regexpEscape(string: string): string {
  * pattern only where the engine has them: Node 23, Chrome 125, Firefox 132,
  * Safari 18.4.
  *
+ * `syntax: "onig"` spells the group with MRI's own option letters instead
+ * (`option_to_str`, `vendor/ruby/v3.3.11/re.c:322`), the bytes MRI's `to_s`
+ * writes: JS's `s` is MRI's `m`, and JS has no `x`. That string is a pattern
+ * for MRI, not for JS, and {@link rbRegInitStr} reads it back.
+ *
  * @noRailsEquivalent PERMANENT
  */
-export function rbRegToS(re: RegExp): string {
+export function rbRegToS(re: RegExp, syntax: "js" | "onig" = "js"): string {
   let on = "";
   let off = "";
+  if (syntax === "onig") {
+    for (const [opt, flag] of [
+      ["m", "s"],
+      ["i", "i"],
+      ["x", ""],
+    ]) {
+      if (flag !== "" && re.flags.includes(flag)) on += opt;
+      else off += opt;
+    }
+    return `(?${on}${off ? `-${off}` : ""}:${re.source})`;
+  }
   for (const opt of "ims") {
     if (re.flags.includes(opt)) on += opt;
     else off += opt;
   }
   return `(?${on}${off ? `-${off}` : ""}:${re.source})`;
+}
+
+/**
+ * `Regexp.new(string)` (`rb_reg_init_str`, `vendor/ruby/v3.3.11/re.c:3360`) for
+ * a pattern in MRI's syntax. A pattern that is wholly one `(?on-off:…)` group,
+ * the form MRI's `Regexp#to_s` writes, becomes the group's body under the JS
+ * flags its options name, which is the pattern `rb_reg_str_with_term`
+ * (`vendor/ruby/v3.3.11/re.c:575-640`) folds it back to. Anything else is
+ * compiled as it stands, so an MRI-only construct (`(?x:…)`) is a
+ * `SyntaxError`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegInitStr(s: string): RegExp {
+  const m = /^\(\?([mi]*)(?:-([mix]*))?:([\s\S]*)\)$/.exec(s);
+  if (m) {
+    const flags = (m[1].includes("i") ? "i" : "") + (m[1].includes("m") ? "s" : "");
+    try {
+      return new RegExp(m[3], flags);
+    } catch (e) {
+      if (!(e instanceof SyntaxError)) throw e;
+    }
+  }
+  return new RegExp(s);
 }
 
 /**

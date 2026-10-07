@@ -4,11 +4,17 @@ import { Temporal, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,
+  Generic,
+  IPAddr,
+  Pathname,
+  Range,
   Rational,
   RuntimeError,
+  URI,
   complex,
   env as ENV,
   rational,
+  rbRegEqual,
   setEnv,
 } from "@blazetrails/ruby-compat";
 import { days, hours, minutes, months, seconds, weeks, years } from "../duration.js";
@@ -68,7 +74,12 @@ describe("MessagePackSerializerTest", () => {
       8: "ActiveSupport::TimeWithZone",
       9: "ActiveSupport::TimeZone",
       10: "ActiveSupport::Duration",
+      11: "Range",
       12: "Set",
+      13: "URI::Generic",
+      14: "IPAddr",
+      15: "Pathname",
+      16: "Regexp",
       17: "ActiveSupport::HashWithIndifferentAccess",
       127: "Object",
     });
@@ -174,6 +185,58 @@ describe("MessagePackSerializerTest", () => {
     expect(duration.eql(roundtrip(duration))).toBe(true);
     const monthAndDay = months(1).plus(days(1));
     expect(monthAndDay.eql(roundtrip(monthAndDay))).toBe(true);
+  });
+
+  it("roundtrips Range", () => {
+    for (const range of [
+      new Range(1, 2),
+      new Range(1, 2, true),
+      new Range(1, null),
+      new Range(1, null, true),
+      new Range(null, 2),
+      new Range(null, 2, true),
+      new Range("1", "2"),
+      new Range("1", "2", true),
+    ]) {
+      const deserialized = roundtrip(range) as Range;
+      expect(deserialized).toBeInstanceOf(Range);
+      expect(range.equals(deserialized)).toBe(true);
+    }
+  });
+
+  it("roundtrips URI::Generic", () => {
+    const uri = URI.parse("https://example.com/#test");
+    const deserialized = roundtrip(uri) as Generic;
+    expect(deserialized).toBeInstanceOf(uri.constructor);
+    expect(deserialized.toString()).toBe(uri.toString());
+  });
+
+  it("roundtrips IPAddr", () => {
+    const assertRoundtrip = (object: IPAddr) => {
+      const deserialized = roundtrip(object) as IPAddr;
+      expect(deserialized).toBeInstanceOf(IPAddr);
+      expect(object.eql(deserialized)).toBe(true);
+    };
+    assertRoundtrip(new IPAddr("127.0.0.1"));
+    assertRoundtrip(new IPAddr("1.1.1.1/16"));
+    expect((roundtrip(new IPAddr("1.1.1.1/16")) as IPAddr).prefix).toBe(16);
+
+    assertRoundtrip(new IPAddr("::1"));
+    assertRoundtrip(new IPAddr("1:1:1:1:1:1:1:1/64"));
+    expect((roundtrip(new IPAddr("1:1:1:1:1:1:1:1/64")) as IPAddr).prefix).toBe(64);
+  });
+
+  it("roundtrips Pathname", () => {
+    const pathname = new Pathname(import.meta.url);
+    const deserialized = roundtrip(pathname) as Pathname;
+    expect(deserialized).toBeInstanceOf(Pathname);
+    expect(pathname.equals(deserialized)).toBe(true);
+  });
+
+  it("roundtrips Regexp", () => {
+    const deserialized = roundtrip(/.*/s) as RegExp;
+    expect(deserialized).toBeInstanceOf(RegExp);
+    expect(rbRegEqual(/.*/s, deserialized)).toBe(true);
   });
 
   it("roundtrips ActiveSupport::HashWithIndifferentAccess", () => {
