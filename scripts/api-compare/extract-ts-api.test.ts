@@ -2079,6 +2079,23 @@ describe("body call capture", () => {
     expect(lazy.calls ?? []).not.toContain("@import");
   });
 
+  it("marks setTimeout as the native form of Kernel#sleep, and setInterval not at all", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        backoff(counter: number): Promise<void> {
+          return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
+        }
+        poll(): void {
+          setInterval(() => this.backoff(1), 1000);
+        }
+      }`,
+    );
+    const backoff = cls.instanceMethods.find((m) => m.name === "backoff")!;
+    expect(backoff.calls).toContain("@timer");
+    const poll = cls.instanceMethods.find((m) => m.name === "poll")!;
+    expect(poll.calls ?? []).not.toContain("@timer");
+  });
+
   it("records rbFSend / rbFPublicSend of a string-literal name as a call to that name", () => {
     const cls = extractFromSource(
       `class Foo {

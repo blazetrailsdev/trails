@@ -239,6 +239,18 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `DEFAULT_ENV()`), and a `(callable || block).call`
  *   (`activerecord/lib/active_record/statement_cache.rb:133`) is credited by
  *   an invocation of either operand.
+ * - `sleep` → `timer`: a `setTimeout(...)` call, the only way JS suspends —
+ *   `Kernel#sleep` (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`)
+ *   suspends the thread and returns the seconds slept, and a JS port awaits
+ *   `new Promise((resolve) => setTimeout(resolve, ms))`, which records no
+ *   callee named `sleep`. `setInterval` is NOT marked: it repeats where
+ *   `sleep` suspends once, so a repeating timer must not credit a one-shot
+ *   wait. Admitted only for an implicit-self receiver, the one shape
+ *   `Kernel#sleep` takes (`rb_define_global_function`, `process.c:9125`), so
+ *   an `x.sleep` site still flags. What this gives up is the INTERVAL: the
+ *   Ruby call leaves significance, so its call-argument row goes with it and
+ *   nothing compares `0.1 * counter` against the ms the port passes. Write the
+ *   Rails constant so the unit is legible at the call site.
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
@@ -253,6 +265,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["prepend", { form: "unshift", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
+  ["sleep", { form: "timer", receivers: "implicit-self" }],
 ]);
 
 /**

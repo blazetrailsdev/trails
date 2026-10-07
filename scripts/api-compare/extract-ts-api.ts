@@ -6564,6 +6564,12 @@ function collectCalls(
         if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
           names.add(`${NATIVE_FORM_PREFIX}String`);
         }
+        // `setTimeout(...)` is the whole port of `Kernel#sleep` (see
+        // NATIVE_FORM_ANALOGUES' `sleep`). `setInterval` is deliberately not
+        // marked: it repeats where `sleep` suspends once.
+        if (!skipHoistedClosures && callee.text === "setTimeout") {
+          names.add(`${NATIVE_FORM_PREFIX}timer`);
+        }
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
         const prop = callee.name.text;

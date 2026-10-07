@@ -520,6 +520,20 @@ describe("significantMissingCalls", () => {
     expect(significantCallsForReceivers({}).has("load")).toBe(true);
   });
 
+  it("significantCallsForReceivers drops an implicit-self sleep for a TS body with a setTimeout", () => {
+    const timer = new Set(["timer"]);
+    expect(significantCallsForReceivers({}, undefined, timer).has("sleep")).toBe(false);
+    // `x.sleep` is not Kernel#sleep, so an explicit receiver keeps flagging.
+    expect(significantCallsForReceivers({ sleep: ["expr"] }, undefined, timer).has("sleep")).toBe(
+      true,
+    );
+    // No setTimeout in the port — the wait was dropped, not ported.
+    expect(significantCallsForReceivers({}).has("sleep")).toBe(true);
+    expect(significantCallsForReceivers({}, undefined, new Set(["setInterval"])).has("sleep")).toBe(
+      true,
+    );
+  });
+
   it("significantCallsForReceivers drops Proc#call for a TS body that invokes the receiver", () => {
     const resolver = new Set(invokeForms(["tableNameResolver"]));
     expect(
