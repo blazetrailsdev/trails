@@ -2,12 +2,8 @@ import { rbModConstSet, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 import type { Packer } from "./packer.js";
 
-export interface CoreExtHost<T> {
-  toMsgpackWithPacker(self: T, packer: Packer): Packer;
-}
-
 function toMsgpack<T>(
-  this: CoreExtHost<T>,
+  this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
   self: T,
   packerOrIo: unknown = null,
 ): Uint8Array | Packer {

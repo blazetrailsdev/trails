@@ -1,12 +1,4 @@
-import "./version.js";
-import "./buffer.js";
-import "./packer.js";
-import "./unpacker.js";
-import "./factory.js";
 import "./symbol.js";
-import "./core-ext.js";
-import "./timestamp.js";
-import "./time.js";
 
 export { Bigint } from "./bigint.js";
 export * from "./buffer.js";

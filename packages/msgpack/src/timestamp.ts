@@ -38,20 +38,18 @@ export class Timestamp {
   }
 
   static toMsgpackExt(sec: number | bigint, nsec: number): Uint8Array {
-    let packed: string;
     if (sec >= 0 && nsec >= 0 && sec <= Timestamp.TIMESTAMP64_MAX_SEC) {
       if (nsec === 0 && sec <= Timestamp.TIMESTAMP32_MAX_SEC) {
-        packed = pack([sec], "L>");
+        return Uint8Array.from(pack([sec], "L>"), (c) => c.charCodeAt(0));
       } else {
         const nsec30 = BigInt(nsec) << 2n;
         const secHigh2 = BigInt(sec) >> 32n;
         const secLow32 = BigInt(sec) & 0xffffffffn;
-        packed = pack([nsec30 | secHigh2, secLow32], "L>2");
+        return Uint8Array.from(pack([nsec30 | secHigh2, secLow32], "L>2"), (c) => c.charCodeAt(0));
       }
     } else {
-      packed = pack([nsec, sec], "L>q>");
+      return Uint8Array.from(pack([nsec, sec], "L>q>"), (c) => c.charCodeAt(0));
     }
-    return Uint8Array.from(packed, (c) => c.charCodeAt(0));
   }
 
   toMsgpackExt(): Uint8Array {
