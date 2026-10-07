@@ -1,3 +1,6 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { MessagePack } from "./namespaces.js";
+
 export class Buffer {
   /** @internal */
   chunks: Uint8Array[] = [];
@@ -45,3 +48,5 @@ export class Buffer {
     return this.toStr();
   }
 }
+
+rbModConstSet(MessagePack, "Buffer", Buffer);

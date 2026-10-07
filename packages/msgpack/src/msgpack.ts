@@ -1,7 +1,9 @@
+import { rbModConstSet } from "@blazetrails/ruby-compat";
 import { Factory } from "./factory.js";
+import { MessagePack } from "./namespaces.js";
 import type { Unpacker } from "./unpacker.js";
 
-export const DefaultFactory = new Factory();
+export const DefaultFactory = rbModConstSet(MessagePack, "DefaultFactory", new Factory());
 
 export function load(src: unknown, param: object | null = null): unknown {
   let unpacker: Unpacker;
@@ -29,3 +31,8 @@ export function pack(v: unknown, io: unknown = null, options: object | null = nu
 export function dump(v: unknown, io: unknown = null, options: object | null = null): Uint8Array {
   return pack(v, io, options);
 }
+
+MessagePack.load = load;
+MessagePack.unpack = unpack;
+MessagePack.pack = pack;
+MessagePack.dump = dump;

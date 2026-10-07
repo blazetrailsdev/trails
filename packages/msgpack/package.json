@@ -9,6 +9,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./core-ext": {
+      "types": "./dist/core-ext.d.ts",
+      "default": "./dist/core-ext.js"
     }
   },
   "files": [
@@ -19,6 +23,7 @@
   },
   "license": "MIT",
   "dependencies": {
+    "@blazetrails/date": "workspace:*",
     "@blazetrails/ruby-compat": "workspace:*",
     "@msgpack/msgpack": "^3.1.3"
   }

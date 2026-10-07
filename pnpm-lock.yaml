@@ -423,6 +423,9 @@ importers:
 
   packages/msgpack:
     dependencies:
+      '@blazetrails/date':
+        specifier: workspace:*
+        version: link:../date
       '@blazetrails/ruby-compat':
         specifier: workspace:*
         version: link:../ruby-compat

@@ -18,6 +18,7 @@ import {
   rbObjMethod,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import { MessagePack } from "./namespaces.js";
 import { MSGPACK_EXT_RECURSIVE, Packer } from "./packer.js";
 import type { PackerExtRegistry, PackerProc } from "./packer.js";
 import { Unpacker } from "./unpacker.js";
@@ -360,3 +361,4 @@ export class Pool {
 
 rbModConstSet(Pool, "MemberPool", MemberPool);
 rbModConstSet(Factory, "Pool", Pool);
+rbModConstSet(MessagePack, "Factory", Factory);

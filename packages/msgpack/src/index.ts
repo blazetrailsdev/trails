@@ -1,57 +1,14 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
-import { Bigint } from "./bigint.js";
-import { Buffer } from "./buffer.js";
-import { Factory } from "./factory.js";
-import { DefaultFactory, dump, load, pack, unpack } from "./msgpack.js";
-import { Packer } from "./packer.js";
 import "./symbol.js";
-import {
-  MalformedFormatError,
-  StackError,
-  UnexpectedTypeError,
-  UnknownExtTypeError,
-  UnpackError,
-  Unpacker,
-} from "./unpacker.js";
-import { VERSION } from "./version.js";
 
 export { Bigint } from "./bigint.js";
 export * from "./buffer.js";
+export { CoreExt } from "./core-ext.js";
 export { Factory } from "./factory.js";
 export type { RegisterTypeOptions, RegisteredType } from "./factory.js";
 export * from "./msgpack.js";
+export { MessagePack } from "./namespaces.js";
 export * from "./packer.js";
+export * from "./time.js";
+export * from "./timestamp.js";
 export * from "./unpacker.js";
 export * from "./version.js";
-
-export const MessagePack = { name: "MessagePack", load, unpack, pack, dump } as {
-  readonly name: string;
-  load: typeof load;
-  unpack: typeof unpack;
-  pack: typeof pack;
-  dump: typeof dump;
-  VERSION: typeof VERSION;
-  Bigint: typeof Bigint;
-  Buffer: typeof Buffer;
-  Packer: typeof Packer;
-  Unpacker: typeof Unpacker;
-  UnpackError: typeof UnpackError;
-  MalformedFormatError: typeof MalformedFormatError;
-  StackError: typeof StackError;
-  UnexpectedTypeError: typeof UnexpectedTypeError;
-  UnknownExtTypeError: typeof UnknownExtTypeError;
-  Factory: typeof Factory;
-  DefaultFactory: typeof DefaultFactory;
-};
-rbModConstSet(MessagePack, "VERSION", VERSION);
-rbModConstSet(MessagePack, "Bigint", Bigint);
-rbModConstSet(MessagePack, "Buffer", Buffer);
-rbModConstSet(MessagePack, "Packer", Packer);
-rbModConstSet(MessagePack, "Unpacker", Unpacker);
-rbModConstSet(MessagePack, "UnpackError", UnpackError);
-rbModConstSet(MessagePack, "MalformedFormatError", MalformedFormatError);
-rbModConstSet(MessagePack, "StackError", StackError);
-rbModConstSet(MessagePack, "UnexpectedTypeError", UnexpectedTypeError);
-rbModConstSet(MessagePack, "UnknownExtTypeError", UnknownExtTypeError);
-rbModConstSet(MessagePack, "Factory", Factory);
-rbModConstSet(MessagePack, "DefaultFactory", DefaultFactory);
