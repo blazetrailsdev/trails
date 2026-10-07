@@ -1,5 +1,4 @@
-import { aryCount } from "@blazetrails/ruby-compat";
-import { applyThenable } from "../thenable.js";
+import { AsyncEnumerable, aryCount, include } from "@blazetrails/ruby-compat";
 import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {
@@ -52,11 +51,6 @@ export class BatchEnumerator<T extends BatchRelation> {
     return this._of;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    yield* this.each();
-  }
-
   eachRecord(): AsyncGenerator<any>;
   eachRecord(fn: (record: any) => void | Promise<void>): Promise<void>;
   eachRecord(fn?: (record: any) => void | Promise<void>): AsyncGenerator<any> | Promise<void> {
@@ -82,52 +76,26 @@ export class BatchEnumerator<T extends BatchRelation> {
     })();
   }
 
-  /**
-   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   */
-  async deleteAll(): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += await batchRelation.deleteAll();
-    }
-    return total;
+  deleteAll(): Promise<number> {
+    return this.sum((relation) => relation.deleteAll());
   }
 
-  /**
-   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   */
-  async updateAll(updates: Record<string, unknown>): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += await batchRelation.updateAll(updates);
-    }
-    return total;
+  updateAll(updates: Record<string, unknown>): Promise<number> {
+    return this.sum((relation) => {
+      return relation.updateAll(updates);
+    });
   }
 
-  /**
-   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   */
-  async touchAll(...args: TouchAllArgs): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += await batchRelation.touchAll(...args);
-    }
-    return total;
+  touchAll(...args: TouchAllArgs): Promise<number> {
+    return this.sum((relation) => {
+      return relation.touchAll(...args);
+    });
   }
 
-  /**
-   * @missingRailsCall sum — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   * @inventedArm loop — CONVERGEABLE batch-enumerator-enumerable-over-an-async-each
-   */
-  async destroyAll(): Promise<number> {
-    let total = 0;
-    for await (const batchRelation of this) {
-      total += aryCount(await batchRelation.destroyAll(), (r) => r.isDestroyed());
-    }
-    return total;
+  destroyAll(): Promise<number> {
+    return this.sum(async (relation) => {
+      return aryCount(await relation.destroyAll(), (r) => r.isDestroyed());
+    });
   }
 
   each(): AsyncGenerator<T>;
@@ -149,28 +117,12 @@ export class BatchEnumerator<T extends BatchRelation> {
       }
     })();
   }
-
-  async toArray(): Promise<T[]> {
-    const batches: T[] = [];
-    for await (const batch of this) {
-      batches.push(batch);
-    }
-    return batches;
-  }
 }
 
 export interface BatchEnumerator<T extends BatchRelation> {
-  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
-  then<TResult1 = T[], TResult2 = never>(
-    onfulfilled?: ((value: T[]) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
-  ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
-  catch<TResult = never>(
-    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
-  ): Promise<T[] | TResult>;
-  /** @noRailsEquivalent CONVERGEABLE batch-enumerator-enumerable-over-an-async-each */
-  finally(onfinally?: (() => void) | null): Promise<T[]>;
+  sum(block: (relation: T) => number | Promise<number>): Promise<number>;
+  toA(): Promise<T[]>;
+  [Symbol.asyncIterator](): AsyncIterator<T>;
 }
 
-applyThenable(BatchEnumerator.prototype);
+include(BatchEnumerator, AsyncEnumerable);

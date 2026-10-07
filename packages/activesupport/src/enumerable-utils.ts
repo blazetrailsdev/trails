@@ -1,6 +1,5 @@
 import {
   Hash,
-  Rational,
   hashAref,
   numericPlus,
   rbBigNorm,
@@ -8,108 +7,13 @@ import {
   rbEqual,
   rbFloatTypeP,
   rbIntegerTypeP,
-  rbPlus,
+  sumIter,
 } from "@blazetrails/ruby-compat";
+import type { EnumSumMemo } from "@blazetrails/ruby-compat";
 import { Range } from "@blazetrails/ruby-compat/range";
 import { SoleItemExpectedError } from "./core-ext/enumerable.js";
 import { isPlainObject, valuesAt } from "./hash-utils.js";
 import { isBlank } from "./string-utils.js";
-
-interface EnumSumMemo {
-  v: unknown;
-  r: Rational | undefined;
-  n: number;
-  f: number;
-  c: number;
-  blockGiven: boolean;
-  floatValue: boolean;
-}
-
-function sumIterNormalizeMemo(memo: EnumSumMemo): void {
-  memo.v = numericPlus(memo.n, memo.v);
-  memo.n = 0;
-  if (memo.r !== undefined) memo.v = numericPlus(memo.r, memo.v);
-  memo.r = undefined;
-}
-
-function sumIterFixnum(i: number, memo: EnumSumMemo): void {
-  if (Number.isSafeInteger(memo.n + i)) {
-    memo.n += i;
-  } else {
-    memo.v = numericPlus(rbBigNorm(BigInt(memo.n) + BigInt(i)), memo.v);
-    memo.n = 0;
-  }
-}
-
-function sumIterBignum(i: bigint, memo: EnumSumMemo): void {
-  memo.v = numericPlus(i, memo.v);
-}
-
-function sumIterRational(i: Rational, memo: EnumSumMemo): void {
-  if (memo.r === undefined) memo.r = i;
-  else memo.r = memo.r.add(i);
-}
-
-/** `sum_iter_some_value` (`vendor/ruby/v3.3.11/enum.c:4581`): `memo->v + i`. */
-function sumIterSomeValue(i: unknown, memo: EnumSumMemo): void {
-  memo.v = rbPlus(memo.v, i);
-}
-
-function sumIterKahanBabuska(i: unknown, memo: EnumSumMemo): void {
-  let x: number;
-  if (rbFloatTypeP(i)) x = i.valueOf();
-  else if (typeof i === "number") x = i;
-  else if (typeof i === "bigint") x = Number(i);
-  else if (i instanceof Rational) x = i.toF();
-  else {
-    memo.v = rbDbl2num(memo.f);
-    memo.floatValue = false;
-    sumIterSomeValue(i, memo);
-    return;
-  }
-  const f = memo.f;
-  if (Number.isNaN(f)) return;
-  else if (!Number.isFinite(x)) {
-    if (!Number.isNaN(x) && !Number.isFinite(f) && x > 0 !== f > 0) {
-      i = rbDbl2num(f);
-      x = NaN;
-    }
-    memo.v = i;
-    memo.f = x;
-    return;
-  } else if (!Number.isFinite(f)) return;
-
-  let c = memo.c;
-  const t = f + x;
-  if (Math.abs(f) >= Math.abs(x)) c += f - t + x;
-  else c += x - t + f;
-  memo.f = t;
-  memo.c = c;
-}
-
-function sumIter<T>(i: unknown, memo: EnumSumMemo, block?: (element: T) => unknown): void {
-  if (memo.blockGiven) i = block!(i as T);
-
-  if (memo.floatValue) {
-    sumIterKahanBabuska(i, memo);
-  } else if (rbIntegerTypeP(memo.v) || rbFloatTypeP(memo.v) || memo.v instanceof Rational) {
-    if (typeof i === "number" && Number.isInteger(i)) sumIterFixnum(i, memo);
-    else if (typeof i === "bigint") sumIterBignum(i, memo);
-    else if (i instanceof Rational) sumIterRational(i, memo);
-    else if (rbFloatTypeP(i)) {
-      sumIterNormalizeMemo(memo);
-      memo.f = memo.v instanceof Rational ? memo.v.toF() : Number((memo.v as number).valueOf());
-      memo.c = 0.0;
-      memo.floatValue = true;
-      sumIterKahanBabuska(i, memo);
-    } else {
-      sumIterNormalizeMemo(memo);
-      sumIterSomeValue(i, memo);
-    }
-  } else {
-    sumIterSomeValue(i, memo);
-  }
-}
 
 function intRangeSum(beg: number | bigint, end: number | bigint, excl: boolean, init: unknown) {
   if (excl) end = typeof end === "bigint" ? end - 1n : end - 1;
@@ -152,7 +56,7 @@ export function sum<T>(collection: Iterable<T> | Range<T>, ...args: unknown[]): 
   }
 
   const each = collection instanceof Range ? collection.each() : collection;
-  for (const element of each) sumIter(element, memo, block);
+  for (const element of each) sumIter(memo.blockGiven ? block!(element) : element, memo);
 
   if (memo.floatValue) {
     return rbDbl2num(memo.f + memo.c);

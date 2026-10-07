@@ -24,6 +24,25 @@ describe("BatchEnumerator (trails)", () => {
     expect(await idsOf()).toEqual(first);
   });
 
+  it("toA collects every batch relation", async () => {
+    const batches = await Post.inBatches({ of: 2 }).toA();
+    const ids: number[] = [];
+    for (const relation of batches) ids.push(...(await relation.pluck("id")).map(Number));
+    expect(ids).toEqual((await Post.order("id").pluck("id")).map(Number));
+  });
+
+  it("sum settles one batch's block before the next batch is fetched", async () => {
+    const events: string[] = [];
+    const total = await Post.inBatches({ of: 1 }).sum(async (relation) => {
+      events.push("enter");
+      const count = await relation.count();
+      events.push("leave");
+      return count;
+    });
+    expect(total).toBe(await Post.count());
+    expect(events).toEqual(Array.from({ length: total }, () => ["enter", "leave"]).flat());
+  });
+
   it("eachRecord honours the cursor it was built with", async () => {
     const records: Post[] = [];
     await Post.inBatches({ of: 1, cursor: "id", order: ":desc" }).eachRecord((post: Post) => {

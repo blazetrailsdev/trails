@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { Enumerable } from "./enumerable.js";
+import { AsyncEnumerable, Enumerable } from "./enumerable.js";
 import { include } from "./include.js";
+import { Rational } from "./rational.js";
 
 class Bag {
   yielded = 0;
@@ -90,5 +91,60 @@ describe("Enumerable", () => {
     include(Child, Enumerable);
     expect([...new Child([1, 2])]).toEqual([1, 2]);
     expect([...new Parent([1, 2])]).toEqual(["parent"]);
+  });
+});
+
+class AsyncBag {
+  constructor(private readonly items: unknown[]) {}
+
+  each(): AsyncIterable<unknown>;
+  each(block: (i: unknown) => unknown): Promise<void>;
+  each(block?: (i: unknown) => unknown): AsyncIterable<unknown> | Promise<void> {
+    const items = this.items;
+    const enumerator = (async function* () {
+      yield* items;
+    })();
+    if (!block) return enumerator;
+    return (async () => {
+      for await (const i of enumerator) await block(i);
+    })();
+  }
+}
+
+describe("AsyncEnumerable", () => {
+  it("toA collects what each yields", async () => {
+    expect(await AsyncEnumerable.toA.call(new AsyncBag([1, 2, 3]))).toEqual([1, 2, 3]);
+  });
+
+  it("sum adds the elements to the initial value, as enum_sum does", async () => {
+    expect(await AsyncEnumerable.sum.call(new AsyncBag([1, 2, 3]))).toBe(6);
+    expect(await AsyncEnumerable.sum.call(new AsyncBag([]))).toBe(0);
+    expect(await AsyncEnumerable.sum.call(new AsyncBag([1, 2]), 10)).toBe(13);
+    expect(await AsyncEnumerable.sum.call(new AsyncBag([0.1, 0.2, 0.3]))).toBe(0.6);
+    expect(await AsyncEnumerable.sum.call(new AsyncBag(["a", "b"]), "x")).toBe("xab");
+    const half = new Rational(1, 2);
+    expect(await AsyncEnumerable.sum.call(new AsyncBag([half, half, half]))).toEqual(
+      new Rational(3, 2),
+    );
+  });
+
+  it("sum awaits the block before each yields the next element", async () => {
+    const events: string[] = [];
+    const total = await AsyncEnumerable.sum.call(new AsyncBag([1, 2]), async (i: unknown) => {
+      events.push(`enter ${i}`);
+      await Promise.resolve();
+      events.push(`leave ${i}`);
+      return (i as number) * 2;
+    });
+    expect(total).toBe(6);
+    expect(events).toEqual(["enter 1", "leave 1", "enter 2", "leave 2"]);
+  });
+
+  it("the async iterator reads the blockless each", async () => {
+    class Included extends AsyncBag {}
+    include(Included, AsyncEnumerable);
+    const seen: unknown[] = [];
+    for await (const i of new Included([1, 2]) as unknown as AsyncIterable<unknown>) seen.push(i);
+    expect(seen).toEqual([1, 2]);
   });
 });

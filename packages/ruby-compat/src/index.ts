@@ -25,8 +25,8 @@ export {
   rubyClass,
 } from "./comparable.js";
 export type { Comparable } from "./comparable.js";
-export { Enumerable } from "./enumerable.js";
-export type { Each } from "./enumerable.js";
+export { AsyncEnumerable, Enumerable, sumIter } from "./enumerable.js";
+export type { AsyncEach, Each, EnumSumMemo } from "./enumerable.js";
 export {
   basicObjRespondTo,
   objRespondToMissing,

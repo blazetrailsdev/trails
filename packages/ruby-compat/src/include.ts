@@ -1390,7 +1390,7 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
         string | symbol,
         PropertyDescriptor
       >;
-      for (const key of [...Object.keys(modDescs), Symbol.iterator]) {
+      for (const key of [...Object.keys(modDescs), Symbol.iterator, Symbol.asyncIterator]) {
         const modDesc = modDescs[key];
         if (modDesc === undefined) continue;
         if (key === "constructor" || (typeof key === "string" && /^[A-Z]/.test(key))) continue;
