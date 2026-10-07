@@ -288,6 +288,10 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
   }
 }
 
+export function destroy<T>(this: Base, superFn: () => Promise<T>): Promise<T> {
+  return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
+}
+
 export function touch(
   this: Base,
   args: unknown[],

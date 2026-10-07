@@ -496,12 +496,14 @@ interface DestroyRecord {
   constructor: { name: string };
 }
 
-export async function destroy<T extends DestroyRecord>(this: T): Promise<T | false> {
+export async function destroy<T extends DestroyRecord>(this: T): Promise<T> {
   const self = this as any;
   if (this.isReadonly()) self._raiseReadonlyRecordError();
-
-  const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
-  return result ? this : false;
+  await self.destroyAssociations();
+  self._triggerDestroyCallback ||= self.isPersisted() && (await self.destroyRow()) > 0;
+  self._destroyed = true;
+  self._previouslyNewRecord = false;
+  return self.freeze();
 }
 
 export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(

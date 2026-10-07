@@ -1653,7 +1653,6 @@ export class Base extends Model {
 
   _newRecord = true;
   _destroyed = false;
-  _destroyCallbackAlreadyCalled = false;
   _readonly = false;
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
@@ -1793,32 +1792,6 @@ export class Base extends Model {
         assoc?.setTarget?.(null);
       }
     }
-  }
-
-  private async _destroyRow(): Promise<boolean> {
-    await this._preloadBelongsToForDestroyCallbacks();
-
-    let didDelete = false;
-    const destroyResult = await callbacksDestroy.call(this, async () => {
-      await (this as any).destroyAssociations();
-
-      if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
-
-      this._destroyed = true;
-      this._previouslyNewRecord = false;
-      this.freeze();
-      return true;
-    });
-
-    if (!destroyResult) return false;
-
-    if (didDelete) {
-      (this as any)._triggerDestroyCallback = true;
-      (this as any)._newRecordBeforeLastCommit = false;
-      (this as any)._triggerUpdateCallback = false;
-    }
-
-    return true;
   }
 
   static async delete(id: unknown): Promise<number> {
@@ -2479,7 +2452,6 @@ include(Base, {
   toggleBang: _Persistence.toggleBang,
   save: _Persistence.save,
   saveBang: _Persistence.saveBang,
-  destroy: _Persistence.destroy,
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
@@ -2696,6 +2668,15 @@ for (const [name, fn] of [
       return Timestamp._createRecord.call(this as any, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
+    },
+  ],
+  [
+    "destroy",
+    function (this: Base): Promise<unknown> {
+      return _Transactions.destroy.call(this, async () => {
+        await this["_preloadBelongsToForDestroyCallbacks"]();
+        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
+      });
     },
   ],
   [
