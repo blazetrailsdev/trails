@@ -184,6 +184,26 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     ]);
   });
 
+  it("unrolls a brace-block include loop and leaves a loop with another body alone", () => {
+    const includes = rubyIncludes({
+      "api.rb": `
+        module ActionController
+          class API
+            MODULES = [UrlFor, Redirecting]
+            OTHERS = [Rescue]
+
+            MODULES.each { |mod| include mod }
+            OTHERS.each do |mod|
+              puts mod
+              include mod
+            end
+          end
+        end
+      `,
+    });
+    expect(includes["ActionController::API"]).toEqual(["UrlFor", "Redirecting"]);
+  });
+
   function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
     return rubyField(fixtures, "skeleton");
   }

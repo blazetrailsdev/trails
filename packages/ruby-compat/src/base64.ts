@@ -13,6 +13,18 @@ const B64_TABLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012345678
  */
 export class Base64 {
   /**
+   * `Base64.encode64` (`vendor/ruby/v3.3.11/lib/base64.rb:219`), which is
+   * `[bin].pack("m")` (`base64.rb:220`): Base64 over the String's BYTES, with a
+   * line feed after every 60 encoded characters and at the end.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby stdlib `Base64.encode64`
+   * (`vendor/ruby/v3.3.11/lib/base64.rb:219`).
+   */
+  static encode64(bin: string): string {
+    return pack([bin], "m");
+  }
+
+  /**
    * `Base64.strict_encode64` (`vendor/ruby/v3.3.11/lib/base64.rb:273`), which is
    * `[bin].pack("m0")` (`base64.rb:274`) — Base64 over the String's BYTES,
    * with no line breaks.

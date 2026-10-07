@@ -1,5 +1,5 @@
 import { beforeEach, describe, it, expect } from "vitest";
-import { pack, rbInspect } from "@blazetrails/ruby-compat";
+import { Base64, rbInspect } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { HttpAuthentication } from "../metal/http-authentication.js";
 import { TestCase } from "../test-case.js";
@@ -166,7 +166,7 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("successful authentication with uppercase authorization scheme", async () => {
-    tc.request.env["HTTP_AUTHORIZATION"] = `BASIC ${pack(["lifo:world"], "m")}`;
+    tc.request.env["HTTP_AUTHORIZATION"] = `BASIC ${Base64.encode64("lifo:world")}`;
     await tc.get("index");
 
     assertResponse("success");
@@ -193,14 +193,14 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   it("authentication request with a missing password", async () => {
-    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${pack(["David"], "m")}`;
+    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${Base64.encode64("David")}`;
     await tc.get("search");
 
     assertResponse("unauthorized");
   });
 
   it("authentication request with no required password", async () => {
-    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${pack(["George"], "m")}`;
+    tc.request.env["HTTP_AUTHORIZATION"] = `Basic ${Base64.encode64("George")}`;
     await tc.get("no_password");
 
     assertResponse("success");
@@ -244,6 +244,6 @@ describe("HttpBasicAuthenticationTest", () => {
   });
 
   function encodeCredentials(username: string, password: string): string {
-    return `Basic ${pack([`${username}:${password}`], "m")}`;
+    return `Basic ${Base64.encode64(`${username}:${password}`)}`;
   }
 });
