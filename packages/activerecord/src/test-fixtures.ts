@@ -44,10 +44,8 @@ import {
 export type { FixtureName } from "./test-helpers/fixtures-registry.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
-import {
-  warmSchemaCacheBeforeFirstTest,
-  type WithTransactionalFixturesOptions,
-} from "./test-fixtures/with-transactional-fixtures.js";
+import type { WithTransactionalFixturesOptions } from "./test-fixtures/with-transactional-fixtures.js";
+import { eagerWarmSchemaCache } from "./support/schema-cache-dump.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { PoolConfig } from "./connection-adapters/pool-config.js";
 import { writingRole } from "./active-record.js";
@@ -143,13 +141,6 @@ export type FixtureSetAccessor<T> = {
   (...fixtureNames: unknown[]): Array<T | Promise<T>>;
 };
 
-type ResolvedFixtureSet = {
-  table: string;
-  model: BaseClass | null;
-  data: Record<string, FixtureAttrs>;
-};
-type ResolvedFixtureMap = Record<string, ResolvedFixtureSet>;
-
 type FixtureAccessor<T extends BaseClass, K extends string> = {
   (name: K, forceReload: true): Promise<InstanceType<T>>;
   (...names: [K, K, ...K[]]): InstanceType<T>[];
@@ -177,43 +168,6 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
     ? JoinTableAccessor<Extract<keyof RegistryData<K>, string>>
     : FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
 };
-
-/**
- * Resolves fixture-set names through the registry into their table and model.
- * Model classes are dynamic-imported (see {@link FixtureRegistryEntry}), so this is async.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE FixtureSet.create_fixtures' name-to-model resolution (fixtures.rb:595), async because model classes load by dynamic import.
- */
-export async function resolveFixtureNames(
-  names: readonly FixtureName[],
-): Promise<ResolvedFixtureMap> {
-  const map: ResolvedFixtureMap = {};
-  for (const name of names) {
-    const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
-    if (!entry) {
-      throw new StandardError(
-        `useFixtures: no fixture set named "${name}" in the registry — add it to fixtures-registry.ts`,
-      );
-    }
-    let table: string;
-    let model: BaseClass | null;
-    if (isJoinTableEntry(entry)) {
-      table = entry.joinTable;
-      model = null;
-    } else {
-      if ("addOn" in entry) await entry.addOn?.();
-      const resolved = await entry.model();
-      const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
-      registerModel(models);
-      const m = models[0];
-      table = m.tableName!;
-      model = m;
-    }
-    map[name] = { table, model, data: entry.data };
-  }
-  return map;
-}
 
 const alreadyLoadedFixtures = new Map<unknown[], Record<string, FixtureSet>>();
 
@@ -694,12 +648,15 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   const names = klass.fixtureTableNames.filter(
     (fsName) => fixtureRegistryNames.has(fsName) && !(fsName in klass.fixtureClassNames),
   );
-  const resolved = await resolveFixtureNames(
-    names.map((fsName) => fixtureRegistryNames.get(fsName)!),
-  );
   const classNames: Record<string, unknown> = {};
-  for (const [name, { model }] of Object.entries(resolved)) {
-    if (model !== null) classNames[underscore(name)] = model;
+  for (const fsName of names) {
+    const entry = fixtureRegistry[fixtureRegistryNames.get(fsName)!];
+    if (isJoinTableEntry(entry)) continue;
+    if ("addOn" in entry) await entry.addOn?.();
+    const resolved = await entry.model();
+    const models = (Array.isArray(resolved) ? resolved : [resolved]) as BaseClass[];
+    registerModel(models);
+    classNames[fsName] = models[0];
   }
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
@@ -781,7 +738,12 @@ export function fixtures(
 ): Record<string, unknown> {
   const { usesTransaction, useTransactionalTests, useInstantiatedFixtures } = options ?? {};
 
-  warmSchemaCacheBeforeFirstTest();
+  let warmed = false;
+  beforeEach(async () => {
+    if (warmed) return;
+    warmed = true;
+    await Base.withConnection(eagerWarmSchemaCache);
+  });
   const klass = testCaseClassFor(getCurrentSuite().suite as SuiteScope | undefined);
   klass.usesTransaction(...(usesTransaction ?? []));
   if (useTransactionalTests !== undefined) klass.useTransactionalTests = useTransactionalTests;

@@ -7,6 +7,7 @@ import {
   assertNoDifference,
   assertRaises,
   assertInDelta,
+  Logger,
 } from "@blazetrails/activesupport";
 import { adapterType } from "./test-adapter.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -15,8 +16,7 @@ import "./support/canonical-model-index.js";
 import { withDbWarningsAction } from "./support/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName } from "./support/quote-regex.js";
-import { regexpEscape } from "@blazetrails/ruby-compat";
-import { captureLogOutput } from "./testing/sql-capture.js";
+import { regexpEscape, StringIO } from "@blazetrails/ruby-compat";
 import { adapterSupports, itIfSupports } from "./support/supports.js";
 import { Base } from "./base.js";
 import { Result } from "./result.js";
@@ -449,23 +449,23 @@ describe("InsertAllTest", () => {
   );
 
   itIfSupports("insert_conflict_target", "insert logs message including model name", async () => {
-    const output = await captureLogOutput(async () => {
+    await captureLogOutput(async (output) => {
       await Book.insert({ name: "Rework", author_id: 1 });
+      expect(output.string()).toMatch("Book Insert");
     });
-    expect(output).toMatch("Book Insert");
   });
 
   itIfSupports(
     "insert_conflict_target",
     "insert all logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.insertAll([
           { name: "Remote", author_id: 1 },
           { name: "Renote", author_id: 1 },
         ]);
+        expect(output.string()).toMatch("Book Bulk Insert");
       });
-      expect(output).toMatch("Book Bulk Insert");
     },
   );
 
@@ -529,10 +529,10 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.upsert({ name: "Remote", author_id: 1 });
+        expect(output.string()).toMatch("Book Upsert");
       });
-      expect(output).toMatch("Book Upsert");
     },
   );
 
@@ -552,13 +552,13 @@ describe("InsertAllTest", () => {
     "insert_on_duplicate_update",
     "upsert all logs message including model name",
     async () => {
-      const output = await captureLogOutput(async () => {
+      await captureLogOutput(async (output) => {
         await Book.upsertAll([
           { name: "Remote", author_id: 1 },
           { name: "Renote", author_id: 1 },
         ]);
+        expect(output.string()).toMatch("Book Bulk Upsert");
       });
-      expect(output).toMatch("Book Bulk Upsert");
     },
   );
 
@@ -1265,4 +1265,16 @@ describe("InsertAllTest", () => {
       Book.tableName = "books";
     }
   });
+
+  async function captureLogOutput(block: (output: StringIO) => Promise<void>): Promise<void> {
+    const output = new StringIO();
+    const oldLogger = Base.logger;
+    Base.logger = new Logger(output);
+
+    try {
+      await block(output);
+    } finally {
+      Base.logger = oldLogger;
+    }
+  }
 });

@@ -20,7 +20,8 @@ import {
 } from "../testing/query-assertions.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { Treasure } from "../test-helpers/models/treasure.js";
-import { captureSql, captureSqlAndBinds } from "../testing/sql-capture.js";
+import { captureSql } from "../testing/sql-capture.js";
+import { captureSqlAndBinds } from "../test-helpers/test-case.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";

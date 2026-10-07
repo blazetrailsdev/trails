@@ -1,5 +1,4 @@
 import { Notifications } from "@blazetrails/activesupport";
-import { SQLCounter } from "./query-assertions.js";
 
 /** @internal */
 export interface StubbableAdapter {
@@ -29,22 +28,8 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
 }
 
 /**
- * Runs `fn` and returns every SQL string emitted via `sql.active_record`
- * during its execution.  Subscription is cleaned up afterward.
- *
- * Cached statements are always dropped (Rails SQLCounter parity). `name: "SCHEMA"`
- * introspection queries are dropped too, mirroring Rails'
- * `capture_sql(include_schema: false)` (test_case.rb:89), which returns
- * `counter.log` unless the caller opts in. Pass `{ includeSchema: true }` for
- * Rails' `log_all` behaviour.
- *
- * Pass `{ stub: adapter }` to intercept the adapter's `execute` so DDL is instrumented-and-returned without hitting the
- * DB — mirroring Rails' ActiveSchemaTest `setup` stub. This avoids issuing
- * real `CREATE TABLE` / `CREATE INDEX` round-trips for pure SQL-assertion
- * tests (and the mysql:8 DDL cost they carry).
- *
  * @internal
- * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql (test/cases/test_case.rb:90), async because the block it wraps is.
+ * @noRailsEquivalent CONVERGEABLE capture-sql-is-test-case-capture-sql-over-sql-counter-with-no-stub
  */
 export async function captureSql(
   fn: () => unknown,
@@ -68,45 +53,4 @@ export async function captureSql(
     Notifications.unsubscribe(sub);
   }
   return sqls;
-}
-
-/**
- * `ActiveRecord::TestCase#capture_sql_and_binds` (test/cases/test_case.rb:102).
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE ActiveRecord::TestCase#capture_sql_and_binds (test/cases/test_case.rb:102), async because the block it wraps is.
- */
-export async function captureSqlAndBinds(fn: () => unknown): Promise<[string, unknown[]][]> {
-  const counter = new SQLCounter();
-  return Notifications.subscribed(counter, "sql.active_record", async () => {
-    await fn();
-    return counter.logFull;
-  });
-}
-
-/**
- * captureLogOutput — mirror of Rails' `capture_log_output` test helper
- * (insert_all_test.rb). Rails swaps `ActiveRecord::Base.logger` for one backed
- * by a StringIO and yields the buffer; assertions then `assert_match` against
- * the accumulated log text. The Rails log line for a statement is the
- * `name` label ("Book Bulk Insert") followed by the SQL, so we reconstruct
- * the same `"<name> <sql>"` text from each `sql.active_record` event and
- * return the joined buffer.
- * @internal
- * @noRailsEquivalent CONVERGEABLE the capture_log_output helper of the Rails insert-all test (test/cases/insert_all_test.rb:849).
- */
-export async function captureLogOutput(fn: () => void | Promise<void>): Promise<string> {
-  let output = "";
-  const sub = Notifications.subscribe("sql.active_record", (event: any) => {
-    const payload = event.payload;
-    const name: unknown = payload?.name;
-    const sql: unknown = payload?.sql;
-    output += `${typeof name === "string" ? name : ""} ${typeof sql === "string" ? sql : ""}\n`;
-  });
-  try {
-    await fn();
-  } finally {
-    Notifications.unsubscribe(sub);
-  }
-  return output;
 }

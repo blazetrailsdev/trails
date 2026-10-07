@@ -2,7 +2,6 @@ import { describe, it, expect, expectTypeOf, vi, beforeAll, beforeEach, afterAll
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { include } from "@blazetrails/ruby-compat";
 import { onLoad } from "@blazetrails/activesupport";
-import { resolveFixtureNames } from "./test-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { registerModel } from "./associations.js";
 import { Fixture, FixtureSet } from "./fixtures.js";
@@ -578,20 +577,6 @@ describe("fixtureRegistry conformance", () => {
   });
 });
 
-describe("resolveFixtureNames same-table guard", () => {
-  it("resolves two requested sets that map to the same table", async () => {
-    const map = await resolveFixtureNames(["deadParrots", "liveParrots"]);
-    expect(Object.keys(map)).toEqual(["deadParrots", "liveParrots"]);
-    expect(map.deadParrots.table).toBe("parrots");
-    expect(map.liveParrots.table).toBe("parrots");
-  });
-
-  it("resolves distinct-table sets without error", async () => {
-    const map = await resolveFixtureNames(["authors", "posts"]);
-    expect(Object.keys(map)).toEqual(["authors", "posts"]);
-  });
-});
-
 describe("fixtures() loads multiple same-table fixture sets in one call", () => {
   const { deadParrots, liveParrots } = fixtures(["deadParrots", "liveParrots"]);
 
@@ -664,7 +649,30 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   });
 
   describe("encryptedBooks set", () => {
+    type SpyableEntry = { addOn?: () => Promise<void>; model: () => Promise<typeof Base> };
+    const entry = fixtureRegistry.encryptedBooks as unknown as SpyableEntry;
+    const originalAddOn = entry.addOn;
+    const originalModel = entry.model;
+    const order: string[] = [];
+    beforeAll(() => {
+      entry.addOn = vi.fn(async () => {
+        order.push("addOn");
+        await originalAddOn?.call(entry);
+      });
+      entry.model = vi.fn(async () => {
+        order.push("model");
+        return originalModel.call(entry);
+      });
+    });
+    afterAll(() => {
+      entry.addOn = originalAddOn;
+      entry.model = originalModel;
+    });
     const { encryptedBooks } = fixtures(["encryptedBooks"]);
+
+    it("awaits an entry's addOn before invoking its model thunk", () => {
+      expect(order).toEqual(["addOn", "model"]);
+    });
 
     it("reads the encrypted name attribute back as its expected plaintext", () => {
       expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
@@ -708,28 +716,6 @@ describe("useFixtures encryption add-on is opt-in", () => {
       typeof (fixtureRegistry.encryptedBookThatIgnoresCases as { addOn?: unknown }).addOn,
     ).toBe("function");
     expect((fixtureRegistry.authors as { addOn?: unknown }).addOn).toBeUndefined();
-  });
-
-  it("awaits an entry's addOn before invoking its model thunk", async () => {
-    type SpyableEntry = { addOn?: () => Promise<void>; model: () => Promise<typeof Base> };
-    const entry = fixtureRegistry.encryptedBooks as unknown as SpyableEntry;
-    const originalAddOn = entry.addOn;
-    const originalModel = entry.model;
-    const order: string[] = [];
-    entry.addOn = vi.fn(async () => {
-      order.push("addOn");
-    });
-    entry.model = vi.fn(async () => {
-      order.push("model");
-      return originalModel.call(entry);
-    });
-    try {
-      await resolveFixtureNames(["encryptedBooks"]);
-    } finally {
-      entry.addOn = originalAddOn;
-      entry.model = originalModel;
-    }
-    expect(order).toEqual(["addOn", "model"]);
   });
 });
 
