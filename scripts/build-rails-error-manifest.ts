@@ -83,9 +83,6 @@ interface ErrorClass {
   rubyFile: string;
 }
 
-// Each scanned gem's `[source, lib, namespace]`, keyed by its api-compare
-// package. A package nested in another's src dir (thor, sqlite3) is written
-// under the hosting directory, behind its subdirectory.
 const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]> = {
   ...Object.fromEntries(
     PACKAGES.map((pkg) => [pkg, ["rails", `${PKG_GEM[pkg]}/lib`, PKG_NS[pkg]]]),

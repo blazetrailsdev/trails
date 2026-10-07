@@ -358,9 +358,9 @@ export function pick<T, K extends keyof T>(
   if (collection.length === 0) return undefined;
 
   if (keys.length > 1) {
-    return keys.map((key) => collection[0][key]);
+    return keys.map((key) => hashAref(collection[0] as object, key) as T[K]);
   } else {
-    return collection[0][keys[0]];
+    return hashAref(collection[0] as object, keys[0]) as T[K];
   }
 }
 
