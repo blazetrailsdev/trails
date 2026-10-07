@@ -117,12 +117,15 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     if (force && this.klass) this.klass.connectionPool().clearQueryCache();
     this.reset();
     this.resetScope();
-    const self = (): this | null => {
-      if (this.target != null) return this;
-      return null;
-    };
     const loaded = this.loadTarget();
-    return loaded instanceof Promise ? loaded.then(self) : self();
+    if (loaded instanceof Promise) {
+      return loaded.then(() => {
+        if (this.target != null) return this;
+        return null;
+      });
+    }
+    if (this.target != null) return this;
+    return null;
   }
 
   setTarget(target: Base | Base[] | null): void {
