@@ -3,8 +3,10 @@ import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.j
 import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
+import type { Parameters } from "./strong-parameters.js";
 import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
 import { Concern, Module, extend, include, mattrAccessor } from "@blazetrails/activesupport";
+import { rbCheckStringType } from "@blazetrails/ruby-compat";
 import { Logger } from "../../abstract-controller/logger.js";
 import { UrlFor } from "./url-for.js";
 
@@ -24,7 +26,9 @@ export type RedirectToOptions =
   | ToModel
   | unknown[]
   | (UrlOptions & Record<string, unknown>)
-  | ((this: never) => RedirectToOptions);
+  | Parameters
+  | ((this: never) => RedirectToOptions)
+  | null;
 
 export interface RedirectToResponseOptions {
   status?: StatusSymbol | `:${StatusSymbol}` | number;
@@ -125,12 +129,10 @@ export function _computeRedirectToLocation(
   options: unknown,
 ): string {
   let result: string;
-  if (typeof options === "string") {
-    if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(options)) {
-      result = options;
-    } else {
-      result = `${request.protocol ?? ""}${request.hostWithPort?.() ?? ""}${options}`;
-    }
+  if (SCHEME_OR_PROTOCOL_RELATIVE_RE.test(rbCheckStringType(options) ?? "")) {
+    result = rbCheckStringType(options)!;
+  } else if (typeof options === "string") {
+    result = `${request.protocol ?? ""}${request.hostWithPort?.() ?? ""}${options}`;
   } else if (typeof options === "function") {
     const self = this as RedirectingHost | undefined;
     const resolved = (options as (this: unknown) => unknown).call(self);
