@@ -51,7 +51,6 @@ import { ActionController } from "../../namespaces.js";
 export class ParameterMissing extends KeyError {
   readonly param: string;
   readonly keys: string[] | null;
-  declare originalMessage: () => string;
   #cachedCorrections?: string[];
 
   constructor(param: string, keys: string[] | null = null) {
