@@ -872,18 +872,14 @@ export function dup(
   return hashDup(hash, hash.constructor as new () => Hash<unknown, unknown>);
 }
 
-/**
- * `RHASH_PASS_AS_KEYWORDS` (`vendor/ruby/v3.3.11/internal/hash.h:23`), a bit in
- * the hash's own `basic.flags`: the hashes that carry it. Membership is per
- * object and is no property of the hash, so no key enumeration or serializer
- * sees it.
- */
 const RHASH_PASS_AS_KEYWORDS = new WeakSet<object>();
 
 /**
  * Ruby `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`
  * `rb_hash_s_ruby2_keywords_hash_p`): whether this hash object is flagged to
- * be passed as keywords.
+ * be passed as keywords. The flag is MRI's `RHASH_PASS_AS_KEYWORDS`
+ * (`vendor/ruby/v3.3.11/internal/hash.h:23`), a bit in the hash's own header
+ * and no entry of the hash, so no key enumeration or serializer sees it.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`).
  */
 export function rbHashSRuby2KeywordsHashP(hash: object): boolean {
