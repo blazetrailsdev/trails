@@ -189,15 +189,11 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
 }
 
 export function lookupCastTypeFromColumn(
-  this: { typeMap: LookupableTypeMap | null; verifyBang(): Promise<void> },
+  this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
   if (this.typeMap == null) void this.verifyBang();
-  return this.typeMap!.lookup(
-    column.oid as number,
-    column.fmod as number,
-    column.sqlType as string,
-  );
+  return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 
 /**

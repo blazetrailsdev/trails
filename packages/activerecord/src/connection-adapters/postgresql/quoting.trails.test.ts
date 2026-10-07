@@ -251,16 +251,18 @@ ActiveRecord.raiseIntWiderThan64bit to false.
     expect(calls).toEqual([[23, -1, "integer"]]);
   });
 
-  it("lookupCastTypeFromColumn starts verify! when no type map is built", () => {
+  it("lookupCastTypeFromColumn runs verify! when no type map is built", () => {
+    const sentinel = new ValueType();
     let verified = 0;
     const host = {
-      typeMap: null,
+      typeMap: null as unknown as { lookup(): ValueType },
       async verifyBang() {
         verified += 1;
+        host.typeMap = { lookup: () => sentinel };
       },
     };
 
-    expect(() => lookupCastTypeFromColumn.call(host, { oid: 23, fmod: -1 })).toThrow(TypeError);
+    expect(lookupCastTypeFromColumn.call(host, { oid: 23, fmod: -1 })).toBe(sentinel);
     expect(verified).toBe(1);
   });
 
