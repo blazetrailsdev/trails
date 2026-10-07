@@ -247,7 +247,15 @@ class ExpoSqliteConnection implements SqliteConnection {
     try {
       sql = sql.slice(0, tail);
       const stmt = empty ? null : await this.raw.prepareAsync(sql);
-      const columnCount = stmt === null ? 0 : (await stmt.getColumnNamesAsync()).length;
+      let columnCount = 0;
+      if (stmt !== null) {
+        try {
+          columnCount = (await stmt.getColumnNamesAsync()).length;
+        } catch (e) {
+          await stmt.finalizeAsync();
+          throw e;
+        }
+      }
       return new ExpoSqliteStatement(stmt, columnCount, remainder);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql);

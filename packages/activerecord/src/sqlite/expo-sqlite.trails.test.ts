@@ -385,6 +385,39 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
     }
   });
 
+  it("prepare finalizes the statement when its column names cannot be read", async () => {
+    let finalized = 0;
+    const native = new Error("Error code 1: SQL logic error");
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {
+              finalized++;
+            },
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      const error = await Promise.resolve(conn.prepare("SELECT 1")).then(
+        () => null,
+        (e: unknown) => e,
+      );
+      expect(error).toBeInstanceOf(Error);
+      expect(finalized).toBe(1);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
   it("a closed statement raises SQLite3::Exception, and reads its own text for reader", async () => {
     const { conn, errors } = await openWith(readonly("unused"));
     const empty = await conn.prepare("-- nothing; here\n; SELECT 1");
