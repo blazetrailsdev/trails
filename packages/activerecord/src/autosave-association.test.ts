@@ -2756,7 +2756,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
           async () => {
             const exception = await assertRaises([RecordInvalid], {}, () => author.saveBang());
 
-            expect(exception.message).toEqual("Validation failed: Published books is invalid");
+            expect(exception.message).toEqual("Validation failed: Publishedbooks is invalid");
           },
         );
       },
