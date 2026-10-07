@@ -2656,11 +2656,12 @@ for (const [name, fn] of [
       options?: { validate?: boolean; touch?: boolean },
       block?: (record: Base) => void,
     ): Promise<boolean | undefined> {
-      return _Suppressor.save.call(this, () =>
-        _Transactions.save.call(this, () =>
+      return _Suppressor.save.call(this, async () => {
+        await (this.constructor as typeof Base).ensureSchemaLoaded();
+        return _Transactions.save.call(this, () =>
           _Validations.save.call(this, options, () => _Persistence.save.call(this, options, block)),
-        ),
-      ) as Promise<boolean | undefined>;
+        );
+      }) as Promise<boolean | undefined>;
     },
   ],
   [
@@ -2670,13 +2671,14 @@ for (const [name, fn] of [
       options?: { validate?: boolean; touch?: boolean },
       block?: (record: Base) => void,
     ): Promise<true | undefined> {
-      return _Suppressor.saveBang.call(this, () =>
-        _Transactions.saveBang.call(this, () =>
+      return _Suppressor.saveBang.call(this, async () => {
+        await (this.constructor as typeof Base).ensureSchemaLoaded();
+        return _Transactions.saveBang.call(this, () =>
           _Validations.saveBang.call(this, options, () =>
             _Persistence.saveBang.call(this, options, block),
           ),
-        ),
-      ) as Promise<true | undefined>;
+        );
+      }) as Promise<true | undefined>;
     },
   ],
   [

@@ -23,7 +23,7 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
       /nonexistent-awesome-file\.sql/,
     );
     expect(() => DatabaseTasks.checkSchemaFile("")).toThrow(/doesn't exist yet/);
-    expect(stderrWrites.join("")).toMatch(/Run `bin\/rails db:migrate`/);
+    expect(stderrWrites.join("")).toMatch(/Run `bin\/trails db migrate`/);
     expect(stderrWrites.join("")).not.toMatch(/config\/application\.rb/);
     expect(exitCodes).toEqual([1, 1]);
   });
