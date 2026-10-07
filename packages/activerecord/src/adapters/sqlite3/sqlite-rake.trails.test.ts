@@ -51,7 +51,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     created.push(filename);
     SchemaDumper.ignoreTables = [/^prefix_/g];
 
-    await new SQLiteDatabaseTasks(configuration).structureDump(filename);
+    await new SQLiteDatabaseTasks(configuration).structureDump(filename, null);
 
     const contents = fs.readFileSync(filename, "utf8");
     expect(contents).not.toMatch(/prefix_bar/);

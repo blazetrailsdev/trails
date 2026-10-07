@@ -38,7 +38,7 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
       adapter: "sqlite3",
       database,
     });
-    await new SQLiteDatabaseTasks(configuration).structureLoad(filename);
+    await new SQLiteDatabaseTasks(configuration).structureLoad(filename, null);
 
     const result = getChildProcess().spawnSync("sqlite3", [database, "SELECT hex(a) FROM t;"]);
     expect(result.stdout.trim()).toBe("FF");

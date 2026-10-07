@@ -3,7 +3,6 @@ import { SQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
 import { newSqlitePool } from "../../support/pooled-sqlite-adapter.js";
 import type { ConnectionPool } from "../../connection-adapters/abstract/connection-pool.js";
-import { isInMemoryDatabase } from "../../sqlite/sqlite-uri.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Errno, File, FileUtils } from "@blazetrails/ruby-compat";
 import { BusyException, CantOpenException } from "../../sqlite/errors.js";
@@ -81,30 +80,6 @@ describe("SqliteAdapter", () => {
       expect(castType("bigint").type()).toBe("integer");
       expect(castType("tinyint").type()).toBe("integer");
     });
-  });
-});
-
-describe("isInMemoryDatabase", () => {
-  const isMemoryFilename = isInMemoryDatabase;
-
-  it("treats :memory: as in-memory", () => {
-    expect(isMemoryFilename(":memory:")).toBe(true);
-  });
-
-  it("treats file::memory: URI as in-memory", () => {
-    expect(isMemoryFilename("file::memory:?cache=shared")).toBe(true);
-  });
-
-  it("treats file:?mode=memory URI as in-memory", () => {
-    expect(isMemoryFilename("file:memdb1?mode=memory&cache=shared")).toBe(true);
-  });
-
-  it("does NOT treat a path containing mode=memory text as in-memory", () => {
-    expect(isMemoryFilename("file:/tmp/mode=memory.db")).toBe(false);
-  });
-
-  it("treats a regular file path as on-disk", () => {
-    expect(isMemoryFilename("/tmp/test.db")).toBe(false);
   });
 });
 

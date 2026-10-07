@@ -13,19 +13,6 @@ export function isRemoteLibsqlUrl(url: string): boolean {
 }
 
 /**
- * @internal
- * @noRailsEquivalent CONVERGEABLE sqlite-uri-helpers-port-memory-database-as-rails-computes-it
- */
-export function isInMemoryDatabase(database: string): boolean {
-  if (database === ":memory:") return true;
-  if (!database.startsWith("file:")) return false;
-  if (database.startsWith("file::memory:")) return true;
-  const q = database.indexOf("?");
-  if (q === -1) return false;
-  return new URLSearchParams(database.slice(q + 1)).get("mode") === "memory";
-}
-
-/**
  * Decode `file:` URIs (including `file://`, percent-encoding, and `?mode=`
  * query strings) and `:memory:` aliases. Returns `null` for memory databases,
  * otherwise the decoded filesystem path.

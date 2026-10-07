@@ -105,10 +105,48 @@ export interface SchemaStatements
     > {}
 
 export class SchemaStatements extends AbstractSchemaStatements {
-  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+  async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
+    await this.dropDatabase(name);
+    return this.createDatabase(name, options);
+  }
 
-  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
-    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
+  async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
+    const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
+
+    let optionString = "";
+    for (const [key, value] of Object.entries(mergedOptions)) {
+      switch (key) {
+        case "owner":
+          optionString += ` OWNER = "${toS(value)}"`;
+          break;
+        case "template":
+          optionString += ` TEMPLATE = "${toS(value)}"`;
+          break;
+        case "encoding":
+          optionString += ` ENCODING = '${toS(value)}'`;
+          break;
+        case "collation":
+          optionString += ` LC_COLLATE = '${toS(value)}'`;
+          break;
+        case "ctype":
+          optionString += ` LC_CTYPE = '${toS(value)}'`;
+          break;
+        case "tablespace":
+          optionString += ` TABLESPACE = "${toS(value)}"`;
+          break;
+        case "connectionLimit":
+          optionString += ` CONNECTION LIMIT = ${toS(value)}`;
+          break;
+        default:
+          break;
+      }
+    }
+
+    return this.execute(`CREATE DATABASE ${this.quoteTableName(name)}${optionString}`);
+  }
+
+  async dropDatabase(name: string): Promise<void> {
+    await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
   }
 
   override async dropTable(
@@ -125,6 +163,34 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return this.execute(
       `DROP TABLE${options.ifExists ? " IF EXISTS" : ""} ${tableNames.map((tableName) => this.quoteTableName(tableName)).join(", ")}${options.force === "cascade" ? " CASCADE" : ""}`,
     );
+  }
+
+  async schemaExists(name: string): Promise<boolean> {
+    const count = await this.queryValue(
+      `SELECT COUNT(*) FROM pg_namespace WHERE nspname = ${this.quote(name)}`,
+      "SCHEMA",
+    );
+    return Number(count) > 0;
+  }
+
+  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
+    const table = this.quotedScope(tableName);
+    const index = this.quotedScope(indexName);
+    const count = await this.queryValue(
+      `
+      SELECT COUNT(*)
+      FROM pg_class t
+      INNER JOIN pg_index d ON t.oid = d.indrelid
+      INNER JOIN pg_class i ON d.indexrelid = i.oid
+      LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
+      WHERE i.relkind IN ('i', 'I')
+        AND i.relname = ${index.name}
+        AND t.relname = ${table.name}
+        AND n.nspname = ${table.schema}
+    `,
+      "SCHEMA",
+    );
+    return Number(count) > 0;
   }
 
   /**
@@ -212,24 +278,19 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return indexes;
   }
 
-  async indexNameExists(tableName: string, indexName: string): Promise<boolean> {
-    const table = this.quotedScope(tableName);
-    const index = this.quotedScope(indexName);
-    const count = await this.queryValue(
-      `
-      SELECT COUNT(*)
-      FROM pg_class t
-      INNER JOIN pg_index d ON t.oid = d.indrelid
-      INNER JOIN pg_class i ON d.indexrelid = i.oid
-      LEFT JOIN pg_namespace n ON n.oid = t.relnamespace
-      WHERE i.relkind IN ('i', 'I')
-        AND i.relname = ${index.name}
-        AND t.relname = ${table.name}
-        AND n.nspname = ${table.schema}
-    `,
-      "SCHEMA",
-    );
-    return Number(count) > 0;
+  override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
+    const options: Record<string, unknown> = {};
+    const comment = await this.tableComment(tableName);
+    if (comment !== null) options.comment = comment;
+    const inherited = await this.inheritedTableNames(tableName);
+    if (inherited.length > 0) {
+      options.options = `INHERITS (${inherited.join(", ")})`;
+    }
+    if (!options.options && (await this.supportsNativePartitioning())) {
+      const partDef = await this.tablePartitionDefinition(tableName);
+      if (partDef) options.options = `PARTITION BY ${partDef}`;
+    }
+    return options;
   }
 
   override async tableComment(tableName: string): Promise<string | null> {
@@ -279,19 +340,33 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return names as string[];
   }
 
-  override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    const options: Record<string, unknown> = {};
-    const comment = await this.tableComment(tableName);
-    if (comment !== null) options.comment = comment;
-    const inherited = await this.inheritedTableNames(tableName);
-    if (inherited.length > 0) {
-      options.options = `INHERITS (${inherited.join(", ")})`;
-    }
-    if (!options.options && (await this.supportsNativePartitioning())) {
-      const partDef = await this.tablePartitionDefinition(tableName);
-      if (partDef) options.options = `PARTITION BY ${partDef}`;
-    }
-    return options;
+  async currentDatabase(): Promise<string> {
+    return (await this.queryValue("SELECT current_database()", "SCHEMA")) as string;
+  }
+
+  async currentSchema(): Promise<string> {
+    return (await this.queryValue("SELECT current_schema", "SCHEMA")) as string;
+  }
+
+  async encoding(): Promise<string> {
+    return (await this.queryValue(
+      "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
+  }
+
+  async collation(): Promise<string> {
+    return (await this.queryValue(
+      "SELECT datcollate FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
+  }
+
+  async ctype(): Promise<string> {
+    return (await this.queryValue(
+      "SELECT datctype FROM pg_database WHERE datname = current_database()",
+      "SCHEMA",
+    )) as string;
   }
 
   async schemaNames(): Promise<string[]> {
@@ -328,85 +403,10 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(`DROP SCHEMA${ifExists} ${this.quoteSchemaName(schemaName)} CASCADE`);
   }
 
-  async schemaExists(name: string): Promise<boolean> {
-    const count = await this.queryValue(
-      `SELECT COUNT(*) FROM pg_namespace WHERE nspname = ${this.quote(name)}`,
-      "SCHEMA",
-    );
-    return Number(count) > 0;
-  }
-
-  async currentSchema(): Promise<string> {
-    return (await this.queryValue("SELECT current_schema", "SCHEMA")) as string;
-  }
-
-  async createDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
-    const mergedOptions: CreateDatabaseOptions = { encoding: "utf8", ...options };
-
-    let optionString = "";
-    for (const [key, value] of Object.entries(mergedOptions)) {
-      switch (key) {
-        case "owner":
-          optionString += ` OWNER = "${toS(value)}"`;
-          break;
-        case "template":
-          optionString += ` TEMPLATE = "${toS(value)}"`;
-          break;
-        case "encoding":
-          optionString += ` ENCODING = '${toS(value)}'`;
-          break;
-        case "collation":
-          optionString += ` LC_COLLATE = '${toS(value)}'`;
-          break;
-        case "ctype":
-          optionString += ` LC_CTYPE = '${toS(value)}'`;
-          break;
-        case "tablespace":
-          optionString += ` TABLESPACE = "${toS(value)}"`;
-          break;
-        case "connectionLimit":
-          optionString += ` CONNECTION LIMIT = ${toS(value)}`;
-          break;
-        default:
-          break;
-      }
-    }
-
-    return this.execute(`CREATE DATABASE ${this.quoteTableName(name)}${optionString}`);
-  }
-
-  async dropDatabase(name: string): Promise<void> {
-    await this.execute(`DROP DATABASE IF EXISTS ${this.quoteTableName(name)}`);
-  }
-
-  async recreateDatabase(name: string, options: CreateDatabaseOptions = {}): Promise<unknown> {
-    await this.dropDatabase(name);
-    return this.createDatabase(name, options);
-  }
-
-  async currentDatabase(): Promise<string> {
-    return (await this.queryValue("SELECT current_database()", "SCHEMA")) as string;
-  }
-
-  async encoding(): Promise<string> {
-    return (await this.queryValue(
-      "SELECT pg_encoding_to_char(encoding) FROM pg_database WHERE datname = current_database()",
-      "SCHEMA",
-    )) as string;
-  }
-
-  async collation(): Promise<string> {
-    return (await this.queryValue(
-      "SELECT datcollate FROM pg_database WHERE datname = current_database()",
-      "SCHEMA",
-    )) as string;
-  }
-
-  async ctype(): Promise<string> {
-    return (await this.queryValue(
-      "SELECT datctype FROM pg_database WHERE datname = current_database()",
-      "SCHEMA",
-    )) as string;
+  async setSchemaSearchPath(searchPath: string | null): Promise<void> {
+    if (!searchPath) return;
+    await this.internalExecute(`SET search_path TO ${searchPath}`);
+    this._schemaSearchPathMemo = searchPath;
   }
 
   async schemaSearchPath(): Promise<string> {
@@ -414,12 +414,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
       "SHOW search_path",
       "SCHEMA",
     )) as string);
-  }
-
-  async setSchemaSearchPath(searchPath: string | null): Promise<void> {
-    if (!searchPath) return;
-    await this.internalExecute(`SET search_path TO ${searchPath}`);
-    this._schemaSearchPathMemo = searchPath;
   }
 
   async clientMinMessages(): Promise<string> {
@@ -432,6 +426,204 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   private quoteSchemaName(name: string): string {
     return pgQuoteColumnName(name);
+  }
+
+  async defaultSequenceName(
+    tableName: string,
+    pk: string | string[] | null = "id",
+  ): Promise<string | null> {
+    if (Array.isArray(pk)) return null;
+    try {
+      const result = await this.serialSequence(tableName, pk);
+      if (!result) return null;
+      return Utils.extractSchemaQualifiedName(result).toString();
+    } catch (error) {
+      if (!(error instanceof StatementInvalid)) throw error;
+      return new Name(null, `${tableName}_${pk}_seq`).toString();
+    }
+  }
+
+  async serialSequence(table: string, column: string | null): Promise<string | null> {
+    return ((await this.queryValue(
+      `SELECT pg_get_serial_sequence(${this.quote(table)}, ${this.quote(column)})`,
+      "SCHEMA",
+    )) ?? null) as string | null;
+  }
+
+  async setPkSequenceBang(table: string, value: number): Promise<void> {
+    const result = await this.pkAndSequenceFor(table);
+    const [pk, sequence] = result ?? [null, null];
+    if (pk) {
+      if (sequence) {
+        const quotedSequence = this.quoteTableName(sequence);
+        await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
+      } else {
+        if (this.logger != null) {
+          (this.logger as { warn(message: string): void }).warn(
+            `${table} has primary key ${pk} with no default sequence.`,
+          );
+        }
+      }
+    }
+  }
+
+  async resetPkSequenceBang(
+    table: string,
+    pk: string | null = null,
+    sequence: Name | string | null = null,
+  ): Promise<void> {
+    if (!pk || !sequence) {
+      const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(table)) ?? [null, null];
+      pk = pk ?? defaultPk;
+      sequence = sequence ?? defaultSeq ?? null;
+    }
+
+    if (pk && !sequence) {
+      (this.logger as { warn?(message: string): void } | null)?.warn?.(
+        `${table} has primary key ${pk} with no default sequence.`,
+      );
+    }
+
+    if (!pk || !sequence) return;
+
+    const quotedSequence = this.quoteTableName(sequence);
+    const maxPk = await this.queryValue(
+      `SELECT MAX(${this.quoteColumnName(pk)}) FROM ${this.quoteTableName(table)}`,
+      "SCHEMA",
+    );
+    let minvalue: unknown = null;
+    if (maxPk == null) {
+      const dbVersion = await this.databaseVersion;
+      minvalue =
+        dbVersion >= 100000
+          ? await this.queryValue(
+              `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.quote(quotedSequence)}::regclass`,
+              "SCHEMA",
+            )
+          : await this.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
+    }
+
+    await this.queryValue(
+      `SELECT setval(${this.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
+      "SCHEMA",
+    );
+  }
+
+  async pkAndSequenceFor(table: string): Promise<[string, Name | null] | null> {
+    try {
+      const quotedTable = this.quote(this.quoteTableName(table));
+
+      let result = (
+        await this.query(
+          `SELECT attr.attname, nsp.nspname, seq.relname
+           FROM pg_class      seq,
+                pg_attribute  attr,
+                pg_depend     dep,
+                pg_constraint cons,
+                pg_namespace  nsp
+           WHERE seq.oid           = dep.objid
+             AND seq.relkind       = 'S'
+             AND attr.attrelid     = dep.refobjid
+             AND attr.attnum       = dep.refobjsubid
+             AND attr.attrelid     = cons.conrelid
+             AND attr.attnum       = cons.conkey[1]
+             AND seq.relnamespace  = nsp.oid
+             AND cons.contype      = 'p'
+             AND dep.classid       = 'pg_class'::regclass
+             AND dep.refobjid      = ${quotedTable}::regclass`,
+          "SCHEMA",
+        )
+      )[0];
+
+      if (result == null || result.length === 0) {
+        result = (
+          await this.query(
+            `SELECT attr.attname, nsp.nspname,
+               CASE
+                 WHEN pg_get_expr(def.adbin, def.adrelid) !~* 'nextval' THEN NULL
+                 WHEN split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2) ~ '.' THEN
+                   substr(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2),
+                          strpos(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2), '.')+1)
+                 ELSE split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2)
+               END
+             FROM pg_class       t
+             JOIN pg_attribute   attr ON (t.oid = attrelid)
+             JOIN pg_attrdef     def  ON (adrelid = attrelid AND adnum = attnum)
+             JOIN pg_constraint  cons ON (conrelid = adrelid AND adnum = conkey[1])
+             JOIN pg_namespace   nsp  ON (t.relnamespace = nsp.oid)
+             WHERE t.oid = ${quotedTable}::regclass
+               AND cons.contype = 'p'
+               AND pg_get_expr(def.adbin, def.adrelid) ~* 'nextval|uuid_generate|gen_random_uuid'`,
+            "SCHEMA",
+          )
+        )[0];
+      }
+
+      const [pk, schema, identifier] = result as unknown as [string, string | null, string | null];
+      if (identifier != null) {
+        return [pk, new Name(schema, identifier)];
+      }
+      return [pk, null];
+    } catch {
+      return null;
+    }
+  }
+
+  async primaryKeys(tableName: string): Promise<string[]> {
+    const names = await this.queryValues(
+      `SELECT a.attname
+       FROM (
+         SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
+           FROM pg_index
+          WHERE indrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
+            AND indisprimary
+       ) i
+       JOIN pg_attribute a
+         ON a.attrelid = i.indrelid
+        AND a.attnum = i.indkey[i.idx]
+       ORDER BY i.idx`,
+      "SCHEMA",
+    );
+    return names as string[];
+  }
+
+  async renameTable(
+    tableName: string,
+    newName: string,
+    options: Record<string, unknown> = {},
+  ): Promise<void> {
+    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
+      this.validateTableLengthBang(newName);
+    }
+    await this.clearCacheBang();
+    await this.schemaCache.clearDataSourceCacheBang(tableName);
+    await this.schemaCache.clearDataSourceCacheBang(newName);
+    await this.execute(
+      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
+    );
+    const maxIdentifierLength = await this.warmMaxIdentifierLength();
+    const [pk, seq] = (await this.pkAndSequenceFor(newName)) ?? [];
+    if (pk != null) {
+      const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
+      const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
+      const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
+      await this.execute(
+        `ALTER INDEX ${this.quoteTableName(idx)} RENAME TO ${this.quoteTableName(newIdx)}`,
+      );
+
+      const maxSeqPrefix = maxIdentifierLength - `_${pk}_seq`.length;
+      if (seq && seq.identifier === `${tableName.slice(0, maxSeqPrefix)}_${pk}_seq`) {
+        const newSeq = `${newName.slice(0, maxSeqPrefix)}_${pk}_seq`;
+        await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
+      }
+    }
+    await this.renameTableIndexes(tableName, newName, options);
+  }
+
+  /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
+
+  override updateTableDefinition(tableName: string, base?: unknown): PgTable {
+    return new PgTable(tableName, (base ?? this) as SchemaStatementsConstraintLike);
   }
 
   /** @internal */
@@ -522,39 +714,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const procs = parts.filter((v): v is () => Promise<void> => typeof v === "function");
     await this.execute(`ALTER TABLE ${this.quoteTableName(tableName)} ${sqls.join(", ")}`);
     for (const proc of procs) await proc();
-  }
-
-  async renameTable(
-    tableName: string,
-    newName: string,
-    options: Record<string, unknown> = {},
-  ): Promise<void> {
-    if (options._usesLegacyTableName == null || options._usesLegacyTableName === false) {
-      this.validateTableLengthBang(newName);
-    }
-    await this.clearCacheBang();
-    await this.schemaCache.clearDataSourceCacheBang(tableName);
-    await this.schemaCache.clearDataSourceCacheBang(newName);
-    await this.execute(
-      `ALTER TABLE ${this.quoteTableName(tableName)} RENAME TO ${this.quoteTableName(newName)}`,
-    );
-    const maxIdentifierLength = await this.warmMaxIdentifierLength();
-    const [pk, seq] = (await this.pkAndSequenceFor(newName)) ?? [];
-    if (pk != null) {
-      const maxPkeyPrefix = maxIdentifierLength - "_pkey".length;
-      const idx = `${tableName.slice(0, maxPkeyPrefix)}_pkey`;
-      const newIdx = `${newName.slice(0, maxPkeyPrefix)}_pkey`;
-      await this.execute(
-        `ALTER INDEX ${this.quoteTableName(idx)} RENAME TO ${this.quoteTableName(newIdx)}`,
-      );
-
-      const maxSeqPrefix = maxIdentifierLength - `_${pk}_seq`.length;
-      if (seq && seq.identifier === `${tableName.slice(0, maxSeqPrefix)}_${pk}_seq`) {
-        const newSeq = `${newName.slice(0, maxSeqPrefix)}_${pk}_seq`;
-        await this.execute(`ALTER TABLE ${seq.quoted()} RENAME TO ${this.quoteTableName(newSeq)}`);
-      }
-    }
-    await this.renameTableIndexes(tableName, newName, options);
   }
 
   override async addColumn(
@@ -1229,106 +1388,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return uniqueConstraint!;
   }
 
-  async primaryKeys(tableName: string): Promise<string[]> {
-    const names = await this.queryValues(
-      `SELECT a.attname
-       FROM (
-         SELECT indrelid, indkey, generate_subscripts(indkey, 1) idx
-           FROM pg_index
-          WHERE indrelid = ${this.quote(this.quoteTableName(tableName))}::regclass
-            AND indisprimary
-       ) i
-       JOIN pg_attribute a
-         ON a.attrelid = i.indrelid
-        AND a.attnum = i.indkey[i.idx]
-       ORDER BY i.idx`,
-      "SCHEMA",
-    );
-    return names as string[];
-  }
-
-  async pkAndSequenceFor(table: string): Promise<[string, Name | null] | null> {
-    try {
-      const quotedTable = this.quote(this.quoteTableName(table));
-
-      let result = (
-        await this.query(
-          `SELECT attr.attname, nsp.nspname, seq.relname
-           FROM pg_class      seq,
-                pg_attribute  attr,
-                pg_depend     dep,
-                pg_constraint cons,
-                pg_namespace  nsp
-           WHERE seq.oid           = dep.objid
-             AND seq.relkind       = 'S'
-             AND attr.attrelid     = dep.refobjid
-             AND attr.attnum       = dep.refobjsubid
-             AND attr.attrelid     = cons.conrelid
-             AND attr.attnum       = cons.conkey[1]
-             AND seq.relnamespace  = nsp.oid
-             AND cons.contype      = 'p'
-             AND dep.classid       = 'pg_class'::regclass
-             AND dep.refobjid      = ${quotedTable}::regclass`,
-          "SCHEMA",
-        )
-      )[0];
-
-      if (result == null || result.length === 0) {
-        result = (
-          await this.query(
-            `SELECT attr.attname, nsp.nspname,
-               CASE
-                 WHEN pg_get_expr(def.adbin, def.adrelid) !~* 'nextval' THEN NULL
-                 WHEN split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2) ~ '.' THEN
-                   substr(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2),
-                          strpos(split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2), '.')+1)
-                 ELSE split_part(pg_get_expr(def.adbin, def.adrelid), '''', 2)
-               END
-             FROM pg_class       t
-             JOIN pg_attribute   attr ON (t.oid = attrelid)
-             JOIN pg_attrdef     def  ON (adrelid = attrelid AND adnum = attnum)
-             JOIN pg_constraint  cons ON (conrelid = adrelid AND adnum = conkey[1])
-             JOIN pg_namespace   nsp  ON (t.relnamespace = nsp.oid)
-             WHERE t.oid = ${quotedTable}::regclass
-               AND cons.contype = 'p'
-               AND pg_get_expr(def.adbin, def.adrelid) ~* 'nextval|uuid_generate|gen_random_uuid'`,
-            "SCHEMA",
-          )
-        )[0];
-      }
-
-      const [pk, schema, identifier] = result as unknown as [string, string | null, string | null];
-      if (identifier != null) {
-        return [pk, new Name(schema, identifier)];
-      }
-      return [pk, null];
-    } catch {
-      return null;
-    }
-  }
-
-  async serialSequence(table: string, column: string | null): Promise<string | null> {
-    return ((await this.queryValue(
-      `SELECT pg_get_serial_sequence(${this.quote(table)}, ${this.quote(column)})`,
-      "SCHEMA",
-    )) ?? null) as string | null;
-  }
-
-  async defaultSequenceName(
-    tableName: string,
-    pk: string | string[] | null = "id",
-  ): Promise<string | null> {
-    if (Array.isArray(pk)) return null;
-    try {
-      const result = await this.serialSequence(tableName, pk);
-      if (!result) return null;
-      return Utils.extractSchemaQualifiedName(result).toString();
-    } catch (error) {
-      if (!(error instanceof StatementInvalid)) throw error;
-      return new Name(null, `${tableName}_${pk}_seq`).toString();
-    }
-  }
-
   /** @internal */
   createTableDefinition(name: string, options: Record<string, unknown> = {}): PgTableDefinition {
     return new PgTableDefinition(this, name, options);
@@ -1422,65 +1481,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     }
 
     return `${tableName}_${columnName}_${suffix}`;
-  }
-
-  async setPkSequenceBang(table: string, value: number): Promise<void> {
-    const result = await this.pkAndSequenceFor(table);
-    const [pk, sequence] = result ?? [null, null];
-    if (pk) {
-      if (sequence) {
-        const quotedSequence = this.quoteTableName(sequence);
-        await this.queryValue(`SELECT setval(${this.quote(quotedSequence)}, ${value})`, "SCHEMA");
-      } else {
-        if (this.logger != null) {
-          (this.logger as { warn(message: string): void }).warn(
-            `${table} has primary key ${pk} with no default sequence.`,
-          );
-        }
-      }
-    }
-  }
-
-  async resetPkSequenceBang(
-    table: string,
-    pk: string | null = null,
-    sequence: Name | string | null = null,
-  ): Promise<void> {
-    if (!pk || !sequence) {
-      const [defaultPk, defaultSeq] = (await this.pkAndSequenceFor(table)) ?? [null, null];
-      pk = pk ?? defaultPk;
-      sequence = sequence ?? defaultSeq ?? null;
-    }
-
-    if (pk && !sequence) {
-      (this.logger as { warn?(message: string): void } | null)?.warn?.(
-        `${table} has primary key ${pk} with no default sequence.`,
-      );
-    }
-
-    if (!pk || !sequence) return;
-
-    const quotedSequence = this.quoteTableName(sequence);
-    const maxPk = await this.queryValue(
-      `SELECT MAX(${this.quoteColumnName(pk)}) FROM ${this.quoteTableName(table)}`,
-      "SCHEMA",
-    );
-    let minvalue: unknown = null;
-    if (maxPk == null) {
-      const dbVersion = await this.databaseVersion;
-      minvalue =
-        dbVersion >= 100000
-          ? await this.queryValue(
-              `SELECT seqmin FROM pg_sequence WHERE seqrelid = ${this.quote(quotedSequence)}::regclass`,
-              "SCHEMA",
-            )
-          : await this.queryValue(`SELECT min_value FROM ${quotedSequence}`, "SCHEMA");
-    }
-
-    await this.queryValue(
-      `SELECT setval(${this.quote(quotedSequence)}, ${maxPk ?? minvalue}, ${maxPk == null ? "false" : "true"})`,
-      "SCHEMA",
-    );
   }
 
   /** @internal */
