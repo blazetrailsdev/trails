@@ -243,20 +243,15 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `new Promise((resolve) => setTimeout(resolve, ms))` — `Kernel#sleep`
  *   (`rb_f_sleep`, `vendor/ruby/v3.3.11/process.c:5055`) suspends the thread
  *   and returns the seconds slept, and that awaited promise is its whole port,
- *   recording no callee named `sleep`. The mark is deliberately NOT every
- *   `setTimeout`: a timer that schedules work rather than settling an
- *   enclosing promise is a deadline or a callback, not a suspension, and must
- *   not satisfy a Rails `sleep` — `Reaper#spawn_thread`'s
- *   `setTimeout(tick, frequency * 1000)`
- *   (`connection_adapters/abstract/connection_pool/reaper.ts`) is the case in
- *   point. `isSuspensionTimer` (extract-ts-api.ts) is the discriminator, and
- *   `setInterval` is excluded by the same reasoning: it repeats where `sleep`
- *   suspends once. Admitted only for an implicit-self receiver, the one shape
- *   `Kernel#sleep` takes (`rb_define_global_function`, `process.c:9125`), so
- *   an `x.sleep` site still flags. What this gives up is the INTERVAL: the
- *   Ruby call leaves significance, so its call-argument row goes with it and
- *   nothing compares `0.1 * counter` against the ms the port passes. Write the
- *   Rails constant so the unit is legible at the call site.
+ *   recording no callee named `sleep`. `isSuspensionTimer` (extract-ts-api.ts)
+ *   is the discriminator: a timer that schedules work rather than settling an
+ *   enclosing promise is a deadline or a callback, not a suspension, and
+ *   `setInterval` repeats where `sleep` suspends once. Admitted only for an
+ *   implicit-self receiver, the one shape `Kernel#sleep` takes
+ *   (`rb_define_global_function`, `process.c:9125`), so an `x.sleep` site
+ *   still flags. The INTERVAL goes unchecked: the Ruby call leaves
+ *   significance, so its call-argument row goes with it
+ *   (`sleep-row-drops-call-argument-parity-for-the-interval`).
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
