@@ -571,13 +571,18 @@ function camelized(name: string): string {
   return name.replace(/_([a-zA-Z\d])/g, (_, c: string) => c.toUpperCase());
 }
 
-function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boolean {
+function checkDefinitionVisibility(
+  mod: { prototype: object },
+  mid: string,
+  includeSuper?: boolean,
+): boolean {
+  const incSuper = includeSuper === undefined ? true : includeSuper;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
   for (
     let o: object | null = mod.prototype;
     o && o !== Object.prototype;
-    o = Object.getPrototypeOf(o) as object | null
+    o = incSuper ? (Object.getPrototypeOf(o) as object | null) : null
   ) {
     const me = Object.getOwnPropertyDescriptor(o, mid);
     if (me) return typeof me.value === "function" || me.get !== undefined;
@@ -597,12 +602,44 @@ function checkDefinitionVisibility(mod: { prototype: object }, mid: string): boo
  * `vendor/ruby/v3.3.11/vm_method.c:2055`). A JS entry carries no visibility, so
  * it answers as {@link rbModPublicMethodDefined} does. A writer `name=` is
  * answered by a JS accessor's setter or a `setName` method, the entries
- * {@link rbFSend} dispatches to.
+ * {@link rbFSend} dispatches to. A false `includeSuper` answers for `mod`'s
+ * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModMethodDefined(mod: { prototype: object }, mid: string): boolean {
-  return checkDefinitionVisibility(mod, mid);
+export function rbModMethodDefined(
+  mod: { prototype: object },
+  mid: string,
+  includeSuper?: boolean,
+): boolean {
+  return checkDefinitionVisibility(mod, mid, includeSuper);
+}
+
+/**
+ * `Module#define_method` on a class receiver (`rb_mod_define_method`,
+ * `vendor/ruby/v3.3.11/proc.c:2325`): binds `body` as `mod`'s instance method
+ * `mid`. `body` is the block, or the method `define_method(symbol, method)`
+ * takes, whose JS carrier is a property descriptor (see
+ * `Module#instanceMethod`), so a zero-argument reader can be defined as the
+ * accessor it ports to. A JS class has no metaclass apart from its own
+ * statics (CLAUDE.md, "`singleton_class` is a per-object subclass"), so a
+ * class's `singleton_class.define_method` passes `{ prototype: klass }`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModDefineMethod(
+  mod: { prototype: object },
+  mid: string,
+  body: ((...args: never[]) => unknown) | PropertyDescriptor,
+): string {
+  Object.defineProperty(
+    mod.prototype,
+    mid,
+    typeof body === "function"
+      ? { value: body, writable: true, configurable: true }
+      : { configurable: true, ...body },
+  );
+  return mid;
 }
 
 /**

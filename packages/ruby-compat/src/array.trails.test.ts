@@ -18,6 +18,7 @@ import {
   arySlice,
   compact,
   compactBang,
+  first,
   isIntersect,
   last,
   pack,
@@ -561,6 +562,27 @@ describe("aryDelete", () => {
     expect(aryDelete(ary, 3)).toBeUndefined();
     expect(aryDelete(ary, 3, (item) => `not found: ${item}`)).toBe("not found: 3");
     expect(ary).toEqual([1, 2]);
+  });
+});
+
+describe("first", () => {
+  it("answers the first element, or nil for an empty array", () => {
+    expect(first([1, 2, 3])).toBe(1);
+    expect(first([])).toBeUndefined();
+  });
+
+  it("reads only the first element of a Set", () => {
+    expect(first(new Set(["a", "b"]))).toBe("a");
+    expect(first(new Set())).toBeUndefined();
+    let yielded = 0;
+    function* each(): Generator<number> {
+      for (const i of [1, 2, 3]) {
+        yielded++;
+        yield i;
+      }
+    }
+    expect(first(each())).toBe(1);
+    expect(yielded).toBe(1);
   });
 });
 

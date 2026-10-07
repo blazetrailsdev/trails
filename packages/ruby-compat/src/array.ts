@@ -593,12 +593,18 @@ export function aryPop<T>(ary: T[], n: number): T[] {
 
 /**
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
- * the first element, or `nil` for an empty array.
+ * the first element, or `nil` for an empty array. Any other enumerable is
+ * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
+ * `first_i` (`enum.c:1245`) breaks out of `each` at the first element.
  *
  * @noRailsEquivalent PERMANENT
  */
-export function first<T>(ary: readonly T[]): T | undefined {
-  return ary[0];
+export function first<T>(ary: Iterable<T>): T | undefined {
+  if (Array.isArray(ary)) return ary[0];
+  for (const i of ary) {
+    return i;
+  }
+  return undefined;
 }
 
 /**

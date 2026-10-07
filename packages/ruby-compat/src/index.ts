@@ -73,6 +73,7 @@ export {
   toSym,
   rbModAttrReader,
   rbModAttrWriter,
+  rbModDefineMethod,
   rbModMethodDefined,
   rbModPublicMethodDefined,
   rtest,

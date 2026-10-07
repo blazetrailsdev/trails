@@ -23,6 +23,7 @@ import {
   rbFPublicSend,
   rbModAttrReader,
   rbModAttrWriter,
+  rbModDefineMethod,
   rbModMethodDefined,
   rbFSend,
   toS as toSSend,
@@ -598,6 +599,32 @@ describe("rbModPublicMethodDefined", () => {
     expect(rbModPublicMethodDefined(Req, "field")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "hasOwnProperty")).toBe(false);
     expect(rbModPublicMethodDefined(Req, "nope")).toBe(false);
+  });
+});
+
+describe("rbModDefineMethod", () => {
+  it("defines an instance method on the class, which method_defined? sees without its ancestors", () => {
+    class Parent {}
+    class Child extends Parent {}
+    expect(
+      rbModDefineMethod(Parent, "greet", function (this: object) {
+        return this.constructor.name;
+      }),
+    ).toBe("greet");
+    expect((new Child() as unknown as { greet(): string }).greet()).toBe("Child");
+    expect(rbModMethodDefined(Child, "greet")).toBe(true);
+    expect(rbModMethodDefined(Child, "greet", false)).toBe(false);
+    expect(rbModMethodDefined(Parent, "greet", false)).toBe(true);
+  });
+
+  it("defines a class's singleton method as a static, a reader as its accessor", () => {
+    class Book {}
+    class Novel extends Book {}
+    rbModDefineMethod({ prototype: Book }, "statuses", { get: () => "values" });
+    rbModDefineMethod({ prototype: Book }, "count", () => 2);
+    expect((Novel as unknown as { statuses: string }).statuses).toBe("values");
+    expect((Novel as unknown as { count(): number }).count()).toBe(2);
+    expect("statuses" in Book.prototype).toBe(false);
   });
 });
 

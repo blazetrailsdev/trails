@@ -854,7 +854,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   override async buildInsertSql(insert: InsertBuilder): Promise<string> {
     const noOpColumn =
-      first([...insert.keys]) != null ? this.quoteColumnName(first([...insert.keys])!) : undefined;
+      first(insert.keys) != null ? this.quoteColumnName(first(insert.keys)!) : undefined;
 
     let sql: string;
     if (await this.supportsInsertRawAliasSyntax()) {

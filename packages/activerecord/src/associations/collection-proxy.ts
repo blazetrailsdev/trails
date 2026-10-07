@@ -461,14 +461,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     this._scope = undefined;
     return this;
   }
-
-  /** @noRailsEquivalent CONVERGEABLE collection-proxy-async-iterator-has-no-rails-counterpart */
-  async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
-    const records = await this.loadTarget();
-    for (const record of records) {
-      yield record;
-    }
-  }
 }
 
 /** @internal */

@@ -44,7 +44,7 @@ describe("AtomicWriteTest", () => {
 
   it("atomic write doesnt write when block raises", () => {
     try {
-      atomicWrite(fileName(), undefined, (file) => {
+      atomicWrite(fileName(), (file) => {
         file.write("testing");
         throw new Error("something bad");
       });
@@ -87,7 +87,7 @@ describe("AtomicWriteTest", () => {
 
     const probedPermissions = probeStatIn(dir)!.mode.toString(8);
 
-    atomicWrite(join(dir, "atomic.file"), undefined, () => undefined);
+    atomicWrite(join(dir, "atomic.file"), () => undefined);
 
     const actualPermissions = statSync(join(dir, "atomic.file")).mode.toString(8);
 

@@ -1,5 +1,5 @@
 import { base58, camelize } from "@blazetrails/activesupport";
-import { StandardError } from "@blazetrails/ruby-compat";
+import { StandardError, rbModDefineMethod } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import { generateSecureTokenOn } from "./active-record.js";
 
@@ -9,7 +9,6 @@ MinimumLengthError.prototype.name = "ActiveRecord::SecureToken::MinimumLengthErr
 
 const MINIMUM_TOKEN_LENGTH = 24;
 
-/** @missingRailsCall define_method — CONVERGEABLE define-method-on-a-class-receiver-goes-through-ruby-compat */
 export function hasSecureToken(
   this: typeof Base,
   attribute: string = "token",
@@ -24,15 +23,15 @@ export function hasSecureToken(
     );
   }
 
-  Object.defineProperty(this.prototype, camelize(`regenerate_${attribute}`, false), {
-    value: function (this: Base): Promise<true | undefined> {
+  rbModDefineMethod(
+    this,
+    camelize(`regenerate_${attribute}`, false),
+    function (this: Base): Promise<true | undefined> {
       return this.updateBang({
         [attribute]: (this.constructor as typeof Base).generateUniqueSecureToken({ length }),
       });
     },
-    writable: true,
-    configurable: true,
-  });
+  );
 
   this.setCallback(on, on === "initialize" ? "after" : "before", function (this: any) {
     if (this.isNewRecord() && !this.queryAttribute(attribute)) {

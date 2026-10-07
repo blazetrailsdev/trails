@@ -614,17 +614,14 @@ export class SchemaCache {
     this._indexes = deepDeduplicate(this._indexes);
   }
 
-  /**
-   * @internal
-   * @missingRailsArgs atomic_write — CONVERGEABLE atomic-write-takes-its-block-without-a-temp-dir-placeholder
-   */
+  /** @internal */
   private async open(
     filename: string,
     block: (file: { write(string: string | Uint8Array): unknown }) => unknown,
   ): Promise<unknown> {
     FileUtils.mkdirP(File.dirname(filename));
 
-    return atomicWrite(filename, undefined, async (file) => {
+    return atomicWrite(filename, async (file) => {
       if (File.extname(filename) === ".gz") {
         const zipper = new Zlib.GzipWriter(file);
         zipper.mtime = 0;
