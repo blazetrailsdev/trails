@@ -44,7 +44,7 @@ export class ValueType<T = unknown> {
     limit?: number | null;
     scale?: number | null;
   } = {}) {
-    // eslint-disable-next-line prefer-rest-params -- a module `initialize` above this one reads its own kwargs (active_record/type/internal/timezone.rb:7-10).
+    // eslint-disable-next-line prefer-rest-params
     initializeIncludedModules(this, arguments[0]);
     this._precision = precision;
     this._scale = scale;

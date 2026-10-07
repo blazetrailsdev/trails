@@ -2074,7 +2074,9 @@ export interface InlinedFromFinding {
  * functions assigned to the host class keep their body in the mixin's file, and
  * an `Included<>` interface sits in that same file beside them, so both stay
  * clear. Nor does a `_name` body that ports the includer's own Ruby `_name`
- * method, which a module's `name` also offers as its underscored candidate.
+ * method, which a module's `name` also offers as its underscored candidate:
+ * `Relation#_create` (relation.rb:1357-1359) beside
+ * `Delegation::ClassMethods#create` (relation/delegation.rb:135-137).
  */
 export function inlinedModuleMembers(
   pkg: string,
@@ -2091,9 +2093,6 @@ export function inlinedModuleMembers(
     const hostBodies = bodiedByTsFile.get(hostTs);
     if (hostBodies === undefined) continue;
     const hostDefinesInitialize = host.instanceMethods.some((im) => im.name === "initialize");
-    // The includer's own Ruby methods, by the one spelling each ports as: Rails'
-    // `Relation#_create` (relation.rb:1357-1359) is `_create`, which is also the
-    // underscored candidate of `Delegation::ClassMethods#create`.
     const hostOwnSpellings = new Set(
       [...host.instanceMethods, ...host.classMethods].flatMap((hm) =>
         hm.name.startsWith("_") ? (rubyMethodCandidates(hm.name) ?? []) : [],

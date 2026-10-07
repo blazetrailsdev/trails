@@ -4541,8 +4541,6 @@ describe("inlinedModuleMembers", () => {
     ]);
   });
 
-  // relation.rb:1357-1359 defines `_create`; relation/delegation.rb:135-137
-  // defines `create`, whose underscored candidate is the same `_create`.
   describe("an includer's own `_name` method beside a module's `name`", () => {
     const delegationModules = {
       "ActiveRecord::Delegation": rubyClass({
