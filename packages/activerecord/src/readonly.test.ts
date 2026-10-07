@@ -11,6 +11,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Project } from "./test-helpers/models/project.js";
 import "./test-helpers/models/reader.js";
+import "./test-helpers/models/ship.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 

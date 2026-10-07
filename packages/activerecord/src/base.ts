@@ -26,8 +26,6 @@ import {
   Model,
   ValueType,
   type AttributeOptions,
-  type CallbackConditions,
-  type CallbackObject,
   ValidationsCallbacks,
 } from "@blazetrails/activemodel";
 import { Table, Nodes } from "@blazetrails/arel";
@@ -62,7 +60,7 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError, RecordNotDestroyed } from "./errors.js";
+import { NotImplementedError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -116,7 +114,9 @@ import type { DatabaseConfig } from "./database-configurations/database-config.j
 import type { IndexedRow } from "./result.js";
 import * as ModelSchema from "./model-schema.js";
 import {
+  type ClassMethods,
   createOrUpdate as callbacksCreateOrUpdate,
+  destroy as callbacksDestroy,
   _createRecord as callbacksCreateRecord,
   _updateRecord as callbacksUpdateRecord,
 } from "./callbacks.js";
@@ -1653,7 +1653,6 @@ export class Base extends Model {
 
   _newRecord = true;
   _destroyed = false;
-  _destroyCallbackAlreadyCalled = false;
   _readonly = false;
   _previouslyNewRecord = false;
   private _destroyedByAssociation: unknown = null;
@@ -1793,39 +1792,6 @@ export class Base extends Model {
         assoc?.setTarget?.(null);
       }
     }
-  }
-
-  private async _destroyRow(): Promise<boolean> {
-    await this._preloadBelongsToForDestroyCallbacks();
-
-    let didDelete = false;
-    let destroyResult: unknown;
-    try {
-      destroyResult = await this.runCallbacks("destroy", async () => {
-        await (this as any).destroyAssociations();
-
-        if (this.isPersisted()) didDelete = (await (this as any).destroyRow()) > 0;
-
-        this._destroyed = true;
-        this._previouslyNewRecord = false;
-        this.freeze();
-        return true;
-      });
-    } catch (e) {
-      if (!(e instanceof RecordNotDestroyed)) throw e;
-      (this as any)._associationDestroyException = e;
-      return false;
-    }
-
-    if (!destroyResult) return false;
-
-    if (didDelete) {
-      (this as any)._triggerDestroyCallback = true;
-      (this as any)._newRecordBeforeLastCommit = false;
-      (this as any)._triggerUpdateCallback = false;
-    }
-
-    return true;
   }
 
   static async delete(id: unknown): Promise<number> {
@@ -2076,140 +2042,35 @@ export class Base extends Model {
     );
   }
 
-  declare static afterInitialize: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterInitialize: ClassMethods["afterInitialize"];
 
-  declare static afterFind: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterFind: ClassMethods["afterFind"];
 
-  declare static afterTouch: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterTouch: ClassMethods["afterTouch"];
 
-  declare static beforeSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeSave: ClassMethods["beforeSave"];
 
-  declare static beforeCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeCreate: ClassMethods["beforeCreate"];
 
-  declare static beforeUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeUpdate: ClassMethods["beforeUpdate"];
 
-  declare static beforeDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static beforeDestroy: ClassMethods["beforeDestroy"];
 
-  declare static afterSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterSave: ClassMethods["afterSave"];
 
-  declare static afterCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterCreate: ClassMethods["afterCreate"];
 
-  declare static afterUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterUpdate: ClassMethods["afterUpdate"];
 
-  declare static afterDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static afterDestroy: ClassMethods["afterDestroy"];
 
-  declare static aroundSave: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundSave: ClassMethods["aroundSave"];
 
-  declare static aroundCreate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundCreate: ClassMethods["aroundCreate"];
 
-  declare static aroundUpdate: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundUpdate: ClassMethods["aroundUpdate"];
 
-  declare static aroundDestroy: <T extends typeof Base>(
-    this: T,
-    fn:
-      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
-      | CallbackObject
-      | string,
-    conditions?: CallbackConditions<InstanceType<T>>,
-  ) => void;
+  declare static aroundDestroy: ClassMethods["aroundDestroy"];
 
   static beforeCommit = _beforeCommit;
 
@@ -2591,7 +2452,6 @@ include(Base, {
   toggleBang: _Persistence.toggleBang,
   save: _Persistence.save,
   saveBang: _Persistence.saveBang,
-  destroy: _Persistence.destroy,
   destroyBang: _Persistence.destroyBang,
   update: _Persistence.update,
   updateBang: _Persistence.updateBang,
@@ -2808,6 +2668,15 @@ for (const [name, fn] of [
       return Timestamp._createRecord.call(this as any, () =>
         callbacksCreateRecord.call(this, attributeNames, block),
       ) as Promise<boolean>;
+    },
+  ],
+  [
+    "destroy",
+    function (this: Base): Promise<unknown> {
+      return _Transactions.destroy.call(this, async () => {
+        await this["_preloadBelongsToForDestroyCallbacks"]();
+        return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
+      });
     },
   ],
   [
