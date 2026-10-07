@@ -55,10 +55,10 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('b')`);
 
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
 
     await adapter.execute(`SELECT * FROM "pq"`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("affectedRows is preserved across DDL", async () => {
@@ -67,14 +67,14 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
 
     await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("execute returns the rows an INSERT ... RETURNING produces", async () => {
     await expect(
       adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id", "nick"`),
     ).resolves.toEqual([{ id: 1, nick: "a" }]);
-    expect(adapter.affectedRows()).toBe(1);
+    expect(adapter.affectedRows(null)).toBe(1);
   });
 
   it("affectedRows is not reset by transaction control in the run branch", async () => {
@@ -83,7 +83,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     await adapter.execute(`BEGIN`);
     expect(await adapter.update(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
     await adapter.execute(`COMMIT`);
-    expect(adapter.affectedRows()).toBe(2);
+    expect(adapter.affectedRows(null)).toBe(2);
   });
 
   it("insert returns the inserted id for INSERT ... RETURNING", async () => {
@@ -92,7 +92,7 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
 
     const second = await adapter.insert(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     expect(second).toBe(2);
-    expect(adapter.affectedRows()).toBe(1);
+    expect(adapter.affectedRows(null)).toBe(1);
   });
 
   it("returns distinct insert ids for concurrent inserts", async () => {

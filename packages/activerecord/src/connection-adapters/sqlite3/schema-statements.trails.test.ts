@@ -227,7 +227,7 @@ describe("SQLite3::SchemaStatements", () => {
 
     it("constructs a Column with name and nullability", () => {
       const field = { name: "title", type: "varchar", notnull: 0, dflt_value: null, pk: 0 };
-      const col = newColumnFromField(makeAdapter(), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter(), "posts", field, defs);
       expect(col).toBeInstanceOf(Column);
       expect(col.name).toBe("title");
       expect(col.null).toBe(true);
@@ -235,13 +235,13 @@ describe("SQLite3::SchemaStatements", () => {
 
     it("respects notnull=1", () => {
       const field = { name: "title", type: "varchar", notnull: 1, dflt_value: null, pk: 0 };
-      const col = newColumnFromField(makeAdapter(), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter(), "posts", field, defs);
       expect(col.null).toBe(false);
     });
 
     it("extracts string defaults", () => {
       const field = { name: "status", type: "varchar", notnull: 0, dflt_value: "'active'", pk: 0 };
-      const col = newColumnFromField(makeAdapter(), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter(), "posts", field, defs);
       expect(col.default).toBe("active");
     });
 
@@ -254,7 +254,7 @@ describe("SQLite3::SchemaStatements", () => {
         pk: 0,
         hidden: 0,
       };
-      const col = newColumnFromField(makeAdapter("datetime"), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter("datetime"), "posts", field, defs);
       expect(col.defaultFunction).toBe("CURRENT_TIMESTAMP");
     });
 
@@ -267,7 +267,7 @@ describe("SQLite3::SchemaStatements", () => {
         pk: 0,
         hidden: 2,
       };
-      const col = newColumnFromField(makeAdapter(), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter(), "posts", field, defs);
       expect(col.isVirtual()).toBe(true);
     });
 
@@ -280,14 +280,14 @@ describe("SQLite3::SchemaStatements", () => {
         pk: 0,
         hidden: 3,
       };
-      const col = newColumnFromField(makeAdapter(), "posts", field, defs);
+      const col = newColumnFromField.call(makeAdapter(), "posts", field, defs);
       expect(col.isVirtualStored()).toBe(true);
     });
 
     it("marks INTEGER PK as rowid", () => {
       const field = { name: "id", type: "INTEGER", notnull: 1, dflt_value: null, pk: 1 };
       const singlePkDefs = [{ pk: 1 }];
-      const col = newColumnFromField(makeAdapter("INTEGER"), "posts", field, singlePkDefs);
+      const col = newColumnFromField.call(makeAdapter("INTEGER"), "posts", field, singlePkDefs);
       expect(col.rowid).toBe(true);
     });
   });

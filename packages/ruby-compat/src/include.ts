@@ -38,6 +38,7 @@ import {
   rbAnyToS,
   rbCBasicObject,
   rbCClass,
+  rbClassSuperclass,
   rbCDate,
   rbCNumeric,
   rbObjClass,
@@ -762,6 +763,22 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  * (`abstract_controller/base.rb`), so it has no `super` site to hook and a
  * mixin included there is seated by whichever subclass root does.
  *
+ * A class module's generator `initialize`, included into a class that has a
+ * superclass, is instead spliced between that class and its superclass, where
+ * `rb_include_module` puts the module: a `super(...)` call, and the implicit
+ * one of a class that declares no constructor, resolves its target through the
+ * class's prototype when it runs. So `ActiveRecord::Type::Internal::Timezone#initialize`
+ * (activerecord/lib/active_record/type/internal/timezone.rb:7-10) wraps its
+ * includer's construction. The value the generator yields is the argument list
+ * of an explicit `super(...)`, and a bare `yield` forwards the arguments it was
+ * called with. A constructor has no `this` until its `super(...)` returns, so
+ * the code before the `yield` runs once with `this` undefined, to read those
+ * arguments, and the whole body then runs against the instance: that code may
+ * only compute the arguments, and one that raises, or a superclass
+ * constructor that does, leaves the code after the `yield` unrun. A `Module`'s
+ * `initialize` that writes to `self` ahead of `super` (thor/actions.rb:72-85)
+ * therefore stays on the root's `super` site.
+ *
  * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
  * lifecycle name, and a string-named TS method spelled that way is drift.
  *
@@ -868,6 +885,32 @@ function trackInstanceInitializer(
     });
   }
   list!.push(initializer);
+}
+
+function spliceInstanceInitializer(
+  klass: AnyClass,
+  mod: object,
+  initializer: (this: object, ...args: never[]) => void | Generator,
+): void {
+  const superclass = Object.getPrototypeOf(klass) as new (...args: unknown[]) => object;
+  const link = class extends superclass {
+    constructor(...args: unknown[]) {
+      const zsuper = (
+        initializer.call(undefined as never, ...(args as never[])) as Generator<
+          unknown[] | undefined
+        >
+      ).next();
+      super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
+      const body = initializer.call(this, ...(args as never[])) as Generator;
+      body.next();
+      if (body.next().done !== true) {
+        body.return(undefined);
+        throw new TypeError("an initialize generator yields once, where Ruby calls super");
+      }
+    }
+  };
+  Object.defineProperty(link, T_ICLASS, { value: mod });
+  Object.setPrototypeOf(klass, link);
 }
 
 const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
@@ -1209,6 +1252,12 @@ type CallableMethods<M extends object> = {
 
 export type Included<M extends object> = CallableMethods<M extends Module<infer I> ? I : M>;
 
+/** @noRailsEquivalent PERMANENT */
+export type Initialized<K extends abstract new (...args: never[]) => object, M> = (new (
+  ...args: M extends { [initialize]: (...args: infer A) => unknown } ? A : never
+) => InstanceType<K>) &
+  Pick<K, keyof K>;
+
 function isClass(klass: object): klass is AnyClass {
   return typeof klass === "function";
 }
@@ -1260,7 +1309,15 @@ export function include(klass: AnyClass | object, mod: ModuleObject | AnyClass |
   trackIncludedModule(klass.prototype, mod);
   const instanceInitializer = (mod as ModuleHooks)[initialize];
   if (typeof instanceInitializer === "function") {
-    trackInstanceInitializer(klass.prototype, instanceInitializer);
+    if (
+      typeof mod === "function" &&
+      Object.getPrototypeOf(instanceInitializer) === GeneratorFunction &&
+      rbClassSuperclass(klass) !== null
+    ) {
+      spliceInstanceInitializer(klass, mod, instanceInitializer);
+    } else {
+      trackInstanceInitializer(klass.prototype, instanceInitializer);
+    }
   }
   const descriptors: PropertyDescriptorMap = {};
   const installed = trackedKeys(klass.prototype);

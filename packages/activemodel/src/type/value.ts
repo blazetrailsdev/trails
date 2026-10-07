@@ -43,7 +43,7 @@ export class ValueType<T = unknown> {
     } = {},
   ) {
     const { precision = null, limit = null, scale = null } = kwargs;
-    initializeIncludedModules(this, kwargs);
+    initializeIncludedModules(this);
     this._precision = precision;
     this._scale = scale;
     this.__limit = limit;

@@ -297,15 +297,15 @@ export function validateIndexLengthBang(
 
 /** @internal */
 export function newColumnFromField(
-  adapter: SQLite3SchemaAdapter,
+  this: SQLite3SchemaAdapter,
   _tableName: string,
   field: Record<string, unknown>,
   definitions: Record<string, unknown>[],
 ): Column {
   const default_ = (field["dflt_value"] as string | null) ?? null;
   const sqlType = String(field["type"] ?? "");
-  const typeMetadata = adapter.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
-  const defaultValue = adapter.extractValueFromDefault(default_);
+  const typeMetadata = this.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
+  const defaultValue = this.extractValueFromDefault(default_);
   const generatedType = extractGeneratedType(field);
 
   let defaultFunction: string | null = null;
@@ -346,10 +346,15 @@ export function isColumnTheRowid(
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
-  name?: string,
-  { type }: { type?: string } = {},
+  name?: string | null | { type?: string },
+  options: { type?: string } = {},
 ): string {
-  const scope = quotedScope.call(this, name, { type });
+  if (name != null && typeof name === "object") {
+    options = name;
+    name = null;
+  }
+  const { type } = options;
+  const scope = quotedScope.call(this, name ?? undefined, { type });
   if (!scope.type) scope.type = "'table','view'";
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
   sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
