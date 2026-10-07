@@ -448,6 +448,7 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
 /** @internal */
 export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._returningColumnsForInsertCache = undefined;
+  (this as { _arelTable?: unknown })._arelTable = undefined;
   this._columnNames = undefined;
   this._symbolColumnToStringNameHash = undefined;
   this._contentColumns = undefined;
@@ -675,6 +676,7 @@ export function setTableName(this: SchemaHost, value: string | null): void {
   }
 
   this._tableName = value;
+  (this as { _arelTable?: unknown })._arelTable = null;
   if (!ownSchemaMemo(this, "_explicitSequenceName")) this._sequenceName = null;
   (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
   (this as { _schemaLoaded?: boolean })._schemaLoaded = false;

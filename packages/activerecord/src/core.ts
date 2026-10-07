@@ -228,7 +228,11 @@ export class ClassMethods {
   }
 
   static get arelTable(): Table {
-    return new Table((this as any).tableName, { klass: this as any });
+    const host = this as unknown as CoreHost;
+    return (
+      (Object.hasOwn(host, "_arelTable") ? host._arelTable : undefined) ||
+      (host._arelTable = new Table((this as any).tableName, { klass: this as any }))
+    );
   }
 
   static get predicateBuilder(): PredicateBuilder {
@@ -506,6 +510,7 @@ interface CoreHost {
   initializeFindByCache(): FindByStatementCache;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
+  _arelTable?: Table | null;
   arelTable?: any;
   prototype: any;
   all(): any;
@@ -658,8 +663,10 @@ export function asynchronousQueriesTracker(): AsynchronousQueriesTracker {
 
 const ASYNCHRONOUS_QUERIES_TRACKER_KEY = "active_record_asynchronous_queries_tracker";
 
-export function asynchronousQueriesSession(): Session {
-  return asynchronousQueriesTracker().currentSession;
+export function asynchronousQueriesSession(this: {
+  asynchronousQueriesTracker(): AsynchronousQueriesTracker;
+}): Session {
+  return this.asynchronousQueriesTracker().currentSession;
 }
 
 export function strictLoadingViolationBang({

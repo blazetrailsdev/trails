@@ -576,3 +576,29 @@ describe("Core's included class attributes", () => {
     expect(Base.filterAttributes).toEqual([]);
   });
 });
+
+describe("arelTable memo", () => {
+  it("answers one table until the table name or the schema cache changes", () => {
+    class Memoized extends Base {
+      static {
+        this.tableName = "topics";
+      }
+    }
+    const table = Memoized.arelTable;
+    expect(Memoized.arelTable).toBe(table);
+    expect(Memoized.predicateBuilder.table.arelTable).toBe(table);
+
+    Memoized.tableName = "posts";
+    const renamed = Memoized.arelTable;
+    expect(renamed).not.toBe(table);
+    expect(renamed.name).toBe("posts");
+
+    (Memoized as unknown as { reloadSchemaFromCache(): void }).reloadSchemaFromCache();
+    expect(Memoized.arelTable).not.toBe(renamed);
+  });
+
+  it("does not hand a subclass its parent's table", () => {
+    expect(Reply.arelTable).toBe(Reply.arelTable);
+    expect(Reply.arelTable).not.toBe(Topic.arelTable);
+  });
+});
