@@ -70,7 +70,7 @@ include(Metal, Testing.Functional);
 
 declare module "./metal.js" {
   /* eslint-disable-next-line @typescript-eslint/no-empty-object-type -- Ruby `class Metal; include Testing::Functional; end` (`actionpack/lib/action_controller/test_case.rb:16-18`). */
-  interface Metal extends Included<typeof Testing.Functional> {}
+  interface Metal extends Included<(typeof Testing)["Functional"]> {}
 }
 
 Live.aliasMethod("originalNewControllerThread", "newControllerThread");

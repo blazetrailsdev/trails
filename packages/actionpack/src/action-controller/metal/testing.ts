@@ -17,12 +17,17 @@ export function recycleBang(this: Record<string, unknown>): void {
   this.params = null;
 }
 
-export const Testing = new Module() as Module & { Functional: typeof Functional };
+type Functional = Module<{
+  clearInstanceVariablesBetweenRequests: typeof clearInstanceVariablesBetweenRequests;
+  recycleBang: typeof recycleBang;
+}>;
+
+export const Testing = new Module() as Module & { Functional: Functional };
 rbModConstSet(ActionController, "Testing", Testing);
 
 export const Functional = new Module((mod) => {
   mod.defineMethod("clearInstanceVariablesBetweenRequests", clearInstanceVariablesBetweenRequests);
   mod.defineMethod("recycleBang", recycleBang);
-});
+}) as Functional;
 
 rbModConstSet(Testing, "Functional", Functional);
