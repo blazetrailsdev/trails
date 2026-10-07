@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { MessagePackCacheSerializer, UnserializableObjectError } from "./index.js";
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { env as ENV, registerConstant, setEnv } from "@blazetrails/ruby-compat";
 import { assertNotNil } from "../testing/assertions.js";
 
 class HasValue {
@@ -50,6 +50,22 @@ describe("MessagePackCacheSerializerTest", () => {
   beforeAll(() => {
     registerConstant("DefinesJsonCreate", DefinesJsonCreate);
     registerConstant("DefinesFromMsgpackExt", DefinesFromMsgpackExt);
+  });
+
+  it("works with ENV['RAILS_MAX_THREADS']", () => {
+    const originalEnv = { ...ENV };
+    setEnv("RAILS_MAX_THREADS", "1");
+    try {
+      const serialized = dump("value");
+      expect(serialized).toBeInstanceOf(Buffer);
+
+      const deserialized = load(serialized);
+      expect(typeof deserialized).toBe("string");
+      expect(deserialized).toBe("value");
+    } finally {
+      for (const name of Object.keys(ENV)) if (!(name in originalEnv)) setEnv(name, undefined);
+      for (const [name, value] of Object.entries(originalEnv)) setEnv(name, value);
+    }
   });
 
   it("uses #to_msgpack_ext and ::from_msgpack_ext to roundtrip unregistered objects", () => {
