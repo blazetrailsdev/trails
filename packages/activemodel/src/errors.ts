@@ -121,16 +121,16 @@ export class Errors<TBase extends object = object> {
     return this._errors.filter((e) => e.match(normAttr, normType, normOpts));
   }
 
-  include(attribute: string): boolean {
+  isInclude(attribute: string): boolean {
     return this._errors.some((e) => e.match(symbolToS(toSym(attribute))));
   }
 
   hasKey(attribute: string): boolean {
-    return this.include(attribute);
+    return this.isInclude(attribute);
   }
 
   isKey(attribute: string): boolean {
-    return this.include(attribute);
+    return this.isInclude(attribute);
   }
 
   delete(

@@ -150,13 +150,9 @@ export function redirectTo(
   );
 }
 
-export interface Notifier {
-  instrument(event: string, payload: Record<string, unknown>, block?: () => unknown): void;
-}
-
 /** @internal */
-export function haltedCallbackHook(filter: unknown, _name?: unknown, notifier?: Notifier): void {
-  notifier?.instrument("halted_callback.action_controller", { filter });
+export function haltedCallbackHook(filter: unknown, _: unknown): void {
+  Notifications.instrument("halted_callback.action_controller", { filter });
 }
 
 /** @internal */

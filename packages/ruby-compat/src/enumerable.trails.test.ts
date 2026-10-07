@@ -47,6 +47,18 @@ describe("Enumerable", () => {
     expect(bag.yielded).toBe(1);
   });
 
+  it("select is findAll", () => {
+    expect(Enumerable.select).toBe(Enumerable.findAll);
+  });
+
+  it("isInclude asks rb_equal of each element and stops at the first hit", () => {
+    const eq = { equals: (other: unknown) => other === "x" };
+    const bag = new Bag([1, eq, 3]);
+    expect(Enumerable.isInclude.call(bag, "x")).toBe(true);
+    expect(bag.yielded).toBe(2);
+    expect(Enumerable.isInclude.call(new Bag([1, 2]), "1")).toBe(false);
+  });
+
   it("Symbol.iterator iterates what each yields, on an includer", () => {
     class Included extends Bag {}
     include(Included, Enumerable);

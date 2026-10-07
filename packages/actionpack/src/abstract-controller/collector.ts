@@ -80,7 +80,7 @@ export function methodMissing(this: object, symbol: string, ...args: unknown[]):
     );
   }
 
-  if (MimeType.SET.select(() => true).includes(mimeConstant)) {
+  if (MimeType.SET.isInclude(mimeConstant)) {
     Collector.generateMethodForMime(mimeConstant);
     return rbFPublicSend(this, symbol, ...args);
   } else {

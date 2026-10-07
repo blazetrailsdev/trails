@@ -199,7 +199,7 @@ describe("ErrorsTest", () => {
 
   it("include? does not add a key to messages hash", () => {
     const person = new Person();
-    person.errors.include("foo");
+    person.errors.isInclude("foo");
 
     assertNot(person.errors.messages.has("foo"));
   });

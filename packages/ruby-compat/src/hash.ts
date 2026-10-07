@@ -1062,6 +1062,13 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#include?` (`vendor/ruby/v3.3.11/hash.c:7255`, `rb_hash_has_key` `:3671`).
+   */
+  isInclude(key: K): boolean {
+    return this.has(key);
+  }
+
+  /**
    * `Hash#key?` (`vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key`), a lookup by
    * the key's `hash` / `eql?`.
    *
