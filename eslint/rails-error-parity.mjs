@@ -13,6 +13,12 @@
  *      Missing/wrong-parent reports on line 1.
  *   2. Everywhere in scope: `throw new Error(` (and TypeError/globalThis.Error/
  *      …) is flagged — keyed on the constructor only, so ported subclasses pass.
+ *   3. Everywhere in scope, the exclude list included: `throw new X(message)`
+ *      where the Rails file this one mirrors raises `X` with no message
+ *      (`raise X` / `raise X unless …`) is flagged. The manifest's
+ *      `bareRaises` lists, per TS file, the classes each Rails method raises
+ *      bare and never with a message.
+ *      This arm has no baseline: it starts from zero.
  *
  * Pre-existing violators are grandfathered via the ratchet baseline
  * `eslint/rails-error-parity-exclude.json` (it only shrinks). Manifest:
@@ -132,6 +138,22 @@ function newCalleeName(callee) {
   return null;
 }
 
+/** Names of the functions, methods and function-valued members enclosing `node`. */
+function enclosingNames(node) {
+  const names = [];
+  for (let n = node.parent; n; n = n.parent) {
+    const id =
+      n.type === "FunctionDeclaration" || n.type === "VariableDeclarator"
+        ? n.id
+        : n.type === "MethodDefinition" || n.type === "PropertyDefinition" || n.type === "Property"
+          ? n.key
+          : null;
+    if (id?.type === "Identifier") names.push(id.name, id.name.replace(/^_/, ""));
+    else if (id?.type === "PrivateIdentifier") names.push(id.name);
+  }
+  return names;
+}
+
 function checkParity(context, exportedClasses, rubyCompatImports) {
   const scope = repoRel(context.filename ?? context.getFilename?.() ?? "");
   if (!scope) return;
@@ -198,13 +220,32 @@ const rule = {
       rootExtends:
         "Rails root error class `{{name}}` must extend a global Error type but extends `{{actual}}`.",
       bareThrow: "throw a ported Rails error class instead of `new {{name}}`.",
+      inventedMessage: "Rails raises `{{name}}` with no message here; throw `new {{name}}()` bare.",
     },
   },
   create(context) {
     const filename = context.filename ?? context.getFilename?.() ?? "";
     const scope = repoRel(filename);
     if (!scope) return {};
-    if (loadExclude().has(scope.rel)) return {};
+    const bareRaises =
+      loadManifest().bareRaises?.[scope.pkg]?.[scope.rel.replace(/^packages\/[^/]+\/src\//, "")];
+    const inventedMessage = {
+      ThrowStatement(node) {
+        const arg = node.argument;
+        if (!bareRaises || arg?.type !== "NewExpression" || arg.arguments.length === 0) return;
+        const name =
+          arg.callee.type === "MemberExpression" ? arg.callee.property?.name : arg.callee.name;
+        if (
+          !enclosingNames(node).some(
+            (fn) => Object.hasOwn(bareRaises, fn) && bareRaises[fn].includes(name),
+          )
+        ) {
+          return;
+        }
+        context.report({ node: arg, messageId: "inventedMessage", data: { name } });
+      },
+    };
+    if (loadExclude().has(scope.rel)) return inventedMessage;
 
     const exportedClasses = new Map();
     // A name bound by an `import` shadows the global of the same spelling, so
@@ -224,6 +265,7 @@ const rule = {
         }
       },
       ThrowStatement(node) {
+        inventedMessage.ThrowStatement(node);
         const arg = node.argument;
         if (arg?.type !== "NewExpression") return;
         const name = newCalleeName(arg.callee);

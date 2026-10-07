@@ -40,9 +40,7 @@ export class DatabaseConfig {
   }
 
   adapterClass(): new (...args: any[]) => unknown {
-    return (this.#adapterClass ||= ConnectionAdapters.resolve(this.adapter) as new (
-      ...args: any[]
-    ) => unknown);
+    return (this.#adapterClass ||= ConnectionAdapters.resolve(this.adapter));
   }
 
   inspect(): string {
@@ -55,15 +53,10 @@ export class DatabaseConfig {
     );
   }
 
-  /** @inventedArm rescue — CONVERGEABLE connection-adapters-resolve-answers-a-promise-for-an-unloaded-adapter */
   async validateBang(): Promise<true> {
     if (this.adapter != null) {
-      try {
-        this.#adapterClass = await this.adapterClass();
-      } catch (error) {
-        this.#adapterClass = null;
-        throw error;
-      }
+      await ConnectionAdapters.load(this.adapter);
+      this.adapterClass();
     }
 
     return true;

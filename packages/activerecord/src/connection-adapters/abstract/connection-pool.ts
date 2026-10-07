@@ -1065,10 +1065,7 @@ function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
 /** @internal */
 function checkoutNewConnection(this: Pool): DatabaseAdapter {
   if (!this.automaticReconnect) {
-    throw new ConnectionNotEstablished(
-      "No connection available from pool and automatic_reconnect is disabled",
-      { connectionPool: this },
-    );
+    throw new ConnectionNotEstablished();
   }
   return this.newConnection();
 }

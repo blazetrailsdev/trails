@@ -746,9 +746,7 @@ export function performQuery(
   },
 ): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:561
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#perform_query is not implemented",
-  );
+  throw new NotImplementedError();
 }
 
 interface DatabaseStatementsDefaultsHost {
@@ -814,9 +812,7 @@ interface DatabaseStatementsDefaultsHost {
 /** @internal */
 export function castResult(rawResult: any): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:566
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#cast_result is not implemented",
-  );
+  throw new NotImplementedError();
 }
 
 export const create = insert;
@@ -1052,9 +1048,7 @@ export const DatabaseStatements = {
 /** @internal */
 export function affectedRows(rawResult: any): never {
   // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/database_statements.rb:570
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::DatabaseStatements#affected_rows is not implemented",
-  );
+  throw new NotImplementedError();
 }
 
 /** @internal */

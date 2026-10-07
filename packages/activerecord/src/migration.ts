@@ -1,4 +1,5 @@
 import {
+  TopLevel,
   getEnv,
   camelize,
   groupBy,
@@ -206,8 +207,14 @@ export class ConcurrentMigrationError extends MigrationError {
 }
 
 export class NoEnvironmentInSchemaError extends MigrationError {
-  constructor(message = "Environment data not found in the schema.") {
-    super(message);
+  constructor() {
+    const msg =
+      "Environment data not found in the schema. To resolve this issue, run: \n\n        bin/rails db:environment:set";
+    if (TopLevel.Trails?.env !== undefined) {
+      super(`${msg} RAILS_ENV=${TopLevel.Trails.env}`);
+    } else {
+      super(msg);
+    }
     this.name = "ActiveRecord::NoEnvironmentInSchemaError";
   }
 }
@@ -1553,14 +1560,12 @@ export class MigrationContext<
     const internalMetadata = this.internalMetadata;
     if (!internalMetadata.enabled) return null;
     if ((await this.currentVersion()) === 0) return null;
-    const noEnvMsg =
-      "Environment data not found in the schema. To resolve this issue, run: bin/rails db:environment:set";
     if (!(await internalMetadata.tableExists())) {
-      throw new NoEnvironmentInSchemaError(noEnvMsg);
+      throw new NoEnvironmentInSchemaError();
     }
     const environment = await internalMetadata.get("environment");
     if (!environment) {
-      throw new NoEnvironmentInSchemaError(noEnvMsg);
+      throw new NoEnvironmentInSchemaError();
     }
     return environment;
   }

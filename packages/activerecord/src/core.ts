@@ -1014,7 +1014,7 @@ async function cachedFindBy(
       return records[0] ?? null;
     } catch (e) {
       if (e instanceof ActiveModelRangeError) return null;
-      if (e instanceof TypeError) throw new StatementInvalid(e.message);
+      if (e instanceof TypeError) throw new StatementInvalid();
       throw e;
     }
   });

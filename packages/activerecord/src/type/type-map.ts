@@ -27,7 +27,7 @@ export class TypeMap {
     value?: ValueType,
     block?: (...args: string[]) => ValueType,
   ): void {
-    if (!value && !block) throw new ArgumentError("registerType requires a value or block");
+    if (!value && !block) throw new ArgumentError();
     if (block) {
       this._mapping.set(key, block);
     } else {

@@ -3,6 +3,7 @@ import { sql as arelSql, Visitors } from "@blazetrails/arel";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Temporal } from "@blazetrails/date";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { NotImplementedError } from "@blazetrails/ruby-compat";
 import { Rollback, StatementInvalid } from "../../errors.js";
 import { FixtureError } from "../../fixtures.js";
 import { defaultInsertValue as sqliteDefaultInsertValue } from "../sqlite3/database-statements.js";
@@ -620,7 +621,7 @@ describe("performQuery", () => {
       performQuery.call({} as DatabaseStatementsHost, null, "SELECT 1", [], [], {
         prepare: false,
       }),
-    ).toThrow(/perform_query is not implemented/);
+    ).toThrow(NotImplementedError);
   });
 });
 

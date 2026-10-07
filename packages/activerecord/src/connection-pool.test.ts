@@ -6,7 +6,7 @@ import {
   assertRaises,
   assertRespondTo,
 } from "@blazetrails/activesupport";
-import { ConnectionTimeoutError } from "./errors.js";
+import { ConnectionNotEstablished, ConnectionTimeoutError } from "./errors.js";
 import {
   NullTransaction,
   RealTransaction,
@@ -24,7 +24,7 @@ import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Base } from "./base.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { register, resolve } from "./connection-adapters.js";
+import { load, register } from "./connection-adapters.js";
 import { resultFromRowHashes } from "./test-helpers/result-from-row-hashes.js";
 
 interface AmbientPoolOptions {
@@ -132,7 +132,7 @@ register(
   "./connection-adapters/transaction-aware-test-adapter.js",
   async () => TransactionAwareTestAdapter,
 );
-await resolve("transaction_aware_test");
+await load("transaction_aware_test");
 
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ adapter: "transaction_aware_test", pool: size });
@@ -402,8 +402,8 @@ it("automatic reconnect can be disabled", async () => {
   await pool.disconnectBang();
   pool.automaticReconnect = false;
 
-  await expect(pool.leaseConnection()).rejects.toThrow(/automatic_reconnect is disabled/);
-  await expect(pool.withConnection(() => {})).rejects.toThrow(/automatic_reconnect is disabled/);
+  await expect(pool.leaseConnection()).rejects.toThrow(ConnectionNotEstablished);
+  await expect(pool.withConnection(() => {})).rejects.toThrow(ConnectionNotEstablished);
 });
 
 it("pool sets connection visitor", async () => {

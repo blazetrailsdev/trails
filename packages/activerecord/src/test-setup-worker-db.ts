@@ -120,9 +120,9 @@ if (lane === "mysql") {
 }
 
 {
-  const { resolve: resolveAdapter } = await import("./connection-adapters.js");
+  const { load: loadAdapter } = await import("./connection-adapters.js");
   const adapters: string[] = ["sqlite3"];
   if (lane === "postgres") adapters.push("postgresql");
   if (lane === "mysql") adapters.push("mysql2");
-  await Promise.all(adapters.map((a) => resolveAdapter(a)));
+  await Promise.all(adapters.map((a) => loadAdapter(a)));
 }

@@ -12,7 +12,7 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { betterSqlite3Driver } from "./sqlite/better-sqlite3.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SqliteConnection, SqliteDriver } from "./sqlite-adapter.js";
-import { register, resolve } from "./connection-adapters.js";
+import { load, register } from "./connection-adapters.js";
 
 let registeredTestAdapters = 0;
 async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string> {
@@ -26,7 +26,7 @@ async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string
         return build();
       } as unknown as new () => DatabaseAdapter,
   );
-  await resolve(adapter);
+  await load(adapter);
   return adapter;
 }
 

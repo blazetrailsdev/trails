@@ -22,7 +22,7 @@ export class NoMethodError extends NameError {
    * @noRailsEquivalent PERMANENT
    */
   constructor(
-    message: string,
+    message?: string,
     name?: string,
     args: unknown = null,
     priv = false,
