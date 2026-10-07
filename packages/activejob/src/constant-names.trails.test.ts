@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { constantize, safeConstantize } from "@blazetrails/activesupport";
+import { constantize, demodulize, safeConstantize } from "@blazetrails/activesupport";
 import {
   NameError,
+  TypeError,
   rbModName,
   registerConstant,
   unregisterConstant,
@@ -15,7 +16,18 @@ describe("ActiveJob constant names", () => {
   afterEach(() => {
     unregisterConstant("HelloJob", HelloJob);
     unregisterConstant("Admin::NestedJob", NestedJob);
+    unregisterConstant("Raising", Raising);
   });
+
+  const Raising = {
+    name: "Raising",
+    get Other(): unknown {
+      throw new NameError("uninitialized constant Elsewhere", "Elsewhere");
+    },
+    get Broken(): unknown {
+      throw new TypeError("not a class");
+    },
+  };
 
   it("names a framework class by its Ruby constant path and resolves it again", () => {
     expect(rbModName(Base)).toBe("ActiveJob::Base");
@@ -30,6 +42,21 @@ describe("ActiveJob constant names", () => {
     expect(constantize(rbModName(HelloJob)!)).toBe(HelloJob);
     expect(rbModName(NestedJob)).toBe("Admin::NestedJob");
     expect(constantize(rbModName(NestedJob)!)).toBe(NestedJob);
+  });
+
+  it("demodulizes the full constant path, not a last-segment name", () => {
+    registerConstant("Admin::NestedJob", NestedJob);
+
+    expect(demodulize(rbModName(Base)!)).toBe("Base");
+    expect(demodulize(rbModName(NestedJob)!)).toBe("NestedJob");
+  });
+
+  it("safeConstantize propagates an error that is not about the requested constant", () => {
+    registerConstant("Raising", Raising);
+
+    expect(() => safeConstantize("Raising::Other")).toThrow("uninitialized constant Elsewhere");
+    expect(() => safeConstantize("Raising::Broken")).toThrow(TypeError);
+    expect(safeConstantize("Raising::Missing")).toBeUndefined();
   });
 
   it("raises NameError for an unregistered job class", () => {
