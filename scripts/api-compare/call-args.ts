@@ -763,17 +763,6 @@ function stripBlockTailPadding(
   return tsArgs.slice(0, rubyArgs.length);
 }
 
-/**
- * Drop the `nil` a TS call writes for an optional positional Ruby omits ahead
- * of its kwargs. `data_source_sql(name = nil, type: nil)` is called as
- * `data_source_sql(type: "BASE TABLE")`; a TS options hash is a trailing
- * PARAMETER, so the port has to write the skipped positional:
- * `dataSourceSql(undefined, { type: "BASE TABLE" })`.
- *
- * Narrow like {@link stripBlockTailPadding}: both lists must end in a kwargs
- * hash, the extra TS arguments must be pure `nil` sitting directly ahead of it,
- * and the TS callee must declare those parameters optional.
- */
 function stripKwargsLeadPadding(
   rubyArgs: string[],
   tsArgs: string[],

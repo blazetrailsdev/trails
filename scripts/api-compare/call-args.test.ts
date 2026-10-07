@@ -491,8 +491,6 @@ describe("compareCallArgs ported-private receiver argument", () => {
 describe("compareCallArgs kwargs-lead nil padding", () => {
   const optional = (name: string): ParamInfo => ({ name, kind: "optional", default: "..." });
   const required = (name: string): ParamInfo => ({ name, kind: "required" });
-  // abstract/schema_statements.rb:52 `data_source_sql(type: "BASE TABLE")`,
-  // against `data_source_sql(name = nil, type: nil)` (:1890).
   const rubyCall = site("data_source_sql", ["kwargs{type=str:BASE TABLE}"]);
   const tsCall = site("dataSourceSql", ["nil", "kwargs{type=str:BASE TABLE}"]);
   const sig = [optional("name"), optional("options")];
