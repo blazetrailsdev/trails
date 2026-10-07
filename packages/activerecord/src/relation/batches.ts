@@ -10,6 +10,7 @@ import { errorOnIgnoredOrder } from "../active-record.js";
 export class Batches {
   static readonly ORDER_IGNORE_MESSAGE =
     "Scoped order is ignored, use :cursor with :order to configure custom order." as const;
+  static readonly DEFAULT_ORDER = ":asc" as const;
 
   findEach<T extends Base>(
     this: any,
@@ -29,7 +30,7 @@ export class Batches {
       batchSize = 1000,
       errorOnIgnore,
       cursor = this.primaryKey,
-      order,
+      order = Batches.DEFAULT_ORDER,
     }: FindEachOptions = {},
     block?: (record: T) => void | Promise<void>,
   ): (AsyncGenerator<T> & { size(): Promise<number> }) | Promise<null> {
@@ -80,7 +81,7 @@ export class Batches {
       batchSize = 1000,
       errorOnIgnore,
       cursor = this.primaryKey,
-      order,
+      order = Batches.DEFAULT_ORDER,
     }: FindEachOptions = {},
     block?: (batch: T[]) => void | Promise<void>,
   ): (AsyncGenerator<T[]> & { size(): Promise<number> }) | Promise<null> {
@@ -132,7 +133,7 @@ export class Batches {
       of = 1000,
       start,
       finish,
-      order,
+      order = Batches.DEFAULT_ORDER,
       cursor: cursorOption,
       errorOnIgnore,
       load = false,
@@ -148,13 +149,7 @@ export class Batches {
     }
 
     const run = async (block: (relation: any) => unknown): Promise<null> => {
-      await ensureValidOptionsForBatchingBang(
-        self,
-        cursor,
-        start,
-        finish,
-        (order ?? ":asc") as any,
-      );
+      await ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
 
       let batchLimit = of;
       let remaining: number | null = null;
@@ -171,7 +166,7 @@ export class Batches {
             start,
             finish,
             cursor,
-            order: (order ?? ":asc") as any,
+            order: order,
             batchLimit,
           },
           block,
@@ -185,7 +180,7 @@ export class Batches {
             finish,
             load,
             cursor,
-            order: (order ?? ":asc") as any,
+            order: order,
             useRanges,
             remaining,
             batchLimit,
@@ -267,7 +262,7 @@ export class Batches {
 
 /** @internal */
 export async function ensureValidOptionsForBatchingBang(
-  relation: any,
+  this: any,
   cursor: string[],
   start: unknown,
   finish: unknown,
@@ -281,9 +276,8 @@ export async function ensureValidOptionsForBatchingBang(
     throw new ArgumentError(":finish must contain one value per cursor column");
   }
 
-  if (Array<string>(relation.primaryKey).some((key) => !cursor.includes(key))) {
-    const model = relation.model;
-    const indexes = (await model.schemaCache().indexes(relation.tableName)) as {
+  if (Array<string>(this.primaryKey).some((key) => !cursor.includes(key))) {
+    const indexes = (await this.model.schemaCache().indexes(this.tableName)) as {
       unique: boolean;
       where?: string | null;
       columns: string[];
@@ -370,9 +364,9 @@ export function batchCondition(
 /** @internal */
 export function buildBatchOrders(
   cursor: string[],
-  order: ":asc" | ":desc" | (":asc" | ":desc")[] | undefined,
+  order: ":asc" | ":desc" | (":asc" | ":desc")[],
 ): [string, ":asc" | ":desc"][] {
-  return cursor.map((column, i) => [column, Array(order)[i] ?? ":asc"]);
+  return cursor.map((column, i) => [column, Array(order)[i] ?? Batches.DEFAULT_ORDER]);
 }
 
 /** @internal */
