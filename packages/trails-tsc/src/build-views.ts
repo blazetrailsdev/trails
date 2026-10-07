@@ -678,11 +678,15 @@ function renderSite(
   const partialKey = block ? "layout" : "partial";
   if (!keys.includes(partialKey)) {
     if (!keys.includes("locals")) return undefined;
-    const named = option(first, "template") ?? option(first, "action");
+    const template = option(first, "template");
+    const action = template ? undefined : option(first, "action");
+    const named = template ?? action;
     return {
       template: named
         ? ts.isStringLiteral(named)
-          ? named.text
+          ? action
+            ? underscore(named.text)
+            : named.text
           : undefined
         : inController
           ? actionName(call)

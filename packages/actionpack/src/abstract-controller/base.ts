@@ -297,9 +297,7 @@ export class AbstractController {
 
   /** @internal */
   isActionMethod(name: string): boolean {
-    const cls = this.constructor as typeof AbstractController;
-    cls.actionMethods();
-    return cls._actionMethodCache!.has(name);
+    return (this.constructor as typeof AbstractController).actionMethods().includes(name);
   }
 
   /** @internal */

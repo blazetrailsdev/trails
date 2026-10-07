@@ -1947,6 +1947,15 @@ turned into one of those, and nowhere else, each site carrying
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
 
+`trails-tsc`'s view compiler follows the same rule when it works out which
+template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
+the enclosing method's name, or a literal `action:`, underscored; a literal
+`template:` as written.
+
+`underscore` is ActiveSupport's, so it also maps `-` to `_` and `::` to `/`.
+An action's name is a method's name, which holds neither, so those arms never
+fire for one.
+
 The conversion is at these sites and not inside the template resolver, because
 the resolver is also handed names an application wrote out in full
 (`render template: "shared/lineItem"`, `render partial: "lineItem"`), which are
