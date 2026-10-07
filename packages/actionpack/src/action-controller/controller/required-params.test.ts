@@ -1,21 +1,62 @@
-import { describe, it, expect } from "vitest";
-import { toParam, toQuery } from "@blazetrails/activesupport";
+import { beforeEach, describe, it, expect } from "vitest";
+import { assertMatch, assertRaise, toParam, toQuery } from "@blazetrails/activesupport";
+import "../../test-helpers/abstract-unit.js";
+import { Base } from "../base.js";
+import { TestCase } from "../test-case.js";
 import { Parameters, ParameterMissing, UnfilteredParameters } from "../metal/strong-parameters.js";
 
+class BooksController extends Base {
+  create() {
+    (this.params.require("book") as Parameters).require("name");
+    this.head("ok");
+  }
+}
+
 describe("ActionControllerRequiredParamsTest", () => {
-  it("missing required parameters will raise exception", () => {
-    const params = new Parameters({ name: "John" });
-    expect(() => params.require("missing_key")).toThrow(ParameterMissing);
+  class ActionControllerRequiredParamsTest extends TestCase {
+    static {
+      this.tests(BooksController);
+    }
+  }
+
+  let tc: ActionControllerRequiredParamsTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new ActionControllerRequiredParamsTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
   });
 
-  it("required parameters that are present will not raise", () => {
-    const params = new Parameters({ name: "John" });
-    expect(params.require("name")).toBe("John");
+  it("missing required parameters will raise exception", async () => {
+    await assertRaise([ParameterMissing], {}, async () => {
+      await tc.post("create", { params: { magazine: { name: "Mjallo!" } } });
+    });
+
+    await assertRaise([ParameterMissing], {}, async () => {
+      await tc.post("create", { params: { book: { title: "Mjallo!" } } });
+    });
   });
 
-  it("required parameters with false value will not raise", () => {
-    const params = new Parameters({ active: false });
-    expect(params.require("active")).toBe(false);
+  it("exceptions have suggestions for fix", async () => {
+    let error = (await assertRaise([ParameterMissing], {}, async () => {
+      await tc.post("create", { params: { boko: { name: "Mjallo!" } } });
+    })) as ParameterMissing;
+    assertMatch("Did you mean?", error.detailedMessage());
+
+    error = (await assertRaise([ParameterMissing], {}, async () => {
+      await tc.post("create", { params: { book: { naem: "Mjallo!" } } });
+    })) as ParameterMissing;
+    assertMatch("Did you mean?", error.detailedMessage());
+  });
+
+  it("required parameters that are present will not raise", async () => {
+    await tc.post("create", { params: { book: { name: "Mjallo!" } } });
+    tc.assertResponse("ok");
+  });
+
+  it("required parameters with false value will not raise", async () => {
+    await tc.post("create", { params: { book: { name: false } } });
+    tc.assertResponse("ok");
   });
 });
 

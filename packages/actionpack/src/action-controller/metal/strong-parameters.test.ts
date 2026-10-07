@@ -7,8 +7,12 @@ describe("ParameterMissing#corrections", () => {
     expect(err.corrections).toEqual(["name"]);
   });
 
-  it("returns [] when no keys are attached", () => {
-    expect(new ParameterMissing("name").corrections).toEqual([]);
+  it("raises when no keys are attached, and detailedMessage falls back to super", () => {
+    const err = new ParameterMissing("name");
+    expect(() => err.corrections).toThrow(TypeError);
+    expect(err.detailedMessage({ highlight: false })).toBe(
+      "param is missing or the value is empty or invalid: name (ActionController::ParameterMissing)",
+    );
   });
 
   it("returns [] when nothing in the dictionary is close", () => {

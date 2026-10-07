@@ -49,6 +49,7 @@ import {
   _computeRedirectToLocation,
   redirectBack,
   redirectBackOrTo,
+  urlFrom,
   type RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
@@ -347,6 +348,7 @@ export interface Base
   ): number;
   redirectBack: typeof redirectBack;
   redirectBackOrTo: typeof redirectBackOrTo;
+  urlFrom: typeof urlFrom;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
   csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
@@ -403,6 +405,7 @@ export class Base extends Metal {
   declare static helpersPath: string[];
   declare static isHelpersPath: boolean;
   declare static includeAllHelpers: boolean;
+  declare static raiseOnOpenRedirects: boolean;
   declare static isIncludeAllHelpers: boolean;
 
   declare static _helpers: Module;
@@ -713,6 +716,7 @@ include(Base, Redirecting);
 mattrAccessor.call(Base, "raiseOnOpenRedirects", { default: false });
 Base.prototype.redirectBack = redirectBack;
 Base.prototype.redirectBackOrTo = redirectBackOrTo;
+Base.prototype.urlFrom = urlFrom;
 Base.prototype._computeRedirectToLocation = _computeRedirectToLocation;
 include(Base, ActionViewRendering);
 extend(Base, ViewPathsClassMethods);

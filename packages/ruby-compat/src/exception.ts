@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /**
  * Ruby's core `Exception` (`vendor/ruby/v3.3.11/error.c:3294` `rb_eException`) — the
  * root every raisable class descends from. A class declared `< Exception`
@@ -11,6 +12,12 @@
  * rather than defines.
  */
 export class Exception extends Error {}
+
+export interface Exception {
+  /** @noRailsEquivalent PERMANENT */
+  detailedMessage(opt?: { highlight?: boolean | null } | null): string;
+}
+/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 Exception.prototype.name = "Exception";
 

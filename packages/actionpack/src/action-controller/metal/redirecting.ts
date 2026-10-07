@@ -27,8 +27,9 @@ const SCHEME_OR_PROTOCOL_RELATIVE_RE = /^([a-z][a-z\d\-+.]*:|\/\/).*/i;
 export type RedirectToOptions =
   | string
   | ToModel
+  | unknown[]
   | (UrlOptions & Record<string, unknown>)
-  | (() => string);
+  | ((this: never) => RedirectToOptions);
 
 export interface RedirectToResponseOptions {
   status?: StatusSymbol | `:${StatusSymbol}` | number;

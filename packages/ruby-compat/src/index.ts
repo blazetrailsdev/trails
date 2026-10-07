@@ -322,6 +322,7 @@ export { isEmpty } from "./ruby-empty.js";
 export { RuntimeError } from "./runtime-error.js";
 export { Exception, excSetupMessage } from "./exception.js";
 export { excToS } from "./exc-to-s.js";
+export { excDetailedMessage, rbDecorateMessage } from "./exc-detailed-message.js";
 export { StandardError } from "./standard-error.js";
 export { Interrupt, SignalException } from "./signal-exception.js";
 export { ObjectSpace } from "./object-space.js";
