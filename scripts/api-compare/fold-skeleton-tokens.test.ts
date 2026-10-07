@@ -86,6 +86,27 @@ describe("foldSkeletonTokens", () => {
     expect(foldSkeletonTokens(ts, "ts")).toEqual(["loop", "ref:get", "if", "if", "ref:equals"]);
   });
 
+  it("lets a synchronous `.some` claim the Ruby `any?` before an awaiting predicate loop", () => {
+    const ts = ["ref:some", "loop:predicate", "ref:get", "if:predicate"];
+
+    expect(foldSkeletonTokens(ts, "ts", ["ref:any?", "ref:send"])).toEqual([
+      "ref:some",
+      "loop",
+      "ref:get",
+      "if",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts", ["ref:any?", "ref:any?"])).toEqual([
+      "ref:some",
+      "ref:some",
+      "ref:get",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts", ["ref:any?", "ref:include?"])).toEqual([
+      "ref:some",
+      "ref:some",
+      "ref:get",
+    ]);
+  });
+
   it("leaves a synchronous loop port of `collect` / `any?` reading as an invented loop", () => {
     const fold = (ruby: string[], ts: string[]) => {
       const tsFolded = foldSkeletonTokens(ts, "ts", ruby);

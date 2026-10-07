@@ -5200,13 +5200,17 @@ function awaitedCollect(
  * whose block awaits in the port, so `Array#some` cannot carry it: a
  * callback's promise is always truthy. The body ends in an `if` with no
  * `else` whose only statement returns a boolean literal, it awaits before or
- * inside that test, and nothing else leaves an iteration early. The loop and
+ * inside that test, and nothing else leaves an iteration early. What follows
+ * the loop is not constrained: that `any?` is the left operand of a `||`, so
+ * its port falls through to the right one. A `for await … of` walks an async
+ * iterable, not an Array, and is not one. The loop and
  * that `if` are marked `loop:predicate` / `if:predicate`, and
  * compare.ts#foldSkeletonTokens reads them against the Ruby stream.
  */
 function awaitedPredicate(
   statement: ts.ForOfStatement,
 ): { statements: ts.Statement[]; test: ts.Expression } | undefined {
+  if (statement.awaitModifier !== undefined) return undefined;
   const body = statement.statement;
   const statements = ts.isBlock(body) ? [...body.statements] : [body];
   const last = statements.pop();

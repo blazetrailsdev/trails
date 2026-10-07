@@ -544,12 +544,16 @@ const COLLECT_LOOP_TOKEN = "loop:collect";
  * (`activerecord/lib/active_record/associations/collection_association.rb:508-516`),
  * so it reads as `ref:some` while the Ruby stream still shows an unclaimed one
  * of {@link AWAITED_PREDICATE_REFS}, and as `loop` / `if` otherwise: a Ruby
- * `each` that returns early is the same TS shape. With no counterpart it reads
- * as `loop` / `if`.
+ * `each` that returns early is the same TS shape. A TS `.some` / `.every` call
+ * claims a Ruby predicate first, once the Ruby stream's `include?`-family
+ * reaches, which a port also spells `.some`, are accounted for. With no
+ * counterpart it reads as `loop` / `if`.
  */
 const PREDICATE_LOOP_TOKEN = "loop:predicate";
 const PREDICATE_IF_TOKEN = "if:predicate";
 const AWAITED_PREDICATE_REFS = new Set(["ref:any?", "ref:all?", "ref:none?"]);
+const SYNC_PREDICATE_REFS = new Set(["ref:some", "ref:every"]);
+const CONTAINMENT_REFS = new Set(["ref:include?", "ref:member?", "ref:exclude?"]);
 
 function isPlainIteration(token: string, side: SkeletonSide): boolean {
   if (token === "loop") return true;
@@ -638,8 +642,16 @@ export function foldSkeletonTokens(
     ]),
   );
   const rubyWhenLists = side === "ts" ? [...(counterpart ?? [])] : [];
+  const reaches = (tokens: readonly string[], refs: ReadonlySet<string>) =>
+    tokens.filter((t) => refs.has(t)).length;
   let unclaimedPredicates =
-    side === "ts" ? (counterpart ?? []).filter((t) => AWAITED_PREDICATE_REFS.has(t)).length : 0;
+    side !== "ts" || counterpart === undefined
+      ? 0
+      : reaches(counterpart, AWAITED_PREDICATE_REFS) -
+        Math.max(
+          0,
+          reaches(skeleton, SYNC_PREDICATE_REFS) - reaches(counterpart, CONTAINMENT_REFS),
+        );
   let predicateIfs = 0;
   for (const [index, token] of skeleton.entries()) {
     const marked = SHORT_CIRCUIT_MARKS.get(token);

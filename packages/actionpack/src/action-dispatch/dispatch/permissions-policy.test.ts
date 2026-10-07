@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, it, expect } from "vitest";
+import { afterAll, beforeEach, describe, it, expect } from "vitest";
 import { Module, assertEqual } from "@blazetrails/activesupport";
 import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import {
@@ -214,14 +214,20 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     },
   });
 
+  const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
+  registerConstant(helperName, ApplicationHelper);
+  afterAll(() => unregisterConstant(helperName, ApplicationHelper));
+
   class ApplicationController extends Base {
+    static override name = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationController";
+
+    static {
+      this.helperMethod("isSkyIsBlue");
+    }
     isSkyIsBlue(): boolean {
       return true;
     }
   }
-  Object.defineProperty(ApplicationController, "name", {
-    value: "PermissionsPolicyWithHelpersIntegrationTest::ApplicationController",
-  });
 
   class PolicyController extends ApplicationController {
     static {
@@ -267,16 +273,10 @@ describe("PermissionsPolicyWithHelpersIntegrationTest", () => {
     middleware.use(Lint as MiddlewareFactory);
   });
 
-  const helperName = "PermissionsPolicyWithHelpersIntegrationTest::ApplicationHelper";
-  beforeAll(() => {
-    registerConstant(helperName, ApplicationHelper);
-    ApplicationController.helperMethod("isSkyIsBlue");
-    controllerConstants.set(
-      "permissions_policy_with_helpers_integration_test/policy",
-      PolicyController,
-    );
-  });
-  afterAll(() => unregisterConstant(helperName, ApplicationHelper));
+  controllerConstants.set(
+    "permissions_policy_with_helpers_integration_test/policy",
+    PolicyController,
+  );
 
   let t: IntegrationTest;
   beforeEach(({ task }) => {

@@ -1817,6 +1817,12 @@ describe("body call capture", () => {
           }
           return false;
         }
+        async streamed(sources: AsyncIterable<unknown>) {
+          for await (const source of sources) {
+            if (await this.clause(source)) return true;
+          }
+          return false;
+        }
         async finding(sources: unknown[]) {
           for (const source of sources) {
             if (await this.clause(source)) return source;
@@ -1845,6 +1851,7 @@ describe("body call capture", () => {
     ]);
     expect(skeleton("syncAny")).toEqual(["loop", "if", "ref:render"]);
     expect(skeleton("finding")).toEqual(["loop", "if", "ref:clause"]);
+    expect(skeleton("streamed")).toEqual(["loop", "if", "ref:clause"]);
   });
 
   it("reads a for-of that keeps its element on an awaited test as a filter", () => {
