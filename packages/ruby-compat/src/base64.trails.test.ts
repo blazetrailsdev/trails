@@ -3,6 +3,13 @@ import { ArgumentError } from "./argument-error.js";
 import { Base64 } from "./base64.js";
 
 describe("Base64", () => {
+  it("encode64 breaks the line after every 60 encoded characters and at the end", () => {
+    expect(Base64.encode64("lifo:world")).toBe("bGlmbzp3b3JsZA==\n");
+    expect(Base64.encode64("a".repeat(50))).toBe(
+      "YWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFhYWFh\nYWFhYWE=\n",
+    );
+  });
+
   it("decode64 answers the bytes, one code unit per byte", () => {
     expect(Base64.decode64("dXNlcjpwYXNz")).toBe("user:pass");
     expect(Base64.decode64("AH+A/w==")).toBe("\x00\x7f\x80\xff");

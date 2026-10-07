@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
-import { Options as ParamsWrapperOptions } from "./metal/params-wrapper.js";
+import { Options as ParamsWrapperOptions, inheritedParamsWrapper } from "./metal/params-wrapper.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 
@@ -55,7 +55,7 @@ describe("Base ParamsWrapper wiring", () => {
     class Parent extends Base {}
     Parent.wrapParameters({ format: [":json"], name: "parent" });
     class Child extends Parent {}
-    Child.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(Child);
     expect(Child._wrapperOptions.klass).toBe(Child);
     expect(Child._wrapperOptions.name).toBe("parent");
     expect(Child._wrapperOptions.format).toEqual([":json"]);
@@ -66,7 +66,7 @@ describe("Base ParamsWrapper wiring", () => {
     class UsersController extends Base {}
     UsersController.wrapParameters({ format: [":json"] });
     class AdminsController extends UsersController {}
-    AdminsController.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(AdminsController);
     expect(AdminsController._wrapperOptions.name).toBe("admin");
     expect(AdminsController._wrapperOptions.klass).toBe(AdminsController);
   });
@@ -74,7 +74,7 @@ describe("Base ParamsWrapper wiring", () => {
   it("inheritedParamsWrapper is a no-op when format is empty", () => {
     class E extends Base {}
     const before = E._wrapperOptions;
-    E.inheritedParamsWrapper();
+    inheritedParamsWrapper.call(E);
     expect(E._wrapperOptions).toBe(before);
   });
 

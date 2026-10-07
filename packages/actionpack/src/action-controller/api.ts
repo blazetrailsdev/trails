@@ -6,7 +6,7 @@ import {
   type ClassMethods as RateLimitingClassMethods,
 } from "./metal/rate-limiting.js";
 import { logAt } from "./metal/logging.js";
-import { classAttribute, include, type Included } from "@blazetrails/activesupport";
+import { include, type Included } from "@blazetrails/activesupport";
 import { Caching } from "../abstract-controller/caching.js";
 import { ConditionalGet } from "./metal/conditional-get.js";
 import { BasicImplicitRender } from "./metal/basic-implicit-render.js";
@@ -18,10 +18,8 @@ import { Instrumentation } from "./metal/instrumentation.js";
 import {
   Options as ParamsWrapperOptions,
   ParamsWrapper,
-  _setWrapperOptions,
-  deferInherited,
-  inheritedParamsWrapper,
-  wrapParameters,
+  type _setWrapperOptions,
+  type wrapParameters,
 } from "./metal/params-wrapper.js";
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
@@ -48,25 +46,12 @@ export class API extends Metal {
   static logAt = logAt;
 
   declare static _wrapperOptions: ParamsWrapperOptions;
-  /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
-  declare static is_wrapperOptions: boolean;
   declare _wrapperOptions: ParamsWrapperOptions;
-
-  static {
-    classAttribute.call(this, "_wrapperOptions", {
-      default: ParamsWrapperOptions.fromHash({ format: [] }),
-    });
-    deferInherited.call(this);
-  }
-
-  static _setWrapperOptions = _setWrapperOptions;
-
-  /** @noRailsEquivalent CONVERGEABLE api-params-wrapper-is-inlined-into-api-process-action */
-  static wrapParameters = wrapParameters;
-
   /** @internal */
-  static inheritedParamsWrapper = inheritedParamsWrapper;
+  declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
+  declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
 
+  /** @missingRailsCall response_body — CONVERGEABLE api-includes-instrumentation-and-the-rest-of-modules */
   render(options: RenderOptions = {}): void {
     if (this.performed) {
       throw new DoubleRenderError();

@@ -19,6 +19,7 @@ import {
   Concern,
   Module,
   any,
+  classAttribute,
   classify,
   demodulize,
   extend,
@@ -231,6 +232,11 @@ export function inheritedParamsWrapper(this: WrapperHostClass): void {
   }
 }
 
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("_setWrapperOptions", _setWrapperOptions);
+  mod.defineMethod("wrapParameters", wrapParameters);
+});
+
 const INHERITED = Symbol("inherited");
 
 /**
@@ -326,8 +332,16 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
 }
 
-export const ParamsWrapper: Module = new Module((mod) => {
+export const ParamsWrapper = new Module((mod) => {
   extend(mod, Concern);
+
+  (mod as unknown as { included(base: null, block: (this: object) => void): void }).included(
+    null,
+    function (this: object) {
+      classAttribute.call(this, "_wrapperOptions", { default: Options.fromHash({ format: [] }) });
+      deferInherited.call(this as WrapperHostClass);
+    },
+  );
 
   mod.defineMethod("processAction", processAction);
   mod.defineMethod("_wrapperKey", _wrapperKey);
@@ -336,4 +350,5 @@ export const ParamsWrapper: Module = new Module((mod) => {
   mod.defineMethod("_extractParameters", _extractParameters);
   mod.defineMethod("_wrapperEnabled", _wrapperEnabled);
   mod.defineMethod("_performParameterWrapping", _performParameterWrapping);
-});
+}) as Module & { ClassMethods: typeof ClassMethods };
+ParamsWrapper.ClassMethods = ClassMethods;

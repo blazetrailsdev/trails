@@ -3,6 +3,7 @@ import { except, rbObjDup, registerConstant, unregisterConstant } from "@blazetr
 import { afterEach, beforeEach, describe, it } from "vitest";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
+import { inheritedParamsWrapper } from "../metal/params-wrapper.js";
 import { SharedTestRoutes } from "../../test-helpers/abstract-unit.js";
 
 registerConstant("IrregularInflectionParamsWrapperTest", {
@@ -24,7 +25,7 @@ let tc: TestCase;
 async function withDefaultWrapperOptions(block: () => void | Promise<void>): Promise<void> {
   const klass = tc.controller.constructor as typeof Base;
   klass._setWrapperOptions({ format: [":json"] });
-  klass.inheritedParamsWrapper();
+  inheritedParamsWrapper.call(klass);
   await block();
 }
 

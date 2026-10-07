@@ -631,6 +631,7 @@ class ApiExtractor
       # only: re-walking the call would reach process_method_add_arg's
       # define_method arm and record the same method a second time.
       consumed_call = process_define_method_block(node)
+      process_each_include(node)
       unless process_each_codegen(node)
         @in_on_load += 1 if on_load_block?(node)
         included_target = concern_included_block?(node) ? (@modules[current_fqn]) : nil
@@ -649,6 +650,7 @@ class ApiExtractor
       lhs, rhs = node[1], node[2]
       maybe_record_valid_options(lhs, rhs)
       maybe_record_constant(lhs, rhs)
+      maybe_record_module_list(lhs, rhs)
       # Only enter the struct-class path when:
       #   lhs = [:var_field, [:@const, "Name", ...]]
       #   rhs = [:method_add_block, [:method_add_arg, [:call, Struct, ., :new], ...], block]
@@ -1168,6 +1170,48 @@ class ApiExtractor
     names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+  end
+
+  def maybe_record_module_list(lhs, rhs)
+    return unless lhs.is_a?(Array) && lhs[0] == :var_field
+    const = lhs[1]
+    return unless const.is_a?(Array) && const[0] == :@const
+    rhs = unwrap_freeze(rhs)
+    return unless rhs.is_a?(Array) && rhs[0] == :array && rhs[1].is_a?(Array)
+    elements = rhs[1]
+    return unless elements.all? { |e| e.is_a?(Array) && %i[var_ref const_path_ref top_const_ref].include?(e[0]) }
+    names = elements.map { |e| qualified_const_name(e) }
+    return if names.empty? || names.any?(&:nil?)
+    (@module_lists ||= {})[[current_fqn, const[1]]] = names
+  end
+
+  def process_each_include(node)
+    return if @in_on_load.positive?
+    call = node[1]
+    return unless call.is_a?(Array) && call[0] == :call && ident_name(call[3]) == "each"
+    receiver = call[1]
+    return unless receiver.is_a?(Array) && receiver[0] == :var_ref &&
+                  receiver[1].is_a?(Array) && receiver[1][0] == :@const
+    fqn = current_fqn
+    names = (@module_lists ||= {})[[fqn, receiver[1][1]]]
+    return unless names
+    block = node[2]
+    return unless block.is_a?(Array) && %i[do_block brace_block].include?(block[0])
+    loop_var = block_param_name(block)
+    return unless loop_var
+    body = block[2]
+    stmts = body.is_a?(Array) && body[0] == :bodystmt ? body[1] : body
+    return unless stmts.is_a?(Array) && stmts.length == 1
+    stmt = stmts[0]
+    return unless stmt.is_a?(Array) && stmt[0] == :command && ident_name(stmt[1]) == "include"
+    arg = stmt.dig(2, 1, 0)
+    return unless arg.is_a?(Array) && arg[0] == :var_ref && ident_name(arg[1]) == loop_var
+    target = @classes[fqn] || @modules[fqn]
+    return unless target
+    names.each do |mod_name|
+      target[:includes] << mod_name
+      (@include_groups[[fqn, :includes]] ||= []) << [mod_name]
+    end
   end
 
   def process_include_from_arg_paren(args)

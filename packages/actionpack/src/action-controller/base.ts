@@ -158,10 +158,8 @@ import { DataStreaming, type sendFileHeadersBang } from "./metal/data-streaming.
 import {
   Options as ParamsWrapperOptions,
   ParamsWrapper,
-  _setWrapperOptions,
-  deferInherited,
-  inheritedParamsWrapper,
-  wrapParameters,
+  type _setWrapperOptions,
+  type wrapParameters,
 } from "./metal/params-wrapper.js";
 import {
   _processOptions,
@@ -585,22 +583,10 @@ export class Base extends Metal {
   declare static paramEncoding: typeof ParameterEncoding.ClassMethods.paramEncoding;
 
   declare static _wrapperOptions: ParamsWrapperOptions;
-  declare static is_wrapperOptions: boolean;
   declare _wrapperOptions: ParamsWrapperOptions;
-
-  static {
-    classAttribute.call(this, "_wrapperOptions", {
-      default: ParamsWrapperOptions.fromHash({ format: [] }),
-    });
-    deferInherited.call(this);
-  }
-
-  static _setWrapperOptions = _setWrapperOptions;
-
-  static wrapParameters = wrapParameters;
-
   /** @internal */
-  static inheritedParamsWrapper = inheritedParamsWrapper;
+  declare static _setWrapperOptions: OmitThisParameter<typeof _setWrapperOptions>;
+  declare static wrapParameters: OmitThisParameter<typeof wrapParameters>;
 
   declare static httpBasicAuthenticateWith: OmitThisParameter<
     typeof HttpAuthentication.Basic.ControllerMethods.ClassMethods.httpBasicAuthenticateWith
