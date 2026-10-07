@@ -874,6 +874,13 @@ export function dup(
 
 const RHASH_PASS_AS_KEYWORDS = new WeakSet<object>();
 
+function rbCheckTypeHash(x: unknown): void {
+  const klass: unknown = rbObjClass(x);
+  if (klass !== Hash && !(typeof klass === "function" && klass.prototype instanceof Hash)) {
+    throw new TypeError(`wrong argument type ${rbBuiltinClassName(x)} (expected Hash)`);
+  }
+}
+
 /**
  * Ruby `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`
  * `rb_hash_s_ruby2_keywords_hash_p`): whether this hash object is flagged to
@@ -883,28 +890,24 @@ const RHASH_PASS_AS_KEYWORDS = new WeakSet<object>();
  * @noRailsEquivalent PERMANENT — Ruby core `Hash.ruby2_keywords_hash?` (`vendor/ruby/v3.3.11/hash.c:1952`).
  */
 export function rbHashSRuby2KeywordsHashP(hash: object): boolean {
-  const klass: unknown = rbObjClass(hash);
-  if (klass !== Hash && !(typeof klass === "function" && klass.prototype instanceof Hash)) {
-    throw new TypeError(`wrong argument type ${rbBuiltinClassName(hash)} (expected Hash)`);
-  }
+  rbCheckTypeHash(hash);
   return RHASH_PASS_AS_KEYWORDS.has(hash);
 }
 
 /**
  * Ruby `Hash.ruby2_keywords_hash` (`vendor/ruby/v3.3.11/hash.c:1974`
  * `rb_hash_s_ruby2_keywords_hash`): a duplicate of the hash carrying the
- * flag. The argument itself is left as it was.
+ * flag. The argument itself is left as it was. Both functions open with
+ * `Check_Type(hash, T_HASH)` (`rb_check_type`,
+ * `vendor/ruby/v3.3.11/error.c:1251`). MRI's `compare_by_identity` arm for an
+ * empty hash (`hash.c:1978-1980`) restores a table type its `hash_copy` drops
+ * for an empty table; `hashDup` here carries `compare_by_identity` whatever
+ * the size, so the copy already has it.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash.ruby2_keywords_hash` (`vendor/ruby/v3.3.11/hash.c:1974`).
  */
 export function rbHashSRuby2KeywordsHash<H extends object>(hash: H): H {
-  const klass: unknown = rbObjClass(hash);
-  if (klass !== Hash && !(typeof klass === "function" && klass.prototype instanceof Hash)) {
-    throw new TypeError(`wrong argument type ${rbBuiltinClassName(hash)} (expected Hash)`);
-  }
+  rbCheckTypeHash(hash);
   const tmp = dup(hash as Hash<string, unknown> | Record<string, unknown>);
-  if (hash instanceof Hash && hash.size === 0 && hash.isCompareByIdentity()) {
-    if (tmp instanceof Hash) tmp.compareByIdentity();
-  }
   RHASH_PASS_AS_KEYWORDS.add(tmp);
   return tmp as H;
 }

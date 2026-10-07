@@ -1153,6 +1153,10 @@ describe("block (a marked `&block`)", () => {
     expect(rbHashSRuby2KeywordsHashP(hash)).toBe(false);
     const empty = new Hash<string, number>().compareByIdentity();
     expect(rbHashSRuby2KeywordsHash(empty).isCompareByIdentity()).toBe(true);
+    expect(rbHashSRuby2KeywordsHashP(rbHashSRuby2KeywordsHash(empty))).toBe(true);
+    const identity = new Hash<object, number>().compareByIdentity();
+    identity.set({}, 1);
+    expect(rbHashSRuby2KeywordsHash(identity).isCompareByIdentity()).toBe(true);
   });
 
   it("the ruby2_keywords functions raise TypeError for a non-Hash", () => {
