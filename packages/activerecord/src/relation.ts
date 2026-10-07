@@ -355,8 +355,6 @@ export class Relation<T extends Base, G extends boolean = false> {
   _withIsRecursive = false;
   private _isNone = false;
   skipPreloadingValue = false;
-  /** @internal */
-  _arel?: SelectManager;
   private _loaded = false;
   private _delegateToModel = false;
   private _recordsStore: T[] = [];
@@ -1789,6 +1787,8 @@ export interface Relation<T extends Base, G extends boolean = false> {
   whereClause: WhereClause;
   havingClause: WhereClause;
   fromClause: FromClause;
+  /** @internal */
+  _arel?: SelectManager;
 }
 
 export interface Relation<T extends Base, G extends boolean = false>
