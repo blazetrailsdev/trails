@@ -51,6 +51,57 @@ describe("foldSkeletonTokens", () => {
     expect(foldSkeletonTokens(ts, "ts")).toEqual(["loop", "ref:clause"]);
   });
 
+  it("reads an awaiting predicate loop as the `any?` Ruby spells, and as a loop otherwise", () => {
+    const ts = ["loop:predicate", "ref:get", "if:predicate", "if", "ref:equals"];
+
+    expect(foldSkeletonTokens(ts, "ts", ["ref:any?", "ref:send", "if", "ref:include?"])).toEqual([
+      "ref:some",
+      "ref:get",
+      "if",
+      "ref:equals",
+    ]);
+    for (const predicate of ["ref:all?", "ref:none?"]) {
+      expect(foldSkeletonTokens(["loop:predicate", "if:predicate"], "ts", [predicate])).toEqual([
+        "ref:some",
+      ]);
+    }
+    expect(foldSkeletonTokens(ts, "ts", ["ref:each", "ref:send", "if", "if"])).toEqual([
+      "loop",
+      "ref:get",
+      "if",
+      "if",
+      "ref:equals",
+    ]);
+    expect(foldSkeletonTokens([...ts, ...ts], "ts", ["ref:any?"])).toEqual([
+      "ref:some",
+      "ref:get",
+      "if",
+      "ref:equals",
+      "loop",
+      "ref:get",
+      "if",
+      "if",
+      "ref:equals",
+    ]);
+    expect(foldSkeletonTokens(ts, "ts")).toEqual(["loop", "ref:get", "if", "if", "ref:equals"]);
+  });
+
+  it("leaves a synchronous loop port of `collect` / `any?` reading as an invented loop", () => {
+    const fold = (ruby: string[], ts: string[]) => {
+      const tsFolded = foldSkeletonTokens(ts, "ts", ruby);
+      return [foldSkeletonTokens(ruby, "ruby", tsFolded), tsFolded];
+    };
+
+    expect(fold(["ref:collect", "ref:build"], ["loop", "ref:push", "ref:build"])).toEqual([
+      ["ref:collect", "ref:build"],
+      ["loop", "ref:push", "ref:build"],
+    ]);
+    expect(fold(["ref:any?", "ref:send"], ["loop", "if", "ref:get"])).toEqual([
+      ["ref:any?", "ref:send"],
+      ["loop", "if", "ref:get"],
+    ]);
+  });
+
   it("folds the JS iteration callee too, so a forEach port reads the same", () => {
     expect(foldSkeletonTokens(["ref:forEach", "ref:save"])).toEqual(["loop", "ref:save"]);
   });

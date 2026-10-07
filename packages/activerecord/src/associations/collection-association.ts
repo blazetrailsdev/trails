@@ -234,10 +234,7 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
-  /**
-   * @internal
-   * @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
-   */
+  /** @internal */
   protected override async _createRecord(
     attributes?: Record<string, unknown> | Record<string, unknown>[],
     raise = false,
@@ -429,10 +426,6 @@ export abstract class CollectionAssociation extends Association {
     }
   }
 
-  /**
-   * @inventedArm loop — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
-   * @inventedArm if — CONVERGEABLE arms-awaited-block-enumerable-reads-as-invented-loop
-   */
   private async isIncludeInMemory(record: Base): Promise<boolean> {
     const reflection = this.reflection as unknown as {
       isThroughReflection?: () => boolean;

@@ -537,6 +537,20 @@ const RETRY_LOOP_TOKEN = "loop:retry";
  */
 const COLLECT_LOOP_TOKEN = "loop:collect";
 
+/**
+ * A `for … of` whose body awaits and ends in an `if` returning a boolean
+ * literal, and that `if` (extract-ts-api.ts#awaitedPredicate). The pair is the
+ * port of an awaiting `any?` / `all?` / `none?` block
+ * (`activerecord/lib/active_record/associations/collection_association.rb:508-516`),
+ * so it reads as `ref:some` while the Ruby stream still shows an unclaimed one
+ * of {@link AWAITED_PREDICATE_REFS}, and as `loop` / `if` otherwise: a Ruby
+ * `each` that returns early is the same TS shape. With no counterpart it reads
+ * as `loop` / `if`.
+ */
+const PREDICATE_LOOP_TOKEN = "loop:predicate";
+const PREDICATE_IF_TOKEN = "if:predicate";
+const AWAITED_PREDICATE_REFS = new Set(["ref:any?", "ref:all?", "ref:none?"]);
+
 function isPlainIteration(token: string, side: SkeletonSide): boolean {
   if (token === "loop") return true;
   if (!token.startsWith("ref:")) return false;
@@ -624,6 +638,9 @@ export function foldSkeletonTokens(
     ]),
   );
   const rubyWhenLists = side === "ts" ? [...(counterpart ?? [])] : [];
+  let unclaimedPredicates =
+    side === "ts" ? (counterpart ?? []).filter((t) => AWAITED_PREDICATE_REFS.has(t)).length : 0;
+  let predicateIfs = 0;
   for (const [index, token] of skeleton.entries()) {
     const marked = SHORT_CIRCUIT_MARKS.get(token);
     if (marked !== undefined) {
@@ -649,6 +666,18 @@ export function foldSkeletonTokens(
     }
     if (token === COLLECT_LOOP_TOKEN) {
       folded.push(unclaimedIterations-- > 0 ? "loop" : "ref:map");
+      continue;
+    }
+    if (token === PREDICATE_LOOP_TOKEN) {
+      if (unclaimedPredicates-- > 0) {
+        predicateIfs++;
+        folded.push("ref:some");
+      } else folded.push("loop");
+      continue;
+    }
+    if (token === PREDICATE_IF_TOKEN) {
+      if (predicateIfs > 0) predicateIfs--;
+      else folded.push("if");
       continue;
     }
     if (token === RETRY_LOOP_TOKEN) {
