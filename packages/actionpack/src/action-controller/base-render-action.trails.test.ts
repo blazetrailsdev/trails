@@ -20,7 +20,7 @@ class BasicController extends Base {
   }
 
   async helloWorldAsTemplatePath(): Promise<void> {
-    await this.render("basic/hello_world");
+    await this.render("basic/hello-world");
   }
 }
 
@@ -32,7 +32,7 @@ async function dispatch(c: Base, action: string): Promise<Base> {
 
 beforeAll(() => {
   BasicController.prependViewPath(
-    new FixtureResolver({ "basic/hello_world.html.tse": "Hello world!" }),
+    new FixtureResolver({ "basic/hello-world.html.tse": "Hello world!" }),
   );
 });
 

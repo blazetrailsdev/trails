@@ -5,6 +5,7 @@ import {
   extend,
   isPlainObject,
   type SafeBuffer,
+  dasherize,
   underscore,
 } from "@blazetrails/activesupport";
 import { Hash, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -230,6 +231,7 @@ export function _normalizeArgs(
 
 /**
  * @inventedArm underscore — PERMANENT
+ * @inventedArm dasherize — PERMANENT
  * @internal
  */
 export function _processRenderTemplateOptions(
@@ -237,14 +239,14 @@ export function _processRenderTemplateOptions(
   options: Record<string, unknown>,
 ): void {
   if (options["partial"] === true) {
-    options["partial"] = underscore(this.actionName);
+    options["partial"] = dasherize(underscore(this.actionName));
   }
 
   if (!["partial", "file", "template"].some((k) => k in options)) {
     options["prefixes"] ??= this._prefixes();
   }
 
-  options["template"] ??= underscore(String(options["action"] ?? this.actionName));
+  options["template"] ??= dasherize(underscore(String(options["action"] ?? this.actionName)));
 }
 
 export const ClassMethods = {
