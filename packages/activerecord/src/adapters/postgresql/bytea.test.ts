@@ -61,7 +61,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("type cast binary value", () => {
       const data = new Uint8Array([0x1f, 0x8b]);
-      expect(type.deserialize(data)).toEqual(data);
+      expect(type.deserialize(data)).toEqual(Buffer.from(data));
     });
 
     it("type case nil", () => {

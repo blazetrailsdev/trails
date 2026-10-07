@@ -38,6 +38,7 @@ import {
   quoteDefaultExpression as pgQuoteDefaultExpression,
   type DefaultExpressionColumn,
   quotedBinary as pgQuotedBinary,
+  unescapeBytea as quotingUnescapeBytea,
   columnNameMatcher as pgColumnNameMatcher,
   columnNameWithOrderMatcher as pgColumnNameWithOrderMatcher,
   lookupCastType as pgLookupCastType,
@@ -57,6 +58,11 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
+import {
+  pgConnection,
+  unescapeBytea as pgUnescapeBytea,
+  type PGConnection,
+} from "./postgresql/pg-connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -137,7 +143,7 @@ const PQTRANS_INERROR = 3;
 const CONNECTION_OK = 0;
 const CONNECTION_BAD = 1;
 
-type RawConnection = pg.Client & {
+type RawConnection = PGConnection & {
   transactionStatus(): number;
   status(): number;
   cancel(): Promise<void>;
@@ -155,6 +161,7 @@ import {
   performQuery as pgPerformQuery,
   returningColumnValues as pgReturningColumnValues,
   explain as pgExplain,
+  query as pgQuery,
   isWriteQuery as pgIsWriteQuery,
   execute as pgExecute,
   execInsert as pgExecInsert,
@@ -213,23 +220,6 @@ function toError(value: unknown): Error {
   } catch {
     return new Error(Object.prototype.toString.call(value));
   }
-}
-
-function prepare(conn: pg.Client, stmtName: string, sql: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const submittable = {
-      name: stmtName,
-      text: sql,
-      submit(connection: { parse(q: object): void; sync(): void }): null {
-        connection.parse({ name: stmtName, text: sql });
-        connection.sync();
-        return null;
-      },
-      handleError: reject,
-      handleReadyForQuery: () => resolve(),
-    };
-    (conn.query as unknown as (s: object) => unknown)(submittable);
-  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -427,8 +417,9 @@ export class PostgreSQLAdapter
   }
 
   private _pgClientOptions: pg.ClientConfig | null = null;
-  private _client: pg.Client | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
+  /** @internal */
+  _typeMapForResults = new Map<number, (value: string) => unknown>([[17, pgUnescapeBytea]]);
 
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();
@@ -695,8 +686,6 @@ export class PostgreSQLAdapter
       }
       await live.query("DISCARD ALL");
 
-      this._client = null;
-
       await super.resetBang();
     });
   }
@@ -704,7 +693,6 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      this._client = null;
       if (this._acquiring) this._acquireGeneration++;
       try {
         await this._rawConnection?.end();
@@ -719,7 +707,6 @@ export class PostgreSQLAdapter
       abandonRawSocket(this._rawConnection);
     } catch {}
     this._rawConnection = null;
-    this._client = null;
     void this._statements.reset();
     this._closed = true;
     if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
@@ -1298,12 +1285,16 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  async prepareStatement(sql: string | null, binds: unknown[], conn: pg.Client): Promise<string> {
+  async prepareStatement(
+    sql: string | null,
+    binds: unknown[],
+    conn: PGConnection,
+  ): Promise<string> {
     const sqlKey = this.sqlKey(sql);
     if (!this._statements.isKey(sqlKey)) {
       const nextkey = this._statements.nextKey();
       try {
-        await prepare(conn, nextkey, sql as string);
+        await conn.prepare(nextkey, sql as string);
       } catch (e) {
         throw excSetupMessage(await this.translateExceptionClass(e, sql, binds), e);
       }
@@ -1506,7 +1497,7 @@ export class PostgreSQLAdapter
   }
   /** @internal */
   set _rawConnection(value: RawConnection | null) {
-    this._connection = value;
+    this._connection = value && pgConnection(value);
   }
 
   /** @internal */
@@ -1780,15 +1771,9 @@ export class PostgreSQLAdapter
   private _discardRawConnection(): void {
     const conn = this._rawConnection;
     this._rawConnection = null;
-    this._client = null;
     void this._statements.reset();
     this._closed = false;
     conn?.end().catch(() => {});
-  }
-
-  /** @internal */
-  _currentClientForTest(): pg.Client | null {
-    return this._client;
   }
 
   /** @internal */
@@ -1886,6 +1871,10 @@ export interface PostgreSQLAdapter {
   explain(arel: string, binds?: unknown[], options?: ExplainOption[]): Promise<string>;
 
   isWriteQuery(sql: string | null): boolean;
+
+  unescapeBytea: typeof quotingUnescapeBytea;
+
+  query(sql: string, name?: string | null): Promise<unknown[][]>;
 
   execute(
     sql: string | null,
@@ -2331,6 +2320,8 @@ function _assertPgAdvisoryLockId(lockId: number | bigint | string): void {
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
 
 (PostgreSQLAdapter.prototype as any).explain = pgExplain;
+PostgreSQLAdapter.prototype.query = pgQuery;
+PostgreSQLAdapter.prototype.unescapeBytea = quotingUnescapeBytea;
 (PostgreSQLAdapter.prototype as any).isWriteQuery = pgIsWriteQuery;
 PostgreSQLAdapter.prototype.execute = pgExecute;
 (PostgreSQLAdapter.prototype as any).execInsert = pgExecInsert;

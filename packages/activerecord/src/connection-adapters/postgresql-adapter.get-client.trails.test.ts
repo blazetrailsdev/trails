@@ -4,7 +4,6 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 interface PrivatePgAdapter {
   _rawConnection: unknown;
-  _client: unknown;
   _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
@@ -35,19 +34,6 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
 
     expect(seen).toHaveLength(11);
     for (const c of seen) expect(c).toBe(persistentClient);
-  });
-
-  it("reuses the persistent client whether or not a TX is active", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
-    const persistentClient = { query: async () => ({ rows: [], fields: [] }) };
-    adapter._rawConnection = persistentClient;
-    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
-
-    adapter._client = null;
-    expect(await adapter._acquireFreshClient()).toBe(persistentClient);
-
-    adapter._client = persistentClient;
-    expect(await adapter._acquireFreshClient()).toBe(persistentClient);
   });
 
   it("isConnected() reflects the raw pg.Client finished? state", () => {
@@ -93,7 +79,6 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
       transactionStatus: () => 2,
     };
     adapter._rawConnection = fakeClient;
-    adapter._client = fakeClient;
 
     vi.spyOn(
       adapter as unknown as { configureConnection: () => Promise<void> },

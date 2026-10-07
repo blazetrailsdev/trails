@@ -1,5 +1,5 @@
-import type pg from "pg";
-import { PGResult } from "./pg-result.js";
+import type { PGResult } from "./pg-result.js";
+import type { PGConnection } from "./pg-connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -52,17 +52,6 @@ export async function explain(
   return new ExplainPrettyPrinter().pp(result);
 }
 
-function query(
-  rawConnection: pg.Client,
-  config: string | Record<string, unknown> | null,
-): Promise<pg.QueryResult | pg.QueryResult[]> {
-  return (
-    rawConnection.query as unknown as (
-      c: string | Record<string, unknown> | null,
-    ) => Promise<pg.QueryResult | pg.QueryResult[]>
-  )(config);
-}
-
 /** @internal */
 interface ExecuteHost extends PerformQueryHost {
   preprocessQuery(sql: string | null): string | null;
@@ -82,6 +71,22 @@ interface ExecuteHost extends PerformQueryHost {
   performQuery: typeof performQuery;
   /** @internal */
   translateExceptionClass(nativeError: unknown, sql: unknown, binds: unknown): Promise<unknown>;
+}
+
+/** @internal */
+interface QueryHost {
+  internalExecute(sql: string, name?: string | null): Promise<unknown>;
+  /** @internal */
+  _typeMapForResults: Map<number, (value: string) => unknown>;
+}
+
+export async function query(
+  this: QueryHost,
+  sql: string,
+  name: string | null = null,
+): Promise<unknown[][]> {
+  const result = (await this.internalExecute(sql, name)) as PGResult;
+  return result.mapTypesBang(this._typeMapForResults).values();
 }
 
 export function isWriteQuery(sql: string | null): boolean {
@@ -127,14 +132,7 @@ interface TransactionHost {
     options?: { allowRetry?: boolean; materializeTransactions?: boolean },
   ): Promise<unknown>;
   /** @internal */
-  _client: pg.Client | null;
-  /** @internal */
-  _acquireFreshClient(): Promise<pg.Client>;
-  /** @internal */
-  _discardRawConnection(): void;
-  /** @internal */
   cancelAnyRunningQuery(): Promise<void>;
-  constructor: { _isConnectionError(err: unknown): boolean };
 }
 
 export async function execInsert(
@@ -173,62 +171,37 @@ export async function execInsert(
 }
 
 export async function beginDbTransaction(this: TransactionHost): Promise<unknown> {
-  try {
-    const result = await this.internalExecute("BEGIN", "TRANSACTION", [], {
-      materializeTransactions: false,
-      allowRetry: true,
-    });
-    this._client = await this._acquireFreshClient();
-    return result;
-  } catch (error) {
-    this._client = null;
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  }
+  return this.internalExecute("BEGIN", "TRANSACTION", [], {
+    allowRetry: true,
+    materializeTransactions: false,
+  });
 }
 
 export async function beginIsolatedDbTransaction(
   this: TransactionHost,
   isolation: string,
 ): Promise<void> {
-  const level = fetch<string>(transactionIsolationLevels(), isolation);
-  try {
-    await this.internalExecute(`BEGIN ISOLATION LEVEL ${level}`, "TRANSACTION", [], {
-      materializeTransactions: false,
-      allowRetry: true,
-    });
-    this._client = await this._acquireFreshClient();
-  } catch (error) {
-    this._client = null;
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  }
+  await this.internalExecute(
+    `BEGIN ISOLATION LEVEL ${fetch<string>(transactionIsolationLevels(), isolation)}`,
+    "TRANSACTION",
+    [],
+    { allowRetry: true, materializeTransactions: false },
+  );
 }
 
 export async function commitDbTransaction(this: TransactionHost): Promise<unknown> {
-  try {
-    return await this.internalExecute("COMMIT", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
-  } catch (error) {
-    if (this.constructor._isConnectionError(error)) this._discardRawConnection();
-    throw error;
-  } finally {
-    this._client = null;
-  }
+  return this.internalExecute("COMMIT", "TRANSACTION", [], {
+    allowRetry: false,
+    materializeTransactions: true,
+  });
 }
 
 export async function execRollbackDbTransaction(this: TransactionHost): Promise<void> {
   await this.cancelAnyRunningQuery();
-  try {
-    await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
-      allowRetry: false,
-      materializeTransactions: true,
-    });
-  } finally {
-    this._client = null;
-  }
+  await this.internalExecute("ROLLBACK", "TRANSACTION", [], {
+    allowRetry: false,
+    materializeTransactions: true,
+  });
 }
 
 export async function execRestartDbTransaction(this: TransactionHost): Promise<void> {
@@ -305,7 +278,11 @@ export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Pr
 /** @internal */
 export interface PerformQueryHost extends HandleWarningsHost {
   updateTypemapForDefaultTimezone(): Promise<void>;
-  prepareStatement(sql: string | null, binds: unknown[], rawConnection: pg.Client): Promise<string>;
+  prepareStatement(
+    sql: string | null,
+    binds: unknown[],
+    rawConnection: PGConnection,
+  ): Promise<string>;
   isCachedPlanFailure(pgerror: unknown): boolean;
   isInTransaction(): boolean;
   sqlKey(sql: string | null): string;
@@ -318,7 +295,7 @@ export interface PerformQueryHost extends HandleWarningsHost {
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: pg.Client,
+  rawConnection: PGConnection,
   sql: string | null,
   binds: unknown[],
   typeCastedBinds: unknown[],
@@ -332,20 +309,14 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<PGResult> {
-  const rowMode = "array";
   await this.updateTypemapForDefaultTimezone();
-  let raw: pg.QueryResult | pg.QueryResult[];
+  let result: PGResult;
   if (prepare) {
     for (;;) {
       try {
         const stmtKey = await this.prepareStatement(sql, binds, rawConnection);
         notificationPayload.statement_name = stmtKey;
-        raw = await query(rawConnection, {
-          name: stmtKey,
-          text: sql as string,
-          values: typeCastedBinds,
-          rowMode,
-        });
+        result = await rawConnection.execPrepared(stmtKey, typeCastedBinds);
         break;
       } catch (error) {
         if (this.isCachedPlanFailure(error)) {
@@ -363,12 +334,11 @@ export async function performQuery(
       }
     }
   } else if (binds == null || binds.length === 0) {
-    raw = await query(rawConnection, sql != null ? { text: sql, rowMode } : sql);
+    result = await rawConnection.asyncExec(sql);
   } else {
-    raw = await query(rawConnection, { text: sql, values: typeCastedBinds, rowMode });
+    result = await rawConnection.execParams(sql, typeCastedBinds);
   }
 
-  const result = new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
   this.verifiedBang();
   this.handleWarnings(result);
   notificationPayload.row_count = result.length;

@@ -34600,13 +34600,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/postgresql_adapter.rb",
-    "rubyName": "query",
-    "digest": "2912d6a7b9a2b4f5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/postgresql_adapter.rb",
     "rubyName": "quote",
     "digest": "3ef6307c01017495",
     "ref": "v8.0.2"
@@ -36086,13 +36079,6 @@
     "rubyFile": "connection_adapters/sqlite3_adapter.rb",
     "rubyName": "primary_keys",
     "digest": "28879db8e4602641",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/sqlite3_adapter.rb",
-    "rubyName": "quote_default_expression",
-    "digest": "e1d0ea96ff491882",
     "ref": "v8.0.2"
   },
   {
