@@ -25,7 +25,7 @@ import { ActionPackTestSuiteUtils } from "../../test-helpers/abstract-unit.js";
 const thisFile = new URL(import.meta.url).pathname;
 const fixtures = File.expandPath("../../test-helpers/fixtures", File.dirname(thisFile));
 
-Base.helpersPath = [File.expandPath("helpers", fixtures)];
+Base.helpersPath = File.expandPath("helpers", fixtures);
 
 const Fun = {
   GamesController: class GamesController extends Base {
@@ -97,7 +97,7 @@ class HelpersPathsController extends Base {
 
 class HelpersTypoController extends Base {
   static {
-    this.helpersPath = [File.expandPath("helpers-typo", fixtures)];
+    this.helpersPath = File.expandPath("helpers-typo", fixtures);
   }
 }
 await ActionPackTestSuiteUtils.requireHelpers(HelpersTypoController.helpersPath);
@@ -269,7 +269,7 @@ describe("HelperTest", () => {
   });
 
   it("all helpers with alternate helper dir", async () => {
-    controllerClass.helpersPath = [File.expandPath("alternate-helpers", fixtures)];
+    controllerClass.helpersPath = File.expandPath("alternate-helpers", fixtures);
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
     controllerClass._helpers = new Module();

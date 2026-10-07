@@ -1,5 +1,10 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NotImplementedError, type Module } from "@blazetrails/ruby-compat";
+import {
+  NotImplementedError,
+  rbObjIvarGet,
+  rbObjIvarSet,
+  type Module,
+} from "@blazetrails/ruby-compat";
 import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError } from "../../errors.js";
 import { _Reflection } from "../../reflection-slot.js";
@@ -212,7 +217,10 @@ export class Association {
         mixin.moduleEval((m) => {
           Object.defineProperty(m, "_afterCommitJobs", {
             get(this: any) {
-              return (this.__afterCommitJobs ||= []);
+              return (
+                rbObjIvarGet(this, "@_after_commit_jobs") ||
+                rbObjIvarSet(this, "@_after_commit_jobs", [])
+              );
             },
             configurable: true,
           });
