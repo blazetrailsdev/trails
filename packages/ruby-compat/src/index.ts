@@ -98,6 +98,8 @@ export {
   merge,
   mergeBang,
   rbBlockGivenP,
+  rbHashSRuby2KeywordsHash,
+  rbHashSRuby2KeywordsHashP,
   reject,
   slice,
   transformValues,

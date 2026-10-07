@@ -93,6 +93,7 @@ Every export, with the call site that justifies it (rule 1).
 | `rbFArray`                                                              | `object.c:3825` `rb_f_array`                                        | `actionpack/src/action-controller/metal/params-wrapper.ts` (`Options.from_hash`'s `Array(hash[:format])`, `params_wrapper.rb:90-92`)                                                                                                                                                                                                                                                                          |
 | `Open3.capture2e`, `Process.Status`                                     | `lib/open3.rb:902`, `process.c:9169` `rb_cProcessStatus`            | `Thor::Actions#run`'s `capture:` arm (`actions.rb:265-266`), same story                                                                                                                                                                                                                                                                                                                                       |
 | `URI::Generic#opaque` / `opaque=` / `user` / `password` / `hostname`    | `lib/uri/generic.rb:277,916,568,573,668`                            | `activerecord/src/database-configurations/connection-url-resolver.ts` (`ConnectionUrlResolver#initialize`, `#raw_config`)                                                                                                                                                                                                                                                                                     |
+| `rbHashSRuby2KeywordsHashP` / `rbHashSRuby2KeywordsHash`                | `hash.c:1952,1974` `rb_hash_s_ruby2_keywords_hash(_p)`              | `ActiveJob::Arguments` (`serialize_argument`'s `Hash.ruby2_keywords_hash?(argument)`, `deserialize_hash`'s `Hash.ruby2_keywords_hash(result)`, `vendor/rails/v8.0.2/activejob/lib/active_job/arguments.rb:93,154`), no caller yet: story `port-ruby-compat-ruby2-keywords-hash-flag` (RFC 0169) lands the primitive ahead of `port-activejob-arguments`, which ports those two lines                          |
 
 ### Core classes are class objects; `Symbol` is not one
 
@@ -107,6 +108,34 @@ call sites that keep its colon to tell it from a String, so no reading of a
 value can answer "is a Symbol": a classifier keyed on the colon would call
 `"::1"` and `"::Float::NAN"` Symbols. `rbObjClass` answers `String` for every
 string, and a call site that discriminates uses `isSymbol`.
+
+### Keyword arguments are a flagged trailing hash
+
+Ruby marks a method `ruby2_keywords` so that the keywords it was called with
+arrive as a trailing Hash in `*args`, flagged to be passed on as keywords.
+`ActiveJob::Core#initialize` and `Enqueuing::ClassMethods#job_or_instantiate`
+are marked that way
+(`vendor/rails/v8.0.2/activejob/lib/active_job/core.rb:103`,
+`enqueuing.rb:94`), and `Arguments` reads and restores the flag across
+serialization (`arguments.rb:93-97,153-155`).
+
+JS has no keyword arguments, so a call site cannot tell `perform_later(k: 1)`
+from `perform_later({ k: 1 })`. This is the repo's kwargs idiom, a trailing
+options object, applied to a `ruby2_keywords` method. The rule is: **a trailing plain-object argument
+to `performLater` / `new` is the kwargs hash.** The port of a `ruby2_keywords`
+method flags it with `rbHashSRuby2KeywordsHash` before storing its arguments,
+which is what the VM does for the Ruby method, and everything downstream asks
+`rbHashSRuby2KeywordsHashP` exactly where Rails asks
+`Hash.ruby2_keywords_hash?`.
+
+This rule is recorded here by story `port-ruby-compat-ruby2-keywords-hash-flag`
+(RFC 0169, the ActiveJob port), which assigns it to this README. Its callers
+are `port-activejob-core` and `port-activejob-enqueuing-and-configured-job`.
+
+The flag is membership in a module-private `WeakSet`, as MRI's is a bit in the
+hash's own header (`RHASH_PASS_AS_KEYWORDS`, `internal/hash.h:23`). It is not a
+property, so `Object.keys`, a spread and `JSON.stringify` never see it, and a
+copy of a flagged hash is unflagged.
 
 ## The contract
 
