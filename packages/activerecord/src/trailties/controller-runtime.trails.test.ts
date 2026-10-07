@@ -232,6 +232,34 @@ describe("ControllerRuntimeTest", () => {
     });
   });
 
+  describe("include", () => {
+    it("is idempotent across a parent and its subclass", () => {
+      class Parent extends FakeController {}
+      class Child extends Parent {}
+      include(Parent as never, ControllerRuntime);
+      include(Child as never, ControllerRuntime);
+      include(Child as never, ControllerRuntime);
+
+      const controller = new Child();
+      controller.processAction("index");
+      expect(controller.processedWith).toEqual(["index"]);
+
+      RuntimeRegistry.setSqlRuntime(RuntimeRegistry.sqlRuntime() + 2.0);
+      const payload: Record<string, unknown> = {};
+      controller.appendInfoToPayload(payload);
+      expect(payload["db_runtime"]).toBe(2.0);
+
+      expect(
+        (
+          Child as unknown as { logProcessAction(payload: Record<string, unknown>): string[] }
+        ).logProcessAction({
+          view_runtime: 1.0,
+          db_runtime: 2.0,
+        }),
+      ).toEqual(["Views: 1ms", "ActiveRecord: 2.0ms (0 queries, 0 cached)"]);
+    });
+  });
+
   describe("initialize", () => {
     it("seats dbRuntime to null on a fresh controller", () => {
       class SeatController {

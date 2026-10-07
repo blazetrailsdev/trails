@@ -37,6 +37,10 @@ export function logProcessAction(
   return messages;
 }
 
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("logProcessAction", logProcessAction);
+});
+
 /** @internal */
 export function processAction(
   this: ControllerRuntimeHost,
@@ -79,10 +83,6 @@ export function appendInfoToPayload(
   payload["queries_count"] = RuntimeRegistry.resetQueriesCount();
   payload["cached_queries_count"] = RuntimeRegistry.resetCachedQueriesCount();
 }
-
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("logProcessAction", logProcessAction);
-});
 
 export const ControllerRuntime = new Module((mod) => {
   extend(mod, Concern);

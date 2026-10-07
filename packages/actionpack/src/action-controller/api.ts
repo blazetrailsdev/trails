@@ -18,13 +18,10 @@ import { Instrumentation } from "./metal/instrumentation.js";
 import {
   Options as ParamsWrapperOptions,
   ParamsWrapper,
-  _performParameterWrapping,
   _setWrapperOptions,
-  _wrapperEnabled,
   deferInherited,
   inheritedParamsWrapper,
   wrapParameters,
-  type ParamsWrapperHost,
 } from "./metal/params-wrapper.js";
 import { StrongParameters, type Parameters as Params } from "./metal/strong-parameters.js";
 
@@ -69,14 +66,6 @@ export class API extends Metal {
 
   /** @internal */
   static inheritedParamsWrapper = inheritedParamsWrapper;
-
-  /** @internal */
-  async processAction(action: string, ...args: unknown[]): Promise<void> {
-    if (_wrapperEnabled.call(this as unknown as ParamsWrapperHost)) {
-      _performParameterWrapping.call(this as unknown as ParamsWrapperHost);
-    }
-    await super.processAction(action, ...args);
-  }
 
   render(options: RenderOptions = {}): void {
     if (this.performed) {

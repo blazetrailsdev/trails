@@ -3,7 +3,7 @@ import { toS } from "@blazetrails/ruby-compat";
 export class Text {
   type: unknown;
 
-  private readonly string: string;
+  private readonly string: string | Uint8Array;
 
   constructor(string: unknown) {
     this.string = toS(string);
@@ -17,11 +17,11 @@ export class Text {
     return this.identifier;
   }
 
-  toString(): string {
+  toString(): string | Uint8Array {
     return this.string;
   }
 
-  render(..._args: unknown[]): string {
+  render(..._args: unknown[]): string | Uint8Array {
     return this.toString();
   }
 

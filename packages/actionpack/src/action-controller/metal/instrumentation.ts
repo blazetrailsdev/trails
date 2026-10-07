@@ -22,10 +22,6 @@ import { Exception, merge, StandardError, throwDataP } from "@blazetrails/ruby-c
 import type { DataStreamingHost, SendDataOptions, SendFileOptions } from "./data-streaming.js";
 import { Flash } from "./flash.js";
 
-export const ClassMethods: Module = new Module((mod) => {
-  mod.defineMethod("logProcessAction", logProcessAction);
-});
-
 export const Instrumentation = new Module((mod) => {
   extend(mod, Concern);
 
@@ -48,7 +44,6 @@ export const Instrumentation = new Module((mod) => {
   mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
   mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
 }) as Module & { ClassMethods: Module };
-Instrumentation.ClassMethods = ClassMethods;
 
 interface InstrumentationHost {
   actionName?: string;
@@ -186,3 +181,9 @@ export function logProcessAction(payload: Record<string, unknown>): string[] {
   }
   return messages;
 }
+
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("logProcessAction", logProcessAction);
+});
+
+Instrumentation.ClassMethods = ClassMethods;

@@ -107,7 +107,7 @@ export class StreamingTemplateRenderer extends TemplateRenderer<
         if (fiber.isAlive()) {
           const content = await template.render(view, locals, null, {}, yielder);
 
-          view.viewFlow.set("layout", content);
+          view.viewFlow.set("layout", content as string | SafeBuffer);
 
           while (fiber.isAlive()) await fiber.resume();
         }
