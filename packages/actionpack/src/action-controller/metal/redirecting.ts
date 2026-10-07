@@ -4,15 +4,8 @@ import type { UrlOptions } from "../../action-dispatch/http/url.js";
 import { DoubleRenderError } from "../../abstract-controller/rendering.js";
 import { ActionControllerError } from "./exceptions.js";
 import type { RedirectToResponseOptionsAndFlash } from "./flash.js";
-import {
-  Concern,
-  Module,
-  extend,
-  include,
-  included,
-  mattrAccessor,
-} from "@blazetrails/activesupport";
-import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
+import { Concern, Module, extend, include, mattrAccessor } from "@blazetrails/activesupport";
+import { Logger } from "../../abstract-controller/logger.js";
 import { UrlFor } from "./url-for.js";
 
 export class UnsafeRedirectError extends Error {
@@ -219,18 +212,10 @@ export function _ensureUrlIsHttpHeaderSafe(this: unknown, url: string): void {
 
 type IncludedBlock = { included(base: null, block: (this: object) => void): void };
 
-export const Redirecting: Module<{
-  redirectTo: typeof redirectTo;
-  redirectBack: typeof redirectBack;
-  redirectBackOrTo: typeof redirectBackOrTo;
-  _computeRedirectToLocation: typeof _computeRedirectToLocation;
-  urlFrom: typeof urlFrom;
-}> & { _computeRedirectToLocation: typeof _computeRedirectToLocation } = new Module((mod) => {
+export const Redirecting = new Module((mod) => {
   extend(mod, Concern);
 
-  (mod as unknown as Record<symbol, unknown>)[included] = (base: LoggerIncludingClass): void => {
-    include(base, Logger);
-  };
+  include(mod, Logger);
   include(mod, UrlFor);
 
   (mod as unknown as IncludedBlock).included(null, function (this: object) {
@@ -247,5 +232,11 @@ export const Redirecting: Module<{
   mod.defineMethod("_enforceOpenRedirectProtection", _enforceOpenRedirectProtection);
   mod.defineMethod("_urlHostAllowed", _urlHostAllowed);
   mod.defineMethod("_ensureUrlIsHttpHeaderSafe", _ensureUrlIsHttpHeaderSafe);
-}) as never;
+}) as Module<{
+  redirectTo: typeof redirectTo;
+  redirectBack: typeof redirectBack;
+  redirectBackOrTo: typeof redirectBackOrTo;
+  _computeRedirectToLocation: typeof _computeRedirectToLocation;
+  urlFrom: typeof urlFrom;
+}> & { _computeRedirectToLocation: typeof _computeRedirectToLocation };
 Redirecting._computeRedirectToLocation = _computeRedirectToLocation;

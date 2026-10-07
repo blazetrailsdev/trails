@@ -1,6 +1,6 @@
 /** @internal */
 
-import { Benchmarkable, include, included } from "@blazetrails/activesupport";
+import { Benchmarkable, Concern, extend, include, Module } from "@blazetrails/activesupport";
 
 export { benchmark, type BenchmarkLogger as LoggerLike } from "@blazetrails/activesupport";
 
@@ -8,14 +8,17 @@ export interface LoggerHost {
   logger?: import("@blazetrails/activesupport").BenchmarkLogger;
 }
 
-/** @internal */
-export type LoggerIncludingClass = (new (...args: never[]) => unknown) & {
+type LoggerIncludingClass = (new (...args: never[]) => unknown) & {
   configAccessor(...names: string[]): void;
 };
 
-export class Logger {
-  static [included](base: LoggerIncludingClass): void {
-    base.configAccessor("logger");
-    include(base, Benchmarkable);
-  }
-}
+export const Logger = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as { included(base: null, block: (this: LoggerIncludingClass) => void): void }
+  ).included(null, function (this: LoggerIncludingClass) {
+    this.configAccessor("logger");
+    include(this, Benchmarkable);
+  });
+});

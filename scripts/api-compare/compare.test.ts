@@ -3498,6 +3498,41 @@ describe("mixinMethodCreditedToOwnFile", () => {
     ).toEqual({ tsName: "[initialize]", tsFile: "metal/url-for.ts" });
   });
 
+  it("leaves an includer's own initialize to its constructor", () => {
+    const seen = new Map<string, SeenRubyMethod>();
+    const initialize: MethodInfo = { name: "initialize", visibility: "public", params: [] };
+    dedupeRubyMethodInto(seen, initialize, "ActionController::Metal", "metal.rb");
+    dedupeRubyMethodInto(
+      seen,
+      { ...initialize, mixinFile: "metal/url_for.rb" },
+      "ActionController::Metal",
+      "metal.rb",
+    );
+    const [own] = [...seen.values()];
+    expect(own.mixinFile).toBeUndefined();
+    expect(
+      mixinMethodCreditedToOwnFile(
+        own,
+        "metal.rb",
+        "actioncontroller",
+        (f) => f === "metal/url_for.rb",
+        new Map([["metal/url-for.ts", new Set(["[initialize]", "urlOptions"])]]),
+      ),
+    ).toBeNull();
+  });
+
+  it("does not credit an inherited initialize to a mixin file with no [initialize] hook", () => {
+    expect(
+      mixinMethodCreditedToOwnFile(
+        { rubyName: "initialize", rubyModule: "Host", mixinFile: "metal/url_for.rb" },
+        "api.rb",
+        "actioncontroller",
+        (f) => f === "metal/url_for.rb",
+        new Map([["metal/url-for.ts", new Set(["urlOptions"])]]),
+      ),
+    ).toBeNull();
+  });
+
   it("credits a method a TS-less includer's first file inherits from a mixin's own file", () => {
     expect(
       mixinMethodCreditedToOwnFile(

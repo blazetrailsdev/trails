@@ -5,13 +5,12 @@ import {
   ExecutionContext,
   extend,
   include,
-  included,
   initialize,
   Module,
   Notifications,
   toF,
 } from "@blazetrails/activesupport";
-import { Logger, type LoggerIncludingClass } from "../../abstract-controller/logger.js";
+import { Logger } from "../../abstract-controller/logger.js";
 import {
   ExceptionWrapper,
   classNameOf,
@@ -25,9 +24,8 @@ import type { redirectTo as flashRedirectTo } from "./flash.js";
 export const Instrumentation = new Module((mod) => {
   extend(mod, Concern);
 
-  (mod as unknown as Record<symbol, unknown>)[included] = (base: LoggerIncludingClass): void => {
-    include(base, Logger);
-  };
+  include(mod, Logger);
+
   (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: {
     viewRuntime: number | null;
   }): void {
