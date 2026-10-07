@@ -997,10 +997,8 @@ export class Base extends Model {
 
   static _suppressInitializeCallback = false;
 
-  /** @noRailsEquivalent CONVERGEABLE persistence-becomes-allocates-then-initializes-without-suppress-flags */
   static _suppressAbstractCheck = false;
 
-  /** @noRailsEquivalent CONVERGEABLE persistence-becomes-allocates-then-initializes-without-suppress-flags */
   declare static _suppressStiNewDispatch?: unknown;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;

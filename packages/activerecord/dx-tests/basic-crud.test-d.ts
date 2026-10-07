@@ -31,7 +31,7 @@ describe("basic CRUD DX — defining and using a model", () => {
     expectTypeOf(u).toEqualTypeOf<User>();
     const u2 = await User.createBang({ name: "x" });
     expectTypeOf(u2).toEqualTypeOf<User>();
-    expectTypeOf(User.new({ name: "y" })).toEqualTypeOf<User>();
+    expectTypeOf(new User({ name: "y" })).toEqualTypeOf<User>();
   });
 
   it("Relation build / create / createBang array overloads return T[]", async () => {
