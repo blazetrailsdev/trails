@@ -10,6 +10,7 @@ import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -373,5 +374,18 @@ describe("PersistenceTest#verifyReadonlyAttribute (trails)", () => {
     await expect(minivan.updateColumn("color", "black")).rejects.toThrow(
       new ActiveRecordError("color is marked as readonly"),
     );
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["posts", "comments"]);
+
+  it("new and create inside a scope on an association take the scope's foreign key", async () => {
+    const post = await CanonicalPost.first();
+    const scope = Comment.where({ post });
+    const built = scope.scoping(() => Comment.new({ body: "built" }));
+    expect(built.post_id).toBe(post!.id);
+    const created = await scope.scoping(() => Comment.create({ body: "created" }));
+    expect((await Comment.find(created.id)).post_id).toBe(post!.id);
   });
 });

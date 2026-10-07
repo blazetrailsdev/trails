@@ -134,10 +134,7 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE base-constructor-enters-inheritance-new-for-a-bare-new
- */
+/** @internal */
 export const _instantiation: { klass: unknown } = { klass: null };
 
 export class ClassMethods {
