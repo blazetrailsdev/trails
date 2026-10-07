@@ -30,7 +30,7 @@ function makeHost() {
 }
 
 function makeController(initial: Policy | null = null) {
-  return { request: { contentSecurityPolicy: initial } };
+  return { request: { contentSecurityPolicy: initial }, currentContentSecurityPolicy };
 }
 
 describe("contentSecurityPolicy class DSL", () => {

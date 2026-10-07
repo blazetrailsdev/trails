@@ -343,9 +343,9 @@ export interface Base
     options?: RedirectToOptions,
     responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<FlashType>,
   ): number;
-  redirectBack: typeof redirectBack;
-  redirectBackOrTo: typeof redirectBackOrTo;
-  urlFrom: typeof urlFrom;
+  redirectBack: OmitThisParameter<typeof redirectBack>;
+  redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
+  urlFrom: OmitThisParameter<typeof urlFrom>;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
   csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
@@ -428,7 +428,6 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
-    this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
       Base as unknown as HelpersPathControllerClass,
@@ -624,7 +623,7 @@ export class Base extends Metal {
   declare head: OmitThisParameter<typeof head>;
 
   /** @internal */
-  _actionHasLayout?: boolean;
+  declare _actionHasLayout?: boolean;
   /** @internal */
   declare _layoutConditions: Record<string, string[]>;
   /** @internal */

@@ -1,8 +1,4 @@
-import {
-  aroundAction,
-  type ActionCallbackHost,
-  type CallbackOptions,
-} from "../../abstract-controller/callbacks.js";
+import type { aroundAction, CallbackOptions } from "../../abstract-controller/callbacks.js";
 import { Concern, Module, extend, type LogLevel } from "@blazetrails/activesupport";
 
 interface LoggedController {
@@ -10,12 +6,11 @@ interface LoggedController {
 }
 
 export function logAt(
-  this: ActionCallbackHost,
+  this: { aroundAction: OmitThisParameter<typeof aroundAction> },
   level: number | LogLevel,
   options: CallbackOptions = {},
 ): void {
-  aroundAction.call(
-    this,
+  this.aroundAction(
     (controller, action) => (controller as unknown as LoggedController).logger.logAt(level, action),
     options,
   );

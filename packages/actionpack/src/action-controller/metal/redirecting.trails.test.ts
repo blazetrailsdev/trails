@@ -2,13 +2,20 @@ import { describe, it, expect, expectTypeOf } from "vitest";
 import type { Base } from "../base.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
-import { redirectBackOrTo, type RedirectingHost } from "./redirecting.js";
+import {
+  _allowOtherHost,
+  _urlHostAllowed,
+  redirectBackOrTo,
+  type RedirectingHost,
+} from "./redirecting.js";
 
 describe("Redirecting#redirect_back_or_to", () => {
   const redirects: string[] = [];
   const host = {
     request: { host: "example.com", referer: "http://evil.test/x" },
     redirectTo: (location: string) => redirects.push(location),
+    _allowOtherHost,
+    _urlHostAllowed,
   } as never;
 
   it("defaults allow_other_host only when the keyword is absent", () => {

@@ -20,7 +20,10 @@ interface ContentSecurityPolicyClassHost {
 
 interface ContentSecurityPolicyInstanceHost {
   request: CspRequest;
-  currentContentSecurityPolicy?: typeof currentContentSecurityPolicy;
+}
+
+interface ContentSecurityPolicyController extends ContentSecurityPolicyInstanceHost {
+  currentContentSecurityPolicy(): Policy;
 }
 
 export function contentSecurityPolicy(
@@ -46,10 +49,9 @@ export function contentSecurityPolicy(
     resolvedBlock = typeof options === "function" ? options : block;
   }
   this.beforeAction(function (controller: unknown) {
-    const host = controller as ContentSecurityPolicyInstanceHost;
+    const host = controller as ContentSecurityPolicyController;
     if (resolvedBlock) {
-      const resolveCurrent = host.currentContentSecurityPolicy ?? currentContentSecurityPolicy;
-      const policy = resolveCurrent.call(host);
+      const policy = host.currentContentSecurityPolicy();
       resolvedBlock.call(controller, policy);
       host.request.contentSecurityPolicy = policy;
     }

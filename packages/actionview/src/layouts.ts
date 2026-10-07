@@ -1,6 +1,6 @@
 import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
 import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
-import { include, Module } from "@blazetrails/ruby-compat/include";
+import { include, initialize, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
 import type { PathSet } from "./path-set.js";
 import type { RenderableTemplate } from "./renderer/abstract-renderer.js";
@@ -250,6 +250,9 @@ export const Layouts = new Module((mod) => {
   );
 
   mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: Layouts): void {
+    this._actionHasLayout = true;
+  };
   mod.defineMethod("isActionHasLayout", isActionHasLayout);
   mod.defineMethod("_isConditionalLayout", _isConditionalLayout);
   mod.defineMethod("_layout", _layout);
