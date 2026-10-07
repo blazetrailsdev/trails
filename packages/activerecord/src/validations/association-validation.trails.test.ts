@@ -48,4 +48,38 @@ describe("AssociationValidationTest", () => {
     expect(value).toBe(reloaded.replies);
     expect(reloaded.replies.isLoaded).toBe(true);
   });
+
+  it("a validator receives a collection association's loaded records", async () => {
+    let value: unknown;
+    Topic.validatesEach(["replies"], (_record: unknown, _attribute: string, v: unknown) => {
+      value = v;
+    });
+    const t = await Topic.create({ title: "uhohuhoh" });
+    const reply = new Reply({ title: "A reply", content: "with content!" });
+    await t.replies.push(reply);
+    const reloaded = await Topic.find(t.id);
+
+    expect(await reloaded.isValid()).toBe(true);
+    expect(Array.isArray(value)).toBe(true);
+    expect((value as Reply[]).map((r) => r.id)).toEqual([reply.id]);
+    expect(reloaded.replies.isLoaded).toBe(true);
+  });
+
+  it("an error added to an unloaded singular association outside validation reads the reader's promise as value", async () => {
+    const topic = await Topic.create({ title: "uhohuhoh" });
+    const r = await Reply.find(
+      (await Reply.create({ title: "A reply", content: "with content!", parent_id: topic.id })).id,
+    );
+    let value: unknown;
+    r.errors.add("topic", ":invalid", {
+      message: (_object: unknown, data: Record<string, unknown>) => {
+        value = data.value;
+        return "is invalid";
+      },
+    });
+
+    expect(r.errors.messagesFor("topic")).toEqual(["is invalid"]);
+    expect(value).toBeInstanceOf(Promise);
+    expect(((await value) as Topic).id).toBe(topic.id);
+  });
 });
