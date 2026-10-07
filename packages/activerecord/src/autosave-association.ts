@@ -21,6 +21,7 @@ const AUTOSAVING_BELONGS_TO_FOR = Symbol.for("blazetrails.autosavingBelongsToFor
 interface AutosaveAssociationHost {
   [key: symbol]: unknown;
   _markedForDestruction: boolean;
+  _destroyedByAssociation: unknown;
   isNewRecord(): boolean;
   hasChangesToSave?: unknown;
   destroyedByAssociation?: unknown;
@@ -65,8 +66,12 @@ export const AutosaveAssociation = {
     return this._markedForDestruction;
   },
 
-  setDestroyedByAssociation(this: AutosaveAssociationHost, reflection: unknown): void {
-    this.destroyedByAssociation = reflection;
+  set destroyedByAssociation(reflection: unknown) {
+    (this as unknown as AutosaveAssociationHost)._destroyedByAssociation = reflection;
+  },
+
+  get destroyedByAssociation(): unknown {
+    return (this as unknown as AutosaveAssociationHost)._destroyedByAssociation;
   },
 
   changedForAutosave(this: AutosaveAssociationHost): boolean {

@@ -763,7 +763,7 @@ describe("EnumTest", () => {
   it("enum on abstract parent resolves against concrete subclass columns", () => {
     class AbstractParent extends Base {
       static {
-        this._abstractClass = true;
+        this.abstractClass = true;
         this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }
@@ -780,7 +780,7 @@ describe("EnumTest", () => {
   it("enum on abstract parent raises through subclass materialization", () => {
     class AbstractParent extends Base {
       static {
-        this._abstractClass = true;
+        this.abstractClass = true;
         this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }

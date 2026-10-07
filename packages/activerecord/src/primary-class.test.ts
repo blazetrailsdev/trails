@@ -8,11 +8,15 @@ class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;
 
 class AnotherAppRecord extends PrimaryAppRecord {
-  static override _abstractClass = true;
+  static {
+    this.abstractClass = true;
+  }
 }
 
 class ApplicationRecord extends Base {
-  static override _abstractClass = true;
+  static {
+    this.abstractClass = true;
+  }
 }
 
 describe("PrimaryClassTest", () => {

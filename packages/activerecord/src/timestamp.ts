@@ -1,6 +1,12 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { Rational, max } from "@blazetrails/ruby-compat";
-import { currentTimeInstant, filterMap, indexWith } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  currentTimeInstant,
+  filterMap,
+  included,
+  indexWith,
+} from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
 import { defaultTimezone } from "./active-record.js";
 
@@ -209,6 +215,9 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
 }
 
 export const Timestamp = {
+  [included](base: object): void {
+    classAttribute.call(base, "recordTimestamps", { default: true });
+  },
   recordUpdateTimestamps,
   shouldRecordTimestamps,
   timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): readonly string[] {

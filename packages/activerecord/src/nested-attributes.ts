@@ -5,7 +5,9 @@ import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import {
   assertValidKeys,
   camelize,
+  classAttribute,
   extractOptionsBang,
+  included,
   isBlank,
   singularize,
 } from "@blazetrails/activesupport";
@@ -430,6 +432,9 @@ function resolveCollectionTargetModel(
 }
 
 export const NestedAttributes = {
+  [included](base: object): void {
+    classAttribute.call(base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
+  },
   _destroy,
   hasDestroyFlag,
   isAllowDestroy,

@@ -62,7 +62,7 @@ export function lockingEnabled(this: LockingRecord): boolean {
 }
 
 interface LockingHost {
-  _lockingColumn: string;
+  lockingColumn: string;
   lockOptimistically?: boolean;
   _updateRecord?(
     values: Record<string, unknown>,
@@ -247,7 +247,7 @@ export function _queryConstraintsHash(
 
 /** @internal */
 export function hookAttributeType(this: LockingHost, name: string, castType: ValueType): ValueType {
-  if (this.lockOptimistically !== false && name === this._lockingColumn) {
+  if (this.lockOptimistically !== false && name === this.lockingColumn) {
     return new LockingType(castType);
   }
   return castType;

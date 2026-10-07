@@ -90,7 +90,6 @@ import {
   ciphertextFor as _ciphertextFor,
   encrypt as _encrypt,
   decrypt as _decrypt,
-  hasEncryptedAttributes as _hasEncryptedAttributes,
   cantModifyEncryptedAttributesWhenFrozen as _cantModifyEncryptedAttributesWhenFrozen,
   sourceAttributeFromPreservedAttribute as _sourceAttributeFromPreservedAttribute,
 } from "./encryption/encryptable-record.js";
@@ -134,6 +133,7 @@ import {
   findSignedBang as _findSignedBang,
 } from "./signed-id.js";
 import {
+  TokenFor as _TokenFor,
   generatesTokenFor as _generatesTokenFor,
   generateTokenFor as _generateTokenFor,
   findByTokenFor as _findByTokenFor,
@@ -597,7 +597,6 @@ export class Base extends Model {
 
   declare static inspectionFilter: typeof _Core.ClassMethods.inspectionFilter;
 
-  static _abstractClass = false;
   declare static automaticScopeInversing: boolean;
   declare static automaticallyInvertPluralAssociations: boolean;
   declare static hasManyInversing: boolean;
@@ -606,7 +605,6 @@ export class Base extends Model {
   declare static cacheTimestampFormat: "usec" | "number";
   declare static collectionCacheVersioning: boolean;
   static _protectedEnvironments: string[] = ["production"];
-  static _lockingColumn: string = "lock_version";
 
   declare static timeZoneAwareAttributes: boolean;
 
@@ -965,15 +963,7 @@ export class Base extends Model {
   /** @internal */
   declare static timestampAttributesForUpdate: typeof Timestamp.timestampAttributesForUpdate;
 
-  static _recordTimestamps = true;
-
-  static get recordTimestamps(): boolean {
-    return this._recordTimestamps;
-  }
-
-  static set recordTimestamps(value: boolean) {
-    this._recordTimestamps = value;
-  }
+  declare static recordTimestamps: boolean;
 
   declare static partialUpdates: boolean;
   declare static partialInserts: boolean;
@@ -1019,6 +1009,7 @@ export class Base extends Model {
     string,
     import("./nested-attributes.js").NestedAttributeOptions
   >;
+  declare static readonly isNestedAttributesOptions: boolean;
 
   static acceptsNestedAttributesFor = _NestedAttributes.acceptsNestedAttributesFor;
 
@@ -1193,10 +1184,6 @@ export class Base extends Model {
     conditions: Record<string, unknown> | string,
     ...rest: unknown[]
   ) => Promise<InstanceType<T>>;
-
-  static respondToMissing = respondToMissing;
-
-  static methodMissing = methodMissing;
 
   static async findSoleBy<T extends typeof Base>(
     this: T,
@@ -1634,7 +1621,6 @@ export class Base extends Model {
   _destroyed = false;
   _readonly = false;
   _previouslyNewRecord = false;
-  private _destroyedByAssociation: unknown = null;
 
   constructor(
     attributes: Record<string, unknown> | PermittedAttributes = {},
@@ -1728,14 +1714,6 @@ export class Base extends Model {
   declare isFrozen: typeof _Core.isFrozen;
   declare freeze: () => this;
 
-  get destroyedByAssociation(): unknown {
-    return this._destroyedByAssociation;
-  }
-
-  set destroyedByAssociation(assoc: unknown) {
-    this._destroyedByAssociation = assoc;
-  }
-
   declare cacheKey: () => string;
   declare cacheKeyWithVersion: () => string;
   declare cacheVersion: () => string | null;
@@ -1755,15 +1733,7 @@ export class Base extends Model {
   declare static validatesUniquenessOf: typeof _Validations.validatesUniquenessOf;
 
   private _touchRecord: boolean | null = null;
-  private _instanceRecordTimestamps: boolean | null = null;
-
-  get recordTimestamps(): boolean {
-    return this._instanceRecordTimestamps ?? (this.constructor as typeof Base).recordTimestamps;
-  }
-
-  set recordTimestamps(value: boolean) {
-    this._instanceRecordTimestamps = value;
-  }
+  declare recordTimestamps: boolean;
 
   /** @internal */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
@@ -2257,6 +2227,11 @@ extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
   cachedFindByStatement: _Core.cachedFindByStatement,
 });
+extend(Base, { respondToMissing, methodMissing });
+type DynamicMatchersClass = {
+  respondToMissing: OmitThisParameter<typeof respondToMissing>;
+  methodMissing: OmitThisParameter<typeof methodMissing>;
+};
 extend(Base, Querying);
 Object.setPrototypeOf(
   Base,
@@ -2271,8 +2246,9 @@ Object.setPrototypeOf(
       ) {
         return value;
       }
-      if (receiver.respondToMissing(prop, false)) {
-        return (...args: unknown[]) => receiver.methodMissing(prop, ...args);
+      const matchers = receiver as unknown as DynamicMatchersClass;
+      if (matchers.respondToMissing(prop, false)) {
+        return (...args: unknown[]) => matchers.methodMissing(prop, ...args);
       }
       return value;
     },
@@ -2356,12 +2332,7 @@ classAttribute.call(Base, "defaultScopeOverride", {
   instancePredicate: false,
   default: null,
 });
-classAttribute.call(Base, "nestedAttributesOptions", { instanceWriter: false, default: {} });
-classAttribute.call(Base, "encryptedAttributes");
-Base.validate(":cantModifyEncryptedAttributesWhenFrozen", {
-  if: (record: any) =>
-    _hasEncryptedAttributes.call(record) && ActiveRecord.Encryption.context.frozenEncryption,
-});
+include(Base, _EncryptableRecord);
 extend(Base, {
   encrypts: _encrypts,
   deterministicEncryptedAttributes: _deterministicEncryptedAttributes,
@@ -2374,15 +2345,7 @@ include(Base, {
   decrypt: _decrypt,
   cantModifyEncryptedAttributesWhenFrozen: _cantModifyEncryptedAttributesWhenFrozen,
 });
-classAttribute.call(Base, "tokenDefinitions", {
-  instanceAccessor: false,
-  instancePredicate: false,
-  default: {},
-});
-classAttribute.call(Base, "generatedTokenVerifier", {
-  instanceAccessor: false,
-  instancePredicate: false,
-});
+include(Base, _TokenFor);
 extend(Base, {
   defaultScope: _defaultScope,
   unscoped: _unscoped,

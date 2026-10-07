@@ -12,7 +12,7 @@ export class Cat extends Base {
   declare static notMale: () => Relation<Cat>;
 
   static {
-    this._abstractClass = true;
+    this.abstractClass = true;
     this.enum("gender", ["female", "male"]);
     this.defaultScope(function (this: any) {
       return this.where({ is_vegetarian: false });
