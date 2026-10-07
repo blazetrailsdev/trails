@@ -197,7 +197,7 @@ export interface AbstractAdapter
     Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
     Pick<QueryCacheHost, "_queryCache"> {
   queryCache: Store | null;
-  readonly queryCacheEnabled: boolean;
+  readonly queryCacheEnabled: boolean | undefined;
   cache<T>(fn: () => T | Promise<T>): T | Promise<T>;
   enableQueryCacheBang(): void;
   uncached<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;

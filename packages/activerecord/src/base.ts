@@ -2262,7 +2262,6 @@ extend(Base, {
   initializeFindByCache: _Core.initializeFindByCache,
   cachedFindByStatement: _Core.cachedFindByStatement,
 });
-_Core.deferInherited.call(Base as any);
 extend(Base, Querying);
 Object.setPrototypeOf(
   Base,

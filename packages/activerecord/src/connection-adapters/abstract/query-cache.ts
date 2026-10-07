@@ -453,8 +453,8 @@ export const QueryCache = {
   set queryCache(value: Store | null) {
     (this as unknown as QueryCacheHost)._queryCache = value;
   },
-  get queryCacheEnabled(): boolean {
-    return (this as unknown as QueryCacheHost)._queryCache?.enabled ?? false;
+  get queryCacheEnabled(): boolean | undefined {
+    return (this as unknown as QueryCacheHost)._queryCache?.enabled;
   },
   cache,
   enableQueryCacheBang,
