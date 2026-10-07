@@ -1,17 +1,15 @@
 import type { Base } from "./base.js";
-import { modelRegistry, registerModelConstant } from "./associations.js";
+import { registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { IndexedRow } from "./result.js";
 import {
-  camelize,
   classAttribute,
   constantize,
   included,
   isPlainObject,
   isPresent,
   safeConstantize,
-  underscore,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { hashAref, rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
@@ -31,18 +29,6 @@ export const Inheritance = {
     setBaseClass(base as typeof Base);
   },
 };
-
-function castInheritanceColumnValue(
-  modelClass: typeof Base,
-  inheritCol: string,
-  value: unknown,
-): unknown {
-  const casted = (
-    modelClass.typeForAttribute(inheritCol) as { cast(value: unknown): unknown }
-  ).cast(value);
-  if (casted == null) return casted;
-  return typeof casted === "string" ? casted : String(casted);
-}
 
 /** @internal */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
@@ -143,41 +129,6 @@ export function registerSubclass(klass: typeof Base): void {
   DescendantsTracker.registerSubclass(parent as never, klass as never);
 }
 
-/**
- * True when STI was explicitly enabled on this class or an ancestor (the
- * inherited `_inheritanceColumn` sentinel). Distinct from `inheritanceColumn`,
- * which resolves to a name (default "type") for any model that hasn't disabled
- * STI: the column merely names where STI *would* read the type; this reports
- * whether the model actually participates in STI.
- *
- * Used to gate the database-row dispatch paths (instantiate, association build),
- * which resolve through the ambiguous global registry and so must stay scoped to
- * explicitly-modeled hierarchies. The `new`-from-attributes path resolves within
- * the class's own subtree and instead gates on the column-aware
- * `_has_attribute?`.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE distinguishes an STI-participating class from one that merely names an inheritance_column (inheritance.rb:311); Ruby reads _has_attribute? instead.
- */
-export function stiEnabled(modelClass: object): boolean {
-  return (modelClass as any)._inheritanceColumn != null;
-}
-
-/**
- * Check if a model class is an STI subclass (not the base STI class).
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE the `self != base_class` test Ruby writes inline (inheritance.rb:119).
- */
-export function isStiSubclass(modelClass: object): boolean {
-  let current = Object.getPrototypeOf(modelClass);
-  while (current && current !== Function.prototype) {
-    if (current._inheritanceColumn) return true;
-    current = Object.getPrototypeOf(current);
-  }
-  return false;
-}
-
 export function baseClass(this: typeof Base): typeof Base {
   if (!Object.prototype.hasOwnProperty.call(this, "_computedBaseClass")) setBaseClass(this);
   return (this as any)._computedBaseClass as typeof Base;
@@ -193,24 +144,6 @@ export class ClassMethods {
   static set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
   }
-}
-
-/**
- * Get the STI base class for a model.
- *
- * @internal
- * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#base_class (inheritance.rb:119) as a free function so callers without a Base-typed receiver can reach it.
- */
-export function getStiBase(modelClass: object): typeof Base {
-  let current = modelClass as typeof Base;
-  let base = current;
-  while (current && current !== Function.prototype) {
-    if ((current as any)._inheritanceColumn) {
-      base = current;
-    }
-    current = Object.getPrototypeOf(current) as typeof Base;
-  }
-  return base;
 }
 
 /** @internal */
@@ -239,14 +172,6 @@ export function isFinderNeedsTypeCondition(modelClass: typeof Base): boolean {
 
 export function __resetPrimaryAbstractClass(): void {
   setApplicationRecordClass(null);
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE resolves the ApplicationRecord constant Ruby names directly (core.rb:121).
- */
-export function getApplicationRecordClass(): typeof Base | null {
-  return applicationRecordClass() as typeof Base | null;
 }
 
 export function primaryAbstractClass(modelClass: typeof Base): void {
@@ -371,97 +296,4 @@ export function subclassFromAttributes(
     }
   }
   return null;
-}
-
-/** @internal */
-function castStiValueFromAttrs(
-  modelClass: typeof Base,
-  attrsHash: Record<string, unknown>,
-  inheritCol: string,
-): { found: false } | { found: true; value: unknown } {
-  const camelCol = camelize(inheritCol, false);
-  const snakeCol = underscore(inheritCol);
-  const subclassValue =
-    attrsHash[inheritCol] ?? attrsHash[snakeCol] ?? attrsHash[camelCol] ?? undefined;
-  if (!isPresent(subclassValue)) return { found: false };
-  return {
-    found: true,
-    value: castInheritanceColumnValue(baseClass.call(modelClass), inheritCol, subclassValue),
-  };
-}
-
-/** @internal */
-function findStiClassInHierarchy(baseClass: typeof Base, typeName: string): typeof Base | null {
-  const registered = modelRegistry.get(typeName);
-  for (const klass of [baseClass, ...baseClass.descendants]) {
-    if (stiName(klass) === typeName || klass === registered) return klass;
-  }
-  return null;
-}
-
-/**
- * Resolve the subclass to construct for `new modelClass(attrs)`.
- *
- * Mirrors the dispatch in ActiveRecord::Inheritance::ClassMethods#new, which
- * tries three attribute sources in order — the explicit `attrs`, the
- * `current_scope`'s create attributes, then (for a base class) the table's
- * `column_defaults` — stopping at the first that names a subclass. We resolve
- * each through {@link findStiClassInHierarchy} (registry-safe) instead of
- * Rails' constant-lookup `find_sti_class`. `inheritance_column` now always
- * resolves to a name (default `"type"`), and the dispatch is gated on the
- * column-aware `_has_attribute?` — or, for a
- * receiver that is explicitly STI-enabled ({@link stiEnabled}), on that
- * assignment, which is the same structural fact Rails reads off
- * `_has_attribute?`. Rails reads `_has_attribute?` alone because
- * `attribute_types` loads the schema synchronously on first touch; trails
- * cannot query the database from a synchronous constructor, so reflection can
- * still be cold at `new` and the `stiEnabled` arm covers exactly that window
- * (an STI *leaf* whose `type` column had not reflected yet otherwise built
- * as-is where Rails raises). Returns null (no dispatch) when no source names
- * an inheritance value at all.
- *
- * Matching Rails' `subclass_from_attributes` → `find_sti_class`: a receiver
- * carrying a *present* inheritance value that names no subclass of it raises
- * {@link SubclassNotFound} (e.g. `Company.new(type: "Account")` or an unknown
- * `"InvalidType"`) rather than silently building the receiver as-is. All three
- * sources resolve identically — `find_sti_class`'s valid set is
- * `self || descendants` (`inheritance.rb:242-265`), so a scope naming an STI
- * *ancestor* of the receiver raises just as an explicit attribute does. The
- * subtree walk resolves in-hierarchy types registry-safely first, then defers
- * to the global `find_sti_class`, which also resolves a registered subclass not
- * tracked as a descendant and raises for a genuine out-of-hierarchy/unknown
- * type.
- *
- * @internal Used by Base's constructor to dispatch `new` to a subclass.
- * @noRailsEquivalent CONVERGEABLE Inheritance::ClassMethods#subclass_from_attributes (inheritance.rb:331-265) split out of `new` because our reflection can be cold.
- */
-export function subclassFromAttributesForNew(
-  modelClass: typeof Base,
-  attrs: Record<string, unknown> | null | undefined,
-): typeof Base | null {
-  const col = modelClass.inheritanceColumn;
-  if (col === null) return null;
-  if (!modelClass._hasAttribute(col) && !stiEnabled(modelClass)) return null;
-
-  const resolve = (source: unknown): typeof Base | null => {
-    if (!source || typeof source !== "object") return null;
-    const cast = castStiValueFromAttrs(modelClass, source as Record<string, unknown>, col);
-    if (!cast.found) return null;
-    const typeName = cast.value as string;
-    const found = findStiClassInHierarchy(modelClass, typeName);
-    if (found) return found;
-    return modelClass.findStiClass(typeName);
-  };
-
-  let subclass = resolve(attrs);
-  if (!subclass) {
-    const scopeAttrs = (
-      modelClass.currentScope?.() as { scopeForCreate?(): unknown } | null
-    )?.scopeForCreate?.();
-    subclass = resolve(scopeAttrs);
-  }
-  if (!subclass && isBaseClass(modelClass)) {
-    subclass = resolve(modelClass.columnDefaults);
-  }
-  return subclass;
 }
