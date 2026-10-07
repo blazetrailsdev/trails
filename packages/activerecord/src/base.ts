@@ -2171,6 +2171,8 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<boolean | undefined>;
+  /** @internal */
+  createOrUpdate(touch?: boolean, block?: (record: any) => void): Promise<boolean>;
   saveBang(
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
@@ -2656,9 +2658,7 @@ for (const [name, fn] of [
     ): Promise<boolean | undefined> {
       return _Suppressor.save.call(this, () =>
         _Transactions.save.call(this, () =>
-          _Validations.save.call(this, options, () =>
-            _Persistence.save.call(this as any, options, block),
-          ),
+          _Validations.save.call(this, options, () => _Persistence.save.call(this, options, block)),
         ),
       ) as Promise<boolean | undefined>;
     },
@@ -2673,7 +2673,7 @@ for (const [name, fn] of [
       return _Suppressor.saveBang.call(this, () =>
         _Transactions.saveBang.call(this, () =>
           _Validations.saveBang.call(this, options, () =>
-            _Persistence.saveBang.call(this as any, options, block),
+            _Persistence.saveBang.call(this, options, block),
           ),
         ),
       ) as Promise<true | undefined>;
