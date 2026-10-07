@@ -3,9 +3,13 @@ import {
   BigDecimal,
   FrozenError,
   Hash,
+  IPAddr,
   NoMethodError,
+  Pathname,
+  Range,
   RangeError,
   StandardError,
+  URI,
 } from "@blazetrails/ruby-compat";
 
 import { Temporal, Time } from "@blazetrails/date";
@@ -127,6 +131,75 @@ describe("MessagePackSerializerTrailsTest", () => {
       2,
       ...Buffer.from("18:0.1e1"),
     ]);
+  });
+
+  it("dumps Range, URI, IPAddr, Pathname and Regexp bytes identical to real Rails MessagePack", () => {
+    const serializer = new Serializer();
+    const dump = (object: unknown) => [...serializer.dump(object)];
+    expect(dump(new Range(1, 2))).toEqual([204, 128, 199, 3, 11, 1, 2, 194]);
+    expect(dump(new Range(1, 2, true))).toEqual([204, 128, 199, 3, 11, 1, 2, 195]);
+    expect(dump(new Range(1, null))).toEqual([204, 128, 199, 3, 11, 1, 192, 194]);
+    expect(dump(new Range(null, 2, true))).toEqual([204, 128, 199, 3, 11, 192, 2, 195]);
+    expect(dump(new Range("1", "2"))).toEqual([204, 128, 199, 5, 11, 161, 49, 161, 50, 194]);
+    expect(dump(URI.parse("https://example.com/#test"))).toEqual([
+      204,
+      128,
+      199,
+      25,
+      13,
+      ...Buffer.from("https://example.com/#test"),
+    ]);
+    expect(dump(new IPAddr("127.0.0.1"))).toEqual([
+      204,
+      128,
+      199,
+      10,
+      14,
+      169,
+      ...Buffer.from("127.0.0.1"),
+    ]);
+    expect(dump(new IPAddr("1.1.1.1/16"))).toEqual([
+      204,
+      128,
+      199,
+      11,
+      14,
+      170,
+      ...Buffer.from("1.1.0.0/16"),
+    ]);
+    expect(dump(new IPAddr("::1"))).toEqual([204, 128, 214, 14, 163, ...Buffer.from("::1")]);
+    expect(dump(new IPAddr("1:1:1:1:1:1:1:1/64"))).toEqual([
+      204,
+      128,
+      199,
+      13,
+      14,
+      172,
+      ...Buffer.from("1:1:1:1::/64"),
+    ]);
+    expect(dump(new Pathname("/usr/bin/ruby"))).toEqual([
+      204,
+      128,
+      199,
+      13,
+      15,
+      ...Buffer.from("/usr/bin/ruby"),
+    ]);
+    expect(dump(/.*/s)).toEqual([204, 128, 199, 10, 16, ...Buffer.from("(?m-ix:.*)")]);
+    expect(dump(/ab+c/i)).toEqual([204, 128, 199, 12, 16, ...Buffer.from("(?i-mx:ab+c)")]);
+  });
+
+  it("dumps a Regexp without the flags MRI has no option for", () => {
+    const serializer = new Serializer();
+    const loaded = serializer.load(serializer.dump(/^a/gimsuy)) as RegExp;
+    expect([loaded.source, loaded.flags]).toEqual(["^a", "is"]);
+  });
+
+  it("loads the Regexp real Rails MessagePack dumps", () => {
+    const serializer = new Serializer();
+    const dumped = Buffer.from([204, 128, 199, 12, 16, ...Buffer.from("(?i-mx:ab+c)")]);
+    const loaded = serializer.load(dumped) as RegExp;
+    expect([loaded.source, loaded.flags]).toEqual(["ab+c", "i"]);
   });
 
   it("freezes the factory once the pool is built", () => {

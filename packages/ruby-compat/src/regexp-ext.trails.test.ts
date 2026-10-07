@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toS } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
-import { rbRegEqual, rbRegToS, regexpEscape } from "./regexp.js";
+import { rbRegEqual, rbRegInitStr, rbRegToS, regexpEscape } from "./regexp.js";
 
 describe("regexpEscape", () => {
   it("escapes the characters a JS RegExp gives meaning to", () => {
@@ -50,5 +50,33 @@ describe("rbRegEqual", () => {
     expect(rbRegEqual(/a/gi, /a/)).toBe(false);
     expect(rbEqual(/a/, /a/)).toBe(true);
     expect(rbEqual("a", /a/)).toBe(false);
+  });
+});
+
+describe("Regexp MRI option spelling (trails)", () => {
+  it("to_s spells MRI's option letters under the onig syntax", () => {
+    expect(rbRegToS(/ab+c/, "onig")).toBe("(?-mix:ab+c)");
+    expect(rbRegToS(/.*/s, "onig")).toBe("(?m-ix:.*)");
+    expect(rbRegToS(/a/is, "onig")).toBe("(?mi-x:a)");
+    expect(rbRegToS(/^a/m, "onig")).toBe("(?-mix:^a)");
+    expect(rbRegToS(/a/dgimsuy, "onig")).toBe("(?mi-x:a)");
+    expect(rbRegToS(new RegExp("a", "v"), "onig")).toBe("(?-mix:a)");
+  });
+
+  it("Regexp.new reads MRI's to_s back", () => {
+    for (const re of [/ab+c/, /.*/s, /a/is, /a(b|c)\)/i]) {
+      const loaded = rbRegInitStr(rbRegToS(re, "onig"));
+      expect([loaded.source, loaded.flags]).toEqual([re.source, re.flags]);
+    }
+    for (const pattern of ["(?m:a)(b)", "(?i:a)|(?i:b)", "(?i:a)(?-i:b)", "(?i:a)[)]"]) {
+      const loaded = rbRegInitStr(pattern);
+      expect([loaded.source, loaded.flags]).toEqual([pattern, ""]);
+    }
+    const classed = rbRegInitStr("(?i-mx:[)(]\\))");
+    expect([classed.source, classed.flags]).toEqual(["[)(]\\)", "i"]);
+    const bare = rbRegInitStr("(?-mix:a)");
+    expect([bare.source, bare.flags]).toEqual(["a", ""]);
+    expect(rbRegInitStr("a+").source).toBe("a+");
+    expect(() => rbRegInitStr("(?x: a )")).toThrow(SyntaxError);
   });
 });

@@ -4,12 +4,19 @@ import { Temporal, Time } from "@blazetrails/date";
 import {
   BigDecimal,
   Complex,
+  Generic,
+  IPAddr,
   NameError,
+  Pathname,
+  Range,
   Rational,
   RuntimeError,
+  URI,
   complex,
   rational,
   rbModConstGet,
+  rbRegInitStr,
+  rbRegToS,
   zip,
 } from "@blazetrails/ruby-compat";
 import { Duration, type DurationParts } from "../duration.js";
@@ -191,12 +198,57 @@ export const Extensions = {
     });
 
     registry.registerType({
+      type: 11,
+      klass: "Range",
+      recursive: true,
+      match: (v) => v instanceof Range,
+      packer: (v, packer) => Extensions.writeRange(v as Range, packer),
+      unpacker: (unpacker) => Extensions.readRange(unpacker as Unpacker),
+    });
+
+    registry.registerType({
       type: 12,
       klass: "Set",
       recursive: true,
       match: (v) => v instanceof Set,
       packer: (v, packer) => packer.write([...(v as Set<unknown>)]),
       unpacker: (unpacker) => new Set((unpacker as Unpacker).read() as unknown[]),
+    });
+
+    registry.registerType({
+      type: 13,
+      klass: "URI::Generic",
+      recursive: false,
+      match: (v) => v instanceof Generic,
+      packer: (v) => Buffer.from((v as Generic).toString(), "utf-8"),
+      unpacker: (payload) => URI.parse((payload as Buffer).toString("utf-8")),
+    });
+
+    registry.registerType({
+      type: 14,
+      klass: "IPAddr",
+      recursive: true,
+      match: (v) => v instanceof IPAddr,
+      packer: (v, packer) => Extensions.writeIpaddr(v as IPAddr, packer),
+      unpacker: (unpacker) => Extensions.readIpaddr(unpacker as Unpacker),
+    });
+
+    registry.registerType({
+      type: 15,
+      klass: "Pathname",
+      recursive: false,
+      match: (v) => v instanceof Pathname,
+      packer: (v) => Buffer.from((v as Pathname).toString(), "utf-8"),
+      unpacker: (payload) => new Pathname((payload as Buffer).toString("utf-8")),
+    });
+
+    registry.registerType({
+      type: 16,
+      klass: "Regexp",
+      recursive: false,
+      match: (v) => v instanceof RegExp,
+      packer: (v) => Buffer.from(rbRegToS(v as RegExp, "onig"), "utf-8"),
+      unpacker: (payload) => rbRegInitStr((payload as Buffer).toString("utf-8")),
     });
 
     registry.registerType({
@@ -335,6 +387,28 @@ export const Extensions = {
     );
     parts = compact(parts);
     return new Duration(value, parts);
+  },
+
+  writeRange(range: Range, packer: Packer): void {
+    packer.write(range.begin);
+    packer.write(range.end);
+    packer.write(range.excludeEnd);
+  },
+
+  readRange(unpacker: Unpacker): Range {
+    return new Range(unpacker.read(), unpacker.read(), unpacker.read() as boolean);
+  },
+
+  writeIpaddr(ipaddr: IPAddr, packer: Packer): void {
+    if (ipaddr.prefix < 32 || (ipaddr.isIpv6() && ipaddr.prefix < 128)) {
+      packer.write(`${ipaddr}/${ipaddr.prefix}`);
+    } else {
+      packer.write(ipaddr.toString());
+    }
+  },
+
+  readIpaddr(unpacker: Unpacker): IPAddr {
+    return new IPAddr(unpacker.read());
   },
 
   dumpClass(klass: ObjectClass): string {

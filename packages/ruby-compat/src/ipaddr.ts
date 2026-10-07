@@ -106,6 +106,11 @@ export class IPAddr {
     return this.family === AF_INET;
   }
 
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/lib/ipaddr.rb:245` */
+  isIpv6(): boolean {
+    return this.family === AF_INET6;
+  }
+
   /**
    * Ruby compares `hash` (`vendor/ruby/v3.3.11/lib/ipaddr.rb:401-403`, built from
    * `@addr`, `@mask_addr`, `@zone_id` and the family); JS has no `hash`
