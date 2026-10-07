@@ -7,11 +7,12 @@ interface RescueHost {
   rescueWithHandler(exception: unknown): unknown;
 }
 
-export const Rescue = new Module((mod) => {
+export const Rescue: Module = new Module((mod) => {
   extend(mod, Concern);
   include(mod, Rescuable);
 
   mod.defineMethod("isShowDetailedExceptions", isShowDetailedExceptions);
+  mod.defineMethod("processAction", processAction);
 });
 
 export function isShowDetailedExceptions(): boolean {
@@ -19,12 +20,14 @@ export function isShowDetailedExceptions(): boolean {
 }
 
 /** @internal */
-export async function processAction(this: RescueHost, block: () => Promise<void>): Promise<void> {
+export async function processAction(this: RescueHost, ...args: unknown[]): Promise<unknown> {
   try {
-    await block();
+    return await Rescue.superMethod(this, "processAction")!(...args);
   } catch (exception) {
     this.request.env["action_dispatch.show_detailed_exceptions"] ||=
       this.isShowDetailedExceptions();
-    if (!rtest(await this.rescueWithHandler(exception))) throw exception;
+    const handled = await this.rescueWithHandler(exception);
+    if (!rtest(handled)) throw exception;
+    return handled;
   }
 }

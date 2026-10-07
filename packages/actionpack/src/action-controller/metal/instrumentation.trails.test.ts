@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { isSymbol } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import { API } from "../api.js";
 import { logProcessAction } from "./instrumentation.js";
 import { Request } from "../../action-dispatch/http/request.js";
 import { Response } from "../../action-dispatch/http/response.js";
@@ -153,6 +154,71 @@ describe("ActionController::Instrumentation#process_action", () => {
     expect(logProcessAction({ view_runtime: "12.5" })).toEqual(["Views: 12.5ms"]);
     expect(logProcessAction({ view_runtime: "abc" })).toEqual(["Views: 0.0ms"]);
     expect(logProcessAction({})).toEqual([]);
+  });
+});
+
+describe("ActionController::API process_action chain (api.rb:139-143)", () => {
+  const teardown: Array<() => void> = [];
+  afterEach(() => {
+    while (teardown.length > 0) teardown.pop()!();
+  });
+
+  it("publishes process_action from the Instrumentation module API includes", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        this.head(204);
+      }
+    }
+    await new WidgetsController().dispatch("index", newRequest(), new Response());
+
+    expect(events).toHaveLength(1);
+    expect(events[0].controller).toBe("WidgetsController");
+    expect(events[0].status).toBe(204);
+  });
+
+  it("instruments send_data through the DataStreaming module beneath it", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("send_data.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        this.sendData("hello", { filename: "hello.txt" });
+      }
+    }
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(events).toHaveLength(1);
+    expect(events[0].filename).toBe("hello.txt");
+    expect(response.body).toBe("hello");
+  });
+
+  it("rescues an action's error through the Rescue module API includes", async () => {
+    const events: Record<string, unknown>[] = [];
+    teardown.push(subscribeOnce("process_action.action_controller", events));
+
+    class WidgetsController extends API {
+      static actions = ["index"];
+      index(): void {
+        throw new ParseError("bad param");
+      }
+    }
+    (WidgetsController as unknown as typeof Base).rescueFrom(ParseError, {
+      with(this: API) {
+        this.head(400);
+      },
+    });
+    const response = new Response();
+    await new WidgetsController().dispatch("index", newRequest(), response);
+
+    expect(response.status).toBe(400);
+    expect(events).toHaveLength(1);
+    expect(events[0].status).toBe(400);
   });
 });
 

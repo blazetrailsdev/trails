@@ -28,7 +28,7 @@ export function withRoutesHelpers(
     const proto = cls.prototype;
     Object.setPrototypeOf(
       proto,
-      new Proxy(Object.getPrototypeOf(proto) as object, {
+      new Proxy(Object.create(Object.getPrototypeOf(proto) as object) as object, {
         get(target, key, receiver) {
           if (typeof key === "string") {
             const accessor = includedAccessor(cls, urlHelpersModule(), key);

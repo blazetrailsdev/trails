@@ -13,6 +13,8 @@ import { BasicImplicitRender } from "./metal/basic-implicit-render.js";
 import { DataStreaming } from "./metal/data-streaming.js";
 import { Redirecting, redirectTo } from "./metal/redirecting.js";
 import { UrlFor } from "./metal/url-for.js";
+import { Rescue } from "./metal/rescue.js";
+import { Instrumentation } from "./metal/instrumentation.js";
 import {
   Options as ParamsWrapperOptions,
   _performParameterWrapping,
@@ -99,3 +101,5 @@ include(API, StrongParameters);
 include(API, RateLimiting);
 include(API, Caching);
 include(API, DataStreaming);
+include(API, Rescue);
+include(API, Instrumentation);

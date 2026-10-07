@@ -53,11 +53,7 @@ import {
   type RedirectToOptions,
 } from "./metal/redirecting.js";
 import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
-import {
-  Rescue,
-  type isShowDetailedExceptions,
-  processAction as _rescueProcessAction,
-} from "./metal/rescue.js";
+import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
   ActionCallback,
@@ -159,7 +155,7 @@ import type {
   writeFragment,
 } from "../abstract-controller/caching/fragments.js";
 import { HttpAuthentication } from "./metal/http-authentication.js";
-import { sendFileHeadersBang } from "./metal/data-streaming.js";
+import { DataStreaming, type sendFileHeadersBang } from "./metal/data-streaming.js";
 import {
   Options as ParamsWrapperOptions,
   _performParameterWrapping,
@@ -177,7 +173,6 @@ import {
   _setVaryHeader,
   _processVariant,
   _normalizeOptions,
-  processAction as _processAction,
   Rendering,
   renderToString,
 } from "./metal/rendering.js";
@@ -193,7 +188,6 @@ import {
   appendInfoToPayload,
   cleanupViewRuntime,
   haltedCallbackHook,
-  processAction as _instrumentProcessAction,
   redirectTo as _instrumentRedirectTo,
   sendData,
   sendFile,
@@ -324,10 +318,10 @@ export interface Base
   extends
     Included<typeof HttpAuthentication.Basic.ControllerMethods>,
     Included<typeof HttpAuthentication.Digest.ControllerMethods>,
-    Included<typeof HttpAuthentication.Token.ControllerMethods>,
-    Instrumentation {
+    Included<typeof HttpAuthentication.Token.ControllerMethods> {
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
+  viewRuntime: number | null;
   helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
@@ -658,12 +652,7 @@ export class Base extends Metal {
         ...this.request.pathParameters,
       });
     }
-    await _instrumentProcessAction.call(this as never, () =>
-      _rescueProcessAction.call(this, async () => {
-        _processAction.call(this as never, action, ...args);
-        await super.processAction(action, ...args);
-      }),
-    );
+    await super.processAction(action, ...args);
   }
 
   declare freshWhen: typeof freshWhen;
@@ -802,9 +791,7 @@ include(Base, PermissionsPolicy);
 include(Base, RateLimiting);
 include(Base, AllowBrowser);
 Base.prototype._renderTemplate = _renderTemplate;
-Base.prototype.sendFile = sendFile;
-Base.prototype.sendData = sendData;
-Base.prototype.sendFileHeadersBang = sendFileHeadersBang;
+include(Base, DataStreaming);
 include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);
@@ -812,9 +799,6 @@ extend(Base, DefaultHeaders.ClassMethods);
 include(Base, Rescue);
 include(Base, Instrumentation);
 Base.prototype.redirectTo = _instrumentRedirectTo;
-Base.prototype.appendInfoToPayload = appendInfoToPayload;
-Base.prototype.cleanupViewRuntime = cleanupViewRuntime;
-Base.prototype.haltedCallbackHook = haltedCallbackHook;
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);
