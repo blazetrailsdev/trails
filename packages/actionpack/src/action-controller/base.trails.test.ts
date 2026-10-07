@@ -119,14 +119,20 @@ describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)
     expect(klass.name).toBe("klass");
     expect(() => new klass()).not.toThrow();
     expect(klass.controllerName()).toBeNull();
+
+    const PostsController = class extends Base {};
+    expect(PostsController.controllerName()).toBe("posts");
   });
 
   it("names a class expression a constant seat paths", () => {
     const seated = class extends Base {};
     registerConstant("SeatedController", seated);
-    expect(() => new seated()).not.toThrow();
-    expect(seated.controllerName()).toBe("seated");
-    unregisterConstant("SeatedController", seated);
+    try {
+      expect(() => new seated()).not.toThrow();
+      expect(seated.controllerName()).toBe("seated");
+    } finally {
+      unregisterConstant("SeatedController", seated);
+    }
   });
 });
 

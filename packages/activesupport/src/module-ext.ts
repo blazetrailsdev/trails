@@ -208,15 +208,18 @@ export const attrInternal = attrInternalAccessor;
 /**
  * `name.nil?` (`core_ext/module/anonymous.rb:27-29`). A class is named by the
  * constant seat that paths it (`vendor/ruby/v3.3.11/variable.c:122-127`), or
- * by its own `class Foo` definition. JS also names `const klass = class {}`
- * after the binding, which is Ruby's nameless `klass = Class.new`, so a class
- * whose definition carries no identifier is anonymous whatever `name` reads.
+ * by its own `class Foo` definition. A definition with no identifier is
+ * Ruby's `Class.new`, which JS names after the binding it is assigned to:
+ * like Ruby, that names the class only when the binding is a constant name
+ * (`Foo = Class.new`), and not when it is a local (`klass = Class.new`).
  */
 export function isAnonymous(klass: { name: string }): boolean {
   if (classpaths.has(klass)) return false;
   if (!klass.name) return true;
   if (typeof klass !== "function") return false;
-  return /^class\s*(?:extends\b|\{)/.test(Function.prototype.toString.call(klass));
+  const source = Function.prototype.toString.call(klass);
+  if (!/^class(?:\s|\/\*[\s\S]*?\*\/|\/\/.*)*(?:extends\b|\{)/.test(source)) return false;
+  return !/^[\p{Lu}\p{Lt}]/u.test(klass.name);
 }
 
 export function moduleParentName(klass: object): string | null {

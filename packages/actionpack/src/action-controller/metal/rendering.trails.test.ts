@@ -33,7 +33,7 @@ describe("Head#head option keys (head.rb:33-35)", () => {
     for (const key of ["xCustomHeader", "x_custom_header", "x-custom-header"]) {
       class KeyController extends Base {
         async show(): Promise<void> {
-          this.head("ok", { [key]: "1", ETag: "e", "WWW-Authenticate": "w" });
+          this.head("ok", { [key]: "1", ETag: "e", "WWW-Authenticate": "w", ContentMD5: "m" });
         }
       }
       const controller = new KeyController();
@@ -45,6 +45,7 @@ describe("Head#head option keys (head.rb:33-35)", () => {
       expect(controller.response.headers.get("X-Custom-Header")).toBe("1");
       expect(controller.response.headers.get("ETag")).toBe("e");
       expect(controller.response.headers.get("WWW-Authenticate")).toBe("w");
+      expect(controller.response.headers.get("ContentMD5")).toBe("m");
     }
   });
 });
