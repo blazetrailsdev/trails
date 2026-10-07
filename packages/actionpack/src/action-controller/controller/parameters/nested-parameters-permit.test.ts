@@ -1,116 +1,355 @@
-import { describe, it, expect } from "vitest";
+import { describe, it } from "vitest";
+import {
+  assertEmpty,
+  assertEqual,
+  assertNil,
+  assertNot,
+  assertNotNil,
+  assertPredicate,
+} from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
 
 describe("NestedParametersPermitTest", () => {
+  function assertFilteredOut(params: Parameters, key: string) {
+    assertNot(params.hasKey(key), `key ${rbInspect(key)} has not been filtered out`);
+  }
+
   it("permitted nested parameters", () => {
-    const inner = new Parameters({ title: "Hello", admin: true });
-    const params = new Parameters({ post: inner });
-    const permitted = params.permit({ post: ["title"] });
-    const post = permitted.get("post") as Parameters;
-    expect(post).toBeInstanceOf(Parameters);
-    expect(post.get("title")).toBe("Hello");
-    expect(post.hasKey("admin")).toBe(false);
+    const params = new Parameters({
+      book: {
+        title: "Romeo and Juliet",
+        authors: [
+          {
+            name: "William Shakespeare",
+            born: "1564-04-26",
+          },
+          {
+            name: "Christopher Marlowe",
+          },
+          {
+            name: ["malicious", "injected", "names"],
+          },
+        ],
+        details: {
+          pages: 200,
+          genre: "Tragedy",
+        },
+        id: {
+          isbn: "x",
+        },
+      },
+      magazine: "Mjallo!",
+    });
+
+    const permitted = params.permit({
+      book: ["title", { authors: ["name"] }, { details: "pages" }, "id"],
+    });
+    const book = permitted.get("book") as Parameters;
+    const authors = book.get("authors") as Parameters[];
+
+    assertPredicate(permitted, (p) => p.permitted);
+    assertEqual("Romeo and Juliet", book.get("title"));
+    assertEqual("William Shakespeare", authors[0].get("name"));
+    assertEqual("Christopher Marlowe", authors[1].get("name"));
+    assertEqual(200, (book.get("details") as Parameters).get("pages"));
+
+    assertFilteredOut(permitted, "magazine");
+    assertFilteredOut(book, "id");
+    assertFilteredOut(book.get("details") as Parameters, "genre");
+    assertFilteredOut(authors[0], "born");
+    assertFilteredOut(authors[2], "name");
   });
 
   it("permitted nested parameters with a string or a symbol as a key", () => {
-    const inner = new Parameters({ title: "Hello" });
-    const params = new Parameters({ post: inner });
-    const permitted = params.permit({ post: ["title"] });
-    expect((permitted.get("post") as Parameters).get("title")).toBe("Hello");
+    const params = new Parameters({
+      book: {
+        authors: [
+          { name: "William Shakespeare", born: "1564-04-26" },
+          { name: "Christopher Marlowe" },
+        ],
+      },
+    });
+
+    let permitted = params.permit({ book: [{ authors: ["name"] }] });
+    let authors = (permitted.get("book") as Parameters).get("authors") as Parameters[];
+
+    assertEqual("William Shakespeare", authors[0].get("name"));
+    assertEqual("William Shakespeare", authors[0].get("name"));
+    assertEqual("Christopher Marlowe", authors[1].get("name"));
+    assertEqual("Christopher Marlowe", authors[1].get("name"));
+
+    permitted = params.permit({ book: [{ authors: ["name"] }] });
+    authors = (permitted.get("book") as Parameters).get("authors") as Parameters[];
+
+    assertEqual("William Shakespeare", authors[0].get("name"));
+    assertEqual("William Shakespeare", authors[0].get("name"));
+    assertEqual("Christopher Marlowe", authors[1].get("name"));
+    assertEqual("Christopher Marlowe", authors[1].get("name"));
   });
 
   it("nested arrays with strings", () => {
-    const params = new Parameters({ tags: ["ruby", "rails"] });
-    const permitted = params.permit({ tags: [] });
-    expect(permitted.get("tags")).toEqual(["ruby", "rails"]);
+    const params = new Parameters({
+      book: {
+        genres: ["Tragedy"],
+      },
+    });
+
+    const permitted = params.permit({ book: { genres: [] } });
+    assertEqual(["Tragedy"], (permitted.get("book") as Parameters).get("genres"));
   });
 
   it("permit may specify symbols or strings", () => {
-    const params = new Parameters({ name: "John", age: 22 });
-    const permitted = params.permit("name", "age");
-    expect(permitted.get("name")).toBe("John");
-    expect(permitted.get("age")).toBe(22);
+    const params = new Parameters({
+      book: {
+        title: "Romeo and Juliet",
+        author: "William Shakespeare",
+      },
+      magazine: "Shakespeare Today",
+    });
+
+    const permitted = params.permit({ book: ["title", "author"] }, "magazine");
+    assertEqual("Romeo and Juliet", (permitted.get("book") as Parameters).get("title"));
+    assertEqual("William Shakespeare", (permitted.get("book") as Parameters).get("author"));
+    assertEqual("Shakespeare Today", permitted.get("magazine"));
   });
 
   it("nested array with strings that should be hashes", () => {
-    const params = new Parameters({ items: ["not_a_hash", "also_not"] });
-    const permitted = params.permit({ items: [] });
-    expect(permitted.get("items")).toEqual(["not_a_hash", "also_not"]);
+    const params = new Parameters({
+      book: {
+        genres: ["Tragedy"],
+      },
+    });
+
+    const permitted = params.permit({ book: { genres: "type" } });
+    assertEmpty((permitted.get("book") as Parameters).get("genres") as unknown[]);
   });
 
   it("nested array with strings that should be hashes and additional values", () => {
     const params = new Parameters({
-      book: new Parameters({ title: "Romeo and Juliet", genres: ["Tragedy"] }),
+      book: {
+        title: "Romeo and Juliet",
+        genres: ["Tragedy"],
+      },
     });
+
     const permitted = params.permit({ book: ["title", { genres: "type" }] });
-    const book = permitted.get("book") as Parameters;
-    expect(book.get("title")).toBe("Romeo and Juliet");
-    expect(book.get("genres")).toEqual([]);
+    assertEqual("Romeo and Juliet", (permitted.get("book") as Parameters).get("title"));
+    assertEmpty((permitted.get("book") as Parameters).get("genres") as unknown[]);
   });
 
   it("nested string that should be a hash", () => {
-    const params = new Parameters({ book: new Parameters({ genre: "Tragedy" }) });
+    const params = new Parameters({
+      book: {
+        genre: "Tragedy",
+      },
+    });
+
     const permitted = params.permit({ book: { genre: "type" } });
-    expect((permitted.get("book") as Parameters).get("genre")).toBeUndefined();
+    assertNil((permitted.get("book") as Parameters).get("genre"));
   });
 
   it("nested params with numeric keys", () => {
-    const inner = new Parameters({
-      "0": new Parameters({ name: "a" }),
-      "1": new Parameters({ name: "b" }),
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": { name: "William Shakespeare", age_of_death: "52" },
+          "1": { name: "Unattributed Assistant" },
+          "2": { name: ["injected", "names"] },
+        },
+      },
     });
-    const params = new Parameters({ items: inner });
-    const permitted = params.permit({ items: ["name"] });
-    expect(permitted.hasKey("items")).toBe(true);
+    const permitted = params.permit({ book: { authors_attributes: ["name"] } });
+    const authorsAttributes = (permitted.get("book") as Parameters).get(
+      "authors_attributes",
+    ) as Parameters;
+
+    assertNotNil(authorsAttributes.get("0"));
+    assertNotNil(authorsAttributes.get("1"));
+    assertEmpty(authorsAttributes.get("2") as Parameters);
+    assertEqual("William Shakespeare", (authorsAttributes.get("0") as Parameters).get("name"));
+    assertEqual("Unattributed Assistant", (authorsAttributes.get("1") as Parameters).get("name"));
+
+    assertEqual(
+      {
+        book: {
+          authors_attributes: {
+            "0": { name: "William Shakespeare" },
+            "1": { name: "Unattributed Assistant" },
+            "2": {},
+          },
+        },
+      },
+      permitted.toH(),
+    );
+
+    assertFilteredOut(authorsAttributes.get("0") as Parameters, "age_of_death");
   });
 
   it("nested params with non_numeric keys", () => {
-    const inner = new Parameters({ x: new Parameters({ name: "a" }) });
-    const params = new Parameters({ items: inner });
-    const permitted = params.permit({ items: ["name"] });
-    expect(permitted.hasKey("items")).toBe(true);
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": { name: "William Shakespeare", age_of_death: "52" },
+          "1": { name: "Unattributed Assistant" },
+          "2": "Not a hash",
+          new_record: { name: "Some name" },
+        },
+      },
+    });
+    const permitted = params.permit({ book: { authors_attributes: ["name"] } });
+    const authorsAttributes = (permitted.get("book") as Parameters).get(
+      "authors_attributes",
+    ) as Parameters;
+
+    assertNotNil(authorsAttributes.get("0"));
+    assertNotNil(authorsAttributes.get("1"));
+
+    assertNil(authorsAttributes.get("2"));
+    assertNil(authorsAttributes.get("new_record"));
+    assertEqual("William Shakespeare", (authorsAttributes.get("0") as Parameters).get("name"));
+    assertEqual("Unattributed Assistant", (authorsAttributes.get("1") as Parameters).get("name"));
+
+    assertEqual(
+      {
+        book: {
+          authors_attributes: {
+            "0": { name: "William Shakespeare" },
+            "1": { name: "Unattributed Assistant" },
+          },
+        },
+      },
+      permitted.toH(),
+    );
   });
 
   it("nested params with negative numeric keys", () => {
-    const inner = new Parameters({ "-1": new Parameters({ name: "a" }) });
-    const params = new Parameters({ items: inner });
-    const permitted = params.permit({ items: ["name"] });
-    expect(permitted.hasKey("items")).toBe(true);
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "-1": { name: "William Shakespeare", age_of_death: "52" },
+          "-2": { name: "Unattributed Assistant" },
+        },
+      },
+    });
+    const permitted = params.permit({ book: { authors_attributes: ["name"] } });
+    const authorsAttributes = (permitted.get("book") as Parameters).get(
+      "authors_attributes",
+    ) as Parameters;
+
+    assertNotNil(authorsAttributes.get("-1"));
+    assertNotNil(authorsAttributes.get("-2"));
+    assertEqual("William Shakespeare", (authorsAttributes.get("-1") as Parameters).get("name"));
+    assertEqual("Unattributed Assistant", (authorsAttributes.get("-2") as Parameters).get("name"));
+
+    assertFilteredOut(authorsAttributes.get("-1") as Parameters, "age_of_death");
   });
 
   it("nested params with numeric keys addressing individual numeric keys", () => {
-    const inner = new Parameters({ "0": new Parameters({ name: "a" }) });
-    const params = new Parameters({ items: inner });
-    expect(params.get("items")).toBeInstanceOf(Parameters);
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": { name: "William Shakespeare", age_of_death: "52" },
+          "1": { name: "Unattributed Assistant" },
+          "2": { name: ["injected", "names"] },
+        },
+      },
+    });
+    const permitted = params.permit({
+      book: { authors_attributes: { "1": ["name"], "0": ["name", "age_of_death"] } },
+    });
+
+    assertEqual(
+      {
+        book: {
+          authors_attributes: {
+            "0": { name: "William Shakespeare", age_of_death: "52" },
+            "1": { name: "Unattributed Assistant" },
+          },
+        },
+      },
+      permitted.toH(),
+    );
   });
 
   it("nested params with numeric keys addressing individual numeric keys using require first", () => {
-    const inner = new Parameters({ name: "a" });
-    const params = new Parameters({ item: inner });
-    const required = params.require("item") as Parameters;
-    const permitted = required.permit("name");
-    expect(permitted.get("name")).toBe("a");
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": { name: "William Shakespeare", age_of_death: "52" },
+          "1": { name: "Unattributed Assistant" },
+          "2": { name: ["injected", "names"] },
+        },
+      },
+    });
+
+    const permitted = params.expect({
+      book: { authors_attributes: { "1": ["name"] } },
+    }) as Parameters;
+
+    assertEqual(
+      { authors_attributes: { "1": { name: "Unattributed Assistant" } } },
+      permitted.toH(),
+    );
   });
 
   it("nested params with numeric keys addressing individual numeric keys to arrays", () => {
-    const params = new Parameters({ items: [new Parameters({ name: "a" })] });
-    const permitted = params.permit({ items: ["name"] });
-    expect(permitted.hasKey("items")).toBe(true);
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": ["draft 1", "draft 2", "draft 3"],
+          "1": ["final draft"],
+          "2": { name: ["injected", "names"] },
+        },
+      },
+    });
+    const permitted = params.permit({ book: { authors_attributes: { "2": ["name"], "0": [] } } });
+
+    assertEqual(
+      { book: { authors_attributes: { "2": {}, "0": ["draft 1", "draft 2", "draft 3"] } } },
+      permitted.toH(),
+    );
   });
 
   it("nested params with numeric keys addressing individual numeric keys to more nested params", () => {
-    const deep = new Parameters({ city: "NYC" });
-    const inner = new Parameters({ name: "a", address: deep });
-    const params = new Parameters({ person: inner });
-    const permitted = params.permit({ person: ["name", { address: ["city"] }] });
-    const person = permitted.get("person") as Parameters;
-    expect(person.get("name")).toBe("a");
-    const address = person.get("address") as Parameters;
-    expect(address.get("city")).toBe("NYC");
+    const params = new Parameters({
+      book: {
+        authors_attributes: {
+          "0": ["draft 1", "draft 2", "draft 3"],
+          "1": ["final draft"],
+          "2": { name: { projects: ["hamlet", "Othello"] } },
+        },
+      },
+    });
+    const permitted = params.permit({
+      book: { authors_attributes: { "2": { name: { projects: [] } }, "0": [] } },
+    });
+
+    assertEqual(
+      {
+        book: {
+          authors_attributes: {
+            "2": { name: { projects: ["hamlet", "Othello"] } },
+            "0": ["draft 1", "draft 2", "draft 3"],
+          },
+        },
+      },
+      permitted.toH(),
+    );
   });
 
   it("nested number as key", () => {
-    const params = new Parameters({ "123": "value" });
-    expect(params.get("123")).toBe("value");
+    let params = new Parameters({
+      product: {
+        properties: {
+          "0": "prop0",
+          "1": "prop1",
+        },
+      },
+    });
+    params = params.expect({ product: { properties: ["0"] } }) as Parameters;
+    assertNotNil((params.get("properties") as Parameters).get("0"));
+    assertNil((params.get("properties") as Parameters).get("1"));
+    assertEqual("prop0", (params.get("properties") as Parameters).get("0"));
   });
 });
