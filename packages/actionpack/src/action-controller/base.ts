@@ -1,6 +1,5 @@
 import {
   SafeBuffer,
-  classAttribute,
   extend,
   include,
   type Included,

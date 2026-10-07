@@ -21,20 +21,26 @@ describe("defaultFormBuilder DSL", () => {
     expect(C._defaultFormBuilder).toBe(FakeBuilder);
   });
 
-  it("inherits from the parent class when subclass has no override", () => {
+  it("walks the prototype chain for inherited defaults", () => {
     const Parent = host();
     class Child extends Parent {}
     Parent.defaultFormBuilder(FakeBuilder);
     expect(Child._defaultFormBuilder).toBe(FakeBuilder);
   });
 
-  it("subclass override does not leak to the parent", () => {
+  it("subclass override does not mutate parent", () => {
     const Parent = host();
     class Child extends Parent {}
     Parent.defaultFormBuilder(FakeBuilder);
     Child.defaultFormBuilder(OtherBuilder);
     expect(Child._defaultFormBuilder).toBe(OtherBuilder);
     expect(Parent._defaultFormBuilder).toBe(FakeBuilder);
+  });
+
+  it("accepts a string name (held as-is for view-layer resolution)", () => {
+    const C = host();
+    C.defaultFormBuilder("MyAppFormBuilder");
+    expect(C._defaultFormBuilder).toBe("MyAppFormBuilder");
   });
 
   it("instance reader returns the class-level configured value", () => {
