@@ -7,6 +7,8 @@ import {
   rbCBasicObject,
   rbClassSuperclass,
   rbObjClass,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbModName,
   rbModToS,
   rbObjSingletonClass,
@@ -162,28 +164,45 @@ describe("initializeIncludedModules", () => {
     expect((sub as unknown as Bare).after).toBe(true);
   });
 
-  it("closes a spliced generator initializer when the superclass constructor raises", () => {
+  it("runs a spliced generator initializer against the instance itself", () => {
+    const seen: object[] = [];
+    class Root {}
+    class Seated {
+      static *[initialize](this: Seated): Generator {
+        yield;
+        seen.push(this);
+        rbObjIvarSet(this, "@seat", 1);
+        Object.defineProperty(this, "defined", { value: 2, enumerable: true });
+      }
+    }
+    class Sub extends Root {}
+    include(Sub, Seated);
+
+    const sub = new Sub();
+    expect(seen).toEqual([sub]);
+    expect(seen[0]).toBe(sub);
+    expect(rbObjIvarGet(sub, "@seat")).toBe(1);
+    expect(Object.keys(sub)).toContain("defined");
+  });
+
+  it("leaves the code after a spliced initializer's yield unrun when the superclass constructor raises", () => {
     const calls: string[] = [];
     class Root {
       constructor() {
         throw new TypeError("root");
       }
     }
-    class Ensured {
+    class After {
       static *[initialize](): Generator {
-        try {
-          yield;
-          calls.push("after");
-        } finally {
-          calls.push("ensure");
-        }
+        yield;
+        calls.push("after");
       }
     }
     class Sub extends Root {}
-    include(Sub, Ensured);
+    include(Sub, After);
 
     expect(() => new Sub()).toThrow(TypeError);
-    expect(calls).toEqual(["ensure"]);
+    expect(calls).toEqual([]);
   });
 
   it("seats a module's per-instance state as an own property at construction", () => {

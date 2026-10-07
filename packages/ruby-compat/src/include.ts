@@ -771,10 +771,13 @@ export const extended = Symbol.for("@blazetrails/ruby-compat:extended");
  * (activerecord/lib/active_record/type/internal/timezone.rb:7-10) wraps its
  * includer's construction. The value the generator yields is the argument list
  * of an explicit `super(...)`, and a bare `yield` forwards the arguments it was
- * called with. `this` is the instance once the superclass constructor has
- * returned, and unreadable before it, which is why a `Module`'s `initialize`
- * that writes to `self` ahead of `super` (thor/actions.rb:72-85) stays on the
- * root's `super` site.
+ * called with. A constructor has no `this` until its `super(...)` returns, so
+ * the code before the `yield` runs once with `this` undefined, to read those
+ * arguments, and the whole body then runs against the instance: that code may
+ * only compute the arguments, and one that raises, or a superclass
+ * constructor that does, leaves the code after the `yield` unrun. A `Module`'s
+ * `initialize` that writes to `self` ahead of `super` (thor/actions.rb:72-85)
+ * therefore stays on the root's `super` site.
  *
  * Symbol-keyed for the same reason `included` is: `initialize` is a Ruby
  * lifecycle name, and a string-named TS method spelled that way is drift.
@@ -892,24 +895,14 @@ function spliceInstanceInitializer(
   const superclass = Object.getPrototypeOf(klass) as new (...args: unknown[]) => object;
   const link = class extends superclass {
     constructor(...args: unknown[]) {
-      const allocated: { instance?: object } = {};
-      const body = initializer.call(
-        new Proxy(Object.create(null) as object, {
-          get: (_target, key) => Reflect.get(allocated.instance!, key),
-          set: (_target, key, value) => Reflect.set(allocated.instance!, key, value),
-          has: (_target, key) => Reflect.has(allocated.instance!, key),
-          getPrototypeOf: () => Reflect.getPrototypeOf(allocated.instance!),
-        }),
-        ...(args as never[]),
-      ) as Generator<unknown[] | undefined>;
-      const zsuper = body.next();
-      try {
-        super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
-      } catch (error) {
-        body.return(undefined);
-        throw error;
-      }
-      allocated.instance = this;
+      const zsuper = (
+        initializer.call(undefined as never, ...(args as never[])) as Generator<
+          unknown[] | undefined
+        >
+      ).next();
+      super(...(zsuper.done !== true && zsuper.value !== undefined ? zsuper.value : args));
+      const body = initializer.call(this, ...(args as never[])) as Generator;
+      body.next();
       if (body.next().done !== true) {
         body.return(undefined);
         throw new TypeError("an initialize generator yields once, where Ruby calls super");
