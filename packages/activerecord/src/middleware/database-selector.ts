@@ -1,4 +1,4 @@
-import { Notifications, TopLevel } from "@blazetrails/activesupport";
+import { TopLevel } from "@blazetrails/activesupport";
 import type { Hash } from "@blazetrails/ruby-compat";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
@@ -40,14 +40,6 @@ export class DatabaseSelector {
     const request = new TopLevel.ActionDispatch!.Request(env) as MiddlewareRequest;
 
     return this.selectDatabase(request, () => this.app(env));
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE mirrors Resolver#instrumenter (middleware/database_selector/resolver.rb:33), read from the middleware rather than the resolver.
-   */
-  instrumenter(): typeof Notifications {
-    return Notifications;
   }
 
   /** @internal */
