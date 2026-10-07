@@ -135,6 +135,7 @@ export function toSqlAndBinds(
 export type ExplainOption = string;
 
 export interface DatabaseStatementsHost {
+  _transactionManager?: TransactionManager;
   preparedStatements?: boolean;
   unpreparedStatement?<T>(fn: () => Promise<T> | T): Promise<T> | T;
   /** @internal */
@@ -441,7 +442,7 @@ export async function transaction<T>(
 }
 
 export function transactionManager(this: DatabaseStatementsHost): TransactionManager | null {
-  return (this as any)._transactionManager ?? null;
+  return this._transactionManager ?? null;
 }
 
 export async function withinNewTransaction<T>(

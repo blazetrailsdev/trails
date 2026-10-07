@@ -87,6 +87,7 @@ import {
 } from "./abstract/query-cache.js";
 import {
   DatabaseStatements,
+  type DatabaseStatementsHost,
   transaction as dbStatementsTransaction,
 } from "./abstract/database-statements.js";
 import {
@@ -200,7 +201,10 @@ export class Version {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface AbstractAdapter {
+export interface AbstractAdapter
+  extends
+    Required<Pick<DatabaseStatementsHost, "_transactionManager">>,
+    Pick<QueryCacheHost, "_queryCache"> {
   columnsForDistinct(columns: string | string[], orders: string[]): string | string[];
   createTable(
     tableName: string,
@@ -812,10 +816,6 @@ export class AbstractAdapter implements Quoting {
   protected _config: Record<string, unknown> = {};
   protected _defaultTimezone?: string;
   protected _advisoryLocksEnabled: unknown = true;
-  _transactionManager!: TransactionManager;
-
-  _queryCache: Store | null = null;
-
   pool: ConnectionPool | NullPool = new NullPool();
   logger: unknown = null;
   lock: ThreadLoadInterlockAwareMonitor | LoadInterlockAwareMonitor | NullLock =

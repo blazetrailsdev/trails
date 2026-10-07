@@ -452,6 +452,9 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
 }
 
 export const QueryCache = {
+  [initialize](this: QueryCacheHost): void {
+    this._queryCache = null;
+  },
   unsetQueryCacheBang,
   lookupSqlCache,
   cacheSql,

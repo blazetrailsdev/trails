@@ -995,9 +995,6 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  declare _maxAllowedPacket?: number | null;
-
-  /** @internal */
   override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
     if (this._defaultTimezone != null) {
       return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
@@ -1499,6 +1496,9 @@ export interface AbstractMysqlAdapter {
 }
 
 export interface AbstractMysqlAdapter {
+  /** @internal */
+  _maxAllowedPacket?: number | null;
+
   readonly schemaCreation: MysqlSchemaCreation;
 
   updateTableDefinition(tableName: string, base?: unknown): MysqlTable;
