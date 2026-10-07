@@ -8,8 +8,9 @@ import {
   TypeError,
   rbEnsure,
   rbFSend,
+  rbCInteger,
+  rbClassInheritedP,
   rbInspect,
-  rbModAncestors,
   rbModConstSet,
   rbObjClass,
   rbObjClassname,
@@ -26,6 +27,7 @@ export type RegisterTypeOptions = {
   packer?: unknown;
   unpacker?: unknown;
   recursive?: boolean | null;
+  oversizedIntegerExtension?: boolean | null;
 };
 
 export type RegisteredType = {
@@ -40,6 +42,7 @@ export class Factory {
 
   private pkrg: PackerExtRegistry = new Map();
   private ukrg: UnpackerExtRegistry = new Map();
+  private hasBigintExtType = false;
 
   registerType(
     type: number,
@@ -147,9 +150,7 @@ export class Factory {
   isTypeRegistered(klassOrType: unknown, selector: string = "both"): boolean {
     if (typeof klassOrType === "function") {
       const klass = klassOrType;
-      return this.registeredTypes(selector).some((entry) =>
-        rbModAncestors(klass).includes(entry.class as object),
-      );
+      return this.registeredTypes(selector).some((entry) => rbClassInheritedP(klass, entry.class));
     } else if (typeof klassOrType === "number") {
       const type = klassOrType;
       return this.registeredTypes(selector).some((entry) => type === entry.type);
@@ -215,6 +216,7 @@ export class Factory {
 
     packer.extRegistry.clear();
     for (const [klass, entry] of this.pkrg) packer.extRegistry.set(klass, entry);
+    packer.hasBigintExtType = this.hasBigintExtType;
 
     return packer;
   }
@@ -265,6 +267,17 @@ export class Factory {
     }
 
     if (options != null) {
+      if (
+        options.oversizedIntegerExtension != null &&
+        options.oversizedIntegerExtension !== false
+      ) {
+        if (extModule === rbCInteger) {
+          this.hasBigintExtType = true;
+        } else {
+          throw new ArgumentError("oversized_integer_extension: true is only for Integer class");
+        }
+      }
+
       if (options.recursive != null && options.recursive !== false) {
         flags |= MSGPACK_EXT_RECURSIVE;
       }

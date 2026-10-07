@@ -40,4 +40,8 @@ export class Buffer {
     }
     return this.chunks[0];
   }
+
+  toS(): Uint8Array {
+    return this.toStr();
+  }
 }

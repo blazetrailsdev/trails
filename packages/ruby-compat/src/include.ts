@@ -1041,6 +1041,10 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
       const mods = [...((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>)];
       for (const m of mods.reverse()) if (!ary.includes(m)) ary.push(m);
     }
+    if (p === Uint8Array.prototype) {
+      for (const m of rbModAncestors(rbCString)) if (!ary.includes(m)) ary.push(m);
+      return ary;
+    }
     if (p === Object.prototype) ary.push(Kernel, rbCBasicObject);
   }
   return ary;
@@ -1065,6 +1069,30 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   }
 }
 
+/**
+ * `rb_class_inherited_p` (`vendor/ruby/v3.3.11/object.c:1778`), `Module#<=`:
+ * true when `mod` is `arg` or has it in its ancestry, false when `arg` has
+ * `mod` in its own, and nil when the two are unrelated. The class-to-class
+ * arm reads `RCLASS_SUPERCLASS_DEPTH`, a cache no JS class carries, so both
+ * arms search the ancestry.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassInheritedP(mod: unknown, arg: unknown): boolean | null {
+  if (mod === arg) return true;
+
+  if (typeof arg !== "function" && (typeof arg !== "object" || arg === null)) {
+    throw new TypeError("compared with non class/module");
+  }
+  if (classSearchAncestor(mod as { prototype: object }, arg)) {
+    return true;
+  }
+  if (classSearchAncestor(arg as { prototype: object }, mod as object)) {
+    return false;
+  }
+  return null;
+}
+
 /** `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`). */
 function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
   for (let p: object | null = cl.prototype; p; p = Object.getPrototypeOf(p) as object | null) {
@@ -1074,6 +1102,7 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
     if (Object.prototype.hasOwnProperty.call(p, includedModulesKey)) {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
+    if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;

@@ -25,12 +25,18 @@ type Klass = abstract new (...args: never) => unknown;
  *
  * @boundary: a JS `number` is the seat for both `Integer` and `Float`, so
  *  which one it is is read off the value; a `Uint8Array` is the binary
- *  `String` seat; a Temporal value carrying an instant
+ *  `String` seat, and an instance of a `Uint8Array` subclass is an instance of
+ *  that String subclass, whose ancestry `class_search_ancestor` continues
+ *  into `String`'s at `Uint8Array.prototype`; a Temporal value carrying an instant
  *  is a Ruby `Time`, by the same reading `cmp` orders it with, and so are a JS
  *  `Date` and a `Temporal.PlainTime`. A function is a `Class` when its
  *  `prototype` is non-writable and a `Proc` otherwise. `Temporal.PlainDate` and
  *  `Temporal.PlainDateTime` are the seats of `Date` and `DateTime`, and a
- *  record whose prototype chain holds no class is a `Hash`.
+ *  record whose prototype chain holds no class is a `Hash`. `-0` is a whole
+ *  `number` and so an `Integer`, though Ruby has no negative Integer zero: JS
+ *  integer arithmetic answers `-0` (`Math.round(-0.4)`, `0 * -1`) where Ruby
+ *  answers `0`, so reading it as `-0.0` would turn those into Floats. The
+ *  Float `-0.0` is the boxed `new Number(-0)`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -40,7 +46,10 @@ export function rbObjClass(obj: unknown): Klass {
   if (typeof obj === "bigint") return rbCInteger;
   if (typeof obj === "number") return Number.isInteger(obj) ? rbCInteger : rbCFloat;
   if (obj instanceof Number) return rbCFloat;
-  if (typeof obj === "string" || obj instanceof Uint8Array) return rbCString;
+  if (typeof obj === "string") return rbCString;
+  if (obj instanceof Uint8Array) {
+    return obj.constructor === Uint8Array ? rbCString : (obj.constructor as Klass);
+  }
   if (typeof obj === "function") {
     return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
       ? rbCClass
@@ -141,6 +150,23 @@ export function rbObjSingletonClass(obj: object): abstract new (...args: never) 
   });
   Object.setPrototypeOf(obj, klass.prototype);
   return klass;
+}
+
+/**
+ * `rb_class_of` (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`):
+ * the singleton class when the object has one, where {@link rbObjClass}
+ * skips it, and the class {@link rbObjClass} answers otherwise.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbClassOf(obj: unknown): Klass {
+  if (typeof obj === "object" && obj !== null) {
+    const proto = Object.getPrototypeOf(obj);
+    if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
+      return proto[FL_SINGLETON] as Klass;
+    }
+  }
+  return rbObjClass(obj);
 }
 
 /**
