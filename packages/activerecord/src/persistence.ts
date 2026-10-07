@@ -32,7 +32,6 @@ import { attributesForUpdate, attributesWithValues } from "./attribute-methods.j
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isDefaultScopes } from "./scoping/default.js";
 import { RecordInvalid } from "./validations.js";
-import { _instantiation } from "./inheritance.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
@@ -594,10 +593,7 @@ interface BecomesRecord {
   errors: { copyBang(other: unknown): unknown };
 }
 
-/**
- * @missingRailsName instanceVariableGet — PERMANENT
- * @inventedArm try — CONVERGEABLE base-constructor-enters-inheritance-new-for-a-bare-new
- */
+/** @missingRailsName instanceVariableGet — PERMANENT */
 export function becomes<
   T extends BecomesRecord,
   K extends new (
@@ -605,19 +601,14 @@ export function becomes<
     initBlock?: (record: BecomesRecord) => void,
   ) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
-  _instantiation.klass = klass;
-  try {
-    return new klass({}, (becoming) => {
-      this._attributes.reverseMergeBang(becoming._attributes);
-      becoming._attributes = this._attributes;
-      becoming._newRecord = this._newRecord;
-      becoming._destroyed = this._destroyed;
-      becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
-      becoming.errors.copyBang(this.errors);
-    }) as InstanceType<K>;
-  } finally {
-    _instantiation.klass = null;
-  }
+  return new klass({}, (becoming) => {
+    this._attributes.reverseMergeBang(becoming._attributes);
+    becoming._attributes = this._attributes;
+    becoming._newRecord = this._newRecord;
+    becoming._destroyed = this._destroyed;
+    becoming._mutationsFromDatabase = this._mutationsFromDatabase ?? null;
+    becoming.errors.copyBang(this.errors);
+  }) as InstanceType<K>;
 }
 
 export function becomesBang<

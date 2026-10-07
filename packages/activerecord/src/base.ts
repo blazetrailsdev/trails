@@ -1592,9 +1592,6 @@ export class Base extends Model {
   ) {
     const allocating = _Core._allocation.klass === new.target;
     if (allocating) _Core._allocation.klass = null;
-    const instantiating = Inheritance._instantiation.klass === new.target;
-    if (instantiating) Inheritance._instantiation.klass = null;
-    if (!allocating && !instantiating) return new.target.new(attributes, initBlock);
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     let assocPending = _extractAssociationAttrs(new.target, attrs);

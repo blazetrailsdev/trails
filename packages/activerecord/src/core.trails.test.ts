@@ -185,16 +185,11 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
         nesting = true;
         nested = new Reply({ title: "Nested" });
       });
-    const replyNew = vi.spyOn(Reply, "new");
-    let newCalls: number;
     try {
       Reply.allocate();
     } finally {
-      newCalls = replyNew.mock.calls.length;
       initInternals.mockRestore();
-      replyNew.mockRestore();
     }
-    expect(newCalls).toBe(1);
     expect(nested!.isNewRecord()).toBe(true);
     expect(nested!.title).toBe("Nested");
     expect(_allocation.klass).toBeNull();

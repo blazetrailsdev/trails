@@ -11,7 +11,7 @@ import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
-import { Company } from "./test-helpers/models/company.js";
+import { Company, Firm } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -82,19 +82,14 @@ describe("PersistenceTest (trails)", () => {
     expect([initialized, yielded]).toEqual([1, 1]);
   });
 
-  it("a constructor that throws before super leaves the next bare new on Inheritance#new", () => {
-    let failing = true;
-    class Throwing extends Topic {
-      static override abstractClass = false;
-      constructor(...args: ConstructorParameters<typeof Topic>) {
-        if (failing) throw new Error("before super");
-        super(...args);
-      }
+  it("a bare new is Class#new: it skips the abstract check and the STI dispatch", () => {
+    class Abstract extends Topic {
+      static override abstractClass = true;
     }
-    expect(() => Throwing.new()).toThrow("before super");
-    failing = false;
-    Throwing.abstractClass = true;
-    expect(() => new Throwing()).toThrow("is an abstract class and cannot be instantiated.");
+    expect(new Abstract()).toBeInstanceOf(Abstract);
+    expect(() => Abstract.new()).toThrow("is an abstract class and cannot be instantiated.");
+    expect(new Company({ type: "Firm" }).constructor).toBe(Company);
+    expect(Company.new({ type: "Firm" }).constructor).toBe(Firm);
   });
 
   it("create inside a scope keeps an explicit attribute over the scope's", async () => {

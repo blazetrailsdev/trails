@@ -134,11 +134,7 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-/** @internal */
-export const _instantiation: { klass: unknown } = { klass: null };
-
 export class ClassMethods {
-  /** @inventedArm try — CONVERGEABLE base-constructor-enters-inheritance-new-for-a-bare-new */
   static new<T extends typeof Base>(
     this: T,
     attributes: ConstructorParameters<typeof Base>[0] | null = null,
@@ -168,12 +164,7 @@ export class ClassMethods {
     if (subclass != null && subclass !== this) {
       return subclass.new(attributes, block as never) as InstanceType<T>;
     } else {
-      _instantiation.klass = this;
-      try {
-        return new this(attributes ?? undefined, block as never) as InstanceType<T>;
-      } finally {
-        _instantiation.klass = null;
-      }
+      return new this(attributes ?? undefined, block as never) as InstanceType<T>;
     }
   }
 

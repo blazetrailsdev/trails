@@ -451,7 +451,7 @@ export class Builder implements InsertBuilder {
     const columnsKeys = Object.keys(columns);
     const unknownColumn = first(keys.filter((key) => !columnsKeys.includes(key)));
     if (unknownColumn !== undefined) {
-      throw new UnknownAttributeError(new this.model(), unknownColumn);
+      throw new UnknownAttributeError(this.model.new(), unknownColumn);
     }
 
     return indexWith(keys, (key) => this.model.typeForAttribute(key));

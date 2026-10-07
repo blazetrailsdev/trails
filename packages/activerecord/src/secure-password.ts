@@ -37,7 +37,7 @@ export async function authenticateBy(
     ).length;
     return count === Object.keys(passwords).length ? record : null;
   } else {
-    new (this as unknown as new (attributes: object) => Base)(passwords);
+    this.new(passwords);
     return null;
   }
 }
