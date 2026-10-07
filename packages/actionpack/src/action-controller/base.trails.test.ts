@@ -7,7 +7,13 @@ import {
   TemplateHandlers,
 } from "@blazetrails/actionview";
 import { Model } from "@blazetrails/activemodel";
-import { extend, Module, rbObjRespondTo, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  extend,
+  Module,
+  rbObjRespondTo,
+  registerConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 
 import { include } from "@blazetrails/activesupport";
 
@@ -104,6 +110,29 @@ describe("ActionController::Cookies#cookies", () => {
     include(CookiesMetal, Cookies);
     expect(Object.hasOwn(CookiesMetal, "_helperMethods")).toBe(false);
     expect(rbObjRespondTo(Base, "helperMethod", true)).toBe(true);
+  });
+});
+
+describe("anonymous? for a class JS names after its binding (anonymous.rb:27-29)", () => {
+  it("constructs a controller class bound to a lowercase local", () => {
+    const klass = class extends Base {};
+    expect(klass.name).toBe("klass");
+    expect(() => new klass()).not.toThrow();
+    expect(klass.controllerName()).toBeNull();
+
+    const PostsController = class extends Base {};
+    expect(PostsController.controllerName()).toBe("posts");
+  });
+
+  it("names a class expression a constant seat paths", () => {
+    const seated = class extends Base {};
+    registerConstant("SeatedController", seated);
+    try {
+      expect(() => new seated()).not.toThrow();
+      expect(seated.controllerName()).toBe("seated");
+    } finally {
+      unregisterConstant("SeatedController", seated);
+    }
   });
 });
 

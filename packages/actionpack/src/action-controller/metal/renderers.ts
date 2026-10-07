@@ -11,6 +11,14 @@ import {
 import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
 
+export function addRenderer(key: string, block: RendererProc): void {
+  Renderers.add(key, block);
+}
+
+export function removeRenderer(key: string): void {
+  Renderers.remove(key);
+}
+
 export class MissingRenderer extends Error {
   constructor(format: string) {
     super(`No renderer defined for format: ${format}`);

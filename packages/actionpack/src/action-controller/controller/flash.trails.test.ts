@@ -2,6 +2,7 @@ import { KeyGenerator } from "@blazetrails/activesupport/key-generator";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { describe, it, expect } from "vitest";
 import { include } from "@blazetrails/activesupport";
+import { ActionNotFound } from "../../abstract-controller/base.js";
 import { Base } from "../base.js";
 import { Metal } from "../metal.js";
 import { Flash } from "../metal/flash.js";
@@ -66,6 +67,20 @@ describe("add_flash_types readers", () => {
     expect(WarningsController.actionMethods()).toContain("warning");
     WarningsController.addFlashTypes("warning");
     expect(WarningsController.actionMethods()).not.toContain("warning");
+  });
+
+  it("drops an inherited multi-word action a flash type shadows, in either spelling", async () => {
+    class FooBarsController extends Base {
+      async fooBar(): Promise<void> {}
+    }
+    expect(FooBarsController.actionMethods()).toContain("foo_bar");
+
+    for (const type of ["fooBar", "foo_bar"]) {
+      const klass = (() => class extends FooBarsController {})();
+      klass.addFlashTypes(type);
+      expect(klass.actionMethods()).not.toContain("foo_bar");
+      await expect(new klass().process("foo_bar")).rejects.toThrow(ActionNotFound);
+    }
   });
 
   it("extends add_flash_types and action_methods onto a Metal includer", () => {

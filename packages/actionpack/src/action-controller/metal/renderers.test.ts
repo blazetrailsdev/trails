@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, test } from "vitest";
 
 import { include } from "@blazetrails/activesupport";
-import { Renderers, type RenderersHost } from "./renderers.js";
+import { addRenderer, removeRenderer, Renderers, type RenderersHost } from "./renderers.js";
 
 class Host {
   contentType = null;
@@ -57,5 +57,29 @@ describe("Renderers", () => {
     expect(Renderers.RENDERERS.has("xyz")).toBe(false);
     expect(Renderers.isMethodDefined("_render_with_renderer_xyz")).toBe(false);
     expect(host._renderToBodyWithRenderer({ xyz: "v" })).toBeNull();
+  });
+});
+
+describe("ActionController.addRenderer / removeRenderer", () => {
+  const KEY = "test-shim-format";
+  beforeEach(() => {
+    Renderers.remove(KEY);
+  });
+  afterEach(() => {
+    Renderers.remove(KEY);
+  });
+
+  it("addRenderer registers via Renderers.add", () => {
+    const block = (value: unknown) => String(value);
+    addRenderer(KEY, block);
+    expect(Renderers.RENDERERS.has(KEY)).toBe(true);
+    expect(Renderers.instanceMethod(`_render_with_renderer_${KEY}`)!.value).toBe(block);
+  });
+
+  it("removeRenderer deregisters via Renderers.remove", () => {
+    addRenderer(KEY, () => "");
+    removeRenderer(KEY);
+    expect(Renderers.RENDERERS.has(KEY)).toBe(false);
+    expect(Renderers.isMethodDefined(`_render_with_renderer_${KEY}`)).toBe(false);
   });
 });

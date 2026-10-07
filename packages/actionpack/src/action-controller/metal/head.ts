@@ -1,4 +1,4 @@
-import { Module, isPlainObject } from "@blazetrails/activesupport";
+import { Module, isPlainObject, underscore } from "@blazetrails/activesupport";
 import { ArgumentError, hashDelete, rbInspect, rbObjAsString } from "@blazetrails/ruby-compat";
 import { Mime, type MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { Metal } from "../metal.js";
@@ -33,7 +33,7 @@ export function head(
 
     for (const [key, value] of Object.entries(options)) {
       this.headers.set(
-        key
+        (/^[a-z][a-zA-Z\d]*$/.test(key) ? underscore(key) : key)
           .split(/[-_]/)
           .map((v) => v[0].toUpperCase() + v.slice(1))
           .join("-"),
