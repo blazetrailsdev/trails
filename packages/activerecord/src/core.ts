@@ -125,6 +125,12 @@ export const Core = {
 
     (base as CoreHost).filterAttributes = [];
 
+    Object.defineProperty(base, "connectionHandler", {
+      configurable: true,
+      get: connectionHandler,
+      set: setConnectionHandler,
+    });
+
     Object.defineProperty(base, "connectionClass", {
       configurable: true,
       get: connectionClass,
@@ -219,6 +225,24 @@ export class ClassMethods {
     } else {
       return `${name}(Table doesn't exist)`;
     }
+  }
+
+  static get arelTable(): Table {
+    const host = this as unknown as CoreHost;
+    return (
+      (Object.hasOwn(host, "_arelTable") ? host._arelTable : undefined) ||
+      (host._arelTable = new Table((this as any).tableName, { klass: this as any }))
+    );
+  }
+
+  static get predicateBuilder(): PredicateBuilder {
+    const host = this as unknown as CoreHost;
+    return (
+      (Object.hasOwn(host, "_predicateBuilder") ? host._predicateBuilder : undefined) ||
+      (host._predicateBuilder = new PredicateBuilder(
+        new TableMetadata(this as any, (this as any).arelTable),
+      ))
+    );
   }
 }
 
@@ -486,6 +510,7 @@ interface CoreHost {
   initializeFindByCache(): FindByStatementCache;
   _generatedAssociationMethods?: Module;
   _predicateBuilder?: any;
+  _arelTable?: Table | null;
   arelTable?: any;
   prototype: any;
   all(): any;
@@ -638,8 +663,10 @@ export function asynchronousQueriesTracker(): AsynchronousQueriesTracker {
 
 const ASYNCHRONOUS_QUERIES_TRACKER_KEY = "active_record_asynchronous_queries_tracker";
 
-export function asynchronousQueriesSession(): Session {
-  return asynchronousQueriesTracker().currentSession;
+export function asynchronousQueriesSession(this: {
+  asynchronousQueriesTracker(): AsynchronousQueriesTracker;
+}): Session {
+  return this.asynchronousQueriesTracker().currentSession;
 }
 
 export function strictLoadingViolationBang({
@@ -697,13 +724,6 @@ export function generatedAssociationMethods(this: CoreHost): Module {
   );
 }
 
-export function predicateBuilder(this: CoreHost): PredicateBuilder {
-  return (
-    (Object.hasOwn(this, "_predicateBuilder") ? this._predicateBuilder : undefined) ||
-    (this._predicateBuilder = new PredicateBuilder(new TableMetadata(this as any, this.arelTable)))
-  );
-}
-
 export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
@@ -738,10 +758,6 @@ export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler)
 }
 
 const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
-
-export function arelTable(this: CoreHost): Table {
-  return new Table((this as any).tableName, { klass: this as any });
-}
 
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
