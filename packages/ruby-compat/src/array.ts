@@ -230,6 +230,16 @@ export function unpack1(
   options?: { offset?: number },
 ): string | null;
 /**
+ * @noRailsEquivalent PERMANENT — Ruby core `String#unpack1`, the `q` and `Q`
+ * directives (`vendor/ruby/v3.3.11/pack.c:1219,1225`), whose 64-bit value is a
+ * `bigint` past 2**53.
+ */
+export function unpack1(
+  str: string | Uint8Array,
+  fmt: `${string}q${string}` | `${string}Q${string}`,
+  options?: { offset?: number },
+): number | bigint | null;
+/**
  * `String#unpack1` (`vendor/ruby/v3.3.11/pack.c:1621` `pack_unpack1`), which is
  * `pack_unpack_internal` (`pack.c:936`) in `UNPACK_1` mode: the first item
  * the format pushes, or nil when none does. Narrowed to the directives
@@ -259,9 +269,9 @@ export function unpack1(
   str: string | Uint8Array,
   fmt: string,
   { offset = 0 }: { offset?: number } = {},
-): number | string | null {
+): number | bigint | string | null {
   const ary = packUnpackInternal(str, fmt, UNPACK_1, offset);
-  return ary.length > 0 ? (ary[0] as number | string) : null;
+  return ary.length > 0 ? ary[0] : null;
 }
 
 /**

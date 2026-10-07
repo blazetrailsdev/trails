@@ -6,12 +6,11 @@ import {
   Float,
   Hash,
   Integer,
-  MessagePack,
   NilClass,
-  Packer,
   String as StringExt,
   TrueClass,
-} from "./index.js";
+} from "./core-ext.js";
+import { MessagePack, Packer } from "./index.js";
 
 class ValueOne {
   constructor(readonly num: number) {}

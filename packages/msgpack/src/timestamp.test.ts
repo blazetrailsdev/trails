@@ -86,6 +86,7 @@ describe("MessagePack::Timestamp", () => {
       expect(rbEqual(unpacked.utc(), time96PositiveMin)).toBe(true);
     });
 
+    // PERMANENT-SKIP: Temporal.Instant holds nothing past 10**8 days from the epoch, as on JRuby (timestamp_spec.rb:88,95).
     it.skip("is serialized into timestamp96", () => {
       const time96Min = RubyTime.at(-(2n ** 63n)).utc();
       expect(factory.pack(time96Min).length).toBe(15);
@@ -93,6 +94,7 @@ describe("MessagePack::Timestamp", () => {
       expect(rbEqual(unpacked.utc(), time96Min)).toBe(true);
     });
 
+    // PERMANENT-SKIP: Temporal.Instant holds nothing past 10**8 days from the epoch, as on JRuby (timestamp_spec.rb:88,95).
     it.skip("is serialized into timestamp96", () => {
       const time96Max = RubyTime.at(2n ** 63n - 1n).utc();
       expect(factory.pack(time96Max).length).toBe(15);

@@ -8,6 +8,7 @@ import {
   RangeError,
   TypeError,
   isSymbol,
+  kernelFloat,
   rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
@@ -131,10 +132,17 @@ export class Packer {
   }
 
   writeFloat(obj: unknown): this {
-    if (typeof obj !== "number" && typeof obj !== "bigint" && !(obj instanceof Number)) {
-      throw new TypeError(`can't convert ${rbBuiltinClassName(obj)} into Float`);
+    let d: number;
+    if (typeof obj === "number" || typeof obj === "bigint" || obj instanceof Number) {
+      d = Number(obj);
+    } else if (obj == null || typeof obj === "boolean") {
+      throw new TypeError(`no implicit conversion to float from ${obj == null ? "nil" : obj}`);
+    } else if (typeof obj === "string" || obj instanceof Uint8Array) {
+      throw new TypeError("no implicit conversion to float from string");
+    } else {
+      d = kernelFloat(obj);
     }
-    this.buffer.write(floatEncoder.encodeSharedRef(Number(obj)));
+    this.buffer.write(floatEncoder.encodeSharedRef(d));
     return this;
   }
 
@@ -171,13 +179,13 @@ export class Packer {
   }
 
   writeInt(obj: unknown): this {
-    if (typeof obj === "number" && Number.isInteger(obj)) {
+    if (Number.isSafeInteger(obj)) {
       this.buffer.write(encoder.encodeSharedRef(obj));
     } else {
-      if (typeof obj !== "bigint") {
+      if (typeof obj !== "bigint" && !(typeof obj === "number" && Number.isInteger(obj))) {
         throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Integer)`);
       }
-      this.writeBignumValue(obj);
+      this.writeBignumValue(BigInt(obj));
     }
     return this;
   }

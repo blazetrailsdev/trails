@@ -172,6 +172,8 @@ describe("String#unpack", () => {
     expect(packed).toBe("\xff".repeat(8) + "\x80" + "\x00".repeat(7));
     expect(unpack(packed, "q>Q>")).toEqual([-1, 2n ** 63n]);
     expect(unpack(pack([1], "q<"), "q<")).toEqual([1]);
+    const max: number | bigint | null = unpack1(pack([2n ** 63n - 1n], "q>"), "q>");
+    expect(max).toBe(2n ** 63n - 1n);
   });
 });
 

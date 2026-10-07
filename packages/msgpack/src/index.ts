@@ -2,7 +2,7 @@ import "./symbol.js";
 
 export { Bigint } from "./bigint.js";
 export * from "./buffer.js";
-export * from "./core-ext.js";
+export { CoreExt } from "./core-ext.js";
 export { Factory } from "./factory.js";
 export type { RegisterTypeOptions, RegisteredType } from "./factory.js";
 export * from "./msgpack.js";

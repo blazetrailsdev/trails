@@ -23,7 +23,9 @@ files do (CLAUDE.md, "Call-time constant resolution").
 `MessagePack::CoreExt`. A JS primitive has no class to reopen, so `core-ext.ts`
 exports one class per Ruby class, each carrying `CoreExt`'s `toMsgpack` and
 taking the receiver first, as ActiveSupport's `core_ext` ports do:
-`128.to_msgpack` is `Integer.toMsgpack(128)`.
+`128.to_msgpack` is `Integer.toMsgpack(128)`. They are imported from
+`@blazetrails/msgpack/core-ext`, since their names are Ruby's top-level ones;
+the package index exports `CoreExt` alone.
 
 ## Where a JS value differs from the Ruby one
 
