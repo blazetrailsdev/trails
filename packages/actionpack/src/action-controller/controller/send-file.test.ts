@@ -12,6 +12,7 @@ import {
 import { File } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
+import { Testing } from "../metal/testing.js";
 import { TestCase } from "../test-case.js";
 import { Request } from "../../action-dispatch/request.js";
 import { Response } from "../../action-dispatch/response.js";
@@ -63,6 +64,7 @@ class SendFileController extends Base {
 
   static {
     include(this, TestFileUtils);
+    include(this, Testing);
     this.layout("layouts/standard");
 
     this.beforeAction("file", { only: "file_from_before_action" });
