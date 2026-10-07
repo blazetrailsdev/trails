@@ -6,6 +6,7 @@ import {
   InvalidAuthenticityToken,
   InvalidCrossOriginRequest,
   NullSession,
+  RequestForgeryProtection,
   ResetSession,
   compareWithGlobalToken,
   compareWithRealToken,
@@ -17,7 +18,6 @@ import {
   isMarkedForSameOriginVerification,
   isNonXhrJavascriptResponse,
   isProtectAgainstForgery,
-  isStorageStrategy,
   isValidAuthenticityToken,
   isValidPerFormCsrfToken,
   isValidRequestOrigin,
@@ -28,10 +28,8 @@ import {
   normalizeActionPath,
   normalizeRelativeActionPath,
   perFormCsrfToken,
-  protectionMethodClass,
   realCsrfToken,
   requestAuthenticityTokens,
-  storageStrategy,
   unmaskToken,
   unverifiedRequestWarningMessage,
   verifySameOriginRequest,
@@ -39,6 +37,7 @@ import {
   type CsrfTokenStorage,
 } from "./request-forgery-protection.js";
 import * as requestForgeryProtection from "./request-forgery-protection.js";
+import { Base } from "../base.js";
 
 const methods = requestForgeryProtection as unknown as Omit<CsrfController, "request">;
 
@@ -442,6 +441,27 @@ describe("P20b/P20c smoke", () => {
     expect(() => strategy.handleUnverifiedRequest()).toThrow(
       "HTTP Origin header didn't match request.base_url",
     );
+  });
+
+  const { protectionMethodClass, isStorageStrategy } = RequestForgeryProtection.ClassMethods;
+  const storageStrategy = (
+    name: Parameters<typeof RequestForgeryProtection.ClassMethods.storageStrategy>[0],
+  ) => RequestForgeryProtection.ClassMethods.storageStrategy(name);
+
+  it("protectFromForgery dispatches the class privates through the controller class", () => {
+    const store: CsrfTokenStorage = { fetch: () => null, store() {}, reset() {} };
+    class Strategy extends NullSession {}
+    class Controller extends Base {
+      static override protectionMethodClass(): typeof Strategy {
+        return Strategy;
+      }
+      static override storageStrategy(): CsrfTokenStorage {
+        return store;
+      }
+    }
+    Controller.protectFromForgery({ with: "exception", store: "cookie" });
+    expect(Controller.forgeryProtectionStrategy).toBe(Strategy);
+    expect(Controller.csrfTokenStorageStrategy).toBe(store);
   });
 
   it("protectionMethodClass maps names + passes class through", () => {

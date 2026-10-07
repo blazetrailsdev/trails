@@ -1,4 +1,6 @@
+import { Concern, Module, extend } from "@blazetrails/activesupport";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
+import type { HelpersClass } from "../../abstract-controller/helpers.js";
 import { ContentSecurityPolicy as Policy } from "../../action-dispatch/http/content-security-policy.js";
 
 export type ContentSecurityPolicyBlock = (this: unknown, policy: Policy) => void;
@@ -92,3 +94,23 @@ export function currentContentSecurityPolicy(this: ContentSecurityPolicyInstance
   const current = this.request.contentSecurityPolicy;
   return current ? current.dup() : new Policy();
 }
+
+export const ClassMethods = { contentSecurityPolicy, contentSecurityPolicyReportOnly };
+
+export const ContentSecurityPolicy = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as {
+      included(base: null, block: (this: HelpersClass) => void): void;
+    }
+  ).included(null, function () {
+    this.helperMethod("isContentSecurityPolicy");
+    this.helperMethod("contentSecurityPolicyNonce");
+  });
+
+  mod.defineMethod("isContentSecurityPolicy", isContentSecurityPolicy);
+  mod.defineMethod("contentSecurityPolicyNonce", contentSecurityPolicyNonce);
+  mod.defineMethod("currentContentSecurityPolicy", currentContentSecurityPolicy);
+}) as Module & { ClassMethods: typeof ClassMethods };
+ContentSecurityPolicy.ClassMethods = ClassMethods;

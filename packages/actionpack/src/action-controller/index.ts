@@ -63,7 +63,7 @@ export { Renderer } from "./renderer.js";
 export { Deprecator, deprecator, addRenderer, removeRenderer } from "./deprecator.js";
 export { TestRequest, LiveTestResponse, TestSession } from "./test-case.js";
 export { fragmentCacheKey } from "./caching.js";
-export { defaultFormBuilder } from "./form-builder.js";
+export { FormBuilder, defaultFormBuilder } from "./form-builder.js";
 export { assertTemplate } from "./template-assertions.js";
 export { LogSubscriber } from "./log-subscriber.js";
 export { type HelpersPathControllerClass } from "./trailties/helpers.js";
