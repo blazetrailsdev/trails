@@ -106,3 +106,33 @@ export function rbRegEqual(re1: RegExp, re2: unknown): boolean {
   }
   return re1.source === re2.source;
 }
+
+/**
+ * `Regexp#match?` (`rb_reg_match_p`, `vendor/ruby/v3.3.11/re.c:3811`): whether
+ * `re` matches `str` at or after `pos`, keeping no state. A JS pattern carrying
+ * `g` or `y` advances its `lastIndex` on a match, which MRI has no counterpart
+ * for, so it is put back.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegMatchP(re: RegExp, str: string | null | undefined, pos = 0): boolean {
+  if (str == null) return false;
+  if (pos < 0) {
+    pos += str.length;
+    if (pos < 0) return false;
+  }
+  if (pos > str.length) return false;
+  const { lastIndex } = re;
+  try {
+    if (re.global || re.sticky) {
+      re.lastIndex = pos;
+      return re.test(str);
+    }
+    if (pos === 0) return re.test(str);
+    const from = new RegExp(re.source, `${re.flags}g`);
+    from.lastIndex = pos;
+    return from.test(str);
+  } finally {
+    re.lastIndex = lastIndex;
+  }
+}

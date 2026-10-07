@@ -13,6 +13,7 @@ import {
   indexBy,
   isBlank,
   kernelArray,
+  pluck,
   valuesAt,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -80,22 +81,11 @@ export abstract class CollectionAssociation extends Association {
     throw new CollectionIdsAssignmentError(this.reflection.name);
   }
 
-  /**
-   * @missingRailsCall empty? — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
-   * @inventedArm if — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
-   * @inventedArm readKeys — CONVERGEABLE collection-association-ids-reader-plucks-through-enumerable-pluck
-   */
   async idsReader(): Promise<unknown[]> {
-    const readKeys = (target: Base[], ...keys: string[]): unknown[] =>
-      target.map((record) =>
-        keys.length > 1
-          ? keys.map((key) => record.readAttribute(key))
-          : record.readAttribute(keys[0]),
-      );
     if (this.isLoaded()) {
-      return readKeys(this.target, ...kernelArray(this.reflection.associationPrimaryKey()));
-    } else if (this.target.length > 0) {
-      return readKeys(
+      return pluck<any, any>(this.target, ...kernelArray(this.reflection.associationPrimaryKey()));
+    } else if (!isEmpty(this.target)) {
+      return pluck<any, any>(
         await this.loadTarget(),
         ...kernelArray(this.reflection.associationPrimaryKey()),
       );
