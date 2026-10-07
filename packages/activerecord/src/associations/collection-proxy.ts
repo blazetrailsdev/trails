@@ -180,7 +180,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
    * @inventedArm if — CONVERGEABLE collection-proxy-extensions-function-form
    */
   constructor(klass: typeof Base, association: CollectionAssociation) {
-    super(klass, klass.arelTable);
+    super(klass);
     this._association = association;
     this._assocName = association.reflection.name;
 

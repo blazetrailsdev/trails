@@ -262,7 +262,7 @@ describe("RelationTest", () => {
 
   it("construction", () => {
     const table = CanonPost.arelTable;
-    const relation = new Relation(CanonPost, table);
+    const relation = new Relation(CanonPost, { table: table });
     expect(relation.model).toBe(CanonPost);
     expect(relation.table).toBe(table);
     assertNot(relation.isLoaded, "relation is not loaded");
@@ -395,7 +395,7 @@ describe("RelationTest", () => {
   });
 
   it("relations can be created with a values hash", () => {
-    const relation = new Relation(CanonPost, undefined, undefined, { select: [":foo"] });
+    const relation = new Relation(CanonPost, { values: { select: [":foo"] } });
     expect(relation.selectValues).toEqual([":foo"]);
   });
 

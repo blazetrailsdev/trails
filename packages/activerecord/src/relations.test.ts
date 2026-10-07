@@ -144,7 +144,7 @@ describe("RelationTest", () => {
   function customPostRelation(aliasName = "omg_posts") {
     const tableAlias = Post.arelTable.alias(aliasName);
 
-    return new Relation(Post, tableAlias);
+    return new Relation(Post, { table: tableAlias });
   }
 
   it("do not double quote string id", async () => {

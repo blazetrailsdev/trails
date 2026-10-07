@@ -7,7 +7,6 @@ import {
   Delegation as ActiveSupportDelegation,
   inGroups,
   inGroupsOf,
-  isPlainObject,
   publicInstanceMethods,
   split,
   toSentence,
@@ -98,18 +97,14 @@ export class DelegateCache {
     include(delegate, this.generatedRelationMethods());
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue
-   */
+  /** @internal */
   static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
-    let methods = _generatedRelationMethodsByModel.get(this);
-    if (!methods) {
-      methods = new GeneratedRelationMethods();
-      rbModConstSet(this, "GeneratedRelationMethods", methods);
-      _generatedRelationMethodsByModel.set(this, methods);
-    }
-    return methods;
+    return (
+      _generatedRelationMethodsByModel.get(this) ??
+      _generatedRelationMethodsByModel
+        .set(this, rbModConstSet(this, "GeneratedRelationMethods", new GeneratedRelationMethods()))
+        .get(this)!
+    );
   }
 }
 
@@ -160,10 +155,7 @@ export class ClassSpecificRelation {
   }
 }
 
-/** @inventedArm if — CONVERGEABLE activerecord-converge-invented-control-flow-arms-relation-part-1-residue */
 export function create(this: FamilyCtor, model: typeof Base, ...args: any[]): any {
-  const [kwargs] = args;
-  if (isPlainObject(kwargs)) args = [kwargs.table, kwargs.predicateBuilder];
   return new (relationClassFor.call(this, model))(model, ...args);
 }
 

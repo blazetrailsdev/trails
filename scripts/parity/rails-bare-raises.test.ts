@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import * as path from "path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { foldBareRaises, scanRaises } from "./rails-bare-raises.js";
+import { classLevelBareRaises, foldBareRaises, scanRaises } from "./rails-bare-raises.js";
 
 describe("bare raises", () => {
   let dir: string;
@@ -109,5 +109,25 @@ describe("bare raises", () => {
       generate: ["FrozenError"],
     };
     expect(await scan(ruby)).toEqual({ "*": methods, Railtie: methods });
+  });
+
+  it("reports a bare raise outside any method, in a class body or a computed define_method", async () => {
+    const file = path.join(dir, "class-level.rb");
+    await writeFile(
+      file,
+      `
+      class Railtie
+        raise LoadError unless defined?(Foo)
+        raise ArgumentError, "no"
+        NAMES.each { |name| define_method("#{name}=") { raise FrozenError } }
+
+        def a
+          raise KeyError
+        end
+      end
+    `,
+    );
+    const rows = (await scanRaises([file]))[file];
+    expect(classLevelBareRaises(rows)).toEqual(["LoadError", "FrozenError"]);
   });
 });

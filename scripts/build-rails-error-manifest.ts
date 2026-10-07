@@ -20,8 +20,10 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { resolveSourcePath } from "../vendor/sources.js";
+import { PACKAGE_DIR_OVERRIDES, PACKAGE_SRC_SUBDIR } from "./api-compare/config.js";
 import { rubyFileToTs } from "./parity/conventions.js";
 import {
+  classLevelBareRaises,
   errinfoClasses,
   foldBareRaises,
   scanRaises,
@@ -89,6 +91,17 @@ const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]>
   actionview: ["rails", "actionview/lib", "action_view/"],
   rack: ["rack", "lib", "rack/"],
   trailties: ["rails", "railties/lib", "rails/"],
+  activejob: ["rails", "activejob/lib", "active_job/"],
+  bcrypt: ["bcrypt-ruby", "lib", "bcrypt/"],
+  date: ["date", "lib", ""],
+  "did-you-mean": ["did_you_mean", "lib", "did_you_mean/"],
+  globalid: ["globalid", "lib", "global_id/"],
+  i18n: ["i18n", "lib", "i18n/"],
+  msgpack: ["msgpack", "lib", "msgpack/"],
+  "rack-session": ["rack-session", "lib", "rack/session/"],
+  "rack-test": ["rack-test", "lib", "rack/test/"],
+  sqlite3: ["sqlite3", "lib", "sqlite3/"],
+  thor: ["thor", "lib", "thor/"],
 };
 
 async function scanPackageBareRaises(
@@ -97,18 +110,27 @@ async function scanPackageBareRaises(
 ): Promise<Record<string, OwnedBareRaises>> {
   const [source, lib, ns] = BARE_RAISE_LIBS[pkg];
   const libDir = resolveSourcePath(source, lib);
+  const entry = `${ns.slice(0, -1)}.rb`;
+  const subdir = PACKAGE_SRC_SUBDIR[pkg] === undefined ? "" : `${PACKAGE_SRC_SUBDIR[pkg]}/`;
+  const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
   const rels = new Map<string, string>();
   for (const file of (await walkRubyFiles(libDir)).sort()) {
     const rel = path.relative(libDir, file).split(path.sep).join("/");
-    if (rel.startsWith(ns) && !rel.includes("generators/")) rels.set(file, rel);
+    if (rel === entry) rels.set(file, path.posix.basename(rel));
+    else if (rel.startsWith(ns) && !rel.includes("generators/"))
+      rels.set(file, rel.slice(ns.length));
   }
   const out: Record<string, OwnedBareRaises> = {};
-  errinfo[pkg] = [];
+  errinfo[dir] ??= [];
   for (const [file, rows] of Object.entries(await scanRaises([...rels.keys()]))) {
-    errinfo[pkg] = [...new Set([...errinfo[pkg], ...errinfoClasses(rows)])].sort();
+    const classLevel = classLevelBareRaises(rows);
+    if (classLevel.length > 0) {
+      throw new Error(`${file}: bare raise of ${classLevel.join(", ")} outside any method`);
+    }
+    errinfo[dir] = [...new Set([...errinfo[dir], ...errinfoClasses(rows)])].sort();
     const scanned = foldBareRaises(rows);
     if (Object.keys(scanned).length === 0) continue;
-    out[rubyFileToTs(rels.get(file)!.slice(ns.length), pkg)] = scanned;
+    out[subdir + rubyFileToTs(rels.get(file)!, pkg)] = scanned;
   }
   return out;
 }
@@ -223,8 +245,10 @@ async function main() {
   // reproducible and only changes when the Rails source does.
   const bareRaises: Record<string, Record<string, OwnedBareRaises>> = {};
   const errinfo: Record<string, string[]> = {};
-  for (const pkg of Object.keys(BARE_RAISE_LIBS))
-    bareRaises[pkg] = await scanPackageBareRaises(pkg, errinfo);
+  for (const pkg of Object.keys(BARE_RAISE_LIBS)) {
+    const dir = PACKAGE_DIR_OVERRIDES[pkg] ?? pkg;
+    bareRaises[dir] = { ...bareRaises[dir], ...(await scanPackageBareRaises(pkg, errinfo)) };
+  }
   const manifest = { generatedAt: "vendored", packages, bareRaises, errinfo };
   writeJsonManifest(OUT, manifest);
 

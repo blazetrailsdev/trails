@@ -15,7 +15,7 @@ import { fileURLToPath } from "url";
 import { promisify } from "util";
 import { rubyMethodToTsIgnoringSkip } from "./conventions.js";
 
-export type RaiseRow = [owner: string | null, method: string, klass: string, kind: string];
+export type RaiseRow = [owner: string | null, method: string | null, klass: string, kind: string];
 export type BareRaises = Record<string, string[]>;
 export type OwnedBareRaises = Record<string, BareRaises>;
 
@@ -35,7 +35,7 @@ export async function scanRaises(files: string[]): Promise<Record<string, RaiseR
 function foldMethods(rows: RaiseRow[]): BareRaises {
   const byMethod = new Map<string, { bare: Set<string>; message: Set<string> }>();
   for (const [, method, klass, kind] of rows) {
-    if (kind === "errinfo") continue;
+    if (kind === "errinfo" || method === null) continue;
     const sets = byMethod.get(method) ?? { bare: new Set(), message: new Set() };
     byMethod.set(method, sets);
     sets[kind === "bare" ? "bare" : "message"].add(klass);
@@ -50,6 +50,15 @@ function foldMethods(rows: RaiseRow[]): BareRaises {
     }
   }
   return methods;
+}
+
+/**
+ * The classes `rows` raise bare outside any method: in a class body, or in a
+ * class-level `define_method` whose name is computed. Such a row has a null
+ * method and no TS function to key on.
+ */
+export function classLevelBareRaises(rows: RaiseRow[]): string[] {
+  return rows.filter(([, method, , kind]) => method === null && kind === "bare").map((r) => r[2]);
 }
 
 /** The classes whose `initialize` reads `$!`, so a port passes the rescued exception. */

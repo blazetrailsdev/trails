@@ -95,6 +95,7 @@ class BareRaiseScan
       klass = const_path(first)&.split("::")&.last
       return unless klass&.match?(/[a-z]/)
 
+      methods = [nil] if methods.empty?
       methods.each { |method| @rows << [owner, method, klass, message ? "message" : "bare"] }
     end
 end

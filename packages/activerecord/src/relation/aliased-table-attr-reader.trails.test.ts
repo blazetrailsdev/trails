@@ -18,7 +18,7 @@ const idQ = quoteTableName("id");
 describe("Relation on an aliased table", () => {
   fixtures(["posts", "comments"]);
 
-  const aliased = () => new Relation(Post, Post.arelTable.alias("omg_posts"));
+  const aliased = () => new Relation(Post, { table: Post.arelTable.alias("omg_posts") });
 
   it("qualifies the star projection against the alias", () => {
     expect(aliased().toSql()).toContain(`${aliasQ}.*`);
