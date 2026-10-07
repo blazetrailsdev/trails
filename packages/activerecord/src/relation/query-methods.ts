@@ -188,6 +188,7 @@ export type OrderArg =
 interface QueryMethodsHost {
   primaryKey: string | string[];
   _values: Record<string, unknown>;
+  _arel?: SelectManager;
   whereClause: WhereClause;
   havingClause: WhereClause;
   fromClause: FromClause;
@@ -1132,7 +1133,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
 
 /** @missingRailsCall with_connection — CONVERGEABLE sync-reads-of-async-reflection-retire-with-rfc-0073 */
 export function arel(this: QueryMethodsHost, aliases?: AliasTracker): any {
-  return ((this as any)._arel ??= this.model
+  return (this._arel ??= this.model
     .connectionPool()
     .withConnectionSync((c) => this.buildArel(c, aliases)));
 }
@@ -1165,7 +1166,7 @@ export function async(this: QueryMethodsHost): QueryMethodsHost {
 
 /** @internal */
 export function assertModifiableBang(this: QueryMethodsHost): void {
-  if ((this as any)._loaded || (this as any)._arel) {
+  if ((this as any)._loaded || this._arel) {
     throw new UnmodifiableRelation();
   }
 }
