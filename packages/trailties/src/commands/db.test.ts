@@ -3,6 +3,7 @@ import {
   env,
   setEnv,
   getProcessAdapter,
+  registerConstant,
   registerProcessAdapter,
   StringIO,
 } from "@blazetrails/ruby-compat";
@@ -55,15 +56,11 @@ async function establishMigrationConnection(
 ): Promise<void> {
   const { Base, HashConfig, ConnectionAdapters } = await import("@blazetrails/activerecord");
   const adapterName = `sqlite3_migration_${(migrationAdapters += 1)}`;
-  ConnectionAdapters.register(
-    adapterName,
-    "SQLite3MigrationAdapter",
-    "./connection-adapters/sqlite3-migration-adapter.js",
-    async () =>
-      function () {
-        return adapter;
-      } as never,
-  );
+  const className = `SQLite3MigrationAdapter${migrationAdapters}`;
+  registerConstant(className, function () {
+    return adapter;
+  });
+  ConnectionAdapters.register(adapterName, className);
   await ConnectionAdapters.load(adapterName);
   const config = new HashConfig("test", "primary", {
     adapter: adapterName,

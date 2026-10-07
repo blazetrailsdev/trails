@@ -35,6 +35,7 @@ export async function scanRaises(files: string[]): Promise<Record<string, RaiseR
 function foldMethods(rows: RaiseRow[]): BareRaises {
   const byMethod = new Map<string, { bare: Set<string>; message: Set<string> }>();
   for (const [, method, klass, kind] of rows) {
+    if (kind === "errinfo") continue;
     const sets = byMethod.get(method) ?? { bare: new Set(), message: new Set() };
     byMethod.set(method, sets);
     sets[kind === "bare" ? "bare" : "message"].add(klass);
@@ -49,6 +50,11 @@ function foldMethods(rows: RaiseRow[]): BareRaises {
     }
   }
   return methods;
+}
+
+/** The classes whose `initialize` reads `$!`, so a port passes the rescued exception. */
+export function errinfoClasses(rows: RaiseRow[]): string[] {
+  return rows.filter(([, , , kind]) => kind === "errinfo").map(([, , klass]) => klass);
 }
 
 export function foldBareRaises(rows: RaiseRow[]): OwnedBareRaises {

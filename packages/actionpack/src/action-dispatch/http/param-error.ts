@@ -46,7 +46,7 @@ export class InvalidParameterError extends ParamError {
 }
 
 export class ParamsTooDeepError extends ParamError {
-  constructor(message?: string) {
+  constructor(message: string = "ActionDispatch::ParamsTooDeepError") {
     super(message);
     this.name = "ActionDispatch::ParamsTooDeepError";
   }

@@ -17,7 +17,7 @@ export class InvalidParameterError extends ArgumentError {
 include(InvalidParameterError, BadRequest);
 
 export class QueryLimitError extends RangeError {
-  constructor(message?: string) {
+  constructor(message: string = "Rack::QueryParser::QueryLimitError") {
     super(message);
     this.name = "QueryLimitError";
   }

@@ -21,7 +21,12 @@ import { fileURLToPath } from "url";
 import { writeJsonManifest } from "@blazetrails/parity/write-json-manifest";
 import { resolveSourcePath } from "../vendor/sources.js";
 import { rubyFileToTs } from "./parity/conventions.js";
-import { foldBareRaises, scanRaises, type OwnedBareRaises } from "./parity/rails-bare-raises.js";
+import {
+  errinfoClasses,
+  foldBareRaises,
+  scanRaises,
+  type OwnedBareRaises,
+} from "./parity/rails-bare-raises.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -86,7 +91,10 @@ const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]>
   trailties: ["rails", "railties/lib", "rails/"],
 };
 
-async function scanPackageBareRaises(pkg: string): Promise<Record<string, OwnedBareRaises>> {
+async function scanPackageBareRaises(
+  pkg: string,
+  errinfo: Record<string, string[]>,
+): Promise<Record<string, OwnedBareRaises>> {
   const [source, lib, ns] = BARE_RAISE_LIBS[pkg];
   const libDir = resolveSourcePath(source, lib);
   const rels = new Map<string, string>();
@@ -95,7 +103,9 @@ async function scanPackageBareRaises(pkg: string): Promise<Record<string, OwnedB
     if (rel.startsWith(ns) && !rel.includes("generators/")) rels.set(file, rel);
   }
   const out: Record<string, OwnedBareRaises> = {};
+  errinfo[pkg] = [];
   for (const [file, rows] of Object.entries(await scanRaises([...rels.keys()]))) {
+    errinfo[pkg] = [...new Set([...errinfo[pkg], ...errinfoClasses(rows)])].sort();
     const scanned = foldBareRaises(rows);
     if (Object.keys(scanned).length === 0) continue;
     out[rubyFileToTs(rels.get(file)!.slice(ns.length), pkg)] = scanned;
@@ -212,9 +222,10 @@ async function main() {
   // `generatedAt` is fixed (not Date.now()) so the committed manifest is
   // reproducible and only changes when the Rails source does.
   const bareRaises: Record<string, Record<string, OwnedBareRaises>> = {};
+  const errinfo: Record<string, string[]> = {};
   for (const pkg of Object.keys(BARE_RAISE_LIBS))
-    bareRaises[pkg] = await scanPackageBareRaises(pkg);
-  const manifest = { generatedAt: "vendored", packages, bareRaises };
+    bareRaises[pkg] = await scanPackageBareRaises(pkg, errinfo);
+  const manifest = { generatedAt: "vendored", packages, bareRaises, errinfo };
   writeJsonManifest(OUT, manifest);
 
   const counts = PACKAGES.map((p) => `${p}: ${packages[p].length}`).join(", ");

@@ -245,24 +245,20 @@ const rule = {
     if (!scope) return {};
     const bareRaises =
       loadManifest().bareRaises?.[scope.pkg]?.[scope.rel.replace(/^packages\/[^/]+\/src\//, "")];
+    const errinfo = loadManifest().errinfo?.[scope.pkg] ?? [];
     const inventedMessage = {
       ThrowStatement(node) {
         const arg = node.argument;
         if (!bareRaises || arg?.type !== "NewExpression" || arg.arguments.length === 0) return;
         const name =
           arg.callee.type === "MemberExpression" ? arg.callee.property?.name : arg.callee.name;
-        if (isRescuedException(node, arg.arguments)) return;
-        const owner = enclosingClassName(node);
-        const methods =
-          owner !== null && Object.hasOwn(bareRaises, owner) ? bareRaises[owner] : bareRaises["*"];
-        if (
-          !methods ||
-          !enclosingNames(node).some(
-            (fn) => Object.hasOwn(methods, fn) && methods[fn].includes(name),
-          )
-        ) {
-          return;
-        }
+        const owned = bareRaises[enclosingClassName(node)];
+        const classes = enclosingNames(node).flatMap((fn) => [
+          ...(owned && Object.hasOwn(owned, fn) ? owned[fn] : []),
+          ...(bareRaises["*"] && Object.hasOwn(bareRaises["*"], fn) ? bareRaises["*"][fn] : []),
+        ]);
+        if (!classes.includes(name)) return;
+        if (errinfo.includes(name) && isRescuedException(node, arg.arguments)) return;
         context.report({ node: arg, messageId: "inventedMessage", data: { name } });
       },
     };

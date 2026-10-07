@@ -1,5 +1,11 @@
 import { it, expect, vi } from "vitest";
-import { Process, RuntimeError, Thread, ThreadError } from "@blazetrails/ruby-compat";
+import {
+  Process,
+  registerConstant,
+  RuntimeError,
+  Thread,
+  ThreadError,
+} from "@blazetrails/ruby-compat";
 import {
   Notifications,
   assertRaise,
@@ -126,12 +132,8 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   }
 }
 
-register(
-  "transaction_aware_test",
-  "TrailsTestAdapter",
-  "./connection-adapters/transaction-aware-test-adapter.js",
-  async () => TransactionAwareTestAdapter,
-);
+registerConstant("TransactionAwareTestAdapter", TransactionAwareTestAdapter);
+register("transaction_aware_test", "TransactionAwareTestAdapter");
 await load("transaction_aware_test");
 
 function makeTransactionAwarePool(size: number = 5): ConnectionPool {

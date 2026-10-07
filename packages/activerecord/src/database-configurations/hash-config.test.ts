@@ -3,14 +3,12 @@ import { HashConfig } from "./hash-config.js";
 import { assertRaises } from "@blazetrails/activesupport";
 import { AdapterNotFound } from "../errors.js";
 import * as connectionAdapters from "../connection-adapters.js";
-import { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import "../connection-handling.js";
 
 connectionAdapters.register(
   "abstract",
-  "AbstractAdapter",
-  "./connection-adapters/abstract-adapter.js",
-  async () => AbstractAdapter as any,
+  "ActiveRecord::ConnectionAdapters::AbstractAdapter",
+  "active_record/connection_adapters/abstract_adapter",
 );
 
 describe("DatabaseConfigurations", () => {

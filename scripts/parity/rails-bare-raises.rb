@@ -20,6 +20,7 @@ class BareRaiseScan
       methods = []
     when :def
       methods = [node[1][1]]
+      @rows << [owner, "initialize", owner&.split("::")&.last, "errinfo"] if node[1][1] == "initialize" && errinfo?(node)
     when :defs
       methods = [node[3][1]]
     when :method_add_block
@@ -34,6 +35,12 @@ class BareRaiseScan
   end
 
   private
+    def errinfo?(node)
+      return false unless node.is_a?(Array)
+
+      (node[0] == :@gvar && node[1] == "$!") || node.any? { |child| errinfo?(child) }
+    end
+
     def raise?(ident)
       ident.is_a?(Array) && ident[0] == :@ident && %w[raise fail].include?(ident[1])
     end
@@ -95,7 +102,8 @@ end
 out = {}
 ARGV.each do |file|
   scan = BareRaiseScan.new
-  scan.walk(Ripper.sexp(File.read(file)), nil, [])
+  sexp = Ripper.sexp(File.read(file)) or abort("rails-bare-raises: #{file} does not parse")
+  scan.walk(sexp, nil, [])
   out[file] = scan.rows unless scan.rows.empty?
 end
 puts JSON.generate(out)

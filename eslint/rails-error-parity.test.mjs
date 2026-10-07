@@ -47,13 +47,14 @@ manifest.bareRaises = {
   activerecord: {
     "base.ts": {
       "*": { dump: ["ForbiddenClass"] },
-      S: { dump: ["ForbiddenClass"] },
+      S: { dump: ["ForbiddenClass"], restore: ["RestoreError"] },
       T: { load: ["ForbiddenClass"] },
     },
     "excluded.ts": { "*": { dump: ["ForbiddenClass"] } },
   },
   rack: { "response.ts": { "*": { getHeader: ["ArgumentError"] } } },
 };
+manifest.errinfo = { activerecord: ["RestoreError"] };
 
 const excludedRel = "packages/activerecord/src/excluded.ts";
 
@@ -120,10 +121,9 @@ tester.run("rails-error-parity", rule, {
     { filename: baseFile, code: `class S { dump() { throw new ForbiddenClass(); } }\n` },
     // The same class with a message in a method Rails does not raise it bare in.
     { filename: baseFile, code: `class S { load() { throw new ForbiddenClass("no"); } }\n` },
-    { filename: baseFile, code: `class T { dump() { throw new ForbiddenClass("no"); } }\n` },
     {
       filename: baseFile,
-      code: `class S { dump() { try { f(); } catch (error) { throw new ForbiddenClass(error); } } }\n`,
+      code: `class S { restore() { try { f(); } catch (error) { throw new RestoreError(error); } } }\n`,
     },
     { filename: rackFile, code: `export function call() { throw new Error("no"); }\n` },
     // Throwing a ported error class is allowed.
@@ -228,6 +228,16 @@ tester.run("rails-error-parity", rule, {
     {
       filename: baseFile,
       code: `class U { dump() { throw new ForbiddenClass("no"); } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class S { dump() { try { f(); } catch (error) { throw new ForbiddenClass(error); } } }\n`,
+      errors: [{ messageId: "inventedMessage" }],
+    },
+    {
+      filename: baseFile,
+      code: `class T { dump() { throw new ForbiddenClass("no"); } }\n`,
       errors: [{ messageId: "inventedMessage" }],
     },
     {

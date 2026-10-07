@@ -1,37 +1,34 @@
 import { underscore } from "@blazetrails/activesupport";
-import { LoadError } from "@blazetrails/ruby-compat";
+import { LoadError, NameError, rbModConstDefined, rbModConstGet } from "@blazetrails/ruby-compat";
 import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
-type AdapterLoader = () => Promise<new (...args: any[]) => DatabaseAdapter>;
 type AdapterClass = new (...args: any[]) => DatabaseAdapter;
-const adapters = new Map<string, [string, string, AdapterLoader]>();
-const resolved = new Map<string, AdapterClass>();
-const resolveErrors = new Map<string, unknown>();
+const adapters = new Map<string, [string, string]>();
+const loadErrors = new Map<string, unknown>();
 
 export function register(
   name: string,
   className: string,
   path: string = underscore(className),
-  loader: AdapterLoader = async () => (await import(path))[className],
 ): void {
-  adapters.set(name, [className, path, loader]);
-  resolved.delete(name);
-  resolveErrors.delete(name);
+  adapters.set(name, [className, path]);
+  loadErrors.delete(name);
 }
 
 /** @noRailsEquivalent PERMANENT */
 export async function load(adapterName: string | undefined): Promise<void> {
-  const [, , loader] = adapters.get(adapterName ?? "") ?? [];
-  if (!loader || resolved.has(adapterName ?? "")) return;
+  const [className, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
+  if (!className) return;
 
-  resolveErrors.delete(adapterName ?? "");
-  try {
-    const klass = await loader();
-    if (klass !== undefined) resolved.set(adapterName ?? "", klass);
-  } catch (error) {
-    resolveErrors.set(adapterName ?? "", error);
+  loadErrors.delete(adapterName ?? "");
+  if (!rbModConstDefined(Object, className)) {
+    try {
+      await (ConnectionAdapters.loadPath[pathToAdapter!] ?? (() => import(pathToAdapter!)))();
+    } catch (error) {
+      loadErrors.set(adapterName ?? "", error);
+    }
   }
 }
 
@@ -47,9 +44,8 @@ export function resolve(adapterName: string | undefined): AdapterClass {
     );
   }
 
-  const klass = resolved.get(adapterName ?? "");
-  if (!klass) {
-    const error = resolveErrors.get(adapterName ?? "");
+  if (!rbModConstDefined(Object, className)) {
+    const error = loadErrors.get(adapterName ?? "");
     if (error !== undefined) {
       const message = error instanceof Error ? error.message : String(error);
       const errorPath =
@@ -75,12 +71,16 @@ export function resolve(adapterName: string | undefined): AdapterClass {
         );
       }
     }
+  }
 
+  try {
+    return rbModConstGet(Object, className) as AdapterClass;
+  } catch (error) {
+    if (!(error instanceof NameError)) throw error;
     throw new AdapterNotFound(
-      `Could not load the ${className} Active Record adapter (uninitialized constant ${className}).`,
+      `Could not load the ${className} Active Record adapter (${error.message}).`,
     );
   }
-  return klass;
 }
 
 ConnectionAdapters.register = register;
@@ -88,59 +88,46 @@ ConnectionAdapters.load = load;
 ConnectionAdapters.resolve = resolve;
 ActiveRecord.ConnectionAdapters = ConnectionAdapters;
 
-const sqlite3Loader: AdapterLoader = async () =>
-  (await import("./connection-adapters/better-sqlite3-adapter.js")).BetterSQLite3Adapter as any;
-const nodeSqliteLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/node-sqlite-adapter.js")).NodeSQLiteAdapter as any;
-const expoSqliteLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/expo-sqlite-adapter.js")).ExpoSQLiteAdapter as any;
-const libsqlLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/libsql-adapter.js")).LibSQLAdapter as any;
-const libsqlRemoteLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/libsql-remote-adapter.js")).LibSQLRemoteAdapter as any;
-const libsqlReplicaLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/libsql-replica-adapter.js")).LibSQLReplicaAdapter as any;
-const mysql2Loader: AdapterLoader = async () =>
-  (await import("./connection-adapters/mysql2-adapter.js")).Mysql2Adapter as any;
-const postgresqlLoader: AdapterLoader = async () =>
-  (await import("./connection-adapters/postgresql-adapter.js")).PostgreSQLAdapter as any;
-const builtinLoaders: Record<string, [string, string, AdapterLoader]> = {
-  sqlite3: [
-    "BetterSQLite3Adapter",
-    "./connection-adapters/better-sqlite3-adapter.js",
-    sqlite3Loader,
-  ],
-  "node-sqlite": [
-    "NodeSQLiteAdapter",
-    "./connection-adapters/node-sqlite-adapter.js",
-    nodeSqliteLoader,
-  ],
-  "expo-sqlite": [
-    "ExpoSQLiteAdapter",
-    "./connection-adapters/expo-sqlite-adapter.js",
-    expoSqliteLoader,
-  ],
-  libsql: ["LibSQLAdapter", "./connection-adapters/libsql-adapter.js", libsqlLoader],
-  "libsql-remote": [
-    "LibSQLRemoteAdapter",
-    "./connection-adapters/libsql-remote-adapter.js",
-    libsqlRemoteLoader,
-  ],
-  "libsql-replica": [
-    "LibSQLReplicaAdapter",
-    "./connection-adapters/libsql-replica-adapter.js",
-    libsqlReplicaLoader,
-  ],
-  mysql2: ["Mysql2Adapter", "./connection-adapters/mysql2-adapter.js", mysql2Loader],
-  postgresql: [
-    "PostgreSQLAdapter",
-    "./connection-adapters/postgresql-adapter.js",
-    postgresqlLoader,
-  ],
-};
-
-for (const [name, [className, path, loader]] of Object.entries(builtinLoaders))
-  register(name, className, path, loader);
+register(
+  "sqlite3",
+  "ActiveRecord::ConnectionAdapters::BetterSQLite3Adapter",
+  "active_record/connection_adapters/better_sqlite3_adapter",
+);
+register(
+  "node-sqlite",
+  "ActiveRecord::ConnectionAdapters::NodeSQLiteAdapter",
+  "active_record/connection_adapters/node_sqlite_adapter",
+);
+register(
+  "expo-sqlite",
+  "ActiveRecord::ConnectionAdapters::ExpoSQLiteAdapter",
+  "active_record/connection_adapters/expo_sqlite_adapter",
+);
+register(
+  "libsql",
+  "ActiveRecord::ConnectionAdapters::LibSQLAdapter",
+  "active_record/connection_adapters/libsql_adapter",
+);
+register(
+  "libsql-remote",
+  "ActiveRecord::ConnectionAdapters::LibSQLRemoteAdapter",
+  "active_record/connection_adapters/libsql_remote_adapter",
+);
+register(
+  "libsql-replica",
+  "ActiveRecord::ConnectionAdapters::LibSQLReplicaAdapter",
+  "active_record/connection_adapters/libsql_replica_adapter",
+);
+register(
+  "mysql2",
+  "ActiveRecord::ConnectionAdapters::Mysql2Adapter",
+  "active_record/connection_adapters/mysql2_adapter",
+);
+register(
+  "postgresql",
+  "ActiveRecord::ConnectionAdapters::PostgreSQLAdapter",
+  "active_record/connection_adapters/postgresql_adapter",
+);
 
 export { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";

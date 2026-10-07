@@ -69,6 +69,24 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/associations": () => import("./associations.js"),
   "active_record/attribute_methods": () => import("./attribute-methods.js"),
   "active_record/connection_adapters": () => import("./connection-adapters.js"),
+  "active_record/connection_adapters/abstract_adapter": () =>
+    import("./connection-adapters/abstract-adapter.js"),
+  "active_record/connection_adapters/better_sqlite3_adapter": () =>
+    import("./connection-adapters/better-sqlite3-adapter.js"),
+  "active_record/connection_adapters/node_sqlite_adapter": () =>
+    import("./connection-adapters/node-sqlite-adapter.js"),
+  "active_record/connection_adapters/expo_sqlite_adapter": () =>
+    import("./connection-adapters/expo-sqlite-adapter.js"),
+  "active_record/connection_adapters/libsql_adapter": () =>
+    import("./connection-adapters/libsql-adapter.js"),
+  "active_record/connection_adapters/libsql_remote_adapter": () =>
+    import("./connection-adapters/libsql-remote-adapter.js"),
+  "active_record/connection_adapters/libsql_replica_adapter": () =>
+    import("./connection-adapters/libsql-replica-adapter.js"),
+  "active_record/connection_adapters/mysql2_adapter": () =>
+    import("./connection-adapters/mysql2-adapter.js"),
+  "active_record/connection_adapters/postgresql_adapter": () =>
+    import("./connection-adapters/postgresql-adapter.js"),
   "active_record/encryption": () => import("./encryption.js"),
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),

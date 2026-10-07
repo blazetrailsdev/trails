@@ -1292,5 +1292,15 @@
         }
       }
     }
+  },
+  "errinfo": {
+    "activerecord": ["StatementInvalid"],
+    "activemodel": [],
+    "activesupport": [],
+    "arel": [],
+    "actionpack": ["BadRequest", "ParseError", "SessionRestoreError"],
+    "actionview": ["Error"],
+    "rack": [],
+    "trailties": []
   }
 }
