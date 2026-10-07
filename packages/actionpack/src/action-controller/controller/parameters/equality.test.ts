@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { assert, assertNot, assertNotEqual } from "@blazetrails/activesupport";
 import { Parameters } from "../../metal/strong-parameters.js";
 
@@ -50,14 +50,14 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("has_value? converts hashes to parameters", () => {
-    const params = new Parameters({ a: { nested: "value" } });
-    params.get("a");
-    expect(params.hasValue(params.get("a"))).toBe(true);
+    const params = new Parameters({ foo: { bar: "baz" } });
+    assert(params.hasValue({ bar: "baz" }));
+    params.get("foo");
+    assert(params.hasValue({ bar: "baz" }));
   });
 
   it("has_value? works with parameters", () => {
-    const inner = new Parameters({ x: "1" });
-    const params = new Parameters({ a: inner });
-    expect(params.hasValue(inner)).toBe(true);
+    const params = new Parameters({ foo: { bar: "baz" } });
+    assert(params.hasValue(new Parameters({ bar: "baz" })));
   });
 });
