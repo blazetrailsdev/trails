@@ -2109,7 +2109,7 @@ export class AbstractAdapter implements Quoting {
 
   /**
    * @internal
-   * @noRailsEquivalent PERMANENT
+   * @noRailsEquivalent CONVERGEABLE internal-schema-cache-is-the-sync-twin-of-schema-reflection-cache
    */
   get internalSchemaCache(): SchemaCache {
     const reflection = this.pool.schemaReflection;
