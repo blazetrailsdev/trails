@@ -32,9 +32,9 @@ describe("Errors — trails-only coverage", () => {
     expect(e.where(":name").length).toBe(1);
     expect(e.added(":name", ":blank")).toBe(true);
     expect(e.ofKind(":name", ":blank")).toBe(true);
-    expect(e.include(":name")).toBe(true);
+    expect(e.isInclude(":name")).toBe(true);
     expect(e.delete(":name")).toEqual(["can't be blank"]);
-    expect(e.include("name")).toBe(false);
+    expect(e.isInclude("name")).toBe(false);
   });
 
   it("add creates an error object and returns it", () => {

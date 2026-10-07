@@ -1917,8 +1917,8 @@ describe("ValidationsTest (trails)", () => {
 
       const u = new User({});
       u.errors.add("name", ":blank");
-      expect(u.errors.include("name")).toBe(true);
-      expect(u.errors.include("email")).toBe(false);
+      expect(u.errors.isInclude("name")).toBe(true);
+      expect(u.errors.isInclude("email")).toBe(false);
     });
 
     it("messages returns grouped messages", () => {
