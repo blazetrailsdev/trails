@@ -159,6 +159,31 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(includes["ActiveRecord::Base"]).toEqual(["ActiveRecord::Core"]);
   });
 
+  it("unrolls an include loop over a constant list of modules", () => {
+    const includes = rubyIncludes({
+      "api.rb": `
+        module ActionController
+          class API
+            MODULES = [
+              AbstractController::Rendering,
+              UrlFor,
+              ParamsWrapper
+            ]
+
+            MODULES.each do |mod|
+              include mod
+            end
+          end
+        end
+      `,
+    });
+    expect(includes["ActionController::API"]).toEqual([
+      "AbstractController::Rendering",
+      "UrlFor",
+      "ParamsWrapper",
+    ]);
+  });
+
   function rubySkeletons(fixtures: Record<string, string>): Record<string, string[] | undefined> {
     return rubyField(fixtures, "skeleton");
   }

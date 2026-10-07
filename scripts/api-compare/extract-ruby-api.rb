@@ -1172,8 +1172,6 @@ class ApiExtractor
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
 
-  # `MODULES = [UrlFor, Redirecting, …]`: an Array literal of nothing but
-  # constants, kept so `MODULES.each { |mod| include mod }` can be unrolled.
   def maybe_record_module_list(lhs, rhs)
     return unless lhs.is_a?(Array) && lhs[0] == :var_field
     const = lhs[1]
@@ -1187,8 +1185,6 @@ class ApiExtractor
     (@module_lists ||= {})[[current_fqn, const[1]]] = names
   end
 
-  # `MODULES.each do |mod| include mod end` (action_controller/api.rb:148-150)
-  # is one `include` per element, in list order.
   def process_each_include(node)
     return if @in_on_load.positive?
     call = node[1]
