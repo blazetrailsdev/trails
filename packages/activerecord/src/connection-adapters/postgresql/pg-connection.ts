@@ -7,6 +7,7 @@ export interface PGConnection extends pg.Client {
   asyncExec(sql: string | null): Promise<PGResult>;
   execParams(sql: string | null, params: unknown[]): Promise<PGResult>;
   unescapeBytea(value: string | Uint8Array): Buffer;
+  socketIo(): { reopen(path: string): void } | null;
 }
 
 type QueryConfig = string | Record<string, unknown> | null;
@@ -124,6 +125,21 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
   return Buffer.from(bytes);
 }
 
+function socketIo(this: pg.Client): { reopen(path: string): void } | null {
+  const stream = (
+    this as unknown as {
+      connection?: { stream?: { removeAllListeners?(): unknown; unref?(): unknown } };
+    }
+  ).connection?.stream;
+  if (!stream) return null;
+  return {
+    reopen(_path: string): void {
+      stream.removeAllListeners?.();
+      stream.unref?.();
+    },
+  };
+}
+
 /** @noRailsEquivalent CONVERGEABLE pg-gem-connection-surface-scores-against-the-pg-gem */
 export function pgConnection<T extends object>(client: T): T & PGConnection {
   return Object.assign(client, {
@@ -132,5 +148,6 @@ export function pgConnection<T extends object>(client: T): T & PGConnection {
     asyncExec,
     execParams,
     unescapeBytea,
+    socketIo,
   }) as unknown as T & PGConnection;
 }

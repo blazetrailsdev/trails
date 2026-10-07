@@ -1,7 +1,7 @@
 import { ConverterNotFoundError } from "./converter-not-found-error.js";
 import { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
 import { Encoding } from "./encoding.js";
-import { getFs, type FsStatResult } from "./fs-adapter.js";
+import { getFs, getPath, type FsStatResult } from "./fs-adapter.js";
 import { EOFError } from "./eof-error.js";
 import { IOError } from "./io-error.js";
 import { ArgumentError } from "./argument-error.js";
@@ -521,6 +521,19 @@ function parseModeEnc(
  * class this file's export lives in.
  */
 export class IO {
+  /**
+   * `vendor/ruby/v3.3.11/file.c:7848` — `File::Constants::NULL`, which `IO`
+   * includes (`file.c:7773`), so it is `IO::NULL` and `File::NULL`:
+   * `ruby_null_device` (`file.c:6540`), `"NUL"` on a DOSISH build and
+   * `"/dev/null"` everywhere else. The platform answer comes from the
+   * registered path backend's separator, as `File::ALT_SEPARATOR` does.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `IO::NULL`.
+   */
+  static get NULL(): string {
+    return getPath().sep === "\\" ? "NUL" : "/dev/null";
+  }
+
   /**
    * The descriptor `rb_io_s_open` (`vendor/ruby/v3.3.11/io.c:8148`) opened the stream
    * on, and the offset `rb_io_seek_m` (`io.c:2495`) moves — Ruby's `rb_io_t`
