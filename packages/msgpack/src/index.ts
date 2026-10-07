@@ -4,6 +4,7 @@ import { Buffer } from "./buffer.js";
 import { Factory } from "./factory.js";
 import { DefaultFactory, dump, load, pack, unpack } from "./msgpack.js";
 import { Packer } from "./packer.js";
+import "./symbol.js";
 import {
   MalformedFormatError,
   StackError,
@@ -20,7 +21,6 @@ export { Factory } from "./factory.js";
 export type { RegisterTypeOptions, RegisteredType } from "./factory.js";
 export * from "./msgpack.js";
 export * from "./packer.js";
-export * from "./symbol.js";
 export * from "./unpacker.js";
 export * from "./version.js";
 

@@ -7,6 +7,7 @@ import {
   NoMethodError,
   RangeError,
   rbAbsintSize,
+  rbCString,
   rbClassInheritedP,
   rbClassOf,
   rbFSend,
@@ -87,7 +88,7 @@ export class Packer {
     if (v == null || typeof v === "boolean" || typeof v === "number" || typeof v === "string") {
       this.buffer.write(encoder.encodeSharedRef(v));
     } else if (v instanceof Uint8Array) {
-      if (v.constructor === Uint8Array || !this.tryWriteWithExtTypeLookup(v)) {
+      if (rbClassOf(v) === rbCString || !this.tryWriteWithExtTypeLookup(v)) {
         this.buffer.write(encoder.encodeSharedRef(v));
       }
     } else if (Array.isArray(v)) {

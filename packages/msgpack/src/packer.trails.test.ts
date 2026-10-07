@@ -19,8 +19,8 @@ import {
   StackError,
   UnpackError,
   Unpacker,
-  toMsgpackExt,
 } from "./index.js";
+import { toMsgpackExt } from "./symbol.js";
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
@@ -158,6 +158,11 @@ describe("ext registry lookup", () => {
     expect(packer.write(new Pair(1, 2)).fullPack()).toEqual(
       Uint8Array.of(0xd6, 2, 0x72, 0x65, 0x61, 0x6c),
     );
+
+    const string = Uint8Array.of(1);
+    packer.registerType(0x04, rbObjSingletonClass(string), null, () => "s");
+    expect(packer.write(string).fullPack()).toEqual(Uint8Array.of(0xd4, 4, 0x73));
+    expect(packer.write(Uint8Array.of(1)).fullPack()).toEqual(Uint8Array.of(0xc4, 1, 1));
 
     const extended = new Pair(1, 2);
     include(rbObjSingletonClass(extended), Mod);
