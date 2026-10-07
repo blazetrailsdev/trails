@@ -48,15 +48,12 @@ export function _renderWithRendererMethodName(key: string): string {
   return `_render_with_renderer_${key}`;
 }
 
-export const ClassMethods = {
-  useRenderers(this: { _renderers: ReadonlySet<string> }, ...args: string[]): void {
-    const renderers = new Set([...this._renderers, ...args]);
-    this._renderers = Object.freeze(renderers);
-  },
-  useRenderer(this: { _renderers: ReadonlySet<string> }, ...args: string[]): void {
-    ClassMethods.useRenderers.call(this, ...args);
-  },
-};
+export function useRenderers(this: { _renderers: ReadonlySet<string> }, ...args: string[]): void {
+  const renderers = new Set([...this._renderers, ...args]);
+  this._renderers = Object.freeze(renderers);
+}
+
+export const ClassMethods = { useRenderers, useRenderer: useRenderers };
 
 export function renderToBody(this: RenderersHost, options: Record<string, unknown>): unknown {
   const body = this._renderToBodyWithRenderer(options);

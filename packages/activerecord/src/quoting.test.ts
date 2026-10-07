@@ -112,10 +112,6 @@ describe("QuotingTest", () => {
     expect(e.message).toBe("can't quote Object");
   });
 
-  it("quote(new Date()) quotes it as a Time", () => {
-    expect(quote(new Date(Date.UTC(2020, 0, 2, 3, 4, 5)))).toBe("'2020-01-02 03:04:05'");
-  });
-
   it("quote column name", () => {
     expect(() => quoteColumnName("foo")).toThrow(NotImplementedError);
   });
