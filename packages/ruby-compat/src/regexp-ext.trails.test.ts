@@ -60,7 +60,7 @@ describe("Regexp MRI option spelling (trails)", () => {
     expect(rbRegToS(/a/is, "onig")).toBe("(?mi-x:a)");
     expect(rbRegToS(/^a/m, "onig")).toBe("(?-mix:^a)");
     expect(rbRegToS(/a/dgimsuy, "onig")).toBe("(?mi-x:a)");
-    expect(rbRegToS(/a/v, "onig")).toBe("(?-mix:a)");
+    expect(rbRegToS(new RegExp("a", "v"), "onig")).toBe("(?-mix:a)");
   });
 
   it("Regexp.new reads MRI's to_s back", () => {
