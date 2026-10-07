@@ -39,7 +39,7 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return this.allSql.at(-1) ?? "";
   }
   override indexes(tableName: string) {
-    return sqliteIndexes(this as never, tableName);
+    return sqliteIndexes.call(this as never, tableName);
   }
   execute(sql: string) {
     this.allSql.push(sql);

@@ -1,7 +1,6 @@
 import {
   ArgumentError,
   Base64,
-  getCrypto,
   intXor,
   chomp,
   OpenSSL,
@@ -13,7 +12,14 @@ import {
   URI,
   type Bytes,
 } from "@blazetrails/ruby-compat";
-import { ActiveSupportJSON, extend, include, included, isBlank } from "@blazetrails/activesupport";
+import {
+  ActiveSupportJSON,
+  extend,
+  include,
+  included,
+  isBlank,
+  SecurityUtils,
+} from "@blazetrails/activesupport";
 import {
   CookieJar,
   cookieJar,
@@ -325,8 +331,8 @@ export interface CsrfRequest {
   isHead(): boolean;
   origin?: string | null;
   baseUrl: string;
-  path?: string;
-  requestMethod?: string;
+  path: string;
+  requestMethod: string;
   mediaType?: string | null;
   xhr?: boolean;
   xCsrfToken?: string | null;
@@ -505,7 +511,7 @@ export function generateCsrfToken(): string {
 
 /** @internal */
 export function encodeCsrfToken(csrfToken: Bytes): string {
-  return csrfToken.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return Base64.urlsafeEncode64(csrfToken.toString("latin1"), { padding: false });
 }
 
 /** @internal */
@@ -604,17 +610,13 @@ export function requestAuthenticityTokens(this: CsrfController): unknown[] {
   return [this.formAuthenticityParam(), this.request.xCsrfToken];
 }
 
-function compareBuffers(a: Bytes, b: Bytes): boolean {
-  return a.length === b.length && getCrypto().timingSafeEqual(a, b);
-}
-
 /** @internal */
 export function compareWithRealToken(
   this: CsrfController,
   token: Bytes,
   session?: unknown,
 ): boolean {
-  return compareBuffers(token, this.realCsrfToken(session));
+  return SecurityUtils.fixedLengthSecureCompare(token, this.realCsrfToken(session));
 }
 
 /** @internal */
@@ -623,19 +625,29 @@ export function compareWithGlobalToken(
   token: Bytes,
   session?: unknown,
 ): boolean {
-  return compareBuffers(token, this.globalCsrfToken(session));
+  return SecurityUtils.fixedLengthSecureCompare(token, this.globalCsrfToken(session));
 }
 
-/** @internal */
+/**
+ * @internal
+ * @missingRailsArgs chomp — PERMANENT
+ */
 export function isValidPerFormCsrfToken(
   this: CsrfController,
   token: Bytes,
   session?: unknown,
 ): boolean {
-  if (!this.perFormCsrfTokens) return false;
-  const path = chomp(this.request.path ?? "", "/");
-  const method = this.request.requestMethod ?? this.request.method;
-  return compareBuffers(token, this.perFormCsrfToken(session, path, method));
+  if (rtest(this.perFormCsrfTokens)) {
+    const correctToken = this.perFormCsrfToken(
+      session,
+      chomp(this.request.path, "/"),
+      this.request.requestMethod,
+    );
+
+    return SecurityUtils.fixedLengthSecureCompare(token, correctToken);
+  } else {
+    return false;
+  }
 }
 
 /** @internal */

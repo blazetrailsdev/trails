@@ -62,7 +62,7 @@ import {
   ConnectionNotEstablished,
   StatementTimeout,
 } from "../errors.js";
-import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { deprecator } from "../deprecator.js";
 import { TypeMap } from "../type/type-map.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
@@ -94,7 +94,6 @@ import {
   explain as sqliteExplain,
   isWriteQuery as sqliteIsWriteQuery,
 } from "./sqlite3/database-statements.js";
-import { Result } from "../result.js";
 import {
   quote as sqliteQuote,
   typeCast as sqliteTypeCast,
@@ -115,7 +114,6 @@ import {
   type AddForeignKeyOptions,
   type ColumnType,
   type ColumnOptions,
-  type IndexDefinition,
 } from "./abstract/schema-definitions.js";
 import { Column as Sqlite3Column } from "./sqlite3/column.js";
 import { databaseCli } from "../active-record.js";
@@ -1109,13 +1107,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     return new RegExp(`^${ordered}(?:\\s*,\\s*${ordered})*$`, "i");
   }
 
-  static override quoteColumnName(name: unknown): string {
-    return quoteColumnName(name);
-  }
+  static override quoteColumnName = quoteColumnName;
 
-  static override quoteTableName(name: unknown): string {
-    return quoteTableName(name);
-  }
+  static override quoteTableName = quoteTableName;
 
   /** @internal */
   get _rawConnection(): SqliteConnection | null {
@@ -1180,14 +1174,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     /.*FOREIGN KEY\s+\("([^"]+)"\)\s+REFERENCES\s+"(\w+)"\s+\("(\w+)"\)/;
   private static readonly DEFERRABLE_REGEX = /DEFERRABLE INITIALLY (\w+)/;
 
-  override quoteString(s: string): string {
-    return sqliteQuoteString(s);
-  }
-
-  override quoteTableNameForAssignment(table: string, attr: string): string {
-    return sqliteQuoteTableNameForAssignment(table, attr);
-  }
-
   override quoteDefaultExpression(value: unknown, column: unknown): string {
     if (typeof value === "function") {
       const result = (value as () => unknown)() as string;
@@ -1200,36 +1186,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     if (!sqlType || !isStructuredDefault(value)) return value;
     const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
     return typeof castType.serialize === "function" ? castType.serialize(value) : value;
-  }
-
-  override quotedTrue(): string {
-    return sqliteQuotedTrue();
-  }
-
-  override quotedFalse(): string {
-    return sqliteQuotedFalse();
-  }
-
-  override unquotedTrue(): number {
-    return sqliteUnquotedTrue();
-  }
-
-  override unquotedFalse(): number {
-    return sqliteUnquotedFalse();
-  }
-
-  override quotedBinary(value: BinaryData): string {
-    return sqliteQuotedBinary(value);
-  }
-
-  /** @internal */
-  override returningColumnValues(result: Result): unknown[] | undefined {
-    return sqliteReturningColumnValues(result);
-  }
-
-  /** @internal */
-  castResult(result: Result): Result {
-    return sqliteCastResult(result);
   }
 
   /** @internal */
@@ -1251,10 +1207,6 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     if (value instanceof globalThis.Date) return `'${sqliteQuoteString(value.toISOString())}'`;
     if (typeof (value as any)?.toSql === "function") return String((value as any).toSql());
     return `'${sqliteQuoteString(String(value))}'`;
-  }
-
-  async indexes(tableName: string): Promise<IndexDefinition[]> {
-    return sqliteIndexes(this, tableName);
   }
 
   /** @internal */
@@ -1368,13 +1320,23 @@ SQLite3Adapter.prototype.isWriteQuery = sqliteIsWriteQuery;
 
 SQLite3Adapter.prototype.performQuery = sqlitePerformQuery;
 SQLite3Adapter.prototype.highPrecisionCurrentTimestamp = sqliteHighPrecisionCurrentTimestamp;
+SQLite3Adapter.prototype.castResult = sqliteCastResult;
 SQLite3Adapter.prototype.affectedRows = sqliteAffectedRows;
 SQLite3Adapter.prototype.executeBatch = sqliteExecuteBatch;
 SQLite3Adapter.prototype.buildTruncateStatement = sqliteBuildTruncateStatement;
+SQLite3Adapter.prototype.returningColumnValues = sqliteReturningColumnValues;
 SQLite3Adapter.prototype.quote = sqliteQuote;
+SQLite3Adapter.prototype.quoteString = sqliteQuoteString;
+SQLite3Adapter.prototype.quoteTableNameForAssignment = sqliteQuoteTableNameForAssignment;
+SQLite3Adapter.prototype.quotedBinary = sqliteQuotedBinary;
+SQLite3Adapter.prototype.quotedTrue = sqliteQuotedTrue;
+SQLite3Adapter.prototype.unquotedTrue = sqliteUnquotedTrue;
+SQLite3Adapter.prototype.quotedFalse = sqliteQuotedFalse;
+SQLite3Adapter.prototype.unquotedFalse = sqliteUnquotedFalse;
 SQLite3Adapter.prototype.quotedTime = sqliteQuotedTime;
 SQLite3Adapter.prototype.typeCast = sqliteTypeCast;
 SQLite3Adapter.prototype.createSchemaDumper = sqliteCreateSchemaDumper;
+SQLite3Adapter.prototype.indexes = sqliteIndexes;
 SQLite3Adapter.prototype.virtualTableExists = sqliteVirtualTableExists;
 SQLite3Adapter.prototype.dataSourceSql = sqliteDataSourceSql;
 SQLite3Adapter.prototype.newColumnFromField = sqliteNewColumnFromField;
@@ -1404,15 +1366,27 @@ export interface SQLite3Adapter {
   explain: typeof sqliteExplain;
   isWriteQuery: typeof sqliteIsWriteQuery;
   /** @internal */
+  castResult: typeof sqliteCastResult;
+  /** @internal */
   affectedRows: typeof sqliteAffectedRows;
   /** @internal */
   executeBatch: typeof sqliteExecuteBatch;
   /** @internal */
   buildTruncateStatement: typeof sqliteBuildTruncateStatement;
+  /** @internal */
+  returningColumnValues: typeof sqliteReturningColumnValues;
   quote: typeof sqliteQuote;
+  quoteString: typeof sqliteQuoteString;
+  quoteTableNameForAssignment: typeof sqliteQuoteTableNameForAssignment;
+  quotedBinary: typeof sqliteQuotedBinary;
+  quotedTrue: typeof sqliteQuotedTrue;
+  unquotedTrue: typeof sqliteUnquotedTrue;
+  quotedFalse: typeof sqliteQuotedFalse;
+  unquotedFalse: typeof sqliteUnquotedFalse;
   quotedTime: typeof sqliteQuotedTime;
   typeCast: typeof sqliteTypeCast;
   createSchemaDumper: typeof sqliteCreateSchemaDumper;
+  indexes: typeof sqliteIndexes;
   virtualTableExists: typeof sqliteVirtualTableExists;
   /** @internal */
   dataSourceSql: typeof sqliteDataSourceSql;

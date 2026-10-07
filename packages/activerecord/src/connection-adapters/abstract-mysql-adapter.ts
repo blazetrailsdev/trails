@@ -1395,21 +1395,6 @@ WHERE fk.referenced_column_name IS NOT NULL
     ];
   }
 
-  /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    nameOrOptions?: string | null | { type?: string },
-    options: { type?: string } = {},
-  ): string {
-    const kwargsOnly = nameOrOptions != null && typeof nameOrOptions === "object";
-    const name = kwargsOnly ? null : nameOrOptions;
-    const opts = kwargsOnly ? nameOrOptions : options;
-    return mysqlDataSourceSql.call(this, name, opts);
-  }
-
   highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
     return arelSql("CURRENT_TIMESTAMP(6)");
   }
@@ -1536,11 +1521,15 @@ export interface AbstractMysqlAdapter {
 
   /** @internal */
   defaultInsertValue: typeof mysqlDefaultInsertValue;
+
+  /** @internal */
+  dataSourceSql: typeof mysqlDataSourceSql;
 }
 /* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 include(AbstractMysqlAdapter as unknown as new (...args: unknown[]) => unknown, SchemaStatements);
 AbstractMysqlAdapter.prototype.defaultInsertValue = mysqlDefaultInsertValue;
+AbstractMysqlAdapter.prototype.dataSourceSql = mysqlDataSourceSql;
 AbstractMysqlAdapter.prototype.newColumnFromField = newColumnFromField;
 AbstractMysqlAdapter.prototype.explain = mysqlExplain;
 AbstractMysqlAdapter.prototype.extractForeignKeyAction = mysqlExtractForeignKeyAction;

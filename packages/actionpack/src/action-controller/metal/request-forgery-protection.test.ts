@@ -42,6 +42,8 @@ import { Base } from "../base.js";
 const methods = requestForgeryProtection as unknown as Omit<CsrfController, "request">;
 
 const verbs = {
+  path: "/",
+  requestMethod: "POST",
   isGet(this: { method: string }): boolean {
     return this.method === "GET";
   },

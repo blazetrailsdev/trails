@@ -407,10 +407,10 @@ export function extractForeignKeyAction(
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
-  name?: string | null,
-  options: { type?: string } = {},
+  name: string | null = null,
+  { type }: { type?: string } = {},
 ): string {
-  const scope = quotedScope.call(this, name, options);
+  const scope = quotedScope.call(this, name, { type });
   let sql = `SELECT table_name FROM information_schema.tables WHERE table_schema = ${scope.schema}`;
   if (scope.name) {
     sql += ` AND table_name = ${scope.name}`;

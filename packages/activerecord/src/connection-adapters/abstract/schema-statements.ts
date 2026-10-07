@@ -803,13 +803,15 @@ export class SchemaStatements {
   }
 
   async tables(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql({ type: "BASE TABLE" }), "SCHEMA")).map(
-      String,
-    );
+    return (
+      await this.queryValues(this.dataSourceSql(undefined, { type: "BASE TABLE" }), "SCHEMA")
+    ).map(String);
   }
 
   async views(): Promise<string[]> {
-    return (await this.queryValues(this.dataSourceSql({ type: "VIEW" }), "SCHEMA")).map(String);
+    return (await this.queryValues(this.dataSourceSql(undefined, { type: "VIEW" }), "SCHEMA")).map(
+      String,
+    );
   }
 
   async viewExists(viewName: string): Promise<boolean | null> {
@@ -1840,14 +1842,7 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  dataSourceSql(name?: string | null, options?: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(options: { type?: string }): string;
-  /** @internal */
-  dataSourceSql(
-    _nameOrOptions?: string | null | { type?: string },
-    _options?: { type?: string },
-  ): string {
+  dataSourceSql(_name: string | null = null, _options: { type?: string } = {}): string {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/schema_statements.rb:1890
     throw new NotImplementedError();
   }
