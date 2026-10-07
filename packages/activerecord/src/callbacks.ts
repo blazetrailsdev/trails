@@ -1,4 +1,6 @@
 import type { Base } from "./base.js";
+import type { CallbackConditions, CallbackObject } from "@blazetrails/activemodel";
+import { RecordNotDestroyed } from "./errors.js";
 import { include, included } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
 import { rtest } from "@blazetrails/ruby-compat";
@@ -23,9 +25,156 @@ export const Callbacks = {
   },
 };
 
-/** @internal */
-export function createOrUpdate(this: any, superFn: () => Promise<boolean>): Promise<boolean> {
-  return this.runCallbacks("save", superFn) as Promise<boolean>;
+export declare class ClassMethods {
+  afterInitialize: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterFind: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterTouch: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  beforeSave: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  aroundSave: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterSave: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  beforeCreate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  aroundCreate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterCreate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  beforeUpdate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  aroundUpdate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterUpdate: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  beforeDestroy: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  aroundDestroy: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>, proceed: () => void | Promise<void>) => void | Promise<void>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+
+  afterDestroy: <T extends typeof Base>(
+    this: T,
+    fn:
+      | ((record: InstanceType<T>) => void | boolean | Promise<void | boolean>)
+      | CallbackObject
+      | string,
+    conditions?: CallbackConditions<InstanceType<T>>,
+  ) => void;
+}
+
+export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<T | boolean> {
+  this._destroyCallbackAlreadyCalled ||= false;
+  if (this._destroyCallbackAlreadyCalled) return true;
+  this._destroyCallbackAlreadyCalled = true;
+  try {
+    return (await this.runCallbacks("destroy", superFn)) as T | boolean;
+  } catch (e) {
+    if (!(e instanceof RecordNotDestroyed)) throw e;
+    this._associationDestroyException = e;
+    return false;
+  } finally {
+    this._destroyCallbackAlreadyCalled = false;
+  }
 }
 
 export function touch(
@@ -46,6 +195,11 @@ export function incrementBang<T>(
   return rtest(options.touch)
     ? (this.runCallbacks("touch", () => super_(attribute, by, options)) as Promise<T>)
     : super_(attribute, by, options);
+}
+
+/** @internal */
+export function createOrUpdate(this: any, superFn: () => Promise<boolean>): Promise<boolean> {
+  return this.runCallbacks("save", superFn) as Promise<boolean>;
 }
 
 /** @internal */

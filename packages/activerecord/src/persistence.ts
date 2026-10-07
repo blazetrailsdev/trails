@@ -500,14 +500,8 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T | fal
   const self = this as any;
   if (this.isReadonly()) self._raiseReadonlyRecordError();
 
-  if (self._destroyCallbackAlreadyCalled) return this;
-  self._destroyCallbackAlreadyCalled = true;
-  try {
-    const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
-    return result ? this : false;
-  } finally {
-    self._destroyCallbackAlreadyCalled = false;
-  }
+  const result = await withTransactionReturningStatus.call(self, () => self._destroyRow());
+  return result ? this : false;
 }
 
 export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(
