@@ -5,7 +5,7 @@ import {
   type Packer,
   type Unpacker,
 } from "@blazetrails/activesupport/message-pack";
-import { RuntimeError, rbInspect, rbObjAlloc } from "@blazetrails/ruby-compat";
+import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import type { Base } from "./base.js";
 import { ActiveRecord } from "./namespaces.js";
@@ -135,7 +135,7 @@ export class Decoder {
     ];
     const klass = ActiveSupportExtensions.loadClass(className) as unknown as typeof Base;
     const attributes = klass.attributesBuilder().buildFromDatabase(attributesHash);
-    return rbObjAlloc(klass).initWithAttributes(attributes, isNewRecord);
+    return klass.allocate().initWithAttributes(attributes, isNewRecord);
   }
 
   resolveCachedAssociations(record: Base, entry: unknown[]): void {

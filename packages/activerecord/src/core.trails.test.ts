@@ -8,8 +8,8 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { rbHash, rbObjAlloc, uniq } from "@blazetrails/ruby-compat";
-import { equals as coreEquals, hash as coreHash } from "./core.js";
+import { rbHash, uniq } from "@blazetrails/ruby-compat";
+import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -103,7 +103,7 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
 
   it("initWithAttributes keeps the attributes and new_record it is handed", async () => {
     const source = await Topic.create({ title: "Carol" });
-    const record = rbObjAlloc(Topic) as Topic & {
+    const record = Topic.allocate() as Topic & {
       initWithAttributes(attributes: unknown, newRecord?: boolean): Topic;
       _attributes: unknown;
     };
@@ -115,7 +115,7 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(record.title).toBe("Carol");
     expect(record.isNewRecord()).toBe(true);
 
-    const loaded = rbObjAlloc(Topic) as typeof record;
+    const loaded = Topic.allocate() as typeof record;
     loaded.initWithAttributes(handed);
     expect(loaded.title).toBe("Carol");
     expect(loaded.isNewRecord()).toBe(false);
@@ -140,48 +140,81 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     expect(record.errors.isEmpty()).toBe(true);
   });
 
-  it("allocate runs no constructor and leaves the class untouched", () => {
+  it("allocate leaves the class untouched when the constructor returns", () => {
+    Reply.allocate();
     const before = [ownState(Reply), ownState(Topic)];
-    const initInternals = vi.spyOn(
-      Reply.prototype as unknown as { initInternals(): void },
-      "initInternals",
-    );
-    const requireConcreteClass = vi.spyOn(Reply, "_requireConcreteClass");
-    let record: Reply;
+    Reply.allocate();
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
+  });
+
+  it("allocate adds no class state of its own while it constructs", () => {
+    Reply.allocate();
+    const before = new Map(ownState(Reply));
+    const changed: PropertyKey[][] = [];
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        const during = new Map(ownState(Reply));
+        changed.push(
+          [...new Set([...before.keys(), ...during.keys()])].filter(
+            (key) =>
+              !before.has(key) || !during.has(key) || !Object.is(before.get(key), during.get(key)),
+          ),
+        );
+        original.call(this);
+      });
     try {
-      record = rbObjAlloc(Reply);
-      expect(initInternals).not.toHaveBeenCalled();
-      expect(requireConcreteClass).not.toHaveBeenCalled();
+      Reply.allocate();
     } finally {
+      initInternals.mockRestore();
+    }
+    expect(changed).toEqual([["_suppressInitializeCallback"]]);
+  });
+
+  it("a nested new of the class being allocated is an ordinary new", () => {
+    let nested: Reply | undefined;
+    let nesting = false;
+    const original = (Reply.prototype as unknown as { initInternals(): void }).initInternals;
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(function (this: unknown) {
+        original.call(this);
+        if (nesting) return;
+        nesting = true;
+        nested = new Reply({ title: "Nested" });
+      });
+    const requireConcreteClass = vi.spyOn(Reply, "_requireConcreteClass");
+    let concreteChecks: number;
+    try {
+      Reply.allocate();
+    } finally {
+      concreteChecks = requireConcreteClass.mock.calls.length;
       initInternals.mockRestore();
       requireConcreteClass.mockRestore();
     }
-    expect(record).toBeInstanceOf(Reply);
-    expect(Object.keys(record)).toEqual([]);
-    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(concreteChecks).toBe(1);
+    expect(nested!.isNewRecord()).toBe(true);
+    expect(nested!.title).toBe("Nested");
+    expect(_allocation.klass).toBeNull();
   });
 
-  it("a loaded record holds what init_with_attributes assigns, and runs no field initializer", async () => {
-    class Flagged extends Topic {
-      seated = true;
+  it("allocate leaves the class untouched when the constructor throws", () => {
+    Reply.allocate();
+    const before = [ownState(Reply), ownState(Topic)];
+    const initInternals = vi
+      .spyOn(Reply.prototype as unknown as { initInternals(): void }, "initInternals")
+      .mockImplementation(() => {
+        throw new Error("constructor failed");
+      });
+    try {
+      expect(() => Reply.allocate()).toThrow("constructor failed");
+    } finally {
+      initInternals.mockRestore();
     }
-    const source = await Topic.create({ title: "Dana" });
-    const handed = (
-      source as unknown as { _attributes: { deepDup(): unknown } }
-    )._attributes.deepDup();
-    const loaded = (
-      rbObjAlloc(Flagged) as Flagged & { initWithAttributes(attributes: unknown): Flagged }
-    ).initWithAttributes(handed);
-    expect(Object.hasOwn(loaded, "seated")).toBe(false);
-    expect(new Flagged().seated).toBe(true);
-    const state = loaded as unknown as Record<string, unknown>;
-    expect(state._readonly).toBe(false);
-    expect(state._destroyed).toBe(false);
-    expect(state._previouslyNewRecord).toBe(false);
-    expect(state._mutationsBeforeLastSave).toBeNull();
-    expect(loaded.isNewRecord()).toBe(false);
-    expect(loaded.errors.isEmpty()).toBe(true);
-    expect(loaded.hasChangesToSave).toBe(false);
+    expect([ownState(Reply), ownState(Topic)]).toEqual(before);
+    expect(_allocation.klass).toBeNull();
   });
 });
 

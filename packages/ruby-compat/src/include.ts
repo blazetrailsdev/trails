@@ -1447,7 +1447,7 @@ export function rbObjClone<T>(obj: T): T {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
-  const clone = Object.defineProperties(allocLike(obj, Object.getPrototypeOf(obj)), descriptors);
+  const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
   initCopyHook(clone, "initializeClone", obj);
   if (frozen) Object.freeze(clone);
   return clone as T;
@@ -1478,7 +1478,7 @@ export function rbObjDup<T>(obj: T): T {
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
-  const dup = Object.defineProperties(allocLike(obj, proto), descriptors);
+  const dup = Object.defineProperties(rbObjAlloc(obj, proto), descriptors);
   initCopyHook(dup, "initializeDup", obj);
   return dup as T;
 }
@@ -1511,36 +1511,10 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
   }
 }
 
-/**
- * `rb_obj_alloc` (`vendor/ruby/v3.3.11/object.c:2117`), `Class#allocate`: the
- * class's allocator (`rb_get_alloc_func`), never `initialize`.
- * `rb_class_allocate_instance` (`vendor/ruby/v3.3.11/gc.c:3120`), the allocator
- * of `Object`, is `Object.create`.
- *
- * @noRailsEquivalent PERMANENT
- */
-export function rbObjAlloc<T>(klass: { prototype: T }): T {
-  const allocator = rbGetAllocFunc(klass);
-  if (allocator) return allocator(klass as never) as T;
-  return Object.create(klass.prototype as object) as T;
-}
-
-/**
- * The allocation step of `rb_obj_clone2` / `rb_obj_dup`
- * (`vendor/ruby/v3.3.11/object.c:531,598`): `rb_obj_alloc(rb_obj_class(obj))`,
- * re-seated on `proto`, which is the singleton class when a clone keeps one.
- * A JS built-in holds its content in internal slots that only its own
- * constructor can fill and that `initialize_copy` cannot write afterwards (a
- * `RegExp`'s source, a `Date`'s time value), so those are built from `obj`
- * here, where MRI's allocator and `init_copy` are two steps.
- *
- * @noRailsEquivalent PERMANENT
- */
-function allocLike(obj: object, proto: object | null): object {
+function rbObjAlloc(obj: object, proto: object | null): object {
   const klass = (proto as { constructor?: unknown } | null)?.constructor;
-  if (rbGetAllocFunc(klass)) {
-    return Object.setPrototypeOf(rbObjAlloc(klass as { prototype: object }), proto);
-  }
+  const allocator = rbGetAllocFunc(klass);
+  if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
   if (Array.isArray(obj)) return Object.setPrototypeOf([], proto);
   if (obj instanceof Date) return Object.setPrototypeOf(new Date(obj.getTime()), proto);
   if (obj instanceof Map) return Object.setPrototypeOf(new Map(obj), proto);

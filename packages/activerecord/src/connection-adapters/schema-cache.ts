@@ -6,7 +6,6 @@ import {
   Zlib,
   forceEncoding,
   isModuleIncluded,
-  rbObjAlloc,
   registerConstant,
   sort,
 } from "@blazetrails/ruby-compat";
@@ -68,7 +67,7 @@ const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).ma
       resolve: (map) => {
         const nodeClass = (RubyObject ??= class extends (map.constructor as typeof YAMLMap) {
           override toJSON(arg?: unknown, ctx?: ToJSContext): object {
-            const object = rbObjAlloc(klass);
+            const object = Object.create(klass.prototype) as object;
             ctx?.onCreate?.(object);
             const coder = super.toJSON(arg, ctx) as ColumnCoder;
             if (object instanceof Column) object.initWith(coder);

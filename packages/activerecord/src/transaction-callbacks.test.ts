@@ -13,13 +13,7 @@ import { setRunAfterTransactionCallbacksInOrderDefined } from "./active-record.j
 
 function defineBehaviourTopic() {
   return class extends Base {
-    declare _history?: any[];
-    get history(): any[] {
-      return (this._history ??= []);
-    }
-    set history(history: any[]) {
-      this._history = history;
-    }
+    history: any[] = [];
     static {
       this._tableName = "topics";
       this.attribute("title", "string");
@@ -40,18 +34,12 @@ function defineBehaviourTopic() {
 type CommitBlock = (record: any) => unknown;
 
 class TopicWithCallbacks extends Base {
-  declare _history?: any[];
-  get history(): any[] {
-    return (this._history ??= []);
-  }
-  set history(history: any[]) {
-    this._history = history;
-  }
+  history: any[] = [];
   abortBeforeUpdate?: boolean;
   abortBeforeDestroy?: boolean;
-  declare _beforeCommit?: Record<string, CommitBlock[]>;
-  declare _afterCommit?: Record<string, CommitBlock[]>;
-  declare _afterRollback?: Record<string, CommitBlock[]>;
+  _beforeCommit: Record<string, CommitBlock[]> = {};
+  _afterCommit: Record<string, CommitBlock[]> = {};
+  _afterRollback: Record<string, CommitBlock[]> = {};
 
   static {
     this._tableName = "topics";
@@ -78,27 +66,27 @@ class TopicWithCallbacks extends Base {
   }
 
   beforeCommitBlock(on: string | null, block: CommitBlock) {
-    ((this._beforeCommit ??= {})[String(on)] ??= []).push(block);
+    (this._beforeCommit[String(on)] ??= []).push(block);
   }
 
   afterCommitBlock(on: string | null, block: CommitBlock) {
-    ((this._afterCommit ??= {})[String(on)] ??= []).push(block);
+    (this._afterCommit[String(on)] ??= []).push(block);
   }
 
   afterRollbackBlock(on: string | null, block: CommitBlock) {
-    ((this._afterRollback ??= {})[String(on)] ??= []).push(block);
+    (this._afterRollback[String(on)] ??= []).push(block);
   }
 
   async doBeforeCommit(on: string | null) {
-    for (const b of this._beforeCommit?.[String(on)] ?? []) await b(this);
+    for (const b of this._beforeCommit[String(on)] ?? []) await b(this);
   }
 
   async doAfterCommit(on: string | null) {
-    for (const b of this._afterCommit?.[String(on)] ?? []) await b(this);
+    for (const b of this._afterCommit[String(on)] ?? []) await b(this);
   }
 
   async doAfterRollback(on: string | null) {
-    for (const b of this._afterRollback?.[String(on)] ?? []) await b(this);
+    for (const b of this._afterRollback[String(on)] ?? []) await b(this);
   }
 }
 registerModel(TopicWithCallbacks);
@@ -987,13 +975,7 @@ describe("TransactionCallbacksTest", () => {
     it("after commit on multiple actions", async () => {
       class TopicWithCallbacksOnMultipleActions extends Base {
         declare approved: boolean;
-        declare _history?: string[];
-        get history(): string[] {
-          return (this._history ??= []);
-        }
-        set history(history: string[]) {
-          this._history = history;
-        }
+        history: string[] = [];
         static {
           this._tableName = "topics";
           this.afterCommit((record: any) => record.history.push("create_and_destroy"), {
@@ -1031,13 +1013,7 @@ describe("TransactionCallbacksTest", () => {
         declare title: string;
 
         declare saveBeforeCommitHistory: boolean;
-        declare _history?: string[];
-        get history(): string[] {
-          return (this._history ??= []);
-        }
-        set history(history: string[]) {
-          this._history = history;
-        }
+        history: string[] = [];
         static {
           this._tableName = "topics";
           this.attribute("title", "string");
@@ -1259,13 +1235,7 @@ describe("TransactionCallbacksTest", () => {
       class TopicWithCallbacksOnActionAndCondition extends Base {
         declare title: string;
         declare approved: boolean;
-        declare _history?: any[];
-        get history(): any[] {
-          return (this._history ??= []);
-        }
-        set history(history: any[]) {
-          this._history = history;
-        }
+        history: any[] = [];
 
         runCallback(): boolean {
           this.history.push("run_callback?");
