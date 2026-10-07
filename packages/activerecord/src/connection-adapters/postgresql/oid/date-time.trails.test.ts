@@ -65,14 +65,14 @@ describe("PostgreSQL::OID::DateTime", () => {
     expect(type.serialize(DateInfinity)).toBe(DateInfinity);
     expect(type.serialize(DateNegativeInfinity)).toBe(DateNegativeInfinity);
     const host = {} as QuotingDispatchHost;
-    expect(typeCast.call(host, type.serialize(DateInfinity))).toBe("infinity");
-    expect(typeCast.call(host, type.serialize(DateNegativeInfinity))).toBe("-infinity");
+    expect(typeCast.call(host, type.serialize(DateInfinity))).toBe(Infinity);
+    expect(typeCast.call(host, type.serialize(DateNegativeInfinity))).toBe(-Infinity);
   });
 
   it("serialize round-trips the 'infinity' / '-infinity' wire strings", () => {
     const host = {} as QuotingDispatchHost;
-    expect(typeCast.call(host, type.serialize("infinity"))).toBe("infinity");
-    expect(typeCast.call(host, type.serialize("-infinity"))).toBe("-infinity");
+    expect(typeCast.call(host, type.serialize("infinity"))).toBe(Infinity);
+    expect(typeCast.call(host, type.serialize("-infinity"))).toBe(-Infinity);
   });
 
   it("type_cast_for_schema renders infinity sentinels", () => {

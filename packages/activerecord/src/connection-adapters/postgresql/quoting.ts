@@ -1,9 +1,4 @@
-import {
-  BinaryData,
-  DateInfinity,
-  DateNegativeInfinity,
-  type ValueType,
-} from "@blazetrails/activemodel";
+import { BinaryData, type ValueType } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import {
   quote as abstractQuote,
@@ -22,7 +17,6 @@ import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
 import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
-import { ConnectionNotEstablished } from "../../errors.js";
 
 export class IntegerOutOf64BitRange extends Error {
   constructor(msg: string) {
@@ -175,8 +169,6 @@ export function quoteDefaultExpression(
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value === DateInfinity) return "infinity";
-  if (value === DateNegativeInfinity) return "-infinity";
   if (value instanceof BinaryData) {
     const u8 = value.toString();
     return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
@@ -197,10 +189,10 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
 }
 
 export function lookupCastTypeFromColumn(
-  this: { typeMap: LookupableTypeMap | null },
+  this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
-  if (this.typeMap == null) throw new ConnectionNotEstablished();
+  if (this.typeMap == null) void this.verifyBang();
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

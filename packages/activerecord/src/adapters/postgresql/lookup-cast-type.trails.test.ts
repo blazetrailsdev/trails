@@ -21,6 +21,10 @@ describeIfPg("PostgreSQLAdapter#lookupCastType", () => {
       expect(connection.lookupCastType("varchar")).toBeInstanceOf(StringType);
       expect(connection.lookupCastType("int4")).toBeInstanceOf(IntegerType);
       expect(connection.lookupCastType("integer")).toBeInstanceOf(IntegerType);
+      expect(connection.lookupCastType("decimal").constructor).toBe(
+        connection.lookupCastType("numeric").constructor,
+      );
+      expect(connection.lookupCastType("decimal")).not.toBeInstanceOf(StringType);
     });
 
     it("answers the real type for a schema-qualified name", () => {
