@@ -5,6 +5,7 @@ import {
   keys,
   merge,
   rbEqual,
+  rbObjAlloc,
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
@@ -965,7 +966,7 @@ export function instantiateInstanceOf(
 ): any {
   const names = keys(attributes as Record<string, unknown>);
   attributes = (klass as any).attributesBuilder().buildFromDatabase(attributes, columnTypes);
-  const record = klass.allocate() as any;
+  const record = rbObjAlloc(klass) as any;
   for (const name of names) {
     if (!basicObjRespondTo(record, name, false)) {
       (rbObjSingletonClass(record) as unknown as typeof Base).defineAttributeMethod(name);

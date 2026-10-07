@@ -211,6 +211,7 @@ export {
   extended,
   rbObjClone,
   rbDefineAllocFunc,
+  rbObjAlloc,
   rbObjDup,
   include,
   included,

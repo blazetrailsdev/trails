@@ -1447,7 +1447,7 @@ export function rbObjClone<T>(obj: T): T {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
-  const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
+  const clone = Object.defineProperties(allocLike(obj, Object.getPrototypeOf(obj)), descriptors);
   initCopyHook(clone, "initializeClone", obj);
   if (frozen) Object.freeze(clone);
   return clone as T;
@@ -1478,7 +1478,7 @@ export function rbObjDup<T>(obj: T): T {
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
-  const dup = Object.defineProperties(rbObjAlloc(obj, proto), descriptors);
+  const dup = Object.defineProperties(allocLike(obj, proto), descriptors);
   initCopyHook(dup, "initializeDup", obj);
   return dup as T;
 }
@@ -1511,7 +1511,21 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
   }
 }
 
-function rbObjAlloc(obj: object, proto: object | null): object {
+/**
+ * `rb_obj_alloc` (`vendor/ruby/v3.3.11/object.c:2117`), `Class#allocate`: the
+ * class's allocator (`rb_get_alloc_func`), never `initialize`.
+ * `rb_class_allocate_instance` (`vendor/ruby/v3.3.11/gc.c:3120`), the allocator
+ * of `Object`, is `Object.create`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjAlloc<T>(klass: { prototype: T }): T {
+  const allocator = rbGetAllocFunc(klass);
+  if (allocator) return allocator(klass as never) as T;
+  return Object.create(klass.prototype as object) as T;
+}
+
+function allocLike(obj: object, proto: object | null): object {
   const klass = (proto as { constructor?: unknown } | null)?.constructor;
   const allocator = rbGetAllocFunc(klass);
   if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);

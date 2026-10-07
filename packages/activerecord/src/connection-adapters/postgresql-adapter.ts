@@ -15,7 +15,7 @@ import {
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
 import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { File, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -198,7 +198,6 @@ import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { PGResult } from "./postgresql/pg-result.js";
-import { abandonRawSocket } from "./abandon-raw-socket.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
@@ -704,7 +703,7 @@ export class PostgreSQLAdapter
   override discardBang(): void {
     super.discardBang();
     try {
-      abandonRawSocket(this._rawConnection);
+      this._rawConnection?.socketIo()?.reopen(File.NULL);
     } catch {}
     this._rawConnection = null;
     void this._statements.reset();
@@ -1599,7 +1598,9 @@ export class PostgreSQLAdapter
 
   private _teardownRacedClient(client: pg.Client, acquireGen: number): void {
     if (this._discardedAcquireGenerations.has(acquireGen)) {
-      abandonRawSocket(client);
+      try {
+        pgConnection(client).socketIo()?.reopen(File.NULL);
+      } catch {}
     } else {
       client.end().catch(() => {});
     }

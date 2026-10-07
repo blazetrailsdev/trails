@@ -1,7 +1,7 @@
 import { ArgumentError } from "./argument-error.js";
 import { Encoding } from "./encoding.js";
 import { Hash } from "./hash.js";
-import { Module, rbGetAllocFunc } from "./include.js";
+import { Module, rbGetAllocFunc, rbObjAlloc } from "./include.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm, rbDbl2num, rbFloatTypeP, rbIntegerTypeP } from "./numeric.js";
 import { Rational, nuratDumper, nuratLoader } from "./rational.js";
@@ -981,17 +981,6 @@ function mustBeModule(v: unknown, path: string): Module {
     throw new ArgumentError(`${path} does not refer to module`);
   }
   return v;
-}
-
-/**
- * `rb_obj_alloc` (`vendor/ruby/v3.3.11/object.c:2117`): the class's allocator
- * (`rb_get_alloc_func`), never `initialize`. `rb_class_allocate_instance`
- * (`vendor/ruby/v3.3.11/gc.c:3120`), the allocator of `Object`, is `Object.create`.
- */
-function rbObjAlloc(klass: AnyClass): object {
-  const allocator = rbGetAllocFunc(klass);
-  if (allocator) return allocator(klass as never);
-  return Object.create(klass.prototype as object) as object;
 }
 
 /**

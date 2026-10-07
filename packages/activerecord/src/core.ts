@@ -759,10 +759,6 @@ export function setConnectionHandler(this: CoreHost, handler: ConnectionHandler)
 
 const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 
-/** @internal */
-export const _allocation: { klass: unknown } = { klass: null };
-
-/** @inventedArm if — CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
 export function constructor(
   this: CoreRecord & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;
@@ -772,18 +768,14 @@ export function constructor(
   attributes: unknown = null,
   block?: (record: CoreRecord) => void,
 ): void {
-  const allocating = _allocation.klass === this.constructor;
-  if (allocating) _allocation.klass = null;
-  if (!allocating) {
-    this._newRecord = true;
-    this._attributes = (
-      this.constructor as unknown as {
-        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
-      }
-    )
-      ._defaultAttributes()
-      .deepDup();
-  }
+  this._newRecord = true;
+  this._attributes = (
+    this.constructor as unknown as {
+      _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+    }
+  )
+    ._defaultAttributes()
+    .deepDup();
 
   this.initInternals();
 

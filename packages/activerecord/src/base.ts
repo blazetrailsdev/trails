@@ -1588,17 +1588,6 @@ export class Base extends Model {
   declare static counterCachedAssociationNames: string[];
   declare static isCounterCachedAssociationNames: boolean;
 
-  /** @noRailsEquivalent CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
-  static allocate<T extends typeof Base>(this: T): InstanceType<T> {
-    const previous = _Core._allocation.klass;
-    _Core._allocation.klass = this;
-    try {
-      return new this() as InstanceType<T>;
-    } finally {
-      _Core._allocation.klass = previous;
-    }
-  }
-
   static _instantiate<T extends typeof Base>(
     this: T,
     row: Record<string, unknown> | IndexedRow,
@@ -1626,13 +1615,10 @@ export class Base extends Model {
     attributes: Record<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,
   ) {
-    const allocating = _Core._allocation.klass === new.target;
-    if (allocating) _Core._allocation.klass = null;
-    if (!allocating) (new.target as typeof Base | undefined)?._requireConcreteClass();
+    (new.target as typeof Base | undefined)?._requireConcreteClass();
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     if (
-      !allocating &&
       (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
         ?._suppressStiNewDispatch !== new.target
     ) {
@@ -1664,10 +1650,9 @@ export class Base extends Model {
     const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
     const previouslySuppressed = suppressor._suppressInitializeCallback;
-    const wasSuppressed = allocating || previouslySuppressed;
+    const wasSuppressed = previouslySuppressed;
     suppressor._suppressInitializeCallback = true;
     try {
-      if (allocating) _Core._allocation.klass = ctor;
       super(attrs);
     } finally {
       if (hadOwn) {

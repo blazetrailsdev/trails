@@ -35,7 +35,7 @@ import {
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
-import { abandonRawSocket } from "./abandon-raw-socket.js";
+import { mysql2Client, type Mysql2Client } from "./mysql2/mysql2-client.js";
 import { defaultTimezone } from "../active-record.js";
 
 const FOUND_ROWS = 2;
@@ -333,11 +333,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._discardedConnectGenerations.add(this._connectGeneration);
     }
     this._connectGeneration++;
-    super.discardBang();
     this._connectionConfigured = false;
     this._statements = null;
-    abandonRawSocket(this._rawConnection);
-    this._rawConnection = null;
+    void this.lock.synchronize(() => {
+      super.discardBang();
+      if (this._rawConnection) this._rawConnection.automaticClose = false;
+      this._rawConnection = null;
+    });
   }
 
   /** @internal */
@@ -435,12 +437,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  get _rawConnection(): mysql.Connection | null {
-    return this._connection as mysql.Connection | null;
+  get _rawConnection(): Mysql2Client | null {
+    return this._connection as Mysql2Client | null;
   }
   /** @internal */
   set _rawConnection(value: mysql.Connection | null) {
-    this._connection = value;
+    this._connection = value && mysql2Client(value);
   }
 
   private _getStmtPool(): MysqlStatementPool {
@@ -488,7 +490,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             "Mysql2Adapter: connection was closed during connect",
           );
           if (this._discardedConnectGenerations.delete(gen)) {
-            abandonRawSocket(conn);
+            mysql2Client(conn).automaticClose = false;
             throw discardErr;
           }
           return conn.end().then(
