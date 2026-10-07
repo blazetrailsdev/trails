@@ -64,10 +64,9 @@ export async function create(
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
   const record = new this(
-    mergedAttrs,
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);
@@ -89,10 +88,9 @@ export async function createBang(
     return records;
   }
   await this.ensureSchemaLoaded();
-  const mergedAttrs = (this as any)._mergeCurrentScopeAttrs(attributes);
   let yielded: unknown;
   const record = new this(
-    mergedAttrs,
+    attributes,
     block &&
       ((record: any) => {
         yielded = block(record);

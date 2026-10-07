@@ -26,7 +26,7 @@ describe("DatabaseConfigurations", () => {
 
     it("validate rejects an empty adapter string", async () => {
       const config = new HashConfig("default_env", "primary", { adapter: "" });
-      await expect(config.validateBang()).rejects.toThrow(AdapterNotFound);
+      expect(() => config.validateBang()).toThrow(AdapterNotFound);
     });
 
     it("validate reports a registered adapter whose loader failed", async () => {
@@ -34,14 +34,15 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_broken_adapter",
       });
-      await expect(config.validateBang()).rejects.toThrow(
+      await load("trails_broken_adapter");
+      expect(() => config.validateBang()).toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? cannot load such file -- pg",
       );
 
       expect(() => resolve("trails_broken_adapter")).toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter. Missing a gem it depends on? cannot load such file -- pg",
       );
-      await expect(config.validateBang()).rejects.toThrow(
+      expect(() => config.validateBang()).toThrow(
         "Error loading the 'trails_broken_adapter' Active Record adapter.",
       );
     });
@@ -92,18 +93,21 @@ describe("DatabaseConfigurations", () => {
       expect(() => config.adapterClass()).toThrow(
         "Could not load the TrailsFirstAdapter Active Record adapter (uninitialized constant TrailsFirstAdapter).",
       );
-      await config.validateBang();
+      await load("trails_unloaded_adapter");
+      config.validateBang();
       expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
     });
 
     it("validate! keeps a memoized adapter class and seats one read before it loaded", async () => {
       register("trails_memo_adapter", "TrailsFirstAdapter", adaptersPath);
       const config = new HashConfig("default_env", "primary", { adapter: "trails_memo_adapter" });
-      await config.validateBang();
+      await load("trails_memo_adapter");
+      config.validateBang();
       expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
 
       register("trails_memo_adapter", "TrailsSecondAdapter", adaptersPath);
-      await config.validateBang();
+      await load("trails_memo_adapter");
+      config.validateBang();
       expect((config.adapterClass() as { name: string }).name).toBe("TrailsFirstAdapter");
     });
 
@@ -112,7 +116,8 @@ describe("DatabaseConfigurations", () => {
       const config = new HashConfig("default_env", "primary", {
         adapter: "trails_inspect_adapter",
       });
-      await config.validateBang();
+      await load("trails_inspect_adapter");
+      config.validateBang();
       expect(config.inspect()).toBe(
         "#<ActiveRecord::DatabaseConfigurations::HashConfig env_name=default_env name=primary adapter_class=TrailsSecondAdapter>",
       );
@@ -125,10 +130,11 @@ describe("DatabaseConfigurations", () => {
       });
       await load("trails_refixed_adapter");
       expect(() => resolve("trails_refixed_adapter")).toThrow(LoadError);
-      await expect(config.validateBang()).rejects.toThrow();
+      expect(() => config.validateBang()).toThrow();
 
       register("trails_refixed_adapter", "TrailsFirstAdapter", adaptersPath);
-      expect(await config.validateBang()).toBe(true);
+      await load("trails_refixed_adapter");
+      expect(config.validateBang()).toBe(true);
     });
   });
 });

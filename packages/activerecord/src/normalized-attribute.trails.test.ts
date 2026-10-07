@@ -26,8 +26,8 @@ describe("STI subclass normalizes", () => {
     expect(Company.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
     expect(OtherCompany.typeForAttribute("name")!.cast("  acme  ")).toBe("  acme  ");
 
-    expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
-    expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");
+    expect(new NormalizedCompany({ name: "  acme  " }).name).toBe("ACME");
+    expect(new Company({ name: "  acme  " }).name).toBe("  acme  ");
   });
 
   it("keeps the subclass decoration across a schema reset and re-reflection", async () => {

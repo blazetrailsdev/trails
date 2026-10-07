@@ -68,7 +68,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("size() on a new-record owner returns the buffered target without querying", async () => {
-    const author = CpcAuthor.new({ name: "unsaved" });
+    const author = new CpcAuthor({ name: "unsaved" });
     const proxy = association(author, "cpcPosts") as any;
     proxy.build({ title: "b1" });
     proxy.build({ title: "b2" });
@@ -212,9 +212,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
   });
 
   it("foreignKeyPresent on the proxy agrees with the OO association (owner PK present)", async () => {
-    const newWithPk = CpcAuthor.new({ name: "withpk" });
+    const newWithPk = new CpcAuthor({ name: "withpk" });
     (newWithPk as any)._writeAttribute("id", 999);
-    const newWithoutPk = CpcAuthor.new({ name: "nopk" });
+    const newWithoutPk = new CpcAuthor({ name: "nopk" });
 
     const withPkProxy = association(newWithPk, "cpcPosts") as any;
     const withoutPkProxy = association(newWithoutPk, "cpcPosts") as any;

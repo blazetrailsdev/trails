@@ -67,7 +67,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
 
   it("test_cast_value_on_write", async () => {
     const payload = { string: "foo", symbol: "bar" };
-    const x = klass().new({ payload }) as JsonRecord;
+    const x = new (klass())({ payload }) as JsonRecord;
     expect((x.attributeBeforeTypeCast as (attrName: string) => unknown)("payload")).toBe(payload);
     expect(x.payload).not.toBe(payload);
     expect(x.payload).toEqual({ string: "foo", symbol: "bar" });
@@ -146,7 +146,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_with_store_accessors", async () => {
-    let x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    let x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     await x.saveBang();
@@ -161,7 +161,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_duplication_with_store_accessors", () => {
-    const x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    const x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     const y = x.dup();
@@ -169,16 +169,16 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_yaml_round_trip_with_store_accessors", () => {
-    const x = klass().new({ resolution: "320×480" }) as JsonRecord;
+    const x = new (klass())({ resolution: "320×480" }) as JsonRecord;
     expect(x.resolution).toBe("320×480");
 
     const payload = yamlStringify(x.serializableHash());
-    const y = klass().new(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
+    const y = new (klass())(yamlParse(payload) as Record<string, unknown>) as JsonRecord;
     expect(y.resolution).toBe("320×480");
   });
 
   it("test_changes_in_place", async () => {
-    const json = klass().new() as JsonRecord;
+    const json = new (klass())() as JsonRecord;
     expect(json.isChanged).toBe(false);
 
     json.payload = { one: "two" };
@@ -199,7 +199,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it.skip("test_changes_in_place_ignores_key_order", async () => {
-    const json = klass().new() as JsonRecord;
+    const json = new (klass())() as JsonRecord;
     expect(json.isChanged).toBe(false);
 
     json.payload = { three: "four", one: "two" };

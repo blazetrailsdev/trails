@@ -23,7 +23,7 @@ export class PostsController extends ApplicationController {
   }
 
   async create(): Promise<void> {
-    const post = Post.new(this.postParams());
+    const post = new Post(this.postParams());
     await post.save();
     await this.render({ json: { title: post.readAttribute("title") }, status: ":created" });
   }

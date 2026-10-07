@@ -67,7 +67,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("write", async () => {
-      const x = Citext.new({ cival: "Some CI Text" });
+      const x = new Citext({ cival: "Some CI Text" });
       await x.saveBang();
       const citext = await Citext.first();
       expect(citext!.cival).toBe("Some CI Text");

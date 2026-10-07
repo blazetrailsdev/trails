@@ -42,7 +42,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("round trip", async () => {
-      const data = XmlDataType.new({ payload: "<foo>bar</foo>" }) as any;
+      const data = new XmlDataType({ payload: "<foo>bar</foo>" }) as any;
       expect(data.payload).toBe("<foo>bar</foo>");
       await data.saveBang();
       await data.reload();

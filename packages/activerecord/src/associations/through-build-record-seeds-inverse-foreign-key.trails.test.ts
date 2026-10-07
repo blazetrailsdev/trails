@@ -29,8 +29,8 @@ describe("ThroughAssociation#build_record seeds the source inverse foreign key",
   });
 
   it("assigns nothing when the through target has no id yet", async () => {
-    const memberDetail = MemberDetail.new({});
-    memberDetail.organization = Organization.new({ name: "Discordians" });
+    const memberDetail = new MemberDetail({});
+    memberDetail.organization = new Organization({ name: "Discordians" });
 
     const attributes: Record<string, unknown> = {};
     (

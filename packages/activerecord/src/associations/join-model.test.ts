@@ -296,7 +296,7 @@ describe("AssociationsJoinModelTest", () => {
   it("set polymorphic has one on new record", async () => {
     const misc = await Tag.find(tags("misc").id);
     const tagging = await (misc as any).taggings.create();
-    const post = Post.new({ title: "foo", body: "bar" });
+    const post = new Post({ title: "foo", body: "bar" });
     await (post as any).association("tagging").replace(tagging);
     await post.save();
 
@@ -1083,8 +1083,8 @@ describe("AssociationsJoinModelTest", () => {
       .includes(":comments")
       .order("comments.id")
       .first()) as Author;
-    SpecialComment.new();
-    VerySpecialComment.new();
+    new SpecialComment();
+    new VerySpecialComment();
     await assertNoQueries(false, async () => {
       const ids = ((author as any).comments.target as Base[]).map((c) => Number(c.id));
       expect(ids).toEqual([1, 2, 3, 5, 6, 7, 8, 9, 10, 12, 13]);
@@ -1107,7 +1107,7 @@ describe("AssociationsJoinModelTest", () => {
 
   it("associating unsaved records with has many through", async () => {
     const savedPost = await Post.find(posts("thinking").id);
-    const newTag = Tag.new({ name: "new" });
+    const newTag = new Tag({ name: "new" });
 
     await (savedPost as any).tags.push(newTag);
     expect((newTag as any).isPersisted()).toBeTruthy();
@@ -1120,7 +1120,7 @@ describe("AssociationsJoinModelTest", () => {
       newTag,
     );
 
-    const newPost = Post.new({
+    const newPost = new Post({
       title: "Association replacement works!",
       body: "You best believe it.",
     });

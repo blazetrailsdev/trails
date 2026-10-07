@@ -616,7 +616,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it("should run add callback methods for habtm", async () => {
     const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" });
     await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
 
     const expected = ["before_adding_method_parrot_<new>", "after_adding_method_parrot_<new>"];
@@ -647,7 +647,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   it("should run add callback procs for habtm", async () => {
     const associationNameWithCallbacks = "parrotsWithProcCallbacks";
 
-    const pirate = CanonicalPirate.new({ catchphrase: "Arr" });
+    const pirate = new CanonicalPirate({ catchphrase: "Arr" });
     await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
 
     const expected = ["before_adding_proc_parrot_<new>", "after_adding_proc_parrot_<new>"];

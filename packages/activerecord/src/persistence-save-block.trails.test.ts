@@ -34,7 +34,7 @@ describe("save block threading (trails)", () => {
         seen.push("after_create");
       });
 
-      const post = Post.new({ title: "yield", body: "after insert" });
+      const post = new Post({ title: "yield", body: "after insert" });
       const saved = await post.save({}, (record) => {
         seen.push("block");
         expect(record).toBe(post);
@@ -55,7 +55,7 @@ describe("save block threading (trails)", () => {
         seen.push("after_create");
       });
 
-      const post = Post.new({ title: "yield!", body: "after insert" });
+      const post = new Post({ title: "yield!", body: "after insert" });
       await post.saveBang({}, () => {
         seen.push("block");
       });
@@ -92,7 +92,7 @@ describe("save block threading (trails)", () => {
         seen.push("after_create");
       });
 
-      const record = Post.new({ title: "insert_record", body: "block" });
+      const record = new Post({ title: "insert_record", body: "block" });
       const inserted = await postsOf(author).insertRecord(record, true, false, () => {
         seen.push("block");
       });
@@ -111,7 +111,7 @@ describe("save block threading (trails)", () => {
         await author.posts.load();
       });
 
-      const post = Post.new({ title: "dup", body: "check" });
+      const post = new Post({ title: "dup", body: "check" });
       await author.posts.push(post);
 
       const target = await author.posts;

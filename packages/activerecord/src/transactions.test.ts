@@ -349,7 +349,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes then retry save on new record", async () => {
-    const topic = Topic.new({ title: "Ruby on Rails" }) as any;
+    const topic = new Topic({ title: "Ruby on Rails" }) as any;
 
     await transaction(Base, async () => {
       await topic.save();
@@ -366,7 +366,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback dirty changes then retry save on new record with autosave association", async () => {
-    const author = Author.new({ name: "DHH" }) as any;
+    const author = new Author({ name: "DHH" }) as any;
     const book = (await Book.createBang({})) as any;
     await author.books.push(book);
 
@@ -411,7 +411,7 @@ describe("TransactionTest", () => {
   });
 
   it("add to null transaction", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
     await expect(topic.addToTransaction()).resolves.not.toThrow();
   });
 
@@ -567,7 +567,7 @@ describe("TransactionTest", () => {
   });
 
   it("raising exception in nested transaction restore state in save", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
     topic.afterSaveForTransaction = () => {
       throw new RuntimeError("Make the transaction rollback");
     };
@@ -660,7 +660,7 @@ describe("TransactionTest", () => {
     };
     registerModel(CallbackRollbackTopic as any);
 
-    const newTopic = CallbackRollbackTopic.new({
+    const newTopic = new CallbackRollbackTopic({
       title: "A new topic",
       author_name: "Ben",
       author_email_address: "ben@example.com",
@@ -691,7 +691,7 @@ describe("TransactionTest", () => {
   it("callback rollback in create with record invalid exception", async () => {
     class RecordInvalidTopic extends Topic {}
     (RecordInvalidTopic.prototype as any).afterCreateForTransaction = function () {
-      throw new RecordInvalid(Author.new() as any);
+      throw new RecordInvalid(new Author() as any);
     };
     registerModel(RecordInvalidTopic as any);
 
@@ -727,8 +727,8 @@ describe("TransactionTest", () => {
   });
 
   it("nested transaction with new transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -748,8 +748,8 @@ describe("TransactionTest", () => {
   });
 
   it("nested transaction without new transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -766,9 +766,9 @@ describe("TransactionTest", () => {
   });
 
   it("double nested transaction applies parent state on rollback", async () => {
-    const topicOne = Topic.new({ title: "A new topic" }) as any;
-    const topicTwo = Topic.new({ title: "Another new topic" }) as any;
-    const topicThree = Topic.new({ title: "Another new topic of course" }) as any;
+    const topicOne = new Topic({ title: "A new topic" }) as any;
+    const topicTwo = new Topic({ title: "Another new topic" }) as any;
+    const topicThree = new Topic({ title: "Another new topic of course" }) as any;
 
     await Topic.transaction(async () => {
       await topicOne.save();
@@ -971,7 +971,7 @@ describe("TransactionTest", () => {
   });
 
   it("rollback when saving a frozen record", async () => {
-    const topic = Topic.new({ title: "test" }) as any;
+    const topic = new Topic({ title: "test" }) as any;
     topic.freeze();
     const e = await assertRaises([FrozenError], {}, async () => {
       await topic.save();
@@ -994,9 +994,9 @@ describe("TransactionTest", () => {
     };
     registerModel(topicWithoutCallbacks as any);
 
-    const topic1 = Topic.new({ title: "test_1" }) as any;
-    const topic2 = Topic.new({ title: "test_2" }) as any;
-    const topic3 = topicWithoutCallbacks.new({ title: "test_3" }) as any;
+    const topic1 = new Topic({ title: "test_1" }) as any;
+    const topic2 = new Topic({ title: "test_2" }) as any;
+    const topic3 = new topicWithoutCallbacks({ title: "test_3" }) as any;
 
     await Topic.transaction(async () => {
       expect(await topic1.save()).toBeTruthy();
@@ -1042,7 +1042,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore new record after double save", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1055,7 +1055,7 @@ describe("TransactionTest", () => {
   });
 
   it("dont restore new record in subsequent transaction", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1101,7 +1101,7 @@ describe("TransactionTest", () => {
   it("rollback on composite key model", async () => {
     try {
       await CpkBook.createBang({ id: [1, 3], title: "Charlotte's Web" });
-      const bookTwoUnpersisted = CpkBook.new({ id: [1, 3] }) as any;
+      const bookTwoUnpersisted = new CpkBook({ id: [1, 3] }) as any;
 
       await expect(
         CpkBook.transaction(async () => {
@@ -1114,7 +1114,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore id after rollback", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1125,7 +1125,7 @@ describe("TransactionTest", () => {
   });
 
   it("restore custom primary key after rollback", async () => {
-    const movie = Movie.new({ name: "foo" }) as any;
+    const movie = new Movie({ name: "foo" }) as any;
 
     await Movie.transaction(async () => {
       await movie.saveBang();
@@ -1160,7 +1160,7 @@ describe("TransactionTest", () => {
   });
 
   it("read attribute after rollback", async () => {
-    const topic = Topic.new() as any;
+    const topic = new Topic() as any;
 
     await Topic.transaction(async () => {
       await topic.saveBang();
@@ -1171,7 +1171,7 @@ describe("TransactionTest", () => {
   });
 
   it("read attribute with custom primary key after rollback", async () => {
-    const movie = Movie.new({ name: "foo" }) as any;
+    const movie = new Movie({ name: "foo" }) as any;
 
     await Movie.transaction(async () => {
       await movie.saveBang();

@@ -159,7 +159,7 @@ describe("CollectionProxy#count — disable_joins through", () => {
   });
 
   it("unsaved owner returns 0 without firing any SQL", async () => {
-    const unsaved = CdAuthor.new({ name: "unsaved" });
+    const unsaved = new CdAuthor({ name: "unsaved" });
     const observed: string[] = [];
     const sub = Notifications.subscribe("sql.active_record", (event: any) => {
       const sql = event?.payload?.sql;

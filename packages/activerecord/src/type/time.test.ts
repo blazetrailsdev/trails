@@ -9,7 +9,7 @@ describe("TimeTest", () => {
 
   it("default year is correct", async () => {
     const expectedTime = RubyTime.utc(2000, 1, 1, 10, 30, 0);
-    const topic = Topic.new({ bonus_time: { 4: 10, 5: 30 } });
+    const topic = new Topic({ bonus_time: { 4: 10, 5: 30 } });
 
     expect(topic.bonus_time).toEqual(expectedTime);
     expect(topic.bonus_time).toBeInstanceOf(RubyTime);

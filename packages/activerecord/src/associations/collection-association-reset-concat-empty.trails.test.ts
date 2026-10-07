@@ -45,7 +45,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const author = await Author.find(authors("david").id);
     const assoc = assocOf(author);
 
-    const built = Post.new({ title: "reset", body: "me" });
+    const built = new Post({ title: "reset", body: "me" });
     assoc.addToTarget(built);
     expect(assoc._replacedOrAddedTargets.has(built)).toBe(true);
 
@@ -59,7 +59,7 @@ describe("CollectionAssociation reset / insert_record block / empty?", () => {
     const author = await Author.find(authors("david").id);
     const assoc = assocOf(author);
 
-    const record = Post.new({ title: "block", body: "yield" });
+    const record = new Post({ title: "block", body: "yield" });
     const seen: Array<boolean | null> = [];
     await assoc.insertRecord(record, true, false, () => {
       assoc._wasLoaded = assoc.isLoaded();

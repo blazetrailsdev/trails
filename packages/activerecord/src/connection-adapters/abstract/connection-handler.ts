@@ -1,7 +1,7 @@
 import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
-import { ActiveRecord } from "../../namespaces.js";
+import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
 import { hashAset, isSymbol, toEnum, toS, type Enumerator } from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
@@ -250,7 +250,10 @@ export class ConnectionHandler {
     return undefined;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm load — CONVERGEABLE connection-adapters-load-is-an-awaited-require-split-from-resolve
+   */
   private async resolvePoolConfig(
     config: DatabaseConfig | string | Record<string, unknown>,
     connectionName: ConnectionDescriptor | ConnectionOwner,
@@ -258,7 +261,8 @@ export class ConnectionHandler {
     shard: string,
   ): Promise<PoolConfig> {
     const dbConfig = ActiveRecord.Base.configurations().resolve(config)!;
-    await dbConfig.validateBang();
+    await ConnectionAdapters.load(dbConfig.adapter);
+    dbConfig.validateBang();
     if (!dbConfig.adapter) {
       throw new AdapterNotSpecified("database configuration does not specify adapter");
     }

@@ -52,7 +52,7 @@ describe("HasOneThroughSetterTrails", () => {
   });
 
   it("assigning to a new owner defers the join row to the owner's first save", async () => {
-    const member = Member.new({ name: "Unsaved" });
+    const member = new Member({ name: "Unsaved" });
     const club = clubs("boring_club");
     const rowCount = async () => Number(await CurrentMembership.count());
     const before = await rowCount();
@@ -85,7 +85,7 @@ describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
   registerModel(CurrentMembership);
 
   it("awaits the in-memory join record's assignment before the setter answers", async () => {
-    const member = Member.new({ name: "Unsaved" });
+    const member = new Member({ name: "Unsaved" });
     await (member as unknown as AwaitableClubSetter).setClub(clubs("boring_club"));
 
     const throughRecord = member.currentMembership as unknown as {
@@ -116,7 +116,7 @@ describe("HasOneThroughInMemoryJoinAssignmentTrails", () => {
   });
 
   it("awaits the in-memory join record's assignment when the association is built", async () => {
-    const member = Member.new({ name: "Unsaved" });
+    const member = new Member({ name: "Unsaved" });
     await (member as unknown as AwaitableClubSetter).setClub(clubs("boring_club"));
 
     const throughRecord = member.currentMembership as unknown as {

@@ -9,6 +9,7 @@ import {
   rbModName,
 } from "@blazetrails/ruby-compat";
 import { Temporal } from "@blazetrails/date";
+import { NotImplementedError } from "./errors.js";
 import "./i18n.js";
 import type { Identification } from "@blazetrails/globalid";
 import { Transaction as _UserTransaction } from "./transaction.js";
@@ -59,7 +60,6 @@ import {
   isDescendsFromActiveRecord as _isDescendsFromActiveRecord,
   usingSingleTableInheritance as _usingSingleTableInheritance,
 } from "./inheritance.js";
-import { NotImplementedError } from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -632,15 +632,6 @@ export class Base extends Model {
     | undefined;
   declare static isSignedIdVerifierSecret: boolean;
 
-  static _requireConcreteClass(): void {
-    if ((this.abstractClass || this === Base) && !this._suppressAbstractCheck) {
-      // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
-      throw new NotImplementedError(
-        `${rbModName(this)} is an abstract class and cannot be instantiated.`,
-      );
-    }
-  }
-
   declare static connectionClass: boolean;
 
   static isConnectionClass = _Core.isConnectionClass;
@@ -998,6 +989,8 @@ export class Base extends Model {
   static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
+
+  declare static _suppressStiNewDispatch?: unknown;
 
   declare static attrReadonly: typeof ReadonlyAttributes.attrReadonly;
   declare static isReadonlyAttribute: typeof ReadonlyAttributes.isReadonlyAttribute;
@@ -1367,57 +1360,18 @@ export class Base extends Model {
     return this.all().createOrFindByBang(conditions, block);
   }
 
-  static new<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>[];
-  static new<T extends typeof Base>(
-    this: T,
-    attrs?: Record<string, unknown> | PermittedAttributes,
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>;
-  static new<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T> | InstanceType<T>[] {
-    if (Array.isArray(attrs)) {
-      return attrs.map((a) => this.new(a, block));
-    }
-    const record = new this(this._mergeCurrentScopeAttrs(attrs)) as InstanceType<T>;
-    if (block) block(record);
-    return record;
-  }
-
-  static build<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>[],
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>[];
-  static build<T extends typeof Base>(
-    this: T,
-    attrs?: Record<string, unknown> | PermittedAttributes,
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T>;
-  static build<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
-    block?: (record: InstanceType<T>) => void,
-  ): InstanceType<T> | InstanceType<T>[] {
-    return Array.isArray(attrs) ? this.new(attrs, block) : this.new(attrs, block);
-  }
-
-  private static _mergeCurrentScopeAttrs(
-    attrs: Record<string, unknown> | PermittedAttributes,
-  ): Record<string, unknown> | PermittedAttributes {
-    const scope = this.currentScope();
-    if (scope) {
-      const scopeAttrs = scope.scopeForCreate?.() ?? {};
-      return { ...scopeAttrs, ...(isEmpty(attrs) ? {} : sanitizeForMassAssignment(attrs)) };
-    }
-    return attrs;
-  }
+  declare static build: {
+    <T extends typeof Base>(
+      this: T,
+      attributes: Record<string, unknown>[],
+      block?: (record: InstanceType<T>) => void,
+    ): InstanceType<T>[];
+    <T extends typeof Base>(
+      this: T,
+      attributes?: Record<string, unknown> | PermittedAttributes,
+      block?: (record: InstanceType<T>) => void,
+    ): InstanceType<T>;
+  };
 
   static async create<T extends typeof Base>(
     this: T,
@@ -1629,36 +1583,40 @@ export class Base extends Model {
   ) {
     const allocating = _Core._allocation.klass === new.target;
     if (allocating) _Core._allocation.klass = null;
-    if (!allocating) (new.target as typeof Base | undefined)?._requireConcreteClass();
-    attributes ??= {};
-    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
-    if (
-      !allocating &&
-      (new.target as (typeof Base & { _suppressStiNewDispatch?: unknown }) | undefined)
-        ?._suppressStiNewDispatch !== new.target
-    ) {
+    if (!allocating) {
       const klass = new.target;
-      let subclass: typeof Base | null = null;
-      if (klass._hasAttribute(klass.inheritanceColumn as string)) {
-        subclass = klass.subclassFromAttributes(attrs);
-
-        let scopeAttributes;
-        if (
-          subclass == null &&
-          (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
-        ) {
-          subclass = klass.subclassFromAttributes(scopeAttributes);
-        }
-
-        if (subclass == null && klass.isBaseClass()) {
-          subclass = klass.subclassFromAttributes(klass.columnDefaults);
-        }
+      if ((klass.abstractClass || klass === Base) && !klass._suppressAbstractCheck) {
+        // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/inheritance.rb:58
+        throw new NotImplementedError(
+          `${rbModName(klass)} is an abstract class and cannot be instantiated.`,
+        );
       }
 
-      if (subclass != null && subclass !== klass) {
-        return new subclass(attrs, initBlock);
+      if (klass._suppressStiNewDispatch !== klass) {
+        let subclass: typeof Base | null = null;
+        if (klass._hasAttribute(klass.inheritanceColumn as string)) {
+          subclass = klass.subclassFromAttributes(attributes as Record<string, unknown>);
+
+          let scopeAttributes;
+          if (
+            subclass == null &&
+            (scopeAttributes = klass.currentScope()?.scopeForCreate()) != null
+          ) {
+            subclass = klass.subclassFromAttributes(scopeAttributes);
+          }
+
+          if (subclass == null && klass.isBaseClass()) {
+            subclass = klass.subclassFromAttributes(klass.columnDefaults);
+          }
+        }
+
+        if (subclass != null && subclass !== klass) {
+          return new subclass(attributes, initBlock);
+        }
       }
     }
+    attributes ??= {};
+    let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
     let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
     const ctor = new.target;
@@ -2250,6 +2208,7 @@ Object.setPrototypeOf(
     },
   }),
 );
+extend(Base, { build: _Persistence.build });
 extend(Base, {
   _updateRecord: _Persistence._updateRecord,
   _deleteRecord: _Persistence._deleteRecord,

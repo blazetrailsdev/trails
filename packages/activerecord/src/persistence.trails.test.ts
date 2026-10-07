@@ -10,6 +10,7 @@ import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
+import { Comment } from "./test-helpers/models/comment.js";
 import { Company } from "./test-helpers/models/company.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { Notifications } from "@blazetrails/activesupport";
@@ -67,6 +68,28 @@ describe("PersistenceTest (trails)", () => {
     expect((await Topic.find(topic.id)).title).toBe("after");
   });
 
+  it("a bare new runs the block and the initialize callbacks once", () => {
+    class Counted extends Topic {}
+    let initialized = 0;
+    Counted.afterInitialize(() => {
+      initialized += 1;
+    });
+    let yielded = 0;
+    const topic = new Counted({ title: "a" }, () => {
+      yielded += 1;
+    });
+    expect(topic).toBeInstanceOf(Counted);
+    expect([initialized, yielded]).toEqual([1, 1]);
+  });
+
+  it("create inside a scope keeps an explicit attribute over the scope's", async () => {
+    const scope = Topic.where({ title: "scoped", author_name: "Scope" });
+    const topic = await scope.scoping(() => Topic.create({ title: "explicit" }));
+    expect([topic.title, topic.author_name]).toEqual(["explicit", "Scope"]);
+    const built = scope.scoping(() => new Topic({ title: "explicit" }));
+    expect([built.title, built.author_name]).toEqual(["explicit", "Scope"]);
+  });
+
   it("create with an array recurses and returns an array of records", async () => {
     const result = await Topic.create([{ title: "a" }, { title: "b" }]);
     expect(result).toHaveLength(2);
@@ -90,12 +113,6 @@ describe("PersistenceTest (trails)", () => {
     const many = Topic.build([{ title: "b" }, { title: "c" }]);
     expect(many).toHaveLength(2);
     expect(many.every((t) => t.isNewRecord())).toBe(true);
-  });
-
-  it("new with an array returns unsaved records", () => {
-    const result = Topic.new([{ title: "a" }, { title: "b" }]);
-    expect(result).toHaveLength(2);
-    expect(result.every((t) => t.isNewRecord())).toBe(true);
   });
 
   it("create yields to block before save", async () => {
@@ -136,7 +153,7 @@ describe("PersistenceTest (trails)", () => {
   });
 
   it("save! runs validations before the destroyed guard", async () => {
-    const developer = CanonicalDeveloper.new({ name: "DC", salary: 1_000_000 });
+    const developer = new CanonicalDeveloper({ name: "DC", salary: 1_000_000 });
     (developer as unknown as { _destroyed: boolean })._destroyed = true;
     await expect(developer.saveBang()).rejects.toThrow(RecordInvalid);
   });
@@ -342,5 +359,18 @@ describe("PersistenceTest#verifyReadonlyAttribute (trails)", () => {
     await expect(minivan.updateColumn("color", "black")).rejects.toThrow(
       new ActiveRecordError("color is marked as readonly"),
     );
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["posts", "comments"]);
+
+  it("new and create inside a scope on an association take the scope's foreign key", async () => {
+    const post = await CanonicalPost.first();
+    const scope = Comment.where({ post });
+    const built = scope.scoping(() => new Comment({ body: "built" }));
+    expect(built.post_id).toBe(post!.id);
+    const created = await scope.scoping(() => Comment.create({ body: "created" }));
+    expect((await Comment.find(created.id)).post_id).toBe(post!.id);
   });
 });

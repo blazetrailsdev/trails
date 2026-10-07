@@ -21,7 +21,7 @@ describe("SchemaLoadingTest", () => {
 
   it("basic model is loaded once", () => {
     const klass = defineModel();
-    klass.new();
+    new klass();
     assertEqual(1, klass.loadSchemaCalls);
   });
 
@@ -30,7 +30,7 @@ describe("SchemaLoadingTest", () => {
       c.tableName = "lock_without_defaults_cust";
       c.lockingColumn = "custom_lock_version";
     });
-    klass.new();
+    new klass();
     assertEqual(1, klass.loadSchemaCalls);
   });
 
@@ -38,9 +38,9 @@ describe("SchemaLoadingTest", () => {
     const klass = defineModel((c) => {
       c.tableName = "lock_without_defaults_cust";
     });
-    klass.new();
+    new klass();
     klass.lockingColumn = "custom_lock_version";
-    klass.new();
+    new klass();
     assertEqual(2, klass.loadSchemaCalls);
   });
 
