@@ -212,6 +212,11 @@ export const attrInternal = attrInternalAccessor;
  * Ruby's `Class.new`, which JS names after the binding it is assigned to:
  * like Ruby, that names the class only when the binding is a constant name
  * (`Foo = Class.new`), and not when it is a local (`klass = Class.new`).
+ *
+ * A minifier that mangles class names is out of scope, as it is for every
+ * reader of `name`: `controller_name` would read the mangled name either way.
+ * A bundle keeps its classes named by preserving names (esbuild `keepNames`
+ * writes the original constant name back onto the class) or by seating them.
  */
 export function isAnonymous(klass: { name: string }): boolean {
   if (classpaths.has(klass)) return false;
