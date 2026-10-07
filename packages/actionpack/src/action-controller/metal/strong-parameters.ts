@@ -307,16 +307,17 @@ export class Parameters {
   }
 
   merge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
     return this._newWithInheritedPermitted(this._data.merge(otherData));
   }
 
   mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
     this._data.mergeBang(otherData, ...(block ? [block] : []));
     return this;
   }
 
+  /** @inventedArm isPlainObject — PERMANENT */
   isDeepMerge(otherHash: unknown): boolean {
     return (
       isPlainObject(otherHash) ||
@@ -327,14 +328,14 @@ export class Parameters {
   }
 
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
     return this._newWithInheritedPermitted(withIndifferentAccess(otherData).merge(this._data));
   }
 
   declare withDefaults: Parameters["reverseMerge"];
 
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
-    const otherData = otherHash instanceof Parameters ? otherHash._toRawHash() : otherHash;
+    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
     this._data.mergeBang(otherData, (_key: string, left: unknown, _right: unknown) => left);
     return this;
   }
@@ -499,10 +500,6 @@ export class Parameters {
       return this._convertParametersToHashes(this._data, "toHash") as Record<string, unknown>;
     }
     throw new UnfilteredParameters();
-  }
-
-  _toRawHash(): Record<string, unknown> {
-    return Object.fromEntries(this._data);
   }
 
   asJson(options: Record<string, unknown> | null = null): Record<string, unknown> {
