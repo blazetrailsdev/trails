@@ -13,7 +13,7 @@ import {
   URI,
   type Bytes,
 } from "@blazetrails/ruby-compat";
-import { ActiveSupportJSON, include, included, isBlank } from "@blazetrails/activesupport";
+import { ActiveSupportJSON, extend, include, included, isBlank } from "@blazetrails/activesupport";
 import {
   CookieJar,
   cookieJar,
@@ -206,12 +206,24 @@ export interface RequestForgeryProtectionHost extends ActionCallbackHost, Helper
   forgeryProtectionOriginCheck: boolean;
   perFormCsrfTokens: boolean;
   csrfTokenStorageStrategy: CsrfTokenStorage;
+  protectionMethodClass: typeof protectionMethodClass;
+  storageStrategy: typeof storageStrategy;
+  isStorageStrategy: typeof isStorageStrategy;
 }
 
 export class RequestForgeryProtection {
   static readonly AUTHENTICITY_TOKEN_LENGTH = 32;
 
+  static ClassMethods = {
+    protectFromForgery,
+    skipForgeryProtection,
+    protectionMethodClass,
+    storageStrategy,
+    isStorageStrategy,
+  };
+
   static [included](base: RequestForgeryProtectionHost): void {
+    extend(base, RequestForgeryProtection.ClassMethods);
     include(base, {
       resetCsrfToken,
       commitCsrfToken,
@@ -281,7 +293,7 @@ export function protectFromForgery(
 ): void {
   options = { prepend: false, ...options };
 
-  this.forgeryProtectionStrategy = protectionMethodClass(
+  this.forgeryProtectionStrategy = this.protectionMethodClass(
     rtest(options.with)
       ? (options.with as ProtectionMethodName | ProtectionMethodCtor)
       : "null_session",
@@ -289,7 +301,7 @@ export function protectFromForgery(
   if (!rtest(this.requestForgeryProtectionToken))
     this.requestForgeryProtectionToken = "authenticity_token";
 
-  this.csrfTokenStorageStrategy = storageStrategy(
+  this.csrfTokenStorageStrategy = this.storageStrategy(
     rtest(options.store)
       ? (options.store as "session" | "cookie" | CsrfTokenStorage)
       : new SessionStore(),
@@ -665,35 +677,47 @@ type ProtectionMethodCtor = new (controller: Controller) => ProtectionMethods;
 
 /** @internal */
 export function protectionMethodClass(
+  this: unknown,
   name: ProtectionMethodName | ProtectionMethodCtor,
 ): ProtectionMethodCtor {
-  if (typeof name === "function") return name;
-  if (name === "null_session") return NullSession;
-  if (name === "reset_session") return ResetSession;
-  if (name === "exception") return Exception;
-  throw new ArgumentError(
-    "Invalid request forgery protection method, use :null_session, :exception, :reset_session, or a custom forgery protection class.",
-  );
+  if (name === "null_session") {
+    return NullSession;
+  } else if (name === "reset_session") {
+    return ResetSession;
+  } else if (name === "exception") {
+    return Exception;
+  } else if (typeof name === "function") {
+    return name;
+  } else {
+    throw new ArgumentError(
+      "Invalid request forgery protection method, use :null_session, :exception, :reset_session, or a custom forgery protection class.",
+    );
+  }
 }
 
 /** @internal */
-export function isStorageStrategy(object: unknown): object is CsrfTokenStorage {
-  const s = object as CsrfTokenStorage | null;
+export function storageStrategy(
+  this: { isStorageStrategy: typeof isStorageStrategy },
+  name: "session" | "cookie" | CsrfTokenStorage,
+): CsrfTokenStorage {
+  if (name === "session") {
+    return new SessionStore();
+  } else if (name === "cookie") {
+    return new CookieStore("csrf_token");
+  } else {
+    if (this.isStorageStrategy(name)) return name;
+    throw new ArgumentError(
+      "Invalid CSRF token storage strategy, use :session, :cookie, or a custom CSRF token storage class.",
+    );
+  }
+}
+
+/** @internal */
+export function isStorageStrategy(this: unknown, object: unknown): object is CsrfTokenStorage {
   return (
-    !!s &&
-    typeof s.fetch === "function" &&
-    typeof s.store === "function" &&
-    typeof s.reset === "function"
-  );
-}
-
-/** @internal */
-export function storageStrategy(name: "session" | "cookie" | CsrfTokenStorage): CsrfTokenStorage {
-  if (name === "session") return new SessionStore();
-  if (name === "cookie") return new CookieStore("csrf_token");
-  if (isStorageStrategy(name)) return name;
-  throw new ArgumentError(
-    "Invalid CSRF token storage strategy, use :session, :cookie, or a custom CSRF token storage class.",
+    rbObjRespondTo(object, "fetch") &&
+    rbObjRespondTo(object, "store") &&
+    rbObjRespondTo(object, "reset")
   );
 }
 

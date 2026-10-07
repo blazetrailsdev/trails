@@ -82,6 +82,7 @@ export function actionMethods(this: FlashClassHost): string[] {
 
 export const ClassMethods = { addFlashTypes, actionMethods };
 
+/** @missingRailsCall delegate — CONVERGEABLE base-included-modules-dispatch-privates-through-self */
 export const Flash = new Module((mod) => {
   extend(mod, Concern);
 

@@ -1,5 +1,5 @@
 import { MissingTranslationData } from "@blazetrails/i18n";
-import { I18n, HtmlSafeTranslation, htmlEscape } from "@blazetrails/activesupport";
+import { I18n, HtmlSafeTranslation, Module, htmlEscape } from "@blazetrails/activesupport";
 
 export interface TranslationHost {
   actionName: string;
@@ -96,3 +96,10 @@ export function localize(
 export function l(this: TranslationHost, object: unknown, options: LocalizeOptions = {}): string {
   return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
 }
+
+export const Translation = new Module((mod) => {
+  mod.defineMethod("translate", translate);
+  mod.aliasMethod("t", "translate");
+  mod.defineMethod("localize", localize);
+  mod.aliasMethod("l", "localize");
+});

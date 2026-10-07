@@ -1,4 +1,6 @@
+import { Concern, Module, extend } from "@blazetrails/activesupport";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
+import type { HelpersClass } from "../../abstract-controller/helpers.js";
 import { ContentSecurityPolicy as Policy } from "../../action-dispatch/http/content-security-policy.js";
 
 export type ContentSecurityPolicyBlock = (this: unknown, policy: Policy) => void;
@@ -18,7 +20,10 @@ interface ContentSecurityPolicyClassHost {
 
 interface ContentSecurityPolicyInstanceHost {
   request: CspRequest;
-  currentContentSecurityPolicy?: typeof currentContentSecurityPolicy;
+}
+
+interface ContentSecurityPolicyController extends ContentSecurityPolicyInstanceHost {
+  currentContentSecurityPolicy(): Policy;
 }
 
 export function contentSecurityPolicy(
@@ -44,10 +49,9 @@ export function contentSecurityPolicy(
     resolvedBlock = typeof options === "function" ? options : block;
   }
   this.beforeAction(function (controller: unknown) {
-    const host = controller as ContentSecurityPolicyInstanceHost;
+    const host = controller as ContentSecurityPolicyController;
     if (resolvedBlock) {
-      const resolveCurrent = host.currentContentSecurityPolicy ?? currentContentSecurityPolicy;
-      const policy = resolveCurrent.call(host);
+      const policy = host.currentContentSecurityPolicy();
       resolvedBlock.call(controller, policy);
       host.request.contentSecurityPolicy = policy;
     }
@@ -92,3 +96,23 @@ export function currentContentSecurityPolicy(this: ContentSecurityPolicyInstance
   const current = this.request.contentSecurityPolicy;
   return current ? current.dup() : new Policy();
 }
+
+export const ClassMethods = { contentSecurityPolicy, contentSecurityPolicyReportOnly };
+
+export const ContentSecurityPolicy = new Module((mod) => {
+  extend(mod, Concern);
+
+  (
+    mod as unknown as {
+      included(base: null, block: (this: HelpersClass) => void): void;
+    }
+  ).included(null, function () {
+    this.helperMethod("isContentSecurityPolicy");
+    this.helperMethod("contentSecurityPolicyNonce");
+  });
+
+  mod.defineMethod("isContentSecurityPolicy", isContentSecurityPolicy);
+  mod.defineMethod("contentSecurityPolicyNonce", contentSecurityPolicyNonce);
+  mod.defineMethod("currentContentSecurityPolicy", currentContentSecurityPolicy);
+}) as Module & { ClassMethods: typeof ClassMethods };
+ContentSecurityPolicy.ClassMethods = ClassMethods;

@@ -1,6 +1,5 @@
 import {
   SafeBuffer,
-  classAttribute,
   extend,
   include,
   type Included,
@@ -16,9 +15,9 @@ import type { FlashHash } from "../action-dispatch/middleware/flash.js";
 import {
   RequestForgeryProtection,
   commitCsrfToken,
-  protectFromForgery,
+  type protectFromForgery,
   resetCsrfToken,
-  skipForgeryProtection,
+  type skipForgeryProtection,
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
 import { respondTo } from "./metal/mime-responds.js";
@@ -60,19 +59,20 @@ import type {
   CallbackOptions,
 } from "../abstract-controller/callbacks.js";
 import {
+  Layouts,
   LookupContext,
   ViewPathsClassMethods,
-  _defaultLayout,
-  _impliedLayoutName,
-  _isConditionalLayout,
-  _isIncludeLayout,
-  _layoutForOption,
-  _normalizeLayout,
+  type _defaultLayout,
+  type _impliedLayoutName,
+  type _isConditionalLayout,
+  type _isIncludeLayout,
+  type _layoutForOption,
+  type _normalizeLayout,
   _prefixes,
-  _processRenderTemplateOptions,
-  _writeLayoutMethod,
-  isActionHasLayout,
-  layout,
+  type _processRenderTemplateOptions,
+  type _writeLayoutMethod,
+  type isActionHasLayout,
+  type layout,
   detailsForLookup,
   isAnyTemplates,
   lookupContext,
@@ -86,16 +86,15 @@ import {
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
-  Rendering as ActionViewRendering,
-  _normalizeArgs,
-  _processFormat,
+  type _normalizeArgs,
+  type _processFormat,
   buildViewContextClass,
   isInheritViewContextClass,
   viewContext,
   viewContextClass,
   viewRenderer,
 } from "@blazetrails/actionview";
-import { _renderTemplate } from "./metal/streaming.js";
+import { Streaming, type _renderTemplate } from "./metal/streaming.js";
 import type {
   PathSet,
   ViewPathsInput,
@@ -120,15 +119,16 @@ import { AssetPaths } from "../abstract-controller/asset-paths.js";
 import { Instrumentation, type logProcessAction } from "./metal/instrumentation.js";
 import { Redirecting } from "./metal/redirecting.js";
 import {
-  contentSecurityPolicy,
-  contentSecurityPolicyNonce,
-  contentSecurityPolicyReportOnly,
-  currentContentSecurityPolicy,
-  isContentSecurityPolicy,
+  ContentSecurityPolicy,
+  type contentSecurityPolicy,
+  type contentSecurityPolicyNonce,
+  type contentSecurityPolicyReportOnly,
+  type currentContentSecurityPolicy,
+  type isContentSecurityPolicy,
 } from "./metal/content-security-policy.js";
 import { type Resolution, type HelpersClass } from "../abstract-controller/helpers.js";
 import { Helpers, type helperAttr, type modulesForHelpers } from "./metal/helpers.js";
-import { defaultFormBuilder } from "./form-builder.js";
+import { FormBuilder, type defaultFormBuilder } from "./form-builder.js";
 import { instrumentPayload, instrumentName } from "./caching.js";
 import {
   Caching,
@@ -189,6 +189,13 @@ import {
   viewAssigns,
   _normalizeRender,
 } from "../abstract-controller/rendering.js";
+import {
+  Translation,
+  type l,
+  type localize,
+  type t,
+  type translate,
+} from "../abstract-controller/translation.js";
 
 export { type ActionCallback, type AroundCallback, type CallbackOptions };
 
@@ -335,9 +342,9 @@ export interface Base
     options?: RedirectToOptions,
     responseOptionsAndFlash?: RedirectToResponseOptionsAndFlash<FlashType>,
   ): number;
-  redirectBack: typeof redirectBack;
-  redirectBackOrTo: typeof redirectBackOrTo;
-  urlFrom: typeof urlFrom;
+  redirectBack: OmitThisParameter<typeof redirectBack>;
+  redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
+  urlFrom: OmitThisParameter<typeof urlFrom>;
   _computeRedirectToLocation: typeof _computeRedirectToLocation;
   allowForgeryProtection: boolean;
   csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
@@ -371,10 +378,10 @@ export class Base extends Metal {
     (paths: ViewPathsInput): void;
   };
 
-  static layout = layout;
-  static _writeLayoutMethod = _writeLayoutMethod;
+  declare static layout: OmitThisParameter<typeof layout>;
+  declare static _writeLayoutMethod: OmitThisParameter<typeof _writeLayoutMethod>;
   /** @internal */
-  static _impliedLayoutName = _impliedLayoutName;
+  declare static _impliedLayoutName: OmitThisParameter<typeof _impliedLayoutName>;
   declare static _layout: Parameters<typeof layout>[0];
   declare static _layoutConditions: Record<string, string[]>;
   declare static _flashTypes: string[];
@@ -420,7 +427,6 @@ export class Base extends Metal {
 
   constructor(...args: unknown[]) {
     super(...(args as []));
-    this._actionHasLayout = true;
     fireInherited(
       new.target as unknown as HelpersPathControllerClass,
       Base as unknown as HelpersPathControllerClass,
@@ -514,6 +520,11 @@ export class Base extends Metal {
 
   respondTo = respondTo;
 
+  declare translate: OmitThisParameter<typeof translate>;
+  declare t: OmitThisParameter<typeof t>;
+  declare localize: OmitThisParameter<typeof localize>;
+  declare l: OmitThisParameter<typeof l>;
+
   declare readonly notice: unknown;
   declare readonly alert: unknown;
 
@@ -526,8 +537,14 @@ export class Base extends Metal {
   declare static forgeryProtectionOriginCheck: RequestForgeryProtectionHost["forgeryProtectionOriginCheck"];
   declare static perFormCsrfTokens: RequestForgeryProtectionHost["perFormCsrfTokens"];
   declare static csrfTokenStorageStrategy: RequestForgeryProtectionHost["csrfTokenStorageStrategy"];
-  static protectFromForgery = protectFromForgery;
-  static skipForgeryProtection = skipForgeryProtection;
+  declare static protectFromForgery: OmitThisParameter<typeof protectFromForgery>;
+  declare static skipForgeryProtection: OmitThisParameter<typeof skipForgeryProtection>;
+  /** @internal */
+  declare static protectionMethodClass: RequestForgeryProtectionHost["protectionMethodClass"];
+  /** @internal */
+  declare static storageStrategy: RequestForgeryProtectionHost["storageStrategy"];
+  /** @internal */
+  declare static isStorageStrategy: RequestForgeryProtectionHost["isStorageStrategy"];
 
   declare static allowBrowser: OmitThisParameter<(typeof AllowBrowserClassMethods)["allowBrowser"]>;
 
@@ -535,22 +552,16 @@ export class Base extends Metal {
     (typeof PermissionsPolicyClassMethods)["permissionsPolicy"]
   >;
 
-  static contentSecurityPolicy = contentSecurityPolicy;
-
-  static contentSecurityPolicyReportOnly = contentSecurityPolicyReportOnly;
-
+  declare static contentSecurityPolicy: OmitThisParameter<typeof contentSecurityPolicy>;
+  declare static contentSecurityPolicyReportOnly: OmitThisParameter<
+    typeof contentSecurityPolicyReportOnly
+  >;
   /** @internal */
-  isContentSecurityPolicy(): boolean {
-    return isContentSecurityPolicy.call(this as never);
-  }
+  declare isContentSecurityPolicy: OmitThisParameter<typeof isContentSecurityPolicy>;
   /** @internal */
-  contentSecurityPolicyNonce(): string | null {
-    return contentSecurityPolicyNonce.call(this as never);
-  }
+  declare contentSecurityPolicyNonce: OmitThisParameter<typeof contentSecurityPolicyNonce>;
   /** @internal */
-  currentContentSecurityPolicy(): ReturnType<typeof currentContentSecurityPolicy> {
-    return currentContentSecurityPolicy.call(this as never);
-  }
+  declare currentContentSecurityPolicy: OmitThisParameter<typeof currentContentSecurityPolicy>;
 
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 
@@ -559,11 +570,9 @@ export class Base extends Metal {
   declare static renderer: Renderer;
   declare static setupRendererBang: () => void;
 
-  static defaultFormBuilder = defaultFormBuilder;
-
-  defaultFormBuilder(): unknown {
-    return defaultFormBuilder.call(this);
-  }
+  declare static _defaultFormBuilder: unknown;
+  declare static defaultFormBuilder: OmitThisParameter<typeof defaultFormBuilder>;
+  declare defaultFormBuilder: () => unknown;
 
   /** @internal */
   instrumentPayload(key: unknown): { controller: string | null; action: string; key: unknown } {
@@ -613,7 +622,7 @@ export class Base extends Metal {
   declare head: OmitThisParameter<typeof head>;
 
   /** @internal */
-  _actionHasLayout?: boolean;
+  declare _actionHasLayout?: boolean;
   /** @internal */
   declare _layoutConditions: Record<string, string[]>;
   /** @internal */
@@ -692,26 +701,13 @@ export class Base extends Metal {
 }
 
 include(Base, AbstractControllerRendering);
+include(Base, Translation);
 include(Base, AssetPaths);
 include(Base, Helpers);
 include(Base, UrlFor);
 include(Base, Redirecting);
-include(Base, ActionViewRendering);
+include(Base, Layouts);
 extend(Base, ViewPathsClassMethods);
-Base.prototype._processRenderTemplateOptions = _processRenderTemplateOptions;
-Base.prototype.isActionHasLayout = isActionHasLayout;
-Base.prototype._isConditionalLayout = _isConditionalLayout;
-Base.prototype._layoutForOption = _layoutForOption;
-Base.prototype._normalizeLayout = _normalizeLayout;
-Base.prototype._defaultLayout = _defaultLayout;
-Base.prototype._isIncludeLayout = _isIncludeLayout;
-classAttribute.call(Base, "_layout", { instanceAccessor: false });
-classAttribute.call(Base, "_layoutConditions", {
-  instanceAccessor: false,
-  instanceReader: true,
-  default: {},
-});
-Base._writeLayoutMethod();
 include(Base, Rendering);
 include(Base, Renderers.All);
 include(Base, ConditionalGet);
@@ -723,12 +719,13 @@ include(Base, StrongParametersModule);
 extend(Base, ParameterEncoding.ClassMethods);
 include(Base, Cookies);
 include(Base, Flash);
+include(Base, FormBuilder);
 include(Base, RequestForgeryProtection);
-Base.helperMethod("isContentSecurityPolicy", "contentSecurityPolicyNonce");
+include(Base, ContentSecurityPolicy);
 include(Base, PermissionsPolicy);
 include(Base, RateLimiting);
 include(Base, AllowBrowser);
-Base.prototype._renderTemplate = _renderTemplate;
+include(Base, Streaming);
 include(Base, DataStreaming);
 include(Base, HttpAuthentication.Basic.ControllerMethods);
 include(Base, HttpAuthentication.Digest.ControllerMethods);

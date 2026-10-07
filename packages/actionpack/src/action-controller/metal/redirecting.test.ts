@@ -13,6 +13,7 @@ const host = (overrides: Record<string, unknown> = {}) =>
   ({
     request: { host: "example.com", protocol: "http://", hostWithPort: () => "example.com" },
     redirectTo: () => {},
+    _urlHostAllowed,
     ...overrides,
   }) as never;
 

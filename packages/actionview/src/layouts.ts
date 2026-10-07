@@ -1,9 +1,10 @@
 import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
-import { include } from "@blazetrails/ruby-compat/include";
+import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
+import { include, initialize, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
 import type { PathSet } from "./path-set.js";
 import type { RenderableTemplate } from "./renderer/abstract-renderer.js";
-import { _processRenderTemplateOptions as renderingProcessRenderTemplateOptions } from "./rendering.js";
+import { Rendering } from "./rendering.js";
 
 type LayoutValue = string | RenderableTemplate | false | null | undefined;
 type LayoutMethod = (
@@ -14,7 +15,7 @@ type LayoutMethod = (
 ) => LayoutValue;
 type LayoutOption = string | ((...args: never[]) => unknown) | boolean | null | undefined;
 
-type Layouts = {
+export type Layouts = {
   actionName: string;
   _actionHasLayout?: boolean;
   _layoutConditions: Record<string, string[]>;
@@ -145,7 +146,7 @@ export function _processRenderTemplateOptions(
   this: Layouts,
   options: Record<string, unknown>,
 ): void {
-  renderingProcessRenderTemplateOptions.call(this, options);
+  Layouts.superMethod(this, "_processRenderTemplateOptions")!(options);
 
   if (_isIncludeLayout(options)) {
     const layout = "layout" in options ? options["layout"] : ":default";
@@ -227,3 +228,37 @@ export function _isIncludeLayout(options: Record<string, unknown>): boolean {
     !["body", "plain", "html", "inline", "partial"].some((k) => k in options) || "layout" in options
   );
 }
+
+export const ClassMethods = { layout, _writeLayoutMethod, _impliedLayoutName };
+
+export const Layouts = new Module((mod) => {
+  extend(mod, Concern);
+  mod.include(Rendering);
+
+  (mod as unknown as { included(base: null, block: (this: LayoutsClass) => void): void }).included(
+    null,
+    function () {
+      classAttribute.call(this, "_layout", { instanceAccessor: false });
+      classAttribute.call(this, "_layoutConditions", {
+        instanceAccessor: false,
+        instanceReader: true,
+        default: {},
+      });
+
+      this._writeLayoutMethod();
+    },
+  );
+
+  mod.defineMethod("_processRenderTemplateOptions", _processRenderTemplateOptions);
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: Layouts): void {
+    this._actionHasLayout = true;
+  };
+  mod.defineMethod("isActionHasLayout", isActionHasLayout);
+  mod.defineMethod("_isConditionalLayout", _isConditionalLayout);
+  mod.defineMethod("_layout", _layout);
+  mod.defineMethod("_layoutForOption", _layoutForOption);
+  mod.defineMethod("_normalizeLayout", _normalizeLayout);
+  mod.defineMethod("_defaultLayout", _defaultLayout);
+  mod.defineMethod("_isIncludeLayout", _isIncludeLayout);
+}) as Module & { ClassMethods: typeof ClassMethods };
+Layouts.ClassMethods = ClassMethods;

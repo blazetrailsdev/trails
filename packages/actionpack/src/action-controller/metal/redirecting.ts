@@ -42,6 +42,13 @@ export interface RedirectingHost {
 
 interface PrivateHost extends RedirectingHost {
   raiseOnOpenRedirects?: boolean;
+  redirectBackOrTo: OmitThisParameter<typeof redirectBackOrTo>;
+  _computeRedirectToLocation: OmitThisParameter<typeof _computeRedirectToLocation>;
+  _allowOtherHost: OmitThisParameter<typeof _allowOtherHost>;
+  _extractRedirectToStatus: OmitThisParameter<typeof _extractRedirectToStatus>;
+  _enforceOpenRedirectProtection: OmitThisParameter<typeof _enforceOpenRedirectProtection>;
+  _urlHostAllowed: OmitThisParameter<typeof _urlHostAllowed>;
+  _ensureUrlIsHttpHeaderSafe: OmitThisParameter<typeof _ensureUrlIsHttpHeaderSafe>;
 }
 
 interface RedirectToHost extends PrivateHost {
@@ -63,15 +70,15 @@ export function redirectTo(
 
   const allowOtherHost = Object.hasOwn(responseOptions, "allowOtherHost")
     ? (responseOptions.allowOtherHost as boolean)
-    : _allowOtherHost.call(this);
+    : this._allowOtherHost();
   delete responseOptions.allowOtherHost;
 
-  const proposedStatus = _extractRedirectToStatus.call(this, options, responseOptions);
+  const proposedStatus = this._extractRedirectToStatus(options, responseOptions);
 
-  const redirectToLocation = _computeRedirectToLocation.call(this, this.request, options);
-  _ensureUrlIsHttpHeaderSafe.call(this, redirectToLocation);
+  const redirectToLocation = this._computeRedirectToLocation(this.request, options);
+  this._ensureUrlIsHttpHeaderSafe(redirectToLocation);
 
-  this.location = _enforceOpenRedirectProtection.call(this, redirectToLocation, {
+  this.location = this._enforceOpenRedirectProtection(redirectToLocation, {
     allowOtherHost,
   });
   this.responseBody = "";
@@ -79,36 +86,36 @@ export function redirectTo(
 }
 
 export function redirectBack(
-  this: RedirectingHost,
+  this: PrivateHost,
   {
     fallbackLocation,
-    allowOtherHost = _allowOtherHost.call(this as PrivateHost),
+    allowOtherHost = this._allowOtherHost(),
     ...args
   }: { fallbackLocation: string; allowOtherHost?: boolean } & Record<string, unknown>,
 ): unknown {
-  return redirectBackOrTo.call(this, fallbackLocation, { allowOtherHost, ...args });
+  return this.redirectBackOrTo(fallbackLocation, { allowOtherHost, ...args });
 }
 
 export function redirectBackOrTo(
-  this: RedirectingHost,
+  this: PrivateHost,
   fallbackLocation: string,
   options: { allowOtherHost?: boolean } & Record<string, unknown> = {},
 ): unknown {
   const { allowOtherHost: explicitAllow, ...redirectOptions } = options;
   const allowOtherHost = Object.hasOwn(options, "allowOtherHost")
     ? explicitAllow
-    : _allowOtherHost.call(this as PrivateHost);
+    : this._allowOtherHost();
   const referer = this.request.referer;
-  if (referer && (allowOtherHost || _urlHostAllowed.call(this, referer))) {
+  if (referer && (allowOtherHost || this._urlHostAllowed(referer))) {
     return this.redirectTo(referer, { allowOtherHost, ...redirectOptions });
   } else {
     return this.redirectTo(fallbackLocation, redirectOptions);
   }
 }
 
-export function urlFrom(this: RedirectingHost, location: string | null | undefined): string | null {
+export function urlFrom(this: PrivateHost, location: string | null | undefined): string | null {
   if (!location || location.trim() === "") return null;
-  return _urlHostAllowed.call(this, location) ? location : null;
+  return this._urlHostAllowed(location) ? location : null;
 }
 
 /** @internal */
@@ -171,11 +178,11 @@ export function _extractRedirectToStatus(
 
 /** @internal */
 export function _enforceOpenRedirectProtection(
-  this: RedirectingHost,
+  this: PrivateHost,
   location: string,
   { allowOtherHost }: { allowOtherHost: boolean },
 ): string {
-  if (allowOtherHost || _urlHostAllowed.call(this, location)) {
+  if (allowOtherHost || this._urlHostAllowed(location)) {
     return location;
   }
   const truncated = location.length > 100 ? `${location.slice(0, 97)}...` : location;
