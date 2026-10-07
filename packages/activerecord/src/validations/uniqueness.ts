@@ -49,16 +49,7 @@ export class UniquenessValidator extends EachValidator {
     if (rbModSingletonP(this._klass)) this._klass = rbClassSuperclass(this._klass);
   }
 
-  /** @internal */
-  protected override readAttributeForValidation(record: any, attribute: string): unknown {
-    if (record?.constructor?._reflectOnAssociation?.(attribute)) {
-      return record.association(attribute).reader;
-    }
-    return super.readAttributeForValidation(record, attribute);
-  }
-
   async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
-    value = await value;
     const finderClass = this.findFinderClassFor(record);
     value = mapEnumAttribute(finderClass, attribute, value);
 

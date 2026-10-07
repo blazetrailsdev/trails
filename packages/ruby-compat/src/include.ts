@@ -1120,15 +1120,60 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { owner: object } {
+export function rbModInstanceMethod(mod: { prototype: object }, mid: string): UnboundMethod {
+  const method = mnewUnbound(mod.prototype, mid);
+  if (method !== null) return method;
+  throw new NameError(
+    `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
+    mid,
+  );
+}
+
+/**
+ * `rb_mod_public_instance_method` (`vendor/ruby/v3.3.11/proc.c:2207`),
+ * `Module#public_instance_method`. Visibility is compile-time only, so it answers
+ * as {@link rbModInstanceMethod} does.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModPublicInstanceMethod(mod: { prototype: object }, mid: string): UnboundMethod {
+  return rbModInstanceMethod(mod, mid);
+}
+
+/**
+ * Ruby's `UnboundMethod`, as far as trails reads one: `owner`
+ * (`method_owner`, `vendor/ruby/v3.3.11/proc.c:1988`), `super_method`
+ * (`method_super_method`, `:3391`) and `bind_call` (`umethod_bind_call`, `:2713`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export interface UnboundMethod {
+  owner: object;
+  superMethod(): UnboundMethod | null;
+  bindCall(recv: object, ...args: unknown[]): unknown;
+}
+
+function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
   for (
-    let link: object | null = mod.prototype;
+    let link: object | null = start;
     link && link !== Object.prototype;
     link = Object.getPrototypeOf(link) as object | null
   ) {
     if (!Object.hasOwn(link, mid)) continue;
+    const entry = link;
+    const method = (owner: object): UnboundMethod => ({
+      owner,
+      superMethod: () => mnewUnbound(Object.getPrototypeOf(entry) as object | null, mid),
+      bindCall: (recv, ...args) => {
+        const desc = Object.getOwnPropertyDescriptor(entry, mid)!;
+        if (typeof desc.value === "function") {
+          return (desc.value as (...a: unknown[]) => unknown).apply(recv, args);
+        }
+        return desc.get ? desc.get.call(recv) : desc.value;
+      },
+    });
     const table = link as Record<symbol, unknown>;
-    if (Object.hasOwn(link, T_ICLASS)) return { owner: table[T_ICLASS] as object };
+    if (Object.hasOwn(link, T_ICLASS)) return method(table[T_ICLASS] as object);
     if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
       const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
       const owner = mods.find((m) => {
@@ -1143,14 +1188,11 @@ export function rbModInstanceMethod(mod: { prototype: object }, mid: string): { 
         }
         return false;
       });
-      if (owner !== undefined) return { owner };
+      if (owner !== undefined) return method(owner);
     }
-    return { owner: link.constructor };
+    return method(link.constructor);
   }
-  throw new NameError(
-    `undefined method '${mid}' for class '${rbModToS(mod as unknown as new () => unknown)}'`,
-    mid,
-  );
+  return null;
 }
 
 /**

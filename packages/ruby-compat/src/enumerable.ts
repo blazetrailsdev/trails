@@ -78,6 +78,29 @@ function first<T>(this: Each<T>, n?: number): T | null | T[] {
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#drop — `vendor/ruby/v3.3.11/enum.c:3603` `enum_drop`, whose
+ * `drop_i` (`:3571`) counts `n` elements down before it pushes.
+ * @noRailsEquivalent PERMANENT
+ */
+function drop<T>(this: Each<T>, n: number): T[] {
+  let len = n;
+
+  if (len < 0) {
+    throw new ArgumentError("attempt to drop negative size");
+  }
+
+  const result: T[] = [];
+  rbBlockCall(this, (i) => {
+    if (len === 0) {
+      result.push(i);
+    } else {
+      len--;
+    }
+  });
+  return result;
+}
+
+/**
  * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/v3.3.11/enum.c:1861` `enum_any`,
  * `RTEST`ing the block's result, or the element itself with no block.
  * @noRailsEquivalent PERMANENT
@@ -132,6 +155,7 @@ export const Enumerable = {
   select: findAll,
   map,
   first,
+  drop,
   isAny,
   isInclude,
   [Symbol.iterator]: iterator,

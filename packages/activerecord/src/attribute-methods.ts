@@ -17,6 +17,9 @@ import {
   rbFCaller,
   rbInspect as inspect,
   rbModConstSet,
+  rbModPublicInstanceMethod,
+  NameError,
+  type UnboundMethod,
 } from "@blazetrails/ruby-compat";
 import {
   ArgumentError,
@@ -73,6 +76,35 @@ export interface InstanceMethodHost {
   columnForAttribute(name: string): { isVirtual(): boolean };
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
+}
+
+export function methodMissing(
+  this: AttributeRecord & InstanceMethodHost,
+  name: string,
+  ...args: unknown[]
+): unknown {
+  const klass = this.constructor as unknown as {
+    prototype: object;
+    defineAttributeMethods(): boolean;
+  };
+  klass.defineAttributeMethods();
+
+  let method: UnboundMethod | null;
+  try {
+    method = rbModPublicInstanceMethod(klass, name);
+  } catch (e) {
+    if (!(e instanceof NameError)) throw e;
+    method = null;
+  }
+
+  while (method && !(method.owner instanceof GeneratedAttributeMethods)) {
+    method = method.superMethod();
+  }
+  if (method) {
+    return method.bindCall(this, ...args);
+  } else {
+    return AMAttributeMethods.AttributeMethods.methodMissing.call(this as never, name, ...args);
+  }
 }
 
 export function isRespondTo(

@@ -224,6 +224,8 @@ export {
   rbClassInheritedP,
   rbObjIsKindOf,
   rbModInstanceMethod,
+  rbModPublicInstanceMethod,
+  type UnboundMethod,
   moduleVisibility,
   publicInstanceMethods,
 } from "./include.js";

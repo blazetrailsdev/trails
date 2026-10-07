@@ -149,7 +149,6 @@ export class BelongsTo extends SingularAssociation {
     model.afterDestroy((o: any) => o.association(reflection.name).handleDependency());
   }
 
-  /** @inventedArm validate — CONVERGEABLE ar-read-attribute-for-validation-is-not-send */
   static override defineValidations(model: any, reflection: any): void {
     if (hasKey(reflection.options, "required")) {
       reflection.options.optional = !hashDelete(reflection.options, "required");
@@ -165,9 +164,7 @@ export class BelongsTo extends SingularAssociation {
     super.defineValidations(model, reflection);
 
     if (required) {
-      const loadTarget = (record: any) => record.association(reflection.name).loadTarget();
       if (belongsToRequiredValidatesForeignKey()) {
-        model.validate(loadTarget);
         model.validatesPresenceOf(reflection.name, { message: ":required" });
       } else {
         const condition = (record: any) => {
@@ -182,7 +179,6 @@ export class BelongsTo extends SingularAssociation {
           );
         };
 
-        model.validate(loadTarget, { if: condition });
         model.validatesPresenceOf(reflection.name, { message: ":required", if: condition });
       }
     }

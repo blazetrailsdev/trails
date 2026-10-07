@@ -39,6 +39,14 @@ describe("Enumerable", () => {
     expect(() => Enumerable.first.call(bag, -1)).toThrow(ArgumentError);
   });
 
+  it("drop skips n elements and rejects a negative size", () => {
+    const bag = new Bag([1, 2, 3]);
+    expect(Enumerable.drop.call(bag, 1)).toEqual([2, 3]);
+    expect(Enumerable.drop.call(bag, 0)).toEqual([1, 2, 3]);
+    expect(Enumerable.drop.call(bag, 50)).toEqual([]);
+    expect(() => Enumerable.drop.call(bag, -1)).toThrow(ArgumentError);
+  });
+
   it("isAny? RTESTs the element, or the block's result", () => {
     expect(Enumerable.isAny.call(new Bag([null, false, 0]))).toBe(true);
     expect(Enumerable.isAny.call(new Bag([null, false]))).toBe(false);

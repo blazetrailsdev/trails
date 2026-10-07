@@ -1,8 +1,10 @@
-import type { Hash } from "@blazetrails/ruby-compat";
+import { Enumerable, type Hash } from "@blazetrails/ruby-compat";
+import { include } from "@blazetrails/activesupport";
 import type { Base } from "../../base.js";
 import type { Table, Nodes } from "@blazetrails/arel";
 import type { JoinAssociation } from "./join-association.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export abstract class JoinPart {
   readonly baseKlass: typeof Base;
   readonly children: JoinAssociation[] = [];
@@ -41,18 +43,6 @@ export abstract class JoinPart {
     for (const child of this.children) child.each(block);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE association-symbol-iterators-come-from-ruby-compat-enumerable */
-  *[Symbol.iterator](): IterableIterator<JoinPart> {
-    yield this;
-    for (const child of this.children) {
-      yield* child;
-    }
-  }
-
-  drop(n: number): JoinPart[] {
-    return [...this].slice(n);
-  }
-
   eachChildren(fn: (parent: JoinPart, child: JoinPart) => void): void {
     for (const child of this.children) {
       fn(this, child);
@@ -87,3 +77,11 @@ export abstract class JoinPart {
     return this.baseKlass.instantiate(this.extractRecord(row, aliases), columnTypes, block);
   }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface JoinPart {
+  [Symbol.iterator](): IterableIterator<JoinPart>;
+  drop(n: number): JoinPart[];
+}
+
+include(JoinPart, Enumerable);

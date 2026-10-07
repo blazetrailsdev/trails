@@ -84,9 +84,14 @@ describe("AssociationValidationTest", () => {
   });
 
   it("validates associated without marked for destruction", async () => {
+    const reply = class {
+      isValid(_context: string | null = null) {
+        return true;
+      }
+    };
     Topic.validatesAssociated("replies");
     const t = new Topic();
-    association(t, "replies").build({ title: "A reply" });
+    Object.defineProperty(t, "replies", { get: () => [new reply()] });
     expect(await t.isValid()).toBeTruthy();
   });
 

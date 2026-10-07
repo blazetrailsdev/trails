@@ -817,7 +817,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
             ]);
 
             assertNot(await reply.save());
-            expect(reply.errors.get("silly_unique_replies")).toEqual(["is invalid"]);
+            expect(reply.errors.get("sillyUniqueReplies")).toEqual(["is invalid"]);
             assertEmpty((await reply.sillyUniqueReplies.first())!.errors);
 
             expect((await reply.sillyUniqueReplies.last())!.errors.get("content")).toEqual([
@@ -2756,7 +2756,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
           async () => {
             const exception = await assertRaises([RecordInvalid], {}, () => author.saveBang());
 
-            expect(exception.message).toEqual("Validation failed: Published books is invalid");
+            expect(exception.message).toEqual("Validation failed: Publishedbooks is invalid");
           },
         );
       },

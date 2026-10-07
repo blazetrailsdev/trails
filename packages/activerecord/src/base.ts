@@ -173,6 +173,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   isRespondTo as _isRespondTo,
+  methodMissing as _methodMissing,
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
   attributePresent as _attributePresent,
@@ -2445,6 +2446,7 @@ include(Base, {
   serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   isRespondTo: _isRespondTo,
+  methodMissing: _methodMissing,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,
   accessedFields: _accessedFields,
@@ -2514,7 +2516,6 @@ prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
 include(Base, {
-  readAttributeForValidation: _Validations.readAttributeForValidation,
   validate: _Validations.validate,
   customValidationContext: _Validations.customValidationContext,
 });

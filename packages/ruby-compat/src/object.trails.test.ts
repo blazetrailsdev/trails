@@ -46,6 +46,7 @@ import {
   rbClassInheritedP,
   rbModAncestors,
   rbModInstanceMethod,
+  rbModPublicInstanceMethod,
   rbObjIsKindOf,
 } from "./include.js";
 import { BigDecimal } from "./big-decimal.js";
@@ -745,6 +746,31 @@ describe("rbModAncestors / rbModInstanceMethod", () => {
     expect(rbModInstanceMethod(Sub, "cast").owner).toBe(mod);
     expect(rbModInstanceMethod(Sub, "serialize").owner).toBe(Base);
     expect(() => rbModInstanceMethod(Sub, "nope")).toThrow(NameError);
+  });
+
+  it("superMethod resumes the lookup above the owner, and bindCall dispatches the entry", () => {
+    class Base {
+      cast(): string {
+        return "base";
+      }
+    }
+    class Sub extends Base {
+      cast(): string {
+        return "sub";
+      }
+    }
+    const mod = new Module();
+    mod.moduleEval((m) => Object.defineProperty(m, "title", { get: () => "generated" }));
+    mod.appendFeatures(Sub);
+    const sub = new Sub();
+
+    const cast = rbModPublicInstanceMethod(Sub, "cast");
+    expect(cast.owner).toBe(Sub);
+    expect(cast.bindCall(sub)).toBe("sub");
+    expect(cast.superMethod()!.owner).toBe(Base);
+    expect(cast.superMethod()!.bindCall(sub)).toBe("base");
+    expect(cast.superMethod()!.superMethod()).toBeNull();
+    expect(rbModPublicInstanceMethod(Sub, "title").bindCall(sub)).toBe("generated");
   });
 
   it("names the module include() copied a method from, and the class for its own", () => {

@@ -37,6 +37,7 @@ describe("I18nGenerateMessageValidationTest", () => {
         this._tableName = "topics";
         this.attribute("id", "integer");
         this.attribute("title", "string");
+        this.aliasAttribute("heading", "title");
       }
     }
     return new Topic();
