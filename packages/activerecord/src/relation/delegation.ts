@@ -1,4 +1,5 @@
 import type { Base } from "../base.js";
+import type { RelationName } from "../relation.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
@@ -450,6 +451,10 @@ export class Delegation {
 
   unscoped(this: DelegationHost) {
     return this.model.unscoped();
+  }
+
+  get name(): RelationName {
+    return (this as unknown as DelegationHost).model.name;
   }
 }
 

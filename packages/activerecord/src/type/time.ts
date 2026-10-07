@@ -14,9 +14,8 @@ export interface Time extends Timezone {}
 export class Time extends ActiveModelTime {
   static Value = Value;
 
-  constructor({ timezone, ...kwargs }: TimezoneOptions = {}) {
+  constructor(kwargs: TimezoneOptions = {}) {
     super(kwargs);
-    this._timezone = timezone;
   }
 
   override serialize(value: unknown): Value | null {
