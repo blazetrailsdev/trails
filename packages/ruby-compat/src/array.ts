@@ -660,6 +660,24 @@ export function partition<T>(ary: readonly T[], block: (item: T) => unknown): [T
 }
 
 /**
+ * Ruby `Array#reject` (`vendor/ruby/v3.3.11/array.c:4301` `rb_ary_reject`): a new
+ * array of the elements the block does not answer truthily for (`RTEST`,
+ * `ary_reject`, `:4210`). Each block result is awaited before the next element
+ * is yielded, so a block that awaits still runs in order, one at a time. The
+ * block-less enumerator arm is not ported: nothing calls it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export async function aryReject<T>(ary: readonly T[], block: (item: T) => unknown): Promise<T[]> {
+  const result: T[] = [];
+  for (const v of ary) {
+    const yielded = await block(v);
+    if (yielded == null || yielded === false) result.push(v);
+  }
+  return result;
+}
+
+/**
  * Ruby `Array#each` (`vendor/ruby/v3.3.11/array.c:2532` `rb_ary_each`): yields each
  * element and returns the receiver. With no block it is
  * `RETURN_SIZED_ENUMERATOR` (`:2535`), whose elements are the receiver's.

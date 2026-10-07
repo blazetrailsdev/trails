@@ -290,26 +290,23 @@ export function _deepTransformKeysInObjectBang(
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function transformKeys<V>(
-  hash: Map<string, V>,
-  block: (key: string) => string,
-): Map<string, V>;
+export function transformKeys<K, V, T = K>(hash: Map<K, V>, block: (key: K) => T): Map<T, V>;
 export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
 export function transformKeys(
-  hash: AnyObject | Map<string, unknown>,
-  block: (key: string) => string,
-): Record<string, unknown> | Map<string, unknown> {
+  hash: AnyObject | Map<unknown, unknown>,
+  block: ((key: string) => string) | ((key: unknown) => unknown),
+): Record<string, unknown> | Map<unknown, unknown> {
   if (hash instanceof Map) {
-    const result = new Map<string, unknown>();
-    for (const [key, value] of hash) result.set(block(key), value);
+    const result = new Map<unknown, unknown>();
+    for (const [key, value] of hash) result.set((block as (key: unknown) => unknown)(key), value);
     return result;
   }
   const result: Record<string, unknown> = {};
   for (const key of Object.keys(hash)) {
-    result[block(key)] = hash[key];
+    result[(block as (key: string) => string)(key)] = hash[key];
   }
   return result;
 }

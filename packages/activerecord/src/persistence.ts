@@ -2,6 +2,8 @@ import { Time as RubyTime } from "@blazetrails/date";
 import { type TouchArgs, type TouchOptions } from "./timestamp.js";
 import {
   basicObjRespondTo,
+  Hash,
+  isEmpty,
   keys,
   merge,
   rbEqual,
@@ -160,29 +162,31 @@ export async function _insertRecord(
     insert(arel: unknown, ...args: unknown[]): Promise<unknown>;
     emptyInsertStatementValue(pk?: string | null): string;
   },
-  values: Record<string, unknown>,
+  values: Hash<string, unknown>,
   returning?: string[] | null,
 ): Promise<unknown> {
   const ctor = this as any;
   const primaryKey = ctor.primaryKey;
   let primaryKeyValue: unknown = null;
   if (ctor.isPrefetchPrimaryKey() && primaryKey) {
-    if (!rtest(values[primaryKey])) {
-      values[primaryKey] = (() => {
-        primaryKeyValue = ctor.nextSequenceValue();
-        return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
-      })();
+    if (!rtest(values.get(primaryKey))) {
+      values.set(
+        primaryKey,
+        (() => {
+          primaryKeyValue = ctor.nextSequenceValue();
+          return ctor._defaultAttributes().getAttribute(primaryKey).withCastValue(primaryKeyValue);
+        })(),
+      );
     }
   }
 
   const arelTable: ArelTable = ctor.arelTable;
   const im = new InsertManager(arelTable);
 
-  const entries = Object.entries(values);
-  if (entries.length === 0) {
+  if (isEmpty(values)) {
     im.insert(connection.emptyInsertStatementValue(primaryKey));
   } else {
-    im.insert(entries.map(([col, val]) => [arelTable.get(col), val]));
+    im.insert([...transformKeys(values, (name) => arelTable.get(name))]);
   }
 
   return connection.insert(
@@ -200,7 +204,7 @@ export async function _insertRecord(
 
 export async function _updateRecord(
   this: PersistenceHost,
-  values: Record<string, unknown>,
+  values: Hash<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const klass = this as unknown as typeof Base;
@@ -218,7 +222,7 @@ export async function _updateRecord(
   }
 
   const um = new UpdateManager(arelTable);
-  um.set(Object.entries(values).map(([name, value]) => [arelTable.get(name), value]));
+  um.set([...transformKeys(values, (name) => arelTable.get(name))]);
   um.wheres = wheres;
 
   return klass.withConnection((c) => c.update(um, `${klass.name} Update`));
@@ -505,7 +509,7 @@ interface UpdateColumnsRecord {
   constructor: {
     attributeAliases: Record<string, string>;
     _updateRecord(
-      values: Record<string, unknown>,
+      values: Hash<string, unknown>,
       constraints: Record<string, unknown>,
     ): Promise<number>;
   };
@@ -535,14 +539,13 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   });
 
   const updateConstraints = this._queryConstraintsHash();
-  const h: Record<string, unknown> = {};
+  const h = new Hash<string, unknown>();
   for (const [k, v] of Object.entries(attributes)) {
-    h[k] = this._attributes.writeCastValue(k, v);
+    h.set(k, this._attributes.writeCastValue(k, v));
     this.clearAttributeChange(k);
   }
-  attributes = h;
 
-  const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
+  const affectedRows = await this.constructor._updateRecord(h, updateConstraints);
 
   return affectedRows === 1;
 }
@@ -699,7 +702,7 @@ type PersistenceInstanceChainHost = {
   _writeAttribute(name: string, value: unknown): void;
   typeForAttribute(name: string): { deserialize(value: unknown): unknown };
   attributesForCreate(attributeNames: string[]): string[];
-  attributesWithValues(attributeNames: string[]): Record<string, unknown>;
+  attributesWithValues(attributeNames: string[]): Hash<string, unknown>;
 };
 
 /** @internal */
