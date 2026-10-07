@@ -1,6 +1,12 @@
 import { chomp, classAttribute } from "@blazetrails/activesupport";
 import { rbEqual } from "@blazetrails/ruby-compat";
-import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
+import {
+  compileJs,
+  hyphenPragma,
+  type EmitJsOptions,
+  type EmitResult,
+  type HyphenOptions,
+} from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
 import {
@@ -38,6 +44,9 @@ export class Tse implements TemplateHandler {
 
   static implementation: TseImplementation = compileJs;
 
+  /** @noRailsEquivalent PERMANENT */
+  static hyphenNames: HyphenOptions | null = null;
+
   static call(template: TseTemplate, source: string): string {
     return new this().call(template, source);
   }
@@ -51,7 +60,10 @@ export class Tse implements TemplateHandler {
   }
 
   translateLocation(spot: Spot, backtraceLocation: BacktraceLocation, source: string): Spot | null {
-    return translateLocationImpl(spot, backtraceLocation, source);
+    const ctor = this.constructor as typeof Tse;
+    const pragma = hyphenPragma(source);
+    const hyphenNames = pragma === undefined ? ctor.hyphenNames : pragma;
+    return translateLocationImpl(spot, backtraceLocation, source, hyphenNames);
   }
 
   /** @missingRailsCall include? — PERMANENT */
@@ -63,6 +75,7 @@ export class Tse implements TemplateHandler {
       trim: ctor.trimMode === "-",
       async: template._streaming === true,
     };
+    if (ctor.hyphenNames !== null) options.hyphenNames = ctor.hyphenNames;
     if (
       ActionView.Base.annotateRenderedViewWithFilenames &&
       template.format === ":html" &&

@@ -7,6 +7,7 @@ import {
   type TseAst,
   type LocalEntry,
   type LineMapping,
+  type HyphenOptions,
 } from "@blazetrails/tse-compiler";
 import type { LineDelta } from "../plugin.js";
 
@@ -89,23 +90,61 @@ function lineMappings(genLine: number, code: string, node: TseAst["nodes"][numbe
   const valueLines = value.split("\n");
   const srcEnd =
     yielded !== null && arg === "" ? valueCol + valueLines[0].length : srcCol + anchor.length;
+  const hyphen = node.kind === "text" || yielded !== null ? undefined : node.hyphen;
+  const leadLen = node.kind === "text" ? 0 : (/^\s*/.exec(node.value)?.[0].length ?? 0);
+  const srcLines = hyphen === undefined ? valueLines : hyphen.source.trim().split("\n");
+  const lineCol = (lines: readonly string[], offset: number): [number, number] => {
+    let line = 0;
+    while (line < lines.length - 1 && offset > lines[line].length) {
+      offset -= lines[line].length + 1;
+      line++;
+    }
+    return [line, offset];
+  };
+  const editPoints = (i: number, genBase: number, srcBase: number): LineMapping[] =>
+    (hyphen?.edits ?? []).flatMap((e) => {
+      const [line, genStart] = lineCol(valueLines, e.genStart - leadLen);
+      if (line !== i) return [];
+      const [, srcStart] = lineCol(srcLines, e.srcStart - leadLen);
+      return [
+        {
+          genLine: genLine + i,
+          srcLine: srcLine + i,
+          genCol: genBase + genStart,
+          srcCol: srcBase + srcStart,
+        },
+        {
+          genLine: genLine + i,
+          srcLine: srcLine + i,
+          genCol: genBase + genStart + (e.genEnd - e.genStart),
+          srcCol: srcBase + srcStart + (e.srcEnd - e.srcStart),
+        },
+      ];
+    });
   return pieces.flatMap((piece, i) => {
     if (i > 0) {
       const end = (valueLines[i] ?? piece).length;
+      const srcLineEnd = (srcLines[i] ?? piece).length;
       return [
         { genLine: genLine + i, srcLine: srcLine + i, genCol: 0, srcCol: 0 },
-        { genLine: genLine + i, srcLine: srcLine + i, genCol: end, srcCol: end },
+        ...editPoints(i, 0, 0),
+        { genLine: genLine + i, srcLine: srcLine + i, genCol: end, srcCol: srcLineEnd },
       ];
     }
     if (at === -1) return [{ genLine, srcLine, genCol: piece.length, srcCol }];
     if (node.kind === "text") return [{ genLine, srcLine, genCol: at, srcCol }];
     return [
       { genLine, srcLine, genCol: at, srcCol },
-      { genLine, srcLine, genCol: at + anchor.length, srcCol: srcEnd },
+      ...editPoints(0, at, srcCol),
+      {
+        genLine,
+        srcLine,
+        genCol: at + anchor.length,
+        srcCol: hyphen === undefined ? srcEnd : srcCol + srcLines[0].length,
+      },
     ];
   });
 }
-
 function contextYield(value: string): string {
   const m = YIELD_EXPR_RE.exec(value);
   if (m === null) return value;
@@ -179,12 +218,20 @@ export interface TseScope {
   resolved?: boolean;
 }
 
-export function virtualizeTse(source: string, scope?: TseScope): string {
-  return virtualizeTseWithDeltas(source, scope).ts;
+export function virtualizeTse(
+  source: string,
+  scope?: TseScope,
+  hyphenNames?: HyphenOptions | null,
+): string {
+  return virtualizeTseWithDeltas(source, scope, hyphenNames).ts;
 }
 
-export function virtualizeTseWithDeltas(source: string, scope?: TseScope): VirtualizeTseResult {
-  const ast = parse(source);
+export function virtualizeTseWithDeltas(
+  source: string,
+  scope?: TseScope,
+  hyphenNames?: HyphenOptions | null,
+): VirtualizeTseResult {
+  const ast = parse(source, true, hyphenNames);
   const locals = ast.localsSignature === null ? [] : parseLocalsSignature(ast.localsSignature);
   const localsType = localsParamType(ast, locals);
   const needsNoExtraKeys = localsType.includes("NoExtraKeys");

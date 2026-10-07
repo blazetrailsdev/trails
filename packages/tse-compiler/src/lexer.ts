@@ -14,7 +14,11 @@ export interface Token {
   srcLine: number;
   srcCol?: number;
 }
-export class TseSyntaxError extends Error {}
+export class TseSyntaxError extends Error {
+  srcLine?: number;
+  srcCol?: number;
+  srcLength?: number;
+}
 
 const TAG_RE = /<%!([\s\S]*?)!%>|<%(==|=|-|#|%)?([\s\S]*?)([-=])?%>([ \t]*\r?\n)?/g;
 const KIND: Record<string, TokenKind> = { "=": "expr", "==": "rawExpr", "#": "comment" };

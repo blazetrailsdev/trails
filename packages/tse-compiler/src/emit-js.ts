@@ -1,4 +1,5 @@
 import { parse, type TseAst, type TseNode } from "./parser.js";
+import type { HyphenOptions } from "./hyphen-names.js";
 import { generateSourceMap, type RawSourceMap, type LineMapping } from "./source-map.js";
 
 export interface EmitJsOptions {
@@ -9,6 +10,7 @@ export interface EmitJsOptions {
   async?: boolean;
   fileName?: string;
   sourceFileName?: string;
+  hyphenNames?: HyphenOptions | null;
 }
 
 export interface EmitResult {
@@ -19,7 +21,7 @@ export interface EmitResult {
 }
 
 export function compileJs(source: string, options: EmitJsOptions = {}): EmitResult {
-  const ast = parse(source, options.trim !== false);
+  const ast = parse(source, options.trim !== false, options.hyphenNames);
   const { code, mappings } = emit(ast, options);
   const sourceMap =
     options.fileName && options.sourceFileName

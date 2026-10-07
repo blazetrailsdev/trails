@@ -1,5 +1,11 @@
 import { tokenize } from "@blazetrails/activesupport";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
+import {
+  hyphenPragma,
+  rewriteHyphenNames,
+  sourceOffset,
+  type HyphenOptions,
+} from "@blazetrails/tse-compiler";
 
 export class LocationParsingError extends Error {
   override name = "LocationParsingError";
@@ -42,12 +48,16 @@ export function findOffset(
   compiled: string,
   sourceTokens: [string, string][],
   errorColumn: number,
+  hyphenNames?: HyphenOptions | null,
 ): number {
   const tokens = offsetSourceTokens(sourceTokens);
   let pos = 0;
 
   for (let i = 0; i < tokens.length - 1; i++) {
-    const [name, str, offset] = tokens[i] as [string, string, number];
+    const [name, srcStr, offset] = tokens[i] as [string, string, number];
+    const rewrite =
+      name === ":CODE" && hyphenNames != null ? rewriteHyphenNames(srcStr, hyphenNames) : null;
+    const str = rewrite?.code ?? srcStr;
     const [, nextStr] = tokens[i + 1];
     let matchedStr = false;
 
@@ -57,7 +67,7 @@ export function findOffset(
       } else if (compiled.startsWith(str, pos)) {
         matchedStr = true;
         if (name === ":CODE" && pos <= errorColumn && pos + str.length >= errorColumn) {
-          return errorColumn - pos + offset;
+          return sourceOffset(rewrite?.edits ?? [], errorColumn - pos) + offset;
         }
         pos += str.length;
       } else {
@@ -73,12 +83,13 @@ export function translateLocation(
   spot: Spot,
   backtraceLocation: BacktraceLocation,
   source: string,
+  hyphenNames: HyphenOptions | null | undefined = hyphenPragma(source),
 ): Spot | null {
   try {
     const lines = sourceLines(source);
     if (lines.length < backtraceLocation.lineno) return null;
     const tokens = tokenize(lines[backtraceLocation.lineno - 1]);
-    const newFirstColumn = findOffset(spot.snippet, tokens, spot.firstColumn);
+    const newFirstColumn = findOffset(spot.snippet, tokens, spot.firstColumn, hyphenNames);
 
     const linenoDelta = spot.firstLineno - backtraceLocation.lineno;
     spot.firstLineno -= linenoDelta;

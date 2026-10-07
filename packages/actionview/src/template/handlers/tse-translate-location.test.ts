@@ -88,3 +88,40 @@ describe("translateLocation", () => {
     ).toBeNull();
   });
 });
+
+describe("SPIKE: hyphen-case names", () => {
+  it("translates a column after a rewritten name back to the template column", () => {
+    const source = "<%= this.window-size.missing() %>\n";
+    const hyphenNames = { resolve: "literal", positions: "property" } as const;
+    const snippet = compileJs(source, { hyphenNames }).code.split("\n")[0];
+    expect(snippet).toContain('this["window-size"].missing()');
+    const firstColumn = snippet.indexOf("missing");
+    const spot = {
+      snippet,
+      firstLineno: 1,
+      lastLineno: 1,
+      firstColumn,
+      lastColumn: firstColumn + 7,
+    };
+    const out = translateLocation(spot, { lineno: 1 }, source, hyphenNames);
+    expect(out!.firstColumn).toBe(source.indexOf("missing"));
+    expect(out!.lastColumn).toBe(source.indexOf("missing") + 7);
+  });
+
+  it("finds the pragma on its own, and gives up without it", () => {
+    const body = "<%= this.a-b.missing() %>";
+    const snippet = '_ob.append( this["a-b"].missing() );';
+    const spot = (line: number) => ({
+      snippet,
+      firstLineno: line,
+      lastLineno: line,
+      firstColumn: 24,
+      lastColumn: 31,
+    });
+    const withPragma = "<%! hyphen-names: literal !%>\n" + body;
+    expect(translateLocation(spot(2), { lineno: 2 }, withPragma)!.firstColumn).toBe(
+      body.indexOf("missing"),
+    );
+    expect(translateLocation(spot(1), { lineno: 1 }, body)).toBeNull();
+  });
+});
