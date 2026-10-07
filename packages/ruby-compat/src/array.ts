@@ -363,23 +363,17 @@ export function unpack1(
  * `rb_range_beg_len` (`vendor/ruby/v3.3.11/range.c:1744`); an out-of-range start is nil.
  * @noRailsEquivalent PERMANENT
  */
-export function arySlice<T>(
-  ary: readonly T[],
-  arg: number | Range<number>,
-  length?: number,
-): T | T[] | null {
+export function arySlice<T>(ary: readonly T[], arg: unknown, length?: unknown): T | T[] | null {
   const argc = arguments.length - 1;
   if (argc < 1 || argc > 2) {
     throw new ArgumentError(`wrong number of arguments (given ${argc}, expected 1..2)`);
   }
   const alen = ary.length;
-  if (arg == null || (argc === 2 && length == null)) {
-    throw new TypeError("no implicit conversion from nil to integer");
-  }
   if (argc === 2) {
-    let beg = arg as number;
+    let beg = num2long(arg);
+    const len = num2long(length);
     if (beg < 0) beg += alen;
-    return subseq(ary, beg, length!);
+    return subseq(ary, beg, len);
   }
   if (arg instanceof Range) {
     let beg = arg.begin ?? 0;
@@ -392,7 +386,8 @@ export function arySlice<T>(
     if (arg.end !== null && !arg.excludeEnd) end += 1;
     return subseq(ary, beg, Math.max(0, end - beg));
   }
-  const index = arg < 0 ? arg + alen : arg;
+  const offset = num2long(arg);
+  const index = offset < 0 ? offset + alen : offset;
   return index >= 0 && index < alen ? ary[index] : null;
 }
 

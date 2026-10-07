@@ -1531,10 +1531,6 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).name;
   }
 
-  get className(): string {
-    return (this._reflection as any).className;
-  }
-
   scopeFor(relation: any, owner?: any): any {
     return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
   }
@@ -1582,18 +1578,6 @@ export class RuntimeReflection extends AbstractReflection {
     this._association = association;
   }
 
-  get name(): string {
-    return (this._reflection as any).name;
-  }
-
-  get className(): string {
-    return (this._reflection as any).className;
-  }
-
-  get pluralName(): string {
-    return (this._reflection as any).pluralName;
-  }
-
   get scope(): ((...args: any[]) => any) | null {
     return (this._reflection as any).scope;
   }
@@ -1624,10 +1608,6 @@ export class RuntimeReflection extends AbstractReflection {
 
   allIncludes(callback: () => any): any {
     return callback();
-  }
-
-  get options(): Record<string, unknown> {
-    return asConcrete(this._reflection).options;
   }
 
   override isThroughReflection(): boolean {

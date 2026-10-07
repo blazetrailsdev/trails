@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
+import { TopLevel } from "@blazetrails/activesupport";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
@@ -80,6 +81,12 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
       expect(error).toBeInstanceOf(EnvironmentMismatchError);
       expect((error as Error).message).toMatch(
         new RegExp(`last run in \`otherenv\`[\\s\\S]*running in \`${current}\``),
+      );
+      expect((error as Error).message).toBe(
+        "You are attempting to modify a database that was last run in `otherenv` environment.\n" +
+          `You are running in \`${current}\` environment. ` +
+          "If you are sure you want to continue, first set the environment using:\n\n" +
+          "        bin/trails db environment:set\n\n",
       );
     },
   );
@@ -212,5 +219,30 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
     }
+  });
+});
+
+describe("EnvironmentMismatchError message", () => {
+  const msg =
+    "You are attempting to modify a database that was last run in `staging` environment.\n" +
+    "You are running in `development` environment. " +
+    "If you are sure you want to continue, first set the environment using:\n\n" +
+    "        bin/trails db environment:set";
+  const trails = TopLevel.Trails;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+  });
+
+  it("ends at the command when Trails.env is not defined", () => {
+    TopLevel.Trails = undefined;
+    const error = new EnvironmentMismatchError({ current: "development", stored: "staging" });
+    expect(error.message).toBe(`${msg}\n\n`);
+  });
+
+  it("appends the TRAILS_ENV assignment when Trails.env is defined", () => {
+    TopLevel.Trails = { env: "development" } as unknown as typeof TopLevel.Trails;
+    const error = new EnvironmentMismatchError({ current: "development", stored: "staging" });
+    expect(error.message).toBe(`${msg} TRAILS_ENV=development\n\n`);
   });
 });

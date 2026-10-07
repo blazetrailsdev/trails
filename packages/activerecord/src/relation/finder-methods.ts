@@ -9,7 +9,10 @@ import {
   last as aryLast,
   take as aryTake,
   uniq,
-  TypeError,
+  arySlice,
+  cmp,
+  numericMinus,
+  rbCmpint,
 } from "@blazetrails/ruby-compat";
 import { inOrderOf, isPlainObject, wrap } from "@blazetrails/activesupport";
 import { pluralize } from "@blazetrails/activesupport/core-ext/string/inflections";
@@ -622,25 +625,29 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
   if ((this as any).selectValues.length > 0) {
     relation = relation.select(this.table.get(pk as string));
   }
-  const records = await relation.toArray();
+  const result = await relation.toArray();
 
-  let expectedSize = ids.length;
-  const limitValue: number | string | null = (this as any).limitValue ?? null;
-  const offsetValue: number | string | null = (this as any).offsetValue ?? null;
-  if (limitValue !== null && typeof limitValue !== "number") {
-    throw new ArgumentError("comparison of Integer with String failed");
+  const limitValue = this.limitValue;
+  const offsetValue = this.offsetValue;
+  let expectedSize: unknown;
+  if (limitValue != null && rbCmpint(cmp(ids.length, limitValue), ids.length, limitValue) > 0) {
+    expectedSize = limitValue;
+  } else {
+    expectedSize = ids.length;
   }
-  if (offsetValue !== null && typeof offsetValue !== "number") {
-    throw new TypeError("String can't be coerced into Integer");
-  }
-  if (limitValue !== null && ids.length > limitValue) expectedSize = limitValue;
-  if (offsetValue !== null && ids.length - offsetValue < expectedSize)
-    expectedSize = ids.length - offsetValue;
 
-  if (records.length !== expectedSize) {
-    this.raiseRecordNotFoundExceptionBang(ids, records.length, expectedSize);
+  if (
+    offsetValue != null &&
+    rbCmpint(cmp(numericMinus(ids.length, offsetValue), expectedSize), ids.length, expectedSize) < 0
+  ) {
+    expectedSize = numericMinus(ids.length, offsetValue);
   }
-  return records;
+
+  if (result.length === expectedSize) {
+    return result;
+  } else {
+    this.raiseRecordNotFoundExceptionBang(ids, result.length, expectedSize as number);
+  }
 }
 
 /**
@@ -648,12 +655,8 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
  * @missingRailsName size — PERMANENT
  */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
-  const offsetValue: number | string = (this as any).offsetValue ?? 0;
-  const limitValue: number | string | null = (this as any).limitValue ?? null;
-  if (typeof offsetValue !== "number" || (limitValue !== null && typeof limitValue !== "number")) {
-    throw new TypeError("no implicit conversion of String into Integer");
-  }
-  ids = ids.slice(offsetValue, offsetValue + (limitValue ?? ids.length));
+  ids =
+    (arySlice(ids, this.offsetValue ?? 0, this.limitValue ?? ids.length) as unknown[] | null) ?? [];
 
   let relation = (this as any).except("limit", "offset");
   const pk = this.model.primaryKey;

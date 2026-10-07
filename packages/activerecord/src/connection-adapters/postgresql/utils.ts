@@ -1,4 +1,5 @@
 import { rbHash } from "@blazetrails/activesupport";
+import { stringValue } from "@blazetrails/ruby-compat";
 
 export class Name {
   static readonly SEPARATOR = ".";
@@ -16,11 +17,12 @@ export class Name {
   }
 
   quoted(): string {
-    const esc = (s: string) => `"${s.replace(/"/g, '""')}"`;
-    if (this.schema) {
-      return `${esc(this.schema)}.${esc(this.identifier)}`;
+    const quoteIdent = (str: unknown) => `"${stringValue(str).replace(/"/g, '""')}"`;
+    if (this.schema != null) {
+      return quoteIdent(this.schema) + Name.SEPARATOR + quoteIdent(this.identifier);
+    } else {
+      return quoteIdent(this.identifier);
     }
-    return esc(this.identifier);
   }
 
   equals(other: Name): boolean {
