@@ -1,10 +1,12 @@
+import { toS } from "@blazetrails/ruby-compat";
+
 export class Text {
   type: unknown;
 
   private readonly string: string;
 
   constructor(string: unknown) {
-    this.string = string == null ? "" : String(string);
+    this.string = toS(string);
   }
 
   get identifier(): string {

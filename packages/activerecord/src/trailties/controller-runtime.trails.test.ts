@@ -1,35 +1,54 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { include, initializeIncludedModules } from "@blazetrails/activesupport";
+import {
+  Concern,
+  Module,
+  extend,
+  include,
+  initializeIncludedModules,
+} from "@blazetrails/activesupport";
 import { ControllerRuntime, logProcessAction } from "./controller-runtime.js";
 import * as RuntimeRegistry from "../runtime-registry.js";
+
+const FakeInstrumentation = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod(
+    "processAction",
+    function (this: FakeController, action: string, ...args: unknown[]): unknown {
+      this.processedWith = [action, ...args];
+      return undefined;
+    },
+  );
+  mod.defineMethod("cleanupViewRuntime", function <T>(block: () => T): T {
+    return block();
+  });
+  mod.defineMethod(
+    "appendInfoToPayload",
+    function (this: FakeController, payload: Record<string, unknown>): void {
+      payload.view_runtime = this.viewRuntime;
+    },
+  );
+}) as Module & { ClassMethods: Module };
+FakeInstrumentation.ClassMethods = new Module((mod) => {
+  mod.defineMethod("logProcessAction", function (payload: Record<string, unknown>): string[] {
+    return payload.view_runtime == null ? [] : [`Views: ${payload.view_runtime}ms`];
+  });
+});
 
 class FakeController {
   dbRuntime: number | null = null;
   logger: { "info?": boolean } | null = null;
   viewRuntime: number | null = null;
   processedWith: unknown[] = [];
+  declare processAction: (action: string, ...args: unknown[]) => unknown;
+  declare cleanupViewRuntime: <T>(block: () => T) => T;
+  declare appendInfoToPayload: (payload: Record<string, unknown>) => void;
 
   constructor() {
     initializeIncludedModules(this);
   }
-
-  processAction(action: string, ...args: unknown[]): unknown {
-    this.processedWith = [action, ...args];
-    return undefined;
-  }
-
-  cleanupViewRuntime<T>(block: () => T): T {
-    return block();
-  }
-
-  appendInfoToPayload(payload: Record<string, unknown>): void {
-    payload.view_runtime = this.viewRuntime;
-  }
-
-  static logProcessAction(payload: Record<string, unknown>): string[] {
-    return payload.view_runtime == null ? [] : [`Views: ${payload.view_runtime}ms`];
-  }
 }
+include(FakeController as never, FakeInstrumentation);
 include(FakeController as never, ControllerRuntime);
 
 describe("ControllerRuntimeTest", () => {
@@ -220,22 +239,16 @@ describe("ControllerRuntimeTest", () => {
         constructor() {
           initializeIncludedModules(this);
         }
-        processAction(): unknown {
-          return undefined;
-        }
-        cleanupViewRuntime<T>(block: () => T): T {
-          return block();
-        }
-        appendInfoToPayload(): void {}
-        static logProcessAction(): string[] {
-          return [];
-        }
       }
+      include(SeatController as never, FakeInstrumentation);
       include(SeatController as never, ControllerRuntime);
 
       const controller = new SeatController() as SeatController & { dbRuntime: number | null };
       expect(
-        typeof Object.getOwnPropertyDescriptor(SeatController.prototype, "dbRuntime")?.get,
+        typeof Object.getOwnPropertyDescriptor(
+          Object.getPrototypeOf(SeatController.prototype),
+          "dbRuntime",
+        )?.get,
       ).toBe("function");
       expect(controller.dbRuntime).toBe(null);
       expect(Object.hasOwn(controller, "_dbRuntime")).toBe(true);

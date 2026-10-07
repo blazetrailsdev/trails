@@ -318,15 +318,15 @@ export class Metal extends AbstractController {
     }
     const str = Array.isArray(body)
       ? body.join("")
-      : Buffer.isBuffer(body) || body instanceof SafeBuffer
+      : body instanceof SafeBuffer
         ? body.toString()
         : body;
     this._responseBody = str;
     if (this.response) this.response.body = str;
   }
 
-  override get responseBody(): string | true | null {
-    return this._responseBody as string | true | null;
+  override get responseBody(): string | Buffer | true | null {
+    return this._responseBody;
   }
 
   override get performed(): boolean {

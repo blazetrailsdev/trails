@@ -16,9 +16,12 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import {
+  Concern,
+  Module,
   any,
   classify,
   demodulize,
+  extend,
   isAnonymous,
   isPlainObject,
   safeConstantize,
@@ -246,6 +249,15 @@ export function deferInherited(this: WrapperHostClass): void {
 }
 
 /** @internal */
+export async function processAction(
+  this: ParamsWrapperHost & { _wrapperEnabled(): boolean; _performParameterWrapping(): void },
+  ...args: unknown[]
+): Promise<unknown> {
+  if (this._wrapperEnabled()) this._performParameterWrapping();
+  return await ParamsWrapper.superMethod(this, "processAction")!(...args);
+}
+
+/** @internal */
 export function _wrapperKey(this: ParamsWrapperHost): string | null {
   return this._wrapperOptions.name;
 }
@@ -311,3 +323,15 @@ export function _performParameterWrapping(this: ParamsWrapperHost): void {
 
   mergeBang(this.request.filteredParameters(), wrappedFilteredHash);
 }
+
+export const ParamsWrapper: Module = new Module((mod) => {
+  extend(mod, Concern);
+
+  mod.defineMethod("processAction", processAction);
+  mod.defineMethod("_wrapperKey", _wrapperKey);
+  mod.defineMethod("_wrapperFormats", _wrapperFormats);
+  mod.defineMethod("_wrapParameters", _wrapParameters);
+  mod.defineMethod("_extractParameters", _extractParameters);
+  mod.defineMethod("_wrapperEnabled", _wrapperEnabled);
+  mod.defineMethod("_performParameterWrapping", _performParameterWrapping);
+});

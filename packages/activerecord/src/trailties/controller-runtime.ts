@@ -1,4 +1,12 @@
-import { attrInternal, included, initialize, pluralize, toF } from "@blazetrails/activesupport";
+import {
+  attrInternal,
+  Concern,
+  extend,
+  initialize,
+  Module,
+  pluralize,
+  toF,
+} from "@blazetrails/activesupport";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 interface ControllerRuntimeHost {
@@ -6,25 +14,7 @@ interface ControllerRuntimeHost {
   logger?: { "info?"?: boolean } | null;
 }
 
-interface ControllerRuntimeSuper {
-  processAction(action: string, ...args: unknown[]): unknown;
-  cleanupViewRuntime<T>(block: () => T): T;
-  appendInfoToPayload(payload: Record<string, unknown>): void;
-  logProcessAction(payload: Record<string, unknown>): string[];
-}
-
-const supers = new WeakMap<object, ControllerRuntimeSuper>();
-
-function superOf(receiver: object): ControllerRuntimeSuper {
-  for (let link = Object.getPrototypeOf(receiver); link; link = Object.getPrototypeOf(link)) {
-    const captured = supers.get(link);
-    if (captured) return captured;
-  }
-  return supers.get(receiver)!;
-}
-
 interface ControllerClass {
-  prototype: object;
   logProcessAction(payload: Record<string, unknown>): string[];
 }
 
@@ -32,7 +22,7 @@ export function logProcessAction(
   this: ControllerClass,
   payload: Record<string, unknown>,
 ): string[] {
-  const messages = superOf(this).logProcessAction.call(this, payload);
+  const messages = ClassMethods.superMethod(this, "logProcessAction")!(payload) as string[];
   const dbRuntime = payload["db_runtime"];
 
   if (dbRuntime != null && dbRuntime !== false) {
@@ -54,7 +44,7 @@ export function processAction(
   ...args: unknown[]
 ): unknown {
   RuntimeRegistry.reset();
-  return superOf(this).processAction.call(this, action, ...args);
+  return ControllerRuntime.superMethod(this, "processAction")!(action, ...args);
 }
 
 /** @internal */
@@ -62,7 +52,7 @@ export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => 
   if (this.logger?.["info?"]) {
     const dbRtBeforeRender = RuntimeRegistry.resetRuntimes();
     this.dbRuntime = (this.dbRuntime ?? 0) + dbRtBeforeRender;
-    const runtime = superOf(this).cleanupViewRuntime.call(this, block);
+    const runtime = ControllerRuntime.superMethod(this, "cleanupViewRuntime")!(block);
     const subtractQueries = (elapsed: number): number => {
       const queriesRt = RuntimeRegistry.sqlRuntime() - RuntimeRegistry.asyncSqlRuntime();
       const dbRtAfterRender = RuntimeRegistry.resetRuntimes();
@@ -74,7 +64,7 @@ export function cleanupViewRuntime<T>(this: ControllerRuntimeHost, block: () => 
     }
     return subtractQueries(runtime as number) as T;
   } else {
-    return superOf(this).cleanupViewRuntime.call(this, block) as T;
+    return ControllerRuntime.superMethod(this, "cleanupViewRuntime")!(block) as T;
   }
 }
 
@@ -83,39 +73,30 @@ export function appendInfoToPayload(
   this: ControllerRuntimeHost,
   payload: Record<string, unknown>,
 ): void {
-  superOf(this).appendInfoToPayload.call(this, payload);
+  ControllerRuntime.superMethod(this, "appendInfoToPayload")!(payload);
 
   payload["db_runtime"] = (this.dbRuntime ?? 0) + RuntimeRegistry.resetRuntimes();
   payload["queries_count"] = RuntimeRegistry.resetQueriesCount();
   payload["cached_queries_count"] = RuntimeRegistry.resetCachedQueriesCount();
 }
 
-export class ControllerRuntime {
-  /** @noRailsEquivalent CONVERGEABLE controller-runtime-supers-map-onto-module-super */
-  static [included](klass: unknown): void {
-    const base = klass as ControllerClass;
-    const proto = base.prototype as Record<string, unknown>;
-    for (
-      let link: object | null = proto;
-      link;
-      link = Object.getPrototypeOf(link) as object | null
-    ) {
-      if (supers.has(link)) return;
-    }
-    supers.set(proto, {
-      processAction: proto.processAction as ControllerRuntimeSuper["processAction"],
-      cleanupViewRuntime: proto.cleanupViewRuntime as ControllerRuntimeSuper["cleanupViewRuntime"],
-      appendInfoToPayload:
-        proto.appendInfoToPayload as ControllerRuntimeSuper["appendInfoToPayload"],
-      logProcessAction: base.logProcessAction,
-    });
-    supers.set(base, supers.get(proto)!);
-    Object.assign(proto, { processAction, cleanupViewRuntime, appendInfoToPayload });
-    base.logProcessAction = logProcessAction;
-  }
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("logProcessAction", logProcessAction);
+});
 
-  static [initialize](this: ControllerRuntimeHost): void {
+export const ControllerRuntime = new Module((mod) => {
+  extend(mod, Concern);
+
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+    this: ControllerRuntimeHost,
+  ): void {
     this.dbRuntime = null;
-  }
-}
-attrInternal.call(ControllerRuntime.prototype, "dbRuntime");
+  };
+
+  mod.moduleEval((carrier) => attrInternal.call(carrier, "dbRuntime"));
+
+  mod.defineMethod("processAction", processAction);
+  mod.defineMethod("cleanupViewRuntime", cleanupViewRuntime);
+  mod.defineMethod("appendInfoToPayload", appendInfoToPayload);
+}) as Module & { ClassMethods: Module };
+ControllerRuntime.ClassMethods = ClassMethods;
