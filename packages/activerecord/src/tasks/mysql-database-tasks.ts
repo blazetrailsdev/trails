@@ -1,5 +1,6 @@
 import {
   getChildProcessAsync,
+  merge,
   rbEqq,
   RuntimeError,
   stderr,
@@ -152,12 +153,9 @@ export class MySQLDatabaseTasks {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall merge — PERMANENT
-   */
+  /** @internal */
   private configurationHashWithoutDatabase(): ConfigHash {
-    return { ...this.configurationHash, database: null };
+    return merge(this.configurationHash, { database: null });
   }
 }
 

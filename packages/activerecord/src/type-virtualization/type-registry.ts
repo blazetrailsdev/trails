@@ -1,4 +1,4 @@
-/** @noRailsEquivalent PERMANENT */
+/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 
 const T = `import("@blazetrails/date").Temporal`;
 const IPADDR = `import("@blazetrails/ruby-compat").IPAddr`;

@@ -27,7 +27,7 @@ export class Session {
     return Session.convertTimestampToTime(this.session.get("lastWrite") as number | undefined);
   }
 
-  /** @missingRailsName now — PERMANENT */
+  /** @missingRailsName now — CONVERGEABLE database-selector-session-timestamps-are-ruby-times */
   updateLastWriteTimestamp(): number {
     const lastWrite = Session.convertTimeToTimestamp(Temporal.Now.instant());
     this.session.set("lastWrite", lastWrite);

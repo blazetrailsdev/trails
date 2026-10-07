@@ -21,7 +21,7 @@ import type {
   ColumnType,
 } from "../connection-adapters/abstract/schema-definitions.js";
 
-/** @inventedArm if — PERMANENT */
+/** @inventedArm if — CONVERGEABLE migration-compatibility-find-stringifies-the-version-in-one-call */
 export function find(version: string | number): unknown {
   version =
     typeof version === "number" && Number.isInteger(version) ? `${version}.0` : `${version}`;

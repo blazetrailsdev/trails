@@ -70,7 +70,7 @@ function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
 
 /**
  * @internal
- * @noRailsEquivalent PERMANENT
+ * @noRailsEquivalent CONVERGEABLE default-scope-override-reads-the-default-scope-method-owner
  */
 export function hasDefaultScopeOverride(modelClass: any): boolean {
   return defaultScopeMethod(modelClass) !== undefined;
@@ -121,15 +121,12 @@ export function unscoped<T extends typeof Base, R>(
   return Default.unscoped.call(this, block) as Relation<InstanceType<T>> | Promise<R>;
 }
 
-/** @missingRailsCall any? — PERMANENT */
 export function isScopeAttributes(this: {
   currentScope?(skipInheritedScope?: boolean): unknown;
-  defaultScopes?: DefaultScope[];
+  defaultScopes: DefaultScope[];
 }): boolean {
   return (
-    baseIsScopeAttributes.call(this) ||
-    (this.defaultScopes?.length ?? 0) > 0 ||
-    hasDefaultScopeOverride(this)
+    baseIsScopeAttributes.call(this) || any(this.defaultScopes) || hasDefaultScopeOverride(this)
   );
 }
 

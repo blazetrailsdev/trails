@@ -5,6 +5,7 @@ import {
   hashDelete,
   include,
   isEmpty,
+  last,
   rbFSend,
   rbObjDup,
   uniq,
@@ -182,14 +183,10 @@ export class CommandRecorder {
     include(this, this.StraightReversions);
   }
 
-  /**
-   * @internal
-   * @missingRailsCall delete — PERMANENT
-   */
+  /** @internal */
   invertCreateTable(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const last = args[args.length - 1];
-    if (isPlainObject(last)) {
-      delete (last as Record<string, unknown>)["ifNotExists"];
+    if (isPlainObject(last(args))) {
+      hashDelete(last(args) as Record<string, unknown>, "ifNotExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod("invertCreateTable")!.value.call(
       this,
@@ -274,20 +271,12 @@ export class CommandRecorder {
     );
   }
 
-  /**
-   * @internal
-   * @missingRailsCall delete — PERMANENT
-   */
+  /** @internal */
   invertAddForeignKey(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
-      const opts = { ...(a[a.length - 1] as Record<string, unknown>) };
-      delete opts["validate"];
-      a[a.length - 1] = opts;
-    }
+    if (isPlainObject(last(args))) hashDelete(last(args) as Record<string, unknown>, "validate");
     return CommandRecorder.StraightReversions.instanceMethod("invertAddForeignKey")!.value.call(
       this,
-      a,
+      args,
       block,
     );
   }
@@ -401,12 +390,9 @@ export class CommandRecorder {
     return ["renameColumn", [table, newName, oldName, ...rest]];
   }
 
-  /**
-   * @internal
-   * @missingRailsName delegate — PERMANENT
-   */
+  /** @internal */
   async invertTransaction(args: unknown[], block?: MigrationBlock): Promise<MigrationCommand> {
-    const subRecorder = new CommandRecorder(this._delegate);
+    const subRecorder = new CommandRecorder(this.delegate);
     await subRecorder.revert(block as () => Promise<void>);
 
     const invertionsProc = async (): Promise<void> => {
