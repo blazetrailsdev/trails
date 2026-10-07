@@ -339,14 +339,47 @@ export class Module<I extends object = Record<never, never>> {
   }
 
   /**
-   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/v3.3.11/class.c:1889
-   * `rb_class_instance_methods`.
+   * Mirrors: Ruby's Module#ancestors — vendor/ruby/v3.3.11/class.c:1570
+   * `rb_mod_ancestors`: the module, then the modules it includes, most
+   * recently included first, each followed by its own.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
-  instanceMethods(): string[] {
-    const carrier = carrierOf(this);
-    return Object.getOwnPropertyNames(carrier).filter((name) => !isUndefEntry(carrier, name));
+  ancestors(): object[] {
+    const ary: object[] = [this];
+    const carrier = carrierOf(this) as Record<symbol, unknown>;
+    const mods = Object.prototype.hasOwnProperty.call(carrier, includedModulesKey)
+      ? [...(carrier[includedModulesKey] as Set<object>)]
+      : [];
+    for (const mod of mods.reverse()) {
+      for (const m of mod instanceof Module ? mod.ancestors() : [mod]) {
+        if (!ary.includes(m)) ary.push(m);
+      }
+    }
+    return ary;
+  }
+
+  /**
+   * Mirrors: Ruby's Module#instance_methods — vendor/ruby/v3.3.11/class.c:1889
+   * `rb_class_instance_methods`, whose `include_super` defaults to true: the
+   * methods of the module's ancestors follow its own, and a name a nearer
+   * module undefines stays hidden.
+   *
+   * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
+   */
+  instanceMethods(includeSuper: boolean = true): string[] {
+    const seen = new Set<string>();
+    const ary: string[] = [];
+    for (const mod of includeSuper ? this.ancestors() : [this]) {
+      if (!(mod instanceof Module)) continue;
+      const carrier = carrierOf(mod);
+      for (const name of Object.getOwnPropertyNames(carrier)) {
+        if (seen.has(name)) continue;
+        seen.add(name);
+        if (!isUndefEntry(carrier, name)) ary.push(name);
+      }
+    }
+    return ary;
   }
 
   /**

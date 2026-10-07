@@ -1,48 +1,43 @@
-import { Module } from "@blazetrails/ruby-compat";
-import { afterEach, describe, expect, it } from "vitest";
+import { File } from "@blazetrails/ruby-compat";
+import { describe, expect, it } from "vitest";
 
-import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
+import { FooHelper } from "../../test-helpers/fixtures/alternate-helpers/foo-helper.js";
+import { AbcHelper } from "../../test-helpers/fixtures/helpers/abc-helper.js";
 import { Base } from "../base.js";
-import { setApplicationHelpers, setHelpersPath } from "./helpers.js";
 
-const AbcHelper = new Module().include({ bareA: () => "a" });
-const FooHelper = new Module().include({ foo: () => "FOO" });
+const fixtures = File.expandPath(
+  "../../test-helpers/fixtures",
+  File.dirname(new URL(import.meta.url).pathname),
+);
 
-const constants = new Map<string, HelperMethodsModule>([
-  ["AbcHelper", AbcHelper],
-  ["FooHelper", FooHelper],
-]);
-
-afterEach(() => {
-  setHelpersPath([]);
-  setApplicationHelpers([], new Map());
-});
+class AlternateHelpersController extends Base {
+  static {
+    this.helpersPath = [File.expandPath("alternate-helpers", fixtures)];
+  }
+}
 
 describe("ActionController::Helpers.modulesForHelpers", () => {
-  it("expands :all to every application helper", () => {
-    setApplicationHelpers(["abc"], constants);
-
-    expect(Base.modulesForHelpers([":all"])).toEqual([AbcHelper]);
+  it("expands :all to every helper under the class's helpersPath", () => {
+    expect(AlternateHelpersController.modulesForHelpers([":all"])).toEqual([FooHelper]);
+    expect(Base.modulesForHelpers([":all"])).toEqual([]);
   });
 
   it("reaches the ActionController override through Base.helper", () => {
-    setApplicationHelpers(["abc"], constants);
-    class AllHelpersController extends Base {}
+    class AllHelpersController extends AlternateHelpersController {}
 
     AllHelpersController.helper(":all");
 
-    expect(AllHelpersController._helpers.isInclude(AbcHelper)).toBe(true);
+    expect(AllHelpersController._helpers.isInclude(FooHelper)).toBe(true);
   });
 
   it("appends the application helpers after the arguments that stay", () => {
-    setApplicationHelpers(["abc"], constants);
-
-    expect(Base.modulesForHelpers(["foo", ":all"])).toEqual([FooHelper, AbcHelper]);
+    expect(AlternateHelpersController.modulesForHelpers(["abc", ":all"])).toEqual([
+      AbcHelper,
+      FooHelper,
+    ]);
   });
 
   it("resolves a helper by name when :all is absent", () => {
-    setApplicationHelpers(["abc"], constants);
-
     expect(Base.modulesForHelpers(["foo"])).toEqual([FooHelper]);
   });
 });

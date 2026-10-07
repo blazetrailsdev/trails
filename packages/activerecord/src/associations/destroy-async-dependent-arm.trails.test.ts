@@ -4,7 +4,9 @@ import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 
-class DestroyAsyncTestJob {}
+class DestroyAsyncTestJob {
+  static performLater(_jobArguments: Record<string, unknown>): void {}
+}
 registerConstant("DestroyAsyncTestJob", DestroyAsyncTestJob);
 
 class AsyncBook extends Base {
@@ -37,10 +39,8 @@ class AsyncContent extends Base {
 }
 
 function jobsFor(record: Base): Array<[unknown, Record<string, unknown>]> {
-  return (
-    (record as unknown as { _afterCommitJobs?: Array<[unknown, Record<string, unknown>]> })
-      ._afterCommitJobs ?? []
-  );
+  return (record as unknown as { _afterCommitJobs: Array<[unknown, Record<string, unknown>]> })
+    ._afterCommitJobs;
 }
 
 describe("destroy_async dependent arm", () => {

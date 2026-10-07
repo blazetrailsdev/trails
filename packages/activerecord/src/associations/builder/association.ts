@@ -30,26 +30,7 @@ type ExtensionModule = {
 };
 
 export class Association {
-  private static _extensions: ExtensionModule[] = [];
-
-  static get extensions(): ExtensionModule[] {
-    if (!Object.prototype.hasOwnProperty.call(this, "_extensions")) {
-      this._extensions = [...(Object.getPrototypeOf(this)._extensions ?? [])];
-    }
-    return this._extensions;
-  }
-
-  static set extensions(value: ExtensionModule[]) {
-    this._extensions = value;
-  }
-
-  get extensions(): ExtensionModule[] {
-    return (this.constructor as typeof Association).extensions;
-  }
-
-  set extensions(value: ExtensionModule[]) {
-    (this.constructor as typeof Association).extensions = value;
-  }
+  static extensions: ExtensionModule[] = [];
 
   static readonly VALID_OPTIONS: readonly string[] = [
     "className",
@@ -217,5 +198,26 @@ export class Association {
     model.beforeDestroy((o: any) => o.association(name).handleDependency());
   }
 
-  static addAfterCommitJobsCallback(_model: any, _dependent: string): void {}
+  static addAfterCommitJobsCallback(model: any, dependent: string): void {
+    if (dependent === "destroyAsync") {
+      const mixin: Module = model.generatedAssociationMethods();
+
+      if (!mixin.isMethodDefined("_afterCommitJobs")) {
+        model.afterCommit(function (this: any) {
+          for (const [jobClass, jobArguments] of this._afterCommitJobs) {
+            jobClass.performLater(jobArguments);
+          }
+        });
+
+        mixin.moduleEval((m) => {
+          Object.defineProperty(m, "_afterCommitJobs", {
+            get(this: any) {
+              return (this.__afterCommitJobs ||= []);
+            },
+            configurable: true,
+          });
+        });
+      }
+    }
+  }
 }

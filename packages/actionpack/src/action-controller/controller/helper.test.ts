@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   include,
   included,
@@ -8,13 +8,10 @@ import {
 } from "@blazetrails/activesupport";
 import {
   excBacktraceLocations,
-  extend,
   File,
   Module,
   rbModConstSet,
   rbObjMethods,
-  registerConstant,
-  unregisterConstant,
 } from "@blazetrails/ruby-compat";
 import type { RackResponse } from "@blazetrails/rack";
 import { TemplateError } from "@blazetrails/actionview";
@@ -22,33 +19,13 @@ import type { HelperMethodsModule } from "../../abstract-controller/helpers.js";
 import { TestRequest } from "../../action-dispatch/testing/test-request.js";
 import type { Response } from "../../action-dispatch/http/response.js";
 import { Base } from "../base.js";
-import { loadApplicationHelperNames, helpersPath, setHelpersPath } from "../metal/helpers.js";
 import { TestCase } from "../test-case.js";
 import { ActionPackTestSuiteUtils } from "../../test-helpers/abstract-unit.js";
-import { FooHelper } from "../../test-helpers/fixtures/alternate-helpers/foo-helper.js";
-import { AbcHelper } from "../../test-helpers/fixtures/helpers/abc-helper.js";
-import { GamesHelper } from "../../test-helpers/fixtures/helpers/fun/games-helper.js";
-import { PdfHelper } from "../../test-helpers/fixtures/helpers/fun/pdf-helper.js";
-import { JustMeHelper } from "../../test-helpers/fixtures/helpers/just-me-helper.js";
-import { MeTooHelper } from "../../test-helpers/fixtures/helpers/me-too-helper.js";
-import { Pack1Helper } from "../../test-helpers/fixtures/helpers1-pack/pack1-helper.js";
-import { Pack2Helper } from "../../test-helpers/fixtures/helpers2-pack/pack2-helper.js";
-import { UsersHelpeR } from "../../test-helpers/fixtures/helpers-typo/admin/users-helper.js";
 
 const thisFile = new URL(import.meta.url).pathname;
 const fixtures = File.expandPath("../../test-helpers/fixtures", File.dirname(thisFile));
 
-const helperConstants: Record<string, object> = {
-  FooHelper,
-  AbcHelper,
-  "Fun::GamesHelper": GamesHelper,
-  "Fun::PdfHelper": PdfHelper,
-  JustMeHelper,
-  MeTooHelper,
-  Pack1Helper,
-  Pack2Helper,
-  "Admin::UsersHelpeR": UsersHelpeR,
-};
+Base.helpersPath = [File.expandPath("helpers", fixtures)];
 
 const Fun = {
   GamesController: class GamesController extends Base {
@@ -67,7 +44,11 @@ for (const [name, klass] of Object.entries(Fun)) {
   Object.defineProperty(klass, "name", { value: `Fun::${name}` });
 }
 
-let AllHelpersController: typeof Base;
+class AllHelpersController extends Base {
+  static {
+    this.helper(":all");
+  }
+}
 
 class ImpressiveLibrary {
   static [included](base: typeof Base): void {
@@ -77,7 +58,13 @@ class ImpressiveLibrary {
   usefulFunction(): void {}
 }
 
+include(Base, ImpressiveLibrary);
+
 class JustMeController extends Base {
+  static {
+    this.clearHelpers();
+  }
+
   async lib() {
     await this.render({ inline: "<%= usefulFunction() %>" });
   }
@@ -93,70 +80,32 @@ Object.defineProperty(JustMeController.prototype, "flash", {
 
 class MeTooController extends JustMeController {}
 
-let HelpersPathsController: typeof Base;
+const paths = ["helpers2-pack", "helpers1-pack"].map((path) => File.join(fixtures, path));
+await ActionPackTestSuiteUtils.requireHelpers(paths);
 
-let HelpersTypoController: typeof Base;
+class HelpersPathsController extends Base {
+  static {
+    this.helpersPath = paths;
+
+    this.helper(":all");
+  }
+
+  async index() {
+    await this.render({ inline: "<%= conflictingHelper() %>" });
+  }
+}
+
+class HelpersTypoController extends Base {
+  static {
+    this.helpersPath = [File.expandPath("helpers-typo", fixtures)];
+  }
+}
+await ActionPackTestSuiteUtils.requireHelpers(HelpersTypoController.helpersPath);
 
 const LocalAbcHelper = new Module().include({
   a(): void {},
   b(): void {},
   c(): void {},
-});
-
-let helpersPathWas: string[];
-let helperMethodsWas: string[];
-
-beforeAll(async () => {
-  for (const [name, mod] of Object.entries(helperConstants)) registerConstant(name, mod);
-
-  helpersPathWas = helpersPath();
-  setHelpersPath([File.expandPath("helpers", fixtures)]);
-  await loadApplicationHelperNames();
-
-  AllHelpersController = class AllHelpersController extends Base {
-    static {
-      this.helper(":all");
-    }
-  };
-
-  helperMethodsWas = Base._helperMethods;
-  include(Base, ImpressiveLibrary);
-
-  JustMeController.clearHelpers();
-
-  const paths = ["helpers2-pack", "helpers1-pack"].map((path) => File.join(fixtures, path));
-
-  setHelpersPath(paths);
-  await loadApplicationHelperNames();
-  HelpersPathsController = class HelpersPathsController extends Base {
-    static {
-      this.helpersPath = paths;
-      this.helper(":all");
-    }
-
-    async index() {
-      await this.render({ inline: "<%= conflictingHelper() %>" });
-    }
-  };
-  await ActionPackTestSuiteUtils.requireHelpers(HelpersPathsController.helpersPath);
-
-  HelpersTypoController = class HelpersTypoController extends Base {
-    static {
-      this.helpersPath = [File.expandPath("helpers-typo", fixtures)];
-    }
-  };
-  await ActionPackTestSuiteUtils.requireHelpers(HelpersTypoController.helpersPath);
-
-  setHelpersPath([File.expandPath("helpers", fixtures)]);
-  await loadApplicationHelperNames();
-});
-
-afterAll(async () => {
-  delete (Base.prototype as { usefulFunction?: unknown }).usefulFunction;
-  Base._helperMethods = helperMethodsWas;
-  setHelpersPath(helpersPathWas);
-  await loadApplicationHelperNames();
-  for (const [name, mod] of Object.entries(helperConstants)) unregisterConstant(name, mod);
 });
 
 function body(response: RackResponse): string {
@@ -288,14 +237,17 @@ describe("HelperTest", () => {
     expect(body(await callController(Fun.PdfController, "test"))).toBe("test: baz");
   });
 
-  // BLOCKED: abstract-controller-helpers-inherited-runs-default-helper-module
-  it.skip("default helpers only", () => {
-    expect(ancestors(JustMeController._helpers)).toEqual(["JustMeHelper"]);
-    expect(ancestors(MeTooController._helpers)).toEqual([
-      "MeTooController::HelperMethods",
-      "MeTooHelper",
-      "JustMeHelper",
-    ]);
+  it("default helpers only", () => {
+    expect(
+      (JustMeController._helpers.ancestors() as Module[])
+        .filter((mod) => !isAnonymous(mod as { name: string }))
+        .map((mod) => mod.toS()),
+    ).toEqual(["JustMeHelper"]);
+    expect(
+      (MeTooController._helpers.ancestors() as Module[])
+        .filter((mod) => !isAnonymous(mod as { name: string }))
+        .map((mod) => mod.toS()),
+    ).toEqual(["MeTooController::HelperMethods", "MeTooHelper", "JustMeHelper"]);
   });
 
   it("base helper methods after clear helpers", async () => {
@@ -307,7 +259,7 @@ describe("HelperTest", () => {
   });
 
   it("all helpers", () => {
-    const methods = instanceMethods(AllHelpersController._helpers);
+    const methods = AllHelpersController._helpers.instanceMethods();
 
     expect(methods).toContain("bareA");
 
@@ -316,8 +268,7 @@ describe("HelperTest", () => {
     expect(methods).toContain("foobar");
   });
 
-  // BLOCKED: abstract-controller-helpers-module-and-caching-instance-halves
-  it.skip("all helpers with alternate helper dir", async () => {
+  it("all helpers with alternate helper dir", async () => {
     controllerClass.helpersPath = [File.expandPath("alternate-helpers", fixtures)];
     await ActionPackTestSuiteUtils.requireHelpers(controllerClass.helpersPath);
 
@@ -366,35 +317,12 @@ describe("HelperTest", () => {
     return controller.helpers() as unknown as Record<string, (...args: unknown[]) => unknown>;
   }
 
-  function instanceMethods(helpers: HelperMethodsModule): string[] {
-    const methods: string[] = [];
-    for (
-      let mod: object | null = Object.getPrototypeOf(extend({}, helpers));
-      mod && mod !== Object.prototype;
-      mod = Object.getPrototypeOf(mod)
-    ) {
-      for (const [name, entry] of Object.entries(Object.getOwnPropertyDescriptors(mod))) {
-        if (entry.get || typeof entry.value === "function") methods.push(name);
-        if (entry.set) methods.push(`${name}=`);
-      }
-    }
-    return methods;
-  }
-
-  function ancestors(helpers: HelperMethodsModule): string[] {
-    const names: string[] = [];
-    for (let mod: object | null = helpers; mod; mod = Object.getPrototypeOf(mod)) {
-      if (!isAnonymous(mod as { name: string })) names.push(String((mod as { name: string }).name));
-    }
-    return names;
-  }
-
   function expectedHelperMethods(): string[] {
-    return instanceMethods(constants.TestHelper!);
+    return constants.TestHelper!.instanceMethods();
   }
 
   function masterHelperMethods(): string[] {
-    return instanceMethods(controllerClass._helpers);
+    return controllerClass._helpers.instanceMethods();
   }
 
   function missingMethods(): string[] {
