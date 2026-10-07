@@ -69,18 +69,20 @@ describe("add_flash_types readers", () => {
     expect(WarningsController.actionMethods()).not.toContain("warning");
   });
 
-  it("drops an inherited multi-word action a flash type shadows, in either spelling", async () => {
+  it("drops an inherited multi-word action a flash type of the same name shadows", async () => {
     class FooBarsController extends Base {
       async fooBar(): Promise<void> {}
     }
-    expect(FooBarsController.actionMethods()).toContain("foo_bar");
+    expect(FooBarsController.actionMethods()).toContain("fooBar");
 
-    for (const type of ["fooBar", "foo_bar"]) {
-      const klass = (() => class extends FooBarsController {})();
-      klass.addFlashTypes(type);
-      expect(klass.actionMethods()).not.toContain("foo_bar");
-      await expect(new klass().process("foo_bar")).rejects.toThrow(ActionNotFound);
-    }
+    const shadowed = (() => class extends FooBarsController {})();
+    shadowed.addFlashTypes("fooBar");
+    expect(shadowed.actionMethods()).not.toContain("fooBar");
+    await expect(new shadowed().process("fooBar")).rejects.toThrow(ActionNotFound);
+
+    const untouched = (() => class extends FooBarsController {})();
+    untouched.addFlashTypes("foo_bar");
+    expect(untouched.actionMethods()).toContain("fooBar");
   });
 
   it("extends add_flash_types and action_methods onto a Metal includer", () => {

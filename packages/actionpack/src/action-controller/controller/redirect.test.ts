@@ -291,122 +291,122 @@ describe("RedirectTest", () => {
   });
 
   it("simple redirect", async () => {
-    await tc.get("simple_redirect");
+    await tc.get("simpleRedirect");
     assertResponse("redirect");
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("redirect with header break", async () => {
-    await tc.get("redirect_with_header_break");
+    await tc.get("redirectWithHeaderBreak");
     assertResponse("redirect");
     assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
   it("redirect with null bytes", async () => {
-    await tc.get("redirect_with_null_bytes");
+    await tc.get("redirectWithNullBytes");
     assertResponse("redirect");
     assertEqual("http://test.host/lolwat", tc.redirectToUrl());
   });
 
   it("redirect with no status", async () => {
-    await tc.get("simple_redirect");
+    await tc.get("simpleRedirect");
     assertResponse(302);
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("redirect with status", async () => {
-    await tc.get("redirect_with_status");
+    await tc.get("redirectWithStatus");
     assertResponse(301);
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("redirect with status hash", async () => {
-    await tc.get("redirect_with_status_hash");
+    await tc.get("redirectWithStatusHash");
     assertResponse(301);
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("redirect with protocol", async () => {
-    await tc.get("redirect_with_protocol");
+    await tc.get("redirectWithProtocol");
     assertResponse(302);
     assertEqual("https://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("url redirect with status", async () => {
-    await tc.get("url_redirect_with_status");
+    await tc.get("urlRedirectWithStatus");
     assertResponse(301);
     assertEqual("http://www.example.com", tc.redirectToUrl());
   });
 
   it("url redirect with status hash", async () => {
-    await tc.get("url_redirect_with_status_hash");
+    await tc.get("urlRedirectWithStatusHash");
     assertResponse(301);
     assertEqual("http://www.example.com", tc.redirectToUrl());
   });
 
   it("relative url redirect with status", async () => {
-    await tc.get("relative_url_redirect_with_status");
+    await tc.get("relativeUrlRedirectWithStatus");
     assertResponse(302);
     assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
   });
 
   it("relative url redirect with status hash", async () => {
-    await tc.get("relative_url_redirect_with_status_hash");
+    await tc.get("relativeUrlRedirectWithStatusHash");
     assertResponse(301);
     assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
   });
 
   it("relative url redirect host with port", async () => {
     tc.request.host = "test.host:1234";
-    await tc.get("relative_url_redirect_with_status");
+    await tc.get("relativeUrlRedirectWithStatus");
     assertResponse(302);
     assertEqual("http://test.host:1234/things/stuff", tc.redirectToUrl());
   });
 
   it("simple redirect using options", async () => {
-    await tc.get("host_redirect");
+    await tc.get("hostRedirect");
     assertResponse("redirect");
     assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   });
 
   it("module redirect", async () => {
-    await tc.get("module_redirect");
+    await tc.get("moduleRedirect");
     assertResponse("redirect");
     assertRedirectedTo("http://test.host/module_test/module_redirect/hello_world");
   });
 
   it("module redirect using options", async () => {
-    await tc.get("module_redirect");
+    await tc.get("moduleRedirect");
     assertResponse("redirect");
     assertRedirectedTo({ controller: "module_test/module_redirect", action: "hello_world" });
   });
 
   it("redirect to url", async () => {
-    await tc.get("redirect_to_url");
+    await tc.get("redirectToUrl");
     assertResponse("redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to url with stringlike", async () => {
-    await tc.get("redirect_to_url_with_stringlike");
+    await tc.get("redirectToUrlWithStringlike");
     assertResponse("redirect");
     assertRedirectedTo("http://www.rubyonrails.org/");
   });
 
   it("redirect to url with unescaped query string", async () => {
-    await tc.get("redirect_to_url_with_unescaped_query_string");
+    await tc.get("redirectToUrlWithUnescapedQueryString");
     assertResponse("redirect");
     assertRedirectedTo("http://example.com/query?status=new");
   });
 
   it("redirect to url with complex scheme", async () => {
-    await tc.get("redirect_to_url_with_complex_scheme");
+    await tc.get("redirectToUrlWithComplexScheme");
     assertResponse("redirect");
     assertEqual("x-test+scheme.complex:redirect", tc.redirectToUrl());
   });
 
   it("redirect to url with network path reference", async () => {
-    await tc.get("redirect_to_url_with_network_path_reference");
+    await tc.get("redirectToUrlWithNetworkPathReference");
     assertResponse("redirect");
     assertEqual("//www.rubyonrails.org/", tc.redirectToUrl());
   });
@@ -415,21 +415,21 @@ describe("RedirectTest", () => {
     const referer = "http://www.example.com/coming/from";
     tc.request.env["HTTP_REFERER"] = referer;
 
-    await tc.get("redirect_back_with_status");
+    await tc.get("redirectBackWithStatus");
 
     assertResponse(307);
     assertEqual(referer, tc.redirectToUrl());
   });
 
   it("redirect back with no referer", async () => {
-    await tc.get("redirect_back_with_status");
+    await tc.get("redirectBackWithStatus");
 
     assertResponse(307);
     assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
   });
 
   it("redirect back with no referer redirects to another host", async () => {
-    await tc.get("redirect_back_with_status_and_fallback_location_to_another_host");
+    await tc.get("redirectBackWithStatusAndFallbackLocationToAnotherHost");
 
     assertResponse(307);
     assertEqual("http://www.rubyonrails.org/", tc.redirectToUrl());
@@ -437,7 +437,7 @@ describe("RedirectTest", () => {
 
   it("safe redirect back from other host", async () => {
     tc.request.env["HTTP_REFERER"] = "http://another.host/coming/from";
-    await tc.get("safe_redirect_back_with_status");
+    await tc.get("safeRedirectBackWithStatus");
 
     assertResponse(307);
     assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
@@ -446,28 +446,28 @@ describe("RedirectTest", () => {
   it("safe redirect back from the same host", async () => {
     const referer = "http://test.host/coming/from";
     tc.request.env["HTTP_REFERER"] = referer;
-    await tc.get("safe_redirect_back_with_status");
+    await tc.get("safeRedirectBackWithStatus");
 
     assertResponse(307);
     assertEqual(referer, tc.redirectToUrl());
   });
 
   it("safe redirect back with no referer", async () => {
-    await tc.get("safe_redirect_back_with_status");
+    await tc.get("safeRedirectBackWithStatus");
 
     assertResponse(307);
     assertEqual("http://test.host/things/stuff", tc.redirectToUrl());
   });
 
   it("safe redirect back with no referer redirects to another host", async () => {
-    await tc.get("safe_redirect_back_with_status_and_fallback_location_to_another_host");
+    await tc.get("safeRedirectBackWithStatusAndFallbackLocationToAnotherHost");
 
     assertResponse(307);
     assertEqual("http://www.rubyonrails.org/", tc.redirectToUrl());
   });
 
   it("safe redirect to root", async () => {
-    await tc.get("safe_redirect_to_root");
+    await tc.get("safeRedirectToRoot");
 
     assertEqual("http://test.host/", tc.redirectToUrl());
   });
@@ -476,7 +476,7 @@ describe("RedirectTest", () => {
     const referer = "http://www.example.com/coming/from";
     tc.request.env["HTTP_REFERER"] = referer;
 
-    await tc.get("redirect_back_with_explicit_fallback_kwarg");
+    await tc.get("redirectBackWithExplicitFallbackKwarg");
 
     assertResponse(307);
     assertEqual(referer, tc.redirectToUrl());
@@ -541,14 +541,14 @@ describe("RedirectTest", () => {
 
   it("redirect to nil", async () => {
     const error = await assertRaise([ActionControllerError], {}, async () => {
-      await tc.get("redirect_to_nil");
+      await tc.get("redirectToNil");
     });
     assertEqual("Cannot redirect to nil!", error.message);
   });
 
   it("redirect to params", async () => {
     const error = await assertRaise([UnfilteredParameters], {}, async () => {
-      await tc.get("redirect_to_params");
+      await tc.get("redirectToParams");
     });
     assertEqual("unable to convert unpermitted parameters to hash", error.message);
   });
@@ -589,7 +589,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect");
+        await tc.get("unsafeRedirect");
       });
 
       assertEqual(
@@ -602,7 +602,7 @@ describe("RedirectTest", () => {
   it("unsafe redirect back", async () => {
     await withRaiseOnOpenRedirects(async () => {
       const error = await assertRaise([UnsafeRedirectError], {}, async () => {
-        await tc.get("unsafe_redirect_back");
+        await tc.get("unsafeRedirectBack");
       });
 
       assertEqual(
@@ -667,7 +667,7 @@ describe("RedirectTest", () => {
 
   it("only path redirect", async () => {
     await withRaiseOnOpenRedirects(async () => {
-      await tc.get("only_path_redirect");
+      await tc.get("onlyPathRedirect");
       assertResponse("redirect");
       assertRedirectedTo("/redirect/other_host");
     });
@@ -714,7 +714,7 @@ describe("RedirectTest", () => {
   });
 
   it("redirect to external with rescue", async () => {
-    await tc.get("redirect_to_external_with_rescue");
+    await tc.get("redirectToExternalWithRescue");
     assertResponse("ok");
   });
 });
@@ -750,25 +750,25 @@ describe("ModuleRedirectTest", () => {
   });
 
   it("simple redirect", async () => {
-    await tc.get("simple_redirect");
+    await tc.get("simpleRedirect");
     assertResponse("redirect");
     assertEqual("http://test.host/module_test/module_redirect/hello_world", tc.redirectToUrl());
   });
 
   it("simple redirect using options", async () => {
-    await tc.get("host_redirect");
+    await tc.get("hostRedirect");
     assertResponse("redirect");
     assertRedirectedTo({ action: "other_host", onlyPath: false, host: "other.test.host" });
   });
 
   it("module redirect", async () => {
-    await tc.get("module_redirect");
+    await tc.get("moduleRedirect");
     assertResponse("redirect");
     assertEqual("http://test.host/redirect/hello_world", tc.redirectToUrl());
   });
 
   it("module redirect using options", async () => {
-    await tc.get("module_redirect");
+    await tc.get("moduleRedirect");
     assertResponse("redirect");
     assertRedirectedTo({ controller: "/redirect", action: "hello_world" });
   });
