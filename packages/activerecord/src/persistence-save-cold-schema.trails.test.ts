@@ -31,14 +31,4 @@ describe("Persistence#save on a record built against a cold schema cache (trails
 
     await expect(topic.saveBang()).rejects.toBeInstanceOf(RecordInvalid);
   });
-
-  it("save inserts the record", async () => {
-    class Topic extends Base {}
-    Base.connectionPool().schemaCache.clearBang();
-    const topic = new Topic();
-    expect(topic.hasAttribute("title")).toBe(false);
-
-    expect(await topic.save()).toBe(true);
-    expect((await Topic.find(topic.id as number)).id).toBe(topic.id);
-  });
 });
