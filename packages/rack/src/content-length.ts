@@ -20,7 +20,7 @@ export class ContentLength {
       Array.isArray(body)
     ) {
       const totalSize = body.reduce(
-        (sum: number, chunk: string) => sum + Buffer.byteLength(String(chunk)),
+        (sum: number, chunk: string | Uint8Array) => sum + Buffer.byteLength(chunk),
         0,
       );
       headers[CONTENT_LENGTH] = String(totalSize);

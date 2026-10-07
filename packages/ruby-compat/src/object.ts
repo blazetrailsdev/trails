@@ -697,7 +697,15 @@ export function toSym(obj: unknown): string {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toS(obj: unknown): string {
+export function toS(obj: string): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: Uint8Array): Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: string | Uint8Array): string | Uint8Array;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: unknown): string;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_str_to_s` (`vendor/ruby/v3.3.11/string.c:6648`). */
+export function toS(obj: unknown): string | Uint8Array {
   if (isSymbol(obj)) return symbolToS(obj);
   return rbObjAsString(obj);
 }

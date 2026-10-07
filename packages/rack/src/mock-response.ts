@@ -56,13 +56,17 @@ export class MockResponse extends Response {
     this._errors = value;
   }
 
+  /** @inventedArm if — CONVERGEABLE io-read-length-answers-a-binary-string-where-the-ascii-8bit-seat-is-uint8array */
   override get body(): string {
     if (this._bufferedBody !== undefined) return this._bufferedBody;
 
     let buffer = "";
 
     for (const chunk of this._body) {
-      buffer += String(chunk);
+      buffer +=
+        chunk instanceof Uint8Array
+          ? Array.from(chunk, (byte) => String.fromCharCode(byte)).join("")
+          : String(chunk);
     }
     this._bufferedBody = buffer;
 

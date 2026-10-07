@@ -1,9 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { connect, type Socket } from "node:net";
+import * as fs from "node:fs";
+import * as os from "node:os";
+import * as path from "node:path";
 import type { HttpRequest, HttpResponse, HttpSocket, StringIO } from "@blazetrails/ruby-compat";
 import { bodyFromString } from "../index.js";
 import type { RackApp, RackBody, RackEnv } from "../index.js";
 import { RACK_ERRORS, RACK_HIJACK, RACK_INPUT, RACK_IS_HIJACK } from "../constants.js";
+import { Files } from "../files.js";
 import { Lint } from "../lint.js";
 import { Node } from "./node.js";
 
@@ -218,6 +222,92 @@ describe("Rack::Handler::Node", () => {
       expect(response.status).toBe(201);
       expect(response.headers.get("content-type")).toBe("text/plain");
       expect(await response.text()).toBe("onetwo");
+    });
+  });
+
+  describe("static files", () => {
+    const utf8 = Buffer.from(
+      "// em dash \u2014 caf\u00e9 \u65e5\u672c\u8a9e\nexport const x = 1;\n".repeat(700),
+    );
+    const png = Buffer.from(Array.from({ length: 20000 }, (_, i) => (i * 131 + 7) % 256));
+
+    async function servingFiles(body: (url: string) => Promise<void>): Promise<void> {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), "rack-handler-node-"));
+      fs.writeFileSync(path.join(root, "app.js"), utf8);
+      fs.writeFileSync(path.join(root, "image.png"), png);
+      const files = new Files(root);
+      try {
+        await serving((env) => files.call(env) as ReturnType<RackApp>, body);
+      } finally {
+        fs.rmSync(root, { recursive: true });
+      }
+    }
+
+    it("serves a file of multi-byte UTF-8 byte-identically", async () => {
+      await servingFiles(async (url) => {
+        const response = await fetch(`${url}/app.js`);
+        const received = Buffer.from(await response.arrayBuffer());
+
+        expect(response.status).toBe(200);
+        expect(response.headers.get("content-length")).toBe(String(received.length));
+        expect(received.equals(utf8)).toBe(true);
+      });
+    });
+
+    it("serves a file of arbitrary bytes byte-identically", async () => {
+      await servingFiles(async (url) => {
+        const response = await fetch(`${url}/image.png`);
+        const received = Buffer.from(await response.arrayBuffer());
+
+        expect(response.headers.get("content-length")).toBe(String(received.length));
+        expect(received.equals(png)).toBe(true);
+      });
+    });
+
+    it("serves exactly the bytes a range request asks for", async () => {
+      await servingFiles(async (url) => {
+        for (const [name, bytes] of [
+          ["app.js", utf8],
+          ["image.png", png],
+        ] as const) {
+          const response = await fetch(`${url}/${name}`, { headers: { range: "bytes=9-9000" } });
+          const received = Buffer.from(await response.arrayBuffer());
+
+          expect(response.status).toBe(206);
+          expect(response.headers.get("content-range")).toBe(`bytes 9-9000/${bytes.length}`);
+          expect(response.headers.get("content-length")).toBe(String(received.length));
+          expect(received.equals(bytes.subarray(9, 9001))).toBe(true);
+        }
+      });
+    });
+
+    it("serves a multipart range response at its declared length", async () => {
+      await servingFiles(async (url) => {
+        const response = await fetch(`${url}/app.js`, {
+          headers: { range: "bytes=9-20, 8200-8300" },
+        });
+        const received = Buffer.from(await response.arrayBuffer());
+
+        expect(response.status).toBe(206);
+        expect(response.headers.get("content-length")).toBe(String(received.length));
+        expect(received.includes(utf8.subarray(9, 21))).toBe(true);
+        expect(received.includes(utf8.subarray(8200, 8301))).toBe(true);
+      });
+    });
+  });
+
+  it("writes a rendered view of non-ASCII text as UTF-8", async () => {
+    const view = "<p>em dash \u2014 caf\u00e9 \u65e5\u672c\u8a9e</p>";
+    const app: RackApp = async () => [
+      200,
+      { "content-type": "text/html; charset=utf-8" },
+      bodyFromString(view),
+    ];
+
+    await serving(app, async (url) => {
+      const received = Buffer.from(await (await fetch(url)).arrayBuffer());
+
+      expect(received.equals(Buffer.from(view, "utf8"))).toBe(true);
     });
   });
 
