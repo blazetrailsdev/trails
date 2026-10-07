@@ -189,6 +189,12 @@ describe("MessagePackSerializerTrailsTest", () => {
     expect(dump(/ab+c/i)).toEqual([204, 128, 199, 12, 16, ...Buffer.from("(?i-mx:ab+c)")]);
   });
 
+  it("dumps a Regexp without the flags MRI has no option for", () => {
+    const serializer = new Serializer();
+    const loaded = serializer.load(serializer.dump(/^a/gimsuy)) as RegExp;
+    expect([loaded.source, loaded.flags]).toEqual(["^a", "is"]);
+  });
+
   it("loads the Regexp real Rails MessagePack dumps", () => {
     const serializer = new Serializer();
     const dumped = Buffer.from([204, 128, 199, 12, 16, ...Buffer.from("(?i-mx:ab+c)")]);

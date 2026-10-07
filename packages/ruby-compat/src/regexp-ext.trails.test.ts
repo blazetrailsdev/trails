@@ -59,6 +59,8 @@ describe("Regexp MRI option spelling (trails)", () => {
     expect(rbRegToS(/.*/s, "onig")).toBe("(?m-ix:.*)");
     expect(rbRegToS(/a/is, "onig")).toBe("(?mi-x:a)");
     expect(rbRegToS(/^a/m, "onig")).toBe("(?-mix:^a)");
+    expect(rbRegToS(/a/dgimsuy, "onig")).toBe("(?mi-x:a)");
+    expect(rbRegToS(/a/v, "onig")).toBe("(?-mix:a)");
   });
 
   it("Regexp.new reads MRI's to_s back", () => {
@@ -66,7 +68,14 @@ describe("Regexp MRI option spelling (trails)", () => {
       const loaded = rbRegInitStr(rbRegToS(re, "onig"));
       expect([loaded.source, loaded.flags]).toEqual([re.source, re.flags]);
     }
-    expect(rbRegInitStr("(?m:a)(b)").source).toBe("(?m:a)(b)");
+    for (const pattern of ["(?m:a)(b)", "(?i:a)|(?i:b)", "(?i:a)(?-i:b)", "(?i:a)[)]"]) {
+      const loaded = rbRegInitStr(pattern);
+      expect([loaded.source, loaded.flags]).toEqual([pattern, ""]);
+    }
+    const classed = rbRegInitStr("(?i-mx:[)(]\\))");
+    expect([classed.source, classed.flags]).toEqual(["[)(]\\)", "i"]);
+    const bare = rbRegInitStr("(?-mix:a)");
+    expect([bare.source, bare.flags]).toEqual(["a", ""]);
     expect(rbRegInitStr("a+").source).toBe("a+");
     expect(() => rbRegInitStr("(?x: a )")).toThrow(SyntaxError);
   });
