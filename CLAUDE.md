@@ -1997,7 +1997,9 @@ renders from `admin/story-pages/`, beside `admin/story-pages-controller.ts`.
 It carries `@inventedArm dasherize — PERMANENT`. `controller_path` itself is
 unchanged and stays underscored: it names the controller in routes and URL
 generation, where a hyphen is not legal. The controller generator writes the
-kebab-case directory, and the view compiler maps a controller to it.
+kebab-case directory, the view compiler maps a controller to it, and
+`RouteInfo#viewPath` (`trails unused_routes`) looks for a route's template in
+it, dasherizing the route's controller as it already does the action.
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
