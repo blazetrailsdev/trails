@@ -1,5 +1,5 @@
 import type { PGTypeMapByOid } from "./pg-text-decoder.js";
-import type { PGResult } from "./pg-result.js";
+import type { PG } from "../../pg/pg.js";
 import type { PGConnection } from "../../pg/connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
@@ -86,7 +86,7 @@ export async function query(
   sql: string,
   name: string | null = null,
 ): Promise<unknown[][]> {
-  const result = (await this.internalExecute(sql, name)) as PGResult;
+  const result = (await this.internalExecute(sql, name)) as PG.Result;
   return result.mapTypesBang(this._typeMapForResults).values();
 }
 
@@ -114,11 +114,11 @@ export async function execute(
   sql: string | null,
   name: string | null = null,
   { allowRetry = false }: { allowRetry?: boolean } = {},
-): Promise<PGResult> {
+): Promise<PG.Result> {
   try {
     return (await AbstractAdapter.prototype.execute.call(this, sql, name, {
       allowRetry,
-    })) as PGResult;
+    })) as PG.Result;
   } finally {
     this._noticeReceiverSqlWarnings = [];
   }
@@ -305,9 +305,9 @@ export async function performQuery(
     notificationPayload: Record<string, unknown>;
     batch?: boolean;
   },
-): Promise<PGResult> {
+): Promise<PG.Result> {
   await this.updateTypemapForDefaultTimezone();
-  let result: PGResult;
+  let result: PG.Result;
   if (prepare) {
     for (;;) {
       try {
@@ -343,14 +343,14 @@ export async function performQuery(
 }
 
 /** @internal */
-export async function castResult(this: CastResultHost, result: PGResult): Promise<Result> {
-  if (isEmpty(result.fields)) {
+export async function castResult(this: CastResultHost, result: PG.Result): Promise<Result> {
+  if (isEmpty(result.fields())) {
     result.clear();
     return Result.empty();
   }
 
   const types: Record<string | number, ValueType> = {};
-  const fields = result.fields;
+  const fields = result.fields();
   for (let i = 0; i < fields.length; i++) {
     const fname = fields[i];
     const ftype = result.ftype(i);
@@ -367,7 +367,7 @@ export async function castResult(this: CastResultHost, result: PGResult): Promis
 }
 
 /** @internal */
-export function affectedRows(result: PGResult): number {
+export function affectedRows(result: PG.Result): number {
   const affectedRows = result.cmdTuples();
   result.clear();
   return affectedRows;

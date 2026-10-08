@@ -1,5 +1,5 @@
 import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
-import { PGResult } from "./postgresql/pg-result.js";
+import { PG } from "../pg/pg.js";
 import { Array as OidArray } from "./postgresql/oid/array.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -96,7 +96,7 @@ describe("PostgreSQLAdapter#castResult", () => {
 
     const result = await castResult.call(
       adapter as never,
-      new PGResult({
+      new PG.Result({
         fields: [{ name: "user_defined_column", dataTypeID: 987_654, dataTypeModifier: -1 }],
         rows: [],
       } as never),

@@ -198,7 +198,7 @@ import {
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
 import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
-import { PGResult } from "./postgresql/pg-result.js";
+import { PG } from "../pg/pg.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
@@ -1390,7 +1390,7 @@ export class PostgreSQLAdapter
         const result = (await this.internalExecute(sql, "SCHEMA", [], {
           allowRetry: true,
           materializeTransactions: false,
-        })) as PGResult;
+        })) as PG.Result;
         return (caseInsensitiveCache[column.sqlType as string] = result.getvalue(0, 0) as boolean);
       }),
     );
@@ -1617,7 +1617,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  affectedRows(result: PGResult): number {
+  affectedRows(result: PG.Result): number {
     return pgAffectedRows(result);
   }
 

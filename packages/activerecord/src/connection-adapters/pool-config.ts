@@ -4,14 +4,9 @@ import { ConnectionPool } from "./abstract/connection-pool.js";
 import { ConnectionDescriptor, type ConnectionOwner } from "./abstract/connection-handler.js";
 import { SchemaReflection } from "./schema-cache.js";
 import { synchronize } from "@blazetrails/activesupport";
+import { ObjectSpace } from "@blazetrails/ruby-compat";
 
-const INSTANCES = new Set<WeakRef<PoolConfig>>();
-const registry =
-  typeof FinalizationRegistry !== "undefined"
-    ? new FinalizationRegistry<WeakRef<PoolConfig>>((ref) => {
-        INSTANCES.delete(ref);
-      })
-    : null;
+const INSTANCES = new ObjectSpace.WeakMap<PoolConfig, PoolConfig>();
 
 export class PoolConfig {
   readonly role: string;
@@ -69,30 +64,12 @@ export class PoolConfig {
     this._serverVersion = value;
   }
 
-  /** @missingRailsCall each_key — CONVERGEABLE pool-config-instances-is-an-objectspace-weak-map */
   static async discardPoolsBang(): Promise<void> {
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      await config.discardPoolBang();
-    }
+    await INSTANCES.eachKey((c) => c.discardPoolBang());
   }
 
-  /** @missingRailsCall each_key — CONVERGEABLE pool-config-instances-is-an-objectspace-weak-map */
   static async disconnectAllBang(): Promise<void> {
-    const drains: Array<Promise<void>> = [];
-    for (const ref of INSTANCES) {
-      const config = ref.deref();
-      if (!config) {
-        INSTANCES.delete(ref);
-        continue;
-      }
-      drains.push(config.disconnectBang({ automaticReconnect: true }));
-    }
-    await Promise.all(drains);
+    await INSTANCES.eachKey((c) => c.disconnectBang({ automaticReconnect: true }));
   }
 
   constructor(
@@ -106,9 +83,7 @@ export class PoolConfig {
     this.role = role;
     this.shard = shard;
 
-    const ref = new WeakRef(this);
-    INSTANCES.add(ref);
-    registry?.register(this, ref);
+    INSTANCES.set(this, this);
   }
 
   async disconnectBang({

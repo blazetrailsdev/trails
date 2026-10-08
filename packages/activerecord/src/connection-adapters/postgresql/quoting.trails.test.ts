@@ -10,7 +10,8 @@ import {
 import { Temporal } from "@blazetrails/date";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { describe, expect, it } from "vitest";
-import { Data as ArrayData, PgTextEncoderArray } from "./oid/array.js";
+import { PG } from "../../pg/pg.js";
+import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import {
@@ -42,7 +43,10 @@ describe("PostgreSQL quoting", () => {
     expect(typeCast(false)).toBe(false);
     expect(
       quote(
-        new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), [true, false]),
+        new ArrayData(new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," }), [
+          true,
+          false,
+        ]),
       ),
     ).toBe("'{true,false}'");
   });
@@ -57,26 +61,34 @@ describe("PostgreSQL quoting", () => {
     expect(quote(new XmlData("<root />"))).toBe("xml '<root />'");
     expect(quote(new BitData("1010"))).toBe("B'1010'");
     expect(
-      quote(new ArrayData(new PgTextEncoderArray({ name: "text[]", delimiter: "," }), ["a", "b"])),
+      quote(
+        new ArrayData(new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," }), [
+          "a",
+          "b",
+        ]),
+      ),
     ).toBe("'{a,b}'");
     expect(quote(new Range(1, 10, true))).toBe("'[1,10)'");
     expect(quote(Infinity)).toBe("'Infinity'");
   });
 
   it("quotes arrays through the encoder's delimiter, not a hardcoded comma", async () => {
-    const boxArray = new ArrayData(new PgTextEncoderArray({ name: "box[]", delimiter: ";" }), [
-      "(1,1),(0,0)",
-      "(2,2),(1,1)",
-    ]);
+    const boxArray = new ArrayData(
+      new PG.TextEncoder.Array(null, { name: "box[]", delimiter: ";" }),
+      ["(1,1),(0,0)", "(2,2),(1,1)"],
+    );
     expect(typeCast(boxArray)).toBe("{(1,1),(0,0);(2,2),(1,1)}");
     expect(quote(boxArray)).toBe("'{(1,1),(0,0);(2,2),(1,1)}'");
   });
 
   it("type_casts datetime array elements through quoted_date (fixed-6, BC)", () => {
-    const dtArray = new ArrayData(new PgTextEncoderArray({ name: "datetime[]", delimiter: "," }), [
-      Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
-      Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
-    ]);
+    const dtArray = new ArrayData(
+      new PG.TextEncoder.Array(null, { name: "datetime[]", delimiter: "," }),
+      [
+        Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
+        Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
+      ],
+    );
     expect(quote(dtArray)).toBe(
       '\'{"2026-04-26 14:23:55.123456","0044-03-15 12:34:56.123456 BC"}\'',
     );
@@ -167,7 +179,7 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("serializes array defaults through the type map", async () => {
-    const arrayType = new PgTextEncoderArray({ name: "text[]", delimiter: "," });
+    const arrayType = new PG.TextEncoder.Array(null, { name: "text[]", delimiter: "," });
     const column = { sqlType: "text[]", array: true };
     const host = Object.assign(Object.create(HOST) as CastTypeLookupHost & typeof HOST, {
       lookupCastTypeFromColumn() {

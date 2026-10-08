@@ -1,12 +1,12 @@
 import type pg from "pg";
-import { PGResult } from "../connection-adapters/postgresql/pg-result.js";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
+import { PG } from "./pg.js";
 
 export interface PGConnection extends pg.Client {
   prepare(stmtName: string, sql: string): Promise<void>;
-  execPrepared(stmtName: string, params: unknown[]): Promise<PGResult>;
-  asyncExec(sql: string | null): Promise<PGResult>;
-  execParams(sql: string | null, params: unknown[]): Promise<PGResult>;
+  execPrepared(stmtName: string, params: unknown[]): Promise<PG.Result>;
+  asyncExec(sql: string | null): Promise<PG.Result>;
+  execParams(sql: string | null, params: unknown[]): Promise<PG.Result>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
   status(): number;
@@ -119,7 +119,7 @@ async function execPrepared(
   this: pg.Client,
   stmtName: string,
   params: unknown[],
-): Promise<PGResult> {
+): Promise<PG.Result> {
   const text = PREPARED.get(this)?.get(stmtName);
   return result(
     await (this.query as unknown as Query)({
@@ -132,7 +132,7 @@ async function execPrepared(
   );
 }
 
-async function asyncExec(this: pg.Client, sql: string | null): Promise<PGResult> {
+async function asyncExec(this: pg.Client, sql: string | null): Promise<PG.Result> {
   return result(
     await (this.query as unknown as Query)(
       sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
@@ -144,7 +144,7 @@ async function execParams(
   this: pg.Client,
   sql: string | null,
   params: unknown[],
-): Promise<PGResult> {
+): Promise<PG.Result> {
   return result(
     await (this.query as unknown as Query)({
       text: sql,
@@ -155,8 +155,8 @@ async function execParams(
   );
 }
 
-function result(raw: pg.QueryResult | pg.QueryResult[]): PGResult {
-  return new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
+function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
+  return new PG.Result(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
 /** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
