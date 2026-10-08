@@ -1411,9 +1411,12 @@ export function compareCallArgs(
     if (rubyQuantity === undefined) return skipped("opaqueRubyArg");
     const tsQuantity = quantityOf(ts, quantity.tsIndex);
     if (tsQuantity === undefined) return skipped("opaqueTsArg");
-    const rubyArgs = [quantityKey(rubyQuantity, quantity.factor)];
-    const tsArgs = [quantityKey(tsQuantity, 1)];
-    return rubyArgs[0] === tsArgs[0]
+    const rubyArgs = [
+      quantityKey(rubyQuantity, quantity.factor),
+      ...ruby.args.slice(quantity.rubyIndex + 1),
+    ];
+    const tsArgs = [quantityKey(tsQuantity, 1), ...ts.args.slice(quantity.tsIndex + 1)];
+    return rubyArgs.join() === tsArgs.join()
       ? { verdict: "match", rubyArgs, tsArgs }
       : { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };
   }

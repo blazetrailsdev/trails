@@ -901,6 +901,18 @@ describe("a native-form row's quantity argument (Kernel#sleep)", () => {
     );
   });
 
+  it("fails a TS call passing more than the interval", () => {
+    const result = compareCallArgs(
+      site("sleep", ["num:1"]),
+      site("setTimeout", ["id:resolve", "num:1000", "id:extra"]),
+    );
+    expect(result).toMatchObject({
+      verdict: "mismatch",
+      rubyArgs: ["qty:1000"],
+      tsArgs: ["qty:1000", "id:extra"],
+    });
+  });
+
   it("skips an interval neither side can describe as a product", () => {
     const result = compareCallArgs(sleep, site("setTimeout", ["id:resolve", "binop:+"]));
     expect(result).toMatchObject({ verdict: "skip", reason: "opaqueTsArg" });

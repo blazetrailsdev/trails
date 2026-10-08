@@ -1369,13 +1369,7 @@ function numToS(num: number | { valueOf(): number }): string {
   return floToS(num);
 }
 
-/**
- * `flo_to_s` (`vendor/ruby/v3.3.11/numeric.c:1059`), `Float#to_s`: always a decimal
- * point, and the exponent form outside `1e-4 ... 1e16`. The receiver is a
- * Float seat, so a whole-valued `number` renders with its `.0`.
- *
- * @noRailsEquivalent PERMANENT
- */
+/** @noRailsEquivalent PERMANENT — Ruby core `flo_to_s` (`vendor/ruby/v3.3.11/numeric.c:1059`). */
 export function floToS(flo: number | { valueOf(): number }): string {
   const value = flo.valueOf();
   if (!Number.isFinite(value)) {

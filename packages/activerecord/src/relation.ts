@@ -1017,12 +1017,26 @@ export class Relation<T extends Base, G extends boolean = false> {
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
     if (this.isNullRelation()) return;
     const predicates = this.whereClause.predicates;
+    const from: unknown = this.fromClause.value;
+    const deferredFrom = from instanceof Relation && from._isDeferredDistinctPkSubquery();
     if (
+      !deferredFrom &&
       !predicates.some((node) => node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn)
     ) {
       return;
     }
     return (async () => {
+      if (deferredFrom) {
+        this._arel = undefined;
+        this._values.from = new FromClause(
+          from._applyEagerJoinDependency(
+            undefined,
+            undefined,
+            await from._materializeDistinctPkIds(),
+          ),
+          this.fromClause.name,
+        );
+      }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
         if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {

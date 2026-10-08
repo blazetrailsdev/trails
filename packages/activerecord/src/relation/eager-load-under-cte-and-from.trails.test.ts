@@ -37,6 +37,7 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
     expect(sql).toMatch(/IN \(SELECT DISTINCT/i);
 
     const posts = await relation;
-    expect(posts.length).toBeGreaterThan(0);
+    expect(new Set(posts.map((post) => post.id)).size).toBe(2);
+    expect(relation.toSql()).not.toMatch(/SELECT DISTINCT/i);
   });
 });

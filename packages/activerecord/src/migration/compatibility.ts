@@ -22,6 +22,7 @@ import type {
   ColumnType,
 } from "../connection-adapters/abstract/schema-definitions.js";
 
+export function find(version: number): unknown;
 export function find(version: number | string): unknown {
   version = floToS(version as number);
   const name = `V${version.replaceAll(".", "_")}`;
