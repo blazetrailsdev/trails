@@ -345,8 +345,6 @@ DEPENDENCY_PATTERNS = {
   },
 }
 
-C_EXTENSION_DIRS = { "pg" => "../../ext" }.freeze
-
 # ---- AST walker ----
 
 class ApiExtractor
@@ -498,102 +496,6 @@ class ApiExtractor
     #   %w{ Foo Bar }.each { |name| const_set(name, Class.new(Superclass)) }
     # Skipped for umbrella scans — only singleton config is harvested there.
     extract_const_set_classes(source) unless @scanning_umbrella
-  end
-
-  C_DEFINE_NAMESPACE = /(\w+)\s*=\s*rb_define_(class|module)(?:_under)?\(\s*(?:(\w+)\s*,\s*)?"(\w+)"(?:\s*,\s*(\w+))?\s*\)/
-  C_DEFINE_METHOD = /rb_define_(method|private_method|singleton_method)\s*\(\s*(\w+)\s*,\s*"([^"]+)"\s*,\s*(\w+)\s*,\s*(-?\d+)\s*\)/
-  C_DEFINE_ALIAS = /rb_define_alias\s*\(\s*(\w+)\s*,\s*"([^"]+)"\s*,\s*"([^"]+)"\s*\)/
-  C_DEFINE_ATTR = /rb_define_attr\s*\(\s*(\w+)\s*,\s*"(\w+)"\s*,\s*(\d)\s*,\s*(\d)\s*\)/
-  C_FUNCTION = /^(\w+)\(([^)]*)\)\s*\n\{\n(.*?)^\}/m
-
-  def process_c_extension(ext_dir)
-    sources = Dir.glob(File.join(ext_dir, "**", "*.c")).sort.map { |f| File.read(f) }
-    vars = {}
-    loop do
-      before = [vars.size, @classes.size, @modules.size]
-      sources.each do |src|
-        src.scan(C_DEFINE_NAMESPACE) do |var, kind, parent, name, superclass|
-          next if parent && !vars.key?(parent)
-          fqn = parent ? "#{vars[parent]}::#{name}" : name
-          vars[var] = fqn unless var == "dummy"
-          c_namespace(kind, fqn, vars[superclass])
-        end
-      end
-      break if [vars.size, @classes.size, @modules.size] == before
-    end
-
-    functions = {}
-    sources.each do |src|
-      src.scan(C_FUNCTION) { |name, params, body| functions[name] = [c_param_names(params), body] }
-    end
-
-    sources.each do |src|
-      c_define_members(src, vars, functions)
-      functions.each do |helper, (params, body)|
-        definer = body[/rb_define_class_under\(\s*(\w+)\s*,\s*(\w+)\s*,\s*\w+\s*\)/]
-        next unless definer && params.include?($1) && params.include?($2)
-        nsp, name, local = $1, $2, body[/(\w+)\s*=\s*rb_define_class_under/, 1]
-        src.scan(/^\s*#{helper}\(([^;]*)\);/) do |(args)|
-          bound = params.zip(args.split(",").map(&:strip)).to_h
-          next unless vars.key?(bound[nsp])
-          klass = "#{vars[bound[nsp]]}::#{bound[name].delete('"')}"
-          guarded = body.gsub(/if\s*\(([^\n]*)\)\s*\n([^\n]*)\n/) do
-            statement = $2
-            $1.split("||").any? { |t| l, r = t.split("==").map(&:strip); bound[l] == r } ? "#{statement}\n" : ""
-          end
-          c_define_members(guarded, vars.merge(local => klass), functions)
-        end
-      end
-    end
-  end
-
-  def c_namespace(kind, fqn, superclass)
-    table = kind == "class" ? @classes : @modules
-    table[fqn] ||= begin
-      rel = fqn.split("::").drop(1).map { |s| s.gsub(/([a-z\d])([A-Z])/, '\1_\2').downcase }
-      info = new_class_info(fqn.split("::").last, fqn)
-      info[:file] = "#{rel.empty? ? fqn.downcase : rel.join('/')}.rb"
-      info[:superclass] = superclass
-      info
-    end
-  end
-
-  def c_param_names(params)
-    params.split(",").map { |param| param.strip[/\w+\z/] }
-  end
-
-  def c_define_members(src, vars, functions)
-    owner = ->(var) { @classes[vars[var]] || @modules[vars[var]] }
-    add = lambda do |info, bucket, name, params, visibility = "public"|
-      next if info[bucket].any? { |m| m[:name] == name }
-      info[bucket] << { name: name, visibility: visibility, params: params, file: info[:file], line: 0 }
-    end
-    src.scan(C_DEFINE_METHOD) do |kind, var, name, func, arity|
-      next unless (info = owner.(var))
-      names = functions.dig(func, 0) || []
-      params =
-        if arity.to_i < 0
-          [{ name: "*", kind: "rest" }]
-        else
-          names.drop(1).first(arity.to_i).map { |n| { name: n, kind: "required" } }
-        end
-      bucket = kind == "singleton_method" ? :classMethods : :instanceMethods
-      add.(info, bucket, name, params, kind == "private_method" ? "private" : "public")
-    end
-    src.scan(/rb_define_const\s*\(\s*(\w+)\s*,\s*"(\w+)"/) do |var, name|
-      next unless (info = owner.(var))
-      (@file_constants[info[:file]] ||= {})[name] ||= { kind: "expr" }
-    end
-    src.scan(C_DEFINE_ALIAS) do |var, new_name, old_name|
-      next unless (info = owner.(var))
-      target = info[:instanceMethods].find { |m| m[:name] == old_name }
-      add.(info, :instanceMethods, new_name, target ? target[:params] : [])
-    end
-    src.scan(C_DEFINE_ATTR) do |var, name, read, write|
-      next unless (info = owner.(var))
-      add.(info, :instanceMethods, name, []) if read == "1"
-      add.(info, :instanceMethods, "#{name}=", [{ name: "value", kind: "required" }]) if write == "1"
-    end
   end
 
   # Scan a top-level umbrella file (e.g. `lib/action_dispatch.rb`, one level
@@ -4864,10 +4766,6 @@ def run
       extractor.process_file(entry_file, File.dirname(entry_file))
     elsif File.file?(umbrella_file)
       extractor.scan_umbrella_file(umbrella_file, pkg_dir)
-    end
-
-    if (ext_dir = C_EXTENSION_DIRS[pkg_name])
-      extractor.process_c_extension(File.expand_path(ext_dir, pkg_dir))
     end
 
     # Replay `CONST.each` codegen loops whose constant lives in a file that
