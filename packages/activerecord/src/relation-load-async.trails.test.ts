@@ -264,6 +264,25 @@ describe("Relation#load_async", () => {
 
     expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(false);
   });
+
+  it("re-runs the query for a later reader when the foreground load rejected", async () => {
+    restoreExecutor?.();
+    restoreExecutor = undefined;
+    setAsyncQueryExecutor(null);
+    await Topic.create({ title: "rejected async topic", author_name: "David" });
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    vi.spyOn(connection, "selectAll").mockRejectedValueOnce(new Error("boom"));
+
+    const relation = Topic.where({ title: "rejected async topic" }).loadAsync();
+
+    await expect(relation.records()).rejects.toThrow("boom");
+    expect((await relation.records()).map((topic) => topic.title)).toEqual([
+      "rejected async topic",
+    ]);
+  });
   itIfSupports(
     "concurrent_connections",
     "cache hands the block's pending FutureResult back unresolved",

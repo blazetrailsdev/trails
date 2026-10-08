@@ -19,7 +19,7 @@ import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
-import { compact, max, min } from "@blazetrails/ruby-compat";
+import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
@@ -370,7 +370,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected _offsets?: Map<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
-  _loadResult?: Promise<unknown>;
+  _loadResult?: Promise<T[]>;
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
@@ -412,18 +412,19 @@ export class Relation<T extends Base, G extends boolean = false> {
         ? this.records()
         : this._records
       : this.annotate("loading for inspect");
-    const inspectEntries = (taken: T[]): string => {
-      const entries = taken.map((record) => record.inspect());
-
+    const inspectEntries = (records: T[]): string => {
+      const entries = take(records, min(compact([this.limitValue, 11])) as number).map((record) =>
+        record.inspect(),
+      );
       if (entries.length === 11) entries[10] = "...";
-
       return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
     };
-    const take = (records: T[]): T[] =>
-      records.slice(0, min(compact([this.limitValue, 11])) as number);
-    if (Array.isArray(subject)) return inspectEntries(take(subject));
-    if (subject instanceof Promise) return subject.then(take).then(inspectEntries);
-    return subject.take(min(compact([this.limitValue, 11])) as number).then(inspectEntries);
+    if (Array.isArray(subject)) return inspectEntries(subject);
+    return (
+      subject instanceof Promise
+        ? subject
+        : subject.take(min(compact([this.limitValue, 11])) as number)
+    ).then(inspectEntries);
   }
 
   async prettyPrint(pp: PrettyPrinter): Promise<void> {

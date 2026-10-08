@@ -13,7 +13,13 @@ import {
   valuesAt,
 } from "@blazetrails/ruby-compat";
 import { ValueType, ArgumentError, BinaryData, TimeType } from "@blazetrails/activemodel";
-import { classAttribute, include, runLoadHooks, filterMap } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  include,
+  runLoadHooks,
+  filterMap,
+  underscore,
+} from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { IO, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
@@ -1504,8 +1510,9 @@ export class PostgreSQLAdapter
     const sliced: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(config)) {
       if (value === undefined || value === null) continue;
-      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key)) continue;
-      sliced[key] = value;
+      const param = PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key) ? key : underscore(key);
+      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(param)) continue;
+      sliced[param] = value;
     }
     return sliced as pg.ClientConfig;
   }

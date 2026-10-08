@@ -4,6 +4,7 @@ import {
   compactBlankObj as compactBlank,
   isBlank,
   reverseMerge,
+  transformKeys,
 } from "@blazetrails/activesupport";
 import {
   type Generic,
@@ -50,11 +51,12 @@ export class ConnectionUrlResolver {
    * @inventedArm camelize — PERMANENT
    */
   private queryHash(): Record<string, string> {
-    return Object.fromEntries(
-      stringSplit(this.query ?? "", "&")
-        .map((pair) => stringSplit(pair, "=", 2))
-        .map(([key, value]) => [camelize(key, false), value]),
-    );
+    return transformKeys(
+      Object.fromEntries(
+        stringSplit(this.query ?? "", "&").map((pair) => stringSplit(pair, "=", 2)),
+      ),
+      (key) => camelize(key, false),
+    ) as Record<string, string>;
   }
 
   /** @internal */

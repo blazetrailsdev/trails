@@ -42,7 +42,7 @@ describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
       sslcapath: "/path/to/cacerts",
       sslcipher: "DHE-RSA-AES256-SHA",
       sslkey: "/path/to/client-key.pem",
-      ssl_mode: "VERIFY_IDENTITY",
+      sslMode: "VERIFY_IDENTITY",
     });
 
     const args = [
