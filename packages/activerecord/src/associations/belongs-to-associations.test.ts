@@ -652,6 +652,8 @@ describe("BelongsToAssociationsTest", () => {
       if (rbModConstDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
       modelRegistry.delete("AdminRegion");
       modelRegistry.delete("AdminRegionalUser");
+      modelRegistry.delete("Admin::Region");
+      modelRegistry.delete("Admin::RegionalUser");
 
       if (await connection.columnExists("admin_users", "region_id")) {
         await connection.removeColumn("admin_users", "region_id");
