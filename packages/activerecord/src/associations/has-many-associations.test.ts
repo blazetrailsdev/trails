@@ -4319,7 +4319,7 @@ describe("HasManyAssociationsTest", () => {
 describe("AsyncHasManyAssociationsTest", () => {
   const { companies } = fixtures(["companies", "accounts"]);
 
-  // PERMANENT-SKIP: the async-executor event ordering needs a lazy ActiveRecord::Promise (CLAUDE.md, "`ActiveRecord::Promise` is the native promise").
+  // BLOCKED: association-async-load-target-uses-async-executor
   it.skip("async load has many", async () => {
     const firm = companies("first_firm") as any;
 
