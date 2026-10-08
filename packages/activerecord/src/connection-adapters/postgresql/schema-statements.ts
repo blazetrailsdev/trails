@@ -22,6 +22,7 @@ import {
   toS,
   valuesAt,
   hasKey,
+  coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -1522,9 +1523,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       ? undefined
       : this.uniqueConstraintName(tableName, options);
     const constraints = await this.uniqueConstraints(tableName);
-    return constraints.find((c) =>
-      c.definedFor({ ...options, name: name ?? (options.name as string | undefined) }),
-    );
+    return constraints.find((c) => c.definedFor(coreHashMergeKwd({ name }, options)));
   }
 
   /**

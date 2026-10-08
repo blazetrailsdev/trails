@@ -55,11 +55,13 @@ type Client = Omit<pg.Client, "connection"> & {
   _ended?: boolean;
 };
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function status(this: pg.Client): number {
   const { _ending, _ended } = this as Client;
   return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
 }
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function transactionStatus(this: pg.Client): number {
   if ((this as Client)._activeQuery != null) return PQTRANS_ACTIVE;
   switch (READY_FOR_QUERY.get(this)) {
@@ -138,11 +140,13 @@ function result(raw: pg.QueryResult | pg.QueryResult[]): PGResult {
   return new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function escapeBytea(value: Buffer | Uint8Array | string): string {
   const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
   return `\\x${buffer.toString("hex")}`;
 }
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function unescapeBytea(value: string | Uint8Array): Buffer {
   if (typeof value !== "string") value = Buffer.from(value).toString("latin1");
   if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
@@ -187,6 +191,7 @@ function socketIo(this: pg.Client): { reopen(path: string): void } | null {
   };
 }
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function block(this: pg.Client): Promise<void> {
   if ((this as Client)._activeQuery == null) return Promise.resolve();
   const connection = (this as Client).connection;
@@ -212,17 +217,14 @@ export function block(this: pg.Client): Promise<void> {
  * @missingRailsArgs connect — PERMANENT
  * @missingRailsArgs new — PERMANENT
  */
-export function cancel(this: pg.Client): Promise<string | null> {
-  const { processID: bePid, secretKey, connection } = this as Client;
-  const beKey = secretKey ?? 0;
-  if (bePid == null || connection == null) return Promise.resolve(null);
-  const Protocol = connection.constructor as new () => Protocol;
+export async function cancel(this: pg.Client): Promise<string | null> {
+  const { processID: bePid, secretKey: beKey, connection } = this as Client;
   return new Promise<string | null>((resolve) => {
-    const cl = new Protocol();
+    const cl = new (connection!.constructor as new () => Protocol)();
     cl.on("error", (err: unknown) => resolve(String(err)));
     cl.on("end", () => resolve(null));
     cl.once("connect", () => {
-      cl.cancel(bePid, beKey);
+      cl.cancel(bePid!, beKey!);
     });
     const { host, port } = this;
     if (host?.startsWith("/")) {
@@ -233,6 +235,7 @@ export function cancel(this: pg.Client): Promise<string | null> {
   });
 }
 
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function pgConnection<T extends object>(client: T): T & PGConnection {
   if (!READY_FOR_QUERY.has(client)) {
     READY_FOR_QUERY.set(client, "I");

@@ -180,14 +180,18 @@ export function fetch(
  * `ActiveRecord::Result::IndexedRow#key?` when `values` is one. `fetch`,
  * `keys` and `eachKey` dispatch the same way. An `undefined`-valued property of
  * a plain object is an absent key: Ruby's stored `nil` is `null`, and a caller
- * forwarding an absent keyword writes `{ name: undefined }`.
+ * forwarding an absent keyword writes `{ name: undefined }`. That holds for a
+ * bare object only, with `Object.prototype` or no prototype: a class instance
+ * and a `Map` answer for the entry they store. `keys`, `eachKey` and the
+ * iterating readers still enumerate the property.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?` (`vendor/ruby/v3.3.11/hash.c:3671`).
  */
 export function hasKey(hash: object, key: PropertyKey): boolean {
   /* `vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
      chain, so `"toString" in {}` is an answer Ruby never gives. */
-  if (Object.getPrototypeOf(hash) === Object.prototype) {
+  const proto: unknown = Object.getPrototypeOf(hash);
+  if (proto === Object.prototype || proto === null) {
     return Object.hasOwn(hash, key) && (hash as Record<PropertyKey, unknown>)[key] !== undefined;
   }
   const own = ownMethod(hash, "isKey");

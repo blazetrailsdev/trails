@@ -715,10 +715,19 @@ describe("SchemaStatements constraint name digests", () => {
     Object.assign(ss, { execute });
     await ss.addExclusionConstraint("invoices", "daterange(start_date, end_date) WITH &&", {
       name: undefined,
+      using: undefined,
+      where: undefined,
+      deferrable: undefined,
     });
-    await ss.addUniqueConstraint("sections", ["position"], { name: undefined });
-    expect(execute.mock.calls[0][0]).toContain("excl_rails_74c9160f55");
-    expect(execute.mock.calls[1][0]).toContain("uniq_rails_1e07660b77");
+    await ss.addUniqueConstraint("sections", ["position"], {
+      name: undefined,
+      usingIndex: undefined,
+      deferrable: undefined,
+    });
+    expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
+      'ALTER TABLE "invoices" ADD CONSTRAINT "excl_rails_74c9160f55" EXCLUDE (daterange(start_date, end_date) WITH &&)',
+      'ALTER TABLE "sections" ADD CONSTRAINT "uniq_rails_1e07660b77" UNIQUE ("position")',
+    ]);
     expect(
       ss.exclusionConstraintName("invoices", {
         name: undefined,

@@ -31,6 +31,7 @@ import {
   update,
   valuesAt,
 } from "./hash.js";
+import { coreHashMergeKwd } from "./keyword-splat.js";
 import { KeyError } from "./key-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { IndexError } from "./index-error.js";
@@ -110,6 +111,12 @@ describe("Hash#fetch with a block", () => {
     ).toBe("yielded");
     expect(hasKey({ a: undefined }, "a")).toBe(false);
     expect(hasKey({ a: null }, "a")).toBe(true);
+    expect(hasKey(Object.assign(Object.create(null), { a: undefined }), "a")).toBe(false);
+    expect(coreHashMergeKwd({ name: "n" }, { name: undefined, column: null })).toEqual({
+      name: "n",
+      column: null,
+    });
+    expect(coreHashMergeKwd({ name: "n" }, { name: "kw" })).toEqual({ name: "kw" });
   });
 
   it("keeps a callable default as a default when it is not marked a block", () => {

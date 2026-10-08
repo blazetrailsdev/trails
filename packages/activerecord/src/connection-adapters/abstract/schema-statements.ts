@@ -12,6 +12,7 @@ import {
   RuntimeError,
   toI,
   hasKey,
+  coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
@@ -1692,7 +1693,9 @@ export class SchemaStatements {
     }
     const chkName = this.checkConstraintName(tableName, options);
     const constraints = await this.checkConstraints(tableName);
-    return constraints.find((chk) => chk.isDefinedFor({ ...options, name: chkName }));
+    return constraints.find((chk) =>
+      chk.isDefinedFor(coreHashMergeKwd({ name: chkName }, options)),
+    );
   }
 
   /** @internal */

@@ -147,7 +147,6 @@ const PQTRANS_INERROR = 3;
 
 const CONNECTION_OK = 0;
 
-type RawConnection = PGConnection;
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -1489,11 +1488,11 @@ export class PostgreSQLAdapter
   }
 
   /** @internal */
-  get _rawConnection(): RawConnection | null {
-    return this._connection as RawConnection | null;
+  get _rawConnection(): PGConnection | null {
+    return this._connection as PGConnection | null;
   }
   /** @internal */
-  set _rawConnection(value: RawConnection | null) {
+  set _rawConnection(value: PGConnection | null) {
     this._connection = value && pgConnection(value);
   }
 
@@ -1588,7 +1587,7 @@ export class PostgreSQLAdapter
         client = this._rawConnection!;
       } else {
         newClient.on("error", () => {});
-        this._rawConnection = newClient as RawConnection;
+        this._rawConnection = newClient as PGConnection;
         client = newClient;
       }
     }
