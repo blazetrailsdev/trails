@@ -3,7 +3,7 @@ import "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { Timeout } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -142,7 +142,7 @@ export async function waitForAsyncQuery(
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
-  throw new RuntimeError(`The async executor wasn't drained after ${timeout} seconds`);
+  throw new Timeout.Error(`The async executor wasn't drained after ${timeout} seconds`);
 }
 
 export function cleanUpConnectionHandler(): void {

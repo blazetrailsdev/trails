@@ -222,7 +222,7 @@ describe("AsynchronousExecutorTypeTest", () => {
       expect(asyncPool2.fallbackPolicy).toEqual("caller_runs");
 
       expect(handler.connectionPoolList("all").length).toEqual(2);
-      expect(asyncPool2).toEqual(asyncPool1);
+      expect(asyncPool2).toBe(asyncPool1);
     } finally {
       cleanUpConnectionHandler();
       setAsyncQueryExecutor(oldValue);
