@@ -43,6 +43,7 @@ export const PACKAGE_DIR_OVERRIDES: Record<string, string> = {
   abstractcontroller: "actionpack",
   actionpackversion: "actionpack",
   "activerecord-test-support": "activerecord",
+  pg: "activerecord",
   sqlite3: "activerecord",
   thor: "trailties",
 };
@@ -107,6 +108,7 @@ export const PACKAGE_SRC_SUBDIR: Record<string, string> = {
   abstractcontroller: "abstract-controller",
   actionpackversion: "action-pack",
   "activerecord-test-support": "support",
+  pg: "pg",
   sqlite3: "sqlite",
   thor: "thor",
 };
@@ -199,6 +201,7 @@ export const MANIFEST_PACKAGES = [
   "did-you-mean",
   "bcrypt",
   "msgpack",
+  "pg",
   "sqlite3",
   "thor",
 ] as const;

@@ -1,5 +1,5 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { pgConnection, unescapeBytea as pgUnescapeBytea } from "./pg-connection.js";
+import { pgConnection, Connection } from "../../pg/connection.js";
 import { quotingHost } from "../../support/quoting-host.js";
 import {
   BinaryData,
@@ -26,6 +26,7 @@ import {
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast as typeCastFn,
+  escapeBytea,
   unescapeBytea,
 } from "./quoting.js";
 import { Range } from "@blazetrails/ruby-compat";
@@ -184,21 +185,28 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("unescapes hex bytea values we now own locally", () => {
-    expect(pgUnescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
+    expect(Connection.unescapeBytea("\\x6869")).toEqual(Buffer.from("hi"));
   });
 
   it("unescapes legacy octal bytea with escaped backslashes", () => {
-    expect(pgUnescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
+    expect(Connection.unescapeBytea("a\\134\\000b")).toEqual(Buffer.from([0x61, 0x5c, 0x00, 0x62]));
   });
 
   it("unescapes the bytes Type::Binary#deserialize hands it", () => {
-    expect(pgUnescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(Buffer.from("hi"));
+    expect(Connection.unescapeBytea(new TextEncoder().encode("\\x6869"))).toEqual(
+      Buffer.from("hi"),
+    );
   });
 
   it("unescape_bytea asks the valid raw connection, and only for a value", async () => {
     const host = { validRawConnection: async () => pgConnection({}) };
     expect(await unescapeBytea.call(host, "\\x6869")).toEqual(Buffer.from("hi"));
     expect(await unescapeBytea.call(host, null)).toBeUndefined();
+  });
+
+  it("escapeBytea escapes through PG::Connection, and answers nil for nil", () => {
+    expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
+    expect(escapeBytea(null)).toBeUndefined();
   });
 
   it("quoteTableNameForAssignment drops the table prefix", () => {

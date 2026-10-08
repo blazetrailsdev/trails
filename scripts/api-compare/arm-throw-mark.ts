@@ -68,6 +68,7 @@ export const GATED_PACKAGES = [
   "did-you-mean",
   "globalid",
   "i18n",
+  "pg",
   "rack",
   "rack-session",
   "rack-test",

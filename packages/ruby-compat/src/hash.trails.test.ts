@@ -46,7 +46,7 @@ describe("Hash#fetch", () => {
 
   it("returns a stored null rather than the default", () => {
     expect(fetch({ offset: null }, "offset", 0)).toBeNull();
-    expect(fetch({ offset: undefined }, "offset", 0)).toBeUndefined();
+    expect(fetch({ offset: undefined }, "offset", 0)).toBe(0);
   });
 
   it("returns a stored false rather than the default", () => {
@@ -100,14 +100,16 @@ describe("Hash#fetch with a block", () => {
     expect(keys).toEqual(["b"]);
   });
 
-  it("does not yield when the key is stored, even for a stored undefined", () => {
+  it("yields for an undefined-valued key, which is an absent keyword", () => {
     expect(
       fetch(
         { a: undefined },
         "a",
         block(() => "yielded"),
       ),
-    ).toBeUndefined();
+    ).toBe("yielded");
+    expect(hasKey({ a: undefined }, "a")).toBe(false);
+    expect(hasKey({ a: null }, "a")).toBe(true);
   });
 
   it("keeps a callable default as a default when it is not marked a block", () => {
@@ -506,8 +508,8 @@ describe("Hash#slice", () => {
     expect(hasKey(slice(hash, "__proto__"), "__proto__")).toBe(true);
   });
 
-  it("ignores keys that are not found, and keeps a stored undefined", () => {
-    expect(slice({ foo: undefined }, "foo", "nope")).toEqual({ foo: undefined });
+  it("ignores keys that are not found, an undefined-valued key among them", () => {
+    expect(slice({ foo: undefined, bar: null }, "foo", "bar", "nope")).toEqual({ bar: null });
     expect(hasKey(slice({ foo: undefined }, "foo", "nope"), "nope")).toBe(false);
   });
 });

@@ -155,13 +155,7 @@ export function fetch(
   const hash = receiver as Record<string, unknown> | Map<unknown, unknown>;
   const blockGiven = rbBlockGivenP(rest[0]);
   const isMap = !plain && hash instanceof Map;
-  if (
-    !(isMap
-      ? hash.has(key)
-      : plain
-        ? Object.hasOwn(hash, key as PropertyKey)
-        : hasKey(hash, key as string))
-  ) {
+  if (!(isMap ? hash.has(key) : hasKey(hash, key as string))) {
     if (blockGiven) {
       return (rest[0] as (key: unknown) => unknown)(key);
     } else if (rest.length === 0) {
@@ -184,14 +178,18 @@ export function fetch(
  * receiver: `values.key?(name)`
  * (`activemodel/lib/active_model/attribute_set/builder.rb:33`) is
  * `ActiveRecord::Result::IndexedRow#key?` when `values` is one. `fetch`,
- * `keys` and `eachKey` dispatch the same way.
+ * `keys` and `eachKey` dispatch the same way. An `undefined`-valued property of
+ * a plain object is an absent key: Ruby's stored `nil` is `null`, and a caller
+ * forwarding an absent keyword writes `{ name: undefined }`.
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#key?` (`vendor/ruby/v3.3.11/hash.c:3671`).
  */
 export function hasKey(hash: object, key: PropertyKey): boolean {
   /* `vendor/ruby/v3.3.11/hash.c:3671` `rb_hash_has_key` reads the hash table through
      `hash_stlike_lookup`, never an ancestor: a Ruby Hash has no prototype
      chain, so `"toString" in {}` is an answer Ruby never gives. */
-  if (Object.getPrototypeOf(hash) === Object.prototype) return Object.hasOwn(hash, key);
+  if (Object.getPrototypeOf(hash) === Object.prototype) {
+    return Object.hasOwn(hash, key) && (hash as Record<PropertyKey, unknown>)[key] !== undefined;
+  }
   const own = ownMethod(hash, "isKey");
   if (own) return own.call(hash, key) as boolean;
   if (hash instanceof Map) return hash.has(key);

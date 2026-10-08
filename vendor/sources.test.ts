@@ -370,6 +370,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "msgpack",
+        "pg",
         "rack",
         "rack-session",
         "rack-test",
