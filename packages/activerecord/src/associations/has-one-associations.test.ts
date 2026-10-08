@@ -1285,7 +1285,7 @@ describe("AsyncHasOneAssociationsTest", () => {
     await Account.loadSchema();
   });
 
-  // BLOCKED: association-async-load-target-uses-async-executor
+  // PERMANENT-SKIP: the async-executor event ordering needs a lazy ActiveRecord::Promise (CLAUDE.md, "`ActiveRecord::Promise` is the native promise").
   it.skip("async load has one", async () => {
     const firm = companies("first_firm") as any;
     const firstAccount = await Account.find(1);

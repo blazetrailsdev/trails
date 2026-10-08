@@ -2362,7 +2362,7 @@ describe("BelongsToAssociationsTest", () => {
 describe("AsyncBelongsToAssociationsTest", () => {
   const { companies } = fixtures(["companies"]);
 
-  // BLOCKED: association-async-load-target-uses-async-executor
+  // PERMANENT-SKIP: the async-executor event ordering needs a lazy ActiveRecord::Promise (CLAUDE.md, "`ActiveRecord::Promise` is the native promise").
   it.skip("async load belongs to", async () => {
     const client = (await Client.find(3)) as any;
     const firstFirm = companies("first_firm");

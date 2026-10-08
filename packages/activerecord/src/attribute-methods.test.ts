@@ -131,7 +131,7 @@ describe("AttributeMethodsTest", () => {
     Base.attributeMethodPatterns = oldMatchers;
   });
 
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  // PERMANENT-SKIP: an undefined name on a record is a type error, not a NoMethodError (CLAUDE.md, "Records are not Proxies").
   it.skip("attribute keys on a new instance", async () => {
     const t = new CanonicalTopic() as any;
     expect(t.title).toBeNull();
@@ -450,7 +450,7 @@ describe("AttributeMethodsTest", () => {
     topic = new klass({ user_defined_json: {} } as any) as any;
     expect(topic["user_defined_json?"]).toBeFalsy();
   });
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  // PERMANENT-SKIP: an undefined name on a record is a type error, not a NoMethodError (CLAUDE.md, "Records are not Proxies").
   it.skip("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     const topic = new target({ title: "Budget" }) as any;
     assertRespondTo(topic, "title");
@@ -1371,7 +1371,7 @@ describe("AttributeMethodsTest", () => {
     expect(topic.get("title")).toBe("a");
   });
 
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
+  // PERMANENT-SKIP: an undefined name on a record is a type error, not a NoMethodError (CLAUDE.md, "Records are not Proxies").
   it.skip("non-attribute read and write", async () => {
     const topic = new CanonicalTopic() as any;
     assertNotRespondTo(topic, "mumbo");
