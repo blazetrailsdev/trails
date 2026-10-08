@@ -247,7 +247,7 @@ export class Unpacker {
   each(block: (v: unknown) => void): null;
   each(block?: (v: unknown) => void): null | Generator<unknown, void> {
     if (block === undefined) {
-      return this.enumFor((block) => this.each(block));
+      return this.enumFor();
     }
     if (this.buffer.io != null) {
       try {
@@ -268,7 +268,7 @@ export class Unpacker {
     block?: (v: unknown) => void,
   ): null | Generator<unknown, void> {
     if (block === undefined) {
-      return this.enumFor((block) => this.feedEach(data, block));
+      return this.enumFor(data);
     }
     this.feedReference(data);
     return this.each(block);
@@ -289,10 +289,13 @@ export class Unpacker {
     return this.buffer.clear();
   }
 
-  private *enumFor(meth: (block: (v: unknown) => void) => null): Generator<unknown, void> {
-    const objects: unknown[] = [];
-    meth((v) => objects.push(v));
-    yield* objects;
+  private *enumFor(data?: string | Uint8Array): Generator<unknown, void> {
+    if (data !== undefined) this.feedReference(data);
+    try {
+      while (this.unpackerRead() >= 0) yield this.uk.lastObject;
+    } catch (error) {
+      if (this.buffer.io == null || !(error instanceof EOFError)) throw error;
+    }
   }
 
   private eachImpl(block: (v: unknown) => void): null {

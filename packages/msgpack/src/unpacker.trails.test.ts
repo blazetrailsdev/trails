@@ -10,4 +10,10 @@ describe("MessagePack::Unpacker", () => {
     expect(str).toEqual(bin);
     expect(Object.isFrozen(ext)).toBe(true);
   });
+
+  it("reads one object per step of an each enumerator", () => {
+    const unpacker = new Unpacker().feed(Uint8Array.of(1, 2));
+    expect([unpacker.each().next().value, unpacker.buffer.size()]).toEqual([1, 1]);
+    expect([...unpacker.feedEach(Uint8Array.of(3))]).toEqual([2, 3]);
+  });
 });

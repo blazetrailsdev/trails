@@ -319,11 +319,7 @@ export class Packer {
   }
 
   isEmpty(): boolean {
-    if (this.buffer.size() === 0) {
-      return true;
-    } else {
-      return false;
-    }
+    return this.buffer.size() === 0;
   }
 
   toStr(): Uint8Array {
@@ -339,8 +335,7 @@ export class Packer {
   }
 
   writeTo(io: unknown): number {
-    const sz = this.buffer.flushToIo(io, "write", true);
-    return sz;
+    return this.buffer.flushToIo(io, "write", true);
   }
 
   fullPack(): Uint8Array | null {
