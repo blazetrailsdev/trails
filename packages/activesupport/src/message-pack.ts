@@ -1,4 +1,5 @@
 import "@blazetrails/msgpack";
+import { rbModConstSet } from "@blazetrails/ruby-compat/include";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import { CacheSerializer } from "./message-pack/cache-serializer.js";
 import { Serializer } from "./message-pack/serializer.js";
@@ -17,6 +18,6 @@ export const MessagePackCacheSerializer = new CacheSerializer();
 export const MessagePack = Object.assign(new Serializer(), {
   CacheSerializer: MessagePackCacheSerializer,
 });
-ActiveSupport.MessagePack = MessagePack;
+rbModConstSet(ActiveSupport, "MessagePack", MessagePack);
 
 runLoadHooks("message_pack", MessagePack);

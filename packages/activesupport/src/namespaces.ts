@@ -1,4 +1,4 @@
-import { registerConstant, warn } from "@blazetrails/ruby-compat";
+import { LoadError, registerConstant, warn } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -15,12 +15,18 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     try {
       return await import("./message-pack.js");
     } catch (error) {
-      if ((error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw error;
+      const { code, message } = error as { code?: unknown; message?: unknown };
+      if (
+        (code !== "ERR_MODULE_NOT_FOUND" && code !== "MODULE_NOT_FOUND") ||
+        !String(message).includes("@blazetrails/msgpack")
+      ) {
+        throw error;
+      }
       warn(
         "ActiveSupport::MessagePack requires the msgpack gem, version 1.7.0 or later. " +
           'Please add it to your Gemfile: `gem "msgpack", ">= 1.7.0"`',
       );
-      throw error;
+      throw new LoadError("cannot load such file -- msgpack", { cause: error });
     }
   },
 };
