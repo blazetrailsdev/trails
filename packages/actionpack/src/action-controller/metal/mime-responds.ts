@@ -3,7 +3,7 @@ import { Mime, MimeType } from "../../action-dispatch/http/mime-type.js";
 import type { NullType } from "../../action-dispatch/http/mime-type.js";
 import { RespondToMismatchError, UnknownFormat } from "./exceptions.js";
 import { _setRenderedContentType } from "./rendering.js";
-import { ArgumentError, fetch, include, rbEqual } from "@blazetrails/ruby-compat";
+import { ArgumentError, fetch, include, rbEqual, rbFSend } from "@blazetrails/ruby-compat";
 
 export type FormatHandler = () => unknown;
 type VariantBlock = (variant: VariantCollector) => unknown;
@@ -28,9 +28,7 @@ export class Collector {
     const block =
       typeof last === "function" ? (args.pop() as FormatHandler | VariantBlock) : undefined;
     if (args.length > 0) {
-      for (const type of args as string[]) {
-        (this as unknown as Record<string, (block?: unknown) => Response>)[type](block);
-      }
+      (args as string[]).forEach((type) => rbFSend(this, type, block));
       return args as string[];
     } else {
       return this.custom(MimeType.ALL, block);

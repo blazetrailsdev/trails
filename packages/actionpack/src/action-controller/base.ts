@@ -10,6 +10,8 @@ import {
 import type { StatusSymbol } from "@blazetrails/rack";
 import type { TemplateLocals, TemplateRegistry } from "@blazetrails/actionview";
 import type { ToModel } from "../action-dispatch/routing/polymorphic-routes.js";
+import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { ActionController } from "../namespaces.js";
 import { Metal } from "./metal.js";
 import type { FlashHash } from "../action-dispatch/middleware/flash.js";
 import {
@@ -50,7 +52,6 @@ import type {
   urlFrom,
   RedirectToOptions,
 } from "./metal/redirecting.js";
-import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
@@ -425,14 +426,6 @@ export class Base extends Metal {
   /** @internal */
   declare _helperProxy?: ActionViewBase | null;
 
-  constructor(...args: unknown[]) {
-    super(...(args as []));
-    fireInherited(
-      new.target as unknown as HelpersPathControllerClass,
-      Base as unknown as HelpersPathControllerClass,
-    );
-  }
-
   static isInheritViewContextClass = isInheritViewContextClass;
   static buildViewContextClass = buildViewContextClass;
   static viewContextClass = viewContextClass;
@@ -736,6 +729,8 @@ include(Base, Rescue);
 include(Base, Instrumentation);
 include(Base, ParamsWrapper);
 Base.setupRendererBang();
+
+rbModConstSet(ActionController, "Base", Base);
 
 runLoadHooks("action_controller_base", Base);
 runLoadHooks("action_controller", Base);

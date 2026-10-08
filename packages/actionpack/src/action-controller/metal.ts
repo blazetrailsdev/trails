@@ -4,6 +4,7 @@ import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
 import type { Session } from "../action-dispatch/request/session.js";
 import { Parameters } from "./metal/strong-parameters.js";
+import { fireInherited, type HelpersPathControllerClass } from "./trailties/helpers.js";
 import type { RackResponse, Response as RackResponseObject } from "@blazetrails/rack";
 import {
   classAttribute,
@@ -24,15 +25,6 @@ import {
 } from "../action-dispatch/middleware/stack.js";
 import type { RackEnv } from "@blazetrails/rack";
 import type { EncodingTemplate } from "../action-dispatch/http/param-builder.js";
-import {
-  _normalizeOptions as _normalizeOptionsFn,
-  _normalizeText as _normalizeTextFn,
-  _processOptions as _processOptionsFn,
-  _renderInPriorities as _renderInPrioritiesFn,
-  _setHtmlContentType as _setHtmlContentTypeFn,
-  _setRenderedContentType as _setRenderedContentTypeFn,
-  _setVaryHeader as _setVaryHeaderFn,
-} from "./metal/rendering.js";
 
 export class MiddlewareStack extends AbstractMiddlewareStack {
   override build(app: RackApp | RackAppObject): RackApp;
@@ -145,6 +137,10 @@ export class Metal extends AbstractController {
 
   constructor() {
     super();
+    fireInherited(
+      new.target as unknown as HelpersPathControllerClass,
+      Metal as unknown as HelpersPathControllerClass,
+    );
     initializeIncludedModules(this);
   }
 
@@ -336,19 +332,4 @@ export class Metal extends AbstractController {
   toA(): RackResponse {
     return this.response.toRack() as RackResponse;
   }
-
-  /** @internal */
-  static _normalizeOptions = _normalizeOptionsFn;
-  /** @internal */
-  static _normalizeText = _normalizeTextFn;
-  /** @internal */
-  static _processOptions = _processOptionsFn;
-  /** @internal */
-  static _renderInPriorities = _renderInPrioritiesFn;
-  /** @internal */
-  static _setHtmlContentType = _setHtmlContentTypeFn;
-  /** @internal */
-  static _setRenderedContentType = _setRenderedContentTypeFn;
-  /** @internal */
-  static _setVaryHeader = _setVaryHeaderFn;
 }

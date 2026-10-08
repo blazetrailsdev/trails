@@ -21,7 +21,7 @@ import { Base } from "./base.js";
 import { API } from "./api.js";
 import { Metal } from "./metal.js";
 import { Cookies } from "./metal/cookies.js";
-import { Helpers } from "./metal/helpers.js";
+import { Helpers, setHelpersPath } from "./metal/helpers.js";
 import type { HelpersClass } from "../abstract-controller/helpers.js";
 import { Request } from "../action-dispatch/http/request.js";
 import { Response } from "../action-dispatch/http/response.js";
@@ -372,6 +372,28 @@ describe("ActionController::Helpers included into ActionController::API", () => 
     expect(subclass.helpersPath).toEqual([]);
     expect(rbObjRespondTo(new SubclassWithHelpersController(), "helpers")).toBe(true);
     expect(rbObjRespondTo(API, "helper", true)).toBe(false);
+  });
+
+  it("fires the inherited hooks for a subclass: default helper module and helpersPath", () => {
+    const helper = new Module().include({ probe: () => "probed" });
+    registerConstant("ApiSubclassProbeHelper", helper);
+    const paths = ["app/helpers"];
+    setHelpersPath(paths);
+    try {
+      class ApiProbeWithHelpersController extends API {}
+      include(ApiProbeWithHelpersController, Helpers);
+      class ApiSubclassProbeController extends ApiProbeWithHelpersController {}
+      new ApiSubclassProbeController();
+
+      const subclass = ApiSubclassProbeController as unknown as HelpersClass & {
+        helpersPath: string[];
+      };
+      expect(subclass.helpersPath).toBe(paths);
+      expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
+    } finally {
+      setHelpersPath([]);
+      unregisterConstant("ApiSubclassProbeHelper", helper);
+    }
   });
 });
 
