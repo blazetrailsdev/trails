@@ -5,6 +5,7 @@ import {
   rbModName,
   rbObjClass,
 } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { constantize, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
@@ -60,6 +61,9 @@ export namespace Delegation {
     methods: string[],
     options: DelegateOptions,
   ): string[] {
+    if (owner instanceof Module) {
+      return owner.moduleEval((mod) => generate(mod, methods, options));
+    }
     const { to, prefix, allowNil } = options;
 
     if (!to) {

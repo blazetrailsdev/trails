@@ -1,66 +1,84 @@
 import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
+import { Module } from "@blazetrails/ruby-compat/include";
 import { Factory, type Pool } from "@blazetrails/msgpack";
+import { delegate } from "../module-ext.js";
 import { Extensions } from "./extensions.js";
 
+const SIGNATURE = Uint8Array.of(0xcc, 0x80);
 const SIGNATURE_INT = 128;
 
-export class Serializer {
-  private factoryInstance: Factory | null = null;
-  private pool: Pool | null = null;
+export interface Serializer {
+  dump(object: unknown): Uint8Array;
+  load(dumped: Uint8Array | string): unknown;
+  isSignature(dumped: Uint8Array): boolean;
+  messagePackFactory: Factory;
+  registerType(...args: Parameters<Factory["registerType"]>): void;
+  warmup(): void;
+}
 
-  get messagePackFactory(): Factory {
-    return (this.factoryInstance ??= new Factory());
-  }
+type SerializerHost = Serializer & {
+  _messagePackFactory?: Factory;
+  _messagePackPool?: Pool | null;
+  messagePackPool(): Pool;
+  installUnregisteredTypeHandler(): void;
+};
 
-  set messagePackFactory(factory: Factory) {
-    this.pool = null;
-    this.factoryInstance = factory;
-  }
-
-  registerType(...args: Parameters<Factory["registerType"]>): void {
-    this.messagePackFactory.registerType(...args);
-  }
-
-  warmup(): void {
-    this.messagePackPool();
-  }
-
-  dump(object: unknown): Uint8Array {
+export const Serializer = new Module((mod) => {
+  delegate.call(mod, "registerType", { to: "messagePackFactory" });
+}).include({
+  dump(this: SerializerHost, object: unknown): Uint8Array {
     return this.messagePackPool().packer((packer) => {
       packer.write(SIGNATURE_INT);
       packer.write(object);
       return packer.fullPack();
     });
-  }
+  },
 
-  load(dumped: Uint8Array | string): unknown {
+  load(this: SerializerHost, dumped: Uint8Array | string): unknown {
     return this.messagePackPool().unpacker((unpacker) => {
       unpacker.feedReference(dumped);
       if (!(unpacker.read() === SIGNATURE_INT))
         throw new RuntimeError("Invalid serialization format");
       return unpacker.fullUnpack();
     });
-  }
+  },
 
   isSignature(dumped: Uint8Array): boolean {
-    return dumped[0] === 0xcc && dumped[1] === 0x80;
-  }
+    return dumped[0] === SIGNATURE[0] && dumped[1] === SIGNATURE[1];
+  },
+
+  get messagePackFactory(): Factory {
+    const self = this as SerializerHost;
+    return (self._messagePackFactory ??= new Factory());
+  },
+
+  set messagePackFactory(factory: Factory) {
+    const self = this as SerializerHost;
+    self._messagePackPool = null;
+    self._messagePackFactory = factory;
+  },
+
+  warmup(this: SerializerHost): void {
+    this.messagePackPool();
+  },
 
   /** @internal */
-  protected messagePackPool(): Pool {
-    if (this.pool === null) {
+  messagePackPool(this: SerializerHost): Pool {
+    if (this._messagePackPool == null) {
       if (!rbObjFrozenP(this.messagePackFactory)) {
         Extensions.install(this.messagePackFactory);
         this.installUnregisteredTypeHandler();
         this.messagePackFactory.freeze();
       }
-      this.pool = this.messagePackFactory.pool(Number(toI(fetch(ENV, "RAILS_MAX_THREADS", 5))));
+      this._messagePackPool = this.messagePackFactory.pool(
+        Number(toI(fetch(ENV, "RAILS_MAX_THREADS", 5))),
+      );
     }
-    return this.pool;
-  }
+    return this._messagePackPool;
+  },
 
   /** @internal */
-  protected installUnregisteredTypeHandler(): void {
+  installUnregisteredTypeHandler(this: SerializerHost): void {
     Extensions.installUnregisteredTypeError(this.messagePackFactory);
-  }
-}
+  },
+}) as Module<Serializer>;

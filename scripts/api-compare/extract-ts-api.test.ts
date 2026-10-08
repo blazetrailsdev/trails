@@ -3203,6 +3203,25 @@ describe("extractFromProgram — include() detection", () => {
     expect(info.modules["core-queries.ts:Other"]).toBeUndefined();
   });
 
+  it("records the methods a Module's block generates with delegate", () => {
+    // activesupport/lib/active_support/message_pack/serializer.rb:40.
+    const info = extractFromFiles("/p", {
+      "serializer.ts": `
+        declare class Module {
+          constructor(block?: (mod: Module) => void);
+        }
+        declare function delegate(this: object, ...methods: unknown[]): string[];
+        const other = {};
+        export const Serializer = new Module((mod) => {
+          delegate.call(mod, "registerType", { to: "messagePackFactory" });
+          delegate.call(other, "elsewhere", { to: "messagePackFactory" });
+        });
+      `,
+    });
+    const methods = info.modules["serializer.ts:Serializer"].instanceMethods;
+    expect(methods.map((m) => [m.name, m.bodyless === true])).toEqual([["registerType", false]]);
+  });
+
   it("records the [initialize] hook a Module's block assigns as the module's initialize", () => {
     const info = extractFromFiles("/p", {
       "shell.ts": `
