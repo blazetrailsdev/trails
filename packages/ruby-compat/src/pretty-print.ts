@@ -18,6 +18,9 @@ export interface PrettyPrintOutput {
  * pretty-printing algorithm. Rails defines none of it and calls it through
  * `PP` from `Core#pretty_print` (`activerecord/src/core.ts`).
  *
+ * `Text`, `Breakable`, `Group` and `GroupQueue` are the classes nested at
+ * `prettyprint.rb:301,339,396,442`.
+ *
  * A block that reads an association is async, so {@link group},
  * {@link groupSub} and {@link nest} return the block's promise and restore
  * their state when it settles.
@@ -148,7 +151,6 @@ export class PrettyPrint {
   }
 }
 
-/** `PrettyPrint::Text` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:301`). */
 class Text {
   private objs: string[] = [];
   width = 0;
@@ -164,7 +166,6 @@ class Text {
   }
 }
 
-/** `PrettyPrint::Breakable` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:339`). */
 class Breakable {
   readonly obj: string;
   readonly width: number;
@@ -195,7 +196,6 @@ class Breakable {
   }
 }
 
-/** `PrettyPrint::Group` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:396`). */
 class Group {
   readonly depth: number;
   readonly breakables: Breakable[] = [];
@@ -225,7 +225,6 @@ class Group {
   }
 }
 
-/** `PrettyPrint::GroupQueue` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:442`). */
 class GroupQueue {
   private queue: Group[][] = [];
 

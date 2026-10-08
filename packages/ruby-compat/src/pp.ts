@@ -1,6 +1,8 @@
 import { rbEnsure } from "./ensure.js";
 import { STDOUT } from "./io.js";
-import { rbAnyToS, rbInspect, rbObjRespondTo } from "./object.js";
+import { SystemCallError } from "./errno.js";
+import { NoMethodError } from "./no-method-error.js";
+import { rbAnyToS, rbFSend, rbInspect } from "./object.js";
 import { PrettyPrint, type PrettyPrintOutput } from "./pretty-print.js";
 import { env } from "./process-adapter.js";
 import { rbStrToI } from "./string/convert.js";
@@ -10,6 +12,11 @@ import { rbStrToI } from "./string/convert.js";
  * includes (`pp.rb:141,301`). Rails defines none of it: `Core#pretty_print`,
  * `Relation#pretty_print` and `CollectionProxy#pretty_print` receive one, and
  * Rails' tests print through `PP.pp`.
+ *
+ * `obj.pretty_print(q)` and `obj.pretty_print_cycle(q)` dispatch to the
+ * receiver's own method, else to `Array`'s (`pp.rb:370,378`), else to
+ * `PP::ObjectMixin`'s (`pp.rb:321,338`), whose arm for an object with an
+ * `inspect` of its own is `q.text self.inspect`.
  *
  * `guard_inspect_key` keeps its table in `Thread.current[:__recursive_key__]`
  * (`pp.rb:145-162`). One JS thread runs many in-flight prints, so the table is
@@ -26,8 +33,10 @@ export class PP extends PrettyPrint {
   /** @noRailsEquivalent PERMANENT — `PP.width_for` (`vendor/ruby/v3.3.11/lib/pp.rb:78`). */
   static widthFor(out: PrettyPrintOutput): number {
     let width: number | undefined;
-    if (rbObjRespondTo(out, "winsize")) {
-      [, width] = (out as unknown as { winsize(): [number, number] }).winsize();
+    try {
+      [, width] = rbFSend(out, "winsize") as [number, number];
+    } catch (e) {
+      if (!(e instanceof NoMethodError || e instanceof SystemCallError)) throw e;
     }
     const columns = env.COLUMNS != null ? Number(rbStrToI(env.COLUMNS)) : 0;
     return (width ?? (columns !== 0 ? columns : 80)) - 1;
@@ -132,12 +141,6 @@ type PrettyPrintable = {
   prettyPrintCycle?(q: PP): void | Promise<void>;
 };
 
-/**
- * `obj.pretty_print(q)`: the receiver's own method, else `Array#pretty_print`
- * (`vendor/ruby/v3.3.11/lib/pp.rb:370`), else `PP::ObjectMixin#pretty_print`
- * (`pp.rb:321`), whose arm for an object with an `inspect` of its own is
- * `q.text self.inspect`.
- */
 function prettyPrint(obj: unknown, q: PP): void | Promise<void> {
   if (typeof (obj as PrettyPrintable | null)?.prettyPrint === "function") {
     return (obj as Required<PrettyPrintable>).prettyPrint(q);
@@ -148,11 +151,6 @@ function prettyPrint(obj: unknown, q: PP): void | Promise<void> {
   q.text(rbInspect(obj));
 }
 
-/**
- * `obj.pretty_print_cycle(q)`: the receiver's own method, else
- * `Array#pretty_print_cycle` (`vendor/ruby/v3.3.11/lib/pp.rb:378`), else
- * `PP::ObjectMixin#pretty_print_cycle` (`pp.rb:338`).
- */
 function prettyPrintCycle(obj: unknown, q: PP): void | Promise<void> {
   if (typeof (obj as PrettyPrintable | null)?.prettyPrintCycle === "function") {
     return (obj as Required<PrettyPrintable>).prettyPrintCycle(q);
