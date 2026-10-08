@@ -54,7 +54,21 @@ describe("MessagePackSerializerTrailsTest", () => {
       204, 128, 199, 25, 10, 203, 64, 188, 33, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 64, 0,
       0, 0, 0, 0, 0, 0, 192, 1,
     ]);
-    expect(serializer.load(Uint8Array.from(negative))).toEqual(hours(1.5).negate());
+    expect([...serializer.dump(hours(new Number(2) as number).times(2))]).toEqual([
+      204, 128, 199, 25, 10, 203, 64, 204, 32, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 64, 16,
+      0, 0, 0, 0, 0, 0, 192, 192,
+    ]);
+    expect([...serializer.dump(Duration.build(new Number(7200)))]).toEqual([
+      204, 128, 199, 17, 10, 203, 64, 188, 32, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 2, 192, 192,
+    ]);
+    expect([...serializer.dump(hours(new Number(2) as number).minus(1))]).toEqual([
+      204, 128, 199, 25, 10, 203, 64, 188, 31, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 64, 0,
+      0, 0, 0, 0, 0, 0, 192, 255,
+    ]);
+    expect([...serializer.dump(hours(3).dividedBy(new Number(2) as number))]).toEqual([
+      204, 128, 199, 25, 10, 203, 64, 181, 24, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 63, 248,
+      0, 0, 0, 0, 0, 0, 192, 192,
+    ]);
     expect(hours(1.5).negate().equals(seconds(-5400))).toBe(true);
   });
 
