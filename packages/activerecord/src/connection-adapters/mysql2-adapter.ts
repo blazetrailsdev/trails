@@ -79,7 +79,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @inventedArm filter — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection */
   static async newClient(
-    config: mysql.PoolOptions & MysqlAdapterOptions,
+    config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
   ): Promise<mysql.Connection> {
     const {
       typeCast: userTypeCast,
@@ -110,7 +110,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         waitForConnections?: boolean;
         username?: string;
         socket?: string;
-        flags?: number | string | string[];
       };
     if (rtest(username)) connOptions.user = username;
     if (rtest(socket)) connOptions.socketPath = socket;
@@ -182,7 +181,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
 
-  constructor(config: mysql.PoolOptions & MysqlAdapterOptions);
+  constructor(config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions);
   /** @deprecated */
   constructor(
     rawConnection: mysql.Connection,
@@ -439,7 +438,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
     this._connectingPromise = Mysql2Adapter.newClient({
-      ...(this._connectionParameters as mysql.PoolOptions & MysqlAdapterOptions),
+      ...(this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions),
       initSql: "SET time_zone = '+00:00'",
     }).then(
       async (conn): Promise<mysql.Connection> => {
@@ -503,7 +502,7 @@ function withoutDefaultIgnoreSpace(list: string[]): string[] {
 
 /** @internal */
 function parseUriField(
-  config: mysql.PoolOptions & MysqlAdapterOptions,
+  config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
   field: "username" | "hostname",
 ): string | undefined {
   const uri = (config as { uri?: string }).uri;
