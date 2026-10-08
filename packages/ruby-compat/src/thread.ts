@@ -176,6 +176,13 @@ export class Thread<R = unknown> {
   }
 
   /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#thread_variable_get` (`vendor/ruby/v3.3.11/thread.c:3722`).
+   */
+  threadVariableGet(key: string): unknown {
+    return _variables.get(this)?.get(isSymbol(key) ? symbolToS(key) : key) ?? null;
+  }
+
+  /**
    * @noRailsEquivalent PERMANENT — Ruby core `Thread#thread_variable_set` (`vendor/ruby/v3.3.11/thread.c:3743`).
    */
   threadVariableSet(key: string, val: unknown): unknown {

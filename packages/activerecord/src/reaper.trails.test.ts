@@ -35,20 +35,38 @@ describe("Reaper", () => {
       flush: async () => {},
       isDiscarded: () => false,
     };
-    new Reaper(flakyPool, FREQUENCY).run();
+    void new Reaper(flakyPool, FREQUENCY).run();
     const thread = reaperInternals().threads.get(FREQUENCY)!;
     expect(thread.isAlive()).toBe(true);
     expect(thread.name).toBe("AR Pool Reaper");
+    expect(thread.threadVariableGet("fork_safe")).toBe(true);
 
     await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
     expect(thread.isAlive()).toBe(false);
 
-    new Reaper(flakyPool, FREQUENCY).run();
+    void new Reaper(flakyPool, FREQUENCY).run();
     expect(reaperInternals().threads.get(FREQUENCY)).not.toBe(thread);
 
     await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
     expect(attempts).toBe(3);
     expect(reaperInternals().threads.get(FREQUENCY)!.isAlive()).toBe(true);
+  });
+
+  it("registerPool waits for a reap in flight, as register_pool's @mutex.synchronize does", async () => {
+    let finishReap!: () => void;
+    const pool: ReapablePool = {
+      reap: () => new Promise((resolve) => (finishReap = resolve)),
+      flush: async () => {},
+      isDiscarded: () => false,
+    };
+    const pools = Reaper.registerPool(pool, FREQUENCY) as WeakRef<ReapablePool>[];
+    await vi.advanceTimersByTimeAsync(FREQUENCY * 1000);
+
+    const registered = Reaper.registerPool(pool, FREQUENCY);
+    expect(registered).toBeInstanceOf(Promise);
+    expect(pools).toHaveLength(1);
+    finishReap();
+    expect(await registered).toHaveLength(2);
   });
 
   it("registerPool appends unconditionally and the thread tears down once every pool is discarded", async () => {
@@ -58,7 +76,7 @@ describe("Reaper", () => {
       flush: async () => {},
       isDiscarded: () => discarded,
     };
-    Reaper.registerPool(pool, FREQUENCY);
+    void Reaper.registerPool(pool, FREQUENCY);
     expect(Reaper.registerPool(pool, FREQUENCY)).toHaveLength(2);
 
     discarded = true;

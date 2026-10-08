@@ -28,14 +28,19 @@ export class Reaper {
   private static pools = new Map<number, WeakRef<ReapablePool>[]>();
   private static threads = new Map<number, Thread>();
 
-  static registerPool(pool: ReapablePool, frequency: number): WeakRef<ReapablePool>[] {
-    if (!Reaper.threads.get(frequency)?.isAlive()) {
-      Reaper.threads.set(frequency, Reaper.spawnThread(frequency));
-    }
-    if (!Reaper.pools.has(frequency)) Reaper.pools.set(frequency, []);
-    const pools = Reaper.pools.get(frequency)!;
-    pools.push(new WeakRef(pool));
-    return pools;
+  static registerPool(
+    pool: ReapablePool,
+    frequency: number,
+  ): WeakRef<ReapablePool>[] | Promise<WeakRef<ReapablePool>[]> {
+    return Reaper.mutex.synchronize(() => {
+      if (!Reaper.threads.get(frequency)?.isAlive()) {
+        Reaper.threads.set(frequency, Reaper.spawnThread(frequency));
+      }
+      if (!Reaper.pools.has(frequency)) Reaper.pools.set(frequency, []);
+      const pools = Reaper.pools.get(frequency)!;
+      pools.push(new WeakRef(pool));
+      return pools;
+    });
   }
 
   private static spawnThread(frequency: number): Thread {
@@ -49,10 +54,10 @@ export class Reaper {
           (setTimeout(resolve, t * 1000) as { unref?(): unknown }).unref?.(),
         );
         await Reaper.mutex.synchronize(async () => {
-          selectBang(
-            Reaper.pools.get(frequency)!,
-            (pool) => pool.deref() !== undefined && !pool.deref()!.isDiscarded(),
-          );
+          selectBang(Reaper.pools.get(frequency)!, (ref) => {
+            const pool = ref.deref();
+            return pool !== undefined && !pool.isDiscarded();
+          });
 
           for (const p of Reaper.pools.get(frequency)!) {
             const pool = p.deref();
@@ -71,7 +76,7 @@ export class Reaper {
     });
   }
 
-  run(): WeakRef<ReapablePool>[] | undefined {
+  run(): WeakRef<ReapablePool>[] | Promise<WeakRef<ReapablePool>[]> | undefined {
     if (!(this.frequency && this.frequency > 0)) return;
     return Reaper.registerPool(this.pool, this.frequency);
   }

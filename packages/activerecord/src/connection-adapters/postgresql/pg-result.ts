@@ -61,11 +61,13 @@ export class PGResult extends Array<Record<string, unknown>> {
   mapTypesBang(typeMap: PGTypeMapByOid): this {
     const fields = this.#native.fields ?? [];
     fields.forEach((field, i) => {
-      const decoder = typeMap.coders.get(field.dataTypeID);
+      const decoder =
+        typeMap.coders.get(field.dataTypeID) ??
+        typeMap.defaultTypeMap?.coders.get(field.dataTypeID);
       if (!decoder) return;
       ((this.#native.rows ?? []) as unknown[][]).forEach((row, tupNum) => {
-        if (row[i] == null) return;
-        row[i] = decoder.decode(row[i] as string);
+        if (typeof row[i] !== "string") return;
+        row[i] = decoder.decode(row[i]);
         this[tupNum][field.name] = row[i];
       });
     });

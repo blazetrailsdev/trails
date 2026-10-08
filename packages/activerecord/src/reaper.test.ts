@@ -81,7 +81,7 @@ describe("ReaperTest", () => {
     const fp = makePool();
     expect(fp.reaped).toBeFalsy();
     const reaper = new Reaper(fp, 0);
-    reaper.run();
+    void reaper.run();
     expect(fp.reaped).toBeFalsy();
   });
 
@@ -90,7 +90,7 @@ describe("ReaperTest", () => {
     expect(fp.reaped).toBeFalsy();
 
     const reaper = new Reaper(fp, 60);
-    reaper.run();
+    void reaper.run();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(fp.reaped).toBeTruthy();
     expect(fp.flushed).toBeTruthy();
@@ -175,8 +175,8 @@ describe("ReaperTest", () => {
     discardedPool._discarded = true;
     const pool = makePool();
 
-    new Reaper(discardedPool, 60).run();
-    new Reaper(pool, 60).run();
+    void new Reaper(discardedPool, 60).run();
+    void new Reaper(pool, 60).run();
 
     await vi.advanceTimersByTimeAsync(60_000);
 

@@ -121,6 +121,8 @@ export const PGTextDecoder = {
 export class PGTypeMapByOid {
   /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   readonly coders = new Map<number, PGSimpleDecoder>();
+  /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
+  defaultTypeMap: PGTypeMapByOid | null = null;
 
   /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
   addCoder(coder: PGSimpleDecoder): this {

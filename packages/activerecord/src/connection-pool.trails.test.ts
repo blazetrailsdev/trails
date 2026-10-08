@@ -1068,8 +1068,8 @@ describe("execution context at Rails thread-spawn sites", () => {
       flush: async () => {},
       isDiscarded: () => stopped,
     }));
-    Reaper.registerPool(pools[0], 0.01);
-    Reaper.registerPool(pools[1], 0.02);
+    void Reaper.registerPool(pools[0], 0.01);
+    void Reaper.registerPool(pools[1], 0.02);
     try {
       await vi.waitFor(() => {
         expect(seen.get(0.01)?.length ?? 0).toBeGreaterThanOrEqual(2);

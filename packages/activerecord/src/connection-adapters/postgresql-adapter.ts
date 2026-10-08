@@ -1468,6 +1468,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     this._rawConnection!.typeMapForResults = map;
 
     this._typeMapForResults = new PGTypeMapByOid();
+    this._typeMapForResults.defaultTypeMap = map;
     this._typeMapForResults.addCoder(new PGTextDecoder.Bytea({ oid: 17, name: "bytea" }));
     this._typeMapForResults.addCoder(new MoneyDecoder({ oid: 790, name: "money" }));
 
