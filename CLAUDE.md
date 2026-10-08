@@ -1302,6 +1302,13 @@ The decision is unchanged; the heading stays here so code citing it still
 resolves. The one-line rule: Trilogy is never ported, its unported-files rows
 are permanent, and a Trilogy-only test arm is dropped.
 
+## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
+The one-line rule: ESM has no synchronous `require`, so
+`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`, and
+no other `require` is ported that way.
+
 ## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#activerecordpromise-is-the-native-promise-promiserb-promisecomplete).

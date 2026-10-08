@@ -17,7 +17,7 @@ export function register(
   loadErrors.delete(name);
 }
 
-/** @noRailsEquivalent CONVERGEABLE connection-adapters-load-is-an-awaited-require-split-from-resolve */
+/** @noRailsEquivalent PERMANENT */
 export async function load(adapterName: string | undefined): Promise<void> {
   const [className, pathToAdapter] = adapters.get(adapterName ?? "") ?? [];
   if (!className) return;
