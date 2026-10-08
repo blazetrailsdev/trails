@@ -35,7 +35,36 @@ import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-c
 import { mysql2Client, type Mysql2Client } from "./mysql2/mysql2-client.js";
 import { defaultTimezone } from "../active-record.js";
 
-const FOUND_ROWS = 2;
+const CLIENT_FLAGS: Record<string, number> = {
+  LONG_PASSWORD: 0x00000001,
+  FOUND_ROWS: 0x00000002,
+  LONG_FLAG: 0x00000004,
+  CONNECT_WITH_DB: 0x00000008,
+  NO_SCHEMA: 0x00000010,
+  COMPRESS: 0x00000020,
+  ODBC: 0x00000040,
+  LOCAL_FILES: 0x00000080,
+  IGNORE_SPACE: 0x00000100,
+  PROTOCOL_41: 0x00000200,
+  INTERACTIVE: 0x00000400,
+  SSL: 0x00000800,
+  IGNORE_SIGPIPE: 0x00001000,
+  TRANSACTIONS: 0x00002000,
+  RESERVED: 0x00004000,
+  SECURE_CONNECTION: 0x00008000,
+  MULTI_STATEMENTS: 0x00010000,
+  MULTI_RESULTS: 0x00020000,
+  PS_MULTI_RESULTS: 0x00040000,
+  PLUGIN_AUTH: 0x00080000,
+  CONNECT_ATTRS: 0x00100000,
+  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
+  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
+  SESSION_TRACK: 0x00800000,
+  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
+  SSL_VERIFY_SERVER_CERT: 0x40000000,
+  REMEMBER_OPTIONS: 0x80000000,
+};
+const FOUND_ROWS = CLIENT_FLAGS.FOUND_ROWS;
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -99,9 +128,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(Array.isArray(flags) ? flags : ["FOUND_ROWS"]).filter(
-          (flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS",
-        ),
+        flags: withoutDefaultIgnoreSpace(
+          Array.isArray(flags)
+            ? flags
+            : Object.keys(CLIENT_FLAGS).filter(
+                (name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0,
+              ),
+        ).filter((flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS"),
         multipleStatements: true,
         typeCast: composedTypeCast,
       });

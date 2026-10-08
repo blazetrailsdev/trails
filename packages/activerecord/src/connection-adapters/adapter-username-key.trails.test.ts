@@ -71,3 +71,15 @@ describe("retained config", () => {
     expect(config.username).toBe("rails");
   });
 });
+
+describe("Mysql2Adapter.newClient flags", () => {
+  it("hands the driver every bit of an Integer flags value by name", async () => {
+    const driverConfig = await mysqlPoolConfig({ ...BASE, flags: 0x20 | 0x02 });
+    expect(driverConfig.flags).toEqual(["FOUND_ROWS", "COMPRESS", "-IGNORE_SPACE"]);
+  });
+
+  it("hands the driver an Array flags value as given", async () => {
+    const driverConfig = await mysqlPoolConfig({ ...BASE, flags: ["COMPRESS", "FOUND_ROWS"] });
+    expect(driverConfig.flags).toEqual(["COMPRESS", "FOUND_ROWS", "-IGNORE_SPACE"]);
+  });
+});

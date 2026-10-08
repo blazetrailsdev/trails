@@ -239,7 +239,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("passing arbitrary flags to adapter", async () => {
-      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: ["COMPRESS"] });
+      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: 0x20 as never });
       try {
         expect((testAdapter as unknown as { _config: { flags: unknown } })._config.flags).toEqual([
           "COMPRESS",
