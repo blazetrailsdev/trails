@@ -97,7 +97,6 @@ describe("TimeZoneConversionTest", () => {
       primaryKeys: async () => null,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn(col: { sqlType: string }) {
         return col.sqlType === "datetime" ? datetimeType : stringType;

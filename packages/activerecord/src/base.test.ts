@@ -261,8 +261,7 @@ describe("BasicsTest", async () => {
 
     await Topic.resetColumnInformation();
 
-    const adapter = (await Topic.leaseConnection()) as any;
-    vi.spyOn(adapter, "internalSchemaCache", "get").mockImplementation(() => {
+    vi.spyOn(Topic.connectionPool(), "schemaReflection", "get").mockImplementation(() => {
       throw new RuntimeError("Some Error");
     });
     await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
@@ -1618,20 +1617,17 @@ describe("BasicsTest", async () => {
   });
 
   it("clear cache!", async () => {
-    const conn = await Base.leaseConnection();
-    let cache = conn.internalSchemaCache;
-    const c1 = await cache.columns(conn.pool, "posts");
-    expect(cache.size).not.toBe(0);
+    const c1 = await Post.schemaCache().columns("posts");
+    expect(await Post.schemaCache().size()).not.toBe(0);
 
     Base.clearCacheBang();
-    cache = conn.internalSchemaCache;
-    expect(cache.size).toBe(0);
+    expect(await Post.schemaCache().size()).toBe(0);
 
-    const c2 = await cache.columns(conn.pool, "posts");
-    expect(cache.size).not.toBe(0);
+    const c2 = await Post.schemaCache().columns("posts");
+    expect(await Post.schemaCache().size()).not.toBe(0);
     expect(c2.map((column, i) => column.equals(c1[i]))).toEqual(new Array(c1.length).fill(true));
 
-    await cache.addAll(conn.pool);
+    await Post.schemaCache().loadAllBang();
   });
 
   it("has attribute", async () => {
@@ -1756,11 +1752,7 @@ describe("BasicsTest", async () => {
   });
 
   it("ignored columns are not present in columns_hash", async () => {
-    const conn = await Base.leaseConnection();
-    const cacheColumns = await conn.internalSchemaCache.columnsHash(
-      conn.pool,
-      Developer.tableName!,
-    );
+    const cacheColumns = await Developer.schemaCache().columnsHash(Developer.tableName!);
     expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
     expect(Object.keys(Developer.columnsHash())).not.toContain("first_name");
     expect(Object.keys(SubDeveloper.columnsHash())).not.toContain("first_name");

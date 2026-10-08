@@ -64,7 +64,7 @@ type AdapterInstrumenter = {
 };
 import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
 import { Result, type ColumnTypes } from "../result.js";
-import { SchemaCache, BoundSchemaReflection } from "./schema-cache.js";
+import { BoundSchemaReflection } from "./schema-cache.js";
 import { NullPool, removeConnectionFromThreadCache } from "./abstract/connection-pool.js";
 import type { ConnectionPool } from "./abstract/connection-pool.js";
 import type { ConnectionDescriptor } from "./abstract/connection-handler.js";
@@ -2107,16 +2107,6 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   _columnMethodNames(): string[] {
     return [...ABSTRACT_COLUMN_METHOD_NAMES];
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE internal-schema-cache-is-the-sync-twin-of-schema-reflection-cache
-   */
-  get internalSchemaCache(): SchemaCache {
-    const reflection = this.pool.schemaReflection;
-    if (!reflection.loadedCache) reflection.loadedCache = new SchemaCache();
-    return reflection.loadedCache;
   }
 
   async transaction<T>(

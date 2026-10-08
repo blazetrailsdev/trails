@@ -40,12 +40,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     `);
     await adapter.loadAdditionalTypes();
   });
-  afterEach(() => {
-    (
-      adapter as unknown as {
-        internalSchemaCache: { clearDataSourceCacheBang(connection: unknown, name: string): void };
-      }
-    ).internalSchemaCache.clearDataSourceCacheBang(null, "pg_arrays");
+  afterEach(async () => {
+    await adapter.schemaCache.clearDataSourceCacheBang("pg_arrays");
   });
   afterAll(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS pg_arrays`).catch(() => {});

@@ -735,10 +735,7 @@ describe("UniquenessValidationWithIndexTest", () => {
 
   beforeEach(async () => {
     const connection = await Base.leaseConnection();
-    connection.internalSchemaCache.clearDataSourceCacheBang(
-      connection.pool ?? connection,
-      "topics",
-    );
+    await connection.schemaCache.clearDataSourceCacheBang("topics");
     await Topic.deleteAll();
     await Event.deleteAll();
   });

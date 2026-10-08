@@ -102,9 +102,7 @@ export class PrimaryKey {
 }
 
 interface CachedSchemaSource {
-  internalSchemaCache?: {
-    getCachedPrimaryKeys?(table: string | null | undefined): string | string[] | null | undefined;
-  };
+  getCachedPrimaryKeys?(table: string | null | undefined): string | string[] | null | undefined;
 }
 
 interface PrimaryKeyHost {
@@ -112,23 +110,11 @@ interface PrimaryKeyHost {
   _primaryKey?: string | string[];
   name: string;
   tableName?: string | null;
-  connectionPool?(): {
-    activeConnection?: CachedSchemaSource | null;
-    poolConfig?: {
-      schemaReflection: { loadedCache: CachedSchemaSource["internalSchemaCache"] | null };
-    };
-  };
+  connectionPool?(): { schemaReflection?: { loadedCache: CachedSchemaSource | null } };
 }
 
-function cachedSchemaCacheFor(
-  host: PrimaryKeyHost,
-): CachedSchemaSource["internalSchemaCache"] | undefined {
-  const pool = host.connectionPool?.();
-  return (
-    pool?.activeConnection?.internalSchemaCache ??
-    pool?.poolConfig?.schemaReflection.loadedCache ??
-    undefined
-  );
+function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefined {
+  return host.connectionPool?.().schemaReflection?.loadedCache ?? undefined;
 }
 
 /**

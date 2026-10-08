@@ -19,12 +19,13 @@ describe("the async schema load warms the shared cache and replaces a synthesize
       }
     }
     const conn = await Post.leaseConnection();
-    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
-    expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeUndefined();
+    await conn.schemaCache.clearDataSourceCacheBang("posts");
+    const reflection = conn.pool.schemaReflection;
+    expect(reflection.loadedCache?.getCachedColumnsHash("posts")).toBeUndefined();
 
     await Post.create({ title: "hello", body: "b" });
 
-    expect(conn.internalSchemaCache.getCachedColumnsHash("posts")).toBeDefined();
+    expect(reflection.loadedCache?.getCachedColumnsHash("posts")).toBeDefined();
   });
 
   it("a warm-cache load invalidates a columnNames memo taken off the synthesized fallback", async () => {
@@ -38,7 +39,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
       }
     }
     const conn = await Post.leaseConnection();
-    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+    await conn.schemaCache.clearDataSourceCacheBang("posts");
 
     const cold = Post.columnNames();
     expect(cold).not.toContain("tags_count");
@@ -58,7 +59,7 @@ describe("the async schema load warms the shared cache and replaces a synthesize
       }
     }
     const conn = await Post.leaseConnection();
-    await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+    await conn.schemaCache.clearDataSourceCacheBang("posts");
 
     const post = await Post.create({ title: "first", body: "b" });
     post.title = "second";

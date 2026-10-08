@@ -6,8 +6,7 @@ import { fixtures } from "../test-fixtures.js";
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 async function clearSchemaCache(table: string): Promise<void> {
-  const conn = await Base.leaseConnection();
-  await conn.internalSchemaCache.clearDataSourceCacheBang(conn.pool ?? conn, table);
+  await Base.schemaCache().clearDataSourceCacheBang(table);
 }
 
 describe("association create on a target whose schema is not reflected yet", () => {

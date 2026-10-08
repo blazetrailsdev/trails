@@ -30,7 +30,6 @@ function makeAdapter(
     isCached: () => true,
   };
   return adapterDouble({
-    internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return typeByColumn[column.sqlType] ?? defaultValue();
@@ -109,7 +108,6 @@ describe("loadSchemaFromAdapter", () => {
       primaryKeys: async () => null,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
@@ -128,7 +126,6 @@ describe("loadSchemaFromAdapter", () => {
       getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => new UuidType(),
     });
@@ -148,7 +145,6 @@ describe("loadSchemaFromAdapter", () => {
       getCachedColumnsHash: () => mysteryHash,
     };
     const adapter = adapterDouble({
-      internalSchemaCache: cache,
       schemaCache: cache,
       lookupCastTypeFromColumn: () => defaultValue(),
     });
@@ -271,7 +267,6 @@ describe("loadSchemaFromAdapter integration details", () => {
       primaryKeys: async () => null,
     };
     const firstAdapter = {
-      internalSchemaCache: firstCache,
       schemaCache: firstCache,
       lookupCastTypeFromColumn: () => new UuidType(),
     };

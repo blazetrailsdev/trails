@@ -27,6 +27,8 @@ export async function establishConnectionTo(
   dbConfig.newConnection = () => connection;
   await klass.establishConnection(dbConfig);
   const pool = klass.connectionPool();
+  const schemaCache = Object.getOwnPropertyDescriptor(connection, "schemaCache")?.value;
+  if (schemaCache) pool.schemaReflection.loadedCache = schemaCache;
   (klass as unknown as { resetColumnInformation(): void }).resetColumnInformation();
   let restored = false;
   const restore = async () => {

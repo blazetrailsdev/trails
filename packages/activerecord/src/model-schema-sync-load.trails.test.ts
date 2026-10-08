@@ -14,7 +14,7 @@ class UuidType extends ValueType {
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,
@@ -323,7 +323,7 @@ describe("sync loadSchema / columnsHash", () => {
       calls,
       isWarm: () => warm,
       adapter: adapterDouble({
-        internalSchemaCache: {
+        schemaCache: {
           isCached: () => warm,
           getCachedColumnsHash: () => (warm ? cols : undefined),
           dataSourceExists: async () => true,
@@ -345,8 +345,6 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { id: { sqlType: "integer", name: "id", default: null } };
     const built = makeResettableAdapter(cols);
     await establishConnectionTo(Post, built.adapter as never);
-    Post.connectionPool().poolConfig.schemaReflection.loadedCache = built.adapter
-      .internalSchemaCache as never;
     Post.columnsHash();
 
     built.calls.clear = 0;

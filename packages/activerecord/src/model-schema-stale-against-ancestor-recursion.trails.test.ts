@@ -14,7 +14,7 @@ const columns: Cols = { id: col("id"), title: col("title") };
 
 function makeAdapter(): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => undefined,
       dataSourceExists: async () => true,
