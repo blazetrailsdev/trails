@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { Result } from "../../result.js";
+import type { PGTypeMapByOid } from "./pg-text-decoder.js";
 
 /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
 export class PGResult extends Array<Record<string, unknown>> {
@@ -57,14 +58,16 @@ export class PGResult extends Array<Record<string, unknown>> {
   }
 
   /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
-  mapTypesBang(typeMap: Map<number, (value: string) => unknown>): this {
+  mapTypesBang(typeMap: PGTypeMapByOid): this {
     const fields = this.#native.fields ?? [];
     fields.forEach((field, i) => {
-      const decoder = typeMap.get(field.dataTypeID);
+      const decoder =
+        typeMap.coders.get(field.dataTypeID) ??
+        typeMap.defaultTypeMap?.coders.get(field.dataTypeID);
       if (!decoder) return;
       ((this.#native.rows ?? []) as unknown[][]).forEach((row, tupNum) => {
-        if (row[i] == null) return;
-        row[i] = decoder(row[i] as string);
+        if (typeof row[i] !== "string") return;
+        row[i] = decoder.decode(row[i]);
         this[tupNum][field.name] = row[i];
       });
     });

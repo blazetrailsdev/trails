@@ -305,7 +305,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("database timezone changes synced to connection", async () => {
     await withTimezoneConfig({ default: "local" }, async () => {
       await assertChanges(
-        () => adapter._databaseTimezone,
+        () => adapter._rawConnection!.queryOptions.databaseTimezone,
         null,
         { from: "utc", to: "local" },
         () => adapter.execute("SELECT 1"),

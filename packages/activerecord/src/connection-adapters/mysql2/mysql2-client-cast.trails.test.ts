@@ -1,14 +1,47 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { temporalTypeCast } from "./temporal-type-cast.js";
+import { mysql2Client } from "./mysql2-client.js";
+
+type TypeCast = (field: unknown, next: () => unknown) => unknown;
+
+const config: { typeCast?: TypeCast } = {};
+const client = mysql2Client({ config });
+client.queryOptions.databaseTimezone = "utc";
+const temporalTypeCast: TypeCast = (field, next) => config.typeCast!(field, next);
 
 function field(type: string, value: string | null) {
   return { type, string: () => value };
 }
 const next = () => "next-called";
 
-describe("temporalTypeCast", () => {
+describe("mysql2Client cast", () => {
+  it("wraps the typeCast the caller configured, and only once", () => {
+    const userConfig: { typeCast?: TypeCast } = { typeCast: () => "from the caller" };
+    const wrapped = mysql2Client({ config: userConfig });
+    const installed = userConfig.typeCast;
+    expect(mysql2Client(wrapped)).toBe(wrapped);
+    expect(userConfig.typeCast).toBe(installed);
+    expect(userConfig.typeCast!(field("VARCHAR", "x"), next)).toBe("from the caller");
+  });
+
+  it("reads a DATETIME in the zone queryOptions.databaseTimezone names", () => {
+    const local: { typeCast?: TypeCast } = {};
+    mysql2Client({ config: local }).queryOptions.databaseTimezone = "local";
+    const naive = Temporal.PlainDateTime.from("2026-04-27T14:23:55");
+    const instantOf = (cast: TypeCast): bigint =>
+      (cast(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime)
+        .getutc()
+        .toZonedDateTime()
+        .toInstant().epochNanoseconds;
+    expect(instantOf(config.typeCast!)).toBe(
+      naive.toZonedDateTime("UTC").toInstant().epochNanoseconds,
+    );
+    expect(instantOf(local.typeCast!)).toBe(
+      naive.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant().epochNanoseconds,
+    );
+  });
+
   describe("TIMESTAMP", () => {
     it("parses a UTC timestamp to Temporal.Instant", () => {
       const result = temporalTypeCast(field("TIMESTAMP", "2026-04-27 14:23:55.123456"), next);

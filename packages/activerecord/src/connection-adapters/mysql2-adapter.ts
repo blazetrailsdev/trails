@@ -32,7 +32,6 @@ import {
   selectAll as mysql2SelectAll,
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import { temporalTypeCast, TEMPORAL_POOL_OPTIONS } from "./mysql/temporal-type-cast.js";
 import { mysql2Client, type Mysql2Client } from "./mysql2/mysql2-client.js";
 import { defaultTimezone } from "../active-record.js";
 
@@ -86,7 +85,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
   ): Promise<mysql.Connection> {
     const {
-      typeCast: userTypeCast,
       adapter: _adapter,
       statementLimit: _statementLimit,
       preparedStatements: _preparedStatements,
@@ -118,14 +116,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (rtest(username)) connOptions.user = username;
     if (rtest(socket)) connOptions.socketPath = socket;
 
-    const composedTypeCast =
-      typeof userTypeCast === "function"
-        ? (field: unknown, next: () => unknown) =>
-            temporalTypeCast(field as Parameters<typeof temporalTypeCast>[0], () =>
-              (userTypeCast as (f: unknown, n: () => unknown) => unknown)(field, next),
-            )
-        : TEMPORAL_POOL_OPTIONS.typeCast;
-
     let conn: mysql.Connection;
     try {
       conn = await mysql.createConnection({
@@ -139,7 +129,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               ),
         ).filter((flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS"),
         multipleStatements: true,
-        typeCast: composedTypeCast,
       });
     } catch (err) {
       if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
@@ -224,8 +213,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _endingClient: Promise<void> | null = null;
   private _connectionConfigured = false;
   declare _statements: MysqlStatementPool | null;
-
-  _databaseTimezone: "utc" | "local" = "utc";
 
   declare _affectedRowsBeforeWarnings: number | null;
 
@@ -338,8 +325,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    this._databaseTimezone = defaultTimezone();
-    if (this._connectionConfigured || !this._rawConnection) return;
+    if (!this._rawConnection) return;
+    this._rawConnection.queryOptions.databaseTimezone = defaultTimezone();
+    if (this._connectionConfigured) return;
     this._connectionConfigured = true;
     await super.configureConnection();
     await this.loadEscapeState();

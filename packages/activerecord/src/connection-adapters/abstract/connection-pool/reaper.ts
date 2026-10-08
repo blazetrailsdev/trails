@@ -1,9 +1,10 @@
-import { Thread } from "@blazetrails/ruby-compat";
+import { selectBang } from "@blazetrails/activesupport";
+import { Mutex, Thread, isEmpty } from "@blazetrails/ruby-compat";
 
 export interface ReapablePool {
-  reap?(): Promise<void>;
-  flush?(): Promise<void>;
-  isDiscarded?(): boolean;
+  reap(): Promise<void>;
+  flush(): Promise<void>;
+  isDiscarded(): boolean;
 }
 
 export class Reaper {
@@ -23,118 +24,60 @@ export class Reaper {
     this._frequency = frequency;
   }
 
-  /** @missingRailsCall spawn_thread — CONVERGEABLE reaper-register-pool-spawns-its-thread-through-spawn-thread */
-  static registerPool(pool: ReapablePool, frequency: number): WeakRef<ReapablePool>[] | undefined {
-    if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return;
-    if (pool.isDiscarded?.()) return;
+  private static mutex = new Mutex();
+  private static pools = new Map<number, WeakRef<ReapablePool>[]>();
+  private static threads = new Map<number, Thread>();
 
-    if (!Reaper._timers.has(frequency)) {
-      Reaper._timers.set(frequency, Reaper._spawnTimer(frequency));
-    }
-
-    const refs = Reaper._pools.get(frequency) ?? [];
-    const alive = refs.filter((ref) => {
-      const p = ref.deref();
-      return p != null && !p.isDiscarded?.();
+  static registerPool(
+    pool: ReapablePool,
+    frequency: number,
+  ): WeakRef<ReapablePool>[] | Promise<WeakRef<ReapablePool>[]> {
+    return Reaper.mutex.synchronize(() => {
+      if (!Reaper.threads.get(frequency)?.isAlive()) {
+        Reaper.threads.set(frequency, Reaper.spawnThread(frequency));
+      }
+      if (!Reaper.pools.has(frequency)) Reaper.pools.set(frequency, []);
+      const pools = Reaper.pools.get(frequency)!;
+      pools.push(new WeakRef(pool));
+      return pools;
     });
-
-    if (alive.some((ref) => ref.deref() === pool)) {
-      Reaper._pools.set(frequency, alive);
-      return alive;
-    }
-
-    alive.push(new WeakRef(pool));
-    Reaper._pools.set(frequency, alive);
-    return alive;
   }
 
-  private static _pools = new Map<number, WeakRef<ReapablePool>[]>();
-  private static _timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private static spawnThread(frequency: number): Thread {
+    return new Thread(async () => {
+      const t = frequency;
+      Thread.current().threadVariableSet("fork_safe", true);
+      Thread.current().name = "AR Pool Reaper";
+      let running = true;
+      while (running) {
+        await new Promise((resolve) =>
+          (setTimeout(resolve, t * 1000) as { unref?(): unknown }).unref?.(),
+        );
+        await Reaper.mutex.synchronize(async () => {
+          selectBang(Reaper.pools.get(frequency)!, (ref) => {
+            const pool = ref.deref();
+            return pool !== undefined && !pool.isDiscarded();
+          });
 
-  run(): WeakRef<ReapablePool>[] | undefined {
-    if (!this.frequency || this.frequency <= 0) return;
+          for (const p of Reaper.pools.get(frequency)!) {
+            const pool = p.deref();
+            if (pool === undefined) continue;
+            await pool.reap();
+            await pool.flush();
+          }
+
+          if (isEmpty(Reaper.pools.get(frequency)!)) {
+            Reaper.pools.delete(frequency);
+            Reaper.threads.delete(frequency);
+            running = false;
+          }
+        });
+      }
+    });
+  }
+
+  run(): WeakRef<ReapablePool>[] | Promise<WeakRef<ReapablePool>[]> | undefined {
+    if (!(this.frequency && this.frequency > 0)) return;
     return Reaper.registerPool(this.pool, this.frequency);
   }
-
-  private static _spawnTimer(frequency: number): ReturnType<typeof setTimeout> {
-    let timer!: ReturnType<typeof setTimeout>;
-    const scheduleNext = (): void => {
-      timer = setTimeout(tick, frequency * 1000);
-      Reaper._timers.set(frequency, timer);
-      if (typeof timer === "object" && "unref" in timer) {
-        timer.unref();
-      }
-    };
-    let tick!: () => void;
-    void new Thread(
-      () =>
-        new Promise<void>((running) => {
-          tick = () => {
-            (async () => {
-              const refs = Reaper._pools.get(frequency);
-              if (!refs) {
-                Reaper._stopTimer(frequency);
-                running();
-                return;
-              }
-
-              const alive = refs.filter((ref) => {
-                const p = ref.deref();
-                return p != null && !p.isDiscarded?.();
-              });
-
-              if (alive.length === 0) {
-                Reaper._pools.delete(frequency);
-                Reaper._stopTimer(frequency);
-                running();
-                return;
-              }
-
-              Reaper._pools.set(frequency, alive);
-
-              for (const ref of alive) {
-                const p = ref.deref();
-                if (p) {
-                  await p.reap?.();
-                  await p.flush?.();
-                }
-              }
-
-              scheduleNext();
-            })().catch((err: unknown) => {
-              Reaper._timers.delete(frequency);
-              console.warn(
-                `[trails] AR Pool Reaper: ${err instanceof Error ? err.message : String(err)}`,
-              );
-              running();
-            });
-          };
-          scheduleNext();
-        }),
-    );
-
-    return timer;
-  }
-
-  private static _stopTimer(frequency: number): void {
-    const timer = Reaper._timers.get(frequency);
-    if (timer) {
-      clearTimeout(timer);
-      Reaper._timers.delete(frequency);
-    }
-  }
-}
-
-/** @internal */
-function spawnThread(frequency: number): ReturnType<typeof setTimeout> | null {
-  if (!frequency || frequency <= 0 || !Number.isFinite(frequency)) return null;
-  const internals = Reaper as unknown as {
-    _timers: Map<number, ReturnType<typeof setTimeout>>;
-    _spawnTimer: (f: number) => ReturnType<typeof setTimeout>;
-  };
-  const existing = internals._timers.get(frequency);
-  if (existing) return existing;
-  const timer = internals._spawnTimer(frequency);
-  internals._timers.set(frequency, timer);
-  return timer;
 }

@@ -64,11 +64,7 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import {
-  pgConnection,
-  unescapeBytea as pgUnescapeBytea,
-  type PGConnection,
-} from "./postgresql/pg-connection.js";
+import { pgConnection, type PGConnection } from "./postgresql/pg-connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -123,13 +119,20 @@ import type {
   SchemaNamespaceStatements,
 } from "./abstract/schema-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
-import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
+import { PGSimpleDecoder, PGTextDecoder, PGTypeMapByOid } from "./postgresql/pg-text-decoder.js";
 
-const getTemporalTypeParser = makeGetTypeParser(pg.types);
-const TEMPORAL_OIDS = new Set([1082, 1083, 1114, 1184, 1266]);
-const OID_INTERVAL = 1186;
-const OID_INTERVAL_ARRAY = 1187;
-const OID_MONEY = 790;
+type PGDecoderClass = new (options: { oid: number; name: string }) => PGSimpleDecoder;
+
+const STRING_OIDS = new Set([
+  114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
+]);
+
+function pgTypeParser(oid: number, format?: string): unknown {
+  if (format === "binary") return pg.types.getTypeParser(oid, "binary");
+  if (STRING_OIDS.has(oid)) return (v: unknown) => v;
+  return pg.types.getTypeParser(oid, "text");
+}
+
 const VALUE_LIMIT_VIOLATION = "22001";
 const NUMERIC_VALUE_OUT_OF_RANGE = "22003";
 const NOT_NULL_VIOLATION = "23502";
@@ -207,9 +210,6 @@ import { PGResult } from "./postgresql/pg-result.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
 import { dbWarningsAction } from "../active-record.js";
-
-const OID_JSON = 114;
-const OID_JSONB = 3802;
 
 type SessionVariables = Record<string, string | number | boolean | null | ":default">;
 
@@ -424,13 +424,14 @@ export class PostgreSQLAdapter
   private _pgClientOptions: pg.ClientConfig | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   /** @internal */
-  _typeMapForResults = new Map<number, (value: string) => unknown>([[17, pgUnescapeBytea]]);
+  _typeMapForResults = new PGTypeMapByOid();
 
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning: unknown = true;
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
+  private timestampDecoder: PGSimpleDecoder | null = null;
   private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
@@ -567,23 +568,7 @@ export class PostgreSQLAdapter
       this._pgClientOptions = {
         connectionString: config,
         types: {
-          getTypeParser: (oid: number, format?: string) => {
-            if (oid === OID_INTERVAL) {
-              return format === "binary"
-                ? pg.types.getTypeParser(OID_INTERVAL, "binary")
-                : (v: unknown) => v;
-            }
-            if (oid === OID_INTERVAL_ARRAY && format !== "binary") return (v: unknown) => v;
-            if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary")
-              return (v: unknown) => v;
-            if (oid === OID_MONEY && format !== "binary")
-              return (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
-            return oid === 1082 && !PostgreSQLAdapter.decodeDates
-              ? format === "binary"
-                ? pg.types.getTypeParser(oid, "binary")
-                : (v: unknown) => v
-              : getTemporalTypeParser(oid, format);
-          },
+          getTypeParser: (oid: number, format?: string) => pgTypeParser(oid, format),
         },
       };
       return;
@@ -615,34 +600,7 @@ export class PostgreSQLAdapter
       }),
       types: {
         getTypeParser(oid: number, format?: string): unknown {
-          if (oid === OID_INTERVAL) {
-            const fallback =
-              format === "binary"
-                ? pg.types.getTypeParser(OID_INTERVAL, "binary")
-                : (v: unknown) => v;
-            return userGetTypeParser?.(oid, format) ?? fallback;
-          }
-          if (oid === OID_INTERVAL_ARRAY && format !== "binary") {
-            const fallback = (v: unknown) => v;
-            return userGetTypeParser?.(oid, format) ?? fallback;
-          }
-          if ((oid === OID_JSON || oid === OID_JSONB) && format !== "binary") {
-            const fallback = (v: unknown) => v;
-            return userGetTypeParser?.(oid, format) ?? fallback;
-          }
-          if (oid === OID_MONEY && format !== "binary") {
-            const fallback = (v: unknown) => (typeof v === "string" ? MoneyDecoder.decode(v) : v);
-            return userGetTypeParser?.(oid, format) ?? fallback;
-          }
-          if (oid === 1082 && !PostgreSQLAdapter.decodeDates) {
-            const fallback =
-              format === "binary" ? pg.types.getTypeParser(oid, "binary") : (v: unknown) => v;
-            return userGetTypeParser?.(oid, format) ?? fallback;
-          }
-          if (TEMPORAL_OIDS.has(oid) && (format === "text" || !format)) {
-            return getTemporalTypeParser(oid, format);
-          }
-          return userGetTypeParser?.(oid, format) ?? getTemporalTypeParser(oid, format);
+          return userGetTypeParser?.(oid, format) ?? pgTypeParser(oid, format);
         },
       },
     };
@@ -1326,7 +1284,6 @@ export class PostgreSQLAdapter
   /** @internal */
   async configureConnection(): Promise<void> {
     await super.configureConnection();
-    this._mappedDefaultTimezone = null;
 
     if (rtest(this._config.encoding)) {
       await this._rawConnection!.query(
@@ -1369,7 +1326,7 @@ export class PostgreSQLAdapter
     }
 
     this.addPgEncoders();
-    this.addPgDecoders();
+    await this.addPgDecoders();
 
     await this.reloadTypeMap();
   }
@@ -1454,23 +1411,78 @@ export class PostgreSQLAdapter
   addPgEncoders(): void {}
 
   /** @internal */
-  async updateTypemapForDefaultTimezone(): Promise<void> {
-    const tz = defaultTimezone();
-    if (this._mappedDefaultTimezone === tz) return;
-    this._mappedDefaultTimezone = tz;
-    await this.reconfigureConnectionTimezone();
+  async updateTypemapForDefaultTimezone(): Promise<true | undefined> {
+    if (
+      this._rawConnection != null &&
+      this._mappedDefaultTimezone !== defaultTimezone() &&
+      this.timestampDecoder != null
+    ) {
+      const decoderClass =
+        defaultTimezone() === "utc"
+          ? PGTextDecoder.TimestampUtc
+          : PGTextDecoder.TimestampWithoutTimeZone;
+
+      this.timestampDecoder = new decoderClass({ ...this.timestampDecoder.toH() });
+      this._rawConnection.typeMapForResults.addCoder(this.timestampDecoder);
+
+      this._mappedDefaultTimezone = defaultTimezone();
+
+      await this.reconfigureConnectionTimezone();
+
+      return true;
+    }
   }
 
   /** @internal */
-  addPgDecoders(): void {}
+  async addPgDecoders(): Promise<void> {
+    this._mappedDefaultTimezone = null;
+    this.timestampDecoder = null;
+
+    const codersByName: Record<string, PGDecoderClass> = {
+      int2: PGTextDecoder.Integer,
+      int4: PGTextDecoder.Integer,
+      int8: PGTextDecoder.Integer,
+      oid: PGTextDecoder.Integer,
+      float4: PGTextDecoder.Float,
+      float8: PGTextDecoder.Float,
+      numeric: PGTextDecoder.Numeric,
+      bool: PGTextDecoder.Boolean,
+      timestamp: PGTextDecoder.TimestampUtc,
+      timestamptz: PGTextDecoder.TimestampWithTimeZone,
+    };
+    if (PostgreSQLAdapter.decodeDates) codersByName["date"] = PGTextDecoder.Date;
+
+    const knownCoderTypes = Object.keys(codersByName).map((n) => this.quote(n));
+    const query = `SELECT t.oid, t.typname
+FROM pg_type as t
+WHERE t.typname IN (${knownCoderTypes.join(", ")})
+`;
+    const result = (await this.internalExecute(query, "SCHEMA", [], {
+      allowRetry: true,
+      materializeTransactions: false,
+    })) as { oid: string | number; typname: string }[];
+    const coders = filterMap(result, (row) => this.constructCoder(row, codersByName[row.typname]));
+
+    const map = new PGTypeMapByOid();
+    coders.forEach((coder) => map.addCoder(coder));
+    this._rawConnection!.typeMapForResults = map;
+
+    this._typeMapForResults = new PGTypeMapByOid();
+    this._typeMapForResults.defaultTypeMap = map;
+    this._typeMapForResults.addCoder(new PGTextDecoder.Bytea({ oid: 17, name: "bytea" }));
+    this._typeMapForResults.addCoder(new MoneyDecoder({ oid: 790, name: "money" }));
+
+    this.timestampDecoder = coders.find((coder) => coder.name === "timestamp") ?? null;
+    await this.updateTypemapForDefaultTimezone();
+  }
 
   /** @internal */
   constructCoder(
     row: { oid: string | number; typname: string },
-    coderClass: string | null,
-  ): { oid: number; name: string; coderClass: string } | null {
-    if (!coderClass) return null;
-    return { oid: Number(row.oid), name: row.typname, coderClass };
+    coderClass: PGDecoderClass | undefined,
+  ): PGSimpleDecoder | undefined {
+    if (!coderClass) return;
+    return new coderClass({ oid: Number(row.oid), name: row.typname });
   }
 
   static columnNameMatcher(): RegExp {
@@ -2311,10 +2323,10 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
   }
 }
 
-export class MoneyDecoder {
+export class MoneyDecoder extends PGSimpleDecoder {
   static readonly TYPE = new Money();
 
-  static decode(value: string): string | null {
+  decode(value: string): string | null {
     return MoneyDecoder.TYPE.deserialize(value) as string | null;
   }
 }

@@ -1,3 +1,4 @@
+import type { PGTypeMapByOid } from "./pg-text-decoder.js";
 import type { PGResult } from "./pg-result.js";
 import type { PGConnection } from "./pg-connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
@@ -77,7 +78,7 @@ interface ExecuteHost extends PerformQueryHost {
 interface QueryHost {
   internalExecute(sql: string, name?: string | null): Promise<unknown>;
   /** @internal */
-  _typeMapForResults: Map<number, (value: string) => unknown>;
+  _typeMapForResults: PGTypeMapByOid;
 }
 
 export async function query(
@@ -273,7 +274,7 @@ export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Pr
 
 /** @internal */
 export interface PerformQueryHost extends HandleWarningsHost {
-  updateTypemapForDefaultTimezone(): Promise<void>;
+  updateTypemapForDefaultTimezone(): Promise<true | undefined>;
   prepareStatement(
     sql: string | null,
     binds: unknown[],

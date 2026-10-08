@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { PGResult } from "./pg-result.js";
+import { PGTypeMapByOid } from "./pg-text-decoder.js";
 
 export interface PGConnection extends pg.Client {
   prepare(stmtName: string, sql: string): Promise<void>;
@@ -8,6 +9,7 @@ export interface PGConnection extends pg.Client {
   execParams(sql: string | null, params: unknown[]): Promise<PGResult>;
   unescapeBytea(value: string | Uint8Array): Buffer;
   socketIo(): { reopen(path: string): void } | null;
+  typeMapForResults: PGTypeMapByOid;
 }
 
 type QueryConfig = string | Record<string, unknown> | null;
@@ -16,12 +18,28 @@ type Query = (config: QueryConfig) => Promise<pg.QueryResult | pg.QueryResult[]>
 const OID_BYTEA = 17;
 const OID_BYTEA_ARRAY = 1001;
 
+const TYPE_MAP_FOR_RESULTS = new WeakMap<object, PGTypeMapByOid>();
+
+const typeMapForResults: PropertyDescriptor = {
+  configurable: true,
+  get(this: object): PGTypeMapByOid {
+    let map = TYPE_MAP_FOR_RESULTS.get(this);
+    if (!map) TYPE_MAP_FOR_RESULTS.set(this, (map = new PGTypeMapByOid()));
+    return map;
+  },
+  set(this: object, map: PGTypeMapByOid) {
+    TYPE_MAP_FOR_RESULTS.set(this, map);
+  },
+};
+
 function types(client: pg.Client): { getTypeParser(oid: number, format?: string): unknown } {
   return {
     getTypeParser(oid: number, format?: string): unknown {
       if ((oid === OID_BYTEA || oid === OID_BYTEA_ARRAY) && format !== "binary") {
         return (value: unknown) => value;
       }
+      const coder = format !== "binary" && TYPE_MAP_FOR_RESULTS.get(client)?.coders.get(oid);
+      if (coder) return (value: string) => coder.decode(value);
       return client.getTypeParser(oid, format as "text");
     },
   };
@@ -142,12 +160,16 @@ function socketIo(this: pg.Client): { reopen(path: string): void } | null {
 
 /** @noRailsEquivalent CONVERGEABLE pg-gem-connection-surface-scores-against-the-pg-gem */
 export function pgConnection<T extends object>(client: T): T & PGConnection {
-  return Object.assign(client, {
-    prepare,
-    execPrepared,
-    asyncExec,
-    execParams,
-    unescapeBytea,
-    socketIo,
-  }) as unknown as T & PGConnection;
+  return Object.defineProperty(
+    Object.assign(client, {
+      prepare,
+      execPrepared,
+      asyncExec,
+      execParams,
+      unescapeBytea,
+      socketIo,
+    }),
+    "typeMapForResults",
+    typeMapForResults,
+  ) as unknown as T & PGConnection;
 }

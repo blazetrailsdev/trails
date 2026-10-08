@@ -13,8 +13,8 @@ import { defaultSqlTimezone } from "./sql-datetime.js";
 
 export { DateInfinity, DateNegativeInfinity };
 
-function naiveIsoToInstant(iso: string): Temporal.Instant {
-  return Temporal.PlainDateTime.from(iso).toZonedDateTime(defaultSqlTimezone()).toInstant();
+function naiveIsoToInstant(iso: string, timeZone = defaultSqlTimezone()): Temporal.Instant {
+  return Temporal.PlainDateTime.from(iso).toZonedDateTime(timeZone).toInstant();
 }
 
 export function timeFromInstant<T>(value: Temporal.Instant | T): Time | T {
@@ -36,13 +36,14 @@ export function parsePostgresInstant(
 
 export function parsePostgresTimestampAsInstant(
   text: string,
+  timeZone = defaultSqlTimezone(),
 ): Temporal.Instant | DateInfinityType | DateNegativeInfinityType {
   const trimmed = text.trim();
   if (trimmed === "infinity") return DateInfinity;
   if (trimmed === "-infinity") return DateNegativeInfinity;
   const { iso, bc } = extractBcSuffix(trimmed);
-  if (bc) return parseBcTimestampAsInstant(iso);
-  return naiveIsoToInstant(clampFraction(iso.replace(" ", "T")));
+  if (bc) return parseBcTimestampAsInstant(iso, timeZone);
+  return naiveIsoToInstant(clampFraction(iso.replace(" ", "T")), timeZone);
 }
 
 export function parsePostgresDate(
@@ -68,10 +69,13 @@ export function parseMysqlInstant(text: string): Temporal.Instant | null {
   return Temporal.Instant.from(iso);
 }
 
-export function parseMysqlDatetimeAsInstant(text: string): Temporal.Instant | null {
+export function parseMysqlDatetimeAsInstant(
+  text: string,
+  timeZone = defaultSqlTimezone(),
+): Temporal.Instant | null {
   const trimmed = text.trim();
   if (isZeroDatetime(trimmed)) return null;
-  return naiveIsoToInstant(clampFraction(trimmed.replace(" ", "T")));
+  return naiveIsoToInstant(clampFraction(trimmed.replace(" ", "T")), timeZone);
 }
 
 export function parseMysqlDate(text: string): Temporal.PlainDate | null {
@@ -125,7 +129,7 @@ function parseBcTimestampTzAsInstant(withoutBc: string): Temporal.Instant {
   return zdt.toInstant();
 }
 
-function parseBcTimestampAsInstant(withoutBc: string): Temporal.Instant {
+function parseBcTimestampAsInstant(withoutBc: string, timeZone: string): Temporal.Instant {
   const match = /^(\d+)-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(withoutBc);
   if (!match) throw new ArgumentError(`Cannot parse BC timestamp: ${JSON.stringify(withoutBc)}`);
   const [, y, mo, d, h, mi, s, frac] = match;
@@ -141,7 +145,7 @@ function parseBcTimestampAsInstant(withoutBc: string): Temporal.Instant {
       millisecond,
       microsecond,
       nanosecond,
-      timeZone: defaultSqlTimezone(),
+      timeZone,
     },
     { overflow: "reject" },
   ).toInstant();
