@@ -72,6 +72,7 @@ export function strOffset(str: string, pos: number): number {
 
 /**
  * `StringValue` (`vendor/ruby/v3.3.11/string.c:2551` `rb_string_value`): a String, or its `to_str`.
+ * A `Uint8Array` is a binary String (`rbObjClass` answers `rbCString` for it), read as UTF-8.
  *
  * @noRailsEquivalent PERMANENT
  */

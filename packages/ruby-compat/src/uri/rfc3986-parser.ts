@@ -130,7 +130,7 @@ export class RFC3986Parser {
     ),
   };
 
-  /** `split` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:77`). */
+  /** `split` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:77`), whose `uri.to_str` (`:79`) is `stringValue`. */
   split(uri: string | Uint8Array): SplitComponents {
     uri = stringValue(uri);
     // eslint-disable-next-line no-control-regex

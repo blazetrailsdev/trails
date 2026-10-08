@@ -64,6 +64,7 @@ export {
   rbModSingletonP,
   rbModToS,
   rbObjClassname,
+  rbObjFrozenP,
   rbObjRespondTo,
   rbObjSingletonClass,
   rbSetClassPathString,

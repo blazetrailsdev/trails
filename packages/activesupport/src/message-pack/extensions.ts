@@ -77,6 +77,21 @@ function classOf(value: object): ObjectClass {
 }
 
 export const Extensions = {
+  /**
+   * Mirrors `ActiveSupport::MessagePack::Extensions#install`
+   * (`vendor/rails/v8.0.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
+   *
+   * Type 0 reads Rails' bytes; a `":name"` Symbol is not packed through it until
+   * the packer has its `T_SYMBOL` arm
+   * (`msgpack-symbol-ext-packer-arm-and-extended-object-lookup`).
+   *
+   * Type 16 passes functions where Rails passes `:to_s` / `:new`. The payload
+   * is MRI's `Regexp#to_s`, with MRI's option letters (`option_to_str`,
+   * `vendor/ruby/v3.3.11/re.c:322`). A JS `RegExp`'s `toString` and constructor
+   * are JS's, and ruby-compat's `Regexp#to_s` writes JS option letters, so the
+   * MRI spelling is asked for by name: `rbRegToS(regexp, "onig")`, read back
+   * by `rbRegInitStr` (`rb_reg_init_str`, `re.c:3360`).
+   */
   install(registry: Factory): void {
     registry.registerType(0, rbCSymbol, {
       packer: "toMsgpackExt",

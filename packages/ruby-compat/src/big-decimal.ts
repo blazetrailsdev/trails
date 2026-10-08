@@ -309,7 +309,8 @@ export class BigDecimal {
   /**
    * Ruby's `BigDecimal._load` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:805`
    * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
-   * (`bigdecimal.c:5420-5421`) over the prefix.
+   * (`bigdecimal.c:5420-5421`) over the prefix. `str` goes through
+   * `StringValueCStr` (`bigdecimal.c:813`), so a binary String loads.
    */
   static _load(str: string | Uint8Array): BigDecimal {
     str = stringValue(str);

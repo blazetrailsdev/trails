@@ -5,7 +5,7 @@ import { stringValue } from "./string/support.js";
 export class Pathname {
   private readonly path: string;
 
-  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:97` `path_initialize` */
+  /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:97` `path_initialize`, whose `RB_TYPE_P(arg, T_STRING)` arm and `StringValue` (`:100-107`) take a binary String too */
   constructor(arg: string | Uint8Array | { toPath(): string }) {
     const str = stringValue(
       typeof arg === "string" || arg instanceof Uint8Array ? arg : arg.toPath(),
