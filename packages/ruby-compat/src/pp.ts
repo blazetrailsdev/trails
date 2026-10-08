@@ -2,7 +2,7 @@ import { rbEnsure } from "./ensure.js";
 import { STDOUT } from "./io.js";
 import { SystemCallError } from "./errno.js";
 import { NoMethodError } from "./no-method-error.js";
-import { rbAnyToS, rbFSend, rbInspect } from "./object.js";
+import { isPlainHash, rbAnyToS, rbFSend, rbInspect } from "./object.js";
 import { PrettyPrint, type PrettyPrintOutput } from "./pretty-print.js";
 import { env } from "./process-adapter.js";
 import { rbStrToI } from "./string/convert.js";
@@ -14,9 +14,12 @@ import { rbStrToI } from "./string/convert.js";
  * Rails' tests print through `PP.pp`.
  *
  * `obj.pretty_print(q)` and `obj.pretty_print_cycle(q)` dispatch to the
- * receiver's own method, else to `Array`'s (`pp.rb:370,378`), else to
- * `PP::ObjectMixin`'s (`pp.rb:321,338`), whose arm for an object with an
- * `inspect` of its own is `q.text self.inspect`.
+ * receiver's own method, else to `Array`'s (`pp.rb:370,378`) or `Hash`'s
+ * (`pp.rb:384,388`), else to `PP::ObjectMixin`'s (`pp.rb:321,338`).
+ * `ObjectMixin#pretty_print` is its `q.text self.inspect` arm alone: every
+ * other value prints as {@link rbInspect} renders it, and `pp_object`
+ * (`pp.rb:269`), which lists the instance variables of an object with no
+ * `inspect` of its own, is not ported.
  *
  * `guard_inspect_key` keeps its table in `Thread.current[:__recursive_key__]`
  * (`pp.rb:145-162`). One JS thread runs many in-flight prints, so the table is
@@ -80,16 +83,15 @@ export class PP extends PrettyPrint {
   }
 
   /** @noRailsEquivalent PERMANENT — `PPMethods#pp` (`vendor/ruby/v3.3.11/lib/pp.rb:189`). */
-  async pp(obj: unknown): Promise<void> {
+  pp(obj: unknown): void | Promise<void> {
     if (isDelegator(obj)) obj = obj.__getobj__();
 
     if (this.checkInspectKey(obj)) {
-      await this.group(0, "", "", () => prettyPrintCycle(obj, this));
-      return;
+      return this.group(0, "", "", () => prettyPrintCycle(obj, this));
     }
 
     this.pushInspectKey(obj);
-    await rbEnsure(
+    return rbEnsure(
       () => this.group(0, "", "", () => prettyPrint(obj, this)),
       () => {
         if (!PP.sharingDetection) this.popInspectKey(obj);
@@ -98,7 +100,7 @@ export class PP extends PrettyPrint {
   }
 
   /** @noRailsEquivalent PERMANENT — `PPMethods#object_address_group` (`vendor/ruby/v3.3.11/lib/pp.rb:216`). */
-  objectAddressGroup(obj: object, block: () => void | Promise<void>): Promise<void> {
+  objectAddressGroup<T extends void | Promise<void>>(obj: object, block: () => T): T {
     const str = rbAnyToS(obj).replace(/>$/, "");
     return this.group(1, str, ">", block);
   }
@@ -109,22 +111,51 @@ export class PP extends PrettyPrint {
     this.breakable();
   }
 
-  /** @noRailsEquivalent PERMANENT — `PPMethods#seplist` (`vendor/ruby/v3.3.11/lib/pp.rb:255`). */
-  async seplist<V>(
+  /**
+   * `list.__send__(iter_method)` is the list's own iteration: a Hash is
+   * handed over as its pairs, which is `each_pair`.
+   *
+   * @noRailsEquivalent PERMANENT — `PPMethods#seplist` (`vendor/ruby/v3.3.11/lib/pp.rb:255`).
+   */
+  seplist<V>(
     list: Iterable<V>,
-    sep: (() => void) | null,
+    sep: (() => void) | null = null,
     block: (v: V) => void | Promise<void>,
-  ): Promise<void> {
+  ): void | Promise<void> {
     sep ??= () => this.commaBreakable();
     let first = true;
-    for (const v of list) {
-      if (first) {
-        first = false;
-      } else {
-        sep();
+    const each = list[Symbol.iterator]();
+    const iterate = (): void | Promise<void> => {
+      for (let v = each.next(); !v.done; v = each.next()) {
+        if (first) {
+          first = false;
+        } else {
+          sep();
+        }
+        const yielded = block(v.value);
+        if (yielded instanceof Promise) return yielded.then(iterate);
       }
-      await block(v);
-    }
+    };
+    return iterate();
+  }
+
+  /** @noRailsEquivalent PERMANENT — `PPMethods#pp_hash` (`vendor/ruby/v3.3.11/lib/pp.rb:285`). */
+  ppHash(obj: Record<string, unknown> | Map<unknown, unknown>): void | Promise<void> {
+    return this.group(1, "{", "}", () =>
+      this.seplist(obj instanceof Map ? obj : Object.entries(obj), null, ([k, v]) =>
+        this.group(0, "", "", () => {
+          const key = this.pp(k);
+          const value = () => {
+            this.text("=>");
+            return this.group(1, "", "", () => {
+              this.breakable("");
+              return this.pp(v);
+            });
+          };
+          return key instanceof Promise ? key.then(value) : value();
+        }),
+      ),
+    );
   }
 }
 
@@ -148,6 +179,7 @@ function prettyPrint(obj: unknown, q: PP): void | Promise<void> {
   if (Array.isArray(obj)) {
     return q.group(1, "[", "]", () => q.seplist(obj, null, (v) => q.pp(v)));
   }
+  if (isPlainHash(obj) || obj instanceof Map) return q.ppHash(obj);
   q.text(rbInspect(obj));
 }
 
@@ -157,6 +189,10 @@ function prettyPrintCycle(obj: unknown, q: PP): void | Promise<void> {
   }
   if (Array.isArray(obj)) {
     q.text(obj.length === 0 ? "[]" : "[...]");
+    return;
+  }
+  if (isPlainHash(obj) || obj instanceof Map) {
+    q.text((obj instanceof Map ? obj.size : Object.keys(obj).length) === 0 ? "{}" : "{...}");
     return;
   }
   return q.objectAddressGroup(obj as object, () => {

@@ -21,9 +21,9 @@ export interface PrettyPrintOutput {
  * `Text`, `Breakable`, `Group` and `GroupQueue` are the classes nested at
  * `prettyprint.rb:301,339,396,442`.
  *
- * A block that reads an association is async, so {@link group},
- * {@link groupSub} and {@link nest} return the block's promise and restore
- * their state when it settles.
+ * A block that reads an association is async. {@link group}, {@link groupSub}
+ * and {@link nest} run a synchronous block in line, as Ruby does, and for an
+ * async one return its promise and finish when it settles.
  *
  * @noRailsEquivalent PERMANENT — Ruby stdlib `PrettyPrint`
  * (`vendor/ruby/v3.3.11/lib/prettyprint.rb:34`).
@@ -111,15 +111,17 @@ export class PrettyPrint {
   }
 
   /** @noRailsEquivalent PERMANENT — `PrettyPrint#group` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:251`). */
-  async group(
+  group<T extends void | Promise<void>>(
     indent = 0,
     openObj = "",
     closeObj = "",
-    block: () => void | Promise<void>,
-  ): Promise<void> {
+    block: () => T,
+  ): T {
     this.text(openObj);
-    await this.groupSub(() => this.nest(indent, block));
+    const result = this.groupSub(() => this.nest(indent, block));
+    if (result instanceof Promise) return result.then(() => this.text(closeObj)) as T;
     this.text(closeObj);
+    return result;
   }
 
   /** @noRailsEquivalent PERMANENT — `PrettyPrint#group_sub` (`vendor/ruby/v3.3.11/lib/prettyprint.rb:262`). */

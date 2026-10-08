@@ -1292,7 +1292,14 @@ function inspectAry(ary: unknown[], recursing: Set<object>): string {
   }
 }
 
-function isPlainHash(value: unknown): value is Record<string, unknown> {
+/**
+ * `RB_TYPE_P(obj, T_HASH)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:122`)
+ * for the object-literal half of a trails Hash: an object whose prototype
+ * chain reaches `Object.prototype` through no class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   for (
     let proto: object | null = Object.getPrototypeOf(value);

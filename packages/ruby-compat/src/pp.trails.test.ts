@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DelegateClass } from "./delegate.js";
 import { rbDefineInspectCustom } from "./object.js";
 import { PP } from "./pp.js";
 import { StringIO } from "./string-io.js";
@@ -17,6 +18,29 @@ describe("PP", () => {
     expect(await pp(["aaaa", "bbbb", ["cccc", "dddd"]], 12)).toBe(
       '["aaaa",\n "bbbb",\n ["cccc",\n  "dddd"]]\n',
     );
+  });
+
+  it("prints a Hash through pp_hash, breaking a pair that does not fit", async () => {
+    expect(await pp({ a: 1 })).toBe('{"a"=>1}\n');
+    expect(await pp({ a: 1, bbbb: [1, 2] }, 10)).toBe('{"a"=>1,\n "bbbb"=>\n  [1, 2]}\n');
+    expect(await pp(new Map([["a", 1]]))).toBe('{"a"=>1}\n');
+    const h: Record<string, unknown> = {};
+    h.s = h;
+    expect(await pp(h)).toBe('{"s"=>{...}}\n');
+  });
+
+  it("prints a Delegator as the object it delegates to", async () => {
+    const Mask = DelegateClass(String);
+    expect(await pp(new Mask("x"))).toBe('"x"\n');
+    expect(await pp([new Mask("y")])).toBe('["y"]\n');
+  });
+
+  it("runs a synchronous block in line", () => {
+    const out = new StringIO();
+    const q = new PP(out);
+    q.group(1, "[", "]", () => q.seplist(["a", "b"], null, (v) => q.pp(v)));
+    q.flush();
+    expect(out.string()).toBe('["a", "b"]');
   });
 
   it("answers the width of an output with no winsize as 79", () => {
