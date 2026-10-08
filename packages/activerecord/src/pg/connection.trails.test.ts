@@ -101,7 +101,14 @@ describe("PG::Connection#cancel and #block", () => {
     expect(await client("error").client.cancel()).toBe("Error: ECONNREFUSED");
   });
 
-  it("block returns at once with no command in flight", async () => {
-    await expect(pgConnection({ _activeQuery: null }).block()).resolves.toBeUndefined();
+  it("block answers true with no command in flight, and false once the timeout passes", async () => {
+    expect(await pgConnection({ _activeQuery: null }).block()).toBe(true);
+    const connection = { on: vi.fn(), off: vi.fn() };
+    expect(await pgConnection({ _activeQuery: {}, connection }).block(0.001)).toBe(false);
+    expect(connection.off).toHaveBeenCalledTimes(5);
+  });
+
+  it("async_cancel is cancel", async () => {
+    expect(await client("end").client.asyncCancel()).toBeNull();
   });
 });

@@ -76,7 +76,11 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
       }),
       end: async () => {},
       on: () => fakeClient,
-      transactionStatus: () => 2,
+      connection: {
+        on: (event: string, listener: (message: { status: string }) => void) => {
+          if (event === "readyForQuery") listener({ status: "T" });
+        },
+      },
     };
     adapter._rawConnection = fakeClient;
 

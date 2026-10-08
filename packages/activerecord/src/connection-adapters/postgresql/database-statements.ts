@@ -233,7 +233,7 @@ interface CancelAnyRunningQueryHost {
   _rawConnection: {
     transactionStatus(): number;
     cancel(): Promise<string | null>;
-    block(): Promise<void>;
+    block(): Promise<boolean>;
   } | null;
 }
 

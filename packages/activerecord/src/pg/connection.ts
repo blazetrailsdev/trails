@@ -10,7 +10,8 @@ export interface PGConnection extends pg.Client {
   transactionStatus(): number;
   status(): number;
   cancel(): Promise<string | null>;
-  block(): Promise<void>;
+  asyncCancel(): Promise<string | null>;
+  block(timeout?: number | null): Promise<boolean>;
   socketIo(): { reopen(path: string): void } | null;
 }
 
@@ -192,19 +193,20 @@ function socketIo(this: pg.Client): { reopen(path: string): void } | null {
 }
 
 /** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
-export function block(this: pg.Client): Promise<void> {
-  if ((this as Client)._activeQuery == null) return Promise.resolve();
+export function block(this: pg.Client, timeout: number | null = null): Promise<boolean> {
+  if ((this as Client)._activeQuery == null) return Promise.resolve(true);
   const connection = (this as Client).connection;
-  if (connection == null) return Promise.resolve();
-  return new Promise<void>((resolve) => {
-    const settle = (): void => {
+  if (connection == null) return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    const settle = (ret: unknown = true): void => {
       connection.off("readyForQuery", settle);
       connection.off("commandComplete", settle);
       connection.off("errorMessage", settle);
       connection.off("end", settle);
       connection.off("error", settle);
-      resolve();
+      resolve(ret !== false);
     };
+    if (timeout != null) setTimeout(() => settle(false), timeout * 1000);
     connection.on("readyForQuery", settle);
     connection.on("commandComplete", settle);
     connection.on("errorMessage", settle);
@@ -235,6 +237,8 @@ export async function cancel(this: pg.Client): Promise<string | null> {
   });
 }
 
+export const asyncCancel = cancel;
+
 /** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function pgConnection<T extends object>(client: T): T & PGConnection {
   if (!READY_FOR_QUERY.has(client)) {
@@ -259,6 +263,7 @@ export function pgConnection<T extends object>(client: T): T & PGConnection {
     transactionStatus,
     status,
     cancel,
+    asyncCancel,
     block,
   }) as unknown as T & PGConnection;
 }
