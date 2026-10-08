@@ -269,10 +269,7 @@ describe("PrimaryKeysTest", () => {
         this._tableName = "developers_projects";
       }
     }
-    await ((await Base.leaseConnection()) as any).internalSchemaCache.primaryKeys(
-      await Base.leaseConnection(),
-      "developers_projects",
-    );
+    await Base.schemaCache().primaryKeys("developers_projects");
     expect(AnonDevelopersProjects.primaryKey).toBeNull();
   });
 

@@ -30,12 +30,12 @@ export async function dumpTemplateSchemaCache(
   pool: Pool,
   runToken: string,
 ): Promise<{ filename: string; fingerprint: string } | null> {
-  const cache = adapter.internalSchemaCache;
-  if (!cache) return null;
-  await cache.addAll(pool);
+  const reflection = adapter.pool.schemaReflection;
+  await reflection.loadAllBang(pool);
   for (const table of BOOKKEEPING_TABLE_NAMES) {
-    cache.clearDataSourceCacheBang(adapter, table);
+    await reflection.clearDataSourceCacheBang(pool, table);
   }
+  const cache = reflection.loadedCache!;
   const filename = await schemaCacheDumpPathFor(runToken);
   await cache.dumpTo(filename);
   return {
@@ -146,13 +146,12 @@ export async function templateSchemaCache(): Promise<SchemaCache | null> {
 let loaded: SchemaCache | null | undefined;
 
 export async function eagerWarmSchemaCache(adapter: DatabaseAdapter): Promise<void> {
-  const sc = adapter.internalSchemaCache;
   const pool = adapter.pool == null || adapter.pool instanceof NullPool ? null : adapter.pool;
-  if (!sc || pool === null) return;
+  if (pool === null) return;
   try {
     const dumped = await templateSchemaCache();
     if (dumped && (await replaySchemaCacheDump(adapter, pool, dumped))) return;
-    await sc.addAll(pool);
+    await pool.schemaReflection.loadAllBang(pool);
   } catch {}
 }
 
@@ -165,9 +164,8 @@ async function replaySchemaCacheDump(
   const shapes = await schemaShapes(adapter);
   if (fingerprintOf(shapes, cached) !== templateSchemaFingerprint()) return false;
   pool.schemaReflection = new SchemaReflection(null, dumped.initializeDup());
-  const sc = adapter.internalSchemaCache;
   for (const table of shapes.keys()) {
-    if (!cached.has(table)) await sc.add(pool, table);
+    if (!cached.has(table)) await pool.schemaReflection.add(pool, table);
   }
   return true;
 }

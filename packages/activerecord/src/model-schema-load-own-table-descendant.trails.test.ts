@@ -13,7 +13,7 @@ function col(name: string): Cols[string] {
 
 function makeAdapter(tables: Record<string, Cols>, asked: string[]): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: (table: string) => {
         asked.push(table);

@@ -253,7 +253,7 @@ export function deriveJoinTableName(firstTable: string | null, secondTable: stri
 }
 
 export function quotedTableName(this: SchemaHost): string {
-  return reflectionAdapter(this).quoteTableName(this.tableName);
+  return (this as unknown as typeof Base).adapterClass().quoteTableName(this.tableName);
 }
 
 export function resetTableName(this: SchemaHost): string | null {
@@ -634,19 +634,26 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
 }
 
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
-  let adapter: SchemaHost["connection"] | undefined;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    adapter = reflectionAdapter(host);
+    pool = (host as unknown as typeof Base).connectionPool();
   } catch {
-    adapter = undefined;
+    return false;
   }
-  if (!adapter) return false;
-  const cache = adapter.internalSchemaCache;
-  if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
+  const cache = pool.schemaReflection.loadedCache;
+  if (cache && typeof cache.getCachedColumnsHash !== "function") return false;
   const table = host.tableName;
   if (table == null) return false;
-  let hash = cache.getCachedColumnsHash(table);
-  if (!hash) hash = warmColumnsHashSync(adapter, cache, table);
+  let hash: Record<string, unknown> | undefined = cache?.getCachedColumnsHash(table);
+  if (!hash) {
+    let adapter: SchemaHost["connection"] | undefined;
+    try {
+      adapter = reflectionAdapter(host);
+    } catch {
+      adapter = undefined;
+    }
+    if (adapter) hash = warmColumnsHashSync(adapter, cache, table);
+  }
   if (!hash) return false;
   applyColumnsHash(host, hash);
   return true;
@@ -657,24 +664,19 @@ function warmColumnsHashSync(
   cache: {
     setColumns?: (table: string, cols: any[]) => void;
     getCachedColumnsHash: (table: string) => Record<string, unknown> | undefined;
-  },
+  } | null,
   table: string,
 ): Record<string, unknown> | undefined {
-  if (typeof adapter.columns !== "function" || typeof cache.setColumns !== "function") {
-    return undefined;
-  }
-  let cols: unknown;
-  try {
-    cols = adapter.columns(table);
-  } catch {
-    return undefined;
-  }
+  if (typeof adapter.columns !== "function") return undefined;
+  if (cache && typeof cache.setColumns !== "function") return undefined;
+  const cols: unknown = adapter.columns(table);
   if (cols != null && typeof (cols as any).then === "function") {
     void (cols as Promise<unknown>).catch(() => {});
     return undefined;
   }
-  if (!Array.isArray(cols) || cols.length === 0) return undefined;
-  cache.setColumns(table, cols);
+  if (!Array.isArray(cols)) return undefined;
+  if (!cache) return Object.fromEntries(cols.map((col) => [col.name, col]));
+  cache.setColumns!(table, cols);
   return cache.getCachedColumnsHash(table);
 }
 
@@ -749,15 +751,15 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
  * @noRailsEquivalent CONVERGEABLE cache-only view of ModelSchema#table_exists? (model_schema.rb:416) for the sync callers; retires with RFC 0073.
  */
 export function cachedTableExists(this: SchemaHost): boolean | undefined {
-  let conn: any;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    conn = reflectionAdapter(this);
+    pool = (this as unknown as typeof Base).connectionPool();
   } catch {
     return undefined;
   }
-  const cache = conn?.internalSchemaCache;
+  const cache = pool.schemaReflection.loadedCache;
   if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
-  return cache.getCachedDataSourceExists(this.tableName);
+  return cache.getCachedDataSourceExists(this.tableName as string);
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {

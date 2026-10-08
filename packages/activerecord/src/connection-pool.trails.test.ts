@@ -478,21 +478,6 @@ describe("ConnectionPool schema cache", () => {
     expect(pool.schemaCache).toBe(pool.schemaCache);
   });
 
-  it("adapter.internalSchemaCache reads the raw SchemaCache from poolConfig, not the bound reflection", async () => {
-    const { SchemaCache } = await import("./connection-adapters/schema-cache.js");
-    const pool = makeAmbientPool();
-    try {
-      const cache = await pool.withConnection(
-        (conn) => (conn as unknown as { internalSchemaCache: unknown }).internalSchemaCache,
-      );
-      expect(cache).toBeInstanceOf(SchemaCache);
-      expect(cache).not.toBe(pool.schemaCache);
-      expect(pool.poolConfig.schemaReflection.loadedCache).toBe(cache);
-    } finally {
-      await closePoolConnections(pool);
-    }
-  });
-
   it("swapping schemaReflection invalidates the cached BoundSchemaReflection", async () => {
     const pool = makePool();
     const before = pool.schemaCache;

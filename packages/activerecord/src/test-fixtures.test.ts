@@ -65,6 +65,7 @@ function makeAdapter(): DatabaseAdapter {
 function mockPool(adapter: DatabaseAdapter) {
   return {
     activeConnection: adapter,
+    schemaReflection: adapter.pool.schemaReflection,
     withConnection: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter),
     withConnectionSync: <T>(fn: (conn: DatabaseAdapter) => T) => fn(adapter),
   };

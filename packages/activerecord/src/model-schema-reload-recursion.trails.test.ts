@@ -20,7 +20,6 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
     primaryKeys: async () => null,
   };
   return adapterDouble({
-    internalSchemaCache: cache,
     schemaCache: cache,
     lookupCastTypeFromColumn(column: { sqlType: string }) {
       return column.sqlType === "uuid" ? new UuidType() : null;

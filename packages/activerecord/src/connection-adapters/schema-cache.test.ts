@@ -712,18 +712,19 @@ describe("SchemaCache DDL invalidation", () => {
   let pool: ConnectionPool;
 
   function warmCache(tableName: string) {
-    adapter.internalSchemaCache.setColumns(tableName, [makeColumn("id", "integer")]);
+    pool.schemaReflection.loadedCache!.setColumns(tableName, [makeColumn("id", "integer")]);
   }
 
   beforeEach(async () => {
     ({ adapter, pool } = await checkoutRawTestAdapter());
+    await pool.schemaReflection.loadBang(pool);
     await adapter.dropTable("things", "stuff", { ifExists: true });
     await adapter.createTable("things", (t) => {
       t.string("name");
       t.integer("count");
     });
     warmCache("things");
-    expect(adapter.internalSchemaCache.isCached("things")).toBe(true);
+    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(true);
   });
 
   afterEach(async () => {
@@ -734,14 +735,14 @@ describe("SchemaCache DDL invalidation", () => {
 
   it("dropTable clears cache before DROP TABLE", async () => {
     await adapter.dropTable("things");
-    expect(adapter.internalSchemaCache.isCached("things")).toBe(false);
+    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(false);
   });
 
   it("renameTable clears both old and new names before ALTER TABLE RENAME", async () => {
     warmCache("stuff");
-    expect(adapter.internalSchemaCache.isCached("stuff")).toBe(true);
+    expect(pool.schemaReflection.loadedCache!.isCached("stuff")).toBe(true);
     await adapter.renameTable("things", "stuff");
-    expect(adapter.internalSchemaCache.isCached("things")).toBe(false);
-    expect(adapter.internalSchemaCache.isCached("stuff")).toBe(false);
+    expect(pool.schemaReflection.loadedCache!.isCached("things")).toBe(false);
+    expect(pool.schemaReflection.loadedCache!.isCached("stuff")).toBe(false);
   });
 });

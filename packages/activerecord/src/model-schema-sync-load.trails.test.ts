@@ -14,7 +14,7 @@ class UuidType extends ValueType {
 
 function makeAdapter(columns: Record<string, unknown>): unknown {
   return adapterDouble({
-    internalSchemaCache: {
+    schemaCache: {
       isCached: () => true,
       getCachedColumnsHash: () => columns,
       dataSourceExists: async () => true,
@@ -323,7 +323,7 @@ describe("sync loadSchema / columnsHash", () => {
       calls,
       isWarm: () => warm,
       adapter: adapterDouble({
-        internalSchemaCache: {
+        schemaCache: {
           isCached: () => warm,
           getCachedColumnsHash: () => (warm ? cols : undefined),
           dataSourceExists: async () => true,
@@ -345,8 +345,6 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { id: { sqlType: "integer", name: "id", default: null } };
     const built = makeResettableAdapter(cols);
     await establishConnectionTo(Post, built.adapter as never);
-    Post.connectionPool().poolConfig.schemaReflection.loadedCache = built.adapter
-      .internalSchemaCache as never;
     Post.columnsHash();
 
     built.calls.clear = 0;
@@ -354,5 +352,25 @@ describe("sync loadSchema / columnsHash", () => {
 
     expect(built.calls.clear).toBe(1);
     expect(built.isWarm()).toBe(false);
+  });
+});
+
+describe("sync loadSchema on a reflection that has not loaded its cache", () => {
+  it("reads a synchronous adapter's columns without seating a cache", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const cols = [{ sqlType: "integer", name: "id", default: null }];
+    await establishConnectionTo(
+      Post,
+      adapterDouble({
+        columns: () => cols,
+        lookupCastTypeFromColumn: () => defaultValue(),
+      }) as never,
+    );
+    await Post.leaseConnection();
+
+    expect(Post.columnsHash().id).toBe(cols[0]);
+    expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
   });
 });

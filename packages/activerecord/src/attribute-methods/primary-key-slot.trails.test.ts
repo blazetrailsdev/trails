@@ -35,7 +35,7 @@ describe("per-instance @primary_key slot", () => {
     await establishConnectionTo(
       ColdToy,
       adapterDouble({
-        internalSchemaCache: { getCachedPrimaryKeys: () => "toy_id" },
+        schemaCache: { getCachedPrimaryKeys: () => "toy_id" },
       }) as never,
     );
     await ColdToy.leaseConnection();
