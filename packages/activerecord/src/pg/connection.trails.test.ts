@@ -106,6 +106,18 @@ describe("PG::Connection#cancel and #block", () => {
     const connection = { on: vi.fn(), off: vi.fn() };
     expect(await pgConnection({ _activeQuery: {}, connection }).block(0.001)).toBe(false);
     expect(connection.off).toHaveBeenCalledTimes(5);
+
+    const listeners: (() => void)[] = [];
+    const live = {
+      on: (_event: string, listener: () => void) => listeners.push(listener),
+      off: vi.fn(),
+    };
+    const clear = vi.spyOn(globalThis, "clearTimeout");
+    const blocked = pgConnection({ _activeQuery: {}, connection: live }).block(30);
+    listeners.at(-1)!();
+    expect(await blocked).toBe(true);
+    expect(clear).toHaveBeenCalledOnce();
+    clear.mockRestore();
   });
 
   it("async_cancel is cancel", async () => {

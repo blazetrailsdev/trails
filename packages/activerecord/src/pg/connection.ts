@@ -199,11 +199,13 @@ export function block(this: pg.Client, timeout: number | null = null): Promise<b
   if (connection == null) return Promise.resolve(true);
   return new Promise<boolean>((resolve) => {
     const events = ["readyForQuery", "commandComplete", "errorMessage", "end", "error"];
-    const settle = (ret: unknown = true): void => {
+    const done = (ret: boolean): void => {
+      clearTimeout(timer);
       for (const event of events) connection.off(event, settle);
-      resolve(ret !== false);
+      resolve(ret);
     };
-    if (timeout != null) setTimeout(() => settle(false), timeout * 1000);
+    const settle = (): void => done(true);
+    const timer = timeout == null ? undefined : setTimeout(() => done(false), timeout * 1000);
     for (const event of events) connection.on(event, settle);
   });
 }
