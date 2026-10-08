@@ -177,7 +177,6 @@ export interface DelegationHost {
   _records?: Base[];
   readonly _loadResult?: Promise<unknown>;
   records(): Promise<Base[]>;
-  loadTarget?(): Base[] | Promise<Base[]>;
 }
 
 type RecordDelegate = (records: Base[], ...args: any[]) => unknown;
@@ -470,8 +469,9 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
   if (host.isLoaded && !host.isScheduled && !host._loadResult)
     return fn([...(host.target ?? host._records ?? [])]);
-  const records = host.loadTarget ? host.loadTarget() : host.records();
-  if (!(records instanceof Promise)) return fn([...records]);
+  const records = host.records();
+  if (host.isLoaded && !host.isScheduled && !host._loadResult)
+    return fn([...(host.target ?? host._records ?? [])]);
   return records.then((records) => fn([...records]));
 }
 

@@ -359,8 +359,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   scope(): any {
     return (this._scope ??= this._association.scope());
   }
-  loadTarget(): T[] | Promise<T[]> {
-    return this._association.loadTarget() as T[] | Promise<T[]>;
+  async loadTarget(): Promise<T[]> {
+    return (await this._association.loadTarget()) as T[];
   }
 
   /** @internal */

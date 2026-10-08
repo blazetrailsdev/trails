@@ -1,9 +1,10 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { CollectionAssociation } from "./collection-association.js";
-import { Range, kernelThrow } from "@blazetrails/ruby-compat";
+import { Enumerable, Range, kernelThrow } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, RecordNotFound } from "../index.js";
+import { Relation } from "../relation.js";
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -79,6 +80,12 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("map and findAll are Enumerable's, over a loaded and an unloaded relation", async () => {
     const author = await authorWithPosts();
     const unloaded = Post.where({ author_id: author.id }).order("title");
+    expect(Relation.prototype.map).toBe(Enumerable.map);
+    expect(Relation.prototype.findAll).toBe(Enumerable.findAll);
+    for (const name of ["first", "select", "isAny", "isInclude", "sum"] as const) {
+      expect(Relation.prototype[name]).not.toBe(Enumerable[name]);
+    }
+    expect(await unloaded.map((...args: unknown[]) => args.length)).toEqual([1, 1, 1]);
     expect(await unloaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
     expect((await unloaded.findAll((p) => p.title !== "b")).length).toBe(2);
     expect((await unloaded.drop(1)).length).toBe(2);

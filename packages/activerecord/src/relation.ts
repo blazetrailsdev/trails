@@ -2018,9 +2018,9 @@ export interface Relation<T extends Base, G extends boolean = false>
 
 export interface Relation<T extends Base, G extends boolean = false> {
   [Symbol.iterator](): IterableIterator<T>;
-  map<R>(block: (record: T) => R): Promise<R[]>;
-  findAll(block: (record: T) => unknown): Promise<T[]>;
-  drop(n: number): Promise<T[]>;
+  map<R>(block: (record: T) => R): R[] | Promise<R[]>;
+  findAll(block: (record: T) => unknown): T[] | Promise<T[]>;
+  drop(n: number): T[] | Promise<T[]>;
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {

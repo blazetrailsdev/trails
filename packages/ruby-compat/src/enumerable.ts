@@ -26,7 +26,7 @@ export interface Each<T, E = unknown> {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export type Enumerated<E, R> = E extends PromiseLike<unknown> ? Promise<R> : R;
+export type Enumerated<E, R> = E extends Promise<unknown> ? Promise<R> : R;
 
 const iterBreak = Symbol("rb_iter_break");
 
@@ -197,7 +197,6 @@ function iterator<T, E = unknown>(this: Each<T, E>): IterableIterator<T> {
     () => ary,
   );
   if (each instanceof Promise) {
-    each.catch(() => {});
     throw new TypeError("each is asynchronous: await it before iterating");
   }
   return ary[Symbol.iterator]();
