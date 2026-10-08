@@ -227,7 +227,15 @@ describe("SchemaStatements privates (PR 8)", () => {
     const derived = ss.foreignKeyName("astronauts", { column: "rocket_id" });
     expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(derived);
     expect(ss.foreignKeyName("astronauts", { name: "", column: "rocket_id" })).toBe("");
-    expect(ss.foreignKeyOptions("astronauts", "rockets", { name: undefined }).name).toBe(derived);
+  });
+
+  it("addForeignKey and addCheckConstraint derive the name for a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    await ss.addForeignKey("astronauts", "rockets", { name: undefined });
+    await ss.addCheckConstraint("users", "age > 0", { name: undefined });
+    const sql = ((ss as any).execute as ReturnType<typeof vi.fn>).mock.calls.map(([s]) => s);
+    expect(sql[0]).toContain(ss.foreignKeyName("astronauts", { column: "rocket_id" }));
+    expect(sql[1]).toContain(ss.checkConstraintName("users", { expression: "age > 0" }));
   });
 
   it("foreignKeyFor ignores a name forwarded as undefined", async () => {
@@ -284,9 +292,6 @@ describe("SchemaStatements privates (PR 8)", () => {
   it("checkConstraintOptions derives a name only when the key is absent", () => {
     const ss = makeStatements();
     expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
-      name: ss.checkConstraintName("users", { expression: "age > 0" }),
-    });
-    expect(ss.checkConstraintOptions("users", "age > 0", { name: undefined })).toEqual({
       name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
   });

@@ -292,17 +292,10 @@ export const SOURCES: readonly UpstreamSource[] = [
     origin: {
       type: "git",
       url: "https://github.com/ged/ruby-pg.git",
-      // vendor/rails/Gemfile.lock:412 resolves pg (1.5.9).
       ref: "v1.5.9",
     },
     packages: [
       {
-        // The driver-layer gem `PostgreSQLAdapter` calls into
-        // (`postgresql/database_statements.rb:160-193` reaches
-        // `PG::Connection`); its ports live in
-        // `packages/activerecord/src/pg/`. `extract-ruby-api.rb` reads
-        // `lib/pg/**/*.rb` only, so the members the gem defines in
-        // `ext/pg_connection.c` have no extracted counterpart.
         name: "pg",
         libPath: "lib/pg",
       },

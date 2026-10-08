@@ -64,7 +64,11 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { Connection, pgConnection, type PGConnection } from "../pg/connection.js";
+import {
+  pgConnection,
+  unescapeBytea as pgUnescapeBytea,
+  type PGConnection,
+} from "../pg/connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -413,9 +417,7 @@ export class PostgreSQLAdapter
   private _pgClientOptions: pg.ClientConfig | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   /** @internal */
-  _typeMapForResults = new Map<number, (value: string) => unknown>([
-    [17, Connection.unescapeBytea],
-  ]);
+  _typeMapForResults = new Map<number, (value: string) => unknown>([[17, pgUnescapeBytea]]);
 
   /** @internal */
   _regtypeOids: Map<string, number> = new Map();

@@ -232,7 +232,7 @@ interface CancelAnyRunningQueryHost {
   /** @internal */
   _rawConnection: {
     transactionStatus(): number;
-    cancel(): Promise<void>;
+    cancel(): Promise<string | null>;
     block(): Promise<void>;
   } | null;
 }

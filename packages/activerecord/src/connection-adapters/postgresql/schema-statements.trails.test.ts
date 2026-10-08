@@ -709,16 +709,16 @@ describe("SchemaStatements constraint name digests", () => {
     );
   });
 
-  it("derives the name when the name option is forwarded as undefined", () => {
+  it("derives the name when the name option is forwarded as undefined", async () => {
     const ss = withSchemaStatements(makeAdapter().adapter);
-    expect(
-      ss.exclusionConstraintOptions("invoices", "daterange(start_date, end_date) WITH &&", {
-        name: undefined,
-      }).name,
-    ).toBe("excl_rails_74c9160f55");
-    expect(ss.uniqueConstraintOptions("sections", ["position"], { name: undefined }).name).toBe(
-      "uniq_rails_1e07660b77",
-    );
+    const execute = vi.fn(async (_sql: string) => []);
+    Object.assign(ss, { execute });
+    await ss.addExclusionConstraint("invoices", "daterange(start_date, end_date) WITH &&", {
+      name: undefined,
+    });
+    await ss.addUniqueConstraint("sections", ["position"], { name: undefined });
+    expect(execute.mock.calls[0][0]).toContain("excl_rails_74c9160f55");
+    expect(execute.mock.calls[1][0]).toContain("uniq_rails_1e07660b77");
     expect(
       ss.exclusionConstraintName("invoices", {
         name: undefined,

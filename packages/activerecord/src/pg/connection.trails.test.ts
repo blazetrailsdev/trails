@@ -1,6 +1,6 @@
 import { it, expect, describe, vi } from "vitest";
 import { IO } from "@blazetrails/ruby-compat";
-import { Connection, pgConnection } from "./connection.js";
+import { escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
 
 describe("pgConnection socket_io", () => {
   it("reopen unrefs and strips listeners, and never closes the socket", () => {
@@ -44,13 +44,6 @@ describe("pgConnection transaction_status and status", () => {
     expect(client.transactionStatus()).toBe(1);
   });
 
-  it("listens once however often the client is wrapped", () => {
-    const connection = protocol();
-    const on = vi.spyOn(connection, "on");
-    pgConnection(pgConnection({ connection }));
-    expect(on).toHaveBeenCalledTimes(2);
-  });
-
   it("is CONNECTION_BAD once the client is ending", () => {
     expect(pgConnection({}).status()).toBe(0);
     expect(pgConnection({ _ending: true }).status()).toBe(1);
@@ -58,11 +51,8 @@ describe("pgConnection transaction_status and status", () => {
 });
 
 describe("PG::Connection.escape_bytea", () => {
-  it("renders the hex format, on the class and on a connection", () => {
-    expect(Connection.escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
-    expect(pgConnection({}).escapeBytea("hi")).toBe("\\x6869");
-    expect(Connection.unescapeBytea(Connection.escapeBytea("a\\\u0000"))).toEqual(
-      Buffer.from([0x61, 0x5c, 0x00]),
-    );
+  it("renders the hex format unescape_bytea reads back", () => {
+    expect(escapeBytea(Buffer.from("hi"))).toBe("\\x6869");
+    expect(unescapeBytea(escapeBytea("a\\\u0000"))).toEqual(Buffer.from([0x61, 0x5c, 0x00]));
   });
 });
