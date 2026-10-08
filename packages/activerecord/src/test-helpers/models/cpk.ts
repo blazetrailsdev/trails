@@ -53,7 +53,7 @@ export class CpkBook extends Base {
       primaryKey: ["shop_id", "id"],
     });
     this.belongsTo("author", { className: "Cpk::Author" });
-    this.hasMany("chapters", { className: "Cpk::Chapter", foreignKey: ["author_id", "book_id"] });
+    this.hasMany("chapters", { foreignKey: ["author_id", "book_id"] });
     this.acceptsNestedAttributesFor("chapters");
     this.beforeDestroy(function (this: CpkBook) {
       if (this.failDestroy) kernelThrow(":abort");
@@ -134,7 +134,6 @@ export class CpkNullifiedBook extends CpkBook {
   }
   static {
     this.hasOne("chapter", {
-      className: "Cpk::Chapter",
       foreignKey: ["author_id", "book_id"],
       dependent: "nullify",
     });
@@ -194,7 +193,7 @@ export class CpkChapter extends Base {
 
   static {
     this._primaryKey = ["author_id", "id"];
-    this.belongsTo("book", { className: "Cpk::Book", foreignKey: ["author_id", "book_id"] });
+    this.belongsTo("book", { foreignKey: ["author_id", "book_id"] });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -243,16 +242,14 @@ export class CpkOrder extends Base {
     this._primaryKey = ["shop_id", "id"];
     this.aliasAttribute("id_value", "id");
     this.hasMany("orderAgreements", {
-      className: "Cpk::OrderAgreement",
       foreignKey: "order_id",
     });
-    this.hasMany("books", { className: "Cpk::Book", foreignKey: ["shop_id", "order_id"] });
-    this.hasOne("book", { className: "Cpk::Book", foreignKey: ["shop_id", "order_id"] });
+    this.hasMany("books", { foreignKey: ["shop_id", "order_id"] });
+    this.hasOne("book", { foreignKey: ["shop_id", "order_id"] });
     this.hasMany("orderTags", {
-      className: "Cpk::OrderTag",
       foreignKey: "order_id",
     });
-    this.hasMany("tags", { className: "Cpk::Tag", through: "orderTags" });
+    this.hasMany("tags", { through: "orderTags" });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -268,8 +265,8 @@ export class CpkBrokenOrder extends CpkOrder {
   }
   static {
     this._primaryKey = ["shop_id", "status"];
-    this.hasMany("books", { className: "Cpk::Book" });
-    this.hasOne("book", { className: "Cpk::Book" });
+    this.hasMany("books");
+    this.hasOne("book");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -285,8 +282,8 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
   }
   static {
     this._primaryKey = ["shop_id", "status"];
-    this.hasMany("books", { className: "Cpk::Book", foreignKey: ["shop_id", "status"] });
-    this.hasOne("book", { className: "Cpk::Book", foreignKey: ["shop_id", "status"] });
+    this.hasMany("books", { foreignKey: ["shop_id", "status"] });
+    this.hasOne("book", { foreignKey: ["shop_id", "status"] });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -327,7 +324,7 @@ export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
     rbModConstSet(Cpk, "OrderWithPrimaryKeyAssociatedBook", this);
   }
   static {
-    this.hasOne("book", { className: "Cpk::Book", foreignKey: "order_id" });
+    this.hasOne("book", { foreignKey: "order_id" });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -343,7 +340,6 @@ export class CpkOrderWithNullifiedBook extends CpkOrder {
   }
   static {
     this.hasOne("book", {
-      className: "Cpk::Book",
       foreignKey: ["shop_id", "order_id"],
       dependent: "nullify",
     });
@@ -362,7 +358,7 @@ export class CpkOrderWithSingularBookChapters extends CpkOrder {
     rbModConstSet(Cpk, "OrderWithSingularBookChapters", this);
   }
   static {
-    this.hasMany("chapters", { className: "Cpk::Chapter", through: "book" });
+    this.hasMany("chapters", { through: "book" });
   }
 }
 
@@ -377,7 +373,7 @@ export class CpkOrderAgreement extends Base {
   static _tableName = "cpk_order_agreements";
 
   static {
-    this.belongsTo("order", { className: "Cpk::Order" });
+    this.belongsTo("order");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -400,8 +396,8 @@ export class CpkOrderTag extends Base {
   static _primaryKey = ["order_id", "tag_id"];
 
   static {
-    this.belongsTo("tag", { className: "Cpk::Tag" });
-    this.belongsTo("order", { className: "Cpk::Order" });
+    this.belongsTo("tag");
+    this.belongsTo("order");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -423,8 +419,8 @@ export class CpkTag extends Base {
   static _tableName = "cpk_tags";
 
   static {
-    this.hasMany("orderTags", { className: "Cpk::OrderTag", foreignKey: "tag_id" });
-    this.hasMany("orders", { className: "Cpk::Order", through: "orderTags" });
+    this.hasMany("orderTags", { foreignKey: "tag_id" });
+    this.hasMany("orders", { through: "orderTags" });
   }
 }
 
@@ -516,7 +512,6 @@ export class CpkCar extends Base {
 
   static {
     this.hasMany("carReviews", {
-      className: "Cpk::CarReview",
       foreignKey: ["car_make", "car_model"],
     });
   }
@@ -535,7 +530,7 @@ export class CpkCarReview extends Base {
   }
 
   static {
-    this.belongsTo("car", { className: "Cpk::Car", foreignKey: ["car_make", "car_model"] });
+    this.belongsTo("car", { foreignKey: ["car_make", "car_model"] });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

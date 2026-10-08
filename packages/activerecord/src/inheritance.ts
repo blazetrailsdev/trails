@@ -36,6 +36,7 @@ export const Inheritance = {
  */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
+    autoloadModel(typeName);
     return constantize(typeName) as typeof Base;
   } else {
     const klass = baseClass as typeof Base & { _typeCandidatesCache: Map<string, string> };
