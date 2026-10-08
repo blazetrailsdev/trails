@@ -14,9 +14,11 @@ import {
   numericModulo,
   numericMul,
   numericPlus,
+  numericUminus,
   rbDbl2num,
   rbFloatTypeP,
   rbCNumeric,
+  rbEql,
   rbEqual,
   rbObjIsKindOf,
   rbObjClassname,
@@ -209,7 +211,7 @@ export class Duration {
     if (other instanceof Duration || other instanceof Scalar) {
       return this.plus(other.negate());
     }
-    return this.plus(numericMinus(0, other) as number);
+    return this.plus(numericUminus(other) as number);
   }
 
   times(other: Duration | Scalar | number): Duration {
@@ -241,7 +243,7 @@ export class Duration {
       );
     }
     if (other instanceof Duration) {
-      return this.value / other.value;
+      return numericDiv(this.value, other.value);
     }
     if (rbObjIsKindOf(other, rbCNumeric)) {
       return new Duration(
@@ -264,8 +266,8 @@ export class Duration {
 
   negate(): Duration {
     return new Duration(
-      numericMinus(0, this.value) as number,
-      this.transformValues((number) => numericMinus(0, number) as number),
+      numericUminus(this.value) as number,
+      this.transformValues((number) => numericUminus(number) as number),
       this._variable,
     );
   }
@@ -407,23 +409,22 @@ export class Duration {
 
   isEqualTo(other: Duration): boolean {
     for (const key of PARTS) {
-      if (this.parts[key] !== other.parts[key]) return false;
+      if (!rbEqual(this.parts[key], other.parts[key])) return false;
     }
     return true;
   }
 
   eql(other: unknown): boolean {
-    if (!(other instanceof Duration)) return false;
-    return Math.abs(this.inSeconds() - other.inSeconds()) < 0.001;
+    return other instanceof Duration && rbEql(other.value, this.value);
   }
 
   compareTo(other: Duration | number | unknown): number {
-    if (typeof other !== "number" && !(other instanceof Duration)) return NaN;
-    const a = this.inSeconds();
-    const b = typeof other === "number" ? other : other.inSeconds();
-    if (a < b) return -1;
-    if (a > b) return 1;
-    return 0;
+    if (other instanceof Duration) {
+      return cmp(this.value, other.value) as number;
+    } else if (rbObjIsKindOf(other, rbCNumeric)) {
+      return cmp(this.value, other) as number;
+    }
+    return NaN;
   }
 
   isA(klass: unknown): boolean {
@@ -736,7 +737,7 @@ export class Scalar {
       const seconds = numericMinus(this.value, other._parts().seconds ?? 0) as number;
       let newParts: Partial<DurationParts> = {};
       for (const [key, v] of Object.entries(other._parts())) {
-        newParts[key as keyof DurationParts] = numericMinus(0, v) as number;
+        newParts[key as keyof DurationParts] = numericUminus(v) as number;
       }
       newParts = { ...newParts, seconds };
       const newValue = numericMinus(this.value, other.value) as number;
@@ -748,7 +749,7 @@ export class Scalar {
   }
 
   negate(): Scalar {
-    return new Scalar(numericMinus(0, this.value) as number);
+    return new Scalar(numericUminus(this.value) as number);
   }
 
   compareTo(other: unknown): number | null {
@@ -785,7 +786,7 @@ export class Scalar {
   div(other: unknown): Scalar;
   div(other: unknown): Scalar | number {
     if (other instanceof Duration) {
-      return this.value / other.value;
+      return numericDiv(this.value, other.value);
     } else {
       return this.calculate("/", other);
     }
