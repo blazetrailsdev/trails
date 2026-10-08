@@ -190,9 +190,8 @@ it("reaper flushes idle connections after idle_timeout", async () => {
     await vi.advanceTimersByTimeAsync(10_000);
     expect(pool.stat().connections).toBe(0);
   } finally {
-    (Reaper as any)._timers.forEach((t: any) => clearInterval(t));
-    (Reaper as any)._timers.clear();
-    (Reaper as any)._pools.clear();
+    (Reaper as any).threads.clear();
+    (Reaper as any).pools.clear();
     vi.useRealTimers();
   }
 });
@@ -1059,12 +1058,15 @@ describe("execution context at Rails thread-spawn sites", () => {
 
   it("one reaper timer keeps one context; two frequencies get distinct ones", async () => {
     const seen = new Map<number, number[]>();
+    let stopped = false;
     const pools = [0.01, 0.02].map((frequency) => ({
       reap: async () => {
         const ids = seen.get(frequency) ?? [];
         ids.push(Thread.current().id);
         seen.set(frequency, ids);
       },
+      flush: async () => {},
+      isDiscarded: () => stopped,
     }));
     Reaper.registerPool(pools[0], 0.01);
     Reaper.registerPool(pools[1], 0.02);
@@ -1074,8 +1076,7 @@ describe("execution context at Rails thread-spawn sites", () => {
         expect(seen.get(0.02)?.length ?? 0).toBeGreaterThanOrEqual(2);
       });
     } finally {
-      (Reaper as any)._pools.delete(0.01);
-      (Reaper as any)._pools.delete(0.02);
+      stopped = true;
     }
     const [a1, a2] = seen.get(0.01)!;
     const [b1, b2] = seen.get(0.02)!;

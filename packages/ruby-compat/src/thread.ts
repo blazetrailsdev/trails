@@ -10,6 +10,7 @@ let _adapter: AsyncContextAdapter | null = null;
 let _threadIdCounter = 0;
 const _locations = new WeakMap<object, string>();
 const _locals = new WeakMap<object, Map<string, unknown>>();
+const _variables = new WeakMap<object, Map<string, unknown>>();
 
 function currentSlot(): AsyncContext<Thread> {
   const adapter = getAsyncContext();
@@ -172,6 +173,16 @@ export class Thread<R = unknown> {
     if (!locals) _locals.set(this, (locals = new Map()));
     locals.set(id, value);
     return value;
+  }
+
+  /**
+   * @noRailsEquivalent PERMANENT — Ruby core `Thread#thread_variable_set` (`vendor/ruby/v3.3.11/thread.c:3743`).
+   */
+  threadVariableSet(key: string, val: unknown): unknown {
+    let locals = _variables.get(this);
+    if (!locals) _variables.set(this, (locals = new Map()));
+    locals.set(isSymbol(key) ? symbolToS(key) : key, val);
+    return val;
   }
 
   /**

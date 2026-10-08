@@ -63,9 +63,8 @@ async function waitForConnIdle(conn: AbstractAdapter, timeout = 5): Promise<void
 }
 
 function clearReaperState() {
-  (Reaper as any)._timers.forEach((timer: any) => clearInterval(timer));
-  (Reaper as any)._timers.clear();
-  (Reaper as any)._pools.clear();
+  (Reaper as any).threads.clear();
+  (Reaper as any).pools.clear();
 }
 
 describe("ReaperTest", () => {
