@@ -10,6 +10,9 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
   cmp,
   equals as cmpEquals,
+  numericMinus,
+  numericMul,
+  numericPlus,
   rbEqual,
   rbObjClassname,
   rubyClass,
@@ -76,11 +79,11 @@ function mergeParts(
 ): Partial<DurationParts> {
   const result: Partial<DurationParts> = {};
   for (const key of aKeys) {
-    result[key] = a[key] + (b[key] ?? 0);
+    result[key] = numericPlus(a[key], b[key] ?? 0) as number;
   }
   for (const key of Object.keys(b) as (keyof DurationParts)[]) {
     if (PARTS.includes(key) && b[key] !== undefined && !aKeys.includes(key)) {
-      result[key] = a[key] + b[key];
+      result[key] = numericPlus(a[key], b[key]) as number;
     }
   }
   return result;
@@ -125,22 +128,22 @@ export class Duration {
     return new Duration(value, { seconds: value }, false);
   }
   static minutes(value: number): Duration {
-    return new Duration(value * SECONDS_PER_MINUTE, { minutes: value }, false);
+    return new Duration(numericMul(value, SECONDS_PER_MINUTE) as number, { minutes: value }, false);
   }
   static hours(value: number): Duration {
-    return new Duration(value * SECONDS_PER_HOUR, { hours: value }, false);
+    return new Duration(numericMul(value, SECONDS_PER_HOUR) as number, { hours: value }, false);
   }
   static days(value: number): Duration {
-    return new Duration(value * SECONDS_PER_DAY, { days: value }, true);
+    return new Duration(numericMul(value, SECONDS_PER_DAY) as number, { days: value }, true);
   }
   static weeks(value: number): Duration {
-    return new Duration(value * SECONDS_PER_WEEK, { weeks: value }, true);
+    return new Duration(numericMul(value, SECONDS_PER_WEEK) as number, { weeks: value }, true);
   }
   static months(value: number): Duration {
-    return new Duration(value * SECONDS_PER_MONTH, { months: value }, true);
+    return new Duration(numericMul(value, SECONDS_PER_MONTH) as number, { months: value }, true);
   }
   static years(value: number): Duration {
-    return new Duration(value * SECONDS_PER_YEAR, { years: value }, true);
+    return new Duration(numericMul(value, SECONDS_PER_YEAR) as number, { years: value }, true);
   }
 
   static second(n: number): Duration {
@@ -176,7 +179,7 @@ export class Duration {
   plus(other: Duration | Scalar | number): Duration {
     if (other instanceof Duration) {
       return new Duration(
-        this.value + other.value,
+        numericPlus(this.value, other.value) as number,
         mergeParts(this.parts, this._partKeys, other._parts()),
         this._variable || other._variable,
       );
@@ -253,8 +256,8 @@ export class Duration {
 
   negate(): Duration {
     return new Duration(
-      -this.value,
-      this.transformValues((number) => -number),
+      numericMinus(0, this.value) as number,
+      this.transformValues((number) => numericMinus(0, number) as number),
       this._variable,
     );
   }
@@ -384,7 +387,7 @@ export class Duration {
 
   equals(other: unknown): boolean {
     if (other instanceof Duration) {
-      return other.value === this.value;
+      return rbEqual(other.value, this.value);
     } else {
       return rbEqual(other, this.value);
     }

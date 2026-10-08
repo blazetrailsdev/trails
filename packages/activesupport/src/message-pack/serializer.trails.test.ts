@@ -34,6 +34,30 @@ describe("MessagePackSerializerTrailsTest", () => {
     ]);
   });
 
+  it("dumps a Duration built from a Float scalar with a float64 value", () => {
+    const serializer = new Serializer();
+    const negative = [
+      204, 128, 199, 25, 10, 203, 192, 181, 24, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 191,
+      248, 0, 0, 0, 0, 0, 0, 192, 192,
+    ];
+    expect([...serializer.dump(hours(1.5).negate())]).toEqual(negative);
+    expect([...serializer.dump(serializer.load(Uint8Array.from(negative)))]).toEqual(negative);
+
+    const whole = [
+      204, 128, 199, 25, 10, 203, 64, 188, 32, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 64, 0,
+      0, 0, 0, 0, 0, 0, 192, 192,
+    ];
+    expect([...serializer.dump(hours(new Number(2) as number))]).toEqual(whole);
+    expect([...serializer.dump(serializer.load(Uint8Array.from(whole)))]).toEqual(whole);
+
+    expect([...serializer.dump(hours(new Number(2) as number).plus(seconds(1)))]).toEqual([
+      204, 128, 199, 25, 10, 203, 64, 188, 33, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 64, 0,
+      0, 0, 0, 0, 0, 0, 192, 1,
+    ]);
+    expect(serializer.load(Uint8Array.from(negative))).toEqual(hours(1.5).negate());
+    expect(hours(1.5).negate().equals(seconds(-5400))).toBe(true);
+  });
+
   it("loads a Duration with the parts and variability it was dumped with", () => {
     const serializer = new Serializer();
     const roundtrip = (duration: Duration) =>
