@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 
 import { SingularAssociation } from "./singular-association.js";
 import { Base } from "../base.js";
@@ -52,6 +52,24 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
     const holder = child.association("compositePkParent");
     expect(holder.isLoaded()).toBe(true);
     expect(holder.target).toBe(parent);
+  });
+
+  it("reads the target PK from the held instance, not the registry", () => {
+    const child = new CpkSeedChild();
+    const parent = new CompositePkParent({ id: [1, 2] });
+
+    const holder = child.association("compositePkParent");
+
+    const spy = vi.spyOn(
+      holder.reflection as unknown as { computeClass(name: string): unknown },
+      "computeClass",
+    );
+    try {
+      holder.setTarget(parent);
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it("scalar FK + composite-PK target collapses to id component on assignment", async () => {
