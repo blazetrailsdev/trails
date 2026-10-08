@@ -119,7 +119,7 @@ export class MySQLDatabaseTasks {
       sslcapath: "--ssl-capath",
       sslcipher: "--ssl-cipher",
       sslkey: "--ssl-key",
-      ssl_mode: "--ssl-mode",
+      sslMode: "--ssl-mode",
     }).flatMap(([opt, arg]) => {
       const value = this.configurationHash[opt];
       return value != null && value !== false ? [`${arg}=${String(value)}`] : [];

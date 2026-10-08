@@ -215,8 +215,16 @@ describe("Relation#load_async", () => {
       length(): number | Promise<number>;
       map(fn: (topic: { title: string }) => string): string[] | Promise<string[]>;
       inspect(): string | Promise<string>;
+      0: unknown;
     };
 
+    const [length, titles] = await Promise.all([
+      relation.length(),
+      relation.map((topic) => topic.title),
+    ]);
+    expect(length).toBe(1);
+    expect(titles).toEqual(["delegated async topic"]);
+    expect(((await relation[0]) as { title: string }).title).toBe("delegated async topic");
     expect(await relation.length()).toBe(1);
     expect(await relation.map((topic) => topic.title)).toEqual(["delegated async topic"]);
     expect(await relation.inspect()).toContain("delegated async topic");
@@ -255,6 +263,25 @@ describe("Relation#load_async", () => {
     await Topic.all().loadAsync();
 
     expect((spy.mock.calls[0][3] as { async?: boolean }).async).toBe(false);
+  });
+
+  it("re-runs the query for a later reader when the foreground load rejected", async () => {
+    restoreExecutor?.();
+    restoreExecutor = undefined;
+    setAsyncQueryExecutor(null);
+    await Topic.create({ title: "rejected async topic", author_name: "David" });
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      selectAll: (...args: unknown[]) => unknown;
+    };
+    vi.spyOn(connection, "selectAll").mockRejectedValueOnce(new Error("boom"));
+
+    const relation = Topic.where({ title: "rejected async topic" }).loadAsync();
+
+    await expect(relation.records()).rejects.toThrow("boom");
+    expect((await relation.records()).map((topic) => topic.title)).toEqual([
+      "rejected async topic",
+    ]);
   });
   itIfSupports(
     "concurrent_connections",

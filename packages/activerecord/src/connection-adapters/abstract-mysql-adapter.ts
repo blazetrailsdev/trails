@@ -187,7 +187,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
       sslcapath: "--ssl-capath",
       sslcipher: "--ssl-cipher",
       sslkey: "--ssl-key",
-      ssl_mode: "--ssl-mode",
+      sslMode: "--ssl-mode",
     }).flatMap(([opt, arg]) =>
       rtest(mysqlConfig[opt]) ? [`${arg}=${String(mysqlConfig[opt])}`] : [],
     );

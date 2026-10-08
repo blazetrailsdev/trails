@@ -17,7 +17,6 @@ export class UrlConfig extends HashConfig {
 
     this.url = url;
     this._configurationHash = merge(this._configurationHash, this.buildUrlHash());
-    camelizeUrlKeys(this._configurationHash as Record<string, unknown>);
 
     if (this._configurationHash.schemaDump === "false") {
       this._configurationHash.schemaDump = false;
@@ -51,19 +50,6 @@ export class UrlConfig extends HashConfig {
 Object.defineProperty(UrlConfig, "name", {
   value: "ActiveRecord::DatabaseConfigurations::UrlConfig",
 });
-
-function camelizeUrlKeys(hash: Record<string, unknown>): void {
-  for (const [snake, camel] of [
-    ["schema_dump", "schemaDump"],
-    ["query_cache", "queryCache"],
-    ["database_tasks", "databaseTasks"],
-  ] as const) {
-    if (snake in hash) {
-      hash[camel] = hash[snake];
-      delete hash[snake];
-    }
-  }
-}
 
 /** @internal */
 export function toBooleanBang(configurationHash: Record<string, unknown>, key: string): void {

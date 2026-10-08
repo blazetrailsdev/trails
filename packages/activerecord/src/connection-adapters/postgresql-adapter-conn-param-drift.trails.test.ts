@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
 import { createRequire } from "module";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { UrlConfig } from "../database-configurations/url-config.js";
 
 const require = createRequire(import.meta.url);
 
@@ -73,5 +74,36 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
         `pg no longer reads "${key}": drop it from VALID_CONN_PARAM_KEYS (removed in pg@9)`,
       ).toBe(false);
     }
+  });
+
+  it("hands a URL query's driver keywords to pg under the names pg reads", () => {
+    const config = new UrlConfig(
+      "default_env",
+      "primary",
+      "postgres://localhost/foo?application_name=trails&statement_timeout=5000&reaping_frequency=2",
+    );
+    const sliced = (
+      PostgreSQLAdapter as unknown as {
+        _sliceValidConnParams(config: Record<string, unknown>): Record<string, unknown>;
+      }
+    )._sliceValidConnParams(config.configurationHash);
+    expect(sliced.application_name).toBe("trails");
+    expect(sliced.statement_timeout).toBe("5000");
+    expect(sliced).not.toHaveProperty("reaping_frequency");
+    expect(sliced).not.toHaveProperty("reapingFrequency");
+  });
+
+  it("prefers a keyword written in pg's spelling and drops keys pg does not read", () => {
+    const slice = (
+      PostgreSQLAdapter as unknown as {
+        _sliceValidConnParams(config: Record<string, unknown>): Record<string, unknown>;
+      }
+    )._sliceValidConnParams;
+    expect(
+      slice({ applicationName: "camel", application_name: "snake", schemaSearchPath: "public" }),
+    ).toEqual({ application_name: "snake" });
+    expect(
+      slice({ application_name: "snake", applicationName: "camel", schemaSearchPath: "public" }),
+    ).toEqual({ application_name: "snake" });
   });
 });

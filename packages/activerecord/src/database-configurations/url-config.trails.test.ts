@@ -34,4 +34,18 @@ describe("UrlConfig", () => {
     expect(mysql2.database).toBe("bar");
     expect(mysql2.configurationHash.database).toBe("bar");
   });
+
+  it("answers the pool readers from an underscored URL query", () => {
+    const config = new UrlConfig(
+      "default_env",
+      "primary",
+      "postgres://localhost/foo?reaping_frequency=2&idle_timeout=7&checkout_timeout=9&min_threads=1&max_threads=4",
+    );
+    expect(config.reapingFrequency).toBe(2);
+    expect(config.idleTimeout).toBe(7);
+    expect(config.checkoutTimeout).toBe(9);
+    expect(config.minThreads).toBe(1);
+    expect(config.maxThreads).toBe(4);
+    expect(config.maxQueue).toBe(16);
+  });
 });
