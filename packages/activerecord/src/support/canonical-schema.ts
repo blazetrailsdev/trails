@@ -1729,15 +1729,7 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
-  await define("clients", {}, (t) => {
-    t.string("name");
-  });
-
   await define("content_pages", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("firms", {}, (t) => {
     t.string("name");
   });
 

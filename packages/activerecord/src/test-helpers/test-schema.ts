@@ -1720,9 +1720,7 @@ export const TEST_SCHEMA: Schema = {
 
   catalog_categories: { name: "string" },
   catalog_products: { name: "string" },
-  clients: { name: "string" },
   content_pages: { name: "string" },
-  firms: { name: "string" },
   hot_accounts: { hot_owner_id: "integer" },
   orgs: {},
   orphans: { name: "string" },
