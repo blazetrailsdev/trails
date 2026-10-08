@@ -288,6 +288,20 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "pg",
+    origin: {
+      type: "git",
+      url: "https://github.com/ged/ruby-pg.git",
+      ref: "v1.5.9",
+    },
+    packages: [
+      {
+        name: "pg",
+        libPath: "lib/pg",
+      },
+    ],
+  },
+  {
     name: "sqlite3",
     origin: {
       type: "git",

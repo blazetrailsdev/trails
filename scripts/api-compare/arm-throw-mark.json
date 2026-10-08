@@ -60,6 +60,10 @@
     "total": 0,
     "byFile": {}
   },
+  "pg": {
+    "total": 0,
+    "byFile": {}
+  },
   "rack": {
     "total": 1,
     "byFile": {

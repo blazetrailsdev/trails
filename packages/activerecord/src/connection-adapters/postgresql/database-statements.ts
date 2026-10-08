@@ -1,6 +1,6 @@
 import type { PGTypeMapByOid } from "./pg-text-decoder.js";
 import type { PGResult } from "./pg-result.js";
-import type { PGConnection } from "./pg-connection.js";
+import type { PGConnection } from "../../pg/connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
 import { PreparedStatementCacheExpired, type SQLWarning } from "../../errors.js";
@@ -233,8 +233,8 @@ interface CancelAnyRunningQueryHost {
   /** @internal */
   _rawConnection: {
     transactionStatus(): number;
-    cancel(): Promise<void>;
-    block(): Promise<void>;
+    cancel(): Promise<string | null>;
+    block(): Promise<boolean>;
   } | null;
 }
 

@@ -11,6 +11,8 @@ import {
   rtest,
   RuntimeError,
   toI,
+  hasKey,
+  coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
 import { findJoinTableName, joinTableName } from "../../migration/join-table.js";
@@ -1120,7 +1122,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<boolean> {
-    if (!("name" in options) && !("expression" in options)) {
+    if (!hasKey(options, "name") && !hasKey(options, "expression")) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
@@ -1631,7 +1633,7 @@ export class SchemaStatements {
     const fk = await this.foreignKeyFor(fromTable, { toTable, ...options });
     if (!rtest(fk)) {
       throw new ArgumentError(
-        `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(symbolizeKeys(options))}`,
+        `Table '${fromTable}' has no foreign key for ${rtest(toTable) ? toTable : rbInspect(symbolizeKeys(options))}`,
       );
     }
     return fk;
@@ -1663,13 +1665,13 @@ export class SchemaStatements {
   /** @internal */
   checkConstraintName(
     tableName: string,
-    options: { name?: string; expression?: string } = {},
+    options: { name?: string; expression?: string | null } = {},
   ): string | undefined {
     return fetch<string | undefined>(
       options,
       "name",
       block(() => {
-        const expression = fetch<string | undefined>(symbolizeKeys(options), ":expression");
+        const expression = fetch<string | null>(symbolizeKeys(options), ":expression");
         const identifier = `${tableName}_${expression ?? ""}_chk`;
         const hashedIdentifier = first(OpenSSL.Digest.SHA256.hexdigest(identifier), 10);
         return `chk_rails_${hashedIdentifier}`;
@@ -1680,7 +1682,7 @@ export class SchemaStatements {
   /** @internal */
   async checkConstraintFor(
     tableName: string,
-    options: { name?: string; expression?: string; validate?: boolean } = {},
+    options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<CheckConstraintDefinition | undefined> {
     const adapter = this as any;
     if (
@@ -1691,18 +1693,23 @@ export class SchemaStatements {
     }
     const chkName = this.checkConstraintName(tableName, options);
     const constraints = await this.checkConstraints(tableName);
-    return constraints.find((chk) => chk.isDefinedFor({ name: chkName, ...options }));
+    return constraints.find((chk) =>
+      chk.isDefinedFor(coreHashMergeKwd({ name: chkName }, options)),
+    );
   }
 
   /** @internal */
   async checkConstraintForBang(
     tableName: string,
-    { expression, ...options }: { name?: string; expression?: string; validate?: boolean },
+    {
+      expression = null,
+      ...options
+    }: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<CheckConstraintDefinition> {
     const chk = await this.checkConstraintFor(tableName, { expression, ...options });
     if (!rtest(chk)) {
       throw new ArgumentError(
-        `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(symbolizeKeys(options))}`,
+        `Table '${tableName}' has no check constraint for ${rtest(expression) ? expression : rbInspect(symbolizeKeys(options))}`,
       );
     }
     return chk;

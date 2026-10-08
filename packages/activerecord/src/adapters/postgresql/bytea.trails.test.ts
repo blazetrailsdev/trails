@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it } from "vitest";
 import pg from "pg";
-import { pgConnection } from "../../connection-adapters/postgresql/pg-connection.js";
+import { pgConnection } from "../../pg/connection.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";

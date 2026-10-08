@@ -317,10 +317,12 @@ describe("Errors — trails-only coverage", () => {
       const source = new Errors({});
       source.add("name", ":invalid");
       const target = new Errors({});
-      expect(() => target.import(source.objects[0], { attribute: undefined })).toThrow(
+      expect(() => target.import(source.objects[0], { attribute: null as never })).toThrow(
         NoMethodError,
       );
-      expect(() => target.import(source.objects[0], { type: undefined })).toThrow(NoMethodError);
+      expect(() => target.import(source.objects[0], { type: null as never })).toThrow(
+        NoMethodError,
+      );
     });
 
     it("import accepts :attribute and :type override (rawType stays on inner)", () => {

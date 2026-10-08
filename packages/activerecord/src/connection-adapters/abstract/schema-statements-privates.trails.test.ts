@@ -222,12 +222,45 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.foreignKeyName("astronauts", {})).toThrow("key not found: :column");
   });
 
-  it("foreignKeyName returns an explicitly supplied nullish name instead of deriving", () => {
+  it("foreignKeyName derives the name for a name forwarded as undefined", () => {
     const ss = makeStatements();
-    expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(
-      undefined,
-    );
+    const derived = ss.foreignKeyName("astronauts", { column: "rocket_id" });
+    expect(ss.foreignKeyName("astronauts", { name: undefined, column: "rocket_id" })).toBe(derived);
     expect(ss.foreignKeyName("astronauts", { name: "", column: "rocket_id" })).toBe("");
+  });
+
+  it("addForeignKey and addCheckConstraint derive the name for a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    await ss.addForeignKey("astronauts", "rockets", { name: undefined });
+    await ss.addCheckConstraint("users", "age > 0", { name: undefined });
+    const sql = ((ss as any).execute as ReturnType<typeof vi.fn>).mock.calls.map(([s]) => s);
+    expect(sql[0]).toContain(ss.foreignKeyName("astronauts", { column: "rocket_id" }));
+    expect(sql[1]).toContain(ss.checkConstraintName("users", { expression: "age > 0" }));
+  });
+
+  it("foreignKeyFor ignores a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    const fk = new ForeignKeyDefinition("astronauts", "rockets", {
+      column: "rocket_id",
+      name: "fk_rails_78146ddd2e",
+    });
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+    expect(await ss.foreignKeyFor("astronauts", { name: undefined, column: "rocket_id" })).toBe(fk);
+  });
+
+  it("the ForBang messages take Ruby truthiness for the || operand", async () => {
+    const ss = makeStatements();
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([]);
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([]);
+    await expect(
+      ss.foreignKeyForBang("astronauts", { toTable: false as never, column: "rocket_id" }),
+    ).rejects.toThrow("Table 'astronauts' has no foreign key for {:column=>\"rocket_id\"}");
+    await expect(
+      ss.checkConstraintForBang("users", { expression: false as never, name: "chk" }),
+    ).rejects.toThrow("Table 'users' has no check constraint for {:name=>\"chk\"}");
+    await expect(
+      ss.checkConstraintForBang("users", { expression: "", name: "chk" }),
+    ).rejects.toThrow("Table 'users' has no check constraint for ");
   });
 
   it("checkConstraintName", () => {
@@ -240,18 +273,18 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
 
-  it("checkConstraintName returns an explicitly supplied nullish name instead of deriving", () => {
+  it("checkConstraintName derives the name for a name forwarded as undefined", () => {
     const ss = makeStatements();
+    const derived = ss.checkConstraintName("users", { expression: "age > 0" });
+    expect(derived).toMatch(/^chk_rails_[0-9a-f]{10}$/);
     expect(ss.checkConstraintName("users", { name: undefined, expression: "age > 0" })).toBe(
-      undefined,
+      derived,
     );
     expect(ss.checkConstraintName("users", { name: "", expression: "age > 0" })).toBe("");
-    expect(ss.checkConstraintName("users", { expression: "age > 0" })).toMatch(
-      /^chk_rails_[0-9a-f]{10}$/,
-    );
-    expect(ss.checkConstraintName("users", { expression: undefined })).toBe(
+    expect(ss.checkConstraintName("users", { expression: null })).toBe(
       ss.checkConstraintName("users", { expression: "" }),
     );
+    expect(() => ss.checkConstraintName("users", { expression: undefined })).toThrow(KeyError);
     expect(() => ss.checkConstraintName("users", {})).toThrow(KeyError);
     expect(() => ss.checkConstraintName("users", {})).toThrow("key not found: :expression");
   });
@@ -261,9 +294,17 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.checkConstraintOptions("users", "age > 0", {})).toEqual({
       name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
-    expect(ss.checkConstraintOptions("users", "age > 0", { name: undefined })).toEqual({
-      name: undefined,
+  });
+
+  it("checkConstraintFor derives the name for a name forwarded as undefined", async () => {
+    const ss = makeStatements();
+    const chk = new CheckConstraintDefinition("users", "age > 0", {
+      name: ss.checkConstraintName("users", { expression: "age > 0" }),
     });
+    vi.spyOn(ss, "checkConstraints").mockResolvedValue([chk]);
+    expect(await ss.checkConstraintFor("users", { name: undefined, expression: "age > 0" })).toBe(
+      chk,
+    );
   });
 
   it("checkConstraintExists guards on key presence, not truthiness", async () => {
@@ -310,7 +351,7 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect((ss as any).execute).toHaveBeenCalled();
   });
 
-  it("checkConstraintExists returns false when an explicit undefined name is supplied", async () => {
+  it("checkConstraintExists derives the name for a name forwarded as undefined", async () => {
     const ss = makeStatements();
     const name = ss.checkConstraintName("users", { expression: "age > 0" })!;
     vi.spyOn(ss, "checkConstraints").mockResolvedValue([
@@ -318,7 +359,10 @@ describe("SchemaStatements privates (PR 8)", () => {
     ]);
     expect(
       await ss.checkConstraintExists("users", { name: undefined, expression: "age > 0" }),
-    ).toBe(false);
+    ).toBe(true);
+    await expect(ss.checkConstraintExists("users", { name: undefined })).rejects.toThrow(
+      "At least one of :name or :expression must be supplied",
+    );
   });
 
   it("addColumns raises ArgumentError without the type keyword", async () => {

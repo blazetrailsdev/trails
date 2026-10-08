@@ -64,7 +64,7 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { pgConnection, type PGConnection } from "./postgresql/pg-connection.js";
+import { pgConnection, type PGConnection } from "../pg/connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -145,19 +145,11 @@ const LOCK_NOT_AVAILABLE = "55P03";
 const QUERY_CANCELED = "57014";
 
 const PQTRANS_IDLE = 0;
-const PQTRANS_ACTIVE = 1;
 const PQTRANS_INTRANS = 2;
 const PQTRANS_INERROR = 3;
 
 const CONNECTION_OK = 0;
-const CONNECTION_BAD = 1;
 
-type RawConnection = PGConnection & {
-  transactionStatus(): number;
-  status(): number;
-  cancel(): Promise<void>;
-  block(): Promise<void>;
-};
 const FEATURE_NOT_SUPPORTED = "0A000";
 import {
   buildTruncateStatements as pgBuildTruncateStatements,
@@ -559,8 +551,7 @@ export class PostgreSQLAdapter
     );
     if (deprecatedRawConnection) {
       deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
-      this._acceptDeprecatedRawConnection(config);
-      this._attachReadyForQueryListener(config as pg.Client);
+      this._acceptDeprecatedRawConnection(pgConnection(config as pg.Client));
       return;
     }
     if (typeof config === "string") {
@@ -1509,11 +1500,11 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  get _rawConnection(): RawConnection | null {
-    return this._connection as RawConnection | null;
+  get _rawConnection(): PGConnection | null {
+    return this._connection as PGConnection | null;
   }
   /** @internal */
-  set _rawConnection(value: RawConnection | null) {
+  set _rawConnection(value: PGConnection | null) {
     this._connection = value && pgConnection(value);
   }
 
@@ -1608,8 +1599,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         client = this._rawConnection!;
       } else {
         newClient.on("error", () => {});
-        this._attachReadyForQueryListener(newClient);
-        this._rawConnection = newClient as RawConnection;
+        this._rawConnection = newClient as PGConnection;
         client = newClient;
       }
     }
@@ -1651,88 +1641,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         ? (err as { message: string }).message
         : "";
     return msg.includes("client has already ended") || /client was closed/i.test(msg);
-  }
-
-  /** @internal */
-  private _attachReadyForQueryListener(client: pg.Client): void {
-    let readyForQueryStatus = "I";
-    (client as RawConnection).transactionStatus = (): number => {
-      if ((client as pg.Client & { _activeQuery?: unknown })._activeQuery != null)
-        return PQTRANS_ACTIVE;
-      switch (readyForQueryStatus) {
-        case "T":
-          return PQTRANS_INTRANS;
-        case "E":
-          return PQTRANS_INERROR;
-        default:
-          return PQTRANS_IDLE;
-      }
-    };
-    (client as RawConnection).status = (): number => {
-      const { _ending, _ended } = client as PgClientLiveness;
-      return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
-    };
-    (client as RawConnection).cancel = () => this._cancel(client);
-    (client as RawConnection).block = () => this._blockUntilCommandSettles(client);
-    const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
-    if (connection == null) return;
-    connection.on("readyForQuery", (message: { status?: string }) => {
-      if (typeof message?.status === "string") readyForQueryStatus = message.status;
-    });
-    connection.on("errorMessage", () => {
-      if (readyForQueryStatus === "T") readyForQueryStatus = "E";
-    });
-  }
-
-  private _cancel(client: pg.Client): Promise<void> {
-    type PgClientWithPid = pg.Client & {
-      processID?: number | null;
-      secretKey?: number | null;
-    };
-    type PgConnectionWithCancel = pg.Connection & {
-      connect(portOrPath: string | number, host?: string): void;
-      cancel(processID: number, secretKey: number): void;
-    };
-    const txClient = client as PgClientWithPid;
-    if (txClient.processID == null) return Promise.resolve();
-    return new Promise<void>((resolve, reject) => {
-      const cancelCon = new pg.Connection() as PgConnectionWithCancel;
-      cancelCon.on("error", (error: unknown) => reject(error));
-      cancelCon.on("end", () => resolve());
-      cancelCon.once("connect", () => {
-        cancelCon.cancel(txClient.processID!, txClient.secretKey ?? 0);
-      });
-      const { host, port } = txClient;
-      if (host?.startsWith("/")) {
-        cancelCon.connect(`${host}/.s.PGSQL.${port}`);
-      } else {
-        cancelCon.connect(port, host);
-      }
-    });
-  }
-
-  /** @internal */
-  private _blockUntilCommandSettles(client: pg.Client): Promise<void> {
-    if ((client as pg.Client & { _activeQuery?: unknown })._activeQuery == null) {
-      return Promise.resolve();
-    }
-    const connection = (client as pg.Client & { connection?: pg.Connection }).connection;
-    if (connection == null) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const settle = (): void => {
-        connection.off("readyForQuery", settle);
-        connection.off("commandComplete", settle);
-        connection.off("errorMessage", settle);
-        connection.off("end", settle);
-        connection.off("error", settle);
-        resolve();
-      };
-      connection.on("readyForQuery", settle);
-      connection.on("commandComplete", settle);
-      connection.on("errorMessage", settle);
-      connection.on("end", settle);
-      connection.on("error", settle);
-    });
   }
 
   /** @internal */

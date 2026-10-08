@@ -451,16 +451,14 @@ describeIfPg("PostgreSQLAdapter", () => {
         await new Promise<void>((r) => setTimeout(r, 200));
         expect(other._rawConnection!.transactionStatus()).toBe(PQTRANS_ACTIVE);
 
-        const internals = other as unknown as {
-          cancelAnyRunningQuery(): Promise<void>;
-          _blockUntilCommandSettles(client: unknown): Promise<void>;
-        };
-        const blockUntilCommandSettles = internals._blockUntilCommandSettles.bind(other);
+        const internals = other as unknown as { cancelAnyRunningQuery(): Promise<void> };
+        const rawConnection = other._rawConnection!;
+        const block = rawConnection.block.bind(rawConnection);
         let releaseBlock!: () => void;
         const blocked = new Promise<void>((r) => (releaseBlock = r));
-        internals._blockUntilCommandSettles = async (client: unknown): Promise<void> => {
+        rawConnection.block = async (): Promise<boolean> => {
           await blocked;
-          await blockUntilCommandSettles(client);
+          return block();
         };
 
         let cancelReturned = false;

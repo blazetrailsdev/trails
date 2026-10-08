@@ -3,7 +3,7 @@ import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { PGTextDecoder, PGTypeMapByOid } from "./pg-text-decoder.js";
-import { pgConnection } from "./pg-connection.js";
+import { pgConnection } from "../../pg/connection.js";
 
 const OID_DATE = 1082;
 const OID_TIMESTAMP = 1114;

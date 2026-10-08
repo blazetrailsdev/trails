@@ -11,7 +11,7 @@ import { PoolConfig } from "./pool-config.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
-import { pgConnection } from "./postgresql/pg-connection.js";
+import { pgConnection } from "../pg/connection.js";
 
 const UUID_OID = 2950;
 

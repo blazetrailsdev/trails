@@ -15,7 +15,7 @@ import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
 import { Utils } from "./utils.js";
-import type { PGConnection } from "./pg-connection.js";
+import { escapeBytea as pgEscapeBytea, type PGConnection } from "../../pg/connection.js";
 import { format, rbFSend, toS, rbObjRespondTo, Range, Rational } from "@blazetrails/ruby-compat";
 import { raiseIntWiderThan64bit } from "../../active-record.js";
 
@@ -47,9 +47,10 @@ export interface CastTypeLookupHost {
 const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
 const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
-export function escapeBytea(value: Buffer | Uint8Array | string): string {
-  const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
-  return `\\x${buffer.toString("hex")}`;
+export function escapeBytea(
+  value: Buffer | Uint8Array | string | null | undefined,
+): string | undefined {
+  if (value != null) return pgEscapeBytea(value);
 }
 
 export async function unescapeBytea(

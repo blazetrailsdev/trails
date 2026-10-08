@@ -1,6 +1,6 @@
 import type pg from "pg";
-import { PGResult } from "./pg-result.js";
-import { PGTypeMapByOid } from "./pg-text-decoder.js";
+import { PGResult } from "../connection-adapters/postgresql/pg-result.js";
+import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
 
 export interface PGConnection extends pg.Client {
   prepare(stmtName: string, sql: string): Promise<void>;
@@ -8,6 +8,11 @@ export interface PGConnection extends pg.Client {
   asyncExec(sql: string | null): Promise<PGResult>;
   execParams(sql: string | null, params: unknown[]): Promise<PGResult>;
   unescapeBytea(value: string | Uint8Array): Buffer;
+  transactionStatus(): number;
+  status(): number;
+  cancel(): Promise<string | null>;
+  asyncCancel(): Promise<string | null>;
+  block(timeout?: number | null): Promise<boolean>;
   socketIo(): { reopen(path: string): void } | null;
   typeMapForResults: PGTypeMapByOid;
 }
@@ -46,6 +51,47 @@ function types(client: pg.Client): { getTypeParser(oid: number, format?: string)
 }
 
 const PREPARED = new WeakMap<object, Map<string, string>>();
+const READY_FOR_QUERY = new WeakMap<object, string>();
+
+const PQTRANS_IDLE = 0;
+const PQTRANS_ACTIVE = 1;
+const PQTRANS_INTRANS = 2;
+const PQTRANS_INERROR = 3;
+
+const CONNECTION_OK = 0;
+const CONNECTION_BAD = 1;
+
+type Protocol = pg.Connection & {
+  connect(portOrPath: string | number, host?: string): void;
+  cancel(processID: number, secretKey: number): void;
+};
+type Client = Omit<pg.Client, "connection"> & {
+  connection?: Protocol;
+  processID?: number | null;
+  secretKey?: number | null;
+  _activeQuery?: unknown;
+  _ending?: boolean;
+  _ended?: boolean;
+};
+
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
+export function status(this: pg.Client): number {
+  const { _ending, _ended } = this as Client;
+  return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
+}
+
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
+export function transactionStatus(this: pg.Client): number {
+  if ((this as Client)._activeQuery != null) return PQTRANS_ACTIVE;
+  switch (READY_FOR_QUERY.get(this)) {
+    case "T":
+      return PQTRANS_INTRANS;
+    case "E":
+      return PQTRANS_INERROR;
+    default:
+      return PQTRANS_IDLE;
+  }
+}
 
 function prepare(this: pg.Client, stmtName: string, sql: string): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -113,7 +159,13 @@ function result(raw: pg.QueryResult | pg.QueryResult[]): PGResult {
   return new PGResult(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
-/** @noRailsEquivalent CONVERGEABLE pg-gem-connection-surface-scores-against-the-pg-gem */
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
+export function escapeBytea(value: Buffer | Uint8Array | string): string {
+  const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
+  return `\\x${buffer.toString("hex")}`;
+}
+
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function unescapeBytea(value: string | Uint8Array): Buffer {
   if (typeof value !== "string") value = Buffer.from(value).toString("latin1");
   if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
@@ -158,8 +210,62 @@ function socketIo(this: pg.Client): { reopen(path: string): void } | null {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE pg-gem-connection-surface-scores-against-the-pg-gem */
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
+export function block(this: pg.Client, timeout: number | null = null): Promise<boolean> {
+  if ((this as Client)._activeQuery == null) return Promise.resolve(true);
+  const connection = (this as Client).connection;
+  if (connection == null) return Promise.resolve(true);
+  return new Promise<boolean>((resolve) => {
+    const events = ["readyForQuery", "commandComplete", "errorMessage", "end", "error"];
+    const done = (ret: boolean): void => {
+      clearTimeout(timer);
+      for (const event of events) connection.off(event, settle);
+      resolve(ret);
+    };
+    const settle = (): void => done(true);
+    const timer = timeout == null ? undefined : setTimeout(() => done(false), timeout * 1000);
+    for (const event of events) connection.on(event, settle);
+  });
+}
+
+/**
+ * @missingRailsArgs connect — PERMANENT
+ * @missingRailsArgs new — PERMANENT
+ */
+export async function cancel(this: pg.Client): Promise<string | null> {
+  const { processID: bePid, secretKey: beKey, connection } = this as Client;
+  return new Promise<string | null>((resolve) => {
+    const cl = new (connection!.constructor as new () => Protocol)();
+    cl.on("error", (err: unknown) => resolve(String(err)));
+    cl.on("end", () => resolve(null));
+    cl.once("connect", () => {
+      cl.cancel(bePid!, beKey!);
+    });
+    const { host, port } = this;
+    if (host?.startsWith("/")) {
+      cl.connect(`${host}/.s.PGSQL.${port}`);
+    } else {
+      cl.connect(port, host);
+    }
+  });
+}
+
+export const asyncCancel = cancel;
+
+/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function pgConnection<T extends object>(client: T): T & PGConnection {
+  if (!READY_FOR_QUERY.has(client)) {
+    READY_FOR_QUERY.set(client, "I");
+    const connection = (client as unknown as Client).connection;
+    if (typeof connection?.on === "function") {
+      connection.on("readyForQuery", (message: { status?: string }) => {
+        if (typeof message?.status === "string") READY_FOR_QUERY.set(client, message.status);
+      });
+      connection.on("errorMessage", () => {
+        if (READY_FOR_QUERY.get(client) === "T") READY_FOR_QUERY.set(client, "E");
+      });
+    }
+  }
   return Object.defineProperty(
     Object.assign(client, {
       prepare,
@@ -168,6 +274,11 @@ export function pgConnection<T extends object>(client: T): T & PGConnection {
       execParams,
       unescapeBytea,
       socketIo,
+      transactionStatus,
+      status,
+      cancel,
+      asyncCancel,
+      block,
     }),
     "typeMapForResults",
     typeMapForResults,

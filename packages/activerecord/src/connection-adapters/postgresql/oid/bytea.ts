@@ -1,6 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { BinaryType, BinaryData } from "@blazetrails/activemodel";
-import { unescapeBytea } from "../pg-connection.js";
+import { unescapeBytea } from "../../../pg/connection.js";
 
 export class Bytea extends BinaryType {
   override deserialize(value: unknown): unknown {

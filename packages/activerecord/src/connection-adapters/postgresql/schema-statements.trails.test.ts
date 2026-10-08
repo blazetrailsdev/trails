@@ -5,7 +5,11 @@ import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { PostgreSQLAdapter } from "../postgresql-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
-import { Table as PgTable } from "./schema-definitions.js";
+import {
+  ExclusionConstraintDefinition,
+  Table as PgTable,
+  UniqueConstraintDefinition,
+} from "./schema-definitions.js";
 import { Name } from "./utils.js";
 import { describeIfPg, PG_TEST_URL } from "../../support/describe-if-pg.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
@@ -705,16 +709,65 @@ describe("SchemaStatements constraint name digests", () => {
     );
   });
 
-  it("derives the name when the name option is forwarded as undefined", () => {
+  it("derives the name when the name option is forwarded as undefined", async () => {
     const ss = withSchemaStatements(makeAdapter().adapter);
+    const execute = vi.fn(async (_sql: string) => []);
+    Object.assign(ss, { execute });
+    await ss.addExclusionConstraint("invoices", "daterange(start_date, end_date) WITH &&", {
+      name: undefined,
+      using: undefined,
+      where: undefined,
+      deferrable: undefined,
+    });
+    await ss.addUniqueConstraint("sections", ["position"], {
+      name: undefined,
+      usingIndex: undefined,
+      deferrable: undefined,
+    });
+    expect(execute.mock.calls.map(([sql]) => sql)).toEqual([
+      'ALTER TABLE "invoices" ADD CONSTRAINT "excl_rails_74c9160f55" EXCLUDE (daterange(start_date, end_date) WITH &&)',
+      'ALTER TABLE "sections" ADD CONSTRAINT "uniq_rails_1e07660b77" UNIQUE ("position")',
+    ]);
     expect(
-      ss.exclusionConstraintOptions("invoices", "daterange(start_date, end_date) WITH &&", {
+      ss.exclusionConstraintName("invoices", {
         name: undefined,
-      }).name,
+        expression: "daterange(start_date, end_date) WITH &&",
+      }),
     ).toBe("excl_rails_74c9160f55");
-    expect(ss.uniqueConstraintOptions("sections", ["position"], { name: undefined }).name).toBe(
+    expect(ss.uniqueConstraintName("sections", { name: undefined, column: ["position"] })).toBe(
       "uniq_rails_1e07660b77",
     );
+  });
+
+  it("looks a constraint up by the derived name when the name option is forwarded as undefined", async () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    const excl = new ExclusionConstraintDefinition("invoices", "x WITH &&", {
+      name: "excl_rails_74c9160f55",
+    });
+    const uniq = new UniqueConstraintDefinition("sections", ["position"], {
+      name: "uniq_rails_79b901ffb4",
+    });
+    const other = new UniqueConstraintDefinition("sections", ["title"], { name: "other" });
+    vi.spyOn(ss, "exclusionConstraints").mockResolvedValue([excl]);
+    vi.spyOn(ss, "uniqueConstraints").mockResolvedValue([other, uniq]);
+    expect(
+      await ss.exclusionConstraintFor("invoices", {
+        name: undefined,
+        expression: "daterange(start_date, end_date) WITH &&",
+      }),
+    ).toBe(excl);
+    expect(
+      await ss.uniqueConstraintFor("sections", { name: undefined, usingIndex: "unique_index" }),
+    ).toBe(uniq);
+    expect(await ss.uniqueConstraintFor("sections", { name: "other", column: null })).toBe(other);
+  });
+
+  it("names the options in the exclusion ForBang message when expression is false", async () => {
+    const ss = withSchemaStatements(makeAdapter().adapter);
+    vi.spyOn(ss, "exclusionConstraints").mockResolvedValue([]);
+    await expect(
+      ss.exclusionConstraintForBang("invoices", { expression: false, name: "excl" }),
+    ).rejects.toThrow("Table 'invoices' has no exclusion constraint for {:name=>\"excl\"}");
   });
 
   it("raises KeyError naming the :expression key when neither name nor expression is given", () => {

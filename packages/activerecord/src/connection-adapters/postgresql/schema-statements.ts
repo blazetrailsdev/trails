@@ -2,7 +2,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { type ArelNode } from "@blazetrails/arel";
 import {
   any,
-  compact,
   compactBlank,
   first,
   isPlainObject,
@@ -22,6 +21,8 @@ import {
   stringDelete,
   toS,
   valuesAt,
+  hasKey,
+  coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
 import type { CommentOrChanges } from "../abstract/schema-statements.js";
@@ -1044,7 +1045,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(await this.schemaCreation.accept(at));
   }
 
-  /** @inventedArm compact — PERMANENT */
   exclusionConstraintOptions(
     tableName: string,
     expression: string,
@@ -1052,7 +1052,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
   ): Record<string, unknown> {
     this.assertValidDeferrable(options.deferrable);
 
-    options = compact({ ...options });
+    options = { ...options };
     options.name ||= this.exclusionConstraintName(tableName, { expression, ...options });
     return options;
   }
@@ -1084,7 +1084,6 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.execute(await this.schemaCreation.accept(at));
   }
 
-  /** @inventedArm compact — PERMANENT */
   uniqueConstraintOptions(
     tableName: string,
     columnName: string | string[] | null | undefined,
@@ -1095,7 +1094,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       throw new ArgumentError("Cannot specify both column_name and :using_index options.");
     }
 
-    options = compact({ ...options });
+    options = { ...options };
     options.name ||= this.uniqueConstraintName(tableName, { column: columnName, ...options });
     return options;
   }
@@ -1494,7 +1493,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     const excl = await this.exclusionConstraintFor(tableName, { expression, ...options });
     if (!rtest(excl)) {
       throw new ArgumentError(
-        `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(expression ?? symbolizeKeys(options))}`,
+        `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(rtest(expression) ? expression : symbolizeKeys(options))}`,
       );
     }
     return excl;
@@ -1520,9 +1519,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
+    const name = hasKey(options, "column")
+      ? undefined
+      : this.uniqueConstraintName(tableName, options);
     const constraints = await this.uniqueConstraints(tableName);
-    return constraints.find((c) => c.definedFor({ name, ...options }));
+    return constraints.find((c) => c.definedFor(coreHashMergeKwd({ name }, options)));
   }
 
   /**

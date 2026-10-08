@@ -6,7 +6,7 @@ import {
   parsePostgresDate,
   timeFromInstant,
 } from "../abstract/temporal-wire.js";
-import { unescapeBytea } from "./pg-connection.js";
+import { unescapeBytea } from "../../pg/connection.js";
 
 /** @noRailsEquivalent CONVERGEABLE pg-gem-result-and-array-coders-score-against-the-pg-gem */
 export abstract class PGSimpleDecoder {

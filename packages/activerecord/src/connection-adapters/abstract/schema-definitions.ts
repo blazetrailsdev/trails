@@ -201,10 +201,7 @@ export class ForeignKeyDefinition {
     validate = null,
     ...options
   }: ForeignKeyLookupOptions = {}): boolean {
-    const slice: Record<string, unknown> = {};
-    for (const k of Object.keys(this.options)) {
-      if (k in options) slice[k] = (options as Record<string, unknown>)[k];
-    }
+    const sliced = slice(options as Record<string, unknown>, ...Object.keys(this.options));
 
     const toStrings = (c: unknown): string[] =>
       c === undefined || c === null ? [] : Array.isArray(c) ? c.map(String) : [String(c)];
@@ -212,7 +209,7 @@ export class ForeignKeyDefinition {
     return (
       (toTable == null || toTable.toString() === this.toTable) &&
       (validate == null || validate === fetch(this.options, "validate", validate)) &&
-      Object.entries(slice).every(([k, v]) => {
+      Object.entries(sliced).every(([k, v]) => {
         const mine = toStrings((this.options as Record<string, unknown>)[k]);
         const theirs = toStrings(v);
         return mine.length === theirs.length && mine.every((x, i) => x === theirs[i]);
@@ -264,7 +261,7 @@ export class CheckConstraintDefinition {
 
   isDefinedFor(options: {
     name: string | null | undefined;
-    expression?: string;
+    expression?: string | null;
     validate?: boolean | null;
     [key: string]: unknown;
   }): boolean {
