@@ -27,7 +27,7 @@ import {
   isPresent,
   toXmlArray,
 } from "@blazetrails/activesupport";
-import { pp } from "./pretty-print.js";
+import { PP } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
@@ -2635,7 +2635,7 @@ describe("RelationTest", () => {
   it("relations limit the records in #pretty_print at 10", async () => {
     const relation = Post.limit(11);
     const out: string[] = [];
-    await pp(relation, { write: (str) => out.push(str) });
+    await PP.pp(relation, { write: (str) => out.push(str) });
     const string = out.join("");
     expect([...string.matchAll(/#<\w*Post:/g)].length).toBe(10);
     assertPredicate(string, (s) => s.endsWith('"..."]\n'), "Did not end with an ellipsis.");
@@ -2643,13 +2643,13 @@ describe("RelationTest", () => {
 
   it("relations don't load all records in #pretty_print", async () => {
     await assertQueriesMatch(/LIMIT|ROWNUM <=|FETCH FIRST/, undefined, false, async () => {
-      await pp(Post.all(), { write: () => {} });
+      await PP.pp(Post.all(), { write: () => {} });
     });
   });
 
   it("loading query is annotated in #pretty_print", async () => {
     await assertQueriesMatch(/\/\* loading for pp \*\//, undefined, false, async () => {
-      await pp(Post.all(), { write: () => {} });
+      await PP.pp(Post.all(), { write: () => {} });
     });
   });
 
@@ -2658,7 +2658,7 @@ describe("RelationTest", () => {
     await relation;
 
     await assertNoQueries(false, async () => {
-      await pp(relation, { write: () => {} });
+      await PP.pp(relation, { write: () => {} });
     });
   });
 

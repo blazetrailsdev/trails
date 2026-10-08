@@ -77,7 +77,7 @@ import {
 import { Explain } from "./explain.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import type { PrettyPrinter } from "./pretty-print.js";
+import type { PP } from "@blazetrails/ruby-compat";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredIdsIn,
@@ -412,7 +412,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     ).then(inspectEntries);
   }
 
-  async prettyPrint(pp: PrettyPrinter): Promise<void> {
+  async prettyPrint(pp: PP): Promise<void> {
     const subject = this.isLoaded ? await this.records() : this.annotate("loading for pp");
     const entries = (
       Array.isArray(subject)

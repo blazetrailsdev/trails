@@ -5,6 +5,7 @@ import {
   Fiber,
   isMonOwned,
   Mutex,
+  rbDefineInspectCustom,
   rbObjDup,
   rtest,
   RuntimeError,
@@ -268,11 +269,6 @@ export class ConnectionPool implements ReapablePool {
     this._lazyLoadPromise = null;
     this._eagerWarmTriggered = false;
     this._eagerWarmPromise = null;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
   }
 
   serverVersion(connection: DatabaseAdapter): unknown {
@@ -818,6 +814,8 @@ export class ConnectionPool implements ReapablePool {
   private adoptConnection = adoptConnection;
   private checkoutNewConnection = checkoutNewConnection;
 }
+
+rbDefineInspectCustom(ConnectionPool);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
 export interface ConnectionPool

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { formatForInspect } from "./attribute-methods.js";
 
-import { pp } from "./pretty-print.js";
+import { PP } from "@blazetrails/ruby-compat";
 import { fixtures } from "./test-fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { LoosePerson } from "./test-helpers/models/person.js";
@@ -126,7 +126,7 @@ describe("CoreTest", () => {
 
   async function ppString(obj: unknown): Promise<string> {
     let out = "";
-    await pp(obj, { write: (s: string) => (out += s) });
+    await PP.pp(obj, { write: (s: string) => (out += s) });
     return out;
   }
 

@@ -1,9 +1,5 @@
-/** @noRailsEquivalent CONVERGEABLE pp-is-kernel-pp-in-ruby-compat-not-an-activerecord-export MOVED-BY-SHORT-NAME: pp. */
-
 export { Base } from "./base.js";
 export type { PrimaryKeyScalar, PrimaryKeyValue } from "./base.js";
-export { pp } from "./pretty-print.js";
-export type { PrettyPrinter, PPSink } from "./pretty-print.js";
 export { Result, IndexedRow } from "./result.js";
 export { FutureResult } from "./future-result.js";
 export { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
