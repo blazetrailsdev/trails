@@ -4522,6 +4522,7 @@ describe("Ruby extractor C extension tables", { timeout: RUBY_SUBPROCESS_TIMEOUT
         out = {}
         ex.classes.merge(ex.modules).each do |fqn, info|
           out[fqn] = "#{info[:file]} < #{info[:superclass]}"
+          out["#{fqn}::"] = (ex.file_constants[info[:file]] || {}).keys.join(",")
           sig = ->(m) { "(#{m[:params].map { |p| p[:kind] == "rest" ? "*" : p[:name] }.join(", ")})" }
           info[:instanceMethods].each { |m| out["#{fqn}##{m[:name]}"] = sig.(m) }
           info[:classMethods].each { |m| out["#{fqn}.#{m[:name]}"] = sig.(m) }
@@ -4555,6 +4556,7 @@ describe("Ruby extractor C extension tables", { timeout: RUBY_SUBPROCESS_TIMEOUT
       '\trb_define_singleton_method(rb_cPGresult, "res_status", pgresult_s_res_status, 1);',
       '\trb_define_alias(rb_cPGresult, "fetch", "getvalue");',
       '\trb_define_attr(rb_cPGresult, "name", 1, 1);',
+      '\trb_define_const(rb_cPGresult, "PGRES_OK", INT2FIX(1));',
       "}",
     ].join("\n"),
     "ext/pg_coder.c": [
@@ -4588,6 +4590,7 @@ describe("Ruby extractor C extension tables", { timeout: RUBY_SUBPROCESS_TIMEOUT
     expect(out["PG::Result#fetch"]).toBe("(tup_num, field_num)");
     expect(out["PG::Result#name"]).toBe("()");
     expect(out["PG::Result#name="]).toBe("(value)");
+    expect(out["PG::Result::"]).toBe("PGRES_OK");
   });
 
   it("files a class no lib file declares at its constant path, replaying a guarded helper", () => {

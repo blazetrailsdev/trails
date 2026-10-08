@@ -580,6 +580,10 @@ class ApiExtractor
       bucket = kind == "singleton_method" ? :classMethods : :instanceMethods
       add.(info, bucket, name, params, kind == "private_method" ? "private" : "public")
     end
+    src.scan(/rb_define_const\s*\(\s*(\w+)\s*,\s*"(\w+)"/) do |var, name|
+      next unless (info = owner.(var))
+      (@file_constants[info[:file]] ||= {})[name] ||= { kind: "expr" }
+    end
     src.scan(C_DEFINE_ALIAS) do |var, new_name, old_name|
       next unless (info = owner.(var))
       target = info[:instanceMethods].find { |m| m[:name] == old_name }
