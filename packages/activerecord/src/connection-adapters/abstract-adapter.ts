@@ -857,11 +857,11 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  static buildReadQueryRegexp(...parts: (string | RegExp)[]): RegExp {
+  static buildReadQueryRegexp(...parts: string[]): RegExp {
     parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
-    parts = parts.map((part) => new RegExp(part, "i"));
+    const res = parts.map((part) => new RegExp(part, "i"));
     return new RegExp(
-      `^(?:[(\\s]|${rbRegToS(AbstractAdapter.COMMENT_REGEX)})*${rbRegToS(rbRegSUnion(...parts))}`,
+      `^(?:[(\\s]|${rbRegToS(AbstractAdapter.COMMENT_REGEX)})*${rbRegToS(rbRegSUnion(...res))}`,
     );
   }
 

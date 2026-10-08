@@ -123,6 +123,7 @@ describe("rbRegMatchP", () => {
 describe("rbRegSUnion", () => {
   it("escapes and joins Strings", () => {
     expect(rbRegSUnion("a.b").source).toBe("a\\.b");
+    expect(rbRegSUnion(["a.b"]).source).toBe("a\\.b");
     expect(rbRegSUnion("skiing", "sledding").source).toBe("skiing|sledding");
     expect(rbRegSUnion(["id", "na|me"]).source).toBe("id|na\\|me");
     expect(rbRegSUnion(["id", "na|me"]).test("na|me")).toBe(true);
