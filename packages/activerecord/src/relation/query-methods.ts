@@ -192,7 +192,7 @@ interface QueryMethodsHost {
   havingClause: WhereClause;
   fromClause: FromClause;
   /** @internal */
-  _fromLimitedIds: unknown[] | undefined;
+  _fromLimitedIds: WeakMap<object, unknown[]>;
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
@@ -1845,11 +1845,11 @@ export function arelColumnAliasesFromHash(
 
 /** @internal */
 export function buildFrom(this: QueryMethodsHost): unknown {
-  let opts: any = this.fromClause.value;
+  let opts: FromClause["value"] = this.fromClause.value;
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
     if (opts.isEagerLoading) {
-      opts = opts._applyEagerJoinDependency(undefined, undefined, this._fromLimitedIds);
+      opts = opts._applyEagerJoinDependency({ limitedIds: this._fromLimitedIds.get(opts) });
     }
     name ??= "subquery";
     return opts.arel().as(toS(name));

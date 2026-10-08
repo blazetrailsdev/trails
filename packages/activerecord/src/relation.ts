@@ -360,7 +360,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _joinDependency: JoinDependency | null = null;
   /** @internal */
-  _fromLimitedIds: unknown[] | undefined = undefined;
+  _fromLimitedIds = new WeakMap<object, unknown[]>();
 
   private _table: Table;
 
@@ -439,7 +439,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
-    this._fromLimitedIds = undefined;
+    this._fromLimitedIds = new WeakMap();
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -1031,7 +1031,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (async () => {
       if (deferredFrom) {
         this._arel = undefined;
-        this._fromLimitedIds = await from._materializeDistinctPkIds();
+        this._fromLimitedIds = new WeakMap([[from, await from._materializeDistinctPkIds()]]);
       }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
@@ -1091,18 +1091,31 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   /** @internal */
-  _applyEagerJoinDependency(
-    jd: JoinDependency = QueryMethods.constructJoinDependency.call(
+  _applyEagerJoinDependency(options?: {
+    eagerLoading?: boolean;
+    limitedIds?: unknown[];
+  }): Relation<T, G>;
+  /** @internal */
+  _applyEagerJoinDependency<R>(
+    options: { eagerLoading?: boolean; limitedIds?: unknown[] },
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R;
+  _applyEagerJoinDependency<R>(
+    {
+      eagerLoading = this.groupValues.length === 0,
+      limitedIds,
+    }: { eagerLoading?: boolean; limitedIds?: unknown[] } = {},
+    block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R | Relation<T, G> {
+    const jd = QueryMethods.constructJoinDependency.call(
       this as any,
       [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
       Nodes.OuterJoin,
-    ),
-    basePk: string | string[] = (this._model as any).primaryKey ?? "id",
-    limitedIds?: unknown[],
-  ): Relation<T, G> {
+    );
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(rel as any, jd as any);
     if (
+      eagerLoading &&
       this.hasLimitOrOffset &&
       !(
         this.usingLimitableReflections(jd.reflections as never) &&
@@ -1119,6 +1132,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         )
       )
     ) {
+      const basePk: string | string[] = (this._model as any).primaryKey ?? "id";
       if (Array.isArray(basePk)) {
         const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
@@ -1135,7 +1149,11 @@ export class Relation<T extends Base, G extends boolean = false> {
       rel.limitValue = null;
       rel.offsetValue = null;
     }
-    return rel;
+    if (block) {
+      return block(rel, jd);
+    } else {
+      return rel;
+    }
   }
 
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
@@ -1217,18 +1235,11 @@ export class Relation<T extends Base, G extends boolean = false> {
     const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     if (allEager.length === 0) return null;
 
-    const basePk = (this._model as any).primaryKey ?? "id";
-
-    const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      allEager as any,
-      Nodes.OuterJoin,
-    );
-    if (jd.reflections.length === 0) return null;
-
-    const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
-    jd.applyColumnAliases(eagerRelation);
-    return eagerRelation.arel();
+    return this._applyEagerJoinDependency({}, (eagerRelation, jd) => {
+      if (jd.reflections.length === 0) return null;
+      jd.applyColumnAliases(eagerRelation);
+      return eagerRelation.arel();
+    });
   }
 
   async preloadAssociations(records: T[]): Promise<void> {

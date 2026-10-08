@@ -55,19 +55,31 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
     for (const [name, query] of Object.entries(run)) {
       const relation = subquery();
       const sqls: string[] = [];
-      Notifications.subscribe("sql.active_record", (...args: unknown[]) => {
+      const subscriber = Notifications.subscribe("sql.active_record", (...args: unknown[]) => {
         const event = args[args.length - 1] as { payload?: { sql: string }; sql?: string };
         sqls.push(String((event.payload ?? event).sql));
       });
       await query(relation);
-      Notifications.unsubscribeAll();
+      Notifications.unsubscribe(subscriber);
       expect(sqls[0], name).toMatch(/^SELECT DISTINCT/i);
       expect(sqls.at(-1), name).toMatch(/IN \(\d+, \d+\)/);
       expect(sqls.at(-1), name).not.toMatch(/IN \(SELECT/i);
       expect(relation.fromClause.value, name).toBe(from);
       expect(subquery().toSql(), name).toMatch(/IN \(SELECT DISTINCT/i);
+      const other = Post.eagerLoad(":comments").limit(1);
+      const swapped = relation.unscope(":from").from(other, "posts").toSql();
+      expect(swapped, name).toMatch(/IN \(SELECT DISTINCT/i);
+      expect(swapped, name).not.toMatch(/IN \(\d/);
       expect(relation.reset().toSql(), name).toMatch(/IN \(SELECT DISTINCT/i);
     }
     expect(new Set((await subquery()).map((post) => post.id)).size).toBe(2);
+  });
+
+  it("skips the limited-ids subquery for a grouped eager-loaded FROM relation", () => {
+    const from = Post.eagerLoad(":comments").group("posts.id").limit(2);
+
+    const sql = Post.from(from, "posts").toSql();
+    expect(sql).toMatch(/LEFT OUTER JOIN/i);
+    expect(sql).not.toMatch(/SELECT DISTINCT/i);
   });
 });
