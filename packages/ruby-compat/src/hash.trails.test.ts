@@ -191,6 +191,24 @@ describe("Hash#[] and Hash#[]= on a non-Hash receiver", () => {
   });
 });
 
+describe("Hash#[] with a binary String key", () => {
+  it("finds a 7-bit String by the binary String that spells it, and the reverse", () => {
+    const h = new Hash<string | Uint8Array, number>();
+    h.set("ab12", 1);
+    h.set(Uint8Array.of(0x63, 0x64), 2);
+    expect(h.get(Uint8Array.of(0x61, 0x62, 0x31, 0x32))).toBe(1);
+    expect(h.get("cd")).toBe(2);
+    expect(h.get(Uint8Array.of(0xe9))).toBeUndefined();
+    expect(h.get("é")).toBeUndefined();
+  });
+
+  it("finds a String by a binary String too long to spread as arguments", () => {
+    const h = new Hash<string | Uint8Array, number>();
+    h.set("a".repeat(300000), 1);
+    expect(h.get(new Uint8Array(300000).fill(0x61))).toBe(1);
+  });
+});
+
 describe("Hash#key?", () => {
   it("is true for a stored null and false for an absent key", () => {
     expect(hasKey({ offset: null }, "offset")).toBe(true);

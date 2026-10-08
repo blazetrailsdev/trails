@@ -4,6 +4,7 @@ export { DelegateClass } from "./delegate.js";
 export { Dir } from "./dir.js";
 export { EncodingError } from "./encoding-error.js";
 export { InvalidByteSequenceError } from "./invalid-byte-sequence-error.js";
+export { UndefinedConversionError } from "./undefined-conversion-error.js";
 export { EOFError } from "./eof-error.js";
 export { Errno, SystemCallError } from "./errno.js";
 export { File } from "./file.js";
@@ -277,6 +278,7 @@ export {
   argv,
   chdir,
   env,
+  exec,
   exit,
   getProcessAdapter,
   onSignal,
@@ -375,6 +377,7 @@ export { stringSplit } from "./string/split.js";
 export { rbStrPartition } from "./string/sub.js";
 export { rbCheckStringType, rbStrSNew, stringValue, strlen } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
+export { encode } from "./string/encode.js";
 export { Encoding } from "./encoding.js";
 export { stringInspect } from "./string/inspect.js";
 export { succ } from "./string/succ.js";

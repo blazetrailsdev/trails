@@ -174,7 +174,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override dbconsole(
     config: DatabaseConfig,
     options: { mode?: string; header?: boolean } = {},
-  ): string[] {
+  ): never {
     const args: string[] = [];
     if (rtest(options.mode)) args.push(`-${options.mode}`);
     if (options.header) args.push("-header");

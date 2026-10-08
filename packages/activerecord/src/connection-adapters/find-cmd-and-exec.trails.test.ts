@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { SystemExit, env, setEnv } from "@blazetrails/ruby-compat";
+import { describe, it, expect, afterEach, vi } from "vitest";
+import { SystemExit, env, getProcessAdapter, setEnv } from "@blazetrails/ruby-compat";
 import { AbstractAdapter } from "./abstract-adapter.js";
 
 describe("AbstractAdapter.findCmdAndExec", () => {
@@ -7,11 +7,15 @@ describe("AbstractAdapter.findCmdAndExec", () => {
 
   afterEach(() => {
     setEnv("PATH", originalPath);
+    vi.restoreAllMocks();
   });
 
-  it("returns the first command found on $PATH, joined to its directory", () => {
+  it("execs the first command found on $PATH, joined to its directory", () => {
+    const adapter = getProcessAdapter() as { exec(argv: readonly string[]): never };
+    const exec = vi.spyOn(adapter, "exec").mockReturnValue(undefined as never);
     setEnv("PATH", ["/nonexistent-dir", "/bin", "/usr/bin"].join(":"));
-    const [cmd, ...args] = AbstractAdapter.findCmdAndExec(["no-such-client", "sh"], "-c", "true");
+    AbstractAdapter.findCmdAndExec(["no-such-client", "sh"], "-c", "true");
+    const [cmd, ...args] = exec.mock.calls[0][0];
     expect(cmd).toMatch(/^\/(usr\/)?bin\/sh$/);
     expect(args).toEqual(["-c", "true"]);
   });

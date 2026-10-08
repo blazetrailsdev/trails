@@ -973,6 +973,7 @@ export class Hash<K, V> extends Map<K, V> {
   #eqlKeys = new Map<number, K[]>();
   #stHash = new WeakMap<object, number>();
   #identhash = false;
+  #binaryKeys = false;
   #iterLev = 0;
 
   /**
@@ -1053,6 +1054,7 @@ export class Hash<K, V> extends Map<K, V> {
     const stored = this.hashStlikeLookup(key);
     if (stored === key && !this.#identhash && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
+      if (key instanceof Uint8Array) this.#binaryKeys = true;
       this.#stHash.set(key, h);
       const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
@@ -1087,12 +1089,24 @@ export class Hash<K, V> extends Map<K, V> {
    * hash's table type is `identhash` (`vendor/ruby/v3.3.11/hash.c:375`), whose
    * `rb_ident_cmp` is the `Map`'s own comparison. Ruby has one Integer for
    * every magnitude (`rb_int_equal`, `vendor/ruby/v3.3.11/numeric.c:4634`), so a
-   * `bigint` that fits a `number` is looked up as that `number`.
+   * `bigint` that fits a `number` is looked up as that `number`. A binary
+   * String, whose seat is a `Uint8Array`, is `eql?` to the 7-bit JS string it
+   * spells and hashes as it does (`rb_str_eql`, `vendor/ruby/v3.3.11/string.c:3773`,
+   * over `rb_str_comparable`, `string.c:3671`), so either finds the other.
    */
   private hashStlikeLookup(key: K): K {
     if (typeof key === "bigint" && Number.isSafeInteger(Number(key))) return Number(key) as K;
-    if (this.#identhash || !isObjectKey(key)) return key;
-    return this.#eqlKeys.get(rbHash(key))?.find((stored) => rbEql(stored, key)) ?? key;
+    if (this.#identhash) return key;
+    if (typeof key === "string" ? !this.#binaryKeys || super.has(key) : !isObjectKey(key)) {
+      return key;
+    }
+    const stored = this.#eqlKeys.get(rbHash(key))?.find((k) => rbEql(k, key));
+    if (stored !== undefined) return stored;
+    if (key instanceof Uint8Array && key.every((byte) => byte < 0x80)) {
+      const str = new TextDecoder().decode(key) as K;
+      if (super.has(str)) return str;
+    }
+    return key;
   }
 
   /**

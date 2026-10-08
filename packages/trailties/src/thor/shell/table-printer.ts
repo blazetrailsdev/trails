@@ -129,13 +129,10 @@ export class TablePrinter extends ColumnPrinter {
   private truncate(string: string): string {
     if (!rtest(this._truncate)) return string;
     const chars = [...string];
-    if (chars.length <= (this._truncate as number)) {
+    if (chars.length <= this._truncate) {
       return chars.join("");
     } else {
-      return (
-        (arySlice(chars, 0, (this._truncate as number) - 3 - this._indent) as string[]).join("") +
-        "..."
-      );
+      return (arySlice(chars, 0, this._truncate - 3 - this._indent) as string[]).join("") + "...";
     }
   }
 

@@ -172,7 +172,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
     this._emulateBooleans = value;
   }
 
-  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): string[] {
+  static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): never {
     const mysqlConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 

@@ -266,7 +266,7 @@ export class PostgreSQLAdapter
   static override dbconsole(
     config: DatabaseConfig,
     options: { includePassword?: boolean } = {},
-  ): string[] {
+  ): never {
     const pgConfig = (config as unknown as { configurationHash: DatabaseConfigOptions })
       .configurationHash;
 

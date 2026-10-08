@@ -14,7 +14,7 @@ describeIfSqlite("SQLite3DbConsoleTest", () => {
     new HashConfig("test", "primary", config as DatabaseConfigOptions);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown) => {
-    const spy = vi.spyOn(SQLite3Adapter, "findCmdAndExec").mockImplementation(() => []);
+    const spy = vi.spyOn(SQLite3Adapter, "findCmdAndExec").mockReturnValue(undefined as never);
     try {
       block();
       expect(spy).toHaveBeenCalledWith(...args);

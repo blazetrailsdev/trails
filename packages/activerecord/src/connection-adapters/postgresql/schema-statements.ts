@@ -1497,7 +1497,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
         `Table '${tableName}' has no exclusion constraint for ${rbObjAsString(expression ?? symbolizeKeys(options))}`,
       );
     }
-    return excl!;
+    return excl;
   }
 
   /** @internal */
@@ -1545,7 +1545,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
             : String(column).replace(/^:/, "");
       throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
     }
-    return uniqueConstraint!;
+    return uniqueConstraint;
   }
 
   /** @internal */

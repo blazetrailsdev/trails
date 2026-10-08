@@ -305,7 +305,7 @@ export async function run(
   if (rtest(this.options["pretend"])) return;
 
   let envSplat: [Record<string, string | null>] | undefined;
-  if (rtest(config.env)) envSplat = [config.env!];
+  if (rtest(config.env)) envSplat = [config.env];
 
   let result: string | boolean | null;
   let success: boolean | null;
