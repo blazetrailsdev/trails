@@ -5,6 +5,7 @@ import {
   isSymbol,
   keywordSplat,
   merge,
+  rbRegMatchP,
   registerConstant,
   slice,
   symbolToS,
@@ -191,9 +192,8 @@ export class ForeignKeyDefinition {
     return this.isValidate;
   }
 
-  /** @missingRailsCall match? — CONVERGEABLE export-name-on-schema-dump-matches-through-a-stateless-regexp-match-p */
-  get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? this.name.search(SchemaDumper.fkIgnorePattern) === -1 : false;
+  get isExportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.fkIgnorePattern, this.name) : null;
   }
 
   isDefinedFor({
@@ -258,8 +258,8 @@ export class CheckConstraintDefinition {
     return "validate" in this.options ? (this.options.validate as boolean | null) : true;
   }
 
-  get isExportNameOnSchemaDump(): boolean {
-    return this.name != null ? this.name.search(SchemaDumper.chkIgnorePattern) === -1 : false;
+  get isExportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.chkIgnorePattern, this.name) : null;
   }
 
   isDefinedFor(options: {

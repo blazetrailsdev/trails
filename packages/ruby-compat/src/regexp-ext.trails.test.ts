@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { toS } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
-import { rbRegEqual, rbRegInitStr, rbRegToS, regexpEscape } from "./regexp.js";
+import { rbRegEqual, rbRegInitStr, rbRegMatchP, rbRegToS, regexpEscape } from "./regexp.js";
 
 describe("regexpEscape", () => {
   it("escapes the characters a JS RegExp gives meaning to", () => {
@@ -78,5 +78,37 @@ describe("Regexp MRI option spelling (trails)", () => {
     expect([bare.source, bare.flags]).toEqual(["a", ""]);
     expect(rbRegInitStr("a+").source).toBe("a+");
     expect(() => rbRegInitStr("(?x: a )")).toThrow(SyntaxError);
+  });
+});
+
+describe("rbRegMatchP", () => {
+  it("answers whether the pattern matches", () => {
+    expect(rbRegMatchP(/b/, "abc")).toBe(true);
+    expect(rbRegMatchP(/x/, "abc")).toBe(false);
+  });
+
+  it("is false for nil", () => {
+    expect(rbRegMatchP(/.*/, null)).toBe(false);
+  });
+
+  it("answers the same on every call for a g-flagged pattern", () => {
+    const re = /^ignored_/g;
+    expect(rbRegMatchP(re, "ignored_fk")).toBe(true);
+    expect(rbRegMatchP(re, "ignored_fk")).toBe(true);
+    expect(re.lastIndex).toBe(0);
+  });
+
+  it("answers the same on every call for a y-flagged pattern", () => {
+    const re = /ignored_/y;
+    expect(rbRegMatchP(re, "ignored_fk")).toBe(true);
+    expect(rbRegMatchP(re, "ignored_fk")).toBe(true);
+    expect(re.lastIndex).toBe(0);
+  });
+
+  it("leaves a lastIndex the caller set where it was", () => {
+    const re = /a/g;
+    re.lastIndex = 2;
+    expect(rbRegMatchP(re, "abc")).toBe(true);
+    expect(re.lastIndex).toBe(2);
   });
 });

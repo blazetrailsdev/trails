@@ -50,6 +50,11 @@ describe("ForeignKeyDefinition#export_name_on_schema_dump?", () => {
     expect(definition.isExportNameOnSchemaDump).toBe(false);
     expect(definition.isExportNameOnSchemaDump).toBe(false);
   });
+
+  it("answers nil for a nameless definition", () => {
+    const definition = new ForeignKeyDefinition("astronauts", "rockets", { column: "rocket_id" });
+    expect(definition.isExportNameOnSchemaDump).toBeNull();
+  });
 });
 
 describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {
