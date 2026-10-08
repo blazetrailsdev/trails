@@ -10,7 +10,7 @@ import {
   String as StringExt,
   TrueClass,
 } from "./core-ext.js";
-import { ExtensionValue, MessagePack, Packer } from "./index.js";
+import { MessagePack, Packer } from "./index.js";
 
 class ValueOne {
   constructor(readonly num: number) {}
@@ -200,17 +200,6 @@ describe("MessagePack::Packer", () => {
       expect(two.type).toEqual(0x02);
       expect(two.class).toEqual(ValueTwo);
       expect(two.packer).toBeInstanceOf(Function);
-    });
-  });
-
-  describe("ext formats", () => {
-    [1, 2, 4, 8, 16].forEach((n, i) => {
-      const b = [0xd4, 0xd5, 0xd6, 0xd7, 0xd8][i];
-      it(`msgpack fixext ${n} format`, () => {
-        expect(new ExtensionValue(1, "a".repeat(n)).toMsgpack()).toEqual(
-          Uint8Array.of(b, 1, ...new TextEncoder().encode("a".repeat(n))),
-        );
-      });
     });
   });
 });

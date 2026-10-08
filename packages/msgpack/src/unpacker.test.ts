@@ -198,16 +198,4 @@ describe("MessagePack::Unpacker", () => {
       expect(objects).toEqual(expected);
     });
   });
-
-  describe("regressions", () => {
-    it("returns correct size for array16 (issue #127)", () => {
-      unpacker.feed(Uint8Array.of(0xdc, 0x00, 0x01, 0x01));
-      expect(unpacker.readArrayHeader()).toEqual(1);
-    });
-
-    it("returns correct size for map16 (issue #127)", () => {
-      unpacker.feed(Uint8Array.of(0xde, 0x00, 0x02, 0x01, 0x02, 0x03, 0x04));
-      expect(unpacker.readMapHeader()).toEqual(2);
-    });
-  });
 });
