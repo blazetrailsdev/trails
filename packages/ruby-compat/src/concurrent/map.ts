@@ -53,6 +53,17 @@ export class Map<K, V> {
   }
 
   /**
+   * `Concurrent::Map#[]=` (concurrent-ruby, not vendored), over
+   * `NonConcurrentMapBackend#[]=` (`vendor/ruby/v3.3.11/hash.c:2941` `rb_hash_aset`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  set(key: K, value: V): V {
+    this.backend.set(key, value);
+    return value;
+  }
+
+  /**
    * `Concurrent::Map#fetch_or_store`: the stored value when the key is present
    * (`vendor/ruby/v3.3.11/hash.c:2176` `rb_hash_fetch_m`), else the block's value, or
    * the default value, stored under it (`vendor/ruby/v3.3.11/hash.c:2941` `rb_hash_aset`).
@@ -85,6 +96,55 @@ export class Map<K, V> {
       this.backend.set(key, value);
       return value;
     }
+  }
+
+  /**
+   * `Concurrent::Map#keys` (concurrent-ruby, not vendored): each key `each_pair` yields, collected
+   * (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair` over the backend).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  keys(): K[] {
+    const arr: K[] = [];
+    this.eachPair((k) => arr.push(k));
+    return arr;
+  }
+
+  /**
+   * `Concurrent::Map#values` (concurrent-ruby, not vendored): each value
+   * `each_pair` yields, collected (`vendor/ruby/v3.3.11/hash.c:3149`
+   * `rb_hash_each_pair` over the backend).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  values(): V[] {
+    const arr: V[] = [];
+    this.eachPair((_k, v) => arr.push(v));
+    return arr;
+  }
+
+  /**
+   * `Concurrent::Map#each_value` (concurrent-ruby, not vendored): yields each
+   * value `each_pair` does (`vendor/ruby/v3.3.11/hash.c:3149`
+   * `rb_hash_each_pair` over the backend).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  eachValue(block: (value: V) => unknown): this {
+    return this.eachPair((_k, v) => block(v));
+  }
+
+  /**
+   * `Concurrent::Map#each_pair` (concurrent-ruby, not vendored), over
+   * `NonConcurrentMapBackend#each_pair`: it
+   * walks a `dupped_backend`, so a write made by the block does not reach the
+   * walk (`vendor/ruby/v3.3.11/hash.c:3149` `rb_hash_each_pair`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  eachPair(block: (key: K, value: V) => unknown): this {
+    for (const [k, v] of [...this.backend]) block(k, v);
+    return this;
   }
 
   /**

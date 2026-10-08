@@ -23,12 +23,14 @@ describe("PrimaryClassTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   function cleanUpConnectionHandler(): void {
-    const managers: Map<string, { roleNames: string[]; removeRole(role: string): unknown }> = (
+    const managers = (
       Base.connectionHandler as unknown as {
-        _connectionNameToPoolManager: Map<string, never>;
+        _connectionNameToPoolManager: {
+          values(): { roleNames: string[]; removeRole(role: string): unknown }[];
+        };
       }
-    )._connectionNameToPoolManager as never;
-    for (const [, poolManager] of managers) {
+    )._connectionNameToPoolManager;
+    for (const poolManager of managers.values()) {
       for (const role of [...poolManager.roleNames]) {
         if (role !== Base.defaultRole) poolManager.removeRole(role);
       }

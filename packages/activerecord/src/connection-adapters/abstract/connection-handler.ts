@@ -2,7 +2,14 @@ import type { ConnectionPool } from "./connection-pool.js";
 import { DatabaseConfig } from "../../database-configurations/database-config.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { hashAset, isSymbol, toEnum, toS, type Enumerator } from "@blazetrails/ruby-compat";
+import {
+  Concurrent,
+  hashAset,
+  isSymbol,
+  toEnum,
+  toS,
+  type Enumerator,
+} from "@blazetrails/ruby-compat";
 import { PoolConfig } from "../pool-config.js";
 import { PoolManager } from "../pool-manager.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -17,11 +24,12 @@ export interface ConnectionOwner {
   isPrimaryClass(): boolean | undefined;
 }
 
+type PoolManagerMap = InstanceType<typeof Concurrent.Map<string, PoolManager>>;
+
 export class ConnectionHandler {
-  private _connectionNameToPoolManager: Map<string, PoolManager>;
-  /** @missingRailsArgs new — CONVERGEABLE connection-handler-pool-manager-map-onto-concurrent-map */
+  private _connectionNameToPoolManager: PoolManagerMap;
   constructor() {
-    this._connectionNameToPoolManager = new Map();
+    this._connectionNameToPoolManager = new Concurrent.Map({ initialCapacity: 2 });
   }
 
   get preventWrites(): boolean | null {
@@ -33,18 +41,18 @@ export class ConnectionHandler {
   }
 
   connectionPoolNames(): string[] {
-    return [...this._connectionNameToPoolManager.keys()];
+    return this.connectionNameToPoolManager().keys();
   }
 
   connectionPoolList(role: string | null = null): ConnectionPool[] {
     if (role == null || role === "all") {
-      return [...this._connectionNameToPoolManager.values()].flatMap((m) =>
-        m.poolConfigs().map((pc) => pc.pool),
-      );
+      return this.connectionNameToPoolManager()
+        .values()
+        .flatMap((m) => m.poolConfigs().map((pc) => pc.pool));
     } else {
-      return [...this._connectionNameToPoolManager.values()].flatMap((m) =>
-        m.poolConfigs(role).map((pc) => pc.pool),
-      );
+      return this.connectionNameToPoolManager()
+        .values()
+        .flatMap((m) => m.poolConfigs(role).map((pc) => pc.pool));
     }
   }
 
@@ -53,15 +61,15 @@ export class ConnectionHandler {
   }
 
   eachConnectionPool(role?: string | null): Enumerator<ConnectionPool>;
-  eachConnectionPool(block: (pool: ConnectionPool) => void): Map<string, PoolManager>;
+  eachConnectionPool(block: (pool: ConnectionPool) => void): PoolManagerMap;
   eachConnectionPool(
     role: string | null | undefined,
     block: (pool: ConnectionPool) => void,
-  ): Map<string, PoolManager>;
+  ): PoolManagerMap;
   eachConnectionPool(
     role?: string | null | ((pool: ConnectionPool) => void),
     block?: (pool: ConnectionPool) => void,
-  ): Enumerator<ConnectionPool> | Map<string, PoolManager> {
+  ): Enumerator<ConnectionPool> | PoolManagerMap {
     if (typeof role === "function") {
       block = role;
       role = null;
@@ -69,12 +77,11 @@ export class ConnectionHandler {
     if (role === "all") role = null;
     if (!block) return toEnum<ConnectionPool>(this, "eachConnectionPool", role);
 
-    for (const manager of this._connectionNameToPoolManager.values()) {
+    return this.connectionNameToPoolManager().eachValue((manager) => {
       manager.eachPoolConfig(role, (poolConfig) => {
         block(poolConfig.pool);
       });
-    }
-    return this._connectionNameToPoolManager;
+    });
   }
 
   async establishConnection(
@@ -214,13 +221,13 @@ export class ConnectionHandler {
   }
 
   /** @internal */
-  private connectionNameToPoolManager(): Map<string, PoolManager> {
+  private connectionNameToPoolManager(): PoolManagerMap {
     return this._connectionNameToPoolManager;
   }
 
   /** @internal */
   private getPoolManager(connectionName: string | null | undefined): PoolManager | undefined {
-    return this._connectionNameToPoolManager.get(connectionName as string);
+    return this.connectionNameToPoolManager().get(connectionName as string);
   }
 
   /** @internal */
@@ -233,7 +240,7 @@ export class ConnectionHandler {
 
   /** @internal */
   private poolManagers(): PoolManager[] {
-    return [...this._connectionNameToPoolManager.values()];
+    return this.connectionNameToPoolManager().values();
   }
 
   /** @internal */

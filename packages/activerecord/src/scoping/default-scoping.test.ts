@@ -876,7 +876,7 @@ describe("DefaultScopingTest", () => {
       assoc.setOwnerAttributes(fresh);
       expect(Number(fresh._readAttribute("post_id"))).toBe(Number(post.id));
 
-      expect(Object.keys(assoc.computeNullifiedOwnerAttributes())).toEqual(["post_id"]);
+      expect(Object.keys(assoc.nullifiedOwnerAttributes())).toEqual(["post_id"]);
 
       const pushed = new SpecialComment({ body: "pushed sti comment" });
       await post.specialComments.push(pushed);

@@ -18,4 +18,22 @@ describe("Concurrent::Map", () => {
     expect([map.get("a"), map.size()]).toEqual(["A", 1]);
     expect(new Concurrent.Map<string, string>().get("a")).toBeUndefined();
   });
+
+  it("[]= stores under the key; keys, values and each_value walk the pairs in insertion order", () => {
+    const map = new Concurrent.Map<string, number>({ initialCapacity: 2 });
+    expect(map.set("a", 1)).toBe(1);
+    map.set("b", 2);
+    expect([map.keys(), map.values()]).toEqual([
+      ["a", "b"],
+      [1, 2],
+    ]);
+    const seen: number[] = [];
+    expect(
+      map.eachValue((value) => {
+        seen.push(value);
+        map.set("c", 3);
+      }),
+    ).toBe(map);
+    expect(seen).toEqual([1, 2]);
+  });
 });

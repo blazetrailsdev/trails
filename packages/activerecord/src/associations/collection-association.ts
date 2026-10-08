@@ -8,7 +8,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import {
-  underscore,
   compactBlank,
   indexBy,
   isBlank,
@@ -330,11 +329,10 @@ export abstract class CollectionAssociation extends Association {
     return count;
   }
 
-  protected async deleteOrNullifyAllRecords(method?: string): Promise<number> {
-    if (method === "deleteAll") {
-      return this.deleteAllRecords();
-    }
-    return this.nullifyAllRecords();
+  /** @internal */
+  protected deleteOrNullifyAllRecords(_method?: string): Promise<number> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:163
+    throw new NotImplementedError();
   }
 
   async destroyAll(): Promise<Base[] | undefined> {
@@ -536,21 +534,6 @@ export abstract class CollectionAssociation extends Association {
     return this._proxy;
   }
 
-  private foreignKeyColumns(): string[] {
-    const foreignKey = this.reflection.foreignKey();
-    return Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-  }
-
-  private foreignKeyColumn(): string {
-    return this.foreignKeyColumns()[0];
-  }
-
-  private polymorphicTypeColumn(): string | null {
-    const opts = this.reflection.options as { as?: string; foreignType?: string };
-    if (!opts.as) return null;
-    return opts.foreignType ?? `${underscore(opts.as)}_type`;
-  }
-
   /** @inventedArm if — CONVERGEABLE converge-collection-writer-isthenable-dual-returns */
   protected deleteOrDestroy(
     records: Array<Base | number | string | bigint>,
@@ -625,51 +608,6 @@ export abstract class CollectionAssociation extends Association {
   protected deleteRecords(_records: Base[], _method: string): Promise<unknown> | unknown {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:415
     throw new NotImplementedError();
-  }
-
-  /** @internal */
-  protected computeNullifiedOwnerAttributes(): Record<string, null> {
-    const nullAttrs: Record<string, null> = {};
-    for (const fk of this.foreignKeyColumns()) {
-      nullAttrs[fk] = null;
-    }
-    const typeCol = this.polymorphicTypeColumn();
-    if (typeCol) {
-      nullAttrs[typeCol] = null;
-    }
-    return nullAttrs;
-  }
-
-  protected async nullifyAllRecords(): Promise<number> {
-    const nullAttrs = this.computeNullifiedOwnerAttributes();
-
-    const rel = this.scope();
-    if (rel && typeof rel.updateAll === "function") {
-      return rel.updateAll(nullAttrs);
-    }
-
-    await this.loadTarget();
-    for (const record of this.target) {
-      for (const [attr, val] of Object.entries(nullAttrs)) {
-        if (typeof (record as any)._writeAttribute === "function") {
-          (record as any)._writeAttribute(attr, val);
-        } else {
-          (record as any)[attr] = val;
-        }
-      }
-      if (typeof (record as any).save === "function") {
-        await (record as any).save();
-      }
-    }
-    return this.target.length;
-  }
-
-  private async deleteAllRecords(): Promise<number> {
-    const rel = this.scope();
-    if (rel && typeof rel.deleteAll === "function") {
-      return rel.deleteAll();
-    }
-    return 0;
   }
 
   /** @internal */

@@ -1,4 +1,12 @@
-import { fetch, first, isEmpty, kernelThrow, rbEqual, toI } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  first,
+  include,
+  isEmpty,
+  kernelThrow,
+  rbEqual,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { NoMethodError } from "@blazetrails/activemodel";
@@ -19,11 +27,7 @@ import {
 } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
 import type { Association } from "./association.js";
-import {
-  ForeignAssociation,
-  foreignKeyPresent,
-  setOwnerAttributes,
-} from "./foreign-association.js";
+import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
 import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
 
@@ -36,6 +40,7 @@ export class HasManyAssociation extends CollectionAssociation {
   declare updateCounter: (difference: number, reflection?: AssociationDefinition) => Promise<void>;
   /** @internal */
   declare deleteCount: (method: string, scope: any) => Promise<number>;
+  declare nullifiedOwnerAttributes: () => Record<string, null>;
   /** @internal */
   declare setOwnerAttributes: (record: Base) => void;
 
@@ -147,10 +152,6 @@ export class HasManyAssociation extends CollectionAssociation {
     );
     for (const record of records) this.setStrictLoading(record);
     return records;
-  }
-
-  protected override computeNullifiedOwnerAttributes(): Record<string, null> {
-    return nullifiedOwnerAttributes(this);
   }
 
   /** @internal */
@@ -267,12 +268,7 @@ function updateCounterInMemory(this: HasManyAssociation, difference: number): vo
 /** @internal */
 function deleteCount(this: HasManyAssociation, method: string, scope: any): Promise<number> {
   if (method === "deleteAll") return scope.deleteAll?.() ?? Promise.resolve(0);
-  const nullAttrs = (
-    this as unknown as {
-      computeNullifiedOwnerAttributes(): Record<string, null>;
-    }
-  ).computeNullifiedOwnerAttributes();
-  return scope.updateAll?.(nullAttrs) ?? Promise.resolve(0);
+  return scope.updateAll?.(this.nullifiedOwnerAttributes()) ?? Promise.resolve(0);
 }
 
 /** @internal */
@@ -293,39 +289,6 @@ function difference(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
 /** @internal */
 function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => b.includes(r));
-}
-
-/** @internal */
-function nullifiedOwnerAttributes(assoc: HasManyAssociation): Record<string, null> {
-  const ctor = assoc.owner.constructor as {
-    name: string;
-    _reflectOnAssociation?: (n: string) => {
-      foreignKey?: () => string | string[];
-      foreignType?: string;
-    } | null;
-  };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
-  let foreignKey: string | string[] | undefined = refl?.foreignKey?.();
-  const typeCol: string | null = refl?.foreignType ?? null;
-  if (foreignKey == null) {
-    const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
-    if (fks?.length) foreignKey = fks;
-  }
-  if (foreignKey == null) {
-    const opts = assoc.reflection.options as { foreignKey?: string | string[]; as?: string };
-    foreignKey =
-      opts.foreignKey ?? (opts.as ? `${underscore(opts.as)}_id` : `${underscore(ctor.name)}_id`);
-  }
-  const polyType = typeCol ?? deriveAsTypeCol(assoc);
-  return ForeignAssociation.nullifiedOwnerAttributes({
-    foreignKey: () => foreignKey,
-    type: polyType,
-  });
-}
-
-function deriveAsTypeCol(assoc: { reflection: { options: { as?: string } } }): string | null {
-  const asName = assoc.reflection.options.as;
-  return asName ? `${underscore(asName)}_type` : null;
 }
 
 /** @internal */
@@ -451,6 +414,6 @@ Object.assign(HasManyAssociation.prototype, {
   deleteCount,
 });
 
-Object.assign(HasManyAssociation.prototype, { foreignKeyPresent, setOwnerAttributes });
+include(HasManyAssociation, ForeignAssociation);
 
 Associations.HasManyAssociation = HasManyAssociation;

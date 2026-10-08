@@ -1,29 +1,38 @@
-import { Notifications } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/date";
+import { Notifications, seconds, type Duration } from "@blazetrails/activesupport";
+import { Time } from "@blazetrails/date";
+import { cmp, rbCmpint } from "@blazetrails/ruby-compat";
 import { Session } from "./resolver/session.js";
 import { Base } from "../../base.js";
 import { readingRole, writingRole } from "../../active-record.js";
 
 export interface ResolverContext {
-  lastWriteTimestamp(): Temporal.Instant;
+  lastWriteTimestamp(): Time;
   updateLastWriteTimestamp(): void;
   save(response: unknown): void;
 }
 
-const SEND_TO_REPLICA_DELAY = 2000;
+const SEND_TO_REPLICA_DELAY = seconds(2);
 
 export class Resolver {
   readonly context: ResolverContext;
-  readonly delay: number;
+  private readonly options: { delay?: Duration | number | null } | null;
+  readonly delay: Duration | number;
   readonly instrumenter: typeof Notifications;
 
-  constructor(context: ResolverContext, options: { delay?: number } = {}) {
+  constructor(context: ResolverContext, options: { delay?: Duration | number | null } | null = {}) {
     this.context = context;
-    this.delay = options.delay !== undefined ? options.delay : SEND_TO_REPLICA_DELAY;
+    this.options = options;
+    this.delay =
+      this.options != null && this.options.delay != null
+        ? this.options.delay
+        : SEND_TO_REPLICA_DELAY;
     this.instrumenter = Notifications;
   }
 
-  static call(context: ResolverContext, options: { delay?: number } = {}): Resolver {
+  static call(
+    context: ResolverContext,
+    options: { delay?: Duration | number | null } | null = {},
+  ): Resolver {
     return new Resolver(context, options);
   }
 
@@ -45,7 +54,7 @@ export class Resolver {
   }
 
   /** @internal */
-  sendToReplicaDelay(): number {
+  sendToReplicaDelay(): Duration | number {
     return this.delay;
   }
 
@@ -54,11 +63,9 @@ export class Resolver {
   }
 
   private isTimeSinceLastWriteOk(): boolean {
-    return (
-      Temporal.Now.instant().epochMilliseconds -
-        this.context.lastWriteTimestamp().epochMilliseconds >=
-      this.delay
-    );
+    const elapsed = Time.now().minus(this.context.lastWriteTimestamp());
+    const sendToReplicaDelay = this.sendToReplicaDelay();
+    return rbCmpint(cmp(elapsed, sendToReplicaDelay), elapsed, sendToReplicaDelay) >= 0;
   }
 
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {

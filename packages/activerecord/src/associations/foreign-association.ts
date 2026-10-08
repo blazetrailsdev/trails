@@ -1,5 +1,5 @@
-import { kernelArray as Array } from "@blazetrails/activesupport";
-import { zip } from "@blazetrails/ruby-compat";
+import { isPresent, kernelArray as Array } from "@blazetrails/activesupport";
+import { Module, zip } from "@blazetrails/ruby-compat";
 import type { AssociationReflection } from "../reflection.js";
 import type { Base } from "../base.js";
 
@@ -15,6 +15,13 @@ export function foreignKeyPresent(this: ForeignAssociationHost): boolean {
   } else {
     return false;
   }
+}
+
+export function nullifiedOwnerAttributes(this: ForeignAssociationHost): Record<string, null> {
+  const attrs: Record<string, null> = {};
+  for (const foreignKey of Array(this.reflection.foreignKey())) attrs[foreignKey] = null;
+  if (isPresent(this.reflection.type)) attrs[this.reflection.type!] = null;
+  return attrs;
 }
 
 /** @internal */
@@ -39,15 +46,10 @@ export function setOwnerAttributes(this: ForeignAssociationHost, record: Base): 
   }
 }
 
-export class ForeignAssociation {
-  foreignKeyPresent: boolean = false;
-
-  static nullifiedOwnerAttributes(
-    reflection: Pick<AssociationReflection, "foreignKey" | "type">,
-  ): Record<string, null> {
-    const attrs: Record<string, null> = {};
-    for (const foreignKey of Array(reflection.foreignKey())) attrs[foreignKey] = null;
-    if (reflection.type) attrs[reflection.type] = null;
-    return attrs;
-  }
-}
+export const ForeignAssociation: Module = new Module((mod) =>
+  mod.include({
+    foreignKeyPresent,
+    nullifiedOwnerAttributes,
+    setOwnerAttributes,
+  }),
+);

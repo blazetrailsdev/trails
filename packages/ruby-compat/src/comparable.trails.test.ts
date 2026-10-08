@@ -179,3 +179,14 @@ describe("Array#<=>", () => {
     expect(cmp(["a", 1], ["a", "x"])).toBeNull();
   });
 });
+
+describe("Float#<=>", () => {
+  it("sends coerce to an operand that is not a Numeric and compares the pair it answers", () => {
+    const twoSeconds = { coerce: (other: unknown) => [other, 2] };
+    expect(cmp(1.5, twoSeconds)).toBe(-1);
+    expect(cmp(2.5, twoSeconds)).toBe(1);
+    expect(cmp(1.5, { coerce: () => null })).toBeNull();
+    expect(cmp(1.5, {})).toBeNull();
+    expect(() => cmp(1.5, { coerce: () => [1] })).toThrow("coerce must return [x, y]");
+  });
+});

@@ -1,14 +1,10 @@
-import { fetch, kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
+import { fetch, include, kernelThrow, rbEqual } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
-import { kernelArray, underscore } from "@blazetrails/activesupport";
-import {
-  ForeignAssociation,
-  foreignKeyPresent,
-  setOwnerAttributes,
-} from "./foreign-association.js";
+import { kernelArray } from "@blazetrails/activesupport";
+import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
@@ -82,7 +78,7 @@ export class HasOneAssociation extends SingularAssociation {
           break;
         }
         case "nullify":
-          if (target.isPersisted()) await target.updateColumns(nullifiedOwnerAttributes(this));
+          if (target.isPersisted()) await target.updateColumns(this.nullifiedOwnerAttributes());
           break;
       }
     }
@@ -225,6 +221,7 @@ export class HasOneAssociation extends SingularAssociation {
     return this.foreignKeyColumns()[0];
   }
 
+  declare nullifiedOwnerAttributes: () => Record<string, null>;
   /** @internal */
   declare setOwnerAttributes: (record: Base) => void;
 
@@ -281,35 +278,6 @@ function transactionIf(
   }
 }
 
-/** @internal */
-function nullifiedOwnerAttributes(assoc: HasOneAssociation): Record<string, null> {
-  const ctor = assoc.owner.constructor as {
-    name: string;
-    _reflectOnAssociation?: (n: string) => {
-      foreignKey?: () => string | string[];
-      foreignType?: string;
-    } | null;
-  };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? null;
-  let foreignKey: string | string[] | undefined = refl?.foreignKey?.();
-  const reflTypeCol: string | null = refl?.foreignType ?? null;
-  if (foreignKey == null) {
-    const fks = (assoc as unknown as { foreignKeyColumns?: () => string[] }).foreignKeyColumns?.();
-    if (fks?.length) foreignKey = fks;
-  }
-  if (foreignKey == null) {
-    const opts = assoc.reflection.options as { foreignKey?: string | string[]; as?: string };
-    foreignKey =
-      opts.foreignKey ?? (opts.as ? `${underscore(opts.as)}_id` : `${underscore(ctor.name)}_id`);
-  }
-  const asName = assoc.reflection.options.as;
-  const typeCol = reflTypeCol ?? (asName ? `${underscore(asName)}_type` : null);
-  return ForeignAssociation.nullifiedOwnerAttributes({
-    foreignKey: () => foreignKey,
-    type: typeCol,
-  });
-}
-
-Object.assign(HasOneAssociation.prototype, { foreignKeyPresent, setOwnerAttributes });
+include(HasOneAssociation, ForeignAssociation);
 
 Associations.HasOneAssociation = HasOneAssociation;
