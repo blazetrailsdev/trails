@@ -1,4 +1,4 @@
-import { RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
+import { RuntimeError, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
@@ -43,6 +43,7 @@ export class Bulb extends Base {
     this.writeAttribute("color", color.toUpperCase() + "!");
   }
 }
+registerConstant("Bulb", Bulb);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Bulb {
   get car(): Car | null | Promise<Car | null>;
@@ -63,6 +64,7 @@ export class CustomBulb extends Bulb {
     }
   }
 }
+registerConstant("CustomBulb", CustomBulb);
 
 export class FunkyBulb extends Bulb {
   static {
@@ -71,6 +73,7 @@ export class FunkyBulb extends Bulb {
     });
   }
 }
+registerConstant("FunkyBulb", FunkyBulb);
 
 export class FailedBulb extends Bulb {
   static {
@@ -79,3 +82,4 @@ export class FailedBulb extends Bulb {
     });
   }
 }
+registerConstant("FailedBulb", FailedBulb);

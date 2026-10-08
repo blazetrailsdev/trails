@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Family } from "./family.js";
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
@@ -13,6 +14,7 @@ export class FamilyTree extends Base {
     this.belongsTo("family");
   }
 }
+registerConstant("FamilyTree", FamilyTree);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FamilyTree {
   get member(): User | null | Promise<User | null>;

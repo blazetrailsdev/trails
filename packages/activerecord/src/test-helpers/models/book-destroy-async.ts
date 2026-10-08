@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Content } from "./content.js";
@@ -38,6 +39,7 @@ export class BookDestroyAsync extends Base {
     this.enum("status", ["proposed", "written", "published"]);
   }
 }
+registerConstant("BookDestroyAsync", BookDestroyAsync);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface BookDestroyAsync {
   get content(): Content | null | Promise<Content | null>;
@@ -55,3 +57,4 @@ export class BookDestroyAsyncWithScopedTags extends Base {
     this.hasMany("tags", { through: "taggings", dependent: "destroy" });
   }
 }
+registerConstant("BookDestroyAsyncWithScopedTags", BookDestroyAsyncWithScopedTags);

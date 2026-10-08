@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { CakeDesigner } from "./cake-designer.js";
 import type { Chef } from "./chef.js";
@@ -44,3 +45,4 @@ export class Hotel extends Base {
     this.hasMany("lostItems", { through: "departments" });
   }
 }
+registerConstant("Hotel", Hotel);

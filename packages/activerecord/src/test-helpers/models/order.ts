@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Customer } from "./customer.js";
 import { Base } from "../../base.js";
 
@@ -12,6 +13,7 @@ export class Order extends Base {
     this.belongsTo("shipping", { className: "Customer", foreignKey: "shipping_customer_id" });
   }
 }
+registerConstant("Order", Order);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Order {
   get billing(): Customer | null | Promise<Customer | null>;

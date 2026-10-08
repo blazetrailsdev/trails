@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Message } from "./message.js";
 import { Base } from "../../base.js";
 
@@ -10,6 +11,7 @@ export class Recipient extends Base {
     this.belongsTo("message", { touch: true });
   }
 }
+registerConstant("Recipient", Recipient);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Recipient {
   get message(): Message | null | Promise<Message | null>;

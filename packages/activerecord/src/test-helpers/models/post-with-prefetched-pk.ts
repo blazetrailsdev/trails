@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class PostWithPrefetchedPk extends Base {
@@ -11,3 +12,4 @@ export class PostWithPrefetchedPk extends Base {
     return 123456;
   }
 }
+registerConstant("PostWithPrefetchedPk", PostWithPrefetchedPk);

@@ -531,7 +531,7 @@ describe("AssociationCallbacksTest", () => {
         });
       }
     }
-    registerModel("ProjectWithBeforeAddCallback", ProjectWithCallback);
+    registerModel(ProjectWithCallback);
     const rec = await ProjectWithCallback.create({ name: "ActiveRecord" });
     const alice = new Developer({ name: "alice" });
     await (rec.association("developersWithCallbacks") as CollectionAssociation).reader.push(alice);

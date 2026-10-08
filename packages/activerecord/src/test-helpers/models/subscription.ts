@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Book } from "./book.js";
 import type { Subscriber } from "./subscriber.js";
 import { Base } from "../../base.js";
@@ -17,6 +18,7 @@ export class Subscription extends Base {
     this.validatesPresenceOf("subscriber_id", "book_id");
   }
 }
+registerConstant("Subscription", Subscription);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Subscription {
   get subscriber(): Subscriber | null | Promise<Subscriber | null>;

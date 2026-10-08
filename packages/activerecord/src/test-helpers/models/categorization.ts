@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Author } from "./author.js";
 import type { Category } from "./category.js";
@@ -37,6 +38,7 @@ export class Categorization extends Base {
     });
   }
 }
+registerConstant("Categorization", Categorization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Categorization {
   get post(): Post | null | Promise<Post | null>;
@@ -62,6 +64,7 @@ export class SpecialCategorization extends Base {
     this.belongsTo("category");
   }
 }
+registerConstant("SpecialCategorization", SpecialCategorization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialCategorization {
   get author(): Author | null | Promise<Author | null>;

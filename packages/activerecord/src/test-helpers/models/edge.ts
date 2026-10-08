@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Vertex } from "./vertex.js";
 import { Base } from "../../base.js";
 
@@ -11,6 +12,7 @@ export class Edge extends Base {
     this.belongsTo("sink", { className: "Vertex", foreignKey: "sink_id" });
   }
 }
+registerConstant("Edge", Edge);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Edge {
   get source(): Vertex | null | Promise<Vertex | null>;

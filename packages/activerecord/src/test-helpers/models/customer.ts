@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Address {
@@ -22,6 +23,7 @@ export class Address {
     );
   }
 }
+registerConstant("Address", Address);
 
 export class Money {
   amount: number;
@@ -41,6 +43,7 @@ export class Money {
     );
   }
 }
+registerConstant("Money", Money);
 
 export class GpsLocation {
   gpsLocation: string;
@@ -61,6 +64,7 @@ export class GpsLocation {
     return this.latitude === other.latitude && this.longitude === other.longitude;
   }
 }
+registerConstant("GpsLocation", GpsLocation);
 
 export class Fullname {
   first: string;
@@ -89,6 +93,7 @@ export class Fullname {
     return this.toS;
   }
 }
+registerConstant("Fullname", Fullname);
 
 export class Customer extends Base {
   declare address: Address | null;
@@ -145,3 +150,4 @@ export class Customer extends Base {
     });
   }
 }
+registerConstant("Customer", Customer);

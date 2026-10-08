@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Developer } from "./developer.js";
@@ -128,6 +129,7 @@ export class Project extends Base {
     return this.all();
   }
 }
+registerConstant("Project", Project);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Project {
   get mentor(): Mentor | null | Promise<Mentor | null>;
@@ -141,3 +143,4 @@ export interface Project {
 }
 
 export class SpecialProject extends Project {}
+registerConstant("SpecialProject", SpecialProject);

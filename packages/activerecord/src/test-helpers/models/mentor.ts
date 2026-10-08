@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Developer } from "./developer.js";
 import { Base } from "../../base.js";
@@ -10,3 +11,4 @@ export class Mentor extends Base {
     this.hasMany("developers");
   }
 }
+registerConstant("Mentor", Mentor);

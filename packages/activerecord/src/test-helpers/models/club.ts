@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Category } from "./category.js";
@@ -61,6 +62,7 @@ export class Club extends Base {
     this.acceptsNestedAttributesFor("membership");
   }
 }
+registerConstant("Club", Club);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Club {
   get membership(): Membership | null | Promise<Membership | null>;
@@ -83,3 +85,4 @@ export class SuperClub extends Base {
     this.hasMany("members", { through: "memberships" });
   }
 }
+registerConstant("SuperClub", SuperClub);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ARUnit2Model } from "./arunit2-model.js";
 
 export class OtherDog extends ARUnit2Model {
@@ -5,3 +6,4 @@ export class OtherDog extends ARUnit2Model {
     this._tableName = "dogs";
   }
 }
+registerConstant("OtherDog", OtherDog);

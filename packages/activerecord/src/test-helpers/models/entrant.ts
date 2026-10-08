@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Course } from "./course.js";
 import { Base } from "../../base.js";
 
@@ -10,6 +11,7 @@ export class Entrant extends Base {
     this.belongsTo("course");
   }
 }
+registerConstant("Entrant", Entrant);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Entrant {
   get course(): Course | null | Promise<Course | null>;

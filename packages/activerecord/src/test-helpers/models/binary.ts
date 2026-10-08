@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Binary extends Base {
@@ -6,3 +7,4 @@ export class Binary extends Base {
   declare name: string;
   declare short_data: Uint8Array | null;
 }
+registerConstant("Binary", Binary);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Club } from "./club.js";
 import { Base } from "../../base.js";
 
@@ -31,6 +32,7 @@ export class Sponsor extends Base {
     );
   }
 }
+registerConstant("Sponsor", Sponsor);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Sponsor {
   get sponsorClub(): Club | null | Promise<Club | null>;

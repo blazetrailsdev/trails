@@ -1,4 +1,4 @@
-import { hashDelete, kernelThrow } from "@blazetrails/ruby-compat";
+import { hashDelete, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -181,6 +181,7 @@ export class Pirate extends Base {
     this.log(record, "after_removing_method");
   }
 }
+registerConstant("Pirate", Pirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;
@@ -209,6 +210,7 @@ export class DestructivePirate extends Pirate {
     });
   }
 }
+registerConstant("DestructivePirate", DestructivePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestructivePirate {
   get dependentShip(): Ship | null | Promise<Ship | null>;
@@ -224,6 +226,7 @@ export class FamousPirate extends Base {
     this.validates("catchphrase", { presence: true, on: "conference" });
   }
 }
+registerConstant("FamousPirate", FamousPirate);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SpacePirate extends Base {
@@ -293,6 +296,7 @@ export class SpacePirate extends Base {
     );
   }
 }
+registerConstant("SpacePirate", SpacePirate);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpacePirate {
   get parrot(): Parrot | null | Promise<Parrot | null>;

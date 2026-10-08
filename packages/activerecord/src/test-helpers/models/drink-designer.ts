@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
 
@@ -10,6 +11,7 @@ export class DrinkDesigner extends Base {
     this.acceptsNestedAttributesFor("chef");
   }
 }
+registerConstant("DrinkDesigner", DrinkDesigner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesigner {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -24,6 +26,10 @@ export class DrinkDesignerWithPolymorphicDependentNullifyChef extends Base {
     this.hasOne("chef", { as: "employable", dependent: "nullify" });
   }
 }
+registerConstant(
+  "DrinkDesignerWithPolymorphicDependentNullifyChef",
+  DrinkDesignerWithPolymorphicDependentNullifyChef,
+);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesignerWithPolymorphicDependentNullifyChef {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -38,6 +44,7 @@ export class DrinkDesignerWithPolymorphicTouchChef extends Base {
     this.hasOne("chef", { as: "employable", touch: true });
   }
 }
+registerConstant("DrinkDesignerWithPolymorphicTouchChef", DrinkDesignerWithPolymorphicTouchChef);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DrinkDesignerWithPolymorphicTouchChef {
   get chef(): Chef | null | Promise<Chef | null>;
@@ -45,3 +52,4 @@ export interface DrinkDesignerWithPolymorphicTouchChef {
 }
 
 export class MocktailDesigner extends DrinkDesigner {}
+registerConstant("MocktailDesigner", MocktailDesigner);

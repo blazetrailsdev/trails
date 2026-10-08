@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Ship } from "./ship.js";
@@ -20,6 +21,7 @@ export class ShipPart extends Base {
     this.validates("name", { presence: true });
   }
 }
+registerConstant("ShipPart", ShipPart);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShipPart {
   get ship(): Ship | null | Promise<Ship | null>;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Club } from "./club.js";
@@ -55,6 +56,7 @@ export class Membership extends Base {
     this.belongsTo("club");
   }
 }
+registerConstant("Membership", Membership);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Membership {
   get member(): Member | null | Promise<Member | null>;

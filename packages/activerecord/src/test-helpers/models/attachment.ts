@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Translation } from "./translation.js";
 import { Base } from "../../base.js";
 
@@ -11,6 +12,7 @@ export class Attachment extends Base {
     this.hasOne("translation");
   }
 }
+registerConstant("Attachment", Attachment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Attachment {
   get record(): Base | null | Promise<Base | null>;

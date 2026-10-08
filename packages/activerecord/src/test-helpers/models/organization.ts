@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -34,6 +35,7 @@ export class Organization extends Base {
     });
   }
 }
+registerConstant("Organization", Organization);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Organization {
   get author(): Author | null | Promise<Author | null>;

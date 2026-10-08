@@ -1,4 +1,4 @@
-import { Exception, RuntimeError, kernelThrow } from "@blazetrails/ruby-compat";
+import { Exception, RuntimeError, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { BestHardback } from "./hardback.js";
 import type { Book } from "./book.js";
@@ -906,6 +906,7 @@ export class Author extends Base {
     return ["twitter", "github"];
   }
 }
+registerConstant("Author", Author);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Author {
   get post(): Post | null | Promise<Post | null>;
@@ -959,6 +960,7 @@ export class AuthorAddress extends Base {
     });
   }
 }
+registerConstant("AuthorAddress", AuthorAddress);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorAddress {
   get author(): Author | null | Promise<Author | null>;
@@ -975,6 +977,7 @@ export class AuthorFavorite extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+registerConstant("AuthorFavorite", AuthorFavorite);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavorite {
   get author(): Author | null | Promise<Author | null>;
@@ -994,6 +997,7 @@ export class AuthorFavoriteWithScope extends Base {
     this.belongsTo("favoriteAuthor", { className: "Author" });
   }
 }
+registerConstant("AuthorFavoriteWithScope", AuthorFavoriteWithScope);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuthorFavoriteWithScope {
   get author(): Author | null | Promise<Author | null>;

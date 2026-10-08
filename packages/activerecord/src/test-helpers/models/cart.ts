@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Cart extends Base {
@@ -6,3 +7,4 @@ export class Cart extends Base {
 
   static _primaryKey = "id";
 }
+registerConstant("Cart", Cart);

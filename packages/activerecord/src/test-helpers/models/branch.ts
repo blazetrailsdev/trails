@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 
@@ -11,6 +12,7 @@ export class Branch extends Base {
     this.belongsTo("branch", { optional: true });
   }
 }
+registerConstant("Branch", Branch);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Branch {
   get branch(): Branch | null | Promise<Branch | null>;
@@ -30,6 +32,7 @@ export class BrokenBranch extends Branch {
     });
   }
 }
+registerConstant("BrokenBranch", BrokenBranch);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface BrokenBranch {
   get branch(): BrokenBranch | null | Promise<BrokenBranch | null>;

@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { OrderedTag } from "./tag.js";
 import type { Tag } from "./tag.js";
@@ -41,6 +41,7 @@ export class Tagging extends Base {
     this.hasMany("things", { through: "taggable" });
   }
 }
+registerConstant("Tagging", Tagging);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tagging {
   get tag(): Tag | null | Promise<Tag | null>;
@@ -64,3 +65,4 @@ export class IndestructibleTagging extends Tagging {
     this.beforeDestroy(() => kernelThrow(":abort"));
   }
 }
+registerConstant("IndestructibleTagging", IndestructibleTagging);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 
@@ -14,6 +15,7 @@ export class CommentOverlappingCounterCache extends Base {
     this.belongsTo("commentable", { polymorphic: true, counterCache: "comments_count" });
   }
 }
+registerConstant("CommentOverlappingCounterCache", CommentOverlappingCounterCache);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentOverlappingCounterCache {
   get userCommentsCount(): UserCommentsCount | null | Promise<UserCommentsCount | null>;
@@ -32,6 +34,7 @@ export class UserCommentsCount extends Base {
     this.hasMany("comments", { as: "commentable", className: "CommentOverlappingCounterCache" });
   }
 }
+registerConstant("UserCommentsCount", UserCommentsCount);
 
 export class PostCommentsCount extends Base {
   declare comments: AssociationProxy<CommentOverlappingCounterCache>;
@@ -41,3 +44,4 @@ export class PostCommentsCount extends Base {
     this.hasMany("comments", { className: "CommentOverlappingCounterCache" });
   }
 }
+registerConstant("PostCommentsCount", PostCommentsCount);

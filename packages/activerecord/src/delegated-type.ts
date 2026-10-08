@@ -1,7 +1,6 @@
 import type { Base } from "./base.js";
 import { camelize, constantize, inquiry, singularize, tableize } from "@blazetrails/activesupport";
 import { hashDelete, merge, rbFPublicSend } from "@blazetrails/ruby-compat";
-import { autoloadModel } from "./associations.js";
 
 export interface DelegatedTypeOptions {
   types: string[];
@@ -52,7 +51,6 @@ export function defineDelegatedTypeMethods(
   Object.defineProperty(this.prototype, `${role}Class`, {
     get(this: Base) {
       const type = rbFPublicSend(this, roleType) as string;
-      autoloadModel(type);
       return constantize(type) as typeof Base;
     },
     configurable: true,

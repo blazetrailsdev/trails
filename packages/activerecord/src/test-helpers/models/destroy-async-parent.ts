@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasMany } from "./dl-keyed-has-many.js";
 import type { DlKeyedHasManyThrough } from "./dl-keyed-has-many-through.js";
@@ -40,6 +41,7 @@ export class DestroyAsyncParent extends Base {
     });
   }
 }
+registerConstant("DestroyAsyncParent", DestroyAsyncParent);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestroyAsyncParent {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;

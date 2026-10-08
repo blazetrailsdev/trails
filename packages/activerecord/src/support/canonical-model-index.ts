@@ -1,22 +1,11 @@
-import { Base } from "../base.js";
-import { _setCanonicalModelAutoloadIndex } from "../associations.js";
-import { rbModName } from "@blazetrails/ruby-compat";
 import "./canonical-model-index-encryption-setup.js";
-import * as canonicalModels from "../test-helpers/models/index.js";
+import "../test-helpers/models/index.js";
+import { safeConstantize } from "@blazetrails/activesupport";
+import type { Base } from "../base.js";
+import { flushPendingCounterCacheColumns } from "../counter-cache.js";
+import { pendingCounterCacheColumns } from "../counter-cache-state.js";
 
-function buildCanonicalModelIndex(): ReadonlyMap<string, typeof Base> {
-  const index = new Map<string, typeof Base>();
-  for (const exported of Object.values(canonicalModels)) {
-    if (typeof exported === "function" && exported !== Base) {
-      const cls = exported as typeof Base;
-      for (const key of new Set([cls.name, rbModName(cls)])) {
-        if (key && !index.has(key)) index.set(key, cls);
-      }
-    }
-  }
-  return index;
+for (const className of pendingCounterCacheColumns.keys()) {
+  const klass = safeConstantize(className) as typeof Base | null | undefined;
+  if (klass != null) flushPendingCounterCacheColumns(klass, className);
 }
-
-export const canonicalModelIndex = buildCanonicalModelIndex();
-
-_setCanonicalModelAutoloadIndex(canonicalModelIndex);

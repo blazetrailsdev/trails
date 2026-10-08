@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { LineItem } from "./line-item.js";
@@ -29,3 +30,4 @@ export class Invoice extends Base {
     });
   }
 }
+registerConstant("Invoice", Invoice);

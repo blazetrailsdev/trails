@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class DlKeyedHasOne extends Base {
@@ -7,3 +8,4 @@ export class DlKeyedHasOne extends Base {
 
   static _primaryKey = "has_one_key";
 }
+registerConstant("DlKeyedHasOne", DlKeyedHasOne);

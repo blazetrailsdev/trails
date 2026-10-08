@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Owner } from "./owner.js";
@@ -37,6 +38,7 @@ export class Pet extends Base {
     });
   }
 }
+registerConstant("Pet", Pet);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Pet {
   get owner(): Owner | null | Promise<Owner | null>;
@@ -54,6 +56,7 @@ export class PetTouchHappyAt extends Base {
     this.belongsTo("owner", { touch: "happy_at" });
   }
 }
+registerConstant("PetTouchHappyAt", PetTouchHappyAt);
 
 export class PetCounterCacheTouch extends Base {
   declare name: string;
@@ -66,3 +69,4 @@ export class PetCounterCacheTouch extends Base {
     this.belongsTo("owner", { counterCache: "use_count", touch: true });
   }
 }
+registerConstant("PetCounterCacheTouch", PetCounterCacheTouch);

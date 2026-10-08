@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class WarehouseThing extends Base {
@@ -7,3 +8,4 @@ export class WarehouseThing extends Base {
     this.validates("value", { uniqueness: true });
   }
 }
+registerConstant("WarehouseThing", WarehouseThing);

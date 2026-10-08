@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Dashboard } from "./dashboard.js";
 import type { Speedometer } from "./speedometer.js";
 import { Base } from "../../base.js";
@@ -16,6 +17,7 @@ export class Minivan extends Base {
     this.attrReadonly("color");
   }
 }
+registerConstant("Minivan", Minivan);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Minivan {
   get speedometer(): Speedometer | null | Promise<Speedometer | null>;

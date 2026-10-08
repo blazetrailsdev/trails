@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ARUnit2Model } from "./arunit2-model.js";
 
 export class Professor extends ARUnit2Model {
@@ -5,3 +6,4 @@ export class Professor extends ARUnit2Model {
     this.hasAndBelongsToMany("courses");
   }
 }
+registerConstant("Professor", Professor);

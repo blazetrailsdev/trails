@@ -15,7 +15,7 @@ import { StringType } from "@blazetrails/activemodel";
 import { Base } from "../../base.js";
 import * as Type from "../../type.js";
 import type { Relation } from "../../relation.js";
-import { Module, Range, RuntimeError } from "@blazetrails/ruby-compat";
+import { Module, Range, RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Developer extends Base {
@@ -206,6 +206,7 @@ export class Developer extends Base {
     (this as any).auditLogs.build({ message });
   }
 }
+registerConstant("Developer", Developer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Developer {
   get mentor(): Mentor | null | Promise<Mentor | null>;
@@ -223,6 +224,7 @@ export interface Developer {
 }
 
 export class SubDeveloper extends Developer {}
+registerConstant("SubDeveloper", SubDeveloper);
 
 export class SpecialDeveloper extends Base {
   declare specialContracts: AssociationProxy<SpecialContract>;
@@ -232,6 +234,7 @@ export class SpecialDeveloper extends Base {
     this.hasMany("specialContracts", { foreignKey: "developer_id" });
   }
 }
+registerConstant("SpecialDeveloper", SpecialDeveloper);
 
 export class SymbolIgnoredDeveloper extends Base {
   declare last_name: unknown;
@@ -242,6 +245,7 @@ export class SymbolIgnoredDeveloper extends Base {
     this.attribute("last_name");
   }
 }
+registerConstant("SymbolIgnoredDeveloper", SymbolIgnoredDeveloper);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AuditLog extends Base {
@@ -254,6 +258,7 @@ export class AuditLog extends Base {
     this.belongsTo("unvalidatedDeveloper", { className: "Developer" });
   }
 }
+registerConstant("AuditLog", AuditLog);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLog {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -269,6 +274,7 @@ export class AuditLogRequired extends Base {
     this.belongsTo("developer", { required: true });
   }
 }
+registerConstant("AuditLogRequired", AuditLogRequired);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AuditLogRequired {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -290,6 +296,7 @@ export class DeveloperWithBeforeDestroyRaise extends Base {
     });
   }
 }
+registerConstant("DeveloperWithBeforeDestroyRaise", DeveloperWithBeforeDestroyRaise);
 
 export class DeveloperWithSelect extends Base {
   static {
@@ -299,6 +306,7 @@ export class DeveloperWithSelect extends Base {
     });
   }
 }
+registerConstant("DeveloperWithSelect", DeveloperWithSelect);
 
 export class DeveloperwithDefaultMentorScopeNot extends Base {
   static {
@@ -308,6 +316,7 @@ export class DeveloperwithDefaultMentorScopeNot extends Base {
     });
   }
 }
+registerConstant("DeveloperwithDefaultMentorScopeNot", DeveloperwithDefaultMentorScopeNot);
 
 export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
   static {
@@ -320,6 +329,10 @@ export class DeveloperWithDefaultMentorScopeAllQueries extends Base {
     );
   }
 }
+registerConstant(
+  "DeveloperWithDefaultMentorScopeAllQueries",
+  DeveloperWithDefaultMentorScopeAllQueries,
+);
 
 export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
   static {
@@ -333,6 +346,10 @@ export class DeveloperWithDefaultNilableFirmScopeAllQueries extends Base {
     );
   }
 }
+registerConstant(
+  "DeveloperWithDefaultNilableFirmScopeAllQueries",
+  DeveloperWithDefaultNilableFirmScopeAllQueries,
+);
 
 export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries extends Base {
   static {
@@ -349,6 +366,10 @@ export class DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScope
     );
   }
 }
+registerConstant(
+  "DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries",
+  DeveloperWithIncludedMentorDefaultScopeNotAllQueriesAndDefaultScopeFirmWithAllQueries,
+);
 
 export class DeveloperWithIncludes extends Base {
   declare auditLogs: AssociationProxy<AuditLog>;
@@ -361,6 +382,7 @@ export class DeveloperWithIncludes extends Base {
     });
   }
 }
+registerConstant("DeveloperWithIncludes", DeveloperWithIncludes);
 
 export class DeveloperFilteredOnJoins extends Base {
   declare projects: AssociationProxy<Project>;
@@ -382,6 +404,7 @@ export class DeveloperFilteredOnJoins extends Base {
     });
   }
 }
+registerConstant("DeveloperFilteredOnJoins", DeveloperFilteredOnJoins);
 
 export class DeveloperOrderedBySalary extends Base {
   declare static byName: () => Relation<DeveloperOrderedBySalary>;
@@ -400,6 +423,7 @@ export class DeveloperOrderedBySalary extends Base {
     });
   }
 }
+registerConstant("DeveloperOrderedBySalary", DeveloperOrderedBySalary);
 
 export class DeveloperCalledDavid extends Base {
   static {
@@ -409,6 +433,7 @@ export class DeveloperCalledDavid extends Base {
     });
   }
 }
+registerConstant("DeveloperCalledDavid", DeveloperCalledDavid);
 
 export class LazyLambdaDeveloperCalledDavid extends Base {
   static {
@@ -418,6 +443,7 @@ export class LazyLambdaDeveloperCalledDavid extends Base {
     });
   }
 }
+registerConstant("LazyLambdaDeveloperCalledDavid", LazyLambdaDeveloperCalledDavid);
 
 export class LazyBlockDeveloperCalledDavid extends Base {
   static {
@@ -427,6 +453,7 @@ export class LazyBlockDeveloperCalledDavid extends Base {
     });
   }
 }
+registerConstant("LazyBlockDeveloperCalledDavid", LazyBlockDeveloperCalledDavid);
 
 export class CallableDeveloperCalledDavid extends Base {
   static {
@@ -435,6 +462,7 @@ export class CallableDeveloperCalledDavid extends Base {
     this.defaultScope({ call: () => call });
   }
 }
+registerConstant("CallableDeveloperCalledDavid", CallableDeveloperCalledDavid);
 
 export class ClassMethodDeveloperCalledDavid extends Base {
   static {
@@ -445,6 +473,7 @@ export class ClassMethodDeveloperCalledDavid extends Base {
     return this.where({ name: "David" });
   }
 }
+registerConstant("ClassMethodDeveloperCalledDavid", ClassMethodDeveloperCalledDavid);
 
 export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<ClassMethodReferencingScopeDeveloperCalledDavid>;
@@ -460,6 +489,10 @@ export class ClassMethodReferencingScopeDeveloperCalledDavid extends Base {
     return this.david();
   }
 }
+registerConstant(
+  "ClassMethodReferencingScopeDeveloperCalledDavid",
+  ClassMethodReferencingScopeDeveloperCalledDavid,
+);
 
 export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
   declare static david: () => Relation<LazyBlockReferencingScopeDeveloperCalledDavid>;
@@ -474,6 +507,10 @@ export class LazyBlockReferencingScopeDeveloperCalledDavid extends Base {
     });
   }
 }
+registerConstant(
+  "LazyBlockReferencingScopeDeveloperCalledDavid",
+  LazyBlockReferencingScopeDeveloperCalledDavid,
+);
 
 export class DeveloperCalledJamis extends Base {
   declare legacy_updated_at: any;
@@ -501,6 +538,7 @@ export class DeveloperCalledJamis extends Base {
     });
   }
 }
+registerConstant("DeveloperCalledJamis", DeveloperCalledJamis);
 
 export class PoorDeveloperCalledJamis extends Base {
   static {
@@ -510,6 +548,7 @@ export class PoorDeveloperCalledJamis extends Base {
     });
   }
 }
+registerConstant("PoorDeveloperCalledJamis", PoorDeveloperCalledJamis);
 
 export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -519,6 +558,7 @@ export class InheritedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
     });
   }
 }
+registerConstant("InheritedPoorDeveloperCalledJamis", InheritedPoorDeveloperCalledJamis);
 
 export class MultiplePoorDeveloperCalledJamis extends Base {
   static {
@@ -534,6 +574,7 @@ export class MultiplePoorDeveloperCalledJamis extends Base {
     });
   }
 }
+registerConstant("MultiplePoorDeveloperCalledJamis", MultiplePoorDeveloperCalledJamis);
 
 export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis {
   static {
@@ -543,6 +584,7 @@ export class ModuleIncludedPoorDeveloperCalledJamis extends DeveloperCalledJamis
     });
   }
 }
+registerConstant("ModuleIncludedPoorDeveloperCalledJamis", ModuleIncludedPoorDeveloperCalledJamis);
 
 export class EagerDeveloperWithDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -564,6 +606,7 @@ export class EagerDeveloperWithDefaultScope extends Base {
     });
   }
 }
+registerConstant("EagerDeveloperWithDefaultScope", EagerDeveloperWithDefaultScope);
 
 export class EagerDeveloperWithClassMethodDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -586,6 +629,10 @@ export class EagerDeveloperWithClassMethodDefaultScope extends Base {
     return this.includes(":projects");
   }
 }
+registerConstant(
+  "EagerDeveloperWithClassMethodDefaultScope",
+  EagerDeveloperWithClassMethodDefaultScope,
+);
 
 export class EagerDeveloperWithLambdaDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -607,6 +654,7 @@ export class EagerDeveloperWithLambdaDefaultScope extends Base {
     });
   }
 }
+registerConstant("EagerDeveloperWithLambdaDefaultScope", EagerDeveloperWithLambdaDefaultScope);
 
 export class EagerDeveloperWithBlockDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -628,6 +676,7 @@ export class EagerDeveloperWithBlockDefaultScope extends Base {
     });
   }
 }
+registerConstant("EagerDeveloperWithBlockDefaultScope", EagerDeveloperWithBlockDefaultScope);
 
 export class EagerDeveloperWithCallableDefaultScope extends Base {
   declare projects: AssociationProxy<Project>;
@@ -648,6 +697,7 @@ export class EagerDeveloperWithCallableDefaultScope extends Base {
     this.defaultScope({ call: () => call });
   }
 }
+registerConstant("EagerDeveloperWithCallableDefaultScope", EagerDeveloperWithCallableDefaultScope);
 
 export class ThreadsafeDeveloper extends Base {
   static {
@@ -657,6 +707,7 @@ export class ThreadsafeDeveloper extends Base {
     });
   }
 }
+registerConstant("ThreadsafeDeveloper", ThreadsafeDeveloper);
 
 export class CachedDeveloper extends Base {
   static {
@@ -668,6 +719,7 @@ export class CachedDeveloper extends Base {
     this.aliasAttribute("updated_on", "legacy_updated_on");
   }
 }
+registerConstant("CachedDeveloper", CachedDeveloper);
 
 export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
   declare companies: AssociationProxy<Company>;
@@ -679,12 +731,17 @@ export class DeveloperWithIncorrectlyOrderedHasManyThrough extends Base {
     this.hasMany("contracts", { foreignKey: "developer_id" });
   }
 }
+registerConstant(
+  "DeveloperWithIncorrectlyOrderedHasManyThrough",
+  DeveloperWithIncorrectlyOrderedHasManyThrough,
+);
 
 export class DeveloperName extends StringType {
   deserialize(value: unknown): string {
     return `Developer: ${value}`;
   }
 }
+registerConstant("DeveloperName", DeveloperName);
 
 Type.register("developer_name", DeveloperName);
 
@@ -697,6 +754,7 @@ export class AttributedDeveloper extends Base {
     this.ignoredColumns = ["name"];
   }
 }
+registerConstant("AttributedDeveloper", AttributedDeveloper);
 
 export class ColumnNamesCachedDeveloper extends Base {
   static {
@@ -704,6 +762,7 @@ export class ColumnNamesCachedDeveloper extends Base {
     if (this.columnNames().includes("name")) this.ignoredColumns = [...this.ignoredColumns, "name"];
   }
 }
+registerConstant("ColumnNamesCachedDeveloper", ColumnNamesCachedDeveloper);
 
 export class AuditRequiredDeveloper extends Base {
   declare requiredAuditLogs: AssociationProxy<AuditLogRequired>;
@@ -713,6 +772,7 @@ export class AuditRequiredDeveloper extends Base {
     this.hasMany("requiredAuditLogs", { className: "AuditLogRequired" });
   }
 }
+registerConstant("AuditRequiredDeveloper", AuditRequiredDeveloper);
 
 export class DevWithAfterTouch extends Base {
   declare afterTouchCalled: boolean | undefined;
@@ -728,6 +788,7 @@ export class DevWithAfterTouch extends Base {
     });
   }
 }
+registerConstant("DevWithAfterTouch", DevWithAfterTouch);
 
 export class MutatingSaveKlass extends Base {
   declare legacy_updated_at: any;
@@ -746,6 +807,7 @@ export class MutatingSaveKlass extends Base {
     });
   }
 }
+registerConstant("MutatingSaveKlass", MutatingSaveKlass);
 
 export class MutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -764,6 +826,7 @@ export class MutatingUpdateKlass extends Base {
     });
   }
 }
+registerConstant("MutatingUpdateKlass", MutatingUpdateKlass);
 
 export class NonMutatingUpdateKlass extends Base {
   declare legacy_updated_at: any;
@@ -776,3 +839,4 @@ export class NonMutatingUpdateKlass extends Base {
     this.beforeUpdate(function () {});
   }
 }
+registerConstant("NonMutatingUpdateKlass", NonMutatingUpdateKlass);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class UuidEntry extends Base {
@@ -9,3 +10,4 @@ export class UuidEntry extends Base {
     });
   }
 }
+registerConstant("UuidEntry", UuidEntry);

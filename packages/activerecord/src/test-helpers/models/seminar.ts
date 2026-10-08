@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Section } from "./section.js";
 import type { Session } from "./session.js";
@@ -13,3 +14,4 @@ export class Seminar extends Base {
     this.hasMany("sessions", { through: "sections" });
   }
 }
+registerConstant("Seminar", Seminar);

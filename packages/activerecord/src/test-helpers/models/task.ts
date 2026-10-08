@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
 
@@ -15,3 +16,4 @@ export class Task extends Base {
     return this.readAttribute("ending");
   }
 }
+registerConstant("Task", Task);

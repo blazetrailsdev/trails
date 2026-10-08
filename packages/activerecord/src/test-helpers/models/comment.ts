@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -12,6 +13,7 @@ import { Base } from "../../base.js";
 import { registerSubclass } from "../../inheritance.js";
 
 export class OopsError extends Error {}
+registerConstant("OopsError", OopsError);
 
 const OopsExtension = {
   destroyAll(): never {
@@ -139,6 +141,7 @@ export class Comment extends Base {
     return this.readAttribute("body") as string;
   }
 }
+registerConstant("Comment", Comment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Comment {
   get specialPostWithDefaultScope():
@@ -181,6 +184,7 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
+registerConstant("SpecialComment", SpecialComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
@@ -190,8 +194,10 @@ export interface SpecialComment {
 }
 
 export class SubSpecialComment extends SpecialComment {}
+registerConstant("SubSpecialComment", SubSpecialComment);
 
 export class VerySpecialComment extends Comment {}
+registerConstant("VerySpecialComment", VerySpecialComment);
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
   static {
@@ -205,6 +211,7 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
     });
   }
 }
+registerConstant("CommentThatAutomaticallyAltersPostBody", CommentThatAutomaticallyAltersPostBody);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
@@ -215,6 +222,10 @@ export class CommentWithDefaultScopeReferencesAssociation extends Comment {
     this.belongsTo("developer");
   }
 }
+registerConstant(
+  "CommentWithDefaultScopeReferencesAssociation",
+  CommentWithDefaultScopeReferencesAssociation,
+);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CommentWithDefaultScopeReferencesAssociation {
   get developer(): Developer | null | Promise<Developer | null>;
@@ -228,6 +239,7 @@ export class CommentWithAfterCreateUpdate extends Comment {
     });
   }
 }
+registerConstant("CommentWithAfterCreateUpdate", CommentWithAfterCreateUpdate);
 
 for (const klass of [
   SpecialComment,

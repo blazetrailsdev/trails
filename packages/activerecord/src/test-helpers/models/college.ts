@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { ARUnit2Model } from "./arunit2-model.js";
 
 export class College extends ARUnit2Model {
@@ -13,3 +14,4 @@ export class College extends ARUnit2Model {
     );
   }
 }
+registerConstant("College", College);

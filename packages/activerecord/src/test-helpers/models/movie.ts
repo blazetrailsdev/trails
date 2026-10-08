@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Movie extends Base {
@@ -9,3 +10,4 @@ export class Movie extends Base {
     this.validates("name", { presence: true });
   }
 }
+registerConstant("Movie", Movie);
