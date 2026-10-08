@@ -15,12 +15,10 @@ export class ScaffoldGenerator extends Base {
   /** @internal */
   declare _controllerClassPath: string[];
 
-  /** @inventedArm dasherize — PERMANENT */
   createRootFolder(): void {
     this.emptyDirectory(File.join("app/views", dasherize(this.controllerFilePath())));
   }
 
-  /** @inventedArm dasherize — PERMANENT */
   copyViewFiles(): void {
     const viewDirectory = dasherize(this.controllerFilePath());
     for (const view of this.availableViews()) {

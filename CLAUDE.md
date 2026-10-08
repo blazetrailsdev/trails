@@ -2011,8 +2011,9 @@ itself (`render(lineItem)`) is looked up through `partialPath`
 `renderer/abstract_renderer.rb`), which dasherizes the directory part of the
 record's `to_partial_path` and leaves the partial's own name alone:
 `line_items/line_item` is found at `line-items/_line_item`. `to_partial_path`
-is unchanged, as `controller_path` is. Both sites carry
-`@inventedArm dasherize — PERMANENT`.
+is unchanged, as `controller_path` is. `partialPath` carries
+`@inventedArm dasherize — PERMANENT`; the scaffold generator's methods are not
+compared against Rails' and carry no receipt.
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
