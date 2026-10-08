@@ -303,7 +303,7 @@ export class Duration {
   }
 
   abs(): number {
-    return Math.abs(this.value);
+    return rbFloatTypeP(this.value) ? rbDbl2num(Math.abs(this.value)) : Math.abs(this.value);
   }
 
   inSeconds(): number {
@@ -755,7 +755,7 @@ export class Scalar {
   compareTo(other: unknown): number | null {
     if (other instanceof Scalar || other instanceof Duration) {
       return cmp(this.value, other.value);
-    } else if (typeof other === "number") {
+    } else if (rbObjIsKindOf(other, rbCNumeric)) {
       return cmp(this.value, other);
     } else {
       return null;

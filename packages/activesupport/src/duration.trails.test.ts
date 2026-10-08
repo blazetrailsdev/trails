@@ -85,6 +85,10 @@ describe("Duration over a Float value", () => {
   it("<=>, == and eql? read a whole Float value", () => {
     expect(hours(1).compareTo(new Number(2))).toBe(1);
     expect(twoHours().compareTo(7200)).toBe(0);
+    expect(new Scalar(5).compareTo(new Number(5))).toBe(0);
+    expect(new Scalar(5).compareTo(new Number(6))).toBe(-1);
+    expect(twoHours().negate().abs()).toEqual(new Number(7200));
+    expect(hours(2).negate().abs()).toBe(7200);
     expect(twoHours().equals(hours(2))).toBe(true);
     expect(twoHours().eql(hours(2))).toBe(false);
     expect(twoHours().eql(twoHours())).toBe(true);
