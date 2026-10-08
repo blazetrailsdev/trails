@@ -5,6 +5,7 @@ import {
   hasKey,
   last,
   merge,
+  rbRegMatchP,
   rbStrPartition,
   registerConstant,
 } from "@blazetrails/ruby-compat";
@@ -746,6 +747,19 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
+  extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null {
+    return this.hasDefaultFunction(defaultValue, default_) ? default_ : null;
+  }
+
+  /** @internal */
+  hasDefaultFunction(defaultValue: unknown, default_: string | null): boolean {
+    return (
+      !rtest(defaultValue) &&
+      rbRegMatchP(/\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/, default_)
+    );
+  }
+
+  /** @internal */
   async alterTable(
     tableName: string,
     foreignKeys?: ForeignKeyDefinition[],
@@ -1257,19 +1271,6 @@ export class SQLite3Integer extends IntegerType {
   protected override _limit(): number {
     return this.limit ?? 8;
   }
-}
-
-/** @internal */
-function extractDefaultFunction(defaultValue: unknown, default_: string): string | undefined {
-  return hasDefaultFunction(defaultValue, default_) ? default_ : undefined;
-}
-
-/** @internal */
-function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
-  return (
-    defaultValue == null &&
-    /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(default_)
-  );
 }
 
 /** @internal */

@@ -591,9 +591,6 @@ export class Base extends Model {
   declare static _primaryKey?: string | string[];
   static readonly _isActiveRecordBase = true;
 
-  /** @internal */
-  declare static _registryKeys: string[];
-
   declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 
   declare static inspectionFilter: typeof _Core.ClassMethods.inspectionFilter;

@@ -12,6 +12,6 @@ export class AdminAccount extends Base {
   declare users: AssociationProxy<AdminUser>;
 
   static {
-    this.hasMany("users", { className: "AdminUser" });
+    this.hasMany("users");
   }
 }

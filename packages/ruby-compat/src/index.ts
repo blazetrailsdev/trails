@@ -357,6 +357,7 @@ export { stringDelete } from "./string/delete.js";
 export { sliceBang } from "./string/slice.js";
 export { strCount } from "./string/tr.js";
 export {
+  center,
   lastMatchGetter,
   matchOperator,
   rbDefineMethod,
@@ -364,6 +365,7 @@ export {
   rbStrMatch,
   rbStrRespondTo,
   rbStrSend,
+  rstrip,
   strip,
   STRING_METHOD_TABLE,
   stringSuperclass,

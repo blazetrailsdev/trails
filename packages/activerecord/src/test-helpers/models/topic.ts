@@ -288,7 +288,7 @@ export class WebTopic extends Base {
     this.hasMany("replies", {
       dependent: "destroy",
       foreignKey: "parent_id",
-      className: "WebReply",
+      className: "Web::Reply",
     });
   }
 }

@@ -25,7 +25,7 @@ export class AdminUserJson extends Base {
   }
 
   static {
-    this.belongsTo("account", { className: "AdminAccount" });
+    this.belongsTo("account");
 
     this.store("params", { accessors: ["token"], coder: JSON });
     this.store("settings", { accessors: ["color", "homepage"], coder: new Coder() });

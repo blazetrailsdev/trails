@@ -220,6 +220,8 @@ describe("SQLite3::SchemaStatements", () => {
         fetchTypeMetadata: (t: string) =>
           new SqlTypeMetadata({ sqlType: t, type: t.toLowerCase() }),
         extractValueFromDefault: _extractValueFromDefault,
+        extractDefaultFunction: SQLite3Adapter.prototype.extractDefaultFunction,
+        hasDefaultFunction: SQLite3Adapter.prototype.hasDefaultFunction,
       } as any;
     }
 

@@ -115,7 +115,11 @@ export class WebReply extends WebTopic {
     rbModConstSet(Web, "Reply", this);
   }
   static {
-    this.belongsTo("topic", { foreignKey: "parent_id", counterCache: true, className: "WebTopic" });
+    this.belongsTo("topic", {
+      foreignKey: "parent_id",
+      counterCache: true,
+      className: "Web::Topic",
+    });
   }
 }
 

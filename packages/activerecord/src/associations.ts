@@ -149,14 +149,14 @@ function guardCanonicalNameShadow(name: string, model: typeof Base): void {
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry
+ * @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
   guardCanonicalNameShadow(name, model);
   registerConstant(name, model);
 }
 
-/** @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry */
+/** @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -178,9 +178,6 @@ export function registerModel(
     if (!model) throw new ArgumentError("registerModel(name, model) requires a model class");
     assertActiveRecordBase(model);
     modelRegistry.set(nameOrModel, model);
-    const keys: string[] = model._registryKeys ?? [];
-    if (!keys.includes(nameOrModel)) keys.push(nameOrModel);
-    model._registryKeys = keys;
     flushPendingCounterCacheColumns(model, nameOrModel);
   } else {
     assertActiveRecordBase(nameOrModel);
@@ -203,7 +200,7 @@ export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeo
 
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry
+ * @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants
  */
 export function autoloadModel(name: string): void {
   const bare = name.replace(/^::/, "");
@@ -301,8 +298,7 @@ export class Associations {
 
     rbModConstSet(self, joinModel.name, joinModel);
 
-    const registryKey = `${self.name}::${joinModel.name}`;
-    modelRegistry.set(registryKey, joinModel);
+    modelRegistry.set(`${rbModName(self)}::${joinModel.name}`, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
     HasManyBuilder.defineCallbacks(self, middleReflection);

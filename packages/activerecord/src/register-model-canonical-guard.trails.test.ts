@@ -97,10 +97,7 @@ describe("registerModel canonical-name shadow guard", () => {
         expect(safeConstantize(name)).not.toBe(model);
       }
     } finally {
-      for (const [name, model] of saved) {
-        if (model._registryKeys?.includes(name)) registerModel(name, model);
-        else modelRegistry.set(name, model);
-      }
+      for (const [name, model] of saved) modelRegistry.set(name, model);
     }
   });
 });

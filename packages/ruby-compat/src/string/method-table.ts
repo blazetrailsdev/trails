@@ -409,6 +409,26 @@ export function strip(str: string): string {
 }
 
 /**
+ * `String#rstrip` (`vendor/ruby/v3.3.11/string.c:9952` `rb_str_rstrip`): the
+ * receiver without its trailing NUL and ASCII whitespace (`rstrip_offset`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rstrip(str: string): string {
+  return str.replace(RSTRIP, "");
+}
+
+/**
+ * `String#center` (`vendor/ruby/v3.3.11/string.c:10560` `rb_str_center`):
+ * `str` centred in `width` characters, padded with `padstr`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function center(str: string, ...argv: unknown[]): string {
+  return rbStrJustify(argv, str, "c");
+}
+
+/**
  * `rb_define_method` (`vendor/ruby/v3.3.11/class.c:2134`) with a fixed `argc`, which MRI
  * checks.
  *
