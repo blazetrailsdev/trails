@@ -1,13 +1,11 @@
-import { KeyError } from "@blazetrails/ruby-compat";
+import { KeyError, LoadError } from "@blazetrails/ruby-compat";
 
 import { Entry } from "./entry.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Store } from "./store.js";
 import { coder } from "./coder.js";
 import { deflate, inflate } from "../gzip.js";
-import { CacheSerializer } from "../message-pack/cache-serializer.js";
-
-const messagePack = new CacheSerializer();
+import { ActiveSupport } from "../namespaces.js";
 
 /**
  * `Marshal.dump` answers an ASCII-8BIT String — its buffer is
@@ -124,11 +122,13 @@ const marshal71WithFallback: Serializer = {
 
 const messagePackWithFallback: Serializer = {
   dump(value: Entry | unknown): string {
-    return Buffer.from(messagePack.dump(value)).toString("latin1");
+    return Buffer.from(ActiveSupport.MessagePack!.CacheSerializer.dump(value)).toString("latin1");
   },
 
   _load(dumped: string | Entry): unknown {
-    const result = messagePack.load(Buffer.from(dumped as string, "latin1"));
+    const result = ActiveSupport.MessagePack!.CacheSerializer.load(
+      Buffer.from(dumped as string, "latin1"),
+    );
     return result === undefined ? null : result;
   },
 
@@ -136,13 +136,12 @@ const messagePackWithFallback: Serializer = {
     return (
       this.isAvailable!() &&
       typeof dumped === "string" &&
-      dumped.charCodeAt(0) === 0xcc &&
-      dumped.charCodeAt(1) === 0x80
+      ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped, "latin1"))
     );
   },
 
   isAvailable(): boolean {
-    return true;
+    return ActiveSupport.MessagePack !== undefined;
   },
 };
 
@@ -182,6 +181,10 @@ export const SerializerWithFallback = {
   load: sharedLoad,
 
   get(format: string): Serializer & { load(dumped: unknown): unknown } {
+    if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
+      throw new LoadError("cannot load such file -- active_support/message_pack");
+    }
+
     const s = SERIALIZERS[format];
     if (!s) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
     return { ...s, load: sharedLoad };

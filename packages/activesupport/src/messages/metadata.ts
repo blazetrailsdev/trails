@@ -1,7 +1,8 @@
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
-import { MessagePack } from "../message-pack.js";
+import { onLoad } from "../lazy-load-hooks.js";
+import { ActiveSupport } from "../namespaces.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";
@@ -29,16 +30,11 @@ function isPresent(value: unknown): boolean {
 export abstract class Metadata {
   static useMessageSerializerForMetadata = false;
 
-  static readonly ENVELOPE_SERIALIZERS: readonly unknown[] = [
-    ...Object.values(SERIALIZERS),
-    coder,
-    MessagePack,
-  ];
+  static readonly ENVELOPE_SERIALIZERS: unknown[] = [...Object.values(SERIALIZERS), coder];
 
-  static readonly TIMESTAMP_SERIALIZERS: readonly unknown[] = [
+  static readonly TIMESTAMP_SERIALIZERS: unknown[] = [
     SERIALIZERS.message_pack,
     SERIALIZERS.message_pack_allow_marshal,
-    MessagePack,
   ];
 
   protected abstract readonly serializer: MessageSerializer;
@@ -189,3 +185,8 @@ export abstract class Metadata {
     return this.deserialize(this.decode(string, { urlSafe: false }).toString("latin1"));
   }
 }
+
+onLoad("message_pack", () => {
+  Metadata.ENVELOPE_SERIALIZERS.push(ActiveSupport.MessagePack);
+  Metadata.TIMESTAMP_SERIALIZERS.push(ActiveSupport.MessagePack);
+});

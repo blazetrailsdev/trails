@@ -1,9 +1,9 @@
-import { ArgumentError, KeyError, RuntimeError } from "@blazetrails/ruby-compat";
+import { ArgumentError, KeyError, LoadError, RuntimeError } from "@blazetrails/ruby-compat";
 
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
-import { MessagePack } from "../message-pack.js";
+import { ActiveSupport } from "../namespaces.js";
 
 /** @internal */
 export type Format =
@@ -151,21 +151,21 @@ const messagePackWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return Buffer.from(MessagePack.dump(object)).toString("latin1");
+    return Buffer.from(ActiveSupport.MessagePack!.dump(object)).toString("latin1");
   },
 
   _load(dumped: string): unknown {
-    return MessagePack.load(Buffer.from(dumped, "latin1"));
+    return ActiveSupport.MessagePack!.load(Buffer.from(dumped, "latin1"));
   },
 
   dumped(dumped: string): boolean {
-    return isAvailable() && MessagePack.isSignature(Buffer.from(dumped, "latin1"));
+    return isAvailable() && ActiveSupport.MessagePack!.isSignature(Buffer.from(dumped, "latin1"));
   },
 };
 
 /** @internal */
 function isAvailable(): boolean {
-  return true;
+  return ActiveSupport.MessagePack !== undefined;
 }
 
 const messagePackWithFallbackAllowMarshal: Serializer = {
@@ -188,6 +188,10 @@ export const SerializerWithFallback = {
   SERIALIZERS,
 
   get(format: string): Serializer {
+    if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
+      throw new LoadError("cannot load such file -- active_support/message_pack");
+    }
+
     const serializer = SERIALIZERS[format as Format];
     if (!serializer) throw new KeyError(`key not found: ${JSON.stringify(format)}`);
     return serializer;

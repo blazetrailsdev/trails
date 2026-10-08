@@ -2,6 +2,7 @@ import "@blazetrails/msgpack";
 import { runLoadHooks } from "./lazy-load-hooks.js";
 import { CacheSerializer } from "./message-pack/cache-serializer.js";
 import { Serializer } from "./message-pack/serializer.js";
+import { ActiveSupport } from "./namespaces.js";
 
 export { Serializer } from "./message-pack/serializer.js";
 export { CacheSerializer } from "./message-pack/cache-serializer.js";
@@ -12,7 +13,10 @@ export {
 } from "./message-pack/extensions.js";
 export type { ObjectClass } from "./message-pack/extensions.js";
 
-export const MessagePack = new Serializer();
 export const MessagePackCacheSerializer = new CacheSerializer();
+export const MessagePack = Object.assign(new Serializer(), {
+  CacheSerializer: MessagePackCacheSerializer,
+});
+ActiveSupport.MessagePack = MessagePack;
 
 runLoadHooks("message_pack", MessagePack);

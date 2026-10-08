@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { registerConstant, warn } from "@blazetrails/ruby-compat";
 import { extend, type Extended } from "@blazetrails/ruby-compat/include";
 import * as Autoload from "./dependencies/autoload.js";
 import type { BroadcastLogger } from "./broadcast-logger.js";
@@ -6,14 +6,29 @@ import type { CacheStore } from "./cache/index.js";
 import type { EnvironmentInquirer } from "./environment-inquirer.js";
 import type { HashWithIndifferentAccess } from "./hash-with-indifferent-access.js";
 import type { Logger } from "./logger.js";
+import type { MessagePack } from "./message-pack.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
-const loadPath: Record<string, () => Promise<unknown>> = {};
+const loadPath: Record<string, () => Promise<unknown>> = {
+  "active_support/message_pack": async () => {
+    try {
+      return await import("./message-pack.js");
+    } catch (error) {
+      if ((error as { code?: unknown }).code !== "ERR_MODULE_NOT_FOUND") throw error;
+      warn(
+        "ActiveSupport::MessagePack requires the msgpack gem, version 1.7.0 or later. " +
+          'Please add it to your Gemfile: `gem "msgpack", ">= 1.7.0"`',
+      );
+      throw error;
+    }
+  },
+};
 
 export const ActiveSupport = { name: "ActiveSupport", loadPath } as AutoloadModule & {
   BroadcastLogger: typeof BroadcastLogger;
   HashWithIndifferentAccess: typeof HashWithIndifferentAccess;
+  MessagePack?: typeof MessagePack;
 };
 extend(ActiveSupport, Autoload);
 

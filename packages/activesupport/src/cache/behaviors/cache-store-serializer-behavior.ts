@@ -1,4 +1,5 @@
 import { afterEach, expect, it } from "vitest";
+import "../../message-pack.js";
 import * as Cache from "../../cache.js";
 import { UnserializableObjectError } from "../../message-pack/extensions.js";
 import type { Store, StoreOptions } from "../store.js";
