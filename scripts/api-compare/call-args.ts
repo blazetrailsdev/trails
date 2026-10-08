@@ -1254,12 +1254,6 @@ interface Quantity {
   refs: string[];
 }
 
-/**
- * The quantity a site passes at `index`: a numeric literal, a plain ref, or a
- * `*` chain of them, which both extractors describe as the opaque `binop:*`
- * and spell out in a `product=` flag. Undefined for anything else, and for a
- * site carrying more than one product, whose flags name no position.
- */
 function quantityOf(site: CallSite, index: number): Quantity | undefined {
   const arg = site.args[index];
   if (arg === undefined) return undefined;
@@ -1281,8 +1275,6 @@ function quantityOf(site: CallSite, index: number): Quantity | undefined {
   return quantity;
 }
 
-/** `qty:<coefficient>*<ref>…`, the coefficient scaled by the row's unit
- *  factor and rounded past the float noise a decimal literal carries. */
 function quantityKey(quantity: Quantity, factor: number): string {
   const coefficient = Number((quantity.coefficient * factor).toPrecision(12));
   return ["qty:" + coefficient, ...quantity.refs].join("*");

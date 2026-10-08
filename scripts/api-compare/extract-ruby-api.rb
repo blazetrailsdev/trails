@@ -4358,10 +4358,6 @@ class ApiExtractor
     end
   end
 
-  # A binary stays the opaque `binop:<op>`. A `*` chain of numeric literals
-  # and plain refs (`0.1 * counter`) also flags the site `product=<factors>`,
-  # the quantity call-args.ts#compareQuantity reads for a native-form row that
-  # declares its argument still compared (`Kernel#sleep`'s interval).
   def describe_binary(node, flags)
     factors = product_factors(node)
     flags << "product=#{factors.join("*")}" if factors

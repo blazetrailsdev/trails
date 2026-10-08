@@ -257,7 +257,7 @@ export const EVAL_CALLBACK_PREFIX = "%";
  * value is the Ruby one multiplied by. `Kernel#sleep` takes seconds and
  * `setTimeout` milliseconds, so `sleep 0.1 * counter` is
  * `setTimeout(resolve, 0.1 * counter * 1000)` and nothing shorter
- * (call-args.ts#compareQuantity).
+ * (call-args.ts#quantityOf).
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,

@@ -6420,11 +6420,6 @@ function escapeDescriptorText(text: string): string {
   return text.replace(/[%,={}]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
-/**
- * The factors of a `*` chain of numeric literals and plain identifiers
- * (`0.1 * counter * 1000`), the twin of extract-ruby-api.rb#product_factors.
- * Anything else in the chain makes the product undescribable.
- */
 function productFactors(node: ts.Expression): string[] | undefined {
   const expr = unwrapArg(node);
   if (ts.isBinaryExpression(expr)) {

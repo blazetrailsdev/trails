@@ -857,7 +857,6 @@ describe("compareCallArgs", () => {
 });
 
 describe("a native-form row's quantity argument (Kernel#sleep)", () => {
-  // abstract_adapter.rb:1079 `sleep 0.1 * counter`.
   const sleep = site("sleep", ["binop:*"], ["product=num:0.1*id:counter"]);
   const timer = (product: string) =>
     site("setTimeout", ["id:resolve", "binop:*"], [`product=${product}`]);
