@@ -1,5 +1,7 @@
 import type { HelpersClass, HelpersClassMethods } from "../../abstract-controller/helpers.js";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { helpersPath } from "../metal/helpers.js";
+import { ActionController } from "../../namespaces.js";
 
 export interface HelpersPathControllerClass extends HelpersClassMethods {
   helpersPath?: string[];
@@ -12,12 +14,12 @@ const fired = new WeakSet<object>();
 /** @noRailsEquivalent CONVERGEABLE port-action-controller-helpers-and-the-inherited-hook */
 export function fireInherited(
   klass: HelpersPathControllerClass,
-  base: HelpersPathControllerClass,
+  metal: HelpersPathControllerClass,
 ): void {
   const chain: HelpersPathControllerClass[] = [];
   for (
     let k: HelpersPathControllerClass | null = klass;
-    k && k !== base;
+    k && k !== metal && Object.getPrototypeOf(k) !== metal;
     k = Object.getPrototypeOf(k) as HelpersPathControllerClass | null
   ) {
     chain.unshift(k);
@@ -26,8 +28,12 @@ export function fireInherited(
   for (const k of chain) {
     if (fired.has(k)) continue;
     fired.add(k);
-    inherited(k, base);
-    (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
+    if ("helpersPath" in (Object.getPrototypeOf(k) as object)) {
+      inherited(k, ActionController.Base as unknown as HelpersPathControllerClass);
+    }
+    if (rbObjRespondTo(k, "_writeLayoutMethod", true)) {
+      (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
+    }
   }
 }
 

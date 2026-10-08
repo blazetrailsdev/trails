@@ -2,6 +2,7 @@ import { Autoload, TopLevel, extend, onLoad, type Extended } from "@blazetrails/
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base, DetailsKey, Template } from "@blazetrails/actionview";
 import { Mime, MimeType } from "./action-dispatch/http/mime-type.js";
+import type { Base as ControllerBase } from "./action-controller/base.js";
 import type { Parameters } from "./action-controller/metal/strong-parameters.js";
 import type { TemplateAssertions } from "./action-controller/template-assertions.js";
 import type { Testing } from "./action-controller/metal/testing.js";
@@ -15,6 +16,7 @@ import type { RoutesProxy } from "./action-dispatch/routing/routes-proxy.js";
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
 const loadPath: Record<string, () => Promise<unknown>> = {
+  "action_controller/base": () => import("./action-controller/base.js"),
   "action_controller/metal/testing": () => import("./action-controller/metal/testing.js"),
   "action_controller/test_case": () => import("./action-controller/test-case.js"),
   "action_dispatch/http/request": () => import("./action-dispatch/http/request.js"),
@@ -60,6 +62,7 @@ Routing.autoload("PolymorphicRoutes");
 ActionDispatch.Routing = Routing;
 
 export const ActionController = { name: "ActionController", loadPath } as AutoloadModule & {
+  Base: typeof ControllerBase;
   Parameters: typeof Parameters;
   TestCase: typeof TestCase;
   TestRequest: typeof TestRequest;
@@ -67,6 +70,7 @@ export const ActionController = { name: "ActionController", loadPath } as Autolo
   Testing: typeof Testing;
 };
 extend(ActionController, Autoload);
+ActionController.autoload("Base");
 ActionController.autoloadUnder("metal", () => {
   ActionController.autoload("Testing");
 });

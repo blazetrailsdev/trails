@@ -47,6 +47,18 @@ describe("Collector#isAnyResponse", () => {
 });
 
 describe("Collector#any", () => {
+  it("sends a Symbol or a snake_case type to the method Rails' send reaches", () => {
+    const collector = collect();
+    const handler = () => "shared";
+    expect(collector.any(":html", "url_encoded_form", handler)).toEqual([
+      ":html",
+      "url_encoded_form",
+    ]);
+
+    expect(collector.html()).toBe(handler);
+    expect(collector.urlEncodedForm()).toBe(handler);
+  });
+
   it("registers the handler for each named format when given format arguments", () => {
     const collector = collect();
     const handler = () => "shared";

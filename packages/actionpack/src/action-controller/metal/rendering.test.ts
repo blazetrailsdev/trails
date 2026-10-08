@@ -209,16 +209,16 @@ describe("_processOptions", () => {
 });
 
 describe("Metal wiring", () => {
-  test("exposes the rendering privates as static members", async () => {
-    const { Metal } = await import("../metal.js");
-    expect(Metal._renderInPriorities).toBe(_renderInPriorities);
-    expect(Metal._normalizeText).toBe(_normalizeText);
-    expect(Metal._normalizeOptions).toBe(_normalizeOptions);
+  test("exposes the rendering privates as static members", () => {
+    expect(Rendering.instanceMethod("_renderInPriorities")!.value).toBe(_renderInPriorities);
+    expect(Rendering.instanceMethod("_normalizeText")!.value).toBe(_normalizeText);
+    expect(Rendering.instanceMethod("_normalizeOptions")!.value).toBe(_normalizeOptions);
     expect(Rendering.instanceMethod("_processOptions")!.value).toBe(_processOptions);
-    expect(Metal._setHtmlContentType).toBe(_setHtmlContentType);
-    expect(Metal._setRenderedContentType).toBe(_setRenderedContentType);
-    expect(Metal._setVaryHeader).toBe(_setVaryHeader);
-    expect(Metal._processOptions).toBe(_processOptions);
+    expect(Rendering.instanceMethod("_setHtmlContentType")!.value).toBe(_setHtmlContentType);
+    expect(Rendering.instanceMethod("_setRenderedContentType")!.value).toBe(
+      _setRenderedContentType,
+    );
+    expect(Rendering.instanceMethod("_setVaryHeader")!.value).toBe(_setVaryHeader);
   });
 
   test("renderToBody routes through _renderInPriorities and falls back to ' '", () => {
