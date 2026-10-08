@@ -1,6 +1,6 @@
 import type { Base } from "./base.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
-import { modelRegistry, collectionProxyFor as collectionProxyFor } from "./associations.js";
+import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import {
   assertValidKeys,
@@ -365,9 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
 
       if (!hasNestedId(a)) {
         if (!isRejectNewRecord.call(record, associationName, a)) {
-          nestedTarget.push(
-            collectionProxyFor(record, associationName).build(except(a, ...UNASSIGNABLE_KEYS)),
-          );
+          nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
           nestedTarget.push(null);
         }

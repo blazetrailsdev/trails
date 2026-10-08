@@ -1,7 +1,7 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import type { TableDefinition } from "../connection-adapters/abstract/schema-definitions.js";
-import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   HasManyThroughAssociationPolymorphicSourceError,
@@ -83,16 +83,16 @@ describe("disable_joins shapes the deleted routing gate rejected", () => {
 
   it("a polymorphic source without source_type raises rather than routing anywhere", async () => {
     const author = await RjAuthor.create({ name: "a" });
-    expect(() => association(author, "polySourceNoTypeRjMembers")).toThrow(
-      HasManyThroughAssociationPolymorphicSourceError,
-    );
+    expect(
+      () => (author.association("polySourceNoTypeRjMembers") as CollectionAssociation).reader,
+    ).toThrow(HasManyThroughAssociationPolymorphicSourceError);
   });
 
   it("a source_type on a non-polymorphic source raises rather than routing anywhere", async () => {
     const author = await RjAuthor.create({ name: "a" });
-    expect(() => association(author, "pointlessSourceTypeRjMembers")).toThrow(
-      HasManyThroughAssociationPointlessSourceTypeError,
-    );
+    expect(
+      () => (author.association("pointlessSourceTypeRjMembers") as CollectionAssociation).reader,
+    ).toThrow(HasManyThroughAssociationPointlessSourceTypeError);
   });
 
   it("a disable_joins association with no through reflection is refused by the macro", () => {

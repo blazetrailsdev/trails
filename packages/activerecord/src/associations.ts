@@ -2,7 +2,6 @@ import type { Base } from "./base.js";
 import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
-import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 
@@ -26,7 +25,6 @@ import {
   include,
   rbInspect,
   RuntimeError,
-  TypeError,
   rbModConstSet,
   rbModName,
   registerConstant,
@@ -565,26 +563,6 @@ export function _inlinePolymorphicKeys(
   }
   const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
   return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
-}
-
-/** @noRailsEquivalent CONVERGEABLE delete-collection-proxy-for-inline-association-reader */
-export function collectionProxyFor<T extends Base = Base>(
-  record: Base,
-  assocName: string,
-): AssociationProxy<T> {
-  const instance = record.association(assocName) as unknown as {
-    isCollection(): boolean;
-    reader: AssociationProxy<T>;
-  };
-  if (!instance.isCollection()) {
-    const ctor = record.constructor as typeof Base;
-    throw new TypeError(
-      `association() builds a CollectionProxy, which Rails has only for a collection ` +
-        `reflection; "${assocName}" on ${ctor.name} is singular. ` +
-        `Use record.association("${assocName}") for the singular association object.`,
-    );
-  }
-  return instance.reader;
 }
 
 /** @internal */

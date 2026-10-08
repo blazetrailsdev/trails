@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { Base } from "../base.js";
-import { collectionProxyFor as association } from "../associations.js";
 import { AssociationTypeMismatch, ConfigurationError } from "../errors.js";
 import {
   HasManyThroughAssociationNotFoundError,
@@ -520,13 +519,13 @@ describe("AssociationsJoinModelTest", () => {
 
   it("unavailable through reflection", async () => {
     const david = await Author.find(authors("david").id);
-    expect(() => association(david, "nothings")).toThrow(HasManyThroughAssociationNotFoundError);
+    expect(() => david.nothings).toThrow(HasManyThroughAssociationNotFoundError);
   });
 
   it("exceptions have suggestions for fix", async () => {
     const david = await Author.find(authors("david").id);
     const error = await assertRaises([HasManyThroughAssociationNotFoundError], {}, () => {
-      association(david, "nothings");
+      void david.nothings;
     });
     expect((error as any).detailedMessage()).toMatch("Did you mean?");
   });
@@ -539,14 +538,10 @@ describe("AssociationsJoinModelTest", () => {
 
   it("has many polymorphic", async () => {
     const general = await Tag.find(tags("general").id);
-    expect(() => association(general, "taggables")).toThrow(
-      HasManyThroughAssociationPolymorphicSourceError,
-    );
+    expect(() => general.taggables).toThrow(HasManyThroughAssociationPolymorphicSourceError);
 
     const welcomeGeneral = await Tagging.find(taggings("welcome_general").id);
-    expect(() => association(welcomeGeneral, "things")).toThrow(
-      HasManyThroughAssociationPolymorphicThroughError,
-    );
+    expect(() => welcomeGeneral.things).toThrow(HasManyThroughAssociationPolymorphicThroughError);
 
     await expect(
       (general as any).taggings

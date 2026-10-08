@@ -1,8 +1,8 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
-import { collectionProxyFor as association } from "../associations.js";
 import {
   assertDeprecated,
   assertDifference,
@@ -1666,7 +1666,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const readerSpy = vi.spyOn(Reader, "transaction");
     try {
-      await association(post, "people").replace([david, michael]);
+      await post.people.replace([david, michael]);
       expect(readerSpy).toHaveBeenCalled();
     } finally {
       vi.restoreAllMocks();
@@ -1704,7 +1704,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const david = await Author.find(authors("david").id);
     const blocks = [
       async () =>
-        association(david, "verySpecialComments").replace([
+        (david.association("verySpecialComments") as CollectionAssociation).reader.replace([
           await VerySpecialComment.createBang({ body: "Gorp!", post_id: 1011 }),
           await VerySpecialComment.createBang({ body: "Eep!", post_id: 1012 }),
         ]),
@@ -2513,19 +2513,19 @@ describe("HasManyThroughAssociationsTest", () => {
   it("through scope is affected by unscoping", async () => {
     const author = authors("david");
 
-    const expected = ids(await association(author, "comments"));
+    const expected = ids(await author.comments);
     await FirstPost.unscoped(async () => {
-      expect(ids(await association(author, "commentsOnFirstPosts"))).toEqual(expected);
+      expect(ids(await author.commentsOnFirstPosts)).toEqual(expected);
     });
   });
 
   it("through scope isnt affected by scoping", async () => {
     const author = authors("david");
-    const expected = ids(await association(author, "commentsOnFirstPosts"));
+    const expected = ids(await author.commentsOnFirstPosts);
 
     const inside = await FirstPost.where({ id: 2 }).scoping(async () => {
-      association(author, "commentsOnFirstPosts").reset();
-      return association(author, "commentsOnFirstPosts").toArray();
+      author.commentsOnFirstPosts.reset();
+      return author.commentsOnFirstPosts.toArray();
     });
 
     expect(ids(inside)).toEqual(expected);

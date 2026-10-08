@@ -1,10 +1,6 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
-import {
-  Base,
-  CollectionProxy,
-  collectionProxyFor as association,
-  registerModel,
-} from "../index.js";
+import { Base, CollectionProxy, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
 import { fixtures } from "../test-fixtures.js";
@@ -27,7 +23,7 @@ describe("AssociationsExtensionsTest", () => {
     "developersProjects",
   ]);
   it("extension on has many", async () => {
-    const proxy = association(posts("welcome"), "comments") as unknown as {
+    const proxy = posts("welcome").comments as unknown as {
       findMostRecent: () => Promise<Base | null>;
     };
     expect((await proxy.findMostRecent())!.id).toBe(comments("more_greetings").id);
@@ -35,7 +31,7 @@ describe("AssociationsExtensionsTest", () => {
 
   it("proxy association after scoped", async () => {
     const post = posts("welcome");
-    const proxy = association(post, "comments") as unknown as CollectionProxy & {
+    const proxy = post.comments as unknown as CollectionProxy & {
       theAssociation: () => unknown;
     };
     expect(post.association("comments")).toBe(proxy.theAssociation());
@@ -44,7 +40,7 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("extension with dirty target", async () => {
-    const proxy = association(posts("welcome"), "comments") as unknown as CollectionProxy & {
+    const proxy = posts("welcome").comments as unknown as CollectionProxy & {
       withContent: (content: string) => Promise<Base | null>;
     };
     const comment = proxy.build({ body: "New comment" });
@@ -53,32 +49,34 @@ describe("AssociationsExtensionsTest", () => {
 
   it("extension with scopes", async () => {
     const post = posts("welcome");
-    const offsetScoped = (association(post, "comments") as any).offset(1) as {
+    const offsetScoped = (post.comments as any).offset(1) as {
       findMostRecent: () => Promise<Base | null>;
     };
     expect((await offsetScoped.findMostRecent())!.id).toBe(comments("greetings").id);
-    const namedScoped = (association(post, "comments") as any).notAgain() as {
+    const namedScoped = (post.comments as any).notAgain() as {
       findMostRecent: () => Promise<Base | null>;
     };
     expect((await namedScoped.findMostRecent())!.id).toBe(comments("greetings").id);
   });
 
   it("extension on habtm", async () => {
-    const proxy = association(developers("david"), "projects") as unknown as {
+    const proxy = developers("david").projects as unknown as {
       findMostRecent: () => Promise<Base | null>;
     };
     expect((await proxy.findMostRecent())!.id).toBe(projects("action_controller").id);
   });
 
   it("named extension on habtm", async () => {
-    const proxy = association(developers("david"), "projectsExtendedByName") as unknown as {
+    const proxy = developers("david").projectsExtendedByName as unknown as {
       findMostRecent: () => Promise<Base | null>;
     };
     expect((await proxy.findMostRecent())!.id).toBe(projects("action_controller").id);
   });
 
   it("named two extensions on habtm", async () => {
-    const proxy = association(developers("david"), "projectsExtendedByNameTwice") as unknown as {
+    const proxy = (
+      developers("david").association("projectsExtendedByNameTwice") as CollectionAssociation
+    ).reader as unknown as {
       findMostRecent: () => Promise<Base | null>;
       findLeastRecent: () => Promise<Base | null>;
     };
@@ -87,7 +85,9 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("named extension and block on habtm", async () => {
-    const proxy = association(developers("david"), "projectsExtendedByNameAndBlock") as unknown as {
+    const proxy = (
+      developers("david").association("projectsExtendedByNameAndBlock") as CollectionAssociation
+    ).reader as unknown as {
       findMostRecent: () => Promise<Base | null>;
       findLeastRecent: () => Promise<Base | null>;
     };
@@ -96,7 +96,7 @@ describe("AssociationsExtensionsTest", () => {
   });
 
   it("association with default scope", async () => {
-    const proxy = association(posts("welcome"), "comments") as unknown as {
+    const proxy = posts("welcome").comments as unknown as {
       destroyAll: () => never;
     };
     expect(() => proxy.destroyAll()).toThrow(OopsError);

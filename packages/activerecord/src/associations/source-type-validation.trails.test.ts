@@ -1,6 +1,7 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { Associations, collectionProxyFor as association } from "../associations.js";
+import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 
 class StvAuthor extends Base {
@@ -59,9 +60,9 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    expect(() => association(author(), "originFromComments")).toThrow(
-      /polymorphic association 'origin'/,
-    );
+    expect(
+      () => (author().association("originFromComments") as CollectionAssociation).reader,
+    ).toThrow(/polymorphic association 'origin'/);
   });
 
   it("raises PointlessSourceTypeError when sourceType is set but source is not polymorphic", () => {
@@ -80,7 +81,9 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "author",
       sourceType: "StvAuthor",
     });
-    expect(() => association(author(), "authorsByPost")).toThrow(/:source_type/);
+    expect(() => (author().association("authorsByPost") as CollectionAssociation).reader).toThrow(
+      /:source_type/,
+    );
   });
 
   it("fires at the loadHasMany entry point too (not just association() / Association#ctor)", async () => {
@@ -115,7 +118,7 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    expect(() => association(author(), "missingSource")).toThrow(
+    expect(() => (author().association("missingSource") as CollectionAssociation).reader).toThrow(
       /Could not find the source association/,
     );
   });
@@ -137,8 +140,12 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "origin",
     });
     const a = author();
-    expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
-    expect(() => association(a, "originFromComments")).toThrow(/polymorphic association 'origin'/);
+    expect(() => (a.association("originFromComments") as CollectionAssociation).reader).toThrow(
+      /polymorphic association 'origin'/,
+    );
+    expect(() => (a.association("originFromComments") as CollectionAssociation).reader).toThrow(
+      /polymorphic association 'origin'/,
+    );
   });
 
   it("raises HasOneThroughCantAssociateThroughCollection for has_one :through collection", () => {
@@ -156,9 +163,9 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       through: "stvComments",
       source: "origin",
     });
-    expect(() => association(author(), "singularThroughCollection")).toThrow(
-      /has_one :through association.*going through.*which is a collection/,
-    );
+    expect(
+      () => (author().association("singularThroughCollection") as CollectionAssociation).reader,
+    ).toThrow(/has_one :through association.*going through.*which is a collection/);
   });
 
   it("accepts the valid shape: polymorphic source with sourceType", () => {
@@ -178,6 +185,8 @@ describe("ThroughReflection — checkValidityBang at first use", () => {
       source: "origin",
       sourceType: "StvMember",
     });
-    expect(() => association(author(), "stvMembersViaComments")).not.toThrow();
+    expect(
+      () => (author().association("stvMembersViaComments") as CollectionAssociation).reader,
+    ).not.toThrow();
   });
 });

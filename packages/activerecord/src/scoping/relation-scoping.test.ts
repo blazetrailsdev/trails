@@ -20,7 +20,6 @@ import {
 } from "../test-helpers/models/comment.js";
 import { Category } from "../test-helpers/models/category.js";
 import { Author } from "../test-helpers/models/author.js";
-import { collectionProxyFor as association } from "../associations.js";
 import { Person } from "../test-helpers/models/person.js";
 import { BadReference } from "../test-helpers/models/reference.js";
 
@@ -61,14 +60,14 @@ describe("RelationScopingTest", () => {
   it("scope breaks caching on collections", async () => {
     let author = authors("david");
     await author.reload();
-    const ids = (await association(author, "specialPostsWithDefaultScope")).map((p: any) => p.id);
+    const ids = (await author.specialPostsWithDefaultScope).map((p: any) => p.id);
     expect(ids.map(Number).sort((a, b) => a - b)).toEqual([1, 5, 6]);
     const scopedPosts = await SpecialPostWithDefaultScope.unscoped(async () => {
       author = authors("david");
       await author.reload();
-      return association(author, "specialPostsWithDefaultScope").toArray();
+      return author.specialPostsWithDefaultScope.toArray();
     });
-    const expected = (await association(author, "posts"))
+    const expected = (await author.posts)
       .map((p: any) => p.id)
       .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0));
     expect(

@@ -1,6 +1,7 @@
+import type { AssociationProxy } from "./collection-proxy.js";
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import "../support/canonical-model-index.js";
 import { Developer as CanonicalDeveloper } from "../test-helpers/models/developer.js";
@@ -11,7 +12,8 @@ describe("has_and_belongs_to_many", () => {
 
   it("loads associated records through a join table", async () => {
     const david = developers("david");
-    const projectList = await association<CanonicalProject>(david, "projects");
+    const projectList = await ((david.association("projects") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<CanonicalProject>);
     expect(projectList).toHaveLength(2);
     const names = projectList.map((p) => p.name).sort();
     expect(names).toEqual(["Active Controller", "Active Record"]);
@@ -19,7 +21,8 @@ describe("has_and_belongs_to_many", () => {
 
   it("uses default join table name (alphabetical)", async () => {
     const activeRecord = projects("active_record");
-    const devs = await association<CanonicalDeveloper>(activeRecord, "developers");
+    const devs = await ((activeRecord.association("developers") as CollectionAssociation)
+      .reader as unknown as AssociationProxy<CanonicalDeveloper>);
     expect(devs.length).toBeGreaterThan(0);
     expect(devs.map((d) => d.name)).toContain("David");
   });

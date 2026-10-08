@@ -8,7 +8,6 @@ import {
   RecordNotUnique,
   RecordNotFound,
 } from "./index.js";
-import { collectionProxyFor as association } from "./associations.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { Person, RichPerson } from "./test-helpers/models/person.js";
@@ -530,7 +529,7 @@ describe("OptimisticLockingTest", () => {
     previouslyWheelsOwnedAt = car.wheels_owned_at;
     travel(2);
     try {
-      await ((await association(car, "wheels").first()) as any).update({ size: 42 });
+      await ((await car.wheels.first()) as any).update({ size: 42 });
     } finally {
       travelBack();
     }
@@ -545,7 +544,7 @@ describe("OptimisticLockingTest", () => {
     previouslyWheelsOwnedAt = car.wheels_owned_at;
     travel(3);
     try {
-      await ((await association(car, "wheels").first()) as any).destroyBang();
+      await ((await car.wheels.first()) as any).destroyBang();
     } finally {
       travelBack();
     }
@@ -556,7 +555,7 @@ describe("OptimisticLockingTest", () => {
     expect(cmp(car.updated_at, previouslyUpdatedAt)).toBeGreaterThan(0);
     expect(cmp(car.wheels_owned_at, previouslyWheelsOwnedAt)).toBeGreaterThan(0);
 
-    await association(car, "wheels").push(await Wheel.createBang({}));
+    await car.wheels.push(await Wheel.createBang({}));
     expect(car.wheels_count).toBe(1);
     expect(car.lock_version).toBe(4);
     expect((car as any).attributeChanged("lock_version")).toBeFalsy();
@@ -566,7 +565,7 @@ describe("OptimisticLockingTest", () => {
   it("polymorphic destroy with dependencies and lock version", async () => {
     const car = await Car.createBang({});
 
-    const wheels = association(car, "wheels");
+    const wheels = car.wheels;
     await assertDifference(
       () => wheels.count() as Promise<number>,
       1,
@@ -587,7 +586,7 @@ describe("OptimisticLockingTest", () => {
   });
   it("removing has and belongs to many associations upon destroy", async () => {
     const p = await RichPerson.createBang({ first_name: "Jon" });
-    const proxy = association(p, "treasures");
+    const proxy = p.treasures;
     await proxy.create({});
     assertNotEmpty(await proxy);
     await p.destroy();

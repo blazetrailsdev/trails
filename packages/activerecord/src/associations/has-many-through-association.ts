@@ -5,7 +5,6 @@ import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
 import { aryCount, Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
 import { underscore, isBlank } from "@blazetrails/activesupport";
-import { collectionProxyFor as collectionProxyFor } from "../associations.js";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 
@@ -426,7 +425,8 @@ function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | nu
   if (!tr?.name) return null;
   const isCollection = tr.isCollection?.() ?? tr.macro === "hasMany";
   if (isCollection) {
-    return collectionProxyFor(assoc.owner, tr.name) as unknown as ThroughTargetStore;
+    return (assoc.owner.association(tr.name) as CollectionAssociation)
+      .reader as unknown as ThroughTargetStore;
   }
   const oo = (assoc.owner as unknown as { association?: (n: string) => any }).association?.(
     tr.name,

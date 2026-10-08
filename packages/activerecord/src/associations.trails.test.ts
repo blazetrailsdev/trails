@@ -1,7 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { assertQueriesCount } from "./testing/query-assertions.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -38,7 +37,7 @@ describe("AssociationsTest", () => {
   });
 });
 
-describe("collectionProxyFor", () => {
+describe("association(name).reader", () => {
   registerModel([Author, AuthorAddress, Post, Comment]);
   const { authors } = fixtures(["posts", "authors", "comments", "authorAddresses"]);
 
@@ -47,10 +46,10 @@ describe("collectionProxyFor", () => {
     await author.posts.create({ title: "title", body: "body" });
 
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments").count();
+      await author.noJoinsComments.count();
     });
     await assertQueriesCount(2, false, async () => {
-      await association(author, "noJoinsComments").count();
+      await author.noJoinsComments.count();
     });
   });
 });

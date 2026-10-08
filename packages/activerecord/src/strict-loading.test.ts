@@ -3,7 +3,6 @@ import { SingularAssociation } from "./associations/singular-association.js";
 import { loadSingularTarget } from "./test-helpers/load-singular-target.js";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, StrictLoadingViolationError, registerModel } from "./index.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { fixtures } from "./test-fixtures.js";
 import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -76,14 +75,12 @@ describe("StrictLoadingTest", () => {
     expect(developer!.strictLoadingBang()).toBeTruthy();
     expect(developer!.isStrictLoading()).toBeTruthy();
 
-    await expect(association(developer!, "auditLogs").toArray()).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(developer!.auditLogs.toArray()).rejects.toThrow(StrictLoadingViolationError);
 
     expect(developer!.strictLoadingBang(false)).toBeFalsy();
     expect(developer!.isStrictLoading()).toBeFalsy();
 
-    await expect(association(developer!, "auditLogs").toArray()).resolves.not.toThrow();
+    await expect(developer!.auditLogs.toArray()).resolves.not.toThrow();
 
     expect(developer!.strictLoadingBang(true, { mode: "n_plus_one_only" })).toBeTruthy();
     expect(developer!.isStrictLoadingNPlusOneOnly()).toBeTruthy();
@@ -93,26 +90,24 @@ describe("StrictLoadingTest", () => {
     const developer = await Developer.first();
     const firm = await Firm.create({ name: "NASA" });
     const project = await Project.create({ name: "Apollo", firm_id: firm.id });
-    await association(developer!, "projects").concat(project);
+    await developer!.projects.concat(project);
 
     await developer!.reload();
 
     developer!.strictLoadingBang(true, { mode: "n_plus_one_only" });
     expect(developer!.isStrictLoading()).toBeTruthy();
 
-    await expect(association(developer!, "projects").toArray()).resolves.not.toThrow();
+    await expect(developer!.projects.toArray()).resolves.not.toThrow();
 
-    const projects = await association(developer!, "projects");
+    const projects = await developer!.projects;
     expect(projects.every((p) => p.isStrictLoading())).toBeTruthy();
     await expect(async () =>
       (projects[projects.length - 1] as any).association("firm").loadTarget(),
     ).rejects.toThrow(StrictLoadingViolationError);
 
-    await expect(
-      association(developer!, "projectsExtendedByName").toArray(),
-    ).resolves.not.toThrow();
+    await expect(developer!.projectsExtendedByName.toArray()).resolves.not.toThrow();
 
-    const projectsExt = await association(developer!, "projectsExtendedByName");
+    const projectsExt = await developer!.projectsExtendedByName;
     expect(projectsExt.every((p) => p.isStrictLoading())).toBeTruthy();
     await expect(async () =>
       (projectsExt[projectsExt.length - 1] as any).association("firm").loadTarget(),
@@ -131,9 +126,9 @@ describe("StrictLoadingTest", () => {
     expect(developer!.isStrictLoading()).toBeTruthy();
 
     const loadedShip = (await (developer as any).association("ship").loadTarget()) as Ship;
-    await expect(association(loadedShip, "parts").toArray()).resolves.not.toThrow();
+    await expect(loadedShip.parts.toArray()).resolves.not.toThrow();
 
-    const parts = await association(loadedShip, "parts");
+    const parts = await loadedShip.parts;
     expect(loadedShip.isStrictLoading()).toBeFalsy();
     expect(parts.every((p) => p.isStrictLoading())).toBeTruthy();
     await expect((parts[0] as any).association("trinkets").loadTarget()).rejects.toThrow(
@@ -221,9 +216,7 @@ describe("StrictLoadingTest", () => {
     const dev = await Developer.all().strictLoading().first();
     expect(dev!.isStrictLoading()).toBeTruthy();
 
-    await expect(association(dev!, "auditLogs").toArray()).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(dev!.auditLogs.toArray()).rejects.toThrow(StrictLoadingViolationError);
   });
 
   it("raises if strict loading by default and lazy loading", async () => {
@@ -231,9 +224,7 @@ describe("StrictLoadingTest", () => {
       const dev = await Developer.first();
       expect(dev!.isStrictLoading()).toBeTruthy();
 
-      await expect(association(dev!, "auditLogs").toArray()).rejects.toThrow(
-        StrictLoadingViolationError,
-      );
+      await expect(dev!.auditLogs.toArray()).rejects.toThrow(StrictLoadingViolationError);
     });
   });
 
@@ -266,7 +257,7 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang();
 
     await expect(
-      association(developer!, "auditLogs").concat(new AuditLog({ message: "message" })),
+      developer!.auditLogs.concat(new AuditLog({ message: "message" })),
     ).resolves.not.toThrow();
   });
 
@@ -284,7 +275,7 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang();
 
     await expect(
-      association(developer!, "auditLogs").replace([new AuditLog({ message: "message" })]),
+      developer!.auditLogs.replace([new AuditLog({ message: "message" })]),
     ).resolves.not.toThrow();
   });
 
@@ -293,7 +284,7 @@ describe("StrictLoadingTest", () => {
     developer.strictLoadingBang();
 
     await expect(
-      association(developer, "auditLogs").concat(new AuditLog({ message: "message" })),
+      developer.auditLogs.concat(new AuditLog({ message: "message" })),
     ).resolves.not.toThrow();
   });
 
@@ -311,7 +302,7 @@ describe("StrictLoadingTest", () => {
     developer.strictLoadingBang();
 
     await expect(
-      association(developer, "auditLogs").replace([new AuditLog({ message: "message" })]),
+      developer.auditLogs.replace([new AuditLog({ message: "message" })]),
     ).resolves.not.toThrow();
   });
 
@@ -346,17 +337,13 @@ describe("StrictLoadingTest", () => {
 
       const devs = await Developer.all().includes(":auditLogs");
 
-      await expect(
-        Promise.all(devs.map((d) => association(d, "auditLogs").toArray())),
-      ).resolves.not.toThrow();
+      await expect(Promise.all(devs.map((d) => d.auditLogs.toArray()))).resolves.not.toThrow();
 
       for (const d of devs) {
         await d.reload();
       }
 
-      await expect(
-        Promise.all(devs.map((d) => association(d, "auditLogs").toArray())),
-      ).resolves.not.toThrow();
+      await expect(Promise.all(devs.map((d) => d.auditLogs.toArray()))).resolves.not.toThrow();
     });
   });
 
@@ -366,11 +353,11 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: dev0!.id, message: "M" });
 
       const dev = (await Developer.all().includes(":auditLogs").first())!;
-      await expect(association(dev, "auditLogs").toArray()).resolves.not.toThrow();
+      await expect(dev.auditLogs.toArray()).resolves.not.toThrow();
 
       await dev.reload();
 
-      await expect(association(dev, "auditLogs").toArray()).resolves.not.toThrow();
+      await expect(dev.auditLogs.toArray()).resolves.not.toThrow();
     });
   });
 
@@ -378,7 +365,7 @@ describe("StrictLoadingTest", () => {
     const dev = await Developer.first();
     const firm = await Firm.create({ name: "NASA" });
     const contract = await Contract.create({ developer_id: dev!.id, company_id: firm.id });
-    await association(dev!, "contracts").concat(contract);
+    await dev!.contracts.concat(contract);
 
     const loaded = await Developer.all().strictLoading().includes(":firms").first();
     expect(loaded!.isStrictLoading()).toBeTruthy();
@@ -386,8 +373,8 @@ describe("StrictLoadingTest", () => {
     const firms = (loaded as any).association("firms").target;
 
     for (const block of [
-      () => association(firms[0], "contracts").first(),
-      () => association(loaded!, "contracts").first(),
+      () => firms[0].association("contracts").reader.first(),
+      () => loaded!.contracts.first(),
       () => loadSingularTarget(loaded!, "ship"),
     ]) {
       await expect(block()).rejects.toThrow(StrictLoadingViolationError);
@@ -489,9 +476,7 @@ describe("StrictLoadingTest", () => {
     const dev = await Developer.all().strictLoading().first();
     expect(dev!.isStrictLoading()).toBeTruthy();
 
-    await expect(association(dev!, "auditLogs").first()).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(dev!.auditLogs.first()).rejects.toThrow(StrictLoadingViolationError);
   });
 
   it("raises on unloaded relation methods if strict loading by default", async () => {
@@ -499,9 +484,7 @@ describe("StrictLoadingTest", () => {
       const dev = await Developer.first();
       expect(dev!.isStrictLoading()).toBeTruthy();
 
-      await expect(association(dev!, "auditLogs").first()).rejects.toThrow(
-        StrictLoadingViolationError,
-      );
+      await expect(dev!.auditLogs.first()).rejects.toThrow(StrictLoadingViolationError);
     });
   });
 
@@ -604,7 +587,7 @@ describe("StrictLoadingTest", () => {
       await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
     }
 
-    await expect(association(developer!, "strictLoadingOptAuditLogs").first()).rejects.toThrow(
+    await expect(developer!.strictLoadingOptAuditLogs.first()).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
@@ -616,9 +599,7 @@ describe("StrictLoadingTest", () => {
         await AuditLog.create({ developer_id: developer!.id, message: "I am message" });
       }
 
-      await expect(association(developer!, "auditLogs").first()).rejects.toThrow(
-        StrictLoadingViolationError,
-      );
+      await expect(developer!.auditLogs.first()).rejects.toThrow(StrictLoadingViolationError);
     });
   });
 
@@ -629,7 +610,7 @@ describe("StrictLoadingTest", () => {
     }
 
     const dev = (await Developer.all().includes(":strictLoadingOptAuditLogs").first())!;
-    await expect(association(dev, "strictLoadingOptAuditLogs").first()).resolves.not.toThrow();
+    await expect(dev.strictLoadingOptAuditLogs.first()).resolves.not.toThrow();
   });
 
   it("does not raise on eager loading a has many relation if strict loading by default", async () => {
@@ -640,18 +621,18 @@ describe("StrictLoadingTest", () => {
       }
 
       const dev = (await Developer.all().includes(":auditLogs").first())!;
-      await expect(association(dev, "auditLogs").first()).resolves.not.toThrow();
+      await expect(dev.auditLogs.first()).resolves.not.toThrow();
     });
   });
 
   it("raises on lazy loading a strict loading habtm relation", async () => {
     const developer = await Developer.first();
     const project = await Project.first();
-    await association(developer!, "projects").concat(project!);
+    await developer!.projects.concat(project!);
 
     expect((developer as any).association("strictLoadingProjects").isLoaded()).toBeFalsy();
 
-    await expect(association(developer!, "strictLoadingProjects").first()).rejects.toThrow(
+    await expect(developer!.strictLoadingProjects.first()).rejects.toThrow(
       StrictLoadingViolationError,
     );
   });
@@ -660,31 +641,29 @@ describe("StrictLoadingTest", () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
       const project = await Project.first();
-      await association(developer!, "projects").concat(project!);
+      await developer!.projects.concat(project!);
 
-      expect(association(developer!, "projects").loaded).toBeFalsy();
+      expect(developer!.projects.loaded).toBeFalsy();
 
-      await expect(association(developer!, "projects").first()).rejects.toThrow(
-        StrictLoadingViolationError,
-      );
+      await expect(developer!.projects.first()).rejects.toThrow(StrictLoadingViolationError);
     });
   });
 
   it("does not raise on eager loading a strict loading habtm relation", async () => {
     const developer = await Developer.first();
-    await association(developer!, "projects").concat((await Project.first())!);
+    await developer!.projects.concat((await Project.first())!);
 
     const dev = (await Developer.all().includes(":strictLoadingProjects").first())!;
-    await expect(association(dev, "strictLoadingProjects").first()).resolves.not.toThrow();
+    await expect(dev.strictLoadingProjects.first()).resolves.not.toThrow();
   });
 
   it("does not raise on eager loading a habtm relation if strict loading by default", async () => {
     await withStrictLoadingByDefault(Developer, async () => {
       const developer = await Developer.first();
-      await association(developer!, "projects").concat((await Project.first())!);
+      await developer!.projects.concat((await Project.first())!);
 
       const dev = (await Developer.all().includes(":projects").first())!;
-      await expect(association(dev, "projects").first()).resolves.not.toThrow();
+      await expect(dev.projects.first()).resolves.not.toThrow();
     });
   });
 
@@ -697,9 +676,7 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang();
     expect(developer!.isStrictLoading()).toBeTruthy();
 
-    await expect(association(developer!, "auditLogs").toArray()).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(developer!.auditLogs.toArray()).rejects.toThrow(StrictLoadingViolationError);
   });
 
   it("strict loading violation can log instead of raise", async () => {
@@ -718,7 +695,7 @@ describe("StrictLoadingTest", () => {
         "`Developer` is marked for strict_loading. " +
         "The AuditLog association named `:auditLogs` cannot be lazily loaded.";
       await assertLogged(expectedLog, async () => {
-        await association(developer!, "auditLogs");
+        await developer!.auditLogs;
       });
     } finally {
       setActionOnStrictLoadingViolation(oldValue);
@@ -789,12 +766,10 @@ describe("StrictLoadingFixturesTest", () => {
     StrictZine.strictLoadingByDefault = true;
 
     try {
-      await expect(association(fixtureZine, "interests").toArray()).resolves.not.toThrow();
+      await expect(fixtureZine.interests.toArray()).resolves.not.toThrow();
 
       const fresh = await StrictZine.find(strictZines("going_out").id);
-      await expect(association(fresh, "interests").toArray()).rejects.toThrow(
-        StrictLoadingViolationError,
-      );
+      await expect(fresh.interests.toArray()).rejects.toThrow(StrictLoadingViolationError);
     } finally {
       StrictZine.strictLoadingByDefault = prevDefault;
     }

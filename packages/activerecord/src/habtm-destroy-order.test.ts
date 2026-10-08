@@ -6,7 +6,7 @@ import {
   assertRaises,
   assertNothingRaised,
 } from "@blazetrails/activesupport";
-import { collectionProxyFor as association, registerModel, Rollback } from "./index.js";
+import { registerModel, Rollback } from "./index.js";
 import "./support/canonical-model-index.js";
 import { Lesson, LessonError } from "./test-helpers/models/lesson.js";
 import { Student } from "./test-helpers/models/student.js";
@@ -20,7 +20,7 @@ describe("HabtmDestroyOrderTest", () => {
   it("may not delete a lesson with students", async () => {
     const sicp = await Lesson.create({ name: "SICP" });
     const ben = await Student.create({ name: "Ben Bitdiddle" });
-    await association(sicp, "students").push(ben);
+    await sicp.students.push(ben);
 
     await assertRaises([LessonError], {}, async () => {
       await assertNoDifference(
@@ -37,7 +37,7 @@ describe("HabtmDestroyOrderTest", () => {
   it("should not raise error if have foreign key in the join table", async () => {
     const student = await Student.create({ name: "Ben Bitdiddle" });
     const lesson = await Lesson.create({ name: "SICP" });
-    await association(lesson, "students").push(student);
+    await lesson.students.push(student);
     await assertNothingRaised(async () => {
       await student.destroy();
     });
@@ -46,25 +46,25 @@ describe("HabtmDestroyOrderTest", () => {
   it("not destroying a student with lessons leaves student<=>lesson association intact", async () => {
     await resetCallbacks(Student, "destroy", async () => {
       Student.beforeDestroy(async (r: any) => {
-        if (!(await association(r, "lessons").isEmpty())) throw new Rollback();
+        if (!(await r.association("lessons").reader.isEmpty())) throw new Rollback();
       });
       const sicp = await Lesson.create({ name: "SICP" });
       const ben = await Student.create({ name: "Ben Bitdiddle" });
-      await association(ben, "lessons").push(sicp);
+      await ben.lessons.push(sicp);
 
       await ben.destroy();
       await ben.reload();
-      assertNotEmpty(await association(ben, "lessons"));
+      assertNotEmpty(await ben.lessons);
     });
   });
 
   it("not destroying a lesson with students leaves student<=>lesson association intact", async () => {
     const sicp = await Lesson.create({ name: "SICP" });
     const ben = await Student.create({ name: "Ben Bitdiddle" });
-    await association(sicp, "students").push(ben);
+    await sicp.students.push(ben);
 
     await expect(sicp.destroy()).rejects.toThrow(LessonError);
     await sicp.reload();
-    assertNotEmpty(await association(sicp, "students"));
+    assertNotEmpty(await sicp.students);
   });
 });

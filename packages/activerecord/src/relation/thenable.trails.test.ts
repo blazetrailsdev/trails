@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Relation, collectionProxyFor as association, registerModel } from "../index.js";
+import { Relation, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -93,7 +93,7 @@ describe("Thenable", () => {
     it("CollectionProxy is directly awaitable", async () => {
       const post = posts("welcome");
 
-      const proxy = association(post, "comments");
+      const proxy = post.comments;
       const comments = await proxy;
       expect(Array.isArray(comments)).toBe(true);
       expect(comments).toHaveLength(2);

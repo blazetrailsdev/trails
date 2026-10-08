@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { collectionProxyFor as association, registerModel, AssociationRelation } from "../index.js";
+import { registerModel, AssociationRelation } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { ShipPart } from "../test-helpers/models/ship-part.js";
@@ -18,21 +18,21 @@ describe("AssociationRelation", () => {
 
   it("returns an AssociationRelation from the collection proxy", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const scope = proxy.where({ name: "Mast" });
     expect(scope).toBeInstanceOf(AssociationRelation);
   });
 
   it("preserves AssociationRelation through chained query methods", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const chained = proxy.where({ name: "Mast" }).order("name").limit(5);
     expect(chained).toBeInstanceOf(AssociationRelation);
   });
 
   it("create on an association relation sets the owner's foreign key", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const part = await proxy.where({ name: "Mast" }).create({});
     expect(Number(part.ship_id)).toBe(Number(ship.id));
     expect(part.name).toBe("Mast");
@@ -41,7 +41,7 @@ describe("AssociationRelation", () => {
 
   it("build on an association relation sets the FK without saving", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const part = proxy.where({ name: "Draft" }).build({});
     expect(Number(part.ship_id)).toBe(Number(ship.id));
     expect(part.name).toBe("Draft");
@@ -50,7 +50,7 @@ describe("AssociationRelation", () => {
 
   it("pushes built records onto the loaded target", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     proxy.where({ name: "x" }).build({});
     expect(proxy.target.length).toBe(1);
     expect(proxy.target[0].name).toBe("x");
@@ -58,7 +58,7 @@ describe("AssociationRelation", () => {
 
   it("propagates the association reference through long chains", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const deep = proxy.where({ name: "Chained" }).order("name").limit(10).offset(0);
     const part = await deep.create({});
     expect(Number(part.ship_id)).toBe(Number(ship.id));
@@ -67,7 +67,7 @@ describe("AssociationRelation", () => {
 
   it("exposes the owner and reflection via proxyAssociation", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const scope = proxy.where({ name: "Mast" }) as unknown as AssociationRelation<ShipPart>;
     expect(scope.proxyAssociation.owner).toBe(ship);
     expect(scope.proxyAssociation.reflection.name).toBe("parts");
@@ -76,7 +76,7 @@ describe("AssociationRelation", () => {
 
   it("equals compares against a loaded array of records", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     await proxy.create({ name: "A" });
     await proxy.create({ name: "A" });
     await proxy.create({ name: "B" });
@@ -92,14 +92,14 @@ describe("AssociationRelation", () => {
 
   it("createBang throws RecordInvalid via the association on validation failure", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     const scope = proxy.where({}) as unknown as AssociationRelation<ShipPart>;
     await expect(scope.createBang({ name: "" })).rejects.toThrow(/name/i);
   });
 
   it("sets inverse_of on records loaded through the relation", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     await proxy.create({ name: "P1" });
 
     const scope = proxy.where({}) as unknown as AssociationRelation<ShipPart>;
@@ -109,7 +109,7 @@ describe("AssociationRelation", () => {
 
   it("sets inverse_of through records() and load() as well as toArray()", async () => {
     const ship = await freshShip();
-    const proxy = association<ShipPart>(ship, "parts");
+    const proxy = ship.parts;
     await proxy.create({ name: "P1" });
     const seed = () => proxy.where({}) as unknown as AssociationRelation<ShipPart>;
 
