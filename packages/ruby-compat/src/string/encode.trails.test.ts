@@ -23,6 +23,11 @@ describe("String#encode", () => {
     expect(encode("h\udce9l", "UTF-8", { invalid: ":replace" })).toBe("h�l");
     const bytes = binary(0xe9);
     expect(encode(bytes, "BINARY", replace)).toBe(bytes);
+    const latin1 = forceEncoding(binary(0x68, 0xe9), "ISO-8859-1");
+    expect(encode(latin1, "ISO-8859-1", { invalid: ":replace" })).toBe(latin1);
+    const ascii = forceEncoding(binary(0x68, 0xe9), "US-ASCII");
+    expect(encode(ascii, "US-ASCII")).toBe(ascii);
+    expect(encode(ascii, "US-ASCII", { invalid: ":replace" })).toBe("h?");
   });
 
   it("answers a non-UTF-8 result as bytes associated with the encoding", () => {

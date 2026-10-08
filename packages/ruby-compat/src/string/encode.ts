@@ -35,7 +35,8 @@ function dump(b: number[]): string {
  * (`output_replacement_character`, `transcode.c:2291`).
  *
  * Between two equal encodings the receiver is scrubbed when `invalid` is
- * given (`transcode.c:2772-2783`) and returned as it is otherwise. The
+ * given (`transcode.c:2772-2783`) and returned as it is otherwise; ASCII-8BIT
+ * and ISO-8859-1 hold no invalid byte, so their scrub is the receiver. The
  * converters here are the ones between UTF-8, US-ASCII, ASCII-8BIT and
  * ISO-8859-1; any other pair raises `Encoding::ConverterNotFoundError`, as
  * `rb_econv_open_exc` (`transcode.c:2097`) does for a pair MRI has no
@@ -58,7 +59,12 @@ export function encode(
   const denc = Encoding.find(encoding);
   if (denc === null) return str;
 
-  if (senc === denc && !(invalidReplace && senc === Encoding.UTF_8)) return str;
+  if (
+    senc === denc &&
+    !(invalidReplace && (senc === Encoding.UTF_8 || senc === Encoding.US_ASCII))
+  ) {
+    return str;
+  }
   const unicode = (enc: Encoding): boolean => enc === Encoding.UTF_8;
   if (
     !(unicode(senc) || senc.name in SINGLE_BYTE) ||

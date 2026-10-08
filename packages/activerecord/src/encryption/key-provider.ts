@@ -25,7 +25,7 @@ export class KeyProvider {
 
   decryptionKeys(encryptedMessage: Message): Key[] | undefined {
     if (rtest(encryptedMessage.headers.encryptedDataKeyId)) {
-      return this.keysGroupedById().get(encryptedMessage.headers.encryptedDataKeyId!);
+      return this.keysGroupedById().get(encryptedMessage.headers.encryptedDataKeyId);
     } else {
       return this._keys;
     }

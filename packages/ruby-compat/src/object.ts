@@ -1283,7 +1283,7 @@ function isPlainHash(value: unknown): value is Record<string, unknown> {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rtest(obj: unknown): boolean {
+export function rtest<T>(obj: T): obj is Exclude<T, null | undefined | false> {
   return obj !== null && obj !== undefined && obj !== false;
 }
 

@@ -973,6 +973,7 @@ export class Hash<K, V> extends Map<K, V> {
   #eqlKeys = new Map<number, K[]>();
   #stHash = new WeakMap<object, number>();
   #identhash = false;
+  #binaryKeys = false;
   #iterLev = 0;
 
   /**
@@ -1053,6 +1054,7 @@ export class Hash<K, V> extends Map<K, V> {
     const stored = this.hashStlikeLookup(key);
     if (stored === key && !this.#identhash && isObjectKey(key) && !super.has(key)) {
       const h = rbHash(key);
+      if (key instanceof Uint8Array) this.#binaryKeys = true;
       this.#stHash.set(key, h);
       const bucket = this.#eqlKeys.get(h);
       if (bucket) bucket.push(key);
@@ -1095,13 +1097,13 @@ export class Hash<K, V> extends Map<K, V> {
   private hashStlikeLookup(key: K): K {
     if (typeof key === "bigint" && Number.isSafeInteger(Number(key))) return Number(key) as K;
     if (this.#identhash) return key;
-    if (typeof key === "string" ? super.has(key) || this.#eqlKeys.size === 0 : !isObjectKey(key)) {
+    if (typeof key === "string" ? !this.#binaryKeys || super.has(key) : !isObjectKey(key)) {
       return key;
     }
     const stored = this.#eqlKeys.get(rbHash(key))?.find((k) => rbEql(k, key));
     if (stored !== undefined) return stored;
     if (key instanceof Uint8Array && key.every((byte) => byte < 0x80)) {
-      const str = String.fromCharCode(...key) as K;
+      const str = new TextDecoder().decode(key) as K;
       if (super.has(str)) return str;
     }
     return key;

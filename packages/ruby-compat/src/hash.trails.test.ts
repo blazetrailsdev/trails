@@ -201,6 +201,12 @@ describe("Hash#[] with a binary String key", () => {
     expect(h.get(Uint8Array.of(0xe9))).toBeUndefined();
     expect(h.get("é")).toBeUndefined();
   });
+
+  it("finds a String by a binary String too long to spread as arguments", () => {
+    const h = new Hash<string | Uint8Array, number>();
+    h.set("a".repeat(300000), 1);
+    expect(h.get(new Uint8Array(300000).fill(0x61))).toBe(1);
+  });
 });
 
 describe("Hash#key?", () => {
