@@ -21,7 +21,10 @@ describe("StandaloneConnectionTest", () => {
     expect(result.rows).toEqual([[1]]);
   });
 
-  it.skip("async fallback", () => {});
+  it("async fallback", async () => {
+    const result = await connection.selectAll("SELECT 1", null, [], { async: true });
+    expect(result.rows).toEqual([[1]]);
+  });
 
   it("can throw away", async () => {
     await connection.throwAwayBang();

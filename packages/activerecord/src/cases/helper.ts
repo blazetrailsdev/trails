@@ -3,7 +3,11 @@ import "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
+import type { PoolManager } from "../connection-adapters/pool-manager.js";
 import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
@@ -123,4 +127,36 @@ export async function inTimeZone(
     setZone(oldZone);
     Base.timeZoneAwareAttributes = oldAware;
   }
+}
+
+export async function waitForAsyncQuery(
+  connection?: AbstractAdapter,
+  { timeout = 5 }: { timeout?: number } = {},
+): Promise<void> {
+  connection ??= await Base.leaseConnection();
+  if (!connection.asyncEnabled()) return;
+
+  const executor = (connection.pool as ConnectionPool).asyncExecutor!;
+  for (let i = 0; i < timeout * 100; i++) {
+    if (!(executor.scheduledTaskCount > executor.completedTaskCount)) return;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+
+  throw new RuntimeError(`The async executor wasn't drained after ${timeout} seconds`);
+}
+
+export function cleanUpConnectionHandler(): void {
+  const handler = Base.connectionHandler as unknown as {
+    _connectionNameToPoolManager: { eachPair(block: (k: string, v: PoolManager) => void): void };
+  };
+  handler._connectionNameToPoolManager.eachPair((owner, poolManager) => {
+    for (const roleName of [...poolManager.roleNames]) {
+      if (
+        roleName === Base.defaultRole &&
+        ["ActiveRecord::Base", "ARUnit2Model", "Contact", "ContactSti"].includes(owner)
+      )
+        continue;
+      poolManager.removeRole(roleName);
+    }
+  });
 }

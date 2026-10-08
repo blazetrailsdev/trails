@@ -25,8 +25,13 @@ function isAdapterCondition(node) {
     // (activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb:28).
     case "Identifier":
       return node.name === "isMariaDb";
+    // Rails' `in_memory_db?` gates an arm on the database the adapter is connected
+    // to (activerecord/test/cases/asynchronous_queries_test.rb:9).
     case "CallExpression":
-      return node.callee.type === "Identifier" && node.callee.name === "currentAdapter";
+      return (
+        node.callee.type === "Identifier" &&
+        (node.callee.name === "currentAdapter" || node.callee.name === "inMemoryDb")
+      );
     case "BinaryExpression":
       return (
         ["===", "!==", "==", "!="].includes(node.operator) &&
@@ -46,7 +51,8 @@ export default {
   meta: {
     type: "problem",
     docs: {
-      description: "disallow conditionals in tests, except a current_adapter?/mariadb? branch",
+      description:
+        "disallow conditionals in tests, except a current_adapter?/mariadb?/in_memory_db? branch",
     },
     messages: { noConditionalInTest: "Remove conditional tests" },
     schema: [],

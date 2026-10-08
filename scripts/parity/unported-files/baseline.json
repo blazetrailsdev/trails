@@ -168,11 +168,6 @@
     "reason": "Rails' else-branch for adapters lacking CTE support; every adapter trails exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable."
   },
   {
-    "testFile": "connection_adapters/standalone_connection_test.rb",
-    "tests": ["async fallback"],
-    "reason": "select_all(async: true) returns a FutureResult::Complete from the thread-backed load_async infrastructure, which is excluded (see the future_result.rb entry)."
-  },
-  {
     "testFile": "hstore_test.rb",
     "tests": ["supports to unsafe h values"],
     "reason": "ActionController::Parameters#to_unsafe_h is a Ruby-only ProtectedParams API; no equivalent in Node.js request-parameter handling."

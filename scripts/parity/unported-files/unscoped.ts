@@ -28,14 +28,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "is enrolled in relation/load-async.test.ts.",
   },
   {
-    testFile: "asynchronous_queries_test.rb",
-    reason:
-      "SOURCE NOW PORTED (asynchronous_queries_tracker.rb — story " +
-      "call-args-ar-select-all-empty-async-row); this is a test-only entry. The tests " +
-      "assert Concurrent::ThreadPoolExecutor sizing (min/max threads, max queue) and " +
-      "cross-thread session barriers, none of which exist without threads.",
-  },
-  {
     testFile: "marshal_serialization_test.rb",
     reason:
       "Ruby's Marshal binary format (Marshal.dump/load). No JS equivalent; " +
@@ -562,13 +554,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Rails' else-branch for adapters lacking CTE support; every adapter trails " +
       "exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable.",
-  },
-  {
-    testFile: "connection_adapters/standalone_connection_test.rb",
-    tests: ["async fallback"],
-    reason:
-      "select_all(async: true) returns a FutureResult::Complete from the thread-backed " +
-      "load_async infrastructure, which is excluded (see the future_result.rb entry).",
   },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
