@@ -68,6 +68,14 @@ describe("Enumerable over an each that answers a promise", () => {
   it("Symbol.iterator raises, since each has yielded nothing yet", () => {
     expect(() => [...new LazyBag([1])]).toThrow(TypeError);
   });
+
+  it("Symbol.iterator raises over an each that rejects, and leaves no unhandled rejection", async () => {
+    const bag = new LazyBag([1]);
+    const boom = new Error("boom");
+    bag.each = () => Promise.reject(boom);
+    expect(() => [...bag]).toThrow(TypeError);
+    await expect(bag.map((i) => i)).rejects.toBe(boom);
+  });
 });
 
 describe("Enumerable", () => {

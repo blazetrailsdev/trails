@@ -197,6 +197,7 @@ function iterator<T, E = unknown>(this: Each<T, E>): IterableIterator<T> {
     () => ary,
   );
   if (each instanceof Promise) {
+    each.catch(() => {});
     throw new TypeError("each is asynchronous: await it before iterating");
   }
   return ary[Symbol.iterator]();
