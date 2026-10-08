@@ -25,8 +25,6 @@ function isAdapterCondition(node) {
     // (activerecord/test/cases/adapters/mysql2/check_constraint_quoting_test.rb:28).
     case "Identifier":
       return node.name === "isMariaDb";
-    // Rails' `in_memory_db?` gates an arm on the database the adapter is connected
-    // to (activerecord/test/cases/asynchronous_queries_test.rb:9).
     case "CallExpression":
       return (
         node.callee.type === "Identifier" &&
