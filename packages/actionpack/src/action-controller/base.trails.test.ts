@@ -389,6 +389,9 @@ describe("ActionController::Helpers included into ActionController::API", () => 
         helpersPath: string[];
       };
       expect(subclass.helpersPath).toBe(paths);
+      expect(
+        (ApiProbeWithHelpersController as unknown as { helpersPath: string[] }).helpersPath,
+      ).toEqual([]);
       expect((extend({}, subclass._helpers) as Probe).probe()).toBe("probed");
     } finally {
       setHelpersPath([]);

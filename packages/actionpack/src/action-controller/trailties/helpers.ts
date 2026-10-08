@@ -28,7 +28,9 @@ export function fireInherited(
   for (const k of chain) {
     if (fired.has(k)) continue;
     fired.add(k);
-    inherited(k, ActionController.Base as unknown as HelpersPathControllerClass);
+    if ("helpersPath" in (Object.getPrototypeOf(k) as object)) {
+      inherited(k, ActionController.Base as unknown as HelpersPathControllerClass);
+    }
     if (rbObjRespondTo(k, "_writeLayoutMethod", true)) {
       (k as unknown as { _writeLayoutMethod(): void })._writeLayoutMethod();
     }
