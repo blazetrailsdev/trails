@@ -1,7 +1,7 @@
 import { coder } from "../cache/coder.js";
 import { ActiveSupportJSON } from "../json.js";
 import { Encoding } from "../json/encoding.js";
-import { MessagePack } from "../message-pack/index.js";
+import { MessagePack } from "../message-pack.js";
 import { Temporal, Time } from "@blazetrails/date";
 import { Rational } from "@blazetrails/ruby-compat";
 import { currentTimeInstant } from "../time-travel.js";

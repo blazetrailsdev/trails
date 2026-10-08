@@ -1,3 +1,4 @@
+import { stringValue } from "./string/support.js";
 /**
  * Ruby's `Regexp.escape` (`re.c` `rb_reg_s_quote`,
  * `vendor/ruby/v3.3.11/re.c:4144`): the metacharacters of `string` escaped so it
@@ -69,7 +70,8 @@ export function rbRegToS(re: RegExp, syntax: "js" | "onig" = "js"): string {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function rbRegInitStr(s: string): RegExp {
+export function rbRegInitStr(s: string | Uint8Array): RegExp {
+  s = stringValue(s);
   const m = /^\(\?([mi]*)(?:-[mix]*)?:/.exec(s);
   if (m && s.endsWith(")")) {
     let depth = 1;

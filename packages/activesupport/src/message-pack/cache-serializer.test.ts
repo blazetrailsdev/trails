@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { MessagePackCacheSerializer, UnserializableObjectError } from "./index.js";
+import { MessagePackCacheSerializer, UnserializableObjectError } from "../message-pack.js";
 import { env as ENV, registerConstant, setEnv } from "@blazetrails/ruby-compat";
 import { assertNotNil } from "../testing/assertions.js";
 
@@ -36,11 +36,11 @@ class Unserializable extends HasValue {
 
 describe("MessagePackCacheSerializerTest", () => {
   const dump = (object: unknown) => MessagePackCacheSerializer.dump(object);
-  const load = (dumped: Buffer) => MessagePackCacheSerializer.load(dumped);
+  const load = (dumped: Uint8Array) => MessagePackCacheSerializer.load(dumped);
 
   const assertRoundtrip = (object: HasValue) => {
     const serialized = dump(object);
-    expect(serialized).toBeInstanceOf(Buffer);
+    expect(serialized).toBeInstanceOf(Uint8Array);
 
     const deserialized = load(serialized);
     expect(deserialized).toBeInstanceOf(object.constructor);
@@ -57,7 +57,7 @@ describe("MessagePackCacheSerializerTest", () => {
     setEnv("RAILS_MAX_THREADS", "1");
     try {
       const serialized = dump("value");
-      expect(serialized).toBeInstanceOf(Buffer);
+      expect(serialized).toBeInstanceOf(Uint8Array);
 
       const deserialized = load(serialized);
       expect(typeof deserialized).toBe("string");

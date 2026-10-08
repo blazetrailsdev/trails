@@ -1,4 +1,4 @@
-import type { Factory, Packer, Unpacker } from "./factory.js";
+import { MessagePack, type Factory, type Packer, type Unpacker } from "@blazetrails/msgpack";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 import { Temporal, Time } from "@blazetrails/date";
 import {
@@ -14,7 +14,12 @@ import {
   URI,
   complex,
   rational,
+  rbCDate,
+  rbCDateTime,
+  rbCInteger,
+  rbCSymbol,
   rbModConstGet,
+  rbObjMethod,
   rbRegInitStr,
   rbRegToS,
   zip,
@@ -55,30 +60,6 @@ function offset(_datetime: Temporal.PlainDateTime): Rational {
   return rational(0, 1);
 }
 
-function bigIntToMsgpackExt(value: bigint): Buffer {
-  let n = value;
-  const bytes: number[] = [n < 0n ? 1 : 0];
-  if (n < 0n) n = -n;
-  while (n > 0n) {
-    const chunk = Number(n & 0xffffffffn);
-    bytes.push((chunk >>> 24) & 0xff, (chunk >>> 16) & 0xff, (chunk >>> 8) & 0xff, chunk & 0xff);
-    n >>= 32n;
-  }
-  return Buffer.from(bytes);
-}
-
-function bigIntFromMsgpackExt(payload: Buffer): bigint {
-  const sign = payload[0];
-  let sum = 0n;
-  for (let i = (payload.length - 1) / 4 - 1; i >= 0; i--) {
-    const off = 1 + i * 4;
-    const chunk =
-      (payload[off] << 24) | (payload[off + 1] << 16) | (payload[off + 2] << 8) | payload[off + 3];
-    sum = (sum << 32n) + BigInt(chunk >>> 0);
-  }
-  return sign === 0 ? sum : -sum;
-}
-
 export class UnserializableObjectError extends Error {}
 export class MissingClassError extends Error {}
 
@@ -96,191 +77,138 @@ function classOf(value: object): ObjectClass {
 }
 
 export const Extensions = {
+  /**
+   * Mirrors `ActiveSupport::MessagePack::Extensions#install`
+   * (`vendor/rails/v8.0.2/activesupport/lib/active_support/message_pack/extensions.rb:20-110`).
+   *
+   * Type 0 reads Rails' bytes; a `":name"` Symbol is not packed through it until
+   * the packer has its `T_SYMBOL` arm
+   * (`msgpack-symbol-ext-packer-arm-and-extended-object-lookup`).
+   *
+   * Type 16 passes functions where Rails passes `:to_s` / `:new`. The payload
+   * is MRI's `Regexp#to_s`, with MRI's option letters (`option_to_str`,
+   * `vendor/ruby/v3.3.11/re.c:322`). A JS `RegExp`'s `toString` and constructor
+   * are JS's, and ruby-compat's `Regexp#to_s` writes JS option letters, so the
+   * MRI spelling is asked for by name: `rbRegToS(regexp, "onig")`, read back
+   * by `rbRegInitStr` (`rb_reg_init_str`, `re.c:3360`).
+   */
   install(registry: Factory): void {
-    registry.registerType({
-      type: 0,
-      klass: "Symbol",
-      recursive: false,
-      match: (v) => typeof v === "symbol",
-      packer: (v) => Buffer.from((v as symbol).description ?? "", "utf-8"),
-      unpacker: (payload) => Symbol.for((payload as Buffer).toString("utf-8")),
+    registry.registerType(0, rbCSymbol, {
+      packer: "toMsgpackExt",
+      unpacker: "fromMsgpackExt",
+      optimizedSymbolsParsing: true,
     });
 
-    registry.registerType({
-      type: 1,
-      klass: "Integer",
-      recursive: false,
-      oversizedInteger: true,
-      match: () => false,
-      packer: (v) => bigIntToMsgpackExt(v as bigint),
-      unpacker: (payload) => bigIntFromMsgpackExt(payload as Buffer),
+    registry.registerType(1, rbCInteger, {
+      packer: rbObjMethod(MessagePack.Bigint, "toMsgpackExt"),
+      unpacker: rbObjMethod(MessagePack.Bigint, "fromMsgpackExt"),
+      oversizedIntegerExtension: true,
     });
 
-    registry.registerType({
-      type: 2,
-      klass: "BigDecimal",
-      recursive: false,
-      match: (v) => v instanceof BigDecimal,
-      packer: (v) => Buffer.from((v as BigDecimal)._dump(), "utf-8"),
-      unpacker: (payload) => BigDecimal._load((payload as Buffer).toString("utf-8")),
+    registry.registerType(2, BigDecimal, {
+      packer: "_dump",
+      unpacker: "_load",
     });
 
-    registry.registerType({
-      type: 3,
-      klass: "Rational",
+    registry.registerType(3, Rational, {
+      packer: Extensions.writeRational,
+      unpacker: Extensions.readRational,
       recursive: true,
-      match: (v) => v instanceof Rational,
-      packer: (v, packer) => Extensions.writeRational(v as Rational, packer),
-      unpacker: (unpacker) => Extensions.readRational(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 4,
-      klass: "Complex",
+    registry.registerType(4, Complex, {
+      packer: Extensions.writeComplex,
+      unpacker: Extensions.readComplex,
       recursive: true,
-      match: (v) => v instanceof Complex,
-      packer: (v, packer) => Extensions.writeComplex(v as Complex, packer),
-      unpacker: (unpacker) => Extensions.readComplex(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 5,
-      klass: "DateTime",
+    registry.registerType(5, rbCDateTime, {
+      packer: Extensions.writeDatetime,
+      unpacker: Extensions.readDatetime,
       recursive: true,
-      match: (v) => v instanceof Temporal.PlainDateTime,
-      packer: (v, packer) => Extensions.writeDatetime(v as Temporal.PlainDateTime, packer),
-      unpacker: (unpacker) => Extensions.readDatetime(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 6,
-      klass: "Date",
+    registry.registerType(6, rbCDate, {
+      packer: Extensions.writeDate,
+      unpacker: Extensions.readDate,
       recursive: true,
-      match: (v) => v instanceof Temporal.PlainDate,
-      packer: (v, packer) => Extensions.writeDate(v as Temporal.PlainDate, packer),
-      unpacker: (unpacker) => Extensions.readDate(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 7,
-      klass: "Time",
+    registry.registerType(7, Time, {
+      packer: Extensions.writeTime,
+      unpacker: Extensions.readTime,
       recursive: true,
-      match: (v) => Object.prototype.isPrototypeOf.call(Time.prototype, v as object),
-      packer: (v, packer) => Extensions.writeTime(v as Time, packer),
-      unpacker: (unpacker) => Extensions.readTime(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 8,
-      klass: "ActiveSupport::TimeWithZone",
+    registry.registerType(8, TimeWithZone, {
+      packer: Extensions.writeTimeWithZone,
+      unpacker: Extensions.readTimeWithZone,
       recursive: true,
-      match: (v) => v instanceof TimeWithZone,
-      packer: (v, packer) => Extensions.writeTimeWithZone(v as TimeWithZone, packer),
-      unpacker: (unpacker) => Extensions.readTimeWithZone(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 9,
-      klass: "ActiveSupport::TimeZone",
-      recursive: false,
-      match: (v) => v instanceof TimeZone,
-      packer: (v) => Buffer.from(Extensions.dumpTimeZone(v as TimeZone), "utf-8"),
-      unpacker: (payload) => Extensions.loadTimeZone((payload as Buffer).toString("utf-8")),
+    registry.registerType(9, TimeZone, {
+      packer: Extensions.dumpTimeZone,
+      unpacker: Extensions.loadTimeZone,
     });
 
-    registry.registerType({
-      type: 10,
-      klass: "ActiveSupport::Duration",
+    registry.registerType(10, Duration, {
+      packer: Extensions.writeDuration,
+      unpacker: Extensions.readDuration,
       recursive: true,
-      match: (v) => v instanceof Duration,
-      packer: (v, packer) => Extensions.writeDuration(v as Duration, packer),
-      unpacker: (unpacker) => Extensions.readDuration(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 11,
-      klass: "Range",
+    registry.registerType(11, Range, {
+      packer: Extensions.writeRange,
+      unpacker: Extensions.readRange,
       recursive: true,
-      match: (v) => v instanceof Range,
-      packer: (v, packer) => Extensions.writeRange(v as Range, packer),
-      unpacker: (unpacker) => Extensions.readRange(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 12,
-      klass: "Set",
+    registry.registerType(12, Set, {
+      packer: Extensions.writeSet,
+      unpacker: Extensions.readSet,
       recursive: true,
-      match: (v) => v instanceof Set,
-      packer: (v, packer) => packer.write([...(v as Set<unknown>)]),
-      unpacker: (unpacker) => new Set((unpacker as Unpacker).read() as unknown[]),
     });
 
-    registry.registerType({
-      type: 13,
-      klass: "URI::Generic",
-      recursive: false,
-      match: (v) => v instanceof Generic,
-      packer: (v) => Buffer.from((v as Generic).toString(), "utf-8"),
-      unpacker: (payload) => URI.parse((payload as Buffer).toString("utf-8")),
+    registry.registerType(13, Generic, {
+      packer: "toString",
+      unpacker: rbObjMethod(URI, "parse"),
     });
 
-    registry.registerType({
-      type: 14,
-      klass: "IPAddr",
+    registry.registerType(14, IPAddr, {
+      packer: Extensions.writeIpaddr,
+      unpacker: Extensions.readIpaddr,
       recursive: true,
-      match: (v) => v instanceof IPAddr,
-      packer: (v, packer) => Extensions.writeIpaddr(v as IPAddr, packer),
-      unpacker: (unpacker) => Extensions.readIpaddr(unpacker as Unpacker),
     });
 
-    registry.registerType({
-      type: 15,
-      klass: "Pathname",
-      recursive: false,
-      match: (v) => v instanceof Pathname,
-      packer: (v) => Buffer.from((v as Pathname).toString(), "utf-8"),
-      unpacker: (payload) => new Pathname((payload as Buffer).toString("utf-8")),
+    registry.registerType(15, Pathname, {
+      packer: "toString",
+      unpacker: "new",
     });
 
-    registry.registerType({
-      type: 16,
-      klass: "Regexp",
-      recursive: false,
-      match: (v) => v instanceof RegExp,
-      packer: (v) => Buffer.from(rbRegToS(v as RegExp, "onig"), "utf-8"),
-      unpacker: (payload) => rbRegInitStr((payload as Buffer).toString("utf-8")),
+    registry.registerType(16, RegExp, {
+      packer: (regexp: RegExp) => rbRegToS(regexp, "onig"),
+      unpacker: rbRegInitStr,
     });
 
-    registry.registerType({
-      type: 17,
-      klass: "ActiveSupport::HashWithIndifferentAccess",
+    registry.registerType(17, HashWithIndifferentAccess, {
+      packer: Extensions.writeHashWithIndifferentAccess,
+      unpacker: Extensions.readHashWithIndifferentAccess,
       recursive: true,
-      match: (v) => v instanceof HashWithIndifferentAccess,
-      packer: (v, packer) => packer.write((v as HashWithIndifferentAccess).toH()),
-      unpacker: (unpacker) =>
-        new HashWithIndifferentAccess((unpacker as Unpacker).read() as Record<string, unknown>),
     });
   },
 
   installUnregisteredTypeError(registry: Factory): void {
-    registry.registerType({
-      type: 127,
-      klass: "Object",
-      recursive: false,
-      match: (v) => typeof v === "object" && v !== null,
-      packer: (v) => Extensions.raiseUnserializable(v),
-      unpacker: () => Extensions.raiseInvalidFormat(),
+    registry.registerType(127, Object, {
+      packer: Extensions.raiseUnserializable,
+      unpacker: Extensions.raiseInvalidFormat,
     });
   },
 
   installUnregisteredTypeFallback(registry: Factory): void {
-    registry.registerType({
-      type: 127,
-      klass: "Object",
+    registry.registerType(127, Object, {
+      packer: Extensions.writeObject,
+      unpacker: Extensions.readObject,
       recursive: true,
-      match: (v) => typeof v === "object" && v !== null,
-      packer: (v, packer) => Extensions.writeObject(v as object, packer),
-      unpacker: (unpacker) => Extensions.readObject(unpacker as Unpacker),
     });
   },
 
@@ -363,7 +291,7 @@ export const Extensions = {
     return timeZone.name;
   },
 
-  loadTimeZone(name: string): TimeZone | null {
+  loadTimeZone(name: string | Uint8Array): TimeZone | null {
     return TimeZone.find(name);
   },
 
@@ -399,6 +327,14 @@ export const Extensions = {
     return new Range(unpacker.read(), unpacker.read(), unpacker.read() as boolean);
   },
 
+  writeSet(set: Set<unknown>, packer: Packer): void {
+    packer.write([...set]);
+  },
+
+  readSet(unpacker: Unpacker): Set<unknown> {
+    return new Set(unpacker.read() as unknown[]);
+  },
+
   writeIpaddr(ipaddr: IPAddr, packer: Packer): void {
     if (ipaddr.prefix < 32 || (ipaddr.isIpv6() && ipaddr.prefix < 128)) {
       packer.write(`${ipaddr}/${ipaddr.prefix}`);
@@ -409,6 +345,14 @@ export const Extensions = {
 
   readIpaddr(unpacker: Unpacker): IPAddr {
     return new IPAddr(unpacker.read());
+  },
+
+  writeHashWithIndifferentAccess(hwia: HashWithIndifferentAccess, packer: Packer): void {
+    packer.write(hwia.toH());
+  },
+
+  readHashWithIndifferentAccess(unpacker: Unpacker): HashWithIndifferentAccess {
+    return new HashWithIndifferentAccess(unpacker.read() as Record<string, unknown>);
   },
 
   dumpClass(klass: ObjectClass): string {

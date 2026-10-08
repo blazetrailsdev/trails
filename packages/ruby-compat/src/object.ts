@@ -48,7 +48,9 @@ export function rbObjClass(obj: unknown): Klass {
   if (obj instanceof Number) return rbCFloat;
   if (typeof obj === "string") return rbCString;
   if (obj instanceof Uint8Array) {
-    return obj.constructor === Uint8Array ? rbCString : (obj.constructor as Klass);
+    const klass = obj.constructor;
+    const nodeBuffer = (globalThis as { Buffer?: unknown }).Buffer;
+    return klass === Uint8Array || klass === nodeBuffer ? rbCString : (klass as Klass);
   }
   if (typeof obj === "function") {
     return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
@@ -77,6 +79,15 @@ export function rbObjClassname(x: unknown): string {
   const branded = typeof x === "object" && x !== null ? (x as Comparable)[rubyClass] : null;
   if (branded != null) return branded;
   return rbModToS(rbObjClass(x));
+}
+
+/**
+ * `rb_obj_frozen_p` (`vendor/ruby/v3.3.11/object.c:1296`), `Object#frozen?`.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbObjFrozenP(obj: unknown): boolean {
+  return Object.isFrozen(obj);
 }
 
 /**

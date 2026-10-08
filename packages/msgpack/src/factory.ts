@@ -29,6 +29,7 @@ export type RegisterTypeOptions = {
   unpacker?: unknown;
   recursive?: boolean | null;
   oversizedIntegerExtension?: boolean | null;
+  optimizedSymbolsParsing?: boolean | null;
 };
 
 export type RegisteredType = {
@@ -324,7 +325,7 @@ export class Pool {
   declare static MemberPool: typeof MemberPool;
 
   private readonly factory: Factory;
-  private readonly packers: MemberPool<Packer>;
+  private readonly packers: MemberPool<Packer<null>>;
   private readonly unpackers: MemberPool<Unpacker>;
 
   constructor(factory: Factory, size: number, options: object | null = null) {
@@ -332,7 +333,7 @@ export class Pool {
     this.factory = factory;
     this.packers = new Pool.MemberPool(
       size,
-      () => Object.freeze(factory.packer(options)) as Packer,
+      () => Object.freeze(factory.packer(options)) as Packer<null>,
     );
     this.unpackers = new Pool.MemberPool(
       size,
@@ -350,7 +351,7 @@ export class Pool {
   dump(object: unknown): Uint8Array {
     return this.packers.with((packer) => {
       packer.write(object);
-      return packer.fullPack() as Uint8Array;
+      return packer.fullPack();
     });
   }
 
@@ -358,7 +359,7 @@ export class Pool {
     return this.unpackers.with(block);
   }
 
-  packer<R>(block: (packer: Packer) => R): R {
+  packer<R>(block: (packer: Packer<null>) => R): R {
     return this.packers.with(block);
   }
 }

@@ -2,7 +2,7 @@ import { NameError } from "./name-error.js";
 import { checkArity, rbCheckStringType } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
-import { FL_SINGLETON, rbInspect, rbObjClass, rbObjClassname } from "./object.js";
+import { FL_SINGLETON, rbCClass, rbInspect, rbObjClass, rbObjClassname } from "./object.js";
 import { methodOwner } from "./include.js";
 
 /**
@@ -128,6 +128,10 @@ export function rbObjMethod(obj: unknown, vid: unknown): Method {
       return new Method(obj, id, entry.value as (...args: unknown[]) => unknown);
     }
     if (entry) break;
+  }
+  if (id === "new" && rbObjClass(obj) === rbCClass) {
+    const klass = obj as new (...args: unknown[]) => unknown;
+    return new Method(obj, id, (...args) => new klass(...args));
   }
   const target = obj as {
     respondToMissing?: (method: string, includePrivate: boolean) => unknown;

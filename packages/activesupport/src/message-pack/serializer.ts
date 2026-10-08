@@ -1,5 +1,5 @@
-import { RuntimeError, env as ENV, fetch, toI } from "@blazetrails/ruby-compat";
-import { Factory, type Pool } from "./factory.js";
+import { RuntimeError, env as ENV, fetch, rbObjFrozenP, toI } from "@blazetrails/ruby-compat";
+import { Factory, type Pool } from "@blazetrails/msgpack";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE_INT = 128;
@@ -25,7 +25,7 @@ export class Serializer {
     this.messagePackPool();
   }
 
-  dump(object: unknown): Buffer {
+  dump(object: unknown): Uint8Array {
     return this.messagePackPool().packer((packer) => {
       packer.write(SIGNATURE_INT);
       packer.write(object);
@@ -42,14 +42,14 @@ export class Serializer {
     });
   }
 
-  isSignature(dumped: Buffer): boolean {
+  isSignature(dumped: Uint8Array): boolean {
     return dumped[0] === 0xcc && dumped[1] === 0x80;
   }
 
   /** @internal */
   protected messagePackPool(): Pool {
     if (this.pool === null) {
-      if (!this.messagePackFactory.isFrozen()) {
+      if (!rbObjFrozenP(this.messagePackFactory)) {
         Extensions.install(this.messagePackFactory);
         this.installUnregisteredTypeHandler();
         this.messagePackFactory.freeze();

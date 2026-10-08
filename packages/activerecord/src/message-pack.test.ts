@@ -2,11 +2,12 @@ import { describe, it } from "vitest";
 import { assertEqual, assertRaises, assertSame } from "@blazetrails/activesupport";
 import {
   Extensions as ActiveSupportExtensions,
-  Factory,
   MissingClassError,
 } from "@blazetrails/activesupport/message-pack";
+import { Factory } from "@blazetrails/msgpack";
 import { Marshal } from "@blazetrails/ruby-compat";
-import { registerModel } from "./index.js";
+import { BinaryData } from "@blazetrails/activemodel";
+import { Base, registerModel } from "./index.js";
 import { Extensions } from "./message-pack.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
@@ -39,14 +40,14 @@ describe("ActiveRecordMessagePackTest", () => {
 
   it("enshrines type IDs", () => {
     const expected = {
-      119: "ActiveModel::Type::Binary::Data",
-      120: "ActiveRecord::Base",
+      119: BinaryData,
+      120: Base,
     };
 
     const factory = new Factory();
     Extensions.install(factory);
     const actual = Object.fromEntries(
-      factory.registeredTypes().map((entry) => [entry.type, entry.klass]),
+      factory.registeredTypes().map((entry) => [entry.type, entry.class]),
     );
 
     assertEqual(expected, actual);

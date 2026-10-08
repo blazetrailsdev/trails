@@ -8,7 +8,7 @@ import {
 } from "@blazetrails/ruby-compat";
 
 import { Extensions, MissingClassError } from "./extensions.js";
-import { Factory } from "./factory.js";
+import { Factory } from "@blazetrails/msgpack";
 import { HashWithIndifferentAccess } from "../hash-with-indifferent-access.js";
 
 describe("MessagePackExtensionsTest", () => {
@@ -17,7 +17,7 @@ describe("MessagePackExtensionsTest", () => {
     const packer = factory.packer();
     packer.write(numerator);
     if (denominator !== undefined) packer.write(denominator);
-    return Extensions.readRational(factory.unpacker(packer.toBuffer()));
+    return Extensions.readRational(factory.unpacker().feed(packer.toStr()));
   };
 
   it("normalizes the sign of a decoded Rational onto the numerator", () => {
@@ -42,12 +42,12 @@ describe("MessagePackExtensionsTest", () => {
     Extensions.install(factory);
     const packer = factory.packer();
     packer.write(value);
-    return packer.toBuffer();
+    return packer.toStr();
   };
-  const load = (dumped: Buffer) => {
+  const load = (dumped: Uint8Array) => {
     const factory = new Factory();
     Extensions.install(factory);
-    return factory.unpacker(dumped).read();
+    return factory.unpacker().feed(dumped).read();
   };
 
   it("round-trips a Rational whose numerator is past Number.MAX_SAFE_INTEGER", () => {
@@ -93,11 +93,11 @@ describe("MessagePackExtensionsTest", () => {
     const hwia = new HashWithIndifferentAccess({ a: { b: 1 } });
     const packer = factory.packer();
     packer.write(hwia);
-    const dumped = packer.toBuffer();
+    const dumped = packer.toStr();
     const nested = factory.packer();
     nested.write(new HashWithIndifferentAccess({ b: 1 }));
-    expect([...dumped].join(",")).toContain([...nested.toBuffer()].join(","));
-    const result = factory.unpacker(dumped).read() as HashWithIndifferentAccess;
+    expect([...dumped].join(",")).toContain([...nested.toStr()].join(","));
+    const result = factory.unpacker().feed(dumped).read() as HashWithIndifferentAccess;
     expect(result).toBeInstanceOf(HashWithIndifferentAccess);
     expect(result.get("a")).toBeInstanceOf(HashWithIndifferentAccess);
   });

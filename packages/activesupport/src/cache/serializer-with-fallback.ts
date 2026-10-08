@@ -124,7 +124,7 @@ const marshal71WithFallback: Serializer = {
 
 const messagePackWithFallback: Serializer = {
   dump(value: Entry | unknown): string {
-    return messagePack.dump(value).toString("latin1");
+    return Buffer.from(messagePack.dump(value)).toString("latin1");
   },
 
   _load(dumped: string | Entry): unknown {

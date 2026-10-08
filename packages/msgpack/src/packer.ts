@@ -40,7 +40,7 @@ export type PackerExtRegistry = Map<unknown, PackerExtType>;
 const encoder = new Encoder();
 const floatEncoder = new Encoder({ forceIntegerToFloat: true });
 
-export class Packer {
+export class Packer<Io = unknown> {
   /** @internal */
   readonly extRegistry: PackerExtRegistry = new Map();
   private readonly extRegistryCache: PackerExtRegistry = new Map();
@@ -338,7 +338,7 @@ export class Packer {
     return this.buffer.flushToIo(io, "write", true);
   }
 
-  fullPack(): Uint8Array | null {
+  fullPack(): Io extends null ? Uint8Array : Uint8Array | null {
     let retval: Uint8Array | null;
 
     if (this.buffer.io != null) {
@@ -349,7 +349,7 @@ export class Packer {
     }
 
     this.buffer.clear();
-    return retval;
+    return retval as Io extends null ? Uint8Array : Uint8Array | null;
   }
 
   private registeredTypesInternal(): PackerExtRegistry {

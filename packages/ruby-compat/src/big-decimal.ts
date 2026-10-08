@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { stringValue } from "./string/support.js";
 
 const BASE_FIG = 9;
 const BASE = 1000000000n;
@@ -308,9 +309,11 @@ export class BigDecimal {
   /**
    * Ruby's `BigDecimal._load` (`vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:805`
    * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
-   * (`bigdecimal.c:5420-5421`) over the prefix.
+   * (`bigdecimal.c:5420-5421`) over the prefix. `str` goes through
+   * `StringValueCStr` (`bigdecimal.c:813`), so a binary String loads.
    */
-  static _load(str: string): BigDecimal {
+  static _load(str: string | Uint8Array): BigDecimal {
+    str = stringValue(str);
     let pch = 0;
     let m = 0;
     while (pch < str.length) {

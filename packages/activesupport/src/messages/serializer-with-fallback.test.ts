@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
-import { MessagePack } from "../message-pack/index.js";
+import { MessagePack } from "../message-pack.js";
 import { assert } from "../testing/assertions.js";
 import {
   SERIALIZERS,

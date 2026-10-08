@@ -3,7 +3,7 @@ import { ArgumentError, KeyError, RuntimeError } from "@blazetrails/ruby-compat"
 import { Notifications } from "../notifications.js";
 import { ActiveSupportJSON } from "../json.js";
 import { coder } from "../cache/coder.js";
-import { MessagePack } from "../message-pack/index.js";
+import { MessagePack } from "../message-pack.js";
 
 /** @internal */
 export type Format =
@@ -151,11 +151,11 @@ const messagePackWithFallback: Serializer = {
   },
 
   dump(object: unknown): string {
-    return MessagePack.dump(object).toString("latin1");
+    return Buffer.from(MessagePack.dump(object)).toString("latin1");
   },
 
   _load(dumped: string): unknown {
-    return MessagePack.load(dumped);
+    return MessagePack.load(Buffer.from(dumped, "latin1"));
   },
 
   dumped(dumped: string): boolean {
