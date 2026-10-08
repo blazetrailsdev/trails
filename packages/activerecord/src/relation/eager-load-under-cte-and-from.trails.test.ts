@@ -66,6 +66,7 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
       expect(sqls.at(-1), name).not.toMatch(/IN \(SELECT/i);
       expect(relation.fromClause.value, name).toBe(from);
       expect(subquery().toSql(), name).toMatch(/IN \(SELECT DISTINCT/i);
+      expect(relation.reset().toSql(), name).toMatch(/IN \(SELECT DISTINCT/i);
     }
     expect(new Set((await subquery()).map((post) => post.id)).size).toBe(2);
   });

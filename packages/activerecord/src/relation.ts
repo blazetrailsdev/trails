@@ -439,6 +439,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
+    this._fromLimitedIds = undefined;
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -1634,7 +1635,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   initializeCopy(other: Relation<T, G>): this {
     this._values = { ...this._values };
-    return this.reset();
+    this.reset();
+    this._fromLimitedIds = other._fromLimitedIds;
+    return this;
   }
 
   clone(): Relation<T, G> {
