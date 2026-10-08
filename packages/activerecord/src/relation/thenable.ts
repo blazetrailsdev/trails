@@ -30,7 +30,7 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function applyThenable(prototype: object, evaluationMethod: string = "toArray"): void {
+export function applyThenable(prototype: object): void {
   const def = { writable: true, configurable: true, enumerable: false };
 
   Object.defineProperties(prototype, {
@@ -41,19 +41,19 @@ export function applyThenable(prototype: object, evaluationMethod: string = "toA
         onfulfilled?: ((value: any) => any) | null,
         onrejected?: ((reason: any) => any) | null,
       ) {
-        return this[evaluationMethod]().then(onfulfilled, onrejected);
+        return this.toArray().then(onfulfilled, onrejected);
       },
     },
     catch: {
       ...def,
       value(this: any, onrejected?: ((reason: any) => any) | null) {
-        return this[evaluationMethod]().catch(onrejected);
+        return this.toArray().catch(onrejected);
       },
     },
     finally: {
       ...def,
       value(this: any, onfinally?: (() => void) | null) {
-        return this[evaluationMethod]().finally(onfinally);
+        return this.toArray().finally(onfinally);
       },
     },
   });

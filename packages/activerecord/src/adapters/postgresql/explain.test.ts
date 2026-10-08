@@ -49,7 +49,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await adapter.execute(`CREATE TABLE "ex_relations" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await ExRelation.create({ name: "r" });
-      const plan = await ExRelation.all().explain();
+      const plan = await ExRelation.all().explain().inspect();
       expect(typeof plan).toBe("string");
       expect(plan.toLowerCase()).toContain("select");
       expect(plan).toContain("ex_relations");
@@ -80,7 +80,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = (await ExAuthor.create({ name: "A" })) as any;
       await ExBook.create({ title: "B", ex_author_id: a.id });
 
-      const plan = await ExAuthor.all().preload(":exBooks").explain();
+      const plan = await ExAuthor.all().preload(":exBooks").explain().inspect();
       const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
       expect(blocks.length).toBeGreaterThanOrEqual(2);
       expect(plan).toContain("ex_authors");
@@ -96,7 +96,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       await adapter.execute(`CREATE TABLE "ex_explains" ("id" SERIAL PRIMARY KEY, "name" TEXT)`);
       await ExExplain.create({ name: "test" });
-      const explain = await ExExplain.where({ id: 1 }).explain(":analyze", ":buffers");
+      const explain = await ExExplain.where({ id: 1 }).explain(":analyze", ":buffers").inspect();
       expect(explain).toMatch(
         /EXPLAIN \(ANALYZE, BUFFERS\) SELECT "ex_explains"\.\* FROM "ex_explains" WHERE "ex_explains"\."id" = (?:\$1 \[\["id", 1\]\]|1)/,
       );

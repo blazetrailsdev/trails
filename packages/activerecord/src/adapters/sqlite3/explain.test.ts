@@ -9,7 +9,9 @@ describeIfSqlite("SQLite3ExplainTest", () => {
   const { authors } = fixtures(["authors", "authorAddresses"]);
 
   it("explain for one query", async () => {
-    const explain = await Author.where({ id: authors("david").id }).explain();
+    const explain = await Author.where({ id: authors("david").id })
+      .explain()
+      .inspect();
     expect(explain).toMatch(
       /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
     );
@@ -19,7 +21,8 @@ describeIfSqlite("SQLite3ExplainTest", () => {
   it("explain with eager loading", async () => {
     const explain = await Author.where({ id: authors("david").id })
       .includes(":posts")
-      .explain();
+      .explain()
+      .inspect();
     expect(explain).toMatch(
       /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|1)/,
     );

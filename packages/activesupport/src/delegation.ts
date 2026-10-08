@@ -1,4 +1,10 @@
-import { ArgumentError, NilClass, NoMethodError, rbModName } from "@blazetrails/ruby-compat";
+import {
+  ArgumentError,
+  NilClass,
+  NoMethodError,
+  rbModName,
+  rbObjClass,
+} from "@blazetrails/ruby-compat";
 import { constantize, safeConstantize } from "./inflector.js";
 import { PROTOCOL_PROBES } from "@blazetrails/ruby-compat/method-missing-proxy";
 
@@ -91,12 +97,14 @@ export namespace Delegation {
 
     const methodNames: string[] = [];
 
-    const receiverClass =
-      typeof to !== "string"
-        ? to
-        : receiver === "self.class"
-          ? (owner as { constructor?: unknown }).constructor
-          : undefined;
+    let nilable = true;
+    let receiverClass: unknown;
+    if (typeof to !== "string") {
+      receiverClass = to;
+    } else if (receiver === "self.class") {
+      nilable = false;
+      receiverClass = (owner as { constructor?: unknown }).constructor;
+    }
 
     for (const method of methods) {
       const methodName = `${methodPrefix}${method}`;
@@ -105,7 +113,10 @@ export namespace Delegation {
       const resolve = (self: Record<string, unknown>): unknown => {
         const _ = receiver.startsWith("::")
           ? constantize(receiver)
-          : receiverValue(self, receiverName);
+          : receiver === "self.class"
+            ? rbObjClass(self)
+            : receiverValue(self, receiverName);
+        if (nilable === false) return _;
         if (_ == null && !Object.hasOwn(NilClass, method)) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(methodName, receiver);

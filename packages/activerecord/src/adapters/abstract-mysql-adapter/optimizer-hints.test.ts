@@ -29,7 +29,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         async () => {
           let posts = Post.optimizerHints("NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id)");
           posts = posts.select("id").where({ author_id: [0, 1] });
-          expect(await posts.explain()).toContain(
+          expect(await posts.explain().inspect()).toContain(
             "| index | index_posts_on_author_id | index_posts_on_author_id |",
           );
         },
@@ -62,7 +62,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
             "/*+ NO_RANGE_OPTIMIZATION(posts index_posts_on_author_id) */",
           );
           posts = posts.select("id").where({ author_id: [0, 1] });
-          expect(await posts.explain()).toContain(
+          expect(await posts.explain().inspect()).toContain(
             "| index | index_posts_on_author_id | index_posts_on_author_id |",
           );
         },
