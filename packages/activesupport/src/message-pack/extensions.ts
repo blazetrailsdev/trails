@@ -92,7 +92,7 @@ export const Extensions = {
 
     registry.registerType(2, BigDecimal, {
       packer: "_dump",
-      unpacker: (data: Uint8Array) => BigDecimal._load(new TextDecoder().decode(data)),
+      unpacker: "_load",
     });
 
     registry.registerType(3, Rational, {
@@ -133,7 +133,7 @@ export const Extensions = {
 
     registry.registerType(9, TimeZone, {
       packer: Extensions.dumpTimeZone,
-      unpacker: (data: Uint8Array) => Extensions.loadTimeZone(new TextDecoder().decode(data)),
+      unpacker: Extensions.loadTimeZone,
     });
 
     registry.registerType(10, Duration, {
@@ -156,7 +156,7 @@ export const Extensions = {
 
     registry.registerType(13, Generic, {
       packer: "toString",
-      unpacker: (data: Uint8Array) => URI.parse(new TextDecoder().decode(data)),
+      unpacker: rbObjMethod(URI, "parse"),
     });
 
     registry.registerType(14, IPAddr, {
@@ -167,12 +167,12 @@ export const Extensions = {
 
     registry.registerType(15, Pathname, {
       packer: "toString",
-      unpacker: (data: Uint8Array) => new Pathname(new TextDecoder().decode(data)),
+      unpacker: "new",
     });
 
     registry.registerType(16, RegExp, {
       packer: (regexp: RegExp) => rbRegToS(regexp, "onig"),
-      unpacker: (data: Uint8Array) => rbRegInitStr(new TextDecoder().decode(data)),
+      unpacker: rbRegInitStr,
     });
 
     registry.registerType(17, HashWithIndifferentAccess, {
@@ -276,7 +276,7 @@ export const Extensions = {
     return timeZone.name;
   },
 
-  loadTimeZone(name: string): TimeZone | null {
+  loadTimeZone(name: string | Uint8Array): TimeZone | null {
     return TimeZone.find(name);
   },
 

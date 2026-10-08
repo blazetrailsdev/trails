@@ -1,12 +1,15 @@
 import { ArgumentError } from "./argument-error.js";
+import { stringValue } from "./string/support.js";
 
 /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:1511` `rb_cPathname` */
 export class Pathname {
   private readonly path: string;
 
   /** @noRailsEquivalent PERMANENT — `vendor/ruby/v3.3.11/ext/pathname/pathname.c:97` `path_initialize` */
-  constructor(arg: string | { toPath(): string }) {
-    const str = typeof arg === "string" ? arg : arg.toPath();
+  constructor(arg: string | Uint8Array | { toPath(): string }) {
+    const str = stringValue(
+      typeof arg === "string" || arg instanceof Uint8Array ? arg : arg.toPath(),
+    );
     if (str.includes("\0")) throw new ArgumentError("pathname contains null byte");
     this.path = str;
   }

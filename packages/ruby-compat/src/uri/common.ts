@@ -188,7 +188,7 @@ export class URI {
   }
 
   /** `URI.parse` (`vendor/ruby/v3.3.11/lib/uri/common.rb:186`). */
-  static parse(uri: string): Generic {
+  static parse(uri: string | Uint8Array): Generic {
     return RFC3986_PARSER.parse(uri);
   }
 }

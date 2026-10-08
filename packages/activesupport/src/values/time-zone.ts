@@ -20,6 +20,7 @@ import {
   KeyError,
   Rational,
   sprintf,
+  stringValue,
 } from "@blazetrails/ruby-compat";
 import type { DateParts } from "@blazetrails/date";
 import { instantFrom } from "../temporal.js";
@@ -615,6 +616,7 @@ export class TimeZone {
 
   static find(arg: unknown): TimeZone | null {
     if (arg instanceof TimeZone) return arg;
+    if (arg instanceof Uint8Array) arg = stringValue(arg);
     if (typeof arg === "string") {
       const cached = zoneCache.get(arg);
       if (cached) return cached;

@@ -56,11 +56,7 @@ describe("MessagePackSerializerTest", () => {
     expect(roundtrip(":some_symbol")).toBe(":some_symbol");
   });
 
-  // BLOCKED: msgpack-symbol-ext-packer-arm-and-extended-object-lookup
-  it.skip("dumps Symbol bytes identical to real Rails MessagePack", () => {
-    const expected = [204, 128, 199, 11, 0, 115, 111, 109, 101, 95, 115, 121, 109, 98, 111, 108];
-    expect([...dump(":some_symbol")]).toEqual(expected);
-  });
+  it.todo("dumps Symbol bytes identical to real Rails MessagePack");
 
   it("enshrines type IDs", () => {
     MessagePack.warmup();

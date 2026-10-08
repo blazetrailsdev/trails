@@ -1,5 +1,6 @@
 import { ArgumentError } from "../argument-error.js";
 import { rbInspect } from "../object.js";
+import { stringValue } from "../string/support.js";
 import { InvalidURIError, URI } from "./common.js";
 import { Generic } from "./generic.js";
 
@@ -130,7 +131,8 @@ export class RFC3986Parser {
   };
 
   /** `split` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:77`). */
-  split(uri: string): SplitComponents {
+  split(uri: string | Uint8Array): SplitComponents {
+    uri = stringValue(uri);
     // eslint-disable-next-line no-control-regex
     if (!/^[\x00-\x7f]*$/.test(uri)) {
       throw new InvalidURIError(`URI must be ascii only ${rbInspect(uri)}`);
@@ -176,7 +178,7 @@ export class RFC3986Parser {
   }
 
   /** `parse` (`vendor/ruby/v3.3.11/lib/uri/rfc3986_parser.rb:130`). */
-  parse(uri: string): Generic {
+  parse(uri: string | Uint8Array): Generic {
     return URI.for(...this.split(uri), this);
   }
 

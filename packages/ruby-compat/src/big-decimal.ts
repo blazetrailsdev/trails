@@ -1,5 +1,6 @@
 import { ArgumentError } from "./argument-error.js";
 import { FloatDomainError } from "./float-domain-error.js";
+import { stringValue } from "./string/support.js";
 
 const BASE_FIG = 9;
 const BASE = 1000000000n;
@@ -310,7 +311,8 @@ export class BigDecimal {
    * `BigDecimal_load`), with `VpAlloc`'s `nalloc = Max(nalloc, len)`
    * (`bigdecimal.c:5420-5421`) over the prefix.
    */
-  static _load(str: string): BigDecimal {
+  static _load(str: string | Uint8Array): BigDecimal {
+    str = stringValue(str);
     let pch = 0;
     let m = 0;
     while (pch < str.length) {
