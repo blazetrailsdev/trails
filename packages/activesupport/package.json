@@ -47,8 +47,8 @@
       "default": "./dist/gzip.js"
     },
     "./message-pack": {
-      "types": "./dist/message-pack/index.d.ts",
-      "default": "./dist/message-pack/index.js"
+      "types": "./dist/message-pack.d.ts",
+      "default": "./dist/message-pack.js"
     },
     "./glob": {
       "types": "./dist/glob.d.ts",
@@ -119,6 +119,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
+    "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*"
   },
   "dependencies": {
@@ -129,9 +130,13 @@
     "tinyglobby": "^0.2.16"
   },
   "peerDependencies": {
+    "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/nokogiri": "workspace:*"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/msgpack": {
+      "optional": true
+    },
     "@blazetrails/nokogiri": {
       "optional": true
     }

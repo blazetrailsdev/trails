@@ -74,6 +74,7 @@ export default defineConfig({
       pkgAlias("@blazetrails/date", "../date/src/index.ts"),
       pkgAlias("@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"),
       pkgAlias("@blazetrails/i18n", "../i18n/src/index.ts"),
+      pkgAlias("@blazetrails/msgpack", "../msgpack/src/index.ts"),
       pkgAlias("@blazetrails/nokogiri", "src/stubs/nokogiri-stub.ts"),
     ],
   },

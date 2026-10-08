@@ -29,6 +29,7 @@ export type RegisterTypeOptions = {
   unpacker?: unknown;
   recursive?: boolean | null;
   oversizedIntegerExtension?: boolean | null;
+  optimizedSymbolsParsing?: boolean | null;
 };
 
 export type RegisteredType = {

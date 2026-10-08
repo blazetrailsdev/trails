@@ -1,10 +1,6 @@
 import { BinaryData } from "@blazetrails/activemodel";
-import {
-  Extensions as ActiveSupportExtensions,
-  type Factory,
-  type Packer,
-  type Unpacker,
-} from "@blazetrails/activesupport/message-pack";
+import { Extensions as ActiveSupportExtensions } from "@blazetrails/activesupport/message-pack";
+import type { Factory, Packer, Unpacker } from "@blazetrails/msgpack";
 import { RuntimeError, rbInspect } from "@blazetrails/ruby-compat";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import type { Base } from "./base.js";
@@ -27,22 +23,15 @@ export function load(dumped: unknown): unknown {
 
 export const Extensions = {
   install(registry: Factory): void {
-    registry.registerType({
-      type: 119,
-      klass: "ActiveModel::Type::Binary::Data",
-      recursive: false,
-      match: (v) => v instanceof BinaryData,
-      packer: (v) => Buffer.from((v as BinaryData).toString()),
-      unpacker: (payload) => new BinaryData(payload),
+    registry.registerType(119, BinaryData, {
+      packer: "toString",
+      unpacker: "new",
     });
 
-    registry.registerType({
-      type: 120,
-      klass: "ActiveRecord::Base",
+    registry.registerType(120, ActiveRecord.Base, {
+      packer: Extensions.writeRecord,
+      unpacker: Extensions.readRecord,
       recursive: true,
-      match: (v) => v instanceof ActiveRecord.Base,
-      packer: (v, packer) => Extensions.writeRecord(v as Base, packer),
-      unpacker: (unpacker) => Extensions.readRecord(unpacker as Unpacker),
     });
   },
 

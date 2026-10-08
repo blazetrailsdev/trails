@@ -284,6 +284,9 @@ importers:
       '@blazetrails/actionview':
         specifier: workspace:*
         version: link:../actionview
+      '@blazetrails/msgpack':
+        specifier: workspace:*
+        version: link:../msgpack
       '@blazetrails/rack':
         specifier: workspace:*
         version: link:../rack
@@ -334,6 +337,9 @@ importers:
         specifier: ^0.2.16
         version: 0.2.16
     devDependencies:
+      '@blazetrails/msgpack':
+        specifier: workspace:*
+        version: link:../msgpack
       '@blazetrails/nokogiri':
         specifier: workspace:*
         version: link:../nokogiri

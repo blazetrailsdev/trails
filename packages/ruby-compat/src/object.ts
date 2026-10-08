@@ -48,7 +48,9 @@ export function rbObjClass(obj: unknown): Klass {
   if (obj instanceof Number) return rbCFloat;
   if (typeof obj === "string") return rbCString;
   if (obj instanceof Uint8Array) {
-    return obj.constructor === Uint8Array ? rbCString : (obj.constructor as Klass);
+    const klass = obj.constructor;
+    const nodeBuffer = (globalThis as { Buffer?: unknown }).Buffer;
+    return klass === Uint8Array || klass === nodeBuffer ? rbCString : (klass as Klass);
   }
   if (typeof obj === "function") {
     return Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false

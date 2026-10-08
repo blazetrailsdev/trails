@@ -70,17 +70,17 @@ describe("ActiveRecord::Encryption::MessagePackMessageSerializerTest", () => {
   });
 
   it("round-trips values that span the str8/bin16/map16 length-prefix boundaries", () => {
-    const message = new Message({ payload: Buffer.from("x".repeat(50)) });
+    const message = new Message({ payload: new TextEncoder().encode("x".repeat(50)) });
     message.headers.set("long", "y".repeat(40));
-    message.headers.set("big", Buffer.from("z".repeat(300)));
+    message.headers.set("big", new TextEncoder().encode("z".repeat(300)));
     for (let i = 0; i < 20; i++) message.headers.set(`k${i}`, `v${i}`);
 
     expect(serializer.load(serializer.dump(message))).toEqual(message);
   });
 
   it("loads a MessagePack ciphertext produced by real Rails", () => {
-    const message = serializer.load(Buffer.from(MRI_FIXTURE).toString("latin1"));
-    expect((message.payload as Buffer).toString("utf-8")).toBe("some payload");
+    const message = serializer.load(Buffer.from(MRI_FIXTURE));
+    expect(new TextDecoder().decode(message.payload as Uint8Array)).toBe("some payload");
     expect(message.headers.get("key_1")).toBe("1");
     expect([...(message.headers.get("iv") as Buffer)]).toEqual(
       Array.from({ length: 12 }, (_, i) => i),

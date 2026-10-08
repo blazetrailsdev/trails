@@ -1036,6 +1036,7 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     class Blob extends Uint8Array {}
     expect(rbClassOf(Uint8Array.of(1))).toBe(rbCString);
     expect(rbClassOf(Blob.of(1))).toBe(Blob);
+    expect(rbClassOf(Buffer.from([1]))).toBe(rbCString);
     expect(rbObjIsKindOf(Blob.of(1), rbCString)).toBe(true);
     expect(rbClassInheritedP(Blob, rbCString)).toBe(true);
     expect(rbModAncestors(Blob)).toContain(rbCString);

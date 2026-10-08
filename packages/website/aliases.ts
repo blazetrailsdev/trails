@@ -35,6 +35,7 @@ export const packageEntries: Array<[string, string]> = [
   ["@blazetrails/date", "../date/src/index.ts"],
   ["@blazetrails/did-you-mean", "../did-you-mean/src/index.ts"],
   ["@blazetrails/i18n", "../i18n/src/index.ts"],
+  ["@blazetrails/msgpack", "../msgpack/src/index.ts"],
   ["@blazetrails/nokogiri", "../nokogiri/src/index.ts"],
 ];
 

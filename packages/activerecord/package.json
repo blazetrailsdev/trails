@@ -69,6 +69,7 @@
     "@blazetrails/i18n": "workspace:*"
   },
   "peerDependencies": {
+    "@blazetrails/msgpack": "workspace:*",
     "better-sqlite3": "^12.6.2",
     "expo-sqlite": "^15.0.0",
     "libsql": "^0.5.29",
@@ -77,6 +78,9 @@
     "typescript": "7.1.0-dev.20260920.1"
   },
   "peerDependenciesMeta": {
+    "@blazetrails/msgpack": {
+      "optional": true
+    },
     "better-sqlite3": {
       "optional": true
     },
@@ -103,6 +107,7 @@
   "license": "MIT",
   "devDependencies": {
     "@blazetrails/actionview": "workspace:*",
+    "@blazetrails/msgpack": "workspace:*",
     "@blazetrails/rack": "workspace:*",
     "typescript": "7.1.0-dev.20260920.1"
   }
