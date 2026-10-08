@@ -25,7 +25,7 @@ beforeAll(() => {
   });
   ImplicitRenderTestController.prependViewPath(
     new FixtureResolver({
-      "implicit_render_test/hello-world.html.html": "Hello world!",
+      "implicit-render-test/hello-world.html.html": "Hello world!",
     }),
   );
   ImplicitRenderTestController.layout(false);

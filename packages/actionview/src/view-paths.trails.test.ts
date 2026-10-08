@@ -69,6 +69,16 @@ describe("ViewPaths::ClassMethods", () => {
     expect(DraftsController._prefixes()).toEqual(["drafts", "posts"]);
   });
 
+  test("the default prefix is the controller path in kebab-case, namespaces kept", () => {
+    class StoryPagesController extends PostsController {
+      static controllerPath(): string {
+        return "admin/story_pages";
+      }
+    }
+    expect(StoryPagesController.localPrefixes()).toEqual(["admin/story-pages"]);
+    expect(StoryPagesController.controllerPath()).toBe("admin/story_pages");
+  });
+
   test("overriding localPrefixes adds its prefix ahead of the ancestors'", () => {
     class OverridingLocalPrefixes extends PostsController {
       static controllerPath(): string {
@@ -79,7 +89,7 @@ describe("ViewPaths::ClassMethods", () => {
       }
     }
     expect(OverridingLocalPrefixes._prefixes()).toEqual([
-      "overriding_local_prefixes",
+      "overriding-local-prefixes",
       "testing/me3",
       "posts",
     ]);

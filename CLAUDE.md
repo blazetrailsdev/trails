@@ -1989,6 +1989,16 @@ or a locale key, and nowhere else. Each site carries
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
 
+The DIRECTORY a controller's templates are looked up in is kebab-case too.
+`ViewPaths::ClassMethods#localPrefixes` (`actionview/src/view-paths.ts`; Rails'
+`local_prefixes`, `view_paths.rb:75-77`, returns `[controller_path]`) returns
+the controller path dasherized, namespaces kept: `Admin::StoryPagesController`
+renders from `admin/story-pages/`, beside `admin/story-pages-controller.ts`.
+It carries `@inventedArm dasherize — PERMANENT`. `controller_path` itself is
+unchanged and stays underscored: it names the controller in routes and URL
+generation, where a hyphen is not legal. The controller generator writes the
+kebab-case directory, and the view compiler maps a controller to it.
+
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal

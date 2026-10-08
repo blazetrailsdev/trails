@@ -40,7 +40,7 @@ describe("StarStarMimeControllerTest", () => {
 });
 
 class AbstractPostController extends Base {}
-AbstractPostController.viewPaths(`${FIXTURE_LOAD_PATH}/post_test`);
+AbstractPostController.viewPaths(`${FIXTURE_LOAD_PATH}/post-test`);
 
 class PostController extends AbstractPostController {
   async index(): Promise<void> {

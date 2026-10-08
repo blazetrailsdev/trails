@@ -1,4 +1,4 @@
-import { Concern, extend } from "@blazetrails/activesupport";
+import { Concern, dasherize, extend } from "@blazetrails/activesupport";
 import { rbClassSuperclass } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
 import { LookupContext } from "./lookup-context.js";
@@ -86,9 +86,12 @@ export class ClassMethods {
     writeInternalViewPaths.call(this, ClassMethods._buildViewPaths.call(this, paths));
   }
 
-  /** @internal */
+  /**
+   * @inventedArm dasherize — PERMANENT
+   * @internal
+   */
   static localPrefixes(this: ViewPathsClass): string[] {
-    return [this.controllerPath()];
+    return [dasherize(this.controllerPath())];
   }
 }
 
