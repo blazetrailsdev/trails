@@ -94,9 +94,6 @@ export class Buffer {
 
   write(string: string | Uint8Array): number {
     const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
-    if (this._io != null && this.size() + bytes.length > this.ioBufferSize) {
-      this.flush();
-    }
     this.chunks.push(bytes);
     return bytes.length;
   }

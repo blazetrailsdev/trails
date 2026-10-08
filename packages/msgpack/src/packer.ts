@@ -16,12 +16,13 @@ import {
   rbClassOf,
   rbFSend,
   rbInspect,
+  isStruct,
   rbCNumeric,
   rbModConstSet,
   rbObjAsString,
   rbObjClass,
   rbObjIsKindOf,
-  rbObjRespondTo,
+  stringValue,
   symbolToS,
   type StructInstance,
 } from "@blazetrails/ruby-compat";
@@ -217,7 +218,7 @@ export class Packer {
   }
 
   writeExtension(obj: unknown): this {
-    if (!rbObjRespondTo(obj, "members")) {
+    if (!isStruct(obj)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Struct)`);
     }
     const struct = obj as StructInstance & Record<string, unknown>;
@@ -233,10 +234,8 @@ export class Packer {
     if (extType < -128 || extType > 127) {
       throw new RangeError(`integer ${extType} too big to convert to \`signed char'`);
     }
-    const payload = struct[struct.members()[1]];
-    if (typeof payload !== "string" && !(payload instanceof Uint8Array)) {
-      throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(payload)} into String`);
-    }
+    let payload = struct[struct.members()[1]] as string | Uint8Array;
+    if (!(payload instanceof Uint8Array)) payload = stringValue(payload);
     this.writeExt(extType, payload);
 
     return this;

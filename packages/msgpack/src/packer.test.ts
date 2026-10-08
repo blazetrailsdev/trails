@@ -58,35 +58,20 @@ describe("MessagePack::Packer", () => {
     expect(packer.toS()).toEqual(Uint8Array.of(0x81));
   });
 
-  it("write_bin_header 0", () => {
-    packer.writeBinHeader(0);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc4, 0x00));
-  });
-
-  it("write_bin_header 255", () => {
-    packer.writeBinHeader(255);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc4, 0xff));
-  });
-
-  it("write_bin_header 256", () => {
-    packer.writeBinHeader(256);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc5, 0x01, 0x00));
-  });
-
-  it("write_bin_header 65535", () => {
-    packer.writeBinHeader(65535);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc5, 0xff, 0xff));
-  });
-
-  it("write_bin_header 65536", () => {
-    packer.writeBinHeader(65536);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc6, 0x00, 0x01, 0x00, 0x00));
-  });
-
-  it("write_bin_header 999999", () => {
-    packer.writeBinHeader(999999);
-    expect(packer.toS()).toEqual(Uint8Array.of(0xc6, 0x00, 0x0f, 0x42, 0x3f));
-  });
+  const binHeaders: [number, number[]][] = [
+    [0, [0xc4, 0x00]],
+    [255, [0xc4, 0xff]],
+    [256, [0xc5, 0x01, 0x00]],
+    [65535, [0xc5, 0xff, 0xff]],
+    [65536, [0xc6, 0x00, 0x01, 0x00, 0x00]],
+    [999999, [0xc6, 0x00, 0x0f, 0x42, 0x3f]],
+  ];
+  for (const [n, packed] of binHeaders) {
+    it(`write_bin_header ${n}`, () => {
+      packer.writeBinHeader(n);
+      expect(packer.toS()).toEqual(Uint8Array.from(packed));
+    });
+  }
 
   it("write_bin", () => {
     packer.writeBin("hello");

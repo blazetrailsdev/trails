@@ -76,9 +76,9 @@ Each is tracked by a story in RFC 0184.
   A plain object's key is a Symbol's bare name already, so `symbolize_keys`
   has no key to convert until maps are `Hash`es. Story:
   `msgpack-unpacker-read-loop-the-engine-hides`.
-- **`Buffer#read` and `#read_all` are absent**, and `Buffer#write` flushes to
-  its IO once the buffered bytes pass `io_buffer_size`, where the gem flushes
-  when its tail chunk is full (`ext/msgpack/buffer.c:404-417`). Story:
+- **`Buffer#read` and `#read_all` are absent**, and a `Buffer` writes to its IO
+  on `flush` only, where the gem also flushes when its tail chunk is full
+  (`ext/msgpack/buffer.c:404-417`). Story:
   `msgpack-buffer-read-and-cruby-buffer-specs`.
 - **`Factory#dup` does not carry `oversized_integer_extension`**, because
   `Factory_dup` (`ext/msgpack/factory_class.c:111-123`) does not copy

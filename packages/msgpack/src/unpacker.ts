@@ -56,15 +56,17 @@ function raiseUnpackerError(error: unknown): never {
 }
 
 function objectComplete(obj: unknown, freeze: boolean): unknown {
-  if (obj instanceof ExtObject) return obj.obj;
-  if (typeof obj === "bigint") return Number.isSafeInteger(Number(obj)) ? Number(obj) : obj;
-  if (Array.isArray(obj)) {
+  if (obj instanceof ExtObject) {
+    obj = obj.obj;
+  } else if (typeof obj === "bigint") {
+    return Number.isSafeInteger(Number(obj)) ? Number(obj) : obj;
+  } else if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) obj[i] = objectComplete(obj[i], freeze);
   } else if (obj !== null && typeof obj === "object" && obj.constructor === Object) {
     const hash = obj as Record<string, unknown>;
     for (const key of Object.keys(hash)) hash[key] = objectComplete(hash[key], freeze);
   }
-  if (freeze) {
+  if (freeze && !ArrayBuffer.isView(obj)) {
     Object.freeze(obj);
   }
   return obj;
@@ -75,6 +77,7 @@ export class Unpacker {
   readonly extRegistry: UnpackerExtRegistry = new Map();
   readonly buffer: Buffer;
   private readonly decoder: Decoder;
+  /** @missingRailsCall rb_str_intern — CONVERGEABLE msgpack-unpacker-read-loop-the-engine-hides */
   private symbolizeKeys = false;
   private freeze = false;
   private allowUnknownExt = false;
@@ -240,7 +243,12 @@ export class Unpacker {
     return resultSize;
   }
 
-  each(block: (v: unknown) => void): null {
+  each(): Generator<unknown, void>;
+  each(block: (v: unknown) => void): null;
+  each(block?: (v: unknown) => void): null | Generator<unknown, void> {
+    if (block === undefined) {
+      return this.enumFor((block) => this.each(block));
+    }
     if (this.buffer.io != null) {
       try {
         return this.eachImpl(block);
@@ -253,7 +261,15 @@ export class Unpacker {
     }
   }
 
-  feedEach(data: string | Uint8Array, block: (v: unknown) => void): null {
+  feedEach(data: string | Uint8Array): Generator<unknown, void>;
+  feedEach(data: string | Uint8Array, block: (v: unknown) => void): null;
+  feedEach(
+    data: string | Uint8Array,
+    block?: (v: unknown) => void,
+  ): null | Generator<unknown, void> {
+    if (block === undefined) {
+      return this.enumFor((block) => this.feedEach(data, block));
+    }
     this.feedReference(data);
     return this.each(block);
   }
@@ -271,6 +287,12 @@ export class Unpacker {
 
   reset(): null {
     return this.buffer.clear();
+  }
+
+  private *enumFor(meth: (block: (v: unknown) => void) => null): Generator<unknown, void> {
+    const objects: unknown[] = [];
+    meth((v) => objects.push(v));
+    yield* objects;
   }
 
   private eachImpl(block: (v: unknown) => void): null {

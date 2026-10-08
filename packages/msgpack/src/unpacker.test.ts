@@ -152,6 +152,18 @@ describe("MessagePack::Unpacker", () => {
   const expected = [{ foo: "bar" }, { hello: { world: [1, 2, 3] } }, { x: "y" }];
 
   describe("#each", () => {
+    describe("with a buffer", () => {
+      it("returns an enumerator when no block is given", () => {
+        for (const buffer of [buffer1, buffer2, buffer3]) unpacker.feed(buffer);
+        const enumerator = unpacker.each();
+        expect([...enumerator].map((obj) => Object.keys(obj as object)[0])).toEqual([
+          "foo",
+          "hello",
+          "x",
+        ]);
+      });
+    });
+
     describe("with a stream passed to the constructor", () => {
       it("yields each object in the stream", () => {
         const objects: unknown[] = [];
