@@ -1,5 +1,5 @@
 import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
-import { Concern, classAttribute, extend } from "@blazetrails/activesupport";
+import { Concern, classAttribute, dasherize, extend } from "@blazetrails/activesupport";
 import { include, initialize, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
 import type { PathSet } from "./path-set.js";
@@ -138,7 +138,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
 
 /** @internal */
 export function _impliedLayoutName(this: LayoutsClass): string {
-  return this.controllerPath();
+  return dasherize(this.controllerPath());
 }
 
 /** @internal */
