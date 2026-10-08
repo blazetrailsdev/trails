@@ -365,11 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
 
       if (!hasNestedId(a)) {
         if (!isRejectNewRecord.call(record, associationName, a)) {
-          nestedTarget.push(
-            (record.association(associationName) as CollectionAssociation).reader.build(
-              except(a, ...UNASSIGNABLE_KEYS),
-            ),
-          );
+          nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
           nestedTarget.push(null);
         }
