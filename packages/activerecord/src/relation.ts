@@ -280,7 +280,9 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
-      return (target.target ?? target._records)[Number(prop)];
+      return target.isLoaded && !target.isScheduled && !target._loadResult
+        ? (target.target ?? target._records)[Number(prop)]
+        : target.records().then((records: any[]) => records[Number(prop)]);
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
@@ -368,7 +370,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected _offsets?: Map<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
-  _loadResult?: Promise<Result>;
+  _loadResult?: Promise<unknown>;
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
@@ -405,21 +407,23 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   inspect(): string | Promise<string> {
-    const inspectEntries = (subject: T[]): string => {
-      const entries = subject.map((record) => record.inspect());
+    const subject = this.isLoaded
+      ? this.isScheduled || this._loadResult
+        ? this.records()
+        : this._records
+      : this.annotate("loading for inspect");
+    const inspectEntries = (taken: T[]): string => {
+      const entries = taken.map((record) => record.inspect());
+
       if (entries.length === 11) entries[10] = "...";
+
       return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
     };
-    if (this.isLoaded) {
-      const entries = (records: T[]): string =>
-        inspectEntries(records.slice(0, min(compact([this.limitValue, 11])) as number));
-      return this.isScheduled || this._loadResult
-        ? this.records().then(entries)
-        : entries(this._records);
-    }
-    return this.annotate("loading for inspect")
-      .take(min(compact([this.limitValue, 11])) as number)
-      .then(inspectEntries);
+    const take = (records: T[]): T[] =>
+      records.slice(0, min(compact([this.limitValue, 11])) as number);
+    if (Array.isArray(subject)) return inspectEntries(take(subject));
+    if (subject instanceof Promise) return subject.then(take).then(inspectEntries);
+    return subject.take(min(compact([this.limitValue, 11])) as number).then(inspectEntries);
   }
 
   async prettyPrint(pp: PrettyPrinter): Promise<void> {
@@ -473,21 +477,23 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._records;
   }
 
-  /**
-   * @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites
-   * @missingRailsCall load — CONVERGEABLE load-async-disabled-arm-calls-load-and-dedupes-in-flight-load
-   */
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
+      if (!c.asyncEnabled()) {
+        void this.load().catch(() => {
+          this._loaded = false;
+        });
+        this._loaded = true;
+        return;
+      }
+
       if (!this.isLoaded) {
-        const asyncEnabled = c.asyncEnabled?.() === true;
-        const result = this.execMainQuery(asyncEnabled && !c.currentTransaction().joinable);
+        const result = this.execMainQuery(!c.currentTransaction().joinable);
         if (result instanceof Result) {
           this.loadRecords(this.instantiateRecords(result));
         } else {
           if (result instanceof Promise) void result.catch(() => {});
-          if (asyncEnabled) this._futureResult = result;
-          else this._loadResult = result as Promise<Result>;
+          this._futureResult = result;
         }
         this._loaded = true;
       }
@@ -639,9 +645,17 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async load(block?: (record: T) => void): Promise<LoadedRelation<this>> {
-    if (!this.isLoaded || this.isScheduled || this._loadResult) {
+    if (this._loadResult) await this._loadResult;
+    if (!this.isLoaded || this.isScheduled) {
       const token = this._loadToken;
-      const records = await this.withConnection(() => this.execQueries(block));
+      const loadResult = this.withConnection(() => this.execQueries(block));
+      this._loadResult = loadResult;
+      let records: T[];
+      try {
+        records = await loadResult;
+      } finally {
+        if (this._loadResult === loadResult) this._loadResult = undefined;
+      }
       if (token === this._loadToken) this.loadRecords(records);
     }
     return stripThenable(this);
@@ -666,10 +680,6 @@ export class Relation<T extends Base, G extends boolean = false> {
         const future = this._futureResult!;
         this._futureResult = undefined;
         rows = await (future instanceof FutureResult ? future.result() : future);
-      } else if (this._loadResult) {
-        const loadResult = this._loadResult;
-        this._loadResult = undefined;
-        rows = await loadResult;
       } else {
         rows = await this.execMainQuery();
       }

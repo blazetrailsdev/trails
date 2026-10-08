@@ -57,7 +57,7 @@ describe("ConnectionUrlResolver", () => {
       "postgres://localhost/db?pool=5&reaping_frequency=2",
     ).toHash();
     expect(hash.pool).toBe("5");
-    expect(hash.reaping_frequency).toBe("2");
+    expect(hash.reapingFrequency).toBe("2");
   });
 
   it("parses query parameters on opaque URIs", () => {

@@ -215,8 +215,16 @@ describe("Relation#load_async", () => {
       length(): number | Promise<number>;
       map(fn: (topic: { title: string }) => string): string[] | Promise<string[]>;
       inspect(): string | Promise<string>;
+      0: unknown;
     };
 
+    const [length, titles] = await Promise.all([
+      relation.length(),
+      relation.map((topic) => topic.title),
+    ]);
+    expect(length).toBe(1);
+    expect(titles).toEqual(["delegated async topic"]);
+    expect(((await relation[0]) as { title: string }).title).toBe("delegated async topic");
     expect(await relation.length()).toBe(1);
     expect(await relation.map((topic) => topic.title)).toEqual(["delegated async topic"]);
     expect(await relation.inspect()).toContain("delegated async topic");

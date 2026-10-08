@@ -1,5 +1,10 @@
 import type { DatabaseConfigOptions } from "./database-config.js";
-import { compactBlankObj as compactBlank, isBlank, reverseMerge } from "@blazetrails/activesupport";
+import {
+  camelize,
+  compactBlankObj as compactBlank,
+  isBlank,
+  reverseMerge,
+} from "@blazetrails/activesupport";
 import {
   type Generic,
   merge,
@@ -40,10 +45,15 @@ export class ConnectionUrlResolver {
     return (this._uriParser ??= new RFC2396Parser());
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm camelize — PERMANENT
+   */
   private queryHash(): Record<string, string> {
     return Object.fromEntries(
-      stringSplit(this.query ?? "", "&").map((pair) => stringSplit(pair, "=", 2)),
+      stringSplit(this.query ?? "", "&")
+        .map((pair) => stringSplit(pair, "=", 2))
+        .map(([key, value]) => [camelize(key, false), value]),
     );
   }
 

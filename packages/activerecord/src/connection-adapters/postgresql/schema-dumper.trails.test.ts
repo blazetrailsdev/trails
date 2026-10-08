@@ -281,6 +281,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         ],
         primaryKey: async () => null,
         nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
+        tableOptions: async () => ({}),
       };
       const dumper = new (SchemaDumper as any)(source);
       const io = new StringIO();

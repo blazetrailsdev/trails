@@ -6,11 +6,14 @@ import type {
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
 import type { Column } from "./column.js";
+import type { PostgreSQLAdapter } from "../postgresql-adapter.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
+  declare protected connection?: PostgreSQLAdapter;
+
   /** @internal */
   protected override async extensions(stream: IO | StringIO): Promise<null | undefined> {
-    const extensions: string[] = await this.pgAdapter().extensions();
+    const extensions = await this.connection!.extensions();
     if (any(extensions)) {
       stream.puts(
         "  // These are extensions that must be enabled in order to support this database",
@@ -24,7 +27,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override async types(stream: IO | StringIO): Promise<void> {
-    const types: [string, string[]][] = await this.pgAdapter().enumTypes();
+    const types = await this.connection!.enumTypes();
     if (any(types)) {
       stream.puts("  // Custom types defined in this database.");
       stream.puts(
@@ -39,9 +42,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override async schemas(stream: IO | StringIO): Promise<void> {
-    const schemaNames = ((await this.pgAdapter().schemaNames()) as string[]).filter(
-      (name) => name !== "public",
-    );
+    const schemaNames = (await this.connection!.schemaNames()).filter((name) => name !== "public");
 
     if (any(schemaNames)) {
       for (const name of schemaNames.sort()) {
@@ -60,7 +61,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream: IO | StringIO,
   ): Promise<void> {
     let exclusionConstraints: ExclusionConstraintDefinition[];
-    if (any((exclusionConstraints = await this.pgAdapter().exclusionConstraints(table)))) {
+    if (any((exclusionConstraints = await this.connection!.exclusionConstraints(table)))) {
       const addExclusionConstraintStatements = exclusionConstraints.map((exclusionConstraint) => {
         const parts: string[] = [];
         if (exclusionConstraint.where)
@@ -91,7 +92,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
     stream: IO | StringIO,
   ): Promise<void> {
     let uniqueConstraints: UniqueConstraintDefinition[];
-    if (any((uniqueConstraints = await this.pgAdapter().uniqueConstraints(table)))) {
+    if (any((uniqueConstraints = await this.connection!.uniqueConstraints(table)))) {
       const addUniqueConstraintStatements = uniqueConstraints.map((uniqueConstraint) => {
         const parts: string[] = [];
         if (uniqueConstraint.nullsNotDistinct)
@@ -202,12 +203,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    const adapter = this.pgAdapter();
-    if (!adapter?.tableOptions) return {};
-    return adapter.tableOptions(tableName);
-  }
-
-  private pgAdapter(): any {
-    return this._adapter();
+    return this.connection!.tableOptions(tableName);
   }
 }
