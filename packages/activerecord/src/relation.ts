@@ -280,9 +280,9 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
-      return target.isLoaded && !target.isScheduled && !target._loadResult
-        ? (target.target ?? target._records)[Number(prop)]
-        : target.records().then((records: any[]) => records[Number(prop)]);
+      return target.isScheduled || target._loadResult
+        ? target.records().then((records: any[]) => records[Number(prop)])
+        : (target.target ?? target._records)[Number(prop)];
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {

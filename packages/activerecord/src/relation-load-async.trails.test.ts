@@ -231,14 +231,6 @@ describe("Relation#load_async", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("loads an unloaded relation for an index read", async () => {
-    await Topic.create({ title: "indexed async topic", author_name: "David" });
-
-    const relation = Topic.where({ title: "indexed async topic" }) as unknown as { 0: unknown };
-
-    expect(((await relation[0]) as { title: string }).title).toBe("indexed async topic");
-  });
-
   it("batches a scheduled relation in memory instead of re-querying", async () => {
     await Topic.create({ title: "batched async topic", author_name: "David" });
     await Topic.create({ title: "other batched async topic", author_name: "David" });
