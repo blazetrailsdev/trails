@@ -1,4 +1,4 @@
-import { it, expect } from "vitest";
+import { afterEach, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -7,6 +7,8 @@ import { Notifications } from "@blazetrails/activesupport";
 
 describeIfSupports("common_table_expressions", "eager load under a CTE / FROM override", () => {
   fixtures(["posts", "comments"]);
+
+  afterEach(() => Notifications.unsubscribeAll());
 
   it("emits the aliased eager JOIN alongside the CTE", async () => {
     const relation = Post.with({
@@ -53,19 +55,17 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
     for (const [name, query] of Object.entries(run)) {
       const relation = subquery();
       const sqls: string[] = [];
-      const subscriber = Notifications.subscribe("sql.active_record", (...args: unknown[]) => {
+      Notifications.subscribe("sql.active_record", (...args: unknown[]) => {
         const event = args[args.length - 1] as { payload?: { sql: string }; sql?: string };
         sqls.push(String((event.payload ?? event).sql));
       });
-      try {
-        await query(relation);
-      } finally {
-        Notifications.unsubscribe(subscriber);
-      }
+      await query(relation);
+      Notifications.unsubscribeAll();
       expect(sqls[0], name).toMatch(/^SELECT DISTINCT/i);
       expect(sqls.at(-1), name).toMatch(/IN \(\d+, \d+\)/);
       expect(sqls.at(-1), name).not.toMatch(/IN \(SELECT/i);
       expect(relation.fromClause.value, name).toBe(from);
+      expect(subquery().toSql(), name).toMatch(/IN \(SELECT DISTINCT/i);
     }
     expect(new Set((await subquery()).map((post) => post.id)).size).toBe(2);
   });

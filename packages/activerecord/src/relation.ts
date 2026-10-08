@@ -360,7 +360,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   private _joinDependency: JoinDependency | null = null;
   /** @internal */
-  _limitedIdsForFrom: unknown[] | undefined = undefined;
+  _fromLimitedIds: unknown[] | undefined = undefined;
 
   private _table: Table;
 
@@ -1030,7 +1030,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (async () => {
       if (deferredFrom) {
         this._arel = undefined;
-        from._limitedIdsForFrom = await from._materializeDistinctPkIds();
+        this._fromLimitedIds = await from._materializeDistinctPkIds();
       }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];

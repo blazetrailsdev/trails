@@ -191,6 +191,8 @@ interface QueryMethodsHost {
   whereClause: WhereClause;
   havingClause: WhereClause;
   fromClause: FromClause;
+  /** @internal */
+  _fromLimitedIds: unknown[] | undefined;
   includesValues: AssociationSpec[];
   eagerLoadValues: AssociationSpec[];
   preloadValues: AssociationSpec[];
@@ -1847,7 +1849,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
     if (opts.isEagerLoading) {
-      opts = opts._applyEagerJoinDependency(undefined, undefined, opts._limitedIdsForFrom);
+      opts = opts._applyEagerJoinDependency(undefined, undefined, this._fromLimitedIds);
     }
     name ??= "subquery";
     return opts.arel().as(toS(name));
