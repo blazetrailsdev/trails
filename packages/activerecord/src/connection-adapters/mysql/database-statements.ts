@@ -1,6 +1,6 @@
 import { sql as arelSql } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { b, cmp, first, rbCmpint, toS } from "@blazetrails/ruby-compat";
+import { aryJoin, b, cmp, first, rbCmpint } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "../../errors.js";
 import type { ExplainOption } from "../abstract/database-statements.js";
 import type { Nodes } from "@blazetrails/arel";
@@ -72,7 +72,7 @@ export async function buildExplainClause(
 ): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
 
-  const explainClause = `EXPLAIN ${options.map(toS).join(" ").toUpperCase()}`;
+  const explainClause = `EXPLAIN ${aryJoin(options, " ").toUpperCase()}`;
 
   if ((await isAnalyzeWithoutExplain.call(this)) && explainClause.includes("ANALYZE")) {
     return explainClause.replace("EXPLAIN ", "");

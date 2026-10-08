@@ -6,7 +6,7 @@ import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm } from "./numeric.js";
-import { conversionMismatch, rbBuiltinClassName } from "./object.js";
+import { conversionMismatch, rbBuiltinClassName, toS } from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -1012,4 +1012,30 @@ export function sort<T>(ary: readonly T[]): T[] {
     return tmp.concat(b1.slice(i), b2.slice(j));
   };
   return msort([...ary]);
+}
+
+/**
+ * Ruby `Array#join` (`vendor/ruby/v3.3.11/array.c:2806` `rb_ary_join`, over
+ * `ary_join_1` at `:2778`): each element's string with `sep` between them. A
+ * nested Array is joined in place with the same `sep` (`ary_join_1_ary`,
+ * `:2760`), and one that contains itself raises `ArgumentError`. Every other
+ * element is sent `to_s` (`rb_obj_as_string`), so a Symbol (`":name"`)
+ * contributes its name. A nil `sep` is `$,`, which is nil: nothing between.
+ * @noRailsEquivalent PERMANENT
+ */
+export function aryJoin(ary: readonly unknown[], sep: string | null = null): string {
+  return aryJoin1([ary], ary, sep ?? "");
+}
+
+/** `ary_join_1` (`vendor/ruby/v3.3.11/array.c:2778`). */
+function aryJoin1(obj: readonly unknown[], ary: readonly unknown[], sep: string): string {
+  return ary
+    .map((val) => {
+      if (Array.isArray(val)) {
+        if (obj.includes(val)) throw new ArgumentError("recursive array join");
+        return aryJoin1([...obj, val], val, sep);
+      }
+      return toS(val);
+    })
+    .join(sep);
 }

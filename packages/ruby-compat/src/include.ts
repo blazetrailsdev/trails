@@ -1063,10 +1063,33 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   if (cl === c) return true;
 
   if (typeof c === "function" || (typeof c === "object" && c !== null)) {
-    return classSearchAncestor(cl, c);
+    return singletonSearchAncestor(obj, c) || classSearchAncestor(cl, c);
   } else {
     throw new TypeError("class or module required");
   }
+}
+
+/**
+ * `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`) over the
+ * singleton class `CLASS_OF(obj)` starts at: the modules `obj` was `extend`ed
+ * with, and for a class those of its superclasses too.
+ */
+function singletonSearchAncestor(obj: unknown, c: object): boolean {
+  if (typeof obj !== "function" && (typeof obj !== "object" || obj === null)) return false;
+  for (
+    let p: object | null = obj;
+    p;
+    p = typeof p === "function" ? (Object.getPrototypeOf(p) as object | null) : null
+  ) {
+    if (
+      Object.hasOwn(p, extendedKeys) &&
+      Object.hasOwn(p, includedModulesKey) &&
+      ((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)
+    ) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1153,7 +1176,15 @@ export interface UnboundMethod {
   bindCall(recv: object, ...args: unknown[]): unknown;
 }
 
-function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
+/**
+ * `mnew_unbound` (`vendor/ruby/v3.3.11/proc.c:1763`): the entry for `mid` found from
+ * `start`, with the `owner` `method_owner` (`:1988`) answers. An entry
+ * `extend()` copied onto an object is owned by the module it came from, and a
+ * class's own static by the class, which stands for its singleton class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
   for (
     let link: object | null = start;
     link && link !== Object.prototype;
@@ -1190,6 +1221,22 @@ function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
       });
       if (owner !== undefined) return method(owner);
     }
+    if (Object.hasOwn(link, extendedKeys) && (table[extendedKeys] as Set<string>).has(mid)) {
+      const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
+      const owner = mods.find((m) => {
+        if (m instanceof Module) return false;
+        for (
+          let ancestor = m as object | null;
+          ancestor && ancestor !== Object.prototype && ancestor !== Function.prototype;
+          ancestor = Object.getPrototypeOf(ancestor) as object | null
+        ) {
+          if (Object.hasOwn(ancestor, mid)) return true;
+        }
+        return false;
+      });
+      if (owner !== undefined) return method(owner);
+    }
+    if (typeof link === "function" && link !== Function.prototype) return method(link);
     return method(link.constructor);
   }
   return null;

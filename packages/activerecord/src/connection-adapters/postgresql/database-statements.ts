@@ -12,7 +12,7 @@ import {
   type ExplainOption,
 } from "../abstract/database-statements.js";
 import { ExplainPrettyPrinter } from "./explain-pretty-printer.js";
-import { b, fetch, first, isEmpty } from "@blazetrails/ruby-compat";
+import { aryJoin, b, fetch, first, isEmpty } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { dbWarningsAction } from "../../active-record.js";
@@ -222,13 +222,9 @@ interface SetConstraintsHost {
   execute(sql: string, name?: string | null): Promise<unknown>;
 }
 
-/** @inventedArm map — CONVERGEABLE build-explain-clause-joins-symbol-options-through-array-join */
 export async function buildExplainClause(options: ExplainOption[] = []): Promise<string> {
   if (options.length === 0) return "EXPLAIN";
-  return `EXPLAIN (${options
-    .map((option) => option.replace(/^:/, ""))
-    .join(", ")
-    .toUpperCase()})`;
+  return `EXPLAIN (${aryJoin(options, ", ").toUpperCase()})`;
 }
 
 /** @internal */

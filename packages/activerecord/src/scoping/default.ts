@@ -1,10 +1,10 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any } from "@blazetrails/activesupport";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjIsKindOf, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
-import { Scoping } from "../namespaces.js";
+import { ActiveRecord, Scoping } from "../namespaces.js";
 
 type DefaultScopeBody<R = any> = ((this: R) => any) | { call(): any };
 
@@ -28,7 +28,10 @@ export class Default {
     if (this.abstractClass) return undefined;
 
     if (this.defaultScopeOverride == null) {
-      this.defaultScopeOverride = hasDefaultScopeOverride(this);
+      this.defaultScopeOverride = !rbObjIsKindOf(
+        ActiveRecord.Base,
+        rbObjMethod(this, "defaultScope").owner(),
+      );
     }
 
     if (this.defaultScopeOverride) {
@@ -54,26 +57,6 @@ export class Default {
   static unscoped(this: any, block?: () => any): any {
     return block ? this.relation().scoping(block) : this.relation();
   }
-}
-
-/** @internal */
-function defaultScopeMethod(modelClass: any): ((this: any) => any) | undefined {
-  let klass = modelClass;
-  while (typeof klass === "function") {
-    if (Object.prototype.hasOwnProperty.call(klass, "defaultScope")) {
-      return klass.defaultScope === defaultScope ? undefined : klass.defaultScope;
-    }
-    klass = Object.getPrototypeOf(klass);
-  }
-  return undefined;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE default-scope-override-reads-the-default-scope-method-owner
- */
-export function hasDefaultScopeOverride(modelClass: any): boolean {
-  return defaultScopeMethod(modelClass) !== undefined;
 }
 
 export function defaultScope<T extends typeof Base>(
@@ -126,7 +109,9 @@ export function isScopeAttributes(this: {
   defaultScopes: DefaultScope[];
 }): boolean {
   return (
-    baseIsScopeAttributes.call(this) || any(this.defaultScopes) || hasDefaultScopeOverride(this)
+    baseIsScopeAttributes.call(this) ||
+    any(this.defaultScopes) ||
+    !rbObjIsKindOf(ActiveRecord.Base, rbObjMethod(this, "defaultScope").owner())
   );
 }
 

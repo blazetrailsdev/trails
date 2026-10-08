@@ -2,7 +2,8 @@ import { NameError } from "./name-error.js";
 import { checkArity, rbCheckStringType } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
-import { FL_SINGLETON, rbInspect, rbObjClassname } from "./object.js";
+import { FL_SINGLETON, rbInspect, rbObjClass, rbObjClassname } from "./object.js";
+import { mnewUnbound } from "./include.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -52,6 +53,20 @@ export class Method {
    */
   name(): string {
     return this.#name;
+  }
+
+  /**
+   * `Method#owner` (`vendor/ruby/v3.3.11/proc.c:1988` `method_owner`): the class or
+   * module that defines the method. A class's own static stands for a method
+   * of its singleton class, and is owned by the class.
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  owner(): object {
+    return (
+      mnewUnbound(Object(this.#receiver) as object, this.#name)?.owner ??
+      (rbObjClass(this.#receiver) as object)
+    );
   }
 
   /**

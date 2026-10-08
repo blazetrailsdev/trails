@@ -119,9 +119,10 @@ describe.skipIf(!isExpoSqliteAvailable)("SqliteDriver — expo-sqlite round-trip
     await conn.exec("DROP TABLE IF EXISTS fk_parent");
   });
 
-  it("columns() returns empty array (expo-sqlite has no column metadata API)", async () => {
-    const stmt = await conn.prepare("SELECT id, name, qty FROM widgets");
-    expect(stmt.columns()).toEqual([]);
+  it("columns() answers the prepared statement's column names", async () => {
+    const stmt = await conn.prepare("SELECT id, name, qty FROM widgets WHERE 0");
+    expect(stmt.columns().map((c) => c.name)).toEqual(["id", "name", "qty"]);
+    expect(await stmt.toA()).toEqual([]);
   });
 
   it("setReadBigInts does not throw (documented no-op on this driver)", async () => {
@@ -412,6 +413,61 @@ describe("SqliteDriver — expo-sqlite raises the sqlite3 gem's exception classe
       );
       expect(error).toBeInstanceOf(Error);
       expect(finalized).toBe(1);
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("prepare re-raises the original error when the finalize rejects too", async () => {
+    const native = new Error("Error code 1: SQL logic error");
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => {
+              throw native;
+            },
+            finalizeAsync: async () => {
+              throw new Error("Error code 21: bad parameter or other API misuse");
+            },
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      await expect(conn.prepare("SELECT 1")).rejects.toThrow("SQL logic error");
+    } finally {
+      vi.doUnmock("node:module");
+      vi.resetModules();
+    }
+  });
+
+  it("columns() answers the names prepare read, with the fields expo cannot report null", async () => {
+    vi.resetModules();
+    vi.doMock("node:module", () => ({
+      createRequire: () => () => ({
+        openDatabaseAsync: async () => ({
+          prepareAsync: async () => ({
+            getColumnNamesAsync: async () => ["id", "name"],
+            executeForRawResultAsync: async () => ({ getAllAsync: async () => [] }),
+            finalizeAsync: async () => {},
+          }),
+        }),
+      }),
+    }));
+    try {
+      const { expoSqliteDriver: driver } = await import("./expo-sqlite.js");
+      const conn = await driver.open({ database: ":memory:" });
+      const stmt = await conn.prepare("SELECT id, name FROM widgets WHERE 0");
+      expect(await stmt.toA()).toEqual([]);
+      expect(stmt.columns()).toEqual([
+        { name: "id", column: null, table: null, database: null, type: null },
+        { name: "name", column: null, table: null, database: null, type: null },
+      ]);
     } finally {
       vi.doUnmock("node:module");
       vi.resetModules();

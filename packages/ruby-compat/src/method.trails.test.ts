@@ -12,6 +12,7 @@ import {
   rbObjProtectedMethods,
   rbObjPublicMethods,
 } from "./method.js";
+import { extend, rbObjIsKindOf } from "./include.js";
 import { NameError } from "./name-error.js";
 import { TypeError } from "./type-error.js";
 
@@ -190,5 +191,46 @@ describe("rbFCaller", () => {
     })();
     expect(caller[0]).toMatch(/^at outer /);
     expect(caller.some((frame) => /^at inner /.test(frame))).toBe(false);
+  });
+});
+
+describe("Method#owner", () => {
+  const M = {
+    ds(): string {
+      return "M";
+    },
+  };
+  class B {
+    declare static ds: () => string;
+  }
+  extend(B, M);
+  class P extends B {
+    static ds(): string {
+      return "P";
+    }
+  }
+  class Q extends B {}
+
+  it("is the module an extended method came from", () => {
+    expect(rbObjMethod(B, "ds").owner()).toBe(M);
+    expect(rbObjMethod(Q, "ds").owner()).toBe(M);
+  });
+
+  it("is the class for a method of its singleton class", () => {
+    expect(rbObjMethod(P, "ds").owner()).toBe(P);
+  });
+
+  it("is the class an instance method is defined in", () => {
+    class Named {
+      check(): void {}
+    }
+    expect(rbObjMethod(new Named(), "check").owner()).toBe(Named);
+  });
+
+  it("answers kind_of? for the modules a class was extended with", () => {
+    expect(rbObjIsKindOf(B, rbObjMethod(Q, "ds").owner())).toBe(true);
+    expect(rbObjIsKindOf(B, rbObjMethod(P, "ds").owner())).toBe(false);
+    expect(rbObjIsKindOf(Q, M)).toBe(true);
+    expect(rbObjIsKindOf(new B(), M)).toBe(false);
   });
 });
