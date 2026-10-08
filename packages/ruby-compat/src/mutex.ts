@@ -130,7 +130,7 @@ export class Mutex {
    * An uncontended call runs its block before it returns, as a Ruby mutex does,
    * and a block that answers a plain value has released the mutex by then too,
    * so two synchronous sections in one tick never queue. A block that answers a
-   * promise holds the mutex until the promise settles.
+   * promise or other thenable holds the mutex until it settles.
    *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#synchronize`
    * (`vendor/ruby/v3.3.11/thread_sync.c:697`).
@@ -175,7 +175,9 @@ export class Mutex {
         ensure();
         throw e;
       }
-      if (value instanceof Promise) return value.finally(ensure);
+      if (typeof (value as PromiseLike<T> | null)?.then === "function") {
+        return Promise.resolve(value).finally(ensure);
+      }
       ensure();
       return value;
     };

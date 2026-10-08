@@ -118,4 +118,24 @@ describe("Mutex", () => {
     expect(mutex.tryLock()).toBe(true);
     mutex.unlock();
   });
+
+  it("holds the lock until a block's thenable settles", async () => {
+    const mutex = new Mutex();
+    let settle!: (value: string) => void;
+    const thenable: PromiseLike<string> = {
+      then: (onfulfilled, onrejected) =>
+        new Promise<string>((resolve) => {
+          settle = resolve;
+        }).then(onfulfilled, onrejected),
+    };
+
+    const held = mutex.synchronize(() => thenable);
+    expect(mutex.tryLock()).toBe(false);
+    await Promise.resolve();
+    settle("done");
+
+    expect(await held).toBe("done");
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
 });

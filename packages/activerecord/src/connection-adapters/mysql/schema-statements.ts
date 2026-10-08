@@ -138,29 +138,29 @@ export class SchemaStatements extends BaseSchemaStatements {
         }
       }
 
-      return await Promise.all(
-        indexes.map(async (index) => {
-          const options = index.pop() as IndexOptions;
+      const definitions: IndexDefinition[] = [];
+      for (const index of indexes) {
+        const options = index.pop() as IndexOptions;
 
-          const expressions = hashDelete(options, "expressions") as IndexOptions["expressions"];
-          if (expressions != null) {
-            const orders = hashDelete(options, "orders") as IndexOptions["orders"];
-            const lengths = hashDelete(options, "lengths") as IndexOptions["lengths"];
+        const expressions = hashDelete(options, "expressions") as IndexOptions["expressions"];
+        if (expressions != null) {
+          const orders = hashDelete(options, "orders") as IndexOptions["orders"];
+          const lengths = hashDelete(options, "lengths") as IndexOptions["lengths"];
 
-            const columns = toH<string, string>(
-              index[3].map((name) => [name, expressions[name] ?? this.quoteColumnName(name)]),
-            );
+          const columns = toH<string, string>(
+            index[3].map((name) => [name, expressions[name] ?? this.quoteColumnName(name)]),
+          );
 
-            (index as unknown[])[3] = Array.from(
-              (
-                await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths })
-              ).values(),
-            ).join(", ");
-          }
+          (index as unknown[])[3] = Array.from(
+            (
+              await this.addOptionsForIndexColumns(columns, { order: orders, length: lengths })
+            ).values(),
+          ).join(", ");
+        }
 
-          return new IndexDefinition(...(index as unknown as IndexArgs), options);
-        }),
-      );
+        definitions.push(new IndexDefinition(...(index as unknown as IndexArgs), options));
+      }
+      return definitions;
     } catch (e) {
       if (!(e instanceof StatementInvalid)) throw e;
       if (rbRegMatchP(/Table '.+' doesn't exist/, e.message)) {
