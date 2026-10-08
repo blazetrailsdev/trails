@@ -58,9 +58,9 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
   declare static define: DefineClassMethod;
   declare define: (info: SchemaDefineInfo, block: DefineBlock<A>) => Promise<void>;
 
-  declare private static _classForVersion: Map<number, typeof Migration> | undefined;
+  declare private static _classForVersion: Map<string | number, typeof Migration> | undefined;
 
-  static get(version: number): typeof Migration {
+  static get(version: string | number): typeof Migration {
     this._classForVersion =
       (Object.hasOwn(this, "_classForVersion") ? this._classForVersion : undefined) ?? new Map();
     return (

@@ -359,6 +359,8 @@ export class Relation<T extends Base, G extends boolean = false> {
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
+  /** @internal */
+  _limitedIdsForFrom: unknown[] | undefined = undefined;
 
   private _table: Table;
 
@@ -1028,14 +1030,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (async () => {
       if (deferredFrom) {
         this._arel = undefined;
-        this._values.from = new FromClause(
-          from._applyEagerJoinDependency(
-            undefined,
-            undefined,
-            await from._materializeDistinctPkIds(),
-          ),
-          this.fromClause.name,
-        );
+        from._limitedIdsForFrom = await from._materializeDistinctPkIds();
       }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];

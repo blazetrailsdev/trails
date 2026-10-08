@@ -1847,7 +1847,7 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   let name = this.fromClause.name;
   if (opts instanceof ActiveRecord.Relation) {
     if (opts.isEagerLoading) {
-      opts = opts._applyEagerJoinDependency();
+      opts = opts._applyEagerJoinDependency(undefined, undefined, opts._limitedIdsForFrom);
     }
     name ??= "subquery";
     return opts.arel().as(toS(name));

@@ -2,7 +2,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent } from "@blazetrails/activesupport";
 import {
   except,
-  floToS,
   include,
   prepend,
   rbInspect,
@@ -22,9 +21,10 @@ import type {
   ColumnType,
 } from "../connection-adapters/abstract/schema-definitions.js";
 
-export function find(version: number): unknown;
-export function find(version: number | string): unknown {
-  version = floToS(version as number);
+/** @inventedArm if — CONVERGEABLE migration-compatibility-find-stringifies-the-version-in-one-call */
+export function find(version: string | number): unknown {
+  version =
+    typeof version === "number" && Number.isInteger(version) ? `${version}.0` : `${version}`;
   const name = `V${version.replaceAll(".", "_")}`;
   if (!Object.hasOwn(Compatibility, name)) {
     const versions = Object.keys(Compatibility)

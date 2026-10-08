@@ -37,7 +37,6 @@ export {
   rbAnyToS,
   rbObjId,
   rbObjAsString,
-  floToS,
   ENUMERABLE_METHOD_TABLE,
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
