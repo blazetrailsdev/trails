@@ -669,17 +669,12 @@ function warmColumnsHashSync(
 ): Record<string, unknown> | undefined {
   if (typeof adapter.columns !== "function") return undefined;
   if (cache && typeof cache.setColumns !== "function") return undefined;
-  let cols: unknown;
-  try {
-    cols = adapter.columns(table);
-  } catch {
-    return undefined;
-  }
+  const cols: unknown = adapter.columns(table);
   if (cols != null && typeof (cols as any).then === "function") {
     void (cols as Promise<unknown>).catch(() => {});
     return undefined;
   }
-  if (!Array.isArray(cols) || cols.length === 0) return undefined;
+  if (!Array.isArray(cols)) return undefined;
   if (!cache) return Object.fromEntries(cols.map((col) => [col.name, col]));
   cache.setColumns!(table, cols);
   return cache.getCachedColumnsHash(table);
