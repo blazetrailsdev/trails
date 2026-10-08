@@ -55,7 +55,13 @@ export function rbRegSUnion(
 
       if (0 < i) source += "|";
 
-      source += e instanceof RegExp ? rbRegToS(e) : regexpEscape(e);
+      let v: string;
+      if (e instanceof RegExp) {
+        v = rbRegToS(e);
+      } else {
+        v = regexpEscape(e);
+      }
+      source += v;
     }
     return new RegExp(source);
   }

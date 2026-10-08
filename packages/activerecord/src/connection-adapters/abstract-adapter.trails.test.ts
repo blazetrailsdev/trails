@@ -455,7 +455,7 @@ describe("AbstractAdapter.buildReadQueryRegexp", () => {
 });
 
 describe("AbstractAdapter.buildReadQueryRegexp comment prefix", () => {
-  it("matches the comment prefix case-sensitively and the parts case-insensitively", () => {
+  it("carries the i option on each part and none on the whole pattern", () => {
     const re = AbstractAdapter.buildReadQueryRegexp();
     expect(re.flags).toBe("");
     expect(re.source).toContain("(?i-ms:begin)|(?i-ms:commit)");

@@ -861,7 +861,7 @@ export class AbstractAdapter implements Quoting {
     parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
     parts = parts.map((part) => new RegExp(part, "i"));
     return new RegExp(
-      `^(?:[(\\s]|${AbstractAdapter.COMMENT_REGEX.source})*${rbRegToS(rbRegSUnion(...parts))}`,
+      `^(?:[(\\s]|${rbRegToS(AbstractAdapter.COMMENT_REGEX)})*${rbRegToS(rbRegSUnion(...parts))}`,
     );
   }
 
