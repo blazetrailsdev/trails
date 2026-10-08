@@ -69,10 +69,15 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(author.posts.isLoaded).toBe(true);
   });
 
-  it("raises when iterated before a persisted owner's records are loaded", async () => {
+  it("is not iterable, and starts no load, before a persisted owner's records are loaded", async () => {
     const author = await authorWithPosts();
     author.posts.reset();
-    expect(() => Array.from(author.posts)).toThrow(TypeError);
+    expect(Symbol.iterator in author.posts).toBe(false);
+    expect(author.posts).not.toBe(Post.where({ author_id: author.id }));
+    expect(author.posts.isLoaded).toBe(false);
+    expect(() => {
+      for (const post of author.posts) void post;
+    }).toThrow(TypeError);
     await author.posts.loadTarget();
     expect(Array.from(author.posts).length).toBe(3);
   });
@@ -85,6 +90,8 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     for (const name of ["first", "select", "isAny", "isInclude", "sum"] as const) {
       expect(Relation.prototype[name]).not.toBe(Enumerable[name]);
     }
+    expect((unloaded as Partial<Iterable<Post>>)[Symbol.iterator]).toBeUndefined();
+    expect(unloaded.isLoaded).toBe(false);
     expect(await unloaded.map((...args: unknown[]) => args.length)).toEqual([1, 1, 1]);
     expect(await unloaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
     expect((await unloaded.findAll((p) => p.title !== "b")).length).toBe(2);

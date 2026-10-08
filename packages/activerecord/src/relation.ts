@@ -258,8 +258,16 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
+function isEachSynchronous(relation: any): boolean {
+  if (relation.isLoaded && !relation.isScheduled && !relation._loadResult) return true;
+  if (relation.target === undefined) return false;
+  const association = relation.proxyAssociation;
+  return !association.isStaleTarget() && !association.isFindTarget();
+}
+
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
   get(target: any, prop: string | symbol, receiver: any) {
+    if (prop === Symbol.iterator && !isEachSynchronous(target)) return undefined;
     const value = Reflect.get(target, prop, receiver);
     if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
       return value;
@@ -282,6 +290,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     return value;
   },
   has(target: any, prop: string | symbol) {
+    if (prop === Symbol.iterator && !isEachSynchronous(target)) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
     if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
