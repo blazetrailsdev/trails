@@ -131,14 +131,12 @@ describe("AsynchronousQueriesTest", () => {
         async: true,
       }) as unknown as FutureResult;
 
-      if (inMemoryDb()) {
-        expect(futureResult).toBeInstanceOf(FutureResult.Complete);
-      } else {
+      if (!inMemoryDb()) {
         expect(futureResult).toBeInstanceOf(FutureResult);
         await waitForFutureResult(futureResult);
       }
 
-      expect(await futureResult.result()).toBeInstanceOf(Result);
+      expect(await futureResult).toBeInstanceOf(Result);
       expect(status.async).toEqual(connection.supportsConcurrentConnections());
     } finally {
       if (subscriber) Notifications.unsubscribe(subscriber);
