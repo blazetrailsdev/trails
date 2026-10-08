@@ -95,6 +95,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "writer",
   "reExportedFrom",
   "bodyless",
+  "objectLiteralMember",
   "admitsFunction",
   "aliasParams",
   "admitsBoolean",

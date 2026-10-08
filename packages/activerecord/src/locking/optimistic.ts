@@ -48,6 +48,10 @@ export const Optimistic = {
   [included](base: object): void {
     classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
   },
+  lockingEnabled,
+  incrementBang,
+  _lockValueForDatabase,
+  _clearLockingColumn,
 };
 
 interface LockingRecord {
@@ -252,13 +256,5 @@ export function hookAttributeType(this: LockingHost, name: string, castType: Val
   }
   return castType;
 }
-
-/** @noRailsEquivalent CONVERGEABLE optimistic-locking-instance-methods-fold-into-the-optimistic-module */
-export const InstanceMethods = {
-  lockingEnabled,
-  incrementBang,
-  _lockValueForDatabase,
-  _clearLockingColumn,
-};
 
 Locking.Optimistic = Optimistic;

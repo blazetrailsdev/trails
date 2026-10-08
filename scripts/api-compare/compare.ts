@@ -2066,7 +2066,10 @@ export function tsOwnerSeat(
  * Whether a TS member states the seat it is declared on. A class member does,
  * by its staticness, and so does an `interface` signature, which types the
  * instance. A non-static member of an object literal does not: the literal may
- * be either half of a module (`ClassInfo.objectLiteral`). A `namespace`
+ * be either half of a module (`ClassInfo.objectLiteral`), and where it merges
+ * with an `interface` only the members harvested from the literal are seatless
+ * (`MethodInfo.objectLiteralMember`): `interface Optimistic { lockOptimistically }`
+ * beside `const Optimistic = { lockingEnabled }` still types the instance. A `namespace`
  * function is the same shape, bodied where the interface it may merge with is
  * not: `interface Naming { modelName }` is `Naming#model_name` and
  * `namespace Naming { function plural }` is `def self.plural`
@@ -2080,11 +2083,12 @@ export function tsOwnerSeat(
  */
 export function tsMemberStatesSeat(
   owner: { name: string; objectLiteral?: boolean; declaredAsNamespace?: boolean },
-  member: { name: string; isStatic?: boolean; bodyless?: boolean },
+  member: { name: string; isStatic?: boolean; bodyless?: boolean; objectLiteralMember?: boolean },
   rubyInstanceNames: ReadonlyMap<string, ReadonlySet<string>> | undefined,
 ): boolean {
   const namespaceFunction = owner.declaredAsNamespace === true && member.bodyless !== true;
-  if ((owner.objectLiteral !== true && !namespaceFunction) || member.isStatic === true) return true;
+  const literalMember = owner.objectLiteral === true || member.objectLiteralMember === true;
+  if ((!literalMember && !namespaceFunction) || member.isStatic === true) return true;
   return rubyInstanceNames?.get(owner.name)?.has(member.name) ?? false;
 }
 

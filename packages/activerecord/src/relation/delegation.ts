@@ -18,6 +18,7 @@ import {
 import { NotImplementedError } from "../errors.js";
 import {
   Module,
+  Mutex,
   NoMethodError,
   Range,
   arySlice,
@@ -109,23 +110,27 @@ export class DelegateCache {
 }
 
 export class GeneratedRelationMethods extends Module {
-  generateMethod(method: string): void {
-    if (this.isMethodDefined(method)) return;
+  static MUTEX = new Mutex();
 
-    if (
-      /^[a-zA-Z_]\w*[!?]?$/.test(method) &&
-      !ActiveSupportDelegation.RESERVED_METHOD_NAMES.has(String(method))
-    ) {
-      this.moduleEval((mod) => {
-        mod[method] = function (this: any, ...args: any[]) {
-          return this.scoping(() => this._model[method](...args));
-        };
-      });
-    } else {
-      this.defineMethod(method, function (this: any, ...args: any[]) {
-        return this.scoping(() => rbFPublicSend(this._model, method, ...args));
-      });
-    }
+  generateMethod(method: string): void {
+    void GeneratedRelationMethods.MUTEX.synchronize(() => {
+      if (this.isMethodDefined(method)) return;
+
+      if (
+        /^[a-zA-Z_]\w*[!?]?$/.test(method) &&
+        !ActiveSupportDelegation.RESERVED_METHOD_NAMES.has(String(method))
+      ) {
+        this.moduleEval((mod) => {
+          mod[method] = function (this: any, ...args: any[]) {
+            return this.scoping(() => this._model[method](...args));
+          };
+        });
+      } else {
+        this.defineMethod(method, function (this: any, ...args: any[]) {
+          return this.scoping(() => rbFPublicSend(this._model, method, ...args));
+        });
+      }
+    });
   }
 }
 

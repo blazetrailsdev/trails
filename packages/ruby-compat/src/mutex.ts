@@ -127,10 +127,17 @@ export class Mutex {
    * `ThreadError, "deadlock; recursive locking"` when the locking fiber already
    * owns the mutex (`vendor/ruby/v3.3.11/thread_sync.c:350-352`).
    *
+   * An uncontended call runs its block before it returns, as a Ruby mutex does,
+   * and a block that answers a plain value has released the mutex by then too,
+   * so two synchronous sections in one tick never queue. A block that answers a
+   * promise holds the mutex until the promise settles.
+   *
    * @noRailsEquivalent PERMANENT — Ruby core `Mutex#synchronize`
    * (`vendor/ruby/v3.3.11/thread_sync.c:697`).
    */
-  async synchronize<T>(block: () => T | Promise<T>): Promise<T> {
+  synchronize<T>(block: () => Promise<T>): Promise<T>;
+  synchronize<T>(block: () => T): T | Promise<T>;
+  synchronize<T>(block: () => T | Promise<T>): T | Promise<T> {
     const data = mutexData(this);
     const storage = data.storage!;
 
@@ -146,23 +153,34 @@ export class Mutex {
     const tail = predecessor ? predecessor.then(() => mine) : mine;
     data.chain = tail;
 
-    if (predecessor) await predecessor;
+    const locked = (): T | Promise<T> => {
+      const fiber = Symbol("mutex");
+      data.fiber = fiber;
+      data.owner = Fiber.current();
+      const release = (data.release = () => {
+        data.fiber = null;
+        data.release = null;
+        data.owner = null;
+        if (data.chain === tail) data.chain = null;
+        unlock();
+      });
+      const ensure = (): void => {
+        if (data.release === release) release();
+        else unlock();
+      };
 
-    const fiber = Symbol("mutex");
-    data.fiber = fiber;
-    data.owner = Fiber.current();
-    data.release = () => {
-      data.fiber = null;
-      data.release = null;
-      data.owner = null;
-      if (data.chain === tail) data.chain = null;
-      unlock();
+      let value: T | Promise<T>;
+      try {
+        value = storage.run(fiber, () => block());
+      } catch (e) {
+        ensure();
+        throw e;
+      }
+      if (value instanceof Promise) return value.finally(ensure);
+      ensure();
+      return value;
     };
 
-    try {
-      return await storage.run(fiber, () => block());
-    } finally {
-      data.release?.();
-    }
+    return predecessor ? predecessor.then(locked) : locked();
   }
 }

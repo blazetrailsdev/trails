@@ -239,6 +239,15 @@ export interface MethodInfo {
    */
   bodyless?: boolean;
   /**
+   * TS-side only: this member was harvested from an exported object literal
+   * that declaration-merges with an `interface` of the same name. The entry's
+   * other members are the interface's signatures, which type the instance and
+   * state that seat, so the literal's no-seat rule (`ClassInfo.objectLiteral`)
+   * is carried per member here instead of on the merged entry. See
+   * compare.ts#tsMemberStatesSeat.
+   */
+  objectLiteralMember?: boolean;
+  /**
    * TS-side only: this bodyless object-literal member is a bare reference to
    * ANOTHER function the same file declares — `buildHavingClause:
    * buildWhereClause` (`relation/query-methods.ts:1890`), which is how TS

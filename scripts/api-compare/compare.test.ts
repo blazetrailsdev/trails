@@ -3177,6 +3177,27 @@ describe("tsMemberStatesSeat", () => {
     expect(tsMemberStatesSeat(naming, { name: "modelName", bodyless: true }, undefined)).toBe(true);
   });
 
+  it("keeps an interface member's seat where the interface merges with an object literal", () => {
+    const optimistic = { name: "Optimistic", isInterface: true };
+    expect(
+      tsMemberStatesSeat(optimistic, { name: "lockOptimistically", bodyless: true }, undefined),
+    ).toBe(true);
+    expect(
+      tsMemberStatesSeat(
+        optimistic,
+        { name: "lockingEnabled", objectLiteralMember: true },
+        undefined,
+      ),
+    ).toBe(false);
+    expect(
+      tsMemberStatesSeat(
+        optimistic,
+        { name: "lockingEnabled", objectLiteralMember: true },
+        new Map([["Optimistic", new Set(["lockingEnabled"])]]),
+      ),
+    ).toBe(true);
+  });
+
   it("keeps a class member's staticness", () => {
     expect(tsMemberStatesSeat({ name: "Base" }, { name: "create" }, undefined)).toBe(true);
     expect(tsMemberStatesSeat(literal, { name: "x", isStatic: true }, undefined)).toBe(true);

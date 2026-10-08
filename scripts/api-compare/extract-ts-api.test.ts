@@ -3147,6 +3147,23 @@ describe("extractFromProgram — include() detection", () => {
     expect(mod.objectLiteral).toBe(true);
   });
 
+  it("marks only the literal's members where an object literal merges with an interface", () => {
+    const info = extractFromFiles("/p", {
+      "optimistic.ts": `
+        export interface Optimistic { readonly lockOptimistically: boolean }
+        export const Optimistic = {
+          lockingEnabled(): boolean { return true; },
+        };
+      `,
+    });
+    const mod = info.modules["optimistic.ts:Optimistic"];
+    expect(mod.objectLiteral).toBeUndefined();
+    expect(mod.instanceMethods.map((m) => [m.name, m.objectLiteralMember])).toEqual([
+      ["lockingEnabled", true],
+      ["lockOptimistically", undefined],
+    ]);
+  });
+
   it("records the methods an exported Module instance includes", () => {
     const info = extractFromFiles("/p", {
       "serialize-cast-value.ts": `
