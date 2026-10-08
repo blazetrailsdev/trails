@@ -42,7 +42,6 @@ export class CpkBook extends Base {
   static {
     this._primaryKey = ["author_id", "id"];
     this.belongsTo("order", {
-      className: "Cpk::Order",
       autosave: true,
       foreignKey: ["shop_id", "order_id"],
       counterCache: true,
@@ -118,7 +117,7 @@ export class CpkNonCpkBook extends CpkBook {
   }
   static {
     this._primaryKey = "id";
-    this.belongsTo("nonCpkOrder", { className: "Cpk::NonCpkOrder", foreignKey: ["order_id"] });
+    this.belongsTo("nonCpkOrder", { foreignKey: ["order_id"] });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

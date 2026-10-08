@@ -35,7 +35,7 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
     const { modelRegistry } = await import("./associations.js");
     modelRegistry.delete("Reply");
     modelRegistry.delete("Topic");
-    modelRegistry.delete("CpkOrder");
+    modelRegistry.delete("Order");
   });
 
   it("counter cache on unloaded association class works", async () => {
@@ -68,9 +68,10 @@ describe("CounterCacheTest deferred resolution (trails)", () => {
   });
 
   it("flushed counter cache column uses demodulized name when owner is defined before target", async () => {
-    const { CpkOrder } = await import("./test-helpers/models/cpk.js");
-    registerModel(CpkOrder);
-    const cols = (CpkOrder as unknown as { _counterCacheColumns: string[] })._counterCacheColumns;
+    await import("./test-helpers/models/cpk.js");
+    const { Order } = await import("./test-helpers/models/order.js");
+    registerModel(Order);
+    const cols = (Order as unknown as { _counterCacheColumns: string[] })._counterCacheColumns;
     expect(cols).toContain("books_count");
     expect(cols).not.toContain("cpk_books_count");
   });
