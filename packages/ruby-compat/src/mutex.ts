@@ -168,18 +168,15 @@ export class Mutex {
         if (data.release === release) release();
       };
 
-      let value: T | Promise<T>;
+      let thenable = false;
       try {
-        value = storage.run(fiber, () => block());
-      } catch (e) {
-        ensure();
-        throw e;
+        const value = storage.run(fiber, () => block());
+        thenable = typeof (value as PromiseLike<T> | null)?.then === "function";
+        if (thenable) return Promise.resolve(value).finally(ensure);
+        return value;
+      } finally {
+        if (!thenable) ensure();
       }
-      if (typeof (value as PromiseLike<T> | null)?.then === "function") {
-        return Promise.resolve(value).finally(ensure);
-      }
-      ensure();
-      return value;
     };
 
     return predecessor ? predecessor.then(locked) : locked();

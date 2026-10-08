@@ -138,4 +138,16 @@ describe("Mutex", () => {
     expect(mutex.tryLock()).toBe(true);
     mutex.unlock();
   });
+
+  it("releases the lock when reading a block's then raises", () => {
+    const mutex = new Mutex();
+    const answer = {
+      get then(): never {
+        throw new Error("boom");
+      },
+    };
+
+    expect(() => mutex.synchronize(() => answer)).toThrow("boom");
+    expect(mutex.synchronize(() => "ok")).toBe("ok");
+  });
 });
