@@ -198,20 +198,13 @@ export function block(this: pg.Client, timeout: number | null = null): Promise<b
   const connection = (this as Client).connection;
   if (connection == null) return Promise.resolve(true);
   return new Promise<boolean>((resolve) => {
+    const events = ["readyForQuery", "commandComplete", "errorMessage", "end", "error"];
     const settle = (ret: unknown = true): void => {
-      connection.off("readyForQuery", settle);
-      connection.off("commandComplete", settle);
-      connection.off("errorMessage", settle);
-      connection.off("end", settle);
-      connection.off("error", settle);
+      for (const event of events) connection.off(event, settle);
       resolve(ret !== false);
     };
     if (timeout != null) setTimeout(() => settle(false), timeout * 1000);
-    connection.on("readyForQuery", settle);
-    connection.on("commandComplete", settle);
-    connection.on("errorMessage", settle);
-    connection.on("end", settle);
-    connection.on("error", settle);
+    for (const event of events) connection.on(event, settle);
   });
 }
 
