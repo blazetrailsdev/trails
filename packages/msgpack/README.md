@@ -8,7 +8,8 @@ is the engine underneath, as `bcryptjs` is for `@blazetrails/bcrypt`.
 The gem is a C extension, so each file mirrors both halves: `packer.ts` is
 `lib/msgpack/packer.rb` plus `ext/msgpack/packer.c`, `packer_class.c` and
 `packer_ext_registry.h`; `unpacker.ts` is `lib/msgpack/unpacker.rb` plus
-`ext/msgpack/unpacker_class.c`; `buffer.ts` is `ext/msgpack/buffer_class.c`;
+`ext/msgpack/unpacker_class.c`; `extension-value.ts` is
+`ext/msgpack/extension_value_class.c`; `buffer.ts` is `ext/msgpack/buffer_class.c`;
 `bigint.ts` and `symbol.ts` are `lib/msgpack/bigint.rb` and
 `lib/msgpack/symbol.rb`; `core-ext.ts`, `timestamp.ts` and `time.ts` are
 `lib/msgpack/core_ext.rb`, `timestamp.rb` and `time.rb`.
@@ -57,26 +58,28 @@ Each is tracked by a story in RFC 0184.
   frozen state.
 - **`Unpacker#read` reads the engine's private `Decoder#pos`** to learn how
   many bytes one object consumed. Story:
-  `msgpack-packer-unpacker-remaining-c-surface`.
+  `msgpack-unpacker-read-loop-the-engine-hides`.
 - **A Symbol packs as the String it is carried by.** `rbObjClass` reads a
   `":name"` string as a String, so an ext type registered on `rbCSymbol` is
   never looked up when packing, and `Factory#register_type` has no Symbol arm
   (`ext/msgpack/factory_class.c:232-239`). `symbol.ts`'s
   `Symbol.from_msgpack_ext` unpacks one. Story:
   `msgpack-symbol-ext-packer-arm-and-extended-object-lookup`.
-- **`MessagePack::ExtensionValue` is unported**, so `core_ext.rb`'s
-  `ExtensionValue#to_msgpack` and `Packer#write_extension` are absent. Story:
-  `msgpack-packer-unpacker-remaining-c-surface`.
 - **A `Time` past ±10^8 days from the epoch cannot be built**: `Temporal.Instant`
   holds no such value, so `timestamp_spec.rb`'s `Time.at(-2**63)` and
   `Time.at(2**63 - 1)` examples are skipped, as the gem skips them on JRuby.
   `Timestamp` itself carries the full int64 range.
 - **`write_array_header` / `write_map_header` take an integer.** `NUM2UINT`'s
   `FloatDomainError` for `NaN` is not ported.
-- **`StackError` is never raised**, unpacker options are ignored, IO-backed
-  buffers are not wired, a map never unpacks as a `Hash`, and the C methods listed
-  there are absent. Story:
-  `msgpack-packer-unpacker-remaining-c-surface`.
+- **`StackError` is never raised, `Unpacker#skip` is absent, and a map never
+  unpacks as a `Hash`.** Each needs a read loop the engine does not expose.
+  A plain object's key is a Symbol's bare name already, so `symbolize_keys`
+  has no key to convert until maps are `Hash`es. Story:
+  `msgpack-unpacker-read-loop-the-engine-hides`.
+- **`Buffer#read` and `#read_all` are absent**, and a `Buffer` writes to its IO
+  on `flush` only, where the gem also flushes when its tail chunk is full
+  (`ext/msgpack/buffer.c:404-417`). Story:
+  `msgpack-buffer-read-and-cruby-buffer-specs`.
 - **`Factory#dup` does not carry `oversized_integer_extension`**, because
   `Factory_dup` (`ext/msgpack/factory_class.c:111-123`) does not copy
   `has_bigint_ext_type`. `Factory#pool` dups an unfrozen factory, so freeze the

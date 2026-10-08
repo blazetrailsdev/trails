@@ -25,7 +25,12 @@ const RSTRUCT = Symbol("RSTRUCT");
 
 const structClasses = new WeakSet<object>();
 
-function isStruct(value: unknown): value is StructInstance & object {
+/**
+ * `RB_TYPE_P(s2, T_STRUCT)` (`vendor/ruby/v3.3.11/struct.c:1403`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isStruct(value: unknown): value is StructInstance & object {
   if (typeof value !== "object" || value === null) return false;
   for (let proto = Object.getPrototypeOf(value); proto; proto = Object.getPrototypeOf(proto)) {
     if (structClasses.has(proto)) return true;

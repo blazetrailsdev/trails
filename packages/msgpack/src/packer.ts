@@ -16,10 +16,15 @@ import {
   rbClassOf,
   rbFSend,
   rbInspect,
+  isStruct,
+  rbCNumeric,
   rbModConstSet,
+  rbObjAsString,
   rbObjClass,
   rbObjIsKindOf,
+  stringValue,
   symbolToS,
+  type StructInstance,
 } from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
 import { MessagePack } from "./namespaces.js";
@@ -45,9 +50,16 @@ export class Packer {
 
   constructor(io: unknown = null, options: object | null = null) {
     if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
+      options = io as object;
       io = null;
     }
-    this.buffer = new Buffer(io);
+
+    if (options != null && !rbObjIsKindOf(options, Hash)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(options)} (expected Hash)`);
+    }
+
+    this.buffer = new Buffer();
+    this.buffer.setOptions(io, options);
   }
 
   registerType(
@@ -116,6 +128,10 @@ export class Packer {
     return this;
   }
 
+  pack(v: unknown): this {
+    return this.write(v);
+  }
+
   writeNil(): this {
     this.buffer.write(Uint8Array.of(0xc0));
     return this;
@@ -150,6 +166,17 @@ export class Packer {
     if (typeof obj !== "string" && !(obj instanceof Uint8Array)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected String)`);
     }
+    this.buffer.write(encoder.encodeSharedRef(obj));
+    return this;
+  }
+
+  writeBin(obj: unknown): this {
+    if (typeof obj !== "string" && !(obj instanceof Uint8Array)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected String)`);
+    }
+
+    if (typeof obj === "string") obj = new TextEncoder().encode(obj);
+
     this.buffer.write(encoder.encodeSharedRef(obj));
     return this;
   }
@@ -190,6 +217,30 @@ export class Packer {
     return this;
   }
 
+  writeExtension(obj: unknown): this {
+    if (!isStruct(obj)) {
+      throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Struct)`);
+    }
+    const struct = obj as StructInstance & Record<string, unknown>;
+
+    const rbExtType = struct[struct.members()[0]];
+    if (typeof rbExtType !== "number" || !Number.isSafeInteger(rbExtType)) {
+      throw new RangeError(
+        `integer ${rbObjAsString(rbExtType)} too big to convert to \`signed char'`,
+      );
+    }
+
+    const extType = rbExtType;
+    if (extType < -128 || extType > 127) {
+      throw new RangeError(`integer ${extType} too big to convert to \`signed char'`);
+    }
+    let payload = struct[struct.members()[1]] as string | Uint8Array;
+    if (!(payload instanceof Uint8Array)) payload = stringValue(payload);
+    this.writeExt(extType, payload);
+
+    return this;
+  }
+
   writeArrayHeader(n: number): this {
     if (n > 0xffffffff || n < -0x80000000) {
       throw new RangeError(
@@ -216,6 +267,31 @@ export class Packer {
     return this;
   }
 
+  writeBinHeader(n: number): this {
+    if (n > 0xffffffff || n < -0x80000000) {
+      throw new RangeError(
+        `integer ${n} too ${n < 0 ? "small" : "big"} to convert to \`unsigned int'`,
+      );
+    }
+    n = n >>> 0;
+    if (n < 256) this.buffer.write(Uint8Array.of(0xc4, n));
+    else if (n < 65536) this.buffer.write(Uint8Array.of(0xc5, n >> 8, n));
+    else this.buffer.write(Uint8Array.of(0xc6, n >>> 24, n >> 16, n >> 8, n));
+    return this;
+  }
+
+  writeFloat32(numeric: unknown): this {
+    if (!rbObjIsKindOf(numeric, rbCNumeric)) {
+      throw new ArgumentError("Expected numeric");
+    }
+
+    const bytes = new Uint8Array(5);
+    bytes[0] = 0xca;
+    new DataView(bytes.buffer).setFloat32(1, Number(numeric));
+    this.buffer.write(bytes);
+    return this;
+  }
+
   writeExt(type: number, payload: string | Uint8Array): this {
     if (type < -128 || type > 127) {
       throw new RangeError(`integer ${type} too big to convert to \`signed char'`);
@@ -225,8 +301,25 @@ export class Packer {
     return this;
   }
 
+  flush(): this {
+    this.buffer.flush();
+    return this;
+  }
+
   reset(): null {
     return this.buffer.clear();
+  }
+
+  clear(): null {
+    return this.reset();
+  }
+
+  size(): number {
+    return this.buffer.size();
+  }
+
+  isEmpty(): boolean {
+    return this.buffer.size() === 0;
   }
 
   toStr(): Uint8Array {
@@ -237,8 +330,24 @@ export class Packer {
     return this.toStr();
   }
 
-  fullPack(): Uint8Array {
-    const retval = this.buffer.toStr();
+  toA(): Uint8Array[] {
+    return this.buffer.toA();
+  }
+
+  writeTo(io: unknown): number {
+    return this.buffer.flushToIo(io, "write", true);
+  }
+
+  fullPack(): Uint8Array | null {
+    let retval: Uint8Array | null;
+
+    if (this.buffer.io != null) {
+      this.buffer.flush();
+      retval = null;
+    } else {
+      retval = this.buffer.toStr();
+    }
+
     this.buffer.clear();
     return retval;
   }

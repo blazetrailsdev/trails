@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { rbCString, rbObjClass } from "@blazetrails/ruby-compat";
+import { ArgumentError, StringIO, rbCString, rbObjClass } from "@blazetrails/ruby-compat";
 import {
   Array as ArrayExt,
   FalseClass,
@@ -33,6 +33,11 @@ describe("MessagePack::Packer", () => {
     expect(packer.toS()).toEqual(Uint8Array.of(0x90));
   });
 
+  it("write_nil", () => {
+    packer.writeNil();
+    expect(packer.toS()).toEqual(Uint8Array.of(0xc0));
+  });
+
   it("write_array_header 0", () => {
     packer.writeArrayHeader(0);
     expect(packer.toS()).toEqual(Uint8Array.of(0x90));
@@ -51,6 +56,59 @@ describe("MessagePack::Packer", () => {
   it("write_map_header 1", () => {
     packer.writeMapHeader(1);
     expect(packer.toS()).toEqual(Uint8Array.of(0x81));
+  });
+
+  const binHeaders: [number, number[]][] = [
+    [0, [0xc4, 0x00]],
+    [255, [0xc4, 0xff]],
+    [256, [0xc5, 0x01, 0x00]],
+    [65535, [0xc5, 0xff, 0xff]],
+    [65536, [0xc6, 0x00, 0x01, 0x00, 0x00]],
+    [999999, [0xc6, 0x00, 0x0f, 0x42, 0x3f]],
+  ];
+  for (const [n, packed] of binHeaders) {
+    it(`write_bin_header ${n}`, () => {
+      packer.writeBinHeader(n);
+      expect(packer.toS()).toEqual(Uint8Array.from(packed));
+    });
+  }
+
+  it("write_bin", () => {
+    packer.writeBin("hello");
+    expect(packer.toS()).toEqual(Uint8Array.of(0xc4, 0x05, ...new TextEncoder().encode("hello")));
+  });
+
+  describe("#write_float32", () => {
+    const tests: [string, number, number[]][] = [
+      ["small floats", 3.14, [0xca, 0x40, 0x48, 0xf5, 0xc3]],
+      ["big floats", Math.PI * 1_000_000_000_000_000_000, [0xca, 0x5e, 0x2e, 0x64, 0xb7]],
+      ["negative floats", -2.1, [0xca, 0xc0, 0x06, 0x66, 0x66]],
+      ["integer", 123, [0xca, 0x42, 0xf6, 0x00, 0x00]],
+    ];
+
+    for (const [ctx, numeric, packed] of tests) {
+      describe(`with ${ctx}`, () => {
+        it(`encodes ${numeric} as float32`, () => {
+          packer.writeFloat32(numeric);
+          expect(packer.toS()).toEqual(Uint8Array.from(packed));
+        });
+      });
+    }
+
+    describe("with non numeric", () => {
+      it("raises argument error", () => {
+        expect(() => packer.writeFloat32("abc")).toThrow(ArgumentError);
+      });
+    });
+  });
+
+  it("flush", () => {
+    const io = new StringIO();
+    const pk = new Packer(io);
+    pk.writeNil();
+    pk.flush();
+    expect(pk.toS()).toEqual(new Uint8Array(0));
+    expect(io.string()).toEqual("\xc0");
   });
 
   it("to_msgpack returns String", () => {

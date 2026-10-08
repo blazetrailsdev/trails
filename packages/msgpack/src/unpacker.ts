@@ -4,6 +4,8 @@ import {
   EOFError,
   FrozenError,
   Hash,
+  Module,
+  include,
   RangeError,
   StandardError,
   rbModConstSet,
@@ -12,6 +14,7 @@ import {
   rbObjIsKindOf,
 } from "@blazetrails/ruby-compat";
 import { Buffer } from "./buffer.js";
+import { ExtensionValue } from "./extension-value.js";
 import { MessagePack } from "./namespaces.js";
 import { MSGPACK_EXT_RECURSIVE } from "./packer.js";
 
@@ -21,13 +24,19 @@ export class MalformedFormatError extends UnpackError {}
 
 export class StackError extends UnpackError {}
 
+export const TypeError = new Module();
+
 export class UnexpectedTypeError extends UnpackError {}
+include(UnexpectedTypeError, TypeError);
 
 export class UnknownExtTypeError extends UnpackError {}
 
 export type UnpackerProc = (data: never) => unknown;
 
 export type UnpackerExtRegistry = Map<number, [unknown, UnpackerProc | null, number]>;
+
+const PRIMITIVE_OBJECT_COMPLETE = 0;
+const PRIMITIVE_EOF = -1;
 
 class RecursiveRaised {
   constructor(readonly lastObject: unknown) {}
@@ -43,20 +52,22 @@ function raiseUnpackerError(error: unknown): never {
     if (error.message.startsWith("Unrecognized")) throw new MalformedFormatError("invalid byte");
     throw new UnpackError(error.message);
   }
-  if (error instanceof globalThis.RangeError) {
-    throw new EOFError("end of buffer reached");
-  }
   throw error;
 }
 
-function ll2inum(obj: unknown): unknown {
-  if (obj instanceof ExtObject) return obj.obj;
-  if (typeof obj === "bigint") return Number.isSafeInteger(Number(obj)) ? Number(obj) : obj;
-  if (Array.isArray(obj)) {
-    for (let i = 0; i < obj.length; i++) obj[i] = ll2inum(obj[i]);
+function objectComplete(obj: unknown, freeze: boolean): unknown {
+  if (obj instanceof ExtObject) {
+    obj = obj.obj;
+  } else if (typeof obj === "bigint") {
+    return Number.isSafeInteger(Number(obj)) ? Number(obj) : obj;
+  } else if (Array.isArray(obj)) {
+    for (let i = 0; i < obj.length; i++) obj[i] = objectComplete(obj[i], freeze);
   } else if (obj !== null && typeof obj === "object" && obj.constructor === Object) {
     const hash = obj as Record<string, unknown>;
-    for (const key of Object.keys(hash)) hash[key] = ll2inum(hash[key]);
+    for (const key of Object.keys(hash)) hash[key] = objectComplete(hash[key], freeze);
+  }
+  if (freeze && !ArrayBuffer.isView(obj)) {
+    Object.freeze(obj);
   }
   return obj;
 }
@@ -66,6 +77,11 @@ export class Unpacker {
   readonly extRegistry: UnpackerExtRegistry = new Map();
   readonly buffer: Buffer;
   private readonly decoder: Decoder;
+  /** @missingRailsCall rb_str_intern — CONVERGEABLE msgpack-unpacker-read-loop-the-engine-hides */
+  private symbolizeKeys = false;
+  private freeze = false;
+  private allowUnknownExt = false;
+  private readonly uk: { lastObject: unknown } = { lastObject: null };
 
   constructor(io: unknown = null, options: object | null = null) {
     if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
@@ -74,7 +90,15 @@ export class Unpacker {
     } else if (options != null && !rbObjIsKindOf(options, Hash)) {
       throw new ArgumentError(`expected Hash but found ${rbObjClass(options).name}.`);
     }
-    this.buffer = new Buffer(io);
+    this.buffer = new Buffer();
+    this.buffer.setOptions(io, options);
+
+    if (options != null) {
+      const { symbolizeKeys, freeze, allowUnknownExt } = options as Record<string, unknown>;
+      this.symbolizeKeys = symbolizeKeys != null && symbolizeKeys !== false;
+      this.freeze = freeze != null && freeze !== false;
+      this.allowUnknownExt = allowUnknownExt != null && allowUnknownExt !== false;
+    }
     this.decoder = new Decoder({
       useBigInt64: true,
       extensionCodec: {
@@ -95,10 +119,25 @@ export class Unpacker {
               throw new RecursiveRaised(error);
             }
           }
+          if (this.allowUnknownExt) {
+            return new ExtObject(new ExtensionValue(type, data));
+          }
           throw new UnknownExtTypeError("unexpected extension type");
         },
       },
     });
+  }
+
+  isSymbolizeKeys(): boolean {
+    return this.symbolizeKeys ? true : false;
+  }
+
+  isFreeze(): boolean {
+    return this.freeze ? true : false;
+  }
+
+  isAllowUnknownExt(): boolean {
+    return this.allowUnknownExt ? true : false;
   }
 
   registerType(
@@ -148,17 +187,91 @@ export class Unpacker {
   }
 
   read(): unknown {
-    const each = this.decoder.decodeMulti(this.buffer.toStr());
-    let r: IteratorResult<unknown, void>;
-    try {
-      r = each.next();
-      each.return();
-    } catch (error) {
-      raiseUnpackerError(error);
+    const r = this.unpackerRead();
+    if (r < 0) {
+      throw new EOFError("end of buffer reached");
     }
-    if (r.done) throw new EOFError("end of buffer reached");
-    this.buffer.skip((this.decoder as unknown as { pos: number }).pos);
-    return ll2inum(r.value);
+    return this.uk.lastObject;
+  }
+
+  unpack(): unknown {
+    return this.read();
+  }
+
+  skipNil(): boolean {
+    const b = this.getHeadByte();
+    if (b === 0xc0) {
+      this.buffer.skipAll(1);
+      return true;
+    }
+    return false;
+  }
+
+  readArrayHeader(): number {
+    const b = this.getHeadByte();
+    let resultSize: number;
+
+    if (0x90 <= b && b <= 0x9f) {
+      resultSize = b & 0x0f;
+      this.buffer.skipAll(1);
+    } else if (b === 0xdc) {
+      resultSize = this.readCastBlock(2);
+    } else if (b === 0xdd) {
+      resultSize = this.readCastBlock(4);
+    } else {
+      throw new UnexpectedTypeError("unexpected type");
+    }
+
+    return resultSize;
+  }
+
+  readMapHeader(): number {
+    const b = this.getHeadByte();
+    let resultSize: number;
+
+    if (0x80 <= b && b <= 0x8f) {
+      resultSize = b & 0x0f;
+      this.buffer.skipAll(1);
+    } else if (b === 0xde) {
+      resultSize = this.readCastBlock(2);
+    } else if (b === 0xdf) {
+      resultSize = this.readCastBlock(4);
+    } else {
+      throw new UnexpectedTypeError("unexpected type");
+    }
+
+    return resultSize;
+  }
+
+  each(): Generator<unknown, void>;
+  each(block: (v: unknown) => void): null;
+  each(block?: (v: unknown) => void): null | Generator<unknown, void> {
+    if (block === undefined) {
+      return this.enumFor();
+    }
+    if (this.buffer.io != null) {
+      try {
+        return this.eachImpl(block);
+      } catch (error) {
+        if (!(error instanceof EOFError)) throw error;
+        return null;
+      }
+    } else {
+      return this.eachImpl(block);
+    }
+  }
+
+  feedEach(data: string | Uint8Array): Generator<unknown, void>;
+  feedEach(data: string | Uint8Array, block: (v: unknown) => void): null;
+  feedEach(
+    data: string | Uint8Array,
+    block?: (v: unknown) => void,
+  ): null | Generator<unknown, void> {
+    if (block === undefined) {
+      return this.enumFor(data);
+    }
+    this.feedReference(data);
+    return this.each(block);
   }
 
   fullUnpack(): unknown {
@@ -174,6 +287,65 @@ export class Unpacker {
 
   reset(): null {
     return this.buffer.clear();
+  }
+
+  private *enumFor(data?: string | Uint8Array): Generator<unknown, void> {
+    if (data !== undefined) this.feedReference(data);
+    try {
+      while (this.unpackerRead() >= 0) yield this.uk.lastObject;
+    } catch (error) {
+      if (this.buffer.io == null || !(error instanceof EOFError)) throw error;
+    }
+  }
+
+  private eachImpl(block: (v: unknown) => void): null {
+    while (true) {
+      const r = this.unpackerRead();
+      if (r < 0) {
+        return null;
+      }
+      const v = this.uk.lastObject;
+      block(v);
+    }
+  }
+
+  private unpackerRead(): number {
+    while (true) {
+      const each = this.decoder.decodeMulti(this.buffer.toStr());
+      let r: IteratorResult<unknown, void>;
+      try {
+        r = each.next();
+        each.return();
+      } catch (error) {
+        if (!(error instanceof globalThis.RangeError)) raiseUnpackerError(error);
+        r = { done: true, value: undefined };
+      }
+      if (r.done) {
+        if (this.buffer.io == null) return PRIMITIVE_EOF;
+        this.buffer.ensureReadable(this.buffer.size() + 1);
+        continue;
+      }
+      this.buffer.skipAll((this.decoder as unknown as { pos: number }).pos);
+      this.uk.lastObject = objectComplete(r.value, this.freeze);
+      return PRIMITIVE_OBJECT_COMPLETE;
+    }
+  }
+
+  private getHeadByte(): number {
+    if (!this.buffer.ensureReadable(1)) {
+      throw new EOFError("end of buffer reached");
+    }
+    return this.buffer.toStr()[0];
+  }
+
+  private readCastBlock(n: number): number {
+    if (!this.buffer.ensureReadable(1 + n)) {
+      throw new EOFError("end of buffer reached");
+    }
+    const cb = this.buffer.toStr();
+    const view = new DataView(cb.buffer, cb.byteOffset + 1, n);
+    this.buffer.skipAll(1 + n);
+    return n === 2 ? view.getUint16(0) : view.getUint32(0);
   }
 
   private registeredTypesInternal(): UnpackerExtRegistry {
@@ -194,6 +366,7 @@ export class Unpacker {
   }
 }
 
+rbModConstSet(MessagePack, "TypeError", TypeError);
 rbModConstSet(MessagePack, "Unpacker", Unpacker);
 rbModConstSet(MessagePack, "UnpackError", UnpackError);
 rbModConstSet(MessagePack, "MalformedFormatError", MalformedFormatError);
