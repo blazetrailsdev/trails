@@ -97,12 +97,14 @@ export namespace Delegation {
 
     const methodNames: string[] = [];
 
-    const receiverClass =
-      typeof to !== "string"
-        ? to
-        : receiver === "self.class"
-          ? (owner as { constructor?: unknown }).constructor
-          : undefined;
+    let nilable = true;
+    let receiverClass: unknown;
+    if (typeof to !== "string") {
+      receiverClass = to;
+    } else if (receiver === "self.class") {
+      nilable = false;
+      receiverClass = (owner as { constructor?: unknown }).constructor;
+    }
 
     for (const method of methods) {
       const methodName = `${methodPrefix}${method}`;
@@ -114,6 +116,7 @@ export namespace Delegation {
           : receiver === "self.class"
             ? rbObjClass(self)
             : receiverValue(self, receiverName);
+        if (nilable === false) return _;
         if (_ == null && !Object.hasOwn(NilClass, method)) {
           if (allowNil) return undefined;
           throw DelegationError.nilTarget(methodName, receiver);

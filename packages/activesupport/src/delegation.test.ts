@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { DelegationError, Delegation } from "./delegation.js";
 
 describe("DelegationError", () => {
@@ -16,6 +17,32 @@ describe("DelegationError", () => {
 });
 
 describe("Delegation.generate", () => {
+  it("delegates to the class of a receiver with no class accessor", () => {
+    class Record {
+      static tableName() {
+        return "records";
+      }
+      declare tableName: () => string;
+    }
+    Delegation.generate(Record.prototype, ["tableName"], { to: "class", allowNil: true });
+
+    expect(new Record().tableName()).toBe("records");
+  });
+
+  it("delegates to the real class through a singleton class", () => {
+    class Record {
+      static tableName() {
+        return "records";
+      }
+      declare tableName: () => string;
+    }
+    Delegation.generate(Record.prototype, ["tableName"], { to: "class" });
+    const record = new Record();
+    rbObjSingletonClass(record);
+
+    expect(record.tableName()).toBe("records");
+  });
+
   it("delegates method to target", () => {
     class Greeter {
       greet() {
