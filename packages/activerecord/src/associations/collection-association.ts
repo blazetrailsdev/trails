@@ -331,7 +331,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected deleteOrNullifyAllRecords(_method?: string): Promise<number> {
-    // @nie disposition=TODO
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/associations/collection_association.rb:163
     throw new NotImplementedError();
   }
 
