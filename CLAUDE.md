@@ -775,7 +775,9 @@ second query to build itself can just run it in place.
 In trails the query is `await`ed, and that costs three shapes Rails has no
 counterpart for:
 
-- **`applyThenable` / `stripThenable`** (`relation/thenable.ts`). `await rel`
+- **`applyThenable`** (`relation/thenable.ts`) **/ `stripThenable`**
+  (`activesupport/src/strip-thenable.ts`, so `Object#presence` can answer a
+  relation unevaluated). `await rel`
   has to evaluate the relation, so `Relation.prototype` carries `then` /
   `catch` / `finally` forwarding to `toArray()`. That makes every `Relation` a
   thenable, which JS then unwraps automatically anywhere one is _returned_ from

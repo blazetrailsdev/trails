@@ -1,7 +1,7 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
 import { compact, groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
-import { stripThenable } from "./relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
 export type DjarKey = string | string[];

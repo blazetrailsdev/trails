@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, stripThenable, toFs } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -23,7 +23,7 @@ import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
-import { applyThenable, stripThenable } from "./relation/thenable.js";
+import { applyThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   wrap,
@@ -599,11 +599,6 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   async isBlank(): Promise<boolean> {
     return isBlank(await this.records());
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE relation-presence-comes-from-activesupport-object-presence */
-  async presence(): Promise<LoadedRelation<Relation<T, G>> | null> {
-    return (await isPresent(this)) ? stripThenable(this as Relation<T, G>) : null;
   }
 
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {

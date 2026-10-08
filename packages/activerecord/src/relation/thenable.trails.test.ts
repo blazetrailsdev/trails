@@ -1,3 +1,4 @@
+import { presence } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Relation, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -79,13 +80,13 @@ describe("Thenable", () => {
 
   it("presence() returns the relation when records exist", async () => {
     const rel = Author.where({ id: 1 });
-    const present = await rel.presence();
+    const present = await presence(rel);
     expect(present).toBeInstanceOf(Relation);
   });
 
   it("presence() returns null when no records exist", async () => {
     const rel = Author.where({ id: 99 });
-    const present = await rel.presence();
+    const present = await presence(rel);
     expect(present).toBeNull();
   });
 

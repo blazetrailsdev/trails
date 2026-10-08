@@ -163,6 +163,7 @@ export interface SQLite3Config extends TrailsAdapterOptions {
 }
 
 export interface MysqlAdapterOptions extends TrailsAdapterOptions {
+  flags?: number | string[];
   strict?: boolean | ":default";
   waitTimeout?: number | string;
   readTimeout?: number;

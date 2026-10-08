@@ -87,11 +87,17 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   it("database exists returns false if database does not exist", async () => {
     const url = new URL(MYSQL_TEST_URL);
     url.pathname = "/inexistent_activerecord_unittest";
-    assertNot(await Mysql2Adapter.databaseExists(url.toString()), "expected database to not exist");
+    assertNot(
+      await Mysql2Adapter.databaseExists({ uri: url.toString() }),
+      "expected database to not exist",
+    );
   });
 
   it("database exists returns true when the database exists", async () => {
-    assert(await Mysql2Adapter.databaseExists(MYSQL_TEST_URL), "expected database to exist");
+    assert(
+      await Mysql2Adapter.databaseExists({ uri: MYSQL_TEST_URL }),
+      "expected database to exist",
+    );
   });
 
   it("columns for distinct zero orders", () => {

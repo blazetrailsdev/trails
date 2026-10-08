@@ -13,7 +13,7 @@ import {
 import type { PP } from "@blazetrails/ruby-compat";
 import { relationClassFor } from "../relation/delegation.js";
 
-import { stripThenable } from "../relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,

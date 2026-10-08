@@ -1,6 +1,7 @@
 import { Temporal } from "@blazetrails/date";
 import { STRING_METHOD_TABLE, rbDefineMethod } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
+import { stripThenable } from "../../strip-thenable.js";
 
 const BLANK_RE = /^\s*$/;
 
@@ -132,10 +133,18 @@ export function isPresent(value: unknown): boolean | Promise<boolean> {
   return !isBlank(value);
 }
 
-export function presence<T extends { isBlank(): Promise<boolean> }>(value: T): Promise<T | null>;
+export function presence<T extends { isBlank(): Promise<boolean> }>(
+  value: T,
+): Promise<(T extends PromiseLike<unknown> ? Omit<T, "then"> : T) | null>;
 export function presence<T>(value: T): T | null;
-export function presence<T>(value: T): T | null | Promise<T | null> {
+export function presence<T>(value: T): T | null | Promise<unknown> {
   const present = isPresent(value as unknown) as boolean | Promise<boolean>;
-  if (typeof present !== "boolean") return present.then((p) => (p ? value : null));
+  if (typeof present !== "boolean") {
+    return present.then((p) => {
+      if (!p) return null;
+      if (typeof (value as { then?: unknown }).then !== "function") return value;
+      return stripThenable(value as object);
+    });
+  }
   return present ? value : null;
 }

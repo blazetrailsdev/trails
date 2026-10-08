@@ -11,7 +11,7 @@ import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapt
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Relation } from "./relation.js";
-import { stripThenable } from "./relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";

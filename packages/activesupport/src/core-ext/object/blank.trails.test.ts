@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isBlank } from "../../index.js";
+import { isBlank, presence } from "../../index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {
   it("invokes a method-shaped isEmpty, as blank.rb:19 invokes empty?", () => {
@@ -57,5 +57,31 @@ describe("Object#blank? vs Hash#blank?", () => {
       }
     }
     expect(isBlank(new Slots())).toBe(false);
+  });
+});
+
+describe("Object#presence on a thenable with an async blank?", () => {
+  class Lazy {
+    evaluated = 0;
+    constructor(private readonly blank: boolean) {}
+    async isBlank(): Promise<boolean> {
+      return this.blank;
+    }
+    then(onfulfilled: (value: string[]) => unknown): unknown {
+      this.evaluated++;
+      return Promise.resolve(["record"]).then(onfulfilled);
+    }
+  }
+
+  it("answers self unevaluated, per blank.rb:45-47", async () => {
+    const lazy = new Lazy(false);
+    const present = await presence(lazy);
+    expect(present).toBeInstanceOf(Lazy);
+    expect(lazy.evaluated).toBe(0);
+    expect("then" in present!).toBe(false);
+  });
+
+  it("answers nil when blank", async () => {
+    expect(await presence(new Lazy(true))).toBeNull();
   });
 });

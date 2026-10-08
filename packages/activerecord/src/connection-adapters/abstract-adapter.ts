@@ -916,7 +916,7 @@ export class AbstractAdapter implements Quoting {
     this._unconfiguredConnection = null;
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
-      this._config = configOrDeprecatedConnection;
+      this._config = { ...configOrDeprecatedConnection };
       this.logger = ActiveRecord.Base?.logger ?? null;
 
       if (
@@ -934,10 +934,10 @@ export class AbstractAdapter implements Quoting {
         ? deprecatedLogger
         : (ActiveRecord.Base?.logger ?? null);
       if (rtest(deprecatedConfig)) {
-        this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConfig ?? {}) as Record<string, unknown>) };
         this._connectionParameters = deprecatedConnectionOptions;
       } else {
-        this._config = (deprecatedConnectionOptions ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConnectionOptions ?? {}) as Record<string, unknown>) };
         this._connectionParameters = null;
       }
     }
