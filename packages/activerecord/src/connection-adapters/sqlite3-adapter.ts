@@ -796,8 +796,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         await this.moveTable(alteredTableName, tableName, {}, caller);
       });
     });
-
-    this.schemaCache.clearBang();
   }
 
   /** @internal */

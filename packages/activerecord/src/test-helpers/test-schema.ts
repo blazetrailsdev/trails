@@ -17,14 +17,9 @@ export const TEST_SCHEMA: Schema = {
     name: { type: "string", null: true },
   },
 
-  admin_regions: {
-    name: "string",
-  },
-
   admin_users: {
     columns: {
       name: "string",
-      region_id: "integer",
       settings: { type: "string", null: true, limit: 1024 },
       parent: { type: "string", null: true, limit: 1024 },
       spouse: { type: "string", null: true, limit: 1024 },
@@ -1717,15 +1712,6 @@ export const TEST_SCHEMA: Schema = {
     account_id: "integer",
     settings: "text",
   },
-
-  catalog_categories: { name: "string" },
-  catalog_products: { name: "string" },
-  content_pages: { name: "string" },
-  hot_accounts: { hot_owner_id: "integer" },
-  orgs: {},
-  orphans: { name: "string" },
-  targets: {},
-  teams: {},
 };
 
 export const ARUNIT2_SCHEMA: Schema = {

@@ -1,16 +1,4 @@
 {
-  "tables": [
-    "admin_regions",
-    "catalog_categories",
-    "catalog_products",
-    "content_pages",
-    "hot_accounts",
-    "orgs",
-    "orphans",
-    "targets",
-    "teams",
-    "to_be_linked_accounts",
-    "to_be_linked_users"
-  ],
-  "columns": ["admin_users.region_id"]
+  "tables": ["to_be_linked_accounts", "to_be_linked_users"],
+  "columns": []
 }
