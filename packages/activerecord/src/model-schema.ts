@@ -1,4 +1,11 @@
-import { type Hash, hashAref, rbObjAsString, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  type Hash,
+  fetch,
+  hashAref,
+  block as rbBlock,
+  rbObjAsString,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
@@ -10,7 +17,13 @@ import {
   type AttributeSet,
   type ValueType,
 } from "@blazetrails/activemodel";
-import { classAttribute, included, moduleParent, moduleParents } from "@blazetrails/activesupport";
+import {
+  classAttribute,
+  delegate,
+  included,
+  moduleParent,
+  moduleParents,
+} from "@blazetrails/activesupport";
 import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { TableNotSpecified } from "./errors.js";
@@ -371,9 +384,12 @@ export function yamlEncoder(this: SchemaHost): YAMLEncoder {
 }
 
 export function columnForAttribute(this: SchemaHost, name: string): any {
-  loadSchema.call(this);
-  const hash = getColumnsHash(this);
-  return name in hash ? hash[name] : new NullColumn(name);
+  name = rbObjAsString(name);
+  return fetch(
+    (this as unknown as typeof Base).columnsHash(),
+    name,
+    rbBlock(() => new NullColumn(name)),
+  );
 }
 
 export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | null {
@@ -775,6 +791,15 @@ export const ModelSchema = {
     classAttribute.call(base, "pluralizeTableNames", { instanceWriter: false, default: true });
     classAttribute.call(base, "implicitOrderColumn", { instanceAccessor: false });
     classAttribute.call(base, "immutableStringsByDefault", { instanceAccessor: false });
+
+    delegate.call(
+      (base as { prototype: object }).prototype,
+      "typeForAttribute",
+      "columnForAttribute",
+      {
+        to: "class",
+      },
+    );
   },
 };
 
@@ -798,25 +823,6 @@ export const ClassMethods = {
   _returningColumnsForInsert,
   loadSchemaBang,
   loadSchemaFromAdapter,
-};
-
-/** @noRailsEquivalent CONVERGEABLE model-schema-instance-readers-come-from-delegate-to-class */
-export const InstanceMethods = {
-  typeForAttribute(
-    this: { constructor: unknown },
-    name: string,
-    block?: () => ValueType,
-  ): ValueType | null {
-    return (
-      this.constructor as { typeForAttribute(n: string, b?: () => ValueType): ValueType | null }
-    ).typeForAttribute(name, block);
-  },
-
-  columnForAttribute(this: { constructor: unknown }, name: string): unknown {
-    return (this.constructor as { columnForAttribute(n: string): unknown }).columnForAttribute(
-      name,
-    );
-  },
 };
 
 /** @internal */

@@ -194,19 +194,19 @@ describe("ExplainTest", () => {
   });
 
   it("explain returns query plan string (Rails-guided)", async () => {
-    const plan = await Car.all().explain();
+    const plan = await Car.all().explain().inspect();
     expect(typeof plan).toBe("string");
     expect(plan.length).toBeGreaterThan(0);
   });
 
   it("prints one EXPLAIN block per collected query with the header prefix", async () => {
-    const plan = await Car.where({ name: "honda" }).explain();
+    const plan = await Car.where({ name: "honda" }).explain().inspect();
     expect(plan).toMatch(/^EXPLAIN\b/m);
     expect(plan.toLowerCase()).toContain("select");
   });
 
   it("captures queries for eager-loaded associations, one block per query", async () => {
-    const plan = await Car.all().preload(":bulbs").explain();
+    const plan = await Car.all().preload(":bulbs").explain().inspect();
     const blocks = plan.split(/^(?=EXPLAIN)/m).filter((b) => /EXPLAIN/.test(b));
     expect(blocks.length).toBeGreaterThanOrEqual(2);
     expect(plan.toLowerCase()).toContain("cars");
@@ -214,24 +214,24 @@ describe("ExplainTest", () => {
   });
 
   it("resets ExplainRegistry after the call (no leaked collection state)", async () => {
-    await Car.all().explain();
+    await Car.all().explain().inspect();
     expect(ExplainRegistry.collect).toBe(false);
     expect(ExplainRegistry.queries).toEqual([]);
   });
 
   it("does not load the relation as a side effect", async () => {
     const relation = Car.where({ name: "honda" });
-    await relation.explain();
+    await relation.explain().inspect();
     expect(relation.isLoaded).toBe(false);
   });
 
   it("yields empty output for a query-less relation", async () => {
-    const plan = await Car.none().explain();
+    const plan = await Car.none().explain().inspect();
     expect(plan).toBe("");
   });
 
   it("yields empty output for a contradiction relation", async () => {
-    const plan = await Car.where({ id: [] }).explain();
+    const plan = await Car.where({ id: [] }).explain().inspect();
     expect(plan).toBe("");
   });
 
@@ -242,7 +242,7 @@ describe("ExplainTest", () => {
     );
     expect(rendered.startsWith('[[nil, 42], [nil, "str"], [nil, 7], [nil, nil], ')).toBe(true);
     expect(rendered).toMatch(/\[nil, (1\], \[nil, 0|true\], \[nil, false)\]\]$/);
-    const plan = await Car.all().explain();
+    const plan = await Car.all().explain().inspect();
     expect(plan.length).toBeGreaterThan(0);
   });
 
@@ -279,8 +279,8 @@ describe("ExplainTest", () => {
 
   it("isolates concurrent explain() calls via AsyncLocalStorage scopes", async () => {
     const [plan1, plan2] = await Promise.all([
-      new Thread(async () => Car.where({ name: "honda" }).explain()).value(),
-      new Thread(async () => Car.all().explain()).value(),
+      new Thread(async () => Car.where({ name: "honda" }).explain().inspect()).value(),
+      new Thread(async () => Car.all().explain().inspect()).value(),
     ]);
     expect(plan1.length).toBeGreaterThan(0);
     expect(plan2.length).toBeGreaterThan(0);

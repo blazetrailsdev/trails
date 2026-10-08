@@ -181,7 +181,6 @@ declare const relationNameBrand: unique symbol;
 
 export type RelationName = string | { readonly [relationNameBrand]: never };
 
-/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging */
 /** @internal */
 export class ExplainProxy<T extends Base> {
   private readonly _relation: Relation<T, boolean>;
@@ -235,20 +234,6 @@ export class ExplainProxy<T extends Base> {
     return this._relation.execExplain(queries, this._options);
   }
 }
-
-export interface ExplainProxy<T extends Base> {
-  then<TResult1 = string, TResult2 = never>(
-    onfulfilled?: ((value: string) => TResult1 | PromiseLike<TResult1>) | null,
-    onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null,
-  ): Promise<TResult1 | TResult2>;
-  /** @noRailsEquivalent CONVERGEABLE explain-proxy-drops-thenable-callers-await-inspect */
-  catch<TResult = never>(
-    onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | null,
-  ): Promise<string | TResult>;
-  /** @noRailsEquivalent CONVERGEABLE explain-proxy-drops-thenable-callers-await-inspect */
-  finally(onfinally?: (() => void) | null): Promise<string>;
-}
-/* eslint-enable @typescript-eslint/no-unsafe-declaration-merging */
 
 const ENUMERABLE_DELEGATES = {
   detect: <T>(records: T[], fn: (record: T, index: number, all: T[]) => unknown): T | undefined =>
@@ -2100,8 +2085,6 @@ for (const name of ["updateAll", "deleteAll"] as const) {
 }
 
 applyThenable(Relation.prototype);
-
-applyThenable(ExplainProxy.prototype, "inspect");
 
 /** @internal */
 async function computeCacheKey(

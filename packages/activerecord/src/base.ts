@@ -2418,7 +2418,6 @@ include(Base, {
   writeStoreAttribute: _writeStoreAttribute,
   storeAccessorFor: _storeAccessorFor,
 });
-include(Base, ModelSchema.InstanceMethods);
 include(Base, _Read);
 include(Base, _Write);
 include(Base, _BeforeTypeCast);

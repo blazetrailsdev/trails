@@ -24,7 +24,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const posts = Post.optimizerHints("SeqScan(posts)")
             .select("id")
             .where({ author_id: [0, 1] });
-          const plan = await posts.explain();
+          const plan = await posts.explain().inspect();
           expect(plan).toContain("Seq Scan on posts");
         },
       );
@@ -55,7 +55,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           const posts = Post.optimizerHints("/*+ SeqScan(posts) */")
             .select("id")
             .where({ author_id: [0, 1] });
-          const plan = await posts.explain();
+          const plan = await posts.explain().inspect();
           expect(plan).toContain("Seq Scan on posts");
         },
       );

@@ -41,13 +41,13 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain for one query", async () => {
-      const explain = await Author.where({ id: 1 }).explain();
+      const explain = await Author.where({ id: 1 }).explain().inspect();
       expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
       expect(explain).toMatch(/authors \|.* const/);
     });
 
     it("explain with eager loading", async () => {
-      const explain = await Author.where({ id: 1 }).includes(":posts").explain();
+      const explain = await Author.where({ id: 1 }).includes(":posts").explain().inspect();
       expect(explain).toMatch("EXPLAIN SELECT `authors`.* FROM `authors` WHERE `authors`.`id` = 1");
       expect(explain).toMatch(/authors |.* const/);
       expect(explain).toMatch(
@@ -57,21 +57,26 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("explain with options as symbol", async () => {
-      const explain = await Author.where({ id: 1 }).explain(explainOpt);
+      const explain = await Author.where({ id: 1 }).explain(explainOpt).inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
     });
 
     it("explain with options as strings", async () => {
-      const explain = await Author.where({ id: 1 }).explain(explainOpt.slice(1).toUpperCase());
+      const explain = await Author.where({ id: 1 })
+        .explain(explainOpt.slice(1).toUpperCase())
+        .inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
     });
 
     it("explain options with eager loading", async () => {
-      const explain = await Author.where({ id: 1 }).includes(":posts").explain(explainOpt);
+      const explain = await Author.where({ id: 1 })
+        .includes(":posts")
+        .explain(explainOpt)
+        .inspect();
       expect(explain).toMatch(
         `${expectedClause} SELECT \`authors\`.* FROM \`authors\` WHERE \`authors\`.\`id\` = 1`,
       );
@@ -81,7 +86,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("Relation#explain on MySQL captures the SELECT via sql.active_record", async () => {
-      const plan = await Author.where({ id: authors("david").id }).explain();
+      const plan = await Author.where({ id: authors("david").id })
+        .explain()
+        .inspect();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);
       expect(plan).toMatch(/EXPLAIN SELECT/);
@@ -90,7 +97,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
       const relation = Author.where({ id: authors("david").id });
       await relation;
-      const plan = await relation.explain();
+      const plan = await relation.explain().inspect();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);
       expect(plan).toMatch(/EXPLAIN SELECT/);
@@ -99,7 +106,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("Relation#explain on MySQL captures preload queries", async () => {
       const plan = await Author.where({ id: authors("david").id })
         .preload(":posts")
-        .explain();
+        .explain()
+        .inspect();
       const blocks = plan.split("\n\n").filter((b) => /EXPLAIN/.test(b));
       expect(blocks.length).toBeGreaterThanOrEqual(2);
       expect(plan).toContain("`authors`");

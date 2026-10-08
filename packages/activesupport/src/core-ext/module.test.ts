@@ -43,10 +43,6 @@ class Someone {
     public place?: any,
   ) {}
 
-  get class() {
-    return this.constructor;
-  }
-
   kwSend({ method }: { method: string }) {
     return (this as any)[method];
   }
