@@ -258,8 +258,12 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
+function isRecordsLoaded(relation: any): boolean {
+  return relation.isLoaded && !relation.isScheduled && !relation._loadResult;
+}
+
 function isEachSynchronous(relation: any): boolean {
-  if (relation.isLoaded && !relation.isScheduled && !relation._loadResult) return true;
+  if (isRecordsLoaded(relation)) return true;
   if (relation.target === undefined) return false;
   const association = relation.proxyAssociation;
   return !association.isStaleTarget() && !association.isFindTarget();
@@ -280,7 +284,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
       return (...args: any[]) =>
-        target.isLoaded && !target.isScheduled && !target._loadResult
+        isRecordsLoaded(target)
           ? enumerable([...(target.target ?? target._records)], args)
           : target.records().then((records: any[]) => enumerable([...records], args));
     }
