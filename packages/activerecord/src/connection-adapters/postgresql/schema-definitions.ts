@@ -10,7 +10,7 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
-import { fetch, rbEqual, RuntimeError, slice, toS } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual, rbRegMatchP, RuntimeError, slice, toS } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -110,9 +110,8 @@ export class ExclusionConstraintDefinition {
     return this.options.deferrable;
   }
 
-  /** @missingRailsCall match? — CONVERGEABLE pg-constraint-export-name-on-schema-dump-matches-through-regexp-match-p */
-  exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.exclIgnorePattern) === -1;
+  exportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.exclIgnorePattern, this.name) : null;
   }
 }
 
@@ -147,9 +146,8 @@ export class UniqueConstraintDefinition {
     return this.options.nullsNotDistinct;
   }
 
-  /** @missingRailsCall match? — CONVERGEABLE pg-constraint-export-name-on-schema-dump-matches-through-regexp-match-p */
-  exportNameOnSchemaDump(): boolean {
-    return this.name != null && this.name.search(SchemaDumper.uniqueIgnorePattern) === -1;
+  exportNameOnSchemaDump(): boolean | null {
+    return this.name != null ? !rbRegMatchP(SchemaDumper.uniqueIgnorePattern, this.name) : null;
   }
 
   definedFor({

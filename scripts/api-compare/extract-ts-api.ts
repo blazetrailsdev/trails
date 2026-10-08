@@ -957,11 +957,12 @@ export function extractFromProgram(
           if (prior) {
             const bodied = new Set(methods.map((m) => m.name));
             prior.instanceMethods = [
-              ...methods,
+              ...(objectLiteral
+                ? methods.map((m) => ({ ...m, objectLiteralMember: true }))
+                : methods),
               ...prior.instanceMethods.filter((m) => !bodied.has(m.name)),
             ];
             prior.noRailsEquivalent ??= modReason;
-            if (objectLiteral) prior.objectLiteral = true;
             continue;
           }
           info.modules[modKey] = {

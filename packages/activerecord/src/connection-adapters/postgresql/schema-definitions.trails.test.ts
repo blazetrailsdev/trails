@@ -46,7 +46,7 @@ describe("ExclusionConstraintDefinition", () => {
     const named = new ExclusionConstraintDefinition("t", "x WITH =", { name: "my_excl" });
     const unnamed = new ExclusionConstraintDefinition("t", "x WITH =", {});
     expect(named.exportNameOnSchemaDump()).toBe(true);
-    expect(unnamed.exportNameOnSchemaDump()).toBe(false);
+    expect(unnamed.exportNameOnSchemaDump()).toBeNull();
   });
 
   it("exportNameOnSchemaDump returns false for auto-generated names matching exclIgnorePattern", () => {
@@ -94,7 +94,7 @@ describe("UniqueConstraintDefinition", () => {
     const named = new UniqueConstraintDefinition("t", "col", { name: "u_col" });
     const unnamed = new UniqueConstraintDefinition("t", "col", {});
     expect(named.exportNameOnSchemaDump()).toBe(true);
-    expect(unnamed.exportNameOnSchemaDump()).toBe(false);
+    expect(unnamed.exportNameOnSchemaDump()).toBeNull();
   });
 
   it("exportNameOnSchemaDump returns false for auto-generated names matching uniqueIgnorePattern", () => {

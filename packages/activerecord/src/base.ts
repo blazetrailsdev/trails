@@ -2157,7 +2157,6 @@ extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
 include(Base, Inheritance.Inheritance);
 include(Base, _Integration);
-include(Base, LockingOptimistic.Optimistic);
 include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
 
@@ -2430,8 +2429,8 @@ include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initA
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
+include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
-include(Base, LockingOptimistic.InstanceMethods);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
 include(Base, TouchLater.InstanceMethods);

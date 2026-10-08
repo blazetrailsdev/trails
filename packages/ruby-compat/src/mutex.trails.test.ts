@@ -74,4 +74,80 @@ describe("Mutex", () => {
     );
     mutex.unlock();
   });
+
+  it("runs an uncontended block before synchronize returns and releases a plain answer at once", () => {
+    const mutex = new Mutex();
+    const order: string[] = [];
+
+    expect(mutex.synchronize(() => order.push("a"))).toBe(1);
+    expect(mutex.synchronize(() => order.push("b"))).toBe(2);
+
+    expect(order).toEqual(["a", "b"]);
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("raises a plain block's error from synchronize and releases the lock", () => {
+    const mutex = new Mutex();
+
+    expect(() =>
+      mutex.synchronize(() => {
+        throw new Error("boom");
+      }),
+    ).toThrow("boom");
+    expect(mutex.synchronize(() => "ok")).toBe("ok");
+  });
+
+  it("holds the lock until a block's promise settles", async () => {
+    const mutex = new Mutex();
+    const order: string[] = [];
+
+    const first = mutex.synchronize(async () => {
+      order.push("a-in");
+      await Promise.resolve();
+      order.push("a-out");
+    });
+    expect(order).toEqual(["a-in"]);
+    expect(mutex.tryLock()).toBe(false);
+    const second = mutex.synchronize(() => order.push("b"));
+    expect(second).toBeInstanceOf(Promise);
+
+    await Promise.all([first, second]);
+
+    expect(order).toEqual(["a-in", "a-out", "b"]);
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("holds the lock until a block's thenable settles", async () => {
+    const mutex = new Mutex();
+    let settle!: (value: string) => void;
+    const thenable: PromiseLike<string> = {
+      then: (onfulfilled, onrejected) =>
+        new Promise<string>((resolve) => {
+          settle = resolve;
+        }).then(onfulfilled, onrejected),
+    };
+
+    const held = mutex.synchronize(() => thenable);
+    expect(mutex.tryLock()).toBe(false);
+    await Promise.resolve();
+    settle("done");
+
+    expect(await held).toBe("done");
+    expect(mutex.tryLock()).toBe(true);
+    mutex.unlock();
+  });
+
+  it("releases the lock when reading a block's then raises", () => {
+    const mutex = new Mutex();
+    const answer = {
+      get then(): never {
+        throw new Error("boom");
+      },
+    };
+
+    expect(() => mutex.synchronize(() => answer)).toThrow("boom");
+    expect(mutex.synchronize(() => "ok")).toBe("ok");
+  });
 });

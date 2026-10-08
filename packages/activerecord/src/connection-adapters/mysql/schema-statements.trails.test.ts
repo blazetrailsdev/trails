@@ -507,6 +507,7 @@ describe("MySQL::SchemaStatements", () => {
     Object.assign(Object.create(SchemaStatements.prototype) as SchemaStatements, {
       internalExecQuery: async () => resultFromRowHashes(rows),
       quoteTableName: (n: string) => `\`${n}\``,
+      quoteColumnName: (n: string) => `\`${n}\``,
       supportsIndexSortOrder: async () => sortOrderSupported,
     });
 
