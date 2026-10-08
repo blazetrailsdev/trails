@@ -160,9 +160,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("wait timeout as url", async () => {
       const url = new URL(MYSQL_TEST_URL);
       url.searchParams.set("wait_timeout", "60");
-      const testAdapter = new Mysql2Adapter(
-        new ConnectionUrlResolver(url.toString()).toHash() as never,
-      );
+      const testAdapter = new Mysql2Adapter(new ConnectionUrlResolver(url.toString()).toHash());
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.wait_timeout AS v",

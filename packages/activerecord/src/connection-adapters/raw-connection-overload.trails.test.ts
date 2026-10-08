@@ -129,6 +129,20 @@ describe("deprecated raw-connection initialize overload", () => {
       expect(adapter.preparedStatements).toBe(false);
     });
 
+    it("leaves the caller's hash alone on every config arm, as symbolize_keys copies", () => {
+      const config = { database: "blog", _fakeConnection: true };
+      new Mysql2Adapter(config);
+      expect(config).not.toHaveProperty("flags");
+
+      const deprecatedConfig = { database: "blog" };
+      new Mysql2Adapter(new FakeRawConnection() as never, null, null, deprecatedConfig);
+      expect(deprecatedConfig).not.toHaveProperty("flags");
+
+      const deprecatedConnectionOptions = { database: "blog" };
+      new Mysql2Adapter(new FakeRawConnection() as never, null, deprecatedConnectionOptions);
+      expect(deprecatedConnectionOptions).not.toHaveProperty("flags");
+    });
+
     it("raises ArgumentError when a config hash is passed with extra arguments", () => {
       expect(
         // @ts-expect-error — the overload signatures forbid a second arg for the

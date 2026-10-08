@@ -933,10 +933,10 @@ export class AbstractAdapter implements Quoting {
         ? deprecatedLogger
         : (ActiveRecord.Base?.logger ?? null);
       if (rtest(deprecatedConfig)) {
-        this._config = (deprecatedConfig ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConfig ?? {}) as Record<string, unknown>) };
         this._connectionParameters = deprecatedConnectionOptions;
       } else {
-        this._config = (deprecatedConnectionOptions ?? {}) as Record<string, unknown>;
+        this._config = { ...((deprecatedConnectionOptions ?? {}) as Record<string, unknown>) };
         this._connectionParameters = null;
       }
     }

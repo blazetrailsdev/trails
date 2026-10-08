@@ -3,6 +3,7 @@ import { prepend, type PrependMethod } from "@blazetrails/activesupport";
 import mysql from "mysql2/promise";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
+import type { DatabaseConfigOptions } from "../database-configurations/database-config.js";
 import {
   AbstractMysqlAdapter,
   StatementPool as MysqlStatementPool,
@@ -77,7 +78,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static readonly ER_CONN_HOST_ERROR = 2003;
   static readonly ER_UNKNOWN_HOST_ERROR = 2005;
 
-  /** @inventedArm filter — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection */
+  /**
+   * @inventedArm filter — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection
+   * @inventedArm if — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection
+   */
   static async newClient(
     config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
   ): Promise<mysql.Connection> {
@@ -181,7 +185,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
 
-  constructor(config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions);
+  constructor(
+    config: (Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions) | DatabaseConfigOptions,
+  );
   /** @deprecated */
   constructor(
     rawConnection: mysql.Connection,

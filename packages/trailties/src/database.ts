@@ -345,7 +345,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       if (config.url) {
         const { UrlConfig } = await import("@blazetrails/activerecord");
         return new Mysql2Adapter(
-          new UrlConfig(resolveEnv(), "primary", config.url).configurationHash as never,
+          new UrlConfig(resolveEnv(), "primary", config.url).configurationHash,
         );
       }
       return new Mysql2Adapter({
