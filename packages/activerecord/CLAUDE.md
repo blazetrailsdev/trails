@@ -435,8 +435,9 @@ reached synchronously through `DatabaseConfig#adapter_class`
 
 ESM has no synchronous load of a module named by a path: `import()` is the
 only one, and it is async. The built-in adapter modules cannot be imported
-eagerly instead, because `postgresql-adapter.ts` imports `pg` and `mysql2-adapter.ts` imports
-`mysql2/promise`, optional peers an application installs one of.
+eagerly instead, because `postgresql-adapter.ts` imports `pg` and
+`mysql2-adapter.ts` imports `mysql2/promise`, optional peers an application
+installs one of.
 
 **The `require` is `ConnectionAdapters.load(adapterName)`, an awaited step that
 runs before `resolve`.** As a consequence:
@@ -452,9 +453,11 @@ runs before `resolve`.** As a consequence:
   step every `establish_connection` already awaits, so `DatabaseConfig#validate!`
   stays Rails' body. Code that builds a `PoolConfig` without a handler
   (`support/template-global-setup.ts`) calls `load` itself.
-- An adapter registered by a third party is loaded the same way. Nothing else
-  calls `load`, and no other `require` is ported as an awaited step on the
-  strength of this section.
+- An adapter registered by a third party is loaded the same way. Outside the
+  handler, the template setup and the per-worker test database setup
+  (`test-setup-worker-db.ts`), the only callers are tests that build a
+  `DatabaseConfig` by hand, and no other `require` is ported as an awaited step
+  on the strength of this section.
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-08). `load` carries `@noRailsEquivalent PERMANENT` and
