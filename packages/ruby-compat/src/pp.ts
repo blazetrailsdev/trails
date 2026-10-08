@@ -19,7 +19,8 @@ import { rbStrToI } from "./string/convert.js";
  * `ObjectMixin#pretty_print` is its `q.text self.inspect` arm alone: every
  * other value prints as {@link rbInspect} renders it, and `pp_object`
  * (`pp.rb:269`), which lists the instance variables of an object with no
- * `inspect` of its own, is not ported.
+ * `inspect` of its own, is not ported
+ * (story `pp-object-mixin-pretty-print-ports-pp-object`).
  *
  * `guard_inspect_key` keeps its table in `Thread.current[:__recursive_key__]`
  * (`pp.rb:145-162`). One JS thread runs many in-flight prints, so the table is
