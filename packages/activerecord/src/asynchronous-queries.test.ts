@@ -136,7 +136,7 @@ describe("AsynchronousQueriesTest", () => {
         await waitForFutureResult(futureResult);
       }
 
-      expect(await futureResult).toBeInstanceOf(Result);
+      expect(await (inMemoryDb() ? futureResult : futureResult.result())).toBeInstanceOf(Result);
       expect(status.async).toEqual(connection.supportsConcurrentConnections());
     } finally {
       if (subscriber) Notifications.unsubscribe(subscriber);
