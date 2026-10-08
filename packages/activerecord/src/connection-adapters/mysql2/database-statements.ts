@@ -4,6 +4,7 @@ import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/data
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
 import { anybits } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
+import type { Mysql2Client } from "./mysql2-client.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { TimeWithZone } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
@@ -27,8 +28,7 @@ export interface Mysql2RawResult {
 
 /** @internal */
 interface PerformQueryHost {
-  _databaseTimezone?: "utc" | "local";
-  _affectedRowsBeforeWarnings?: number;
+  _affectedRowsBeforeWarnings?: number | null;
   _lastId?: number;
   _statements?: StatementPool | null;
   handleWarnings?(sql: string): void | Promise<void>;
@@ -129,7 +129,7 @@ export function isMultiStatementsEnabled(this: MultiStatementsHost): boolean {
 /** @internal */
 export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: mysql.PoolConnection | mysql.Connection,
+  rawConnection: Mysql2Client,
   sql: string,
   binds: unknown[],
   typeCastedBinds: unknown[],
@@ -142,7 +142,7 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Mysql2RawResult> {
-  this._databaseTimezone = defaultTimezone();
+  rawConnection.queryOptions.databaseTimezone = defaultTimezone();
 
   const hasBinds = binds != null && binds.length > 0;
 

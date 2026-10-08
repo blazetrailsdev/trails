@@ -11,6 +11,7 @@ import {
   fixMod,
   isNan,
   numericMinus,
+  numericUminus,
   numericModulo,
   numericMul,
   numericPow,
@@ -89,6 +90,18 @@ describe("Numeric#*", () => {
     expect(numericMul(2n ** 60n, 4)).toBe(2n ** 62n);
     expect(toI(numericMul(0.5, 1_000_000))).toBe(500000);
     expect(() => numericMul(1, "a")).toThrow("String can't be coerced into Integer");
+  });
+});
+
+describe("Numeric#-@", () => {
+  it("negates within the Integer, Float and Rational seats", () => {
+    expect(numericUminus(3)).toBe(-3);
+    expect(Object.is(numericUminus(0), 0)).toBe(true);
+    expect(numericUminus(1.5)).toBe(-1.5);
+    expect(numericUminus(new Number(2))).toEqual(new Number(-2));
+    expect(Object.is((numericUminus(new Number(0)) as number).valueOf(), -0)).toBe(true);
+    expect(numericUminus(2n ** 60n)).toBe(-(2n ** 60n));
+    expect(numericUminus(new Rational(1, 2))).toEqual(new Rational(-1, 2));
   });
 });
 

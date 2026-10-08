@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import "../message-pack.js";
 import { SerializerWithFallback } from "./serializer-with-fallback.js";
 import { KeyError } from "@blazetrails/ruby-compat";
 import { Entry } from "./entry.js";

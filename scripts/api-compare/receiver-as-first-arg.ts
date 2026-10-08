@@ -127,6 +127,11 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // prototype to hang it on, so activerecord's `ruby-empty.ts` exports it as
   // `isEmpty(collection)` and the Ruby receiver is TS argument 1.
   "empty?",
+  // Ruby core `Array#select!` — `@pools[frequency].select! { … }`
+  // (activerecord/lib/active_record/connection_adapters/abstract/connection_pool/reaper.rb:49).
+  // No JS method filters an array in place, so @blazetrails/activesupport
+  // exports it as `selectBang(array, block)` and the receiver is TS argument 1.
+  "select!",
   // Ruby core `Integer#anybits?` (`vendor/ruby/v3.3.11/numeric.c:3647`) — a bit test on
   // a Number, which TS cannot hang on `Number.prototype` any more than it can
   // on `String.prototype`, so @blazetrails/ruby-compat exports it as

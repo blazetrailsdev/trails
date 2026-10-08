@@ -5,7 +5,9 @@ import { Mysql2Adapter } from "./mysql2-adapter.js";
 describe("adapter prepared_statements from config", () => {
   it("applies default_prepared_statements to connection-string configs", () => {
     expect(new PostgreSQLAdapter("postgres://localhost:59999/none").preparedStatements).toBe(true);
-    expect(new Mysql2Adapter("mysql2://localhost:59999/none").preparedStatements).toBe(false);
+    expect(new Mysql2Adapter({ uri: "mysql2://localhost:59999/none" }).preparedStatements).toBe(
+      false,
+    );
   });
 
   it("applies default_prepared_statements to hash configs", () => {

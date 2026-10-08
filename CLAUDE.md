@@ -84,9 +84,15 @@ So:
   you already have in front of you. Do not silently propagate the shape.
 - **A deviation-convergence story always converges.** Do not close one by
   writing a better justification for the deviation, by broadening a baseline
-  reason, or by moving it to a different register. If it genuinely cannot
-  converge, `pnpm tasks block` it with the specific blocker — but that is rare,
-  and "it would be a bigger diff" is not one.
+  reason, or by moving it to a different register. `pnpm tasks block` is for a
+  story waiting on something that can change: another story, an unported
+  package, an upstream release, an owner decision. Name that thing, and prefer
+  a `deps` edge when it is a story. A story that can never converge is not
+  blocked: once the limit is ratified in this file or ruled on by the repo
+  owner, `pnpm tasks close` it with a reason that starts `PERMANENT:` and
+  stands alone, after its receipts in the code are `PERMANENT` too. A story
+  whose premise or acceptance criteria turned out wrong closes with
+  `FALSIFIED:`. Both are rare, and "it would be a bigger diff" is neither.
 - **Never widen an allowlist to cover new work.** Baselines are only-shrink by
   construction; adding a row for code you are writing right now inverts the
   entire mechanism.
@@ -775,7 +781,9 @@ second query to build itself can just run it in place.
 In trails the query is `await`ed, and that costs three shapes Rails has no
 counterpart for:
 
-- **`applyThenable` / `stripThenable`** (`relation/thenable.ts`). `await rel`
+- **`applyThenable`** (`relation/thenable.ts`) **/ `stripThenable`**
+  (`activesupport/src/strip-thenable.ts`, so `Object#presence` can answer a
+  relation unevaluated). `await rel`
   has to evaluate the relation, so `Relation.prototype` carries `then` /
   `catch` / `finally` forwarding to `toArray()`. That makes every `Relation` a
   thenable, which JS then unwraps automatically anywhere one is _returned_ from
@@ -1271,6 +1279,58 @@ schema-cache readers carry `@noRailsEquivalent PERMANENT` receipts against this
 section, and a cold-cache `undefined` at a sync reader is the designed answer,
 not a bug to re-derive per call site.
 
+## Adapter facts are prewarmed and peeked (`lookup_cast_type`, `max_identifier_length`, `quote_string`)
+
+Some synchronous Rails bodies ask the adapter a question only the server can
+answer, and ask it in line:
+
+- `PostgreSQL::Quoting#lookup_cast_type`
+  (`activerecord/lib/active_record/connection_adapters/postgresql/quoting.rb:195-197`)
+  is `super(query_value("SELECT #{quote(sql_type)}::regtype::oid", "SCHEMA").to_i)`,
+  reached from the String-returning `quote_default_expression`
+  (`abstract/quoting.rb:157-164`).
+- `PostgreSQLAdapter#max_identifier_length` (`postgresql_adapter.rb:620-622`)
+  memoizes `query_value("SHOW max_identifier_length", "SCHEMA")`. It is
+  PostgreSQL's `table_alias_length`, which `JoinDependency#initialize` reads
+  inside the synchronous eager builders § "`Relation` is evaluated by an async
+  query" ratifies.
+- `quote_string` (`postgresql/quoting.rb:127-131`,
+  `abstract_mysql_adapter.rb:695-699`) escapes through
+  `with_raw_connection { |connection| connection.escape(s) }`. It is reached
+  from `Quoting#quote`, Sanitization and the Arel visitor behind `to_sql`.
+- `InsertAll#primary_keys` (`insert_all.rb:61-63`) reads
+  `@model.schema_cache.primary_keys(model.table_name)`, and
+  `InsertAll#initialize` reads it and `supports_insert_returning?` (`:39`).
+
+In trails each answer is a query or a connection round-trip, and those are
+awaited. The settled shape is the one § "Schema reflection peeks at a warm
+cache" records for the schema cache: **an explicit async step warms the fact,
+and the synchronous body peeks at the warmed value.**
+
+- `warmMaxIdentifierLength` runs the `SHOW`, and `maxIdentifierLength` reads the
+  memo, answering PostgreSQL's default of 63 while it is cold.
+- The PostgreSQL type map and its regtype OIDs are warmed when the connection is
+  configured and by `reloadTypeMap`. `lookupCastType` reads them, and a type
+  created after the warm-up resolves to `ValueType` where Rails returns the
+  registered type.
+- `quoteString` escapes in process. PostgreSQL doubles the quote; MySQL reads
+  the warmed `NO_BACKSLASH_ESCAPES` state to choose between doubling the quote
+  and backslash escaping, which is the arm `connection.escape` takes inside the
+  client library.
+- `InsertAll` awaits its facts before construction, and `primaryKeys` returns
+  the warmed list.
+
+The alternative is making the callers async, which is the cascade through
+`quote`, the Arel visitor and `to_sql` that § "`Relation` is evaluated by an
+async query" rejects.
+
+This is a genuine language shortcoming, ratified repo-wide here. The omitted
+`query_value`, `quote`, `with_raw_connection` and `table_name` calls carry
+`@missingRailsCall … — PERMANENT`, `warmMaxIdentifierLength` carries
+`@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
+`@inventedArm if — PERMANENT`, all against this section. A new instance is not
+a new decision to argue.
+
 ## The adapter lock defaults to a monitor, not `NullLock`
 
 Rails' `AbstractAdapter#initialize` ends with `self.lock_thread = nil`
@@ -1476,6 +1536,55 @@ citing this section. A test with nothing left is parked as `it.skip` under a
 This is a genuine language shortcoming, ratified repo-wide here. There is no
 story to add a mutable String carrier, and a new instance is not a new decision
 to argue.
+
+### A String has no encoding tag either
+
+`str.encoding`, `force_encoding` and `String#b` read or change a per-object
+encoding. A JS string has none, and trails adds none: the carrier that would
+hold it is the carrier this section rejects. ruby-compat tags a `Uint8Array`
+only. A Rails body that branches on a String's encoding ports the UTF-8 arm,
+and a test asserting `str.encoding` is permanently unportable for that
+assertion.
+
+## Runtime facts Node does not expose
+
+Each of these is a Ruby or C-library fact with no Node source. They are
+ratified here so no port re-derives them.
+
+- **`fork`.** Ruby's `fork` copies the parent's heap; `child_process.fork`
+  starts a fresh process. A Rails test that asserts on per-pid state after a
+  fork is permanently unportable.
+- **Allocated-object count.** `Event#now_allocations`
+  (`activesupport/lib/active_support/notifications/instrumenter.rb:229-236`)
+  reads `GC.stat(:total_allocated_objects)`, which only grows. V8's heap
+  statistics report occupancy, which a collection lowers. `nowAllocations`
+  answers 0, the arm Rails takes where `GC.stat` has no such key.
+- **Arity -1.** `Function.length` cannot express a method that takes any number
+  of arguments, so an assertion on `arity == -1` is dropped.
+- **The errno behind a failed `IO#noecho`.** Node exposes termios only as
+  `setRawMode`, and `stty` reports libc- and locale-dependent text, never the
+  number. ruby-compat raises a bare `SystemCallError` where Ruby raises the
+  specific `Errno` class. A native termios binding is not taken on.
+- **SQLite's double-quoted-string setting.** better-sqlite3 compiles with
+  `SQLITE_DQS=0` and no option reaches `SQLITE_DBCONFIG_DQS_DDL` / `_DML`, so
+  `strict: false` cannot re-enable double-quoted string literals on that
+  driver.
+
+A test that depends on one of these ports the assertions that do not, and parks
+the rest as `it.skip` under a `PERMANENT-SKIP:` line citing this section.
+
+## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
+
+Rails reads a fixture file through `FixtureSet::File#raw_rows`
+(`activerecord/lib/active_record/fixture_set/file.rb:51-53`), which is
+`ActiveSupport::ConfigurationFile.parse` over YAML. trails also accepts a
+fixture as a `.ts` module registered through `File.registerModule`, and the
+canonical test fixtures ship that way.
+
+The registry stays. A YAML-free ActiveRecord boot is a requirement (RFC 0170),
+and with the registry gone npm `yaml` would be the only fixture path.
+`File.registerModule` and `File.modules` carry `@noRailsEquivalent PERMANENT`
+against this section, and there is no story to convert the fixtures to `.yml`.
 
 ## Ruby protocol methods with a different JS mechanism
 
@@ -1738,6 +1847,16 @@ As a consequence:
   constructor with `_suppressAbstractCheck` and `_suppressStiNewDispatch` set.
 - `Relation#new` and `CollectionProxy#new` are instance methods with no `new`
   expression to stand in for them, and stay.
+- A record loaded from the database is built with `new` too. Rails'
+  `instantiate_instance_of` is `klass.allocate.init_with_attributes(attributes,
+&block)` (`persistence.rb:313`), which skips `initialize`. The JS spelling of
+  `allocate`, `Object.create`, also skips every class-field initializer, so a
+  model field such as `history = []` would be unset on a record `find`
+  returns. That was tried on trails#8661 and reddened
+  `TransactionCallbacksTest` on all three adapters. `Base.allocate` therefore
+  goes through the constructor and carries `@noRailsEquivalent PERMANENT`, and
+  the arm in `Core`'s constructor that recognises an allocation carries
+  `@inventedArm if — PERMANENT`.
 
 This is ratified repo-wide here by the repo owner.
 

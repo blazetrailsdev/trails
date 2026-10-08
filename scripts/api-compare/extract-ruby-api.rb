@@ -4350,11 +4350,30 @@ class ApiExtractor
     when :array then "array"
     when :hash then describe_hash(node[1], flags)
     when :bare_assoc_hash then describe_kwargs(node[1], flags) || "hash"
-    when :binary then "binop:#{node[2]}"
+    when :binary then describe_binary(node, flags)
     when :unary then describe_unary(node, flags)
     when :ifop then "ternary"
     when :paren then describe_args(node[1], flags).first || "?"
     else "?"
+    end
+  end
+
+  def describe_binary(node, flags)
+    factors = product_factors(node)
+    flags << "product=#{factors.join("*")}" if factors
+    "binop:#{node[2]}"
+  end
+
+  def product_factors(node)
+    if node.is_a?(Array) && node[0] == :binary
+      return nil unless node[2] == :*
+
+      left = product_factors(node[1])
+      right = product_factors(node[3])
+      left && right ? left + right : nil
+    else
+      factor = describe_arg(node, [])
+      factor.start_with?("num:", "id:") ? [factor] : nil
     end
   end
 

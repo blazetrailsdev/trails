@@ -918,8 +918,8 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /**
-   * @missingRailsCall with_raw_connection — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
-   * @inventedArm if — CONVERGEABLE mysql-quote-string-escapes-without-with-raw-connection
+   * @missingRailsCall with_raw_connection — PERMANENT
+   * @inventedArm if — PERMANENT
    */
   override quoteString(string: string): string {
     if (this._escapeState.noBackslashEscapes) {

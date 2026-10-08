@@ -18,7 +18,7 @@ export const EncryptedUniquenessValidator = {
     await super_(record, attribute, value);
 
     const klass = record.constructor;
-    if (klass.deterministicEncryptedAttributes()?.has(attribute)) {
+    if (klass.deterministicEncryptedAttributes()?.includes(attribute)) {
       const encryptedType = klass.typeForAttribute(attribute);
       for (const type of encryptedType.previousTypes) {
         const encryptedValue = type.serialize(value);

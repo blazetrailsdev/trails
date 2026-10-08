@@ -2,24 +2,25 @@ import { describe, expect, it } from "vitest";
 import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
-import { makeGetTypeParser } from "./temporal-type-parsers.js";
-
-const getTypeParser = makeGetTypeParser(pg.types);
+import { PGTextDecoder, PGTypeMapByOid } from "./pg-text-decoder.js";
+import { pgConnection } from "../../pg/connection.js";
 
 const OID_DATE = 1082;
-const OID_TIME = 1083;
 const OID_TIMESTAMP = 1114;
 const OID_TIMESTAMPTZ = 1184;
-const OID_TIMETZ = 1266;
 const OID_INT8 = 20;
 
+const map = new PGTypeMapByOid()
+  .addCoder(new PGTextDecoder.TimestampWithTimeZone({ oid: OID_TIMESTAMPTZ, name: "timestamptz" }))
+  .addCoder(new PGTextDecoder.TimestampUtc({ oid: OID_TIMESTAMP, name: "timestamp" }))
+  .addCoder(new PGTextDecoder.Date({ oid: OID_DATE, name: "date" }))
+  .addCoder(new PGTextDecoder.Integer({ oid: OID_INT8, name: "int8" }));
+
 function parse(oid: number, value: string): unknown {
-  const parser = getTypeParser(oid, "text");
-  if (!parser) throw new Error(`No parser for OID ${oid}`);
-  return parser(value);
+  return map.coders.get(oid)!.decode(value);
 }
 
-describe("getTypeParser — timestamptz (OID 1184)", () => {
+describe("PGTextDecoder — timestamptz (OID 1184)", () => {
   it("returns a Temporal.Instant", () => {
     const result = parse(OID_TIMESTAMPTZ, "2026-04-26 14:23:55.123456+00");
     expect(result).toBeInstanceOf(RubyTime);
@@ -49,7 +50,7 @@ describe("getTypeParser — timestamptz (OID 1184)", () => {
   });
 });
 
-describe("getTypeParser — timestamp (OID 1114)", () => {
+describe("PGTextDecoder — timestamp (OID 1114)", () => {
   it("returns a Temporal.Instant (UTC)", () => {
     const result = parse(OID_TIMESTAMP, "2026-04-26 14:23:55.123456") as RubyTime;
     expect(result).toBeInstanceOf(RubyTime);
@@ -67,7 +68,7 @@ describe("getTypeParser — timestamp (OID 1114)", () => {
   });
 });
 
-describe("getTypeParser — date (OID 1082)", () => {
+describe("PGTextDecoder — date (OID 1082)", () => {
   it("returns a Temporal.PlainDate", () => {
     const result = parse(OID_DATE, "2026-04-26");
     expect(result).toBeInstanceOf(Temporal.PlainDate);
@@ -83,21 +84,7 @@ describe("getTypeParser — date (OID 1082)", () => {
   });
 });
 
-describe("getTypeParser — time (OID 1083) and timetz (OID 1266)", () => {
-  it("delegates to the driver default so Type::Time casts the string", () => {
-    expect(parse(OID_TIME, "14:23:55.123456")).toBe("14:23:55.123456");
-    expect(parse(OID_TIMETZ, "14:23:55.123456+02")).toBe("14:23:55.123456+02");
-  });
-});
-
-describe("getTypeParser — binary format", () => {
-  it("delegates binary format to pg built-ins (always returns a function)", () => {
-    expect(typeof getTypeParser(OID_TIMESTAMPTZ, "binary")).toBe("function");
-    expect(typeof getTypeParser(OID_DATE, "binary")).toBe("function");
-  });
-});
-
-describe("getTypeParser — int8 (OID 20)", () => {
+describe("PGTextDecoder — int8 (OID 20)", () => {
   it("returns a number for a count(*) value", () => {
     expect(parse(OID_INT8, "3")).toBe(3);
   });
@@ -112,10 +99,44 @@ describe("getTypeParser — int8 (OID 20)", () => {
   });
 });
 
-describe("getTypeParser — unknown OIDs", () => {
-  it("delegates non-temporal OIDs to pg built-ins (always returns a function)", () => {
-    expect(typeof getTypeParser(23, "text")).toBe("function");
-    expect(typeof getTypeParser(25, "text")).toBe("function");
+describe("PGTextDecoder — Float, Boolean", () => {
+  it("decodes the text wire form", () => {
+    expect(new PGTextDecoder.Float({ oid: 701, name: "float8" }).decode("1.5")).toBe(1.5);
+    expect(new PGTextDecoder.Float({ oid: 701, name: "float8" }).decode("NaN")).toBeNaN();
+    expect(new PGTextDecoder.Boolean({ oid: 16, name: "bool" }).decode("t")).toBe(true);
+    expect(new PGTextDecoder.Boolean({ oid: 16, name: "bool" }).decode("f")).toBe(false);
+  });
+});
+
+describe("PGTextDecoder — TimestampWithoutTimeZone", () => {
+  it("reads the timestamp in the local zone, and keeps the coder's oid and name", () => {
+    const utc = map.coders.get(OID_TIMESTAMP)!;
+    const local = new PGTextDecoder.TimestampWithoutTimeZone({ ...utc.toH() });
+    expect(local.toH()).toEqual({ oid: OID_TIMESTAMP, name: "timestamp" });
+    const naive = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
+    expect(
+      (local.decode("2026-04-26 14:23:55") as RubyTime).getutc().toZonedDateTime().toInstant()
+        .epochNanoseconds,
+    ).toBe(naive.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant().epochNanoseconds);
+  });
+});
+
+describe("PGConnection#typeMapForResults", () => {
+  it("decodes a text column through its coder and leaves the rest to the client", async () => {
+    const queries: { types: { getTypeParser(oid: number, format?: string): unknown } }[] = [];
+    const client = pgConnection({
+      getTypeParser: () => () => "from the client",
+      query: async (config: never) => (queries.push(config), { rows: [], fields: [] }),
+    });
+    expect(client.typeMapForResults.coders.size).toBe(0);
+    client.typeMapForResults = map;
+    await client.asyncExec("SELECT 1");
+    const { getTypeParser } = queries[0].types;
+    expect((getTypeParser(OID_INT8, "text") as (v: string) => unknown)("3")).toBe(3);
+    expect((getTypeParser(OID_INT8, "binary") as (v: string) => unknown)("3")).toBe(
+      "from the client",
+    );
+    expect((getTypeParser(25, "text") as (v: string) => unknown)("x")).toBe("from the client");
   });
 });
 

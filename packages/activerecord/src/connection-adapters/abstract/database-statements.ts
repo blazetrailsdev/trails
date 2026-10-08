@@ -283,23 +283,23 @@ export function cacheableQuery(
 }
 
 export async function queryValue(
-  this: DatabaseStatementsHost,
+  this: DatabaseStatementsHost & { query: typeof query },
   sql: string,
   name?: string | null,
   binds?: unknown[],
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown> {
-  return singleValueFromRows(await query.call(this, sql, name, binds, options));
+  return singleValueFromRows(await this.query(sql, name, binds, options));
 }
 
 export function queryValues(
-  this: DatabaseStatementsHost,
+  this: DatabaseStatementsHost & { query: typeof query },
   sql: string,
   name?: string | null,
   binds?: unknown[],
   options?: { prepare?: boolean; allowRetry?: boolean; materializeTransactions?: boolean },
 ): Promise<unknown[]> {
-  return query.call(this, sql, name, binds, options).then((rows) => rows.map((row) => row[0]));
+  return this.query(sql, name, binds, options).then((rows) => rows.map((row) => row[0]));
 }
 
 export async function query(

@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, isPresent, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, stripThenable, toFs } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -23,7 +23,7 @@ import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
-import { applyThenable, stripThenable } from "./relation/thenable.js";
+import { applyThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   wrap,
@@ -359,6 +359,8 @@ export class Relation<T extends Base, G extends boolean = false> {
   private _loadToken = 0;
 
   private _joinDependency: JoinDependency | null = null;
+  /** @internal */
+  _fromLimitedIds = new WeakMap<object, unknown[]>();
 
   private _table: Table;
 
@@ -437,6 +439,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   reset(): this {
     this._arel = undefined;
+    this._fromLimitedIds = new WeakMap();
     this._loaded = false;
     this._delegateToModel = false;
     this._offsets = undefined;
@@ -596,11 +599,6 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   async isBlank(): Promise<boolean> {
     return isBlank(await this.records());
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE relation-presence-comes-from-activesupport-object-presence */
-  async presence(): Promise<LoadedRelation<Relation<T, G>> | null> {
-    return (await isPresent(this)) ? stripThenable(this as Relation<T, G>) : null;
   }
 
   async detect(fn: (record: T, index: number, all: T[]) => unknown): Promise<T | undefined> {
@@ -1017,12 +1015,19 @@ export class Relation<T extends Base, G extends boolean = false> {
   _materializeDeferredDistinctPkPredicates(): Promise<void> | void {
     if (this.isNullRelation()) return;
     const predicates = this.whereClause.predicates;
+    const from: unknown = this.fromClause.value;
+    const deferredFrom = from instanceof Relation && from._isDeferredDistinctPkSubquery();
     if (
+      !deferredFrom &&
       !predicates.some((node) => node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn)
     ) {
       return;
     }
     return (async () => {
+      if (deferredFrom) {
+        this._arel = undefined;
+        this._fromLimitedIds = new WeakMap([[from, await from._materializeDistinctPkIds()]]);
+      }
       for (let i = 0; i < predicates.length; i++) {
         const node = predicates[i];
         if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
@@ -1080,14 +1085,32 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._model._loadFromSql(rows, block as never) as T[];
   }
 
-  private _applyEagerJoinDependency(
-    jd: JoinDependency,
-    basePk: string | string[],
-    limitedIds?: unknown[],
-  ): Relation<T, G> {
+  /** @internal */
+  _applyEagerJoinDependency(options?: {
+    eagerLoading?: boolean;
+    limitedIds?: unknown[];
+  }): Relation<T, G>;
+  /** @internal */
+  _applyEagerJoinDependency<R>(
+    options: { eagerLoading?: boolean; limitedIds?: unknown[] },
+    block: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R;
+  _applyEagerJoinDependency<R>(
+    {
+      eagerLoading = this.groupValues.length === 0,
+      limitedIds,
+    }: { eagerLoading?: boolean; limitedIds?: unknown[] } = {},
+    block?: (relation: Relation<T, G>, joinDependency: JoinDependency) => R,
+  ): R | Relation<T, G> {
+    const jd = QueryMethods.constructJoinDependency.call(
+      this as any,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      Nodes.OuterJoin,
+    );
     let rel = this.except("includes", "eagerLoad", "preload");
     QueryMethods.joinsBang.call(rel as any, jd as any);
     if (
+      eagerLoading &&
       this.hasLimitOrOffset &&
       !(
         this.usingLimitableReflections(jd.reflections as never) &&
@@ -1104,6 +1127,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         )
       )
     ) {
+      const basePk: string | string[] = (this._model as any).primaryKey ?? "id";
       if (Array.isArray(basePk)) {
         const tuples = limitedIds as unknown[][] | undefined;
         basePk.forEach((column, i) => {
@@ -1120,7 +1144,11 @@ export class Relation<T extends Base, G extends boolean = false> {
       rel.limitValue = null;
       rel.offsetValue = null;
     }
-    return rel;
+    if (block) {
+      return block(rel, jd);
+    } else {
+      return rel;
+    }
   }
 
   private _eagerJoinDependencyIsLimitable(jd: JoinDependency): boolean {
@@ -1202,18 +1230,11 @@ export class Relation<T extends Base, G extends boolean = false> {
     const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
     if (allEager.length === 0) return null;
 
-    const basePk = (this._model as any).primaryKey ?? "id";
-
-    const jd = QueryMethods.constructJoinDependency.call(
-      this as any,
-      allEager as any,
-      Nodes.OuterJoin,
-    );
-    if (jd.reflections.length === 0) return null;
-
-    const eagerRelation = this._applyEagerJoinDependency(jd, basePk);
-    jd.applyColumnAliases(eagerRelation);
-    return eagerRelation.arel();
+    return this._applyEagerJoinDependency({}, (eagerRelation, jd) => {
+      if (jd.reflections.length === 0) return null;
+      jd.applyColumnAliases(eagerRelation);
+      return eagerRelation.arel();
+    });
   }
 
   async preloadAssociations(records: T[]): Promise<void> {
@@ -1620,7 +1641,9 @@ export class Relation<T extends Base, G extends boolean = false> {
 
   initializeCopy(other: Relation<T, G>): this {
     this._values = { ...this._values };
-    return this.reset();
+    this.reset();
+    this._fromLimitedIds = other._fromLimitedIds;
+    return this;
   }
 
   clone(): Relation<T, G> {

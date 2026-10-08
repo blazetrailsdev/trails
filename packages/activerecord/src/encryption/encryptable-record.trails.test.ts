@@ -121,9 +121,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const deterministic = deterministicEncryptedAttributes.call(
       EncryptedBookWithSerializedDeterministicName,
     );
-    expect(deterministic!.has("name")).toBe(true);
+    expect(deterministic!.includes("name")).toBe(true);
     expect(
-      deterministicEncryptedAttributes.call(EncryptedBookWithSerializedSecondBinary)!.has("logo"),
+      deterministicEncryptedAttributes
+        .call(EncryptedBookWithSerializedSecondBinary)!
+        .includes("logo"),
     ).toBe(false);
   });
 

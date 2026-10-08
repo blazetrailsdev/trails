@@ -1009,7 +1009,7 @@ export class Base extends Model {
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
   declare static encrypts: (...args: Array<string | EncryptsOptions>) => void;
-  declare static deterministicEncryptedAttributes: () => Set<string> | undefined;
+  declare static deterministicEncryptedAttributes: () => string[] | undefined;
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);
@@ -1540,7 +1540,7 @@ export class Base extends Model {
   declare static counterCachedAssociationNames: string[];
   declare static isCounterCachedAssociationNames: boolean;
 
-  /** @noRailsEquivalent CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
+  /** @noRailsEquivalent PERMANENT */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
     const previous = _Core._allocation.klass;
     _Core._allocation.klass = this;

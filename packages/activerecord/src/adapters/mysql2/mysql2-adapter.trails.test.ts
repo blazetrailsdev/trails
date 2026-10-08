@@ -36,7 +36,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   it("active is false for a never-connected / fake adapter", async () => {
     expect(await adapter.active()).toBe(false);
     expect(adapter.isConnected()).toBe(false);
-    const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+    const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
     expect(await fresh.active()).toBe(false);
     expect(fresh.isConnected()).toBe(false);
   });
@@ -126,7 +126,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
-      const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+      const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       try {
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);
@@ -211,34 +211,34 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   it("database timezone changes synced to connection (extended re-sync paths)", async () => {
     await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
+    expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
     await withTimezoneConfig({ default: "local" }, async () => {
-      adapter._databaseTimezone = "utc";
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execQuery("SELECT 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execute("DO 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.execute("DO 1");
-      expect(adapter._databaseTimezone).toBe("local");
-      adapter._databaseTimezone = "utc";
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
+      adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
       await adapter.explain("SELECT 1");
-      expect(adapter._databaseTimezone).toBe("local");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
     });
     await adapter.execute("SELECT 1");
-    expect(adapter._databaseTimezone).toBe("utc");
+    expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
   });
 
   it("configure connection seeds database timezone from default", async () => {
-    adapter._databaseTimezone = "utc";
+    adapter._rawConnection!.queryOptions.databaseTimezone = "utc";
     await withTimezoneConfig({ default: "local" }, async () => {
       await adapter.configureConnection();
-      expect(adapter._databaseTimezone).toBe("local");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("local");
     });
     await withTimezoneConfig({ default: "utc" }, async () => {
       await adapter.configureConnection();
-      expect(adapter._databaseTimezone).toBe("utc");
+      expect(adapter._rawConnection!.queryOptions.databaseTimezone).toBe("utc");
     });
   });
 

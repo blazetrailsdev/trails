@@ -24,7 +24,7 @@ describe("SubscribeEventObjectsTest", () => {
   afterEach(teardownTestCase);
 
   it.skip("subscribe events", () => {
-    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
+    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
     const evs: Event[] = [];
     notifier.subscribe(null, (event: Event) => {
       evs.push(event);
@@ -62,7 +62,7 @@ describe("SubscribeEventObjectsTest", () => {
   });
 
   it.skip("subscribe via top level api", () => {
-    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
+    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
     const oldNotifier = Notifications.notifier;
     Notifications.notifier = new Fanout();
     try {

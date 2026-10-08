@@ -290,7 +290,7 @@ export class ConnectionPool implements ReapablePool {
     this.asyncExecutor = this.buildAsyncExecutor();
 
     this.reaper = new Reaper(this, this.dbConfig.reapingFrequency ?? 0);
-    this.reaper.run();
+    void this.reaper.run();
 
     initializeIncludedModules(this);
   }
