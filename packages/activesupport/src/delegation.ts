@@ -56,6 +56,7 @@ export namespace Delegation {
     "block",
   ]);
 
+  /** @inventedArm if — PERMANENT */
   export function generate<T extends object>(
     owner: T,
     methods: string[],
