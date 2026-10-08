@@ -104,6 +104,11 @@ export function unscoped<T extends typeof Base, R>(
   return Default.unscoped.call(this, block) as Relation<InstanceType<T>> | Promise<R>;
 }
 
+/**
+ * @inventedArm rbObjIsKindOf — PERMANENT
+ * @inventedArm rbObjMethod — PERMANENT
+ * @inventedArm owner — PERMANENT
+ */
 export function isScopeAttributes(this: {
   currentScope?(skipInheritedScope?: boolean): unknown;
   defaultScopes: DefaultScope[];

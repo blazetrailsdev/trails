@@ -3,7 +3,7 @@ import { checkArity, rbCheckStringType } from "./string/support.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { TypeError } from "./type-error.js";
 import { FL_SINGLETON, rbInspect, rbObjClass, rbObjClassname } from "./object.js";
-import { mnewUnbound } from "./include.js";
+import { methodOwner } from "./include.js";
 
 /**
  * Ruby core `Method` (`vendor/ruby/v3.3.11/proc.c:1657` `mnew_missing` builds the
@@ -64,7 +64,7 @@ export class Method {
    */
   owner(): object {
     return (
-      mnewUnbound(Object(this.#receiver) as object, this.#name)?.owner ??
+      methodOwner(Object(this.#receiver) as object, this.#name) ??
       (rbObjClass(this.#receiver) as object)
     );
   }
