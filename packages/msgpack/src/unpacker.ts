@@ -8,6 +8,7 @@ import {
   include,
   RangeError,
   StandardError,
+  rbDbl2num,
   rbModConstSet,
   rbObjMethod,
   rbObjClass,
@@ -101,6 +102,11 @@ export class Unpacker {
     }
     this.decoder = new Decoder({
       useBigInt64: true,
+      mapKeyConverter: (key) => {
+        if (key instanceof Number) return key.valueOf();
+        if (typeof key === "string" || typeof key === "number") return key;
+        throw new DecodeError("The type of key must be string or number but " + typeof key);
+      },
       extensionCodec: {
         tryToEncode: () => null,
         decode: (data, type) => {
@@ -126,6 +132,10 @@ export class Unpacker {
         },
       },
     });
+    const engine = this.decoder as unknown as { readF32(): number; readF64(): number };
+    const { readF32, readF64 } = engine;
+    engine.readF32 = () => rbDbl2num(readF32.call(engine));
+    engine.readF64 = () => rbDbl2num(readF64.call(engine));
   }
 
   isSymbolizeKeys(): boolean {

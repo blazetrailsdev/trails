@@ -256,6 +256,7 @@ export { anybits, fixDiv, fixMod, isNan, round, toF, toI } from "./numeric.js";
 export {
   intXor,
   numericMinus,
+  numericUminus,
   numericModulo,
   numericMul,
   numericPlus,

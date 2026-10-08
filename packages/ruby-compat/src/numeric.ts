@@ -276,6 +276,19 @@ export function numericMul(x: unknown, y: unknown): unknown {
 }
 
 /**
+ * `rb_float_uminus` (`vendor/ruby/v3.3.11/numeric.c:1156`), `rb_int_uminus` (`numeric.c:3833`),
+ * `rb_rational_uminus` (`vendor/ruby/v3.3.11/rational.c:611`).
+ * @noRailsEquivalent PERMANENT
+ */
+export function numericUminus(x: unknown): unknown {
+  if (rbFloatTypeP(x)) return rbDbl2num(-x.valueOf());
+  if (x instanceof Rational) return new Rational(-x.numerator, x.denominator);
+  if (typeof x === "bigint") return rbBigNorm(-x);
+  if (typeof x === "number") return 0 - x;
+  throw new NoMethodError(`undefined method '-@' for ${rbInspect(x)}`);
+}
+
+/**
  * `fix_minus` (`vendor/ruby/v3.3.11/numeric.c:3995`), `rb_float_minus` (`numeric.c:1207`),
  * `rb_rational_minus` (`vendor/ruby/v3.3.11/rational.c:765`).
  * @noRailsEquivalent PERMANENT
