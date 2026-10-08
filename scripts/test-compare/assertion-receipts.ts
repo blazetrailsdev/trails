@@ -83,6 +83,15 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClassname(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
     },
   ],
+  "activerecord:asynchronous_queries_test.rb › AsynchronousQueriesTest › async select all": [
+    {
+      kind: "assert_kind_of",
+      value: null,
+      as: null,
+      reason:
+        'asynchronous_queries_test.rb:107 `assert_kind_of ActiveRecord::FutureResult::Complete, future_result` — on an in-memory database the fallback query is a promise, and a promise resolving to a thenable `FutureResult::Complete` unwraps it to the Result (CLAUDE.md, "`ActiveRecord::Promise` is the native promise")',
+    },
+  ],
   "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
     [
       {
