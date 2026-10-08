@@ -25,7 +25,7 @@ import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors
 import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { ActiveRecord } from "../namespaces.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
-import { stripThenable } from "./thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 
 export const ONE_AS_ONE = "1 AS one";
 

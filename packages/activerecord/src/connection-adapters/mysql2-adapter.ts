@@ -461,11 +461,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (!ending) return;
     this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
   }
-
-  /** @internal */
-  _testOnlyPoolFlags(): string[] | undefined {
-    return this._config.flags as string[] | undefined;
-  }
 }
 
 /** @internal */

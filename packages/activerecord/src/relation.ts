@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, stripThenable, toFs } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -23,7 +23,7 @@ import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 
-import { applyThenable, stripThenable } from "./relation/thenable.js";
+import { applyThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   wrap,

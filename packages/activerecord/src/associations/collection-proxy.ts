@@ -13,7 +13,7 @@ import {
 import type { PrettyPrinter } from "../pretty-print.js";
 import { relationClassFor } from "../relation/delegation.js";
 
-import { stripThenable } from "../relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 import {
   findNthFromLast as baseFindNthFromLast,
   findNthWithLimit as baseFindNthWithLimit,

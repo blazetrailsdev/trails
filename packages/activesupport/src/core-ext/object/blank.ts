@@ -1,6 +1,7 @@
 import { Temporal } from "@blazetrails/date";
 import { STRING_METHOD_TABLE, rbDefineMethod } from "@blazetrails/ruby-compat";
 import { TimeWithZone } from "../../time-with-zone.js";
+import { stripThenable } from "../../strip-thenable.js";
 
 const BLANK_RE = /^\s*$/;
 
@@ -142,11 +143,7 @@ export function presence<T>(value: T): T | null | Promise<unknown> {
     return present.then((p) => {
       if (!p) return null;
       if (typeof (value as { then?: unknown }).then !== "function") return value;
-      return new Proxy(value as object, {
-        get: (target, prop) => (prop === "then" ? undefined : Reflect.get(target, prop, target)),
-        set: (target, prop, v) => Reflect.set(target, prop, v, target),
-        has: (target, prop) => prop !== "then" && Reflect.has(target, prop),
-      });
+      return stripThenable(value as object);
     });
   }
   return present ? value : null;

@@ -492,6 +492,7 @@ export {
 export { CurrentAttributes } from "./current-attributes.js";
 export { SecurityUtils } from "./security-utils.js";
 export { StringInquirer, inquiry } from "./string-inquirer.js";
+export { stripThenable } from "./strip-thenable.js";
 export { StringIO } from "@blazetrails/ruby-compat";
 export { EnvironmentInquirer } from "./environment-inquirer.js";
 export { Reloader } from "./reloader.js";

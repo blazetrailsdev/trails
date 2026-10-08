@@ -10,7 +10,7 @@ import {
   rtest,
 } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
-import { stripThenable } from "../relation/thenable.js";
+import { stripThenable } from "@blazetrails/activesupport";
 
 export function validatesUniquenessOf(
   this: {
