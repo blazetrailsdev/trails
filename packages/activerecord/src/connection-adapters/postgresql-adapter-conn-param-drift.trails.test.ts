@@ -92,4 +92,18 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
     expect(sliced).not.toHaveProperty("reaping_frequency");
     expect(sliced).not.toHaveProperty("reapingFrequency");
   });
+
+  it("prefers a keyword written in pg's spelling and drops keys pg does not read", () => {
+    const slice = (
+      PostgreSQLAdapter as unknown as {
+        _sliceValidConnParams(config: Record<string, unknown>): Record<string, unknown>;
+      }
+    )._sliceValidConnParams;
+    expect(
+      slice({ applicationName: "camel", application_name: "snake", schemaSearchPath: "public" }),
+    ).toEqual({ application_name: "snake" });
+    expect(
+      slice({ application_name: "snake", applicationName: "camel", schemaSearchPath: "public" }),
+    ).toEqual({ application_name: "snake" });
+  });
 });

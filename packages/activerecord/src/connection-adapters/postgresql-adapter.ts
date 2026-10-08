@@ -1512,6 +1512,7 @@ export class PostgreSQLAdapter
       if (value === undefined || value === null) continue;
       const param = PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key) ? key : underscore(key);
       if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(param)) continue;
+      if (param !== key && config[param] != null) continue;
       sliced[param] = value;
     }
     return sliced as pg.ClientConfig;
