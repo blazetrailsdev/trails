@@ -10,6 +10,7 @@ import type { Timestamp } from "./timestamp.js";
 import type {
   MalformedFormatError,
   StackError,
+  TypeError,
   UnexpectedTypeError,
   UnknownExtTypeError,
   UnpackError,
@@ -33,6 +34,7 @@ export const MessagePack = { name: "MessagePack" } as {
   UnpackError: typeof UnpackError;
   MalformedFormatError: typeof MalformedFormatError;
   StackError: typeof StackError;
+  TypeError: typeof TypeError;
   UnexpectedTypeError: typeof UnexpectedTypeError;
   UnknownExtTypeError: typeof UnknownExtTypeError;
   Factory: typeof Factory;

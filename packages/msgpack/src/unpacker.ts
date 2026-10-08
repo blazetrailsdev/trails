@@ -4,6 +4,8 @@ import {
   EOFError,
   FrozenError,
   Hash,
+  Module,
+  include,
   RangeError,
   StandardError,
   rbModConstSet,
@@ -22,13 +24,19 @@ export class MalformedFormatError extends UnpackError {}
 
 export class StackError extends UnpackError {}
 
+export const TypeError = new Module();
+
 export class UnexpectedTypeError extends UnpackError {}
+include(UnexpectedTypeError, TypeError);
 
 export class UnknownExtTypeError extends UnpackError {}
 
 export type UnpackerProc = (data: never) => unknown;
 
 export type UnpackerExtRegistry = Map<number, [unknown, UnpackerProc | null, number]>;
+
+const PRIMITIVE_OBJECT_COMPLETE = 0;
+const PRIMITIVE_EOF = -1;
 
 class RecursiveRaised {
   constructor(readonly lastObject: unknown) {}
@@ -70,6 +78,7 @@ export class Unpacker {
   private symbolizeKeys = false;
   private freeze = false;
   private allowUnknownExt = false;
+  private readonly uk: { lastObject: unknown } = { lastObject: null };
 
   constructor(io: unknown = null, options: object | null = null) {
     if (options == null && io != null && rbObjIsKindOf(io, Hash)) {
@@ -175,24 +184,11 @@ export class Unpacker {
   }
 
   read(): unknown {
-    while (true) {
-      const each = this.decoder.decodeMulti(this.buffer.toStr());
-      let r: IteratorResult<unknown, void>;
-      try {
-        r = each.next();
-        each.return();
-      } catch (error) {
-        if (!(error instanceof globalThis.RangeError)) raiseUnpackerError(error);
-        r = { done: true, value: undefined };
-      }
-      if (r.done) {
-        if (this.buffer.io == null) throw new EOFError("end of buffer reached");
-        this.buffer.ensureReadable(this.buffer.size() + 1);
-        continue;
-      }
-      this.buffer.skipAll((this.decoder as unknown as { pos: number }).pos);
-      return objectComplete(r.value, this.freeze);
+    const r = this.unpackerRead();
+    if (r < 0) {
+      throw new EOFError("end of buffer reached");
     }
+    return this.uk.lastObject;
   }
 
   unpack(): unknown {
@@ -279,16 +275,34 @@ export class Unpacker {
 
   private eachImpl(block: (v: unknown) => void): null {
     while (true) {
-      let v: unknown;
-      try {
-        v = this.read();
-      } catch (error) {
-        if (error instanceof EOFError && error.message === "end of buffer reached") {
-          return null;
-        }
-        throw error;
+      const r = this.unpackerRead();
+      if (r < 0) {
+        return null;
       }
+      const v = this.uk.lastObject;
       block(v);
+    }
+  }
+
+  private unpackerRead(): number {
+    while (true) {
+      const each = this.decoder.decodeMulti(this.buffer.toStr());
+      let r: IteratorResult<unknown, void>;
+      try {
+        r = each.next();
+        each.return();
+      } catch (error) {
+        if (!(error instanceof globalThis.RangeError)) raiseUnpackerError(error);
+        r = { done: true, value: undefined };
+      }
+      if (r.done) {
+        if (this.buffer.io == null) return PRIMITIVE_EOF;
+        this.buffer.ensureReadable(this.buffer.size() + 1);
+        continue;
+      }
+      this.buffer.skipAll((this.decoder as unknown as { pos: number }).pos);
+      this.uk.lastObject = objectComplete(r.value, this.freeze);
+      return PRIMITIVE_OBJECT_COMPLETE;
     }
   }
 
@@ -327,6 +341,7 @@ export class Unpacker {
   }
 }
 
+rbModConstSet(MessagePack, "TypeError", TypeError);
 rbModConstSet(MessagePack, "Unpacker", Unpacker);
 rbModConstSet(MessagePack, "UnpackError", UnpackError);
 rbModConstSet(MessagePack, "MalformedFormatError", MalformedFormatError);

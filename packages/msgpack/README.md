@@ -72,9 +72,10 @@ Each is tracked by a story in RFC 0184.
 - **`write_array_header` / `write_map_header` take an integer.** `NUM2UINT`'s
   `FloatDomainError` for `NaN` is not ported.
 - **`StackError` is never raised, `Unpacker#skip` is absent, and a map never
-  unpacks as a `Hash`**, so `symbolize_keys` is recorded and answered by
-  `isSymbolizeKeys` but converts no key. Each needs a read loop the engine
-  does not expose. Story: `msgpack-unpacker-read-loop-the-engine-hides`.
+  unpacks as a `Hash`.** Each needs a read loop the engine does not expose.
+  A plain object's key is a Symbol's bare name already, so `symbolize_keys`
+  has no key to convert until maps are `Hash`es. Story:
+  `msgpack-unpacker-read-loop-the-engine-hides`.
 - **`Buffer#read` and `#read_all` are absent**, and `Buffer#write` flushes to
   its IO once the buffered bytes pass `io_buffer_size`, where the gem flushes
   when its tail chunk is full (`ext/msgpack/buffer.c:404-417`). Story:

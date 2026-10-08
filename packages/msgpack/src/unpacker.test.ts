@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { EOFError, StringIO } from "@blazetrails/ruby-compat";
+import { EOFError, StringIO, rbObjIsKindOf } from "@blazetrails/ruby-compat";
 import {
   ExtensionValue,
   MalformedFormatError,
@@ -43,7 +43,9 @@ describe("MessagePack::Unpacker", () => {
 
   it("read_array_header fails", () => {
     unpacker.feed(Uint8Array.of(0x81));
-    expect(() => unpacker.readArrayHeader()).toThrow(UnexpectedTypeError);
+    expect(() => unpacker.readArrayHeader()).toThrow(
+      expect.toSatisfy((e) => rbObjIsKindOf(e, MessagePack.TypeError)),
+    );
     expect(() => unpacker.readArrayHeader()).toThrow(UnexpectedTypeError);
   });
 
@@ -54,7 +56,9 @@ describe("MessagePack::Unpacker", () => {
 
   it("read_map_header fails", () => {
     unpacker.feed(Uint8Array.of(0x91));
-    expect(() => unpacker.readMapHeader()).toThrow(UnexpectedTypeError);
+    expect(() => unpacker.readMapHeader()).toThrow(
+      expect.toSatisfy((e) => rbObjIsKindOf(e, MessagePack.TypeError)),
+    );
     expect(() => unpacker.readMapHeader()).toThrow(UnexpectedTypeError);
   });
 
@@ -155,6 +159,19 @@ describe("MessagePack::Unpacker", () => {
         for (const buffer of [buffer1, buffer2, buffer3]) io.write(buffer);
         io.rewind();
         new Unpacker(io).each((obj) => objects.push(obj));
+        expect(objects).toEqual(expected);
+      });
+    });
+  });
+
+  describe("#each", () => {
+    describe("with a stream and symbolize_keys passed to the constructor", () => {
+      it("yields each object in the stream, with symbolized keys", () => {
+        const objects: unknown[] = [];
+        const io = new StringIO();
+        for (const buffer of [buffer1, buffer2, buffer3]) io.write(buffer);
+        io.rewind();
+        new Unpacker(io, { symbolizeKeys: true }).each((obj) => objects.push(obj));
         expect(objects).toEqual(expected);
       });
     });
