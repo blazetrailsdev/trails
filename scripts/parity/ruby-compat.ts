@@ -62,6 +62,7 @@ export const RUBY_COMPAT_EXPORTS = new Map<string, string>([
   ["Module#define_method", "rbModDefineMethod"],
   ["Range#cover?", "cover"],
   ["Regexp.escape", "regexpEscape"],
+  ["Regexp.union", "rbRegSUnion"],
   ["Regexp#match?", "rbRegMatchP"],
 ]);
 
