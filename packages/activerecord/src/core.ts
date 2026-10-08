@@ -42,7 +42,7 @@ import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries
 import { _reflectOnAssociation, reflectOnAggregation } from "./reflection.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
 import { TableMetadata } from "./table-metadata.js";
-import type { PrettyPrinter } from "./pretty-print.js";
+import type { PP } from "@blazetrails/ruby-compat";
 import { Table } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { cachedTableExists, columnsHash, isSchemaLoaded } from "./model-schema.js";
@@ -264,7 +264,7 @@ export async function prettyPrint(
     _hasAttribute(attrName: string): boolean;
     constructor: { prototype: object };
   },
-  pp: PrettyPrinter,
+  pp: PP,
 ): Promise<void> {
   if (isCustomInspectMethodDefined.call(this)) {
     pp.text((this as unknown as { inspect(): string }).inspect());
@@ -1047,7 +1047,7 @@ export async function findByBang(this: CoreHost, ...args: any[]): Promise<any> {
 
 /** @internal */
 export class InspectionMask extends DelegateClass(String) {
-  prettyPrint(pp: PrettyPrinter): void {
+  prettyPrint(pp: PP): void {
     pp.text(String(this.__getobj__()));
   }
 }

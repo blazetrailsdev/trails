@@ -2,6 +2,7 @@ import {
   ArgumentError,
   Cipher,
   OpenSSL,
+  rbDefineInspectCustom,
   rbObjId,
   sprintf,
   type Bytes,
@@ -36,11 +37,6 @@ export class Aes256Gcm {
       configurable: false,
     });
     this.deterministic = options?.deterministic ?? false;
-  }
-
-  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
   }
 
   encrypt(clearText: string | Bytes): Message {
@@ -114,3 +110,5 @@ export class Aes256Gcm {
     ) as Bytes;
   }
 }
+
+rbDefineInspectCustom(Aes256Gcm);

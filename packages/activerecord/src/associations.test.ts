@@ -2,7 +2,7 @@ import type { CollectionAssociation } from "./associations/collection-associatio
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
-import { Base, reflectOnAssociation, registerModel, NameError, Relation, pp } from "./index.js";
+import { Base, reflectOnAssociation, registerModel, NameError, Relation } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertEmpty,
@@ -51,7 +51,7 @@ import "./test-helpers/models/bird.js";
 import "./test-helpers/models/treasure.js";
 import "./test-helpers/models/price-estimate.js";
 
-import { NoMethodError, regexpEscape, StandardError } from "@blazetrails/ruby-compat";
+import { NoMethodError, PP, regexpEscape, StandardError } from "@blazetrails/ruby-compat";
 
 import { Preloader } from "./associations/preloader.js";
 
@@ -255,7 +255,7 @@ describe("AssociationProxyTest", () => {
     (andreas as any).log = "new developer added";
     expect(andreas.auditLogs.loaded).toBe(false);
     let out = "";
-    await pp(andreas.auditLogs, { write: (s: string) => (out += s) });
+    await PP.pp(andreas.auditLogs, { write: (s: string) => (out += s) });
     expect(out).toMatch(/message: "new developer added"/);
     expect(andreas.auditLogs.loaded).toBe(true);
   });

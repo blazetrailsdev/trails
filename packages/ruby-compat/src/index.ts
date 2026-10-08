@@ -33,6 +33,7 @@ export {
   objRespondToMissing,
   rbBuiltinClassName,
   rbInspect,
+  rbDefineInspectCustom,
   rbObjInspect,
   rbAnyToS,
   rbObjId,
@@ -346,6 +347,9 @@ export { SecureRandom } from "./secure-random.js";
 export { Digest, DigestClass, DigestInstance } from "./digest.js";
 export { Cipher, HMAC, OpenSSL } from "./openssl.js";
 export { StringIO } from "./string-io.js";
+export { PrettyPrint } from "./pretty-print.js";
+export type { PrettyPrintOutput } from "./pretty-print.js";
+export { PP } from "./pp.js";
 export { b } from "./string/b.js";
 export { bytes, strNew } from "./string/bytes.js";
 export { byteslice, rbStrGetbyte, rbStrSetbyte } from "./string/byte-methods.js";

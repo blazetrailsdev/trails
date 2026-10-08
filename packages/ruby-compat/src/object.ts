@@ -1034,6 +1034,25 @@ export function rbInspect(value: unknown): string {
 }
 
 /**
+ * Node's `util.inspect` (`console.log`, an assertion diff, a spy matcher)
+ * renders an object by walking its fields, where Ruby's `p`
+ * (`rb_p`, `vendor/ruby/v3.3.11/io.c:9023`) prints `rb_inspect(obj)`. This
+ * defines the `nodejs.util.inspect.custom` hook on `klass` as its own
+ * `inspect`, so a class that ports `inspect` is printed by it.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbDefineInspectCustom(klass: { prototype: { inspect(): unknown } }): void {
+  Object.defineProperty(klass.prototype, Symbol.for("nodejs.util.inspect.custom"), {
+    value(this: { inspect(): unknown }) {
+      return this.inspect();
+    },
+    writable: true,
+    configurable: true,
+  });
+}
+
+/**
  * `rb_obj_inspect` (`vendor/ruby/v3.3.11/object.c:783-795`), Ruby's `Kernel#inspect`:
  * `#<Class:0x… @ivar=value, …>`, or `rb_any_to_s` when there are no ivars.
  * A trails field `fooBar` / `_fooBar` is Ruby's `@foo_bar`. JS exposes no
@@ -1273,7 +1292,14 @@ function inspectAry(ary: unknown[], recursing: Set<object>): string {
   }
 }
 
-function isPlainHash(value: unknown): value is Record<string, unknown> {
+/**
+ * `RB_TYPE_P(obj, T_HASH)` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:122`)
+ * for the object-literal half of a trails Hash: an object whose prototype
+ * chain reaches `Object.prototype` through no class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isPlainHash(value: unknown): value is Record<string, unknown> {
   if (typeof value !== "object" || value === null) return false;
   for (
     let proto: object | null = Object.getPrototypeOf(value);

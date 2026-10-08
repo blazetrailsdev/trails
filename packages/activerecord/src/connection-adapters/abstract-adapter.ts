@@ -44,6 +44,7 @@ import {
   isEmpty,
   isNil,
   last,
+  rbDefineInspectCustom,
   rbEnsure,
   rbFSend,
   rbModConstSet,
@@ -1216,11 +1217,6 @@ export class AbstractAdapter implements Quoting {
     return false;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE nodejs-inspect-custom-hooks-come-from-one-ruby-compat-seam */
-  [Symbol.for("nodejs.util.inspect.custom")](): string {
-    return this.inspect();
-  }
-
   supportsForeignKeys(): boolean {
     return false;
   }
@@ -2165,6 +2161,7 @@ Object.defineProperty(AbstractAdapter, "name", {
 
 let abstractTypeMap: TypeMap | undefined;
 
+rbDefineInspectCustom(AbstractAdapter);
 include(AbstractAdapter, DatabaseStatements);
 include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);

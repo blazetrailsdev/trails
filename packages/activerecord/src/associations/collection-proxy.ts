@@ -10,7 +10,7 @@ import {
   callbacksFor as assocCallbacksFor,
   type CallbackHost,
 } from "./collection-association.js";
-import type { PrettyPrinter } from "../pretty-print.js";
+import type { PP } from "@blazetrails/ruby-compat";
 import { relationClassFor } from "../relation/delegation.js";
 
 import { stripThenable } from "../relation/thenable.js";
@@ -383,7 +383,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return super.inspect();
   }
 
-  override async prettyPrint(pp: PrettyPrinter): Promise<void> {
+  override async prettyPrint(pp: PP): Promise<void> {
     if (this.isFindFromTarget()) await this.loadTarget();
     return super.prettyPrint(pp);
   }

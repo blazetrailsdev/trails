@@ -6,7 +6,7 @@ import {
 } from "@blazetrails/ruby-compat/psych-adapter";
 import { Base } from "../base.js";
 import { ColumnNotSerializableError } from "../attribute-methods/serialization.js";
-import { pp } from "../pretty-print.js";
+import { PP } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Table } from "../connection-adapters/abstract/schema-definitions.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
@@ -305,7 +305,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     const x = (await JsonDataTypeWithFilter.createBang({ payload: {} })) as JsonRecord;
     (x.payload as Record<number, string>)[11] = "foo";
     let string = "";
-    await pp(x, { write: (s: string) => (string += s) });
+    await PP.pp(x, { write: (s: string) => (string += s) });
     expect(string).toBeTruthy();
   });
 
