@@ -387,7 +387,7 @@ export class IndexDefinition {
   readonly using?: string;
   readonly include?: string | string[] | null;
   readonly nullsNotDistinct?: boolean;
-  readonly comment?: string;
+  readonly comment?: string | null;
   readonly valid: boolean;
   readonly algorithm?: string;
   readonly ifNotExists?: boolean;
@@ -408,7 +408,7 @@ export class IndexDefinition {
       algorithm?: string;
       ifNotExists?: boolean;
       nullsNotDistinct?: boolean;
-      comment?: string;
+      comment?: string | null;
       valid?: boolean;
     } = {},
   ) {

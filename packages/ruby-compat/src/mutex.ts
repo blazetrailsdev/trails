@@ -166,7 +166,6 @@ export class Mutex {
       });
       const ensure = (): void => {
         if (data.release === release) release();
-        else unlock();
       };
 
       let value: T | Promise<T>;

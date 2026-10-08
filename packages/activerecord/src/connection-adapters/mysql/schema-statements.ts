@@ -30,7 +30,7 @@ type IndexOptions = {
   orders?: Record<string, string>;
   type?: string;
   using?: string;
-  comment?: string;
+  comment?: string | null;
   expressions?: Record<string, string>;
 };
 
@@ -112,7 +112,7 @@ export class SchemaStatements extends BaseSchemaStatements {
               orders: {},
               type: indexType,
               using: indexUsing,
-              comment: presence(row["Index_comment"] as string | null) ?? undefined,
+              comment: presence(row["Index_comment"] as string | null),
             },
           ]);
         }
@@ -126,12 +126,15 @@ export class SchemaStatements extends BaseSchemaStatements {
           last(indexes)![4].expressions![expression] = expression;
           if (row["Collation"] === "D") last(indexes)![4].orders![expression] = "desc";
         } else {
-          const columnName = row["Column_name"] as string;
-          last(indexes)![3].push(columnName);
+          last(indexes)![3].push(row["Column_name"] as string);
           if (row["Sub_part"] != null) {
-            last(indexes)![4].lengths![columnName] = toI(row["Sub_part"]) as number;
+            last(indexes)![4].lengths![row["Column_name"] as string] = toI(
+              row["Sub_part"],
+            ) as number;
           }
-          if (row["Collation"] === "D") last(indexes)![4].orders![columnName] = "desc";
+          if (row["Collation"] === "D") {
+            last(indexes)![4].orders![row["Column_name"] as string] = "desc";
+          }
         }
       }
 
