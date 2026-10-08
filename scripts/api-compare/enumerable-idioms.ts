@@ -249,9 +249,15 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   `setInterval` repeats where `sleep` suspends once. Admitted only for an
  *   implicit-self receiver, the one shape `Kernel#sleep` takes
  *   (`rb_define_global_function`, `process.c:9125`), so an `x.sleep` site
- *   still flags. The INTERVAL goes unchecked: the Ruby call leaves
- *   significance, so its call-argument row goes with it
- *   (`sleep-row-drops-call-argument-parity-for-the-interval`).
+ *   still flags.
+ *
+ * A row drops the Ruby call from significance, so nothing pairs its argument
+ * list by name. A row whose argument is a QUANTITY declares `argument`: the TS
+ * call carrying it, its position on each side, and the unit `factor` the TS
+ * value is the Ruby one multiplied by. `Kernel#sleep` takes seconds and
+ * `setTimeout` milliseconds, so `sleep 0.1 * counter` is
+ * `setTimeout(resolve, 0.1 * counter * 1000)` and nothing shorter
+ * (call-args.ts#compareQuantity).
  */
 export const NATIVE_FORM_ANALOGUES = new Map<
   string,
@@ -259,6 +265,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
     form: string;
     receivers: "implicit-self" | "explicit";
     uncreditedKinds?: ReadonlySet<string>;
+    argument?: { tsCall: string; rubyIndex: number; tsIndex: number; factor: number };
   }
 >([
   ["size", { form: "length", receivers: "explicit" }],
@@ -266,7 +273,14 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["prepend", { form: "unshift", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
   ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
-  ["sleep", { form: "timer", receivers: "implicit-self" }],
+  [
+    "sleep",
+    {
+      form: "timer",
+      receivers: "implicit-self",
+      argument: { tsCall: "setTimeout", rubyIndex: 0, tsIndex: 1, factor: 1000 },
+    },
+  ],
 ]);
 
 /**

@@ -856,6 +856,58 @@ describe("compareCallArgs", () => {
   });
 });
 
+describe("a native-form row's quantity argument (Kernel#sleep)", () => {
+  // abstract_adapter.rb:1079 `sleep 0.1 * counter`.
+  const sleep = site("sleep", ["binop:*"], ["product=num:0.1*id:counter"]);
+  const timer = (product: string) =>
+    site("setTimeout", ["id:resolve", "binop:*"], [`product=${product}`]);
+
+  it("pairs the Ruby call against the TS call the row names", () => {
+    const pairs = pairCallSites([sleep], [timer("num:0.1*id:counter*num:1000")]);
+    expect(pairs.map((p) => p.ts.name)).toEqual(["setTimeout"]);
+  });
+
+  it("matches an interval scaled by the row's unit factor", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:counter*num:1000"));
+    expect(result.verdict).toBe("match");
+    expect(compareCallArgs(sleep, timer("num:100*id:counter")).verdict).toBe("match");
+  });
+
+  it("fails an interval passed unscaled, 1000x too short", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:counter"));
+    expect(result).toMatchObject({
+      verdict: "mismatch",
+      class: "shape",
+      rubyArgs: ["qty:100*counter"],
+      tsArgs: ["qty:0.1*counter"],
+    });
+  });
+
+  it("fails an interval over a different operand", () => {
+    const result = compareCallArgs(sleep, timer("num:0.1*id:retries*num:1000"));
+    expect(result.verdict).toBe("mismatch");
+  });
+
+  it("compares a literal and a plain ref interval", () => {
+    const literal = site("sleep", ["num:5"]);
+    expect(compareCallArgs(literal, site("setTimeout", ["id:resolve", "num:5000"])).verdict).toBe(
+      "match",
+    );
+    expect(compareCallArgs(literal, site("setTimeout", ["id:resolve", "num:5"])).verdict).toBe(
+      "mismatch",
+    );
+    const ref = site("sleep", ["id:interval"]);
+    expect(compareCallArgs(ref, site("setTimeout", ["id:resolve", "id:interval"])).verdict).toBe(
+      "mismatch",
+    );
+  });
+
+  it("skips an interval neither side can describe as a product", () => {
+    const result = compareCallArgs(sleep, site("setTimeout", ["id:resolve", "binop:+"]));
+    expect(result).toMatchObject({ verdict: "skip", reason: "opaqueTsArg" });
+  });
+});
+
 describe("pairCallSites", () => {
   it("falls back to source order when the argument lists cannot tell the sites apart", () => {
     const pairs = pairCallSites(

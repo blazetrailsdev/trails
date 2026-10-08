@@ -17,6 +17,7 @@ import {
   rbObjInspect,
   rbObjId,
   rbObjAsString as toS,
+  floToS,
   rbObjRespondTo,
   CLASS_METHOD_TABLE,
   OBJECT_METHOD_TABLE,
@@ -184,6 +185,17 @@ describe("Object#to_s", () => {
       }
     }
     expect(toS(new Unported())).toMatch(/^#<Unported/);
+  });
+});
+
+describe("Float#to_s", () => {
+  it("renders a whole-valued Float with its point", () => {
+    expect(floToS(8)).toBe("8.0");
+    expect(floToS(7.2)).toBe("7.2");
+    expect(floToS(-0)).toBe("-0.0");
+    expect(floToS(1e16)).toBe("1.0e+16");
+    expect(toS(8)).toBe("8");
+    expect(toS(new Number(8))).toBe("8.0");
   });
 });
 

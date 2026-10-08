@@ -1165,7 +1165,7 @@ let nextObjAddress = 0x7f0000000000;
 function inspectValue(value: unknown, recursing: Set<object>): string {
   if (value == null) return "nil";
   if (typeof value === "boolean") return value ? "true" : "false";
-  if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (typeof value === "number" || value instanceof Number) return numToS(value);
   if (typeof value === "bigint") return String(value);
   if (isSymbol(value)) return symInspect(value);
   if (typeof value === "string") return stringInspect(value);
@@ -1343,7 +1343,7 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);
-  if (typeof value === "number" || value instanceof Number) return floToS(value);
+  if (typeof value === "number" || value instanceof Number) return numToS(value);
   if (value instanceof RegExp) return rbRegToS(value);
   if (rbObjRespondTo(value, "toS")) {
     const str = (value as { toS(): unknown }).toS();
@@ -1364,20 +1364,19 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   return String(value);
 }
 
+function numToS(num: number | { valueOf(): number }): string {
+  if (typeof num === "number" && Number.isInteger(num) && !Object.is(num, -0)) return String(num);
+  return floToS(num);
+}
+
 /**
  * `flo_to_s` (`vendor/ruby/v3.3.11/numeric.c:1059`), `Float#to_s`: always a decimal
- * point, and the exponent form outside `1e-4 ... 1e16`.
+ * point, and the exponent form outside `1e-4 ... 1e16`. The receiver is a
+ * Float seat, so a whole-valued `number` renders with its `.0`.
  *
- * JS has one `number` where Ruby has Integer and Float, and `1.0 === 1`, so the
- * seat cannot be recovered from the value. A whole-valued `number` is read as
- * an Integer and renders without a point: it is what nearly every caller hands
- * over (ids, counts, sizes), and a `bigint` is not what those seats hold in
- * trails. `-0` is the one whole value no Integer can be, so it stays a Float.
- * A seat that must stay a Float whatever its value arrives boxed — `new Number(1)`,
- * JS's own object wrapper — and takes the Float reading before that one.
+ * @noRailsEquivalent PERMANENT
  */
-function floToS(flo: number | { valueOf(): number }): string {
-  if (typeof flo === "number" && Number.isInteger(flo) && !Object.is(flo, -0)) return String(flo);
+export function floToS(flo: number | { valueOf(): number }): string {
   const value = flo.valueOf();
   if (!Number.isFinite(value)) {
     return Number.isNaN(value) ? "NaN" : value > 0 ? "Infinity" : "-Infinity";

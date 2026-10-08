@@ -16,7 +16,7 @@ import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/co
 import { stripThis, isReceiverParam } from "./arity.js";
 import { decodeRubyString, normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
-import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
+import { JS_ENUMERABLE_ALIASES, NATIVE_FORM_ANALOGUES } from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 import {
@@ -956,6 +956,8 @@ function argsEqual(rubyArgs: string[], tsArgs: string[]): boolean {
  *  spelling the port actually chose. `new` is `constructor`, exactly as the
  *  call-set gate credits `new Foo()` (extract-ts-api.ts#callSiteName). */
 function tsCallNameKeys(rubyName: string): string[] {
+  const quantity = NATIVE_FORM_ANALOGUES.get(rubyName)?.argument;
+  if (quantity !== undefined) return [quantity.tsCall];
   if (rubyName === "new") return ["constructor"];
   if (/[?!=]$/.test(rubyName)) return rubyMethodToTsIgnoringSkip(rubyName) ?? [];
   return [snakeToCamel(rubyName)];
@@ -1247,6 +1249,45 @@ export function comparableRubySites(
   );
 }
 
+interface Quantity {
+  coefficient: number;
+  refs: string[];
+}
+
+/**
+ * The quantity a site passes at `index`: a numeric literal, a plain ref, or a
+ * `*` chain of them, which both extractors describe as the opaque `binop:*`
+ * and spell out in a `product=` flag. Undefined for anything else, and for a
+ * site carrying more than one product, whose flags name no position.
+ */
+function quantityOf(site: CallSite, index: number): Quantity | undefined {
+  const arg = site.args[index];
+  if (arg === undefined) return undefined;
+  let factors = [arg];
+  if (arg === "binop:*") {
+    const products = site.flags.filter((flag) => flag.startsWith("product="));
+    if (products.length !== 1) return undefined;
+    factors = products[0].slice("product=".length).split("*");
+  }
+  const quantity: Quantity = { coefficient: 1, refs: [] };
+  for (const factor of factors) {
+    if (factor.startsWith("num:"))
+      quantity.coefficient *= Number(factor.slice(4).replace(/_/g, ""));
+    else if (factor.startsWith("id:")) quantity.refs.push(normalizeRef(factor.slice(3)));
+    else return undefined;
+  }
+  if (!Number.isFinite(quantity.coefficient)) return undefined;
+  quantity.refs.sort();
+  return quantity;
+}
+
+/** `qty:<coefficient>*<ref>…`, the coefficient scaled by the row's unit
+ *  factor and rounded past the float noise a decimal literal carries. */
+function quantityKey(quantity: Quantity, factor: number): string {
+  const coefficient = Number((quantity.coefficient * factor).toPrecision(12));
+  return ["qty:" + coefficient, ...quantity.refs].join("*");
+}
+
 /** Compare one name-matched pair of call sites, mirroring
  *  literals.ts#compareLiteral's verdict shape. "skip" whenever the two
  *  languages cannot agree on the site at all — a splat / double-splat /
@@ -1371,6 +1412,19 @@ export function compareCallArgs(
   });
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
+
+  const quantity = NATIVE_FORM_ANALOGUES.get(ruby.name)?.argument;
+  if (quantity !== undefined) {
+    const rubyQuantity = quantityOf(ruby, quantity.rubyIndex);
+    if (rubyQuantity === undefined) return skipped("opaqueRubyArg");
+    const tsQuantity = quantityOf(ts, quantity.tsIndex);
+    if (tsQuantity === undefined) return skipped("opaqueTsArg");
+    const rubyArgs = [quantityKey(rubyQuantity, quantity.factor)];
+    const tsArgs = [quantityKey(tsQuantity, 1)];
+    return rubyArgs[0] === tsArgs[0]
+      ? { verdict: "match", rubyArgs, tsArgs }
+      : { verdict: "mismatch", class: "shape", rubyArgs, tsArgs };
+  }
 
   const aligned = alignReceiverArgs(ruby, ts, ts.args, calleeSigs);
   const rubyArgs = normalizeArgsOrFailure(aligned.rubyArgs);

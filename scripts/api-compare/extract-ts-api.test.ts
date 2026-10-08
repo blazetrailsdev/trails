@@ -6237,6 +6237,19 @@ describe("callArgs", () => {
     ]);
   });
 
+  it("flags a product of literals and identifiers with its factors", () => {
+    const sites = site(
+      `class Foo {
+        create(counter: number) {
+          return new Promise((resolve) => setTimeout(resolve, 0.1 * counter * 1000));
+        }
+      }`,
+    );
+    const timer = sites.find((s) => s.name === "setTimeout")!;
+    expect(timer.args).toEqual(["id:resolve", "binop:*"]);
+    expect(timer.flags).toContain("product=num:0.1*id:counter*num:1000");
+  });
+
   it("describes a non-keyword or empty object literal as the opaque hash", () => {
     const sites = site(
       `class Foo {

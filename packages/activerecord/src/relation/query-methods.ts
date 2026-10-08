@@ -45,7 +45,6 @@ import { ActiveRecord } from "../namespaces.js";
 import { defaultValue } from "../type.js";
 import {
   IrreversibleOrderError,
-  NotImplementedError,
   PreparedStatementInvalid,
   UnmodifiableRelation,
 } from "../errors.js";
@@ -1842,40 +1841,19 @@ export function arelColumnAliasesFromHash(
   });
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE build-from-applies-join-dependency-synchronously
- * @inventedArm try — CONVERGEABLE build-from-applies-join-dependency-synchronously
- * @inventedArm throw — CONVERGEABLE build-from-applies-join-dependency-synchronously
- */
+/** @internal */
 export function buildFrom(this: QueryMethodsHost): unknown {
-  const fromClause = (this as any).fromClause;
-  const opts = fromClause?.value;
-  let name = fromClause?.name;
-  if (opts && typeof opts.arel === "function") {
-    name ??= "subquery";
-    const alias = String(name);
-    let resolved: any = opts;
-    if (opts.isEagerLoading === true && typeof opts.applyJoinDependency === "function") {
-      const pending = opts.applyJoinDependency({}, (relation: any) => {
-        resolved = relation;
-      });
-      if (resolved === opts) {
-        pending.catch(() => {});
-        // @nie disposition=TODO
-        throw new NotImplementedError(
-          "Using an eager-loaded relation with a limit/offset over a collection " +
-            "association as a `from` subquery is not supported: Rails resolves this " +
-            "by executing a query to materialize the limited primary keys " +
-            "(distinct_relation_for_primary_key), which the synchronous `from` " +
-            "cannot do. Materialize the ids first, e.g. " +
-            "where(id: await rel.pluck(primaryKey)).",
-        );
-      }
+  let opts: any = this.fromClause.value;
+  let name = this.fromClause.name;
+  if (opts instanceof ActiveRecord.Relation) {
+    if (opts.isEagerLoading) {
+      opts = opts._applyEagerJoinDependency();
     }
-    return resolved.arel().as(alias);
+    name ??= "subquery";
+    return opts.arel().as(toS(name));
+  } else {
+    return opts;
   }
-  return opts;
 }
 
 /** @internal */

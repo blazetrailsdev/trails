@@ -6420,6 +6420,23 @@ function escapeDescriptorText(text: string): string {
   return text.replace(/[%,={}]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
 }
 
+/**
+ * The factors of a `*` chain of numeric literals and plain identifiers
+ * (`0.1 * counter * 1000`), the twin of extract-ruby-api.rb#product_factors.
+ * Anything else in the chain makes the product undescribable.
+ */
+function productFactors(node: ts.Expression): string[] | undefined {
+  const expr = unwrapArg(node);
+  if (ts.isBinaryExpression(expr)) {
+    if (expr.operatorToken.kind !== ts.SyntaxKind.AsteriskToken) return undefined;
+    const left = productFactors(expr.left);
+    const right = productFactors(expr.right);
+    return left !== undefined && right !== undefined ? [...left, ...right] : undefined;
+  }
+  const factor = describeArg(expr, []);
+  return /^(num|id):/.test(factor) ? [factor] : undefined;
+}
+
 function describeArg(node: ts.Expression, flags: string[]): string {
   const expr = unwrapArg(node);
   if (ts.isIdentifier(expr)) {
@@ -6452,6 +6469,8 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (ts.isObjectLiteralExpression(expr)) return describeObjectLiteral(expr, flags);
   if (ts.isArrayLiteralExpression(expr)) return "array";
   if (ts.isBinaryExpression(expr)) {
+    const factors = productFactors(expr);
+    if (factors !== undefined) flags.push(`product=${factors.join("*")}`);
     return `binop:${ts.tokenToString(expr.operatorToken.kind) ?? "?"}`;
   }
   if (ts.isPrefixUnaryExpression(expr) || ts.isPostfixUnaryExpression(expr)) {

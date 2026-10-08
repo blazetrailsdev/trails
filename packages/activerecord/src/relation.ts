@@ -1080,9 +1080,14 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._model._loadFromSql(rows, block as never) as T[];
   }
 
-  private _applyEagerJoinDependency(
-    jd: JoinDependency,
-    basePk: string | string[],
+  /** @internal */
+  _applyEagerJoinDependency(
+    jd: JoinDependency = QueryMethods.constructJoinDependency.call(
+      this as any,
+      [...new Set([...this.eagerLoadValues, ...this.includesValues])] as any,
+      Nodes.OuterJoin,
+    ),
+    basePk: string | string[] = (this._model as any).primaryKey ?? "id",
     limitedIds?: unknown[],
   ): Relation<T, G> {
     let rel = this.except("includes", "eagerLoad", "preload");

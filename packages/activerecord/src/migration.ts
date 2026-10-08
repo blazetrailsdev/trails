@@ -945,7 +945,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("indexExists", tableName, columnName)) as boolean;
   }
 
-  static get(version: string | number): typeof Migration {
+  static get(version: number): typeof Migration {
     return Migration.Compatibility.find(version) as typeof Migration;
   }
 

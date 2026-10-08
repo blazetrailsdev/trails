@@ -244,11 +244,6 @@ describe("Migrator trails extensions", () => {
     expect(Klass).toBe(Current);
   });
 
-  it("Migration.version returns Current for string version", () => {
-    const Klass = Migration.get("8.0");
-    expect(Klass).toBe(Current);
-  });
-
   it("Migration.version throws when no compatible version exists", () => {
     expect(() => Migration.get(0.1)).toThrow(/Unknown migration version/);
   });
@@ -266,7 +261,7 @@ describe("Migrator trails extensions", () => {
   it("Migration.version resolves every ported Compatibility version", () => {
     expect(V8_0).toBe(Current);
     expect(Migration.get(8.0)).toBe(V8_0);
-    expect(Migration.get("7.2")).toBe(V7_2);
+    expect(Migration.get(7.2)).toBe(V7_2);
     expect(Migration.get(7.1)).toBe(V7_1);
     expect(Object.getPrototypeOf(V7_1)).toBe(V7_2);
   });
