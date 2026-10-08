@@ -6,7 +6,7 @@ import {
   rbObjRespondTo,
   symbolToS,
 } from "@blazetrails/ruby-compat";
-import { htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
+import { dasherize, htmlSafe, kernelArray, type SafeBuffer } from "@blazetrails/activesupport";
 import type { LookupContext } from "../lookup-context.js";
 import type { Template } from "../template.js";
 
@@ -171,7 +171,10 @@ export function raiseInvalidOptionAs(as: unknown): never {
   );
 }
 
-/** @internal */
+/**
+ * @inventedArm dasherize — PERMANENT
+ * @internal
+ */
 export function partialPath(this: ObjectRenderingHost, object: unknown, view: ViewContext): string {
   const contextPrefix = this.contextPrefix;
   if (rbObjRespondTo(object, "toModel")) object = (object as { toModel(): unknown }).toModel();
@@ -179,6 +182,10 @@ export function partialPath(this: ObjectRenderingHost, object: unknown, view: Vi
   let path: string;
   if (rbObjRespondTo(object, "toPartialPath")) {
     path = (object as { toPartialPath(): string }).toPartialPath();
+    const directoryEnd = path.lastIndexOf("/");
+    if (directoryEnd >= 0) {
+      path = dasherize(path.slice(0, directoryEnd)) + path.slice(directoryEnd);
+    }
   } else {
     throw new ArgumentError(
       `'${rbInspect(object)}' is not an ActiveModel-compatible object. It must implement #to_partial_path.`,

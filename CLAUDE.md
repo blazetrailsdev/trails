@@ -2001,6 +2001,19 @@ kebab-case directory, the view compiler maps a controller to it, and
 `RouteInfo#viewPath` (`trails unused_routes`) looks for a route's template in
 it, dasherizing the route's controller as it already does the action.
 
+Two more sites name that directory and follow it. The scaffold's view generator
+(`trailties/src/generators/tse/scaffold/scaffold-generator.ts`; Rails'
+`erb/scaffold/scaffold_generator.rb` writes to `controller_file_path`) writes
+to the dasherized `controllerFilePath()`; `controllerFilePath` and
+`controllerI18nScope` themselves stay underscored. And a record rendered by
+itself (`render(lineItem)`) is looked up through `partialPath`
+(`actionview/src/renderer/abstract-renderer.ts`; Rails' `partial_path`,
+`renderer/abstract_renderer.rb`), which dasherizes the directory part of the
+record's `to_partial_path` and leaves the partial's own name alone:
+`line_items/line_item` is found at `line-items/_line_item`. `to_partial_path`
+is unchanged, as `controller_path` is. Both sites carry
+`@inventedArm dasherize — PERMANENT`.
+
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal
