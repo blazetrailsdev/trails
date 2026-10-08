@@ -15,6 +15,7 @@ export {
 export type { ObjectClass } from "./message-pack/extensions.js";
 
 export const MessagePackCacheSerializer = new CacheSerializer();
+/** @noRailsEquivalent CONVERGEABLE message-pack-serializer-is-a-module-extended-onto-message-pack */
 export const MessagePack = Object.assign(new Serializer(), {
   CacheSerializer: MessagePackCacheSerializer,
 });
