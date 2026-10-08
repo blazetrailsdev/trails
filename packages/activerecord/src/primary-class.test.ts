@@ -3,6 +3,7 @@ import { Base } from "./base.js";
 import { __resetPrimaryAbstractClass } from "./inheritance.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { fixtures } from "./test-fixtures.js";
+import { cleanUpConnectionHandler } from "./cases/helper.js";
 
 class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;
@@ -21,21 +22,6 @@ class ApplicationRecord extends Base {
 
 describe("PrimaryClassTest", () => {
   fixtures({}, { useTransactionalTests: false });
-
-  function cleanUpConnectionHandler(): void {
-    const managers = (
-      Base.connectionHandler as unknown as {
-        _connectionNameToPoolManager: {
-          values(): { roleNames: string[]; removeRole(role: string): unknown }[];
-        };
-      }
-    )._connectionNameToPoolManager;
-    for (const poolManager of managers.values()) {
-      for (const role of [...poolManager.roleNames]) {
-        if (role !== Base.defaultRole) poolManager.removeRole(role);
-      }
-    }
-  }
 
   afterEach(() => {
     cleanUpConnectionHandler();
