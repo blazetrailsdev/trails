@@ -12,7 +12,7 @@ import {
   rbObjProtectedMethods,
   rbObjPublicMethods,
 } from "./method.js";
-import { extend, rbObjIsKindOf } from "./include.js";
+import { extend, rbObjClone, rbObjIsKindOf } from "./include.js";
 import { NameError } from "./name-error.js";
 import { TypeError } from "./type-error.js";
 
@@ -232,5 +232,31 @@ describe("Method#owner", () => {
     expect(rbObjIsKindOf(B, rbObjMethod(P, "ds").owner())).toBe(false);
     expect(rbObjIsKindOf(Q, M)).toBe(true);
     expect(rbObjIsKindOf(new B(), M)).toBe(false);
+  });
+
+  it("is the parent module for a member an extended module inherits", () => {
+    const Parent = {
+      inherited(): string {
+        return "Parent";
+      },
+    };
+    const Child = Object.create(Parent) as typeof Parent & { own(): string };
+    Child.own = () => "Child";
+    class Host {}
+    extend(Host, Child);
+
+    expect(rbObjMethod(Host, "inherited").owner()).toBe(Parent);
+    expect(rbObjMethod(Host, "own").owner()).toBe(Child);
+    expect(rbObjIsKindOf(Host, Parent)).toBe(true);
+    expect(rbObjIsKindOf(Host, Child)).toBe(true);
+    expect(rbObjIsKindOf(Host, {})).toBe(false);
+  });
+
+  it("is carried to a clone, which keeps its singleton class", () => {
+    const host = extend({}, M);
+    const clone = rbObjClone(host);
+
+    expect(rbObjMethod(clone, "ds").owner()).toBe(M);
+    expect(rbObjIsKindOf(clone, M)).toBe(true);
   });
 });

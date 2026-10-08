@@ -29,6 +29,25 @@ describe("scopeAttributes?", () => {
   });
 });
 
+describe("default_scope_override", () => {
+  it("is true for a subclass that redefines default_scope, and for its own subclasses", () => {
+    class Inheriting extends ClassMethodDeveloperCalledDavid {}
+
+    Default.buildDefaultScope.call(ClassMethodDeveloperCalledDavid);
+    Default.buildDefaultScope.call(Inheriting);
+
+    expect(ClassMethodDeveloperCalledDavid.defaultScopeOverride).toBe(true);
+    expect(Inheriting.defaultScopeOverride).toBe(true);
+    expect(Inheriting.isScopeAttributes()).toBe(true);
+  });
+
+  it("is false for a model that only inherits the mixed-in default_scope", () => {
+    Default.buildDefaultScope.call(DeveloperOrderedBySalary);
+
+    expect(DeveloperOrderedBySalary.defaultScopeOverride).toBe(false);
+  });
+});
+
 describe("build_default_scope", () => {
   it("defaults its relation to the model's own relation", () => {
     const withDefault = Default.buildDefaultScope.call(DeveloperOrderedBySalary);

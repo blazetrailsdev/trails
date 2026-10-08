@@ -1088,12 +1088,12 @@ function singletonSearchAncestor(obj: unknown, c: object): boolean {
     p;
     p = typeof p === "function" ? (Object.getPrototypeOf(p) as object | null) : null
   ) {
-    if (
-      Object.hasOwn(p, extendedKeys) &&
-      Object.hasOwn(p, includedModulesKey) &&
-      ((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)
-    ) {
-      return true;
+    if (!Object.hasOwn(p, extendedKeys) || !Object.hasOwn(p, includedModulesKey)) continue;
+    const mods = (p as Record<symbol, unknown>)[includedModulesKey] as Set<object>;
+    if (mods.has(c)) return true;
+    if (typeof c !== "object") continue;
+    for (const m of mods) {
+      if (typeof m === "object" && Object.prototype.isPrototypeOf.call(c, m)) return true;
     }
   }
   return false;
@@ -1238,9 +1238,10 @@ function entryOwner(link: object, mid: string): object {
   if (Object.hasOwn(link, extendedKeys) && (table[extendedKeys] as Set<string>).has(mid)) {
     const defined = extendedOwners.get(link)?.get(mid);
     if (defined !== undefined) return defined;
-    const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
-    const owner = mods.find((m) => !(m instanceof Module) && methodEntry(m, mid) !== null);
-    if (owner !== undefined) return owner;
+    for (const m of [...(table[includedModulesKey] as Set<object>)].reverse()) {
+      const owner = m instanceof Module ? null : methodEntry(m, mid);
+      if (owner !== null) return owner;
+    }
   }
   if (typeof link === "function" && link !== Function.prototype) return link;
   return link.constructor;
@@ -1541,6 +1542,8 @@ export function rbObjClone<T>(obj: T): T {
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
   const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
+  const defined = extendedOwners.get(obj);
+  if (defined) extendedOwners.set(clone, new Map(defined));
   initCopyHook(clone, "initializeClone", obj);
   if (frozen) Object.freeze(clone);
   return clone as T;
@@ -1774,7 +1777,7 @@ export function extend<T extends AnyClass | object>(
       : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
-      defined.set(key, mod);
+      defined.set(key, owner);
       if (!modIsAccessor || modDesc.get != null) installed.add(key);
       if (modDesc.set != null) installed.add(writer);
       continue;
@@ -1791,12 +1794,12 @@ export function extend<T extends AnyClass | object>(
       });
       if (takeGetter) {
         installed.add(key);
-        defined.set(key, mod);
+        defined.set(key, owner);
       }
       if (takeSetter) installed.add(writer);
     } else if (getterIsMixin && (!existingIsAccessor || existing.set == null || setterIsMixin)) {
       Object.defineProperty(klass, key, descriptor);
-      defined.set(key, mod);
+      defined.set(key, owner);
       if (modDesc.set != null) installed.add(writer);
     }
   }
