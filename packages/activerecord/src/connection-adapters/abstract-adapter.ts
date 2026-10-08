@@ -915,7 +915,7 @@ export class AbstractAdapter implements Quoting {
     this._unconfiguredConnection = null;
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
-      this._config = configOrDeprecatedConnection;
+      this._config = { ...configOrDeprecatedConnection };
       this.logger = ActiveRecord.Base?.logger ?? null;
 
       if (

@@ -15,7 +15,7 @@ describeIfMysqlAdapter("Mysql2Adapter savepoint statements dirty the parent (tra
   let adapter: Mysql2Adapter;
 
   beforeEach(() => {
-    adapter = new Mysql2Adapter(MYSQL_TEST_URL);
+    adapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
   });
   afterEach(async () => {
     vi.restoreAllMocks();

@@ -132,10 +132,22 @@ export function isPresent(value: unknown): boolean | Promise<boolean> {
   return !isBlank(value);
 }
 
-export function presence<T extends { isBlank(): Promise<boolean> }>(value: T): Promise<T | null>;
+export function presence<T extends { isBlank(): Promise<boolean> }>(
+  value: T,
+): Promise<(T extends PromiseLike<unknown> ? Omit<T, "then"> : T) | null>;
 export function presence<T>(value: T): T | null;
-export function presence<T>(value: T): T | null | Promise<T | null> {
+export function presence<T>(value: T): T | null | Promise<unknown> {
   const present = isPresent(value as unknown) as boolean | Promise<boolean>;
-  if (typeof present !== "boolean") return present.then((p) => (p ? value : null));
+  if (typeof present !== "boolean") {
+    return present.then((p) => {
+      if (!p) return null;
+      if (typeof (value as { then?: unknown }).then !== "function") return value;
+      return new Proxy(value as object, {
+        get: (target, prop) => (prop === "then" ? undefined : Reflect.get(target, prop, target)),
+        set: (target, prop, v) => Reflect.set(target, prop, v, target),
+        has: (target, prop) => prop !== "then" && Reflect.has(target, prop),
+      });
+    });
+  }
   return present ? value : null;
 }

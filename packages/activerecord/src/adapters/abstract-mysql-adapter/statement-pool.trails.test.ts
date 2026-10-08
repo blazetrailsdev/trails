@@ -97,7 +97,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("dealloc does not raise on inactive connection", async () => {
-      const closable = new Mysql2Adapter(MYSQL_TEST_URL);
+      const closable = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       closable.preparedStatements = true;
       await closable.beginDbTransaction();
       await closable.internalExecQuery("SELECT ? AS n", "SQL", [1], { prepare: true });
@@ -143,7 +143,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         await zero.disconnectBang();
       }
 
-      const adapter2 = new Mysql2Adapter(MYSQL_TEST_URL);
+      const adapter2 = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       try {
         (adapter2 as unknown as { preparedStatements: unknown }).preparedStatements = "true";
         expect(adapter2.preparedStatements).toBe(true);

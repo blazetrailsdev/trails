@@ -24,6 +24,7 @@ import {
 } from "../../errors.js";
 import mysql from "mysql2/promise";
 import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
+import { ConnectionUrlResolver } from "../../database-configurations/connection-url-resolver.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {
   (
@@ -47,7 +48,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("bad connection", async () => {
       const u = new URL(MYSQL_TEST_URL);
       u.pathname = "/inexistent_activerecord_unittest";
-      const badAdapter = new Mysql2Adapter(u.toString());
+      const badAdapter = new Mysql2Adapter({ uri: u.toString() });
       try {
         await assertRaises([NoDatabaseError], {}, () =>
           badAdapter.dropTable("ex", { ifExists: true }),
@@ -159,7 +160,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("wait timeout as url", async () => {
       const url = new URL(MYSQL_TEST_URL);
       url.searchParams.set("wait_timeout", "60");
-      const testAdapter = new Mysql2Adapter(url.toString());
+      const testAdapter = new Mysql2Adapter(
+        new ConnectionUrlResolver(url.toString()).toHash() as never,
+      );
       try {
         const result = (await testAdapter.execute(
           "SELECT @@SESSION.wait_timeout AS v",
@@ -406,7 +409,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     afterEach(() => vi.restoreAllMocks());
 
     it("maps ER_BAD_DB_ERROR (1049) to NoDatabaseError", async () => {
-      const a = new Mysql2Adapter("mysql://root@localhost/no_such_db");
+      const a = new Mysql2Adapter({ uri: "mysql://root@localhost/no_such_db" });
       stubCreateConnection(makeDriverError(1049));
       try {
         await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(NoDatabaseError);
@@ -428,7 +431,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_ACCESS_DENIED_ERROR via URI to DatabaseConnectionError with parsed username", async () => {
-      const a = new Mysql2Adapter("mysql://myuser:pw@localhost/test");
+      const a = new Mysql2Adapter({ uri: "mysql://myuser:pw@localhost/test" });
       stubCreateConnection(makeDriverError(1045));
       try {
         const err = (await a.execute("SELECT 1").catch((e: Error) => e)) as Error;
@@ -440,7 +443,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps ER_CONN_HOST_ERROR (2003) to DatabaseConnectionError with hostname", async () => {
-      const a = new Mysql2Adapter("mysql://root@myhost.example.com/test");
+      const a = new Mysql2Adapter({ uri: "mysql://root@myhost.example.com/test" });
       stubCreateConnection(makeDriverError(2003));
       try {
         const err = (await a.execute("SELECT 1").catch((e: Error) => e)) as Error;
@@ -452,7 +455,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("maps unknown errno to ConnectionNotEstablished", async () => {
-      const a = new Mysql2Adapter(MYSQL_TEST_URL);
+      const a = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       stubCreateConnection(makeDriverError(9999, "something went wrong"));
       try {
         await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);

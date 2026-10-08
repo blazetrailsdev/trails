@@ -36,7 +36,7 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   it("active is false for a never-connected / fake adapter", async () => {
     expect(await adapter.active()).toBe(false);
     expect(adapter.isConnected()).toBe(false);
-    const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+    const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
     expect(await fresh.active()).toBe(false);
     expect(fresh.isConnected()).toBe(false);
   });
@@ -126,7 +126,7 @@ describeIfMysqlAdapter("Mysql2Adapter (trails extensions)", () => {
 
   describe("#active sync getter reflects connection state", () => {
     it("is false before any connection and true after the first query", async () => {
-      const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+      const fresh = new Mysql2Adapter({ uri: MYSQL_TEST_URL });
       try {
         expect(await fresh.active()).toBe(false);
         expect(fresh.isConnected()).toBe(false);

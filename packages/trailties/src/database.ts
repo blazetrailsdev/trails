@@ -343,7 +343,7 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       const { Mysql2Adapter } =
         await import("@blazetrails/activerecord/connection-adapters/mysql2-adapter.js");
       if (config.url) {
-        return new Mysql2Adapter(config.url);
+        return new Mysql2Adapter({ uri: config.url });
       }
       return new Mysql2Adapter({
         host: config.host ?? "localhost",

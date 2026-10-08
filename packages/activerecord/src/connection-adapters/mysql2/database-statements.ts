@@ -28,7 +28,7 @@ export interface Mysql2RawResult {
 /** @internal */
 interface PerformQueryHost {
   _databaseTimezone?: "utc" | "local";
-  _affectedRowsBeforeWarnings?: number;
+  _affectedRowsBeforeWarnings?: number | null;
   _lastId?: number;
   _statements?: StatementPool | null;
   handleWarnings?(sql: string): void | Promise<void>;

@@ -112,19 +112,6 @@ describe("deprecated raw-connection initialize overload", () => {
       ).toBe(raw);
     });
 
-    it("emits a deprecation warning for the legacy raw-connection signature", () => {
-      const { messages } = captureDeprecations(
-        () => new Mysql2Adapter(new FakeRawConnection() as never),
-      );
-      expect(messages).toHaveLength(1);
-      expect(messages[0]).toMatch(/pre-opened raw connection is.*deprecated/i);
-    });
-
-    it("does not warn for the modern connection-string signature", () => {
-      const { messages } = captureDeprecations(() => new Mysql2Adapter("mysql2://localhost/blog"));
-      expect(messages).toEqual([]);
-    });
-
     it("does not warn for the modern config-hash signature", () => {
       const { messages } = captureDeprecations(
         () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }),
@@ -134,7 +121,10 @@ describe("deprecated raw-connection initialize overload", () => {
 
     it("honors prepared_statements from the deprecated config", () => {
       const { result: adapter } = captureDeprecations(
-        () => new Mysql2Adapter(new FakeRawConnection() as never, { preparedStatements: false }),
+        () =>
+          new Mysql2Adapter(new FakeRawConnection() as never, null, null, {
+            preparedStatements: false,
+          }),
       );
       expect(adapter.preparedStatements).toBe(false);
     });

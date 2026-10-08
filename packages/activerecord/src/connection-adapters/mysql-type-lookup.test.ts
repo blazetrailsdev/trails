@@ -4,7 +4,7 @@ import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js"
 
 class TestMysqlAdapter extends Mysql2Adapter {
   constructor() {
-    super("mysql2://localhost/test");
+    super({ uri: "mysql2://localhost/test" });
   }
   override isWriteQuery(sql: string): boolean {
     return /^\s*(INSERT|UPDATE|DELETE|REPLACE|CREATE|ALTER|DROP|TRUNCATE)/i.test(sql);

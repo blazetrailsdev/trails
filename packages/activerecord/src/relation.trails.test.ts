@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, presence } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { merge, SpawnMethods } from "./relation/spawn-methods.js";
@@ -853,8 +853,8 @@ describe("Relation Enumerable surface (trails)", () => {
   });
 
   it("presence returns the relation when records exist and null when none do", async () => {
-    expect(await CanonPost.where({ id: -1 }).presence()).toBeNull();
-    const present = await CanonPost.all().presence();
+    expect(await presence(CanonPost.where({ id: -1 }))).toBeNull();
+    const present = await presence(CanonPost.all());
     expect(present).not.toBeNull();
     expect((await present!.toArray()).length).toBe(await CanonPost.all().count());
   });

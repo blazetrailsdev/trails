@@ -1,7 +1,6 @@
 import { ConnectionAdapters } from "../namespaces.js";
 import { prepend, type PrependMethod } from "@blazetrails/activesupport";
 import mysql from "mysql2/promise";
-import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
@@ -14,8 +13,6 @@ import { rbModConstSet, rbObjRespondTo, rtest, RuntimeError } from "@blazetrails
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
-import { RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
-import { deprecator } from "../deprecator.js";
 import {
   AdapterTimeout,
   ConnectionFailed,
@@ -58,13 +55,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const {
       typeCast: userTypeCast,
       adapter: _adapter,
+      statementLimit: _statementLimit,
+      preparedStatements: _preparedStatements,
+      advisoryLocks: _advisoryLocks,
       strict: _strict,
       waitTimeout: _wt,
+      readTimeout: _readTimeout,
+      encoding: _encoding,
+      collation: _collation,
       variables: _vars,
+      _fakeConnection: _fake,
       initSql,
       connectionLimit: _connLimit,
       queueLimit: _queueLimit,
       waitForConnections: _waitFor,
+      username,
+      socket,
+      flags,
       ...connOptions
     } = config as mysql.PoolOptions &
       MysqlAdapterOptions & {
@@ -72,7 +79,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         connectionLimit?: number;
         queueLimit?: number;
         waitForConnections?: boolean;
+        username?: string;
+        socket?: string;
+        flags?: number | string | string[];
       };
+    if (rtest(username)) connOptions.user = username;
+    if (rtest(socket)) connOptions.socketPath = socket;
 
     const composedTypeCast =
       typeof userTypeCast === "function"
@@ -87,7 +99,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       conn = await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(connOptions.flags).filter(
+        flags: withoutDefaultIgnoreSpace(Array.isArray(flags) ? flags : ["FOUND_ROWS"]).filter(
           (flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS",
         ),
         multipleStatements: true,
@@ -103,12 +115,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         case Mysql2Adapter.ER_DBACCESS_DENIED_ERROR:
         case Mysql2Adapter.ER_ACCESS_DENIED_ERROR:
           throw DatabaseConnectionError.usernameError(
-            config.user ?? parseUriField(config, "username") ?? "unknown",
+            connOptions.user ?? parseUriField(config, "username") ?? "unknown",
           );
         case Mysql2Adapter.ER_CONN_HOST_ERROR:
         case Mysql2Adapter.ER_UNKNOWN_HOST_ERROR:
           throw DatabaseConnectionError.hostnameError(
-            config.host ?? parseUriField(config, "hostname") ?? "unknown",
+            connOptions.host ?? parseUriField(config, "hostname") ?? "unknown",
           );
         default:
           throw new ConnectionNotEstablished(err.message, { cause: err });
@@ -137,26 +149,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
 
-  constructor(config: string | (mysql.PoolOptions & MysqlAdapterOptions));
+  constructor(config: mysql.PoolOptions & MysqlAdapterOptions);
   /** @deprecated */
-  constructor(rawConnection: mysql.Connection, deprecatedConfig?: Record<string, unknown> | null);
   constructor(
-    config: string | (mysql.PoolOptions & MysqlAdapterOptions) | mysql.Connection,
+    rawConnection: mysql.Connection,
+    deprecatedLogger?: unknown,
+    deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
-  ) {
-    const deprecatedRawConnection = Mysql2Adapter._isDeprecatedRawConnectionArg(config);
-    if (!deprecatedRawConnection && deprecatedConfig != null) {
-      throw new ArgumentError(
-        "when initializing an Active Record adapter with a config hash, that should be the only argument",
-      );
-    }
-    super(
-      deprecatedRawConnection
-        ? { ...deprecatedConfig }
-        : typeof config === "object" && config !== null
-          ? { ...(config as Record<string, unknown>) }
-          : {},
-    );
+  );
+  constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
+    super(...args);
+
+    this._affectedRowsBeforeWarnings = null;
     this._config.flags ||= 0;
 
     if (Array.isArray(this._config.flags)) {
@@ -165,81 +169,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       this._config.flags = (this._config.flags as number) | FOUND_ROWS;
     }
 
-    if (deprecatedRawConnection) {
-      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
-      this._acceptDeprecatedRawConnection(config);
-      this._poolConfig = { flags: ["FOUND_ROWS"] };
-      this._isFakeConnection = true;
-      return;
-    }
-    if (typeof config === "string") {
-      let waitTimeout: number | undefined;
-      let uri = config;
-      try {
-        const url = new URL(config);
-        this._database =
-          decodeURIComponent(url.pathname.replace(/^\/+/, "").replace(/\/+$/, "")) || undefined;
-        const wt = url.searchParams.get("wait_timeout");
-        if (wt !== null) {
-          const n = parseInt(wt, 10);
-          if (Number.isInteger(n)) waitTimeout = n;
-          url.searchParams.delete("wait_timeout");
-          uri = url.toString();
-        }
-      } catch {}
-      if (waitTimeout !== undefined) this._config.waitTimeout = waitTimeout;
-      this._poolConfig = { uri, waitTimeout, flags: ["FOUND_ROWS"] };
-      return;
-    }
-    const {
-      statementLimit: _statementLimit,
-      preparedStatements,
-      advisoryLocks,
-      strict,
-      waitTimeout,
-      readTimeout: _readTimeout,
-      encoding: _encoding,
-      collation: _collation,
-      variables,
-      _fakeConnection: fake,
-      ...mysqlConfig
-    } = config as mysql.PoolOptions & MysqlAdapterOptions;
-    this._database =
-      mysqlConfig.database ??
-      (() => {
-        try {
-          const uri = (mysqlConfig as { uri?: string }).uri;
-          return uri
-            ? decodeURIComponent(new URL(uri).pathname.replace(/^\/+/, "").replace(/\/+$/, "")) ||
-                undefined
-            : undefined;
-        } catch {
-          return undefined;
-        }
-      })();
-    const resolvedFlags: string[] = Array.isArray(this._config.flags)
-      ? this._config.flags
-      : ["FOUND_ROWS"];
-    const {
-      username: railsUsername,
-      socket: railsSocket,
-      ...mysqlDriverConfig
-    } = mysqlConfig as typeof mysqlConfig & {
-      username?: string;
-      socket?: string;
-    };
-    this._poolConfig = {
-      ...mysqlDriverConfig,
-      ...(rtest(railsUsername) ? { user: railsUsername } : {}),
-      ...(rtest(railsSocket) ? { socketPath: railsSocket } : {}),
-      flags: resolvedFlags,
-      strict,
-      waitTimeout,
-      variables,
-    };
-    if (fake) {
-      this._isFakeConnection = true;
-    }
+    this._connectionParameters ||= this._config;
   }
 
   async supportsJson(): Promise<boolean> {
@@ -254,14 +184,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _connectingPromiseGen = -1;
   private _discardedConnectGenerations = new Set<number>();
   private _endingClient: Promise<void> | null = null;
-  private _isFakeConnection = false;
-  private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _connectionConfigured = false;
   declare _statements: MysqlStatementPool | null;
 
   _databaseTimezone: "utc" | "local" = "utc";
 
-  _affectedRowsBeforeWarnings = 0;
+  declare _affectedRowsBeforeWarnings: number | null;
 
   supportsCommentsInCreate(): boolean {
     return true;
@@ -278,8 +206,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   supportsLazyTransactions(): boolean {
     return true;
   }
-
-  private _database: string | undefined;
 
   override errorNumber(exception: Error & { errno?: number }): number | null {
     if (rbObjRespondTo(exception, "errno")) return exception.errno as number;
@@ -475,12 +401,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
       return this._connectingPromise;
     }
-    if (this._isFakeConnection)
+    if (rtest(this._config._fakeConnection))
       throw new RuntimeError("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
     this._connectingPromise = Mysql2Adapter.newClient({
-      ...this._poolConfig,
+      ...(this._connectionParameters as mysql.PoolOptions & MysqlAdapterOptions),
       initSql: "SET time_zone = '+00:00'",
     }).then(
       async (conn): Promise<mysql.Connection> => {
@@ -538,17 +464,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   _testOnlyPoolFlags(): string[] | undefined {
-    return this._poolConfig.flags;
+    return this._config.flags as string[] | undefined;
   }
 }
 
 /** @internal */
-function withoutDefaultIgnoreSpace(flags: string | string[] | undefined): string[] {
-  const list = Array.isArray(flags)
-    ? flags
-    : String(flags ?? "")
-        .split(/\s*,+\s*/)
-        .filter(Boolean);
+function withoutDefaultIgnoreSpace(list: string[]): string[] {
   return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
 
