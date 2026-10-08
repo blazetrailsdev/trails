@@ -2018,9 +2018,11 @@ compared against Rails' and carry no receipt.
 A controller's implied layout follows the directory. `_impliedLayoutName`
 (`actionview/src/layouts.ts`; Rails' `_implied_layout_name`, `layouts.rb:345-347`,
 returns `controller_path`) returns the controller path dasherized, so
-`Admin::StoryPagesController` looks for `layouts/admin/story-pages`. The gate
-does not compare that declaration, so it carries no receipt. A layout the
-application names itself
+`Admin::StoryPagesController` looks for `layouts/admin/story-pages`. It
+carries no `@inventedArm` receipt, and must not be given one: the arm-throw gate
+does not compare that declaration and fails a tag on it as stale
+(`_impliedLayoutName: dasherize (declaration not compared)`). This paragraph is
+its record. A layout the application names itself
 (`layout "line_items"`, `render layout: "line_items"`) is looked up as written.
 
 `trails-tsc`'s view compiler follows the same rule when it works out which
