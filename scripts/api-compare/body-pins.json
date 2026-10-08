@@ -56479,13 +56479,6 @@
   {
     "package": "activesupport",
     "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "dump",
-    "digest": "89c37438b8b6fc68",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
     "rubyName": "install_unregistered_type_handler",
     "digest": "afda2dbebd7810a0",
     "ref": "v8.0.2"
@@ -56495,41 +56488,6 @@
     "rubyFile": "message_pack/cache_serializer.rb",
     "rubyName": "load",
     "digest": "ff6ba3e62bc7f4b4",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "message_pack_factory",
-    "digest": "36e93ba6358be41e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "message_pack_factory=",
-    "digest": "5031d54128644c2c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "message_pack_pool",
-    "digest": "2d4299fd8d38a871",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "signature?",
-    "digest": "435c3a7c9548774d",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activesupport",
-    "rubyFile": "message_pack/cache_serializer.rb",
-    "rubyName": "warmup",
-    "digest": "52e5ba52ec80683a",
     "ref": "v8.0.2"
   },
   {
