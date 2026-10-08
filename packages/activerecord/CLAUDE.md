@@ -302,6 +302,14 @@ answer, and ask it in line:
   `@model.schema_cache.primary_keys(model.table_name)`, and
   `InsertAll#initialize` reads it and `supports_insert_returning?` (`:39`).
 
+- `PostgreSQL::Quoting#lookup_cast_type_from_column`
+  (`postgresql/quoting.rb:189-192`) runs `verify! if type_map.nil?`, which
+  connects and loads the type map before the lookup.
+- `AbstractMysqlAdapter#mismatched_foreign_key`
+  (`abstract_mysql_adapter.rb:1001-1015`), reached from `translate_exception`
+  (`:832-835`), merges `mismatched_foreign_key_details` into the error, and
+  that reads the referenced primary-key column through `column_for` (`:995`).
+
 In trails each answer is a query or a connection round-trip, and those are
 awaited. The settled shape is the one § "Schema reflection peeks at a warm
 cache" records for the schema cache: **an explicit async step warms the fact,
@@ -320,6 +328,18 @@ and the synchronous body peeks at the warmed value.**
 - `InsertAll` awaits its facts before construction, and `primaryKeys` returns
   the warmed list.
 
+- `lookupCastTypeFromColumn` keeps Rails' line and cannot await it. On a cold
+  type map it starts `verifyBang` and the lookup raises `TypeError` off the
+  unset map. A caller that can reach it on a connection nothing has verified
+  warms first: `buildFixtureSql` awaits `verifyBang` when the type map is
+  unset.
+- `mismatchedForeignKey` has no fact to warm, because the table and column are
+  only known once the failed statement is in hand. It is the one member here
+  that answers a value or a promise of it: the `sql` arm returns a promise of
+  the `MismatchedForeignKey`, and the `query_parser` arm returns the error
+  itself, whose `setQuery` awaits the details. Both are reached only through
+  `translateExceptionClass` and `log`, which await.
+
 The alternative is making the callers async, which is the cascade through
 `quote`, the Arel visitor and `to_sql` that § "`Relation` is evaluated by an
 async query" rejects.
@@ -328,8 +348,10 @@ This is a genuine language shortcoming, ratified repo-wide here. The omitted
 `query_value`, `quote`, `with_raw_connection` and `table_name` calls carry
 `@missingRailsCall … — PERMANENT`, `warmMaxIdentifierLength` carries
 `@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
-`@inventedArm if — PERMANENT`, all against this section. A new instance is not
-a new decision to argue.
+`@inventedArm if — PERMANENT`, `buildFixtureSql`'s warm step carries
+`@inventedArm if` / `verifyBang — PERMANENT`, and `mismatchedForeignKey`'s
+promise arm carries `@inventedArm then — PERMANENT`, all against this section.
+A new instance is not a new decision to argue.
 
 ## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
 

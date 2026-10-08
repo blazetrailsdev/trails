@@ -134,11 +134,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-includes-enumerable-over-an-async-each */
-  [Symbol.iterator](): IterableIterator<T> {
-    return this.target[Symbol.iterator]();
-  }
-
   /** @internal */
   static _targetModelFor(
     record: Base,
@@ -364,8 +359,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   scope(): any {
     return (this._scope ??= this._association.scope());
   }
-  async loadTarget(): Promise<T[]> {
-    return (await this._association.loadTarget()) as T[];
+  loadTarget(): T[] | Promise<T[]> {
+    return this._association.loadTarget() as T[] | Promise<T[]>;
   }
 
   /** @internal */

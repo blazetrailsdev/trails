@@ -60,6 +60,35 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(titles.sort()).toEqual(["a", "b", "c"]);
   });
 
+  it("iterates the built records of a new owner, which has nothing to find", () => {
+    const author = new Author({ name: "Dev" });
+    const post = author.posts.build({ title: "a", body: "a" });
+    expect(author.posts.isLoaded).toBe(false);
+    expect(Array.from(author.posts)).toEqual([post]);
+    expect(author.posts.isLoaded).toBe(true);
+  });
+
+  it("raises when iterated before a persisted owner's records are loaded", async () => {
+    const author = await authorWithPosts();
+    author.posts.reset();
+    expect(() => Array.from(author.posts)).toThrow(TypeError);
+    await author.posts.loadTarget();
+    expect(Array.from(author.posts).length).toBe(3);
+  });
+
+  it("map and findAll are Enumerable's, over a loaded and an unloaded relation", async () => {
+    const author = await authorWithPosts();
+    const unloaded = Post.where({ author_id: author.id }).order("title");
+    expect(await unloaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect((await unloaded.findAll((p) => p.title !== "b")).length).toBe(2);
+    expect((await unloaded.drop(1)).length).toBe(2);
+
+    const loaded = await Post.where({ author_id: author.id }).order("title").load();
+    expect(loaded.map((p) => p.title)).toEqual(["a", "b", "c"]);
+    expect([...loaded].length).toBe(3);
+    expect((await loaded.first())?.title).toBe("a");
+  });
+
   it("supports numeric indexing (proxy[0]) — typed via the index signature", async () => {
     const author = await authorWithPosts();
     const proxy = author.posts;
@@ -79,7 +108,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("map / filter / forEach delegate to the target", async () => {
     const author = await authorWithPosts();
     const proxy = author.posts;
-    expect(proxy.map((p: Post) => p.title).sort()).toEqual(["a", "b", "c"]);
+    expect((await proxy.map((p: Post) => p.title)).sort()).toEqual(["a", "b", "c"]);
     expect(
       proxy
         .filter((p: Post) => p.title !== "b")
@@ -195,7 +224,7 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     const author = await authorWithPosts();
     const proxy = author.posts;
     const ctx = { suffix: "!" };
-    const titles = proxy.map(function (this: { suffix: string }, p: Post) {
+    const titles = proxy.flatMap(function (this: { suffix: string }, p: Post) {
       return p.title + this.suffix;
     }, ctx);
     expect(titles.sort()).toEqual(["a!", "b!", "c!"]);

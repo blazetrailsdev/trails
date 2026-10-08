@@ -11,7 +11,7 @@ import {
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
+import { Enumerable, isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
@@ -2017,6 +2017,13 @@ export interface Relation<T extends Base, G extends boolean = false>
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {
+  [Symbol.iterator](): IterableIterator<T>;
+  map<R>(block: (record: T) => R): Promise<R[]>;
+  findAll(block: (record: T) => unknown): Promise<T[]>;
+  drop(n: number): Promise<T[]>;
+}
+
+export interface Relation<T extends Base, G extends boolean = false> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
@@ -2079,14 +2086,12 @@ const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknow
   toSet: (records) => new Set(records),
 };
 ENUMERABLE_METHODS.collect = (records, args) => records.map(...(args as [any]));
-ENUMERABLE_METHODS.findAll = (records, args) => records.filter(...(args as [any]));
 for (const name of [
   "forEach",
   "at",
   "indexOf",
   "lastIndexOf",
   "concat",
-  "map",
   "filter",
   "some",
   "every",
@@ -2097,6 +2102,7 @@ for (const name of [
   ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
 }
 
+include(Relation, Enumerable);
 include(Relation, Delegation);
 include(Relation, Explain);
 include(Relation, Batches);
