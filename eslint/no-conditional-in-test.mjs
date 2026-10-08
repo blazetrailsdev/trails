@@ -26,7 +26,10 @@ function isAdapterCondition(node) {
     case "Identifier":
       return node.name === "isMariaDb";
     case "CallExpression":
-      return node.callee.type === "Identifier" && node.callee.name === "currentAdapter";
+      return (
+        node.callee.type === "Identifier" &&
+        (node.callee.name === "currentAdapter" || node.callee.name === "inMemoryDb")
+      );
     case "BinaryExpression":
       return (
         ["===", "!==", "==", "!="].includes(node.operator) &&
@@ -46,7 +49,8 @@ export default {
   meta: {
     type: "problem",
     docs: {
-      description: "disallow conditionals in tests, except a current_adapter?/mariadb? branch",
+      description:
+        "disallow conditionals in tests, except a current_adapter?/mariadb?/in_memory_db? branch",
     },
     messages: { noConditionalInTest: "Remove conditional tests" },
     schema: [],

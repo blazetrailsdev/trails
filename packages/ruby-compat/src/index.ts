@@ -404,6 +404,7 @@ export {
   rbFCaller,
 } from "./backtrace-location.js";
 export { ThreadError } from "./thread-error.js";
+export { Timeout } from "./timeout.js";
 export { CachedThreadPool, ThreadPoolExecutor } from "./thread-pool-executor.js";
 export { ImmediateExecutor } from "./immediate-executor.js";
 export { ScheduledTask } from "./scheduled-task.js";

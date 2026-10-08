@@ -29,6 +29,7 @@ import {
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import { inMemoryDb } from "./support/adapter-helper.js";
 import { typeRegistryKeyFor } from "./support/type-registry-key.js";
+import { cleanUpConnectionHandler } from "./cases/helper.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
@@ -62,21 +63,6 @@ function assertCache(
 
 function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
   return (pool as unknown as { _queryCacheMaxSize: number | null })._queryCacheMaxSize;
-}
-
-function cleanUpConnectionHandler(): void {
-  const managers = (
-    Base.connectionHandler as unknown as {
-      _connectionNameToPoolManager: {
-        values(): { roleNames: string[]; removeRole(role: string): unknown }[];
-      };
-    }
-  )._connectionNameToPoolManager;
-  for (const poolManager of managers.values()) {
-    for (const role of [...poolManager.roleNames]) {
-      if (role !== Base.defaultRole) poolManager.removeRole(role);
-    }
-  }
 }
 
 describe("QueryCacheTest", () => {

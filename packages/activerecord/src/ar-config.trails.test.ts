@@ -34,7 +34,6 @@ describe("ar-config module-level flags", () => {
       mysql: ["mysql", "mysql5"],
       sqlite: "sqlite3",
     });
-    expect(asyncQueryExecutor()).toBeNull();
     expect(queues()).toEqual({});
     expect(maintainTestSchema()).toBeNull();
     expect(applicationRecordClass()).toBeNull();

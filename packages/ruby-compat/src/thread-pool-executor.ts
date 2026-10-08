@@ -12,10 +12,18 @@ import { Thread } from "./thread.js";
  * @noRailsEquivalent PERMANENT
  */
 export class ThreadPoolExecutor {
-  private readonly minThreads: number;
-  private readonly maxThreads: number;
-  private readonly maxQueue: number;
-  private readonly fallbackPolicy: "caller_runs";
+  /** @noRailsEquivalent PERMANENT */
+  readonly minLength: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly maxLength: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly maxQueue: number;
+  /** @noRailsEquivalent PERMANENT */
+  readonly fallbackPolicy: "caller_runs";
+  /** @noRailsEquivalent PERMANENT */
+  scheduledTaskCount = 0;
+  /** @noRailsEquivalent PERMANENT */
+  completedTaskCount = 0;
   private _running = 0;
   private readonly _queue: (() => unknown)[] = [];
   private _stopped = false;
@@ -33,8 +41,8 @@ export class ThreadPoolExecutor {
     maxQueue: number;
     fallbackPolicy: "caller_runs";
   }) {
-    this.minThreads = minThreads;
-    this.maxThreads = maxThreads;
+    this.minLength = minThreads;
+    this.maxLength = maxThreads;
     this.maxQueue = maxQueue;
     this.fallbackPolicy = fallbackPolicy;
   }
@@ -47,11 +55,13 @@ export class ThreadPoolExecutor {
     const task = () => block(...args);
     if (!this.isRunning()) {
       task();
-    } else if (this._running < this.maxThreads) {
+    } else if (this._running < this.maxLength) {
       this._running += 1;
+      this.scheduledTaskCount += 1;
       queueMicrotask(() => this._runWorker(task));
     } else if (this.maxQueue === 0 || this._queue.length < this.maxQueue) {
       this._queue.push(task);
+      this.scheduledTaskCount += 1;
     } else {
       task();
     }
@@ -102,6 +112,7 @@ export class ThreadPoolExecutor {
       }
     });
     void Promise.resolve(thread.value()).then(() => {
+      this.completedTaskCount += 1;
       const next = this._queue.shift();
       if (next) this._runWorker(next);
       else this._running -= 1;

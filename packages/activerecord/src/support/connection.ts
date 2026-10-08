@@ -2,6 +2,7 @@ import { getEnv } from "@blazetrails/activesupport";
 import { File, FileUtils } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
+import { setAsyncQueryExecutor } from "../active-record.js";
 import { ARUnit2Model } from "../test-helpers/models/arunit2-model.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
@@ -171,6 +172,7 @@ async function sqliteEntries(): Promise<Record<"arunit" | "arunit2", Record<stri
 }
 
 export async function connect(): Promise<TestDatabaseConfig> {
+  setAsyncQueryExecutor("global_thread_pool");
   const name = connectionName();
   const { adapter, envConfig, configurationHashes } = await testConfigurationHashes();
   const configs = new DatabaseConfigurations(configurationHashes);

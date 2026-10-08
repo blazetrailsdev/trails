@@ -16,6 +16,7 @@ tester.run("no-conditional-in-test", rule, {
     'test("x", () => { if (currentAdapter("postgres")) {} });',
     'it("x", () => { if (isMariaDb) { expect(1).toBe(1); } else { expect(2).toBe(2); } });',
     'it("x", () => { if (adapterType === "mysql" || !currentAdapter("postgres")) {} });',
+    'it("x", () => { if (!inMemoryDb()) {} });',
     "function helper(x) { if (x) {} }",
     'describe("x", () => { beforeEach(() => { if (y) {} }); });',
   ],

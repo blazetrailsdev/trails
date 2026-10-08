@@ -83,6 +83,16 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'attributes_test.rb:45 `assert_kind_of Float` — a JS number has no Float class; the port asserts `rbObjClassname(...)` equals "Float", the boxed Float seat FloatType#castValue produces',
     },
   ],
+  "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
+    [
+      {
+        kind: "assert_instance_of",
+        value: null,
+        as: null,
+        reason:
+          'connection_adapters/standalone_connection_test.rb:23 `assert_instance_of FutureResult::Complete, result` — the fallback query is awaited, and a promise resolving to a thenable `FutureResult::Complete` unwraps it to the Result (CLAUDE.md, "`ActiveRecord::Promise` is the native promise")',
+      },
+    ],
   "activemodel:attribute_methods_test.rb › AttributeMethodsTest › should not interfere with respond_to? if the attribute has a private/protected method":
     [
       {
