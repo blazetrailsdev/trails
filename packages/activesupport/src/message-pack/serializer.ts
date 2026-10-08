@@ -1,12 +1,12 @@
 import { RuntimeError, env as ENV, fetch, toI } from "@blazetrails/ruby-compat";
-import { Factory } from "@blazetrails/msgpack";
+import { Factory, type Pool } from "@blazetrails/msgpack";
 import { Extensions } from "./extensions.js";
 
 const SIGNATURE_INT = 128;
 
 export class Serializer {
   private factoryInstance: Factory | null = null;
-  private pool: InstanceType<typeof Factory.Pool> | null = null;
+  private pool: Pool | null = null;
 
   get messagePackFactory(): Factory {
     return (this.factoryInstance ??= new Factory());
@@ -47,7 +47,7 @@ export class Serializer {
   }
 
   /** @internal */
-  protected messagePackPool(): InstanceType<typeof Factory.Pool> {
+  protected messagePackPool(): Pool {
     if (this.pool === null) {
       if (!Object.isFrozen(this.messagePackFactory)) {
         Extensions.install(this.messagePackFactory);

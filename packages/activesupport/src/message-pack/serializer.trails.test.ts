@@ -212,4 +212,10 @@ describe("MessagePackSerializerTrailsTest", () => {
     expect(serializer.load(serializer.dump("value"))).toBe("value");
     expect(Object.isFrozen(factory)).toBe(true);
   });
+
+  it("loads the Symbol real Rails MessagePack dumps", () => {
+    const serializer = new Serializer();
+    const dumped = Uint8Array.from([204, 128, 199, 11, 0, ...Buffer.from("some_symbol")]);
+    expect(serializer.load(dumped)).toBe(":some_symbol");
+  });
 });
