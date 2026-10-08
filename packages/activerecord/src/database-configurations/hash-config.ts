@@ -118,7 +118,7 @@ export class HashConfig extends DatabaseConfig {
     if (hasKey(this.configurationHash, "schemaDump")) {
       const config = this.configurationHash.schemaDump;
       if (rtest(config)) {
-        return config as string;
+        return config;
       }
       return null;
     } else if (this.isPrimary()) {

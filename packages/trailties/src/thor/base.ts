@@ -208,7 +208,7 @@ ThorBase.attrWriter("options", "parentOptions", "args");
   let parseOptions = klass.classOptions();
 
   const commandOptions = hashDelete(config, "commandOptions") as Record<string, Option> | null;
-  if (rtest(commandOptions)) parseOptions = merge(parseOptions, commandOptions!);
+  if (rtest(commandOptions)) parseOptions = merge(parseOptions, commandOptions);
 
   let arrayOptions: unknown[];
   let hashOptions: Record<string, unknown>;
@@ -243,7 +243,7 @@ ThorBase.attrWriter("options", "parentOptions", "args");
 
   this.options = opts.parse(arrayOptions);
   if (rtest(config.classOptions)) {
-    this.options = config.classOptions!.merge(this.options) as typeof this.options;
+    this.options = config.classOptions.merge(this.options) as typeof this.options;
   }
 
   if (klass.isCheckUnknownOptions(config)) opts.checkUnknownBang();
@@ -381,7 +381,7 @@ export const ClassMethods = {
     if (!Object.hasOwn(this, "_classOptions")) {
       this._classOptions = this.fromSuperclass("classOptions", {}) as Record<string, Option>;
     }
-    if (rtest(options)) this.buildOptions(options!, this._classOptions!);
+    if (rtest(options)) this.buildOptions(options, this._classOptions!);
     return this._classOptions!;
   },
 
@@ -450,7 +450,7 @@ export const ClassMethods = {
       if (!Object.hasOwn(this, "_group") || !rtest(this._group)) {
         this._group = this.fromSuperclass("group", "standard") as string;
       }
-      return this._group!;
+      return this._group;
     }
   },
 
@@ -510,7 +510,7 @@ export const ClassMethods = {
       if (!Object.hasOwn(this, "_namespace") || !rtest(this._namespace)) {
         this._namespace = namespaceFromThorClass(this);
       }
-      return this._namespace!;
+      return this._namespace;
     }
   },
 
@@ -768,7 +768,7 @@ export const ClassMethods = {
   /** @internal */
   commandScopeMember(this: BaseClass, name: string, options: { for?: string } = {}): unknown {
     if (rtest(options.for)) {
-      return rbFSend(this.findAndRefreshCommand(options.for!), name);
+      return rbFSend(this.findAndRefreshCommand(options.for), name);
     } else {
       return rbFSend(this, name);
     }

@@ -1634,7 +1634,7 @@ export class SchemaStatements {
         `Table '${fromTable}' has no foreign key for ${toTable ?? rbInspect(symbolizeKeys(options))}`,
       );
     }
-    return fk!;
+    return fk;
   }
 
   /** @internal */
@@ -1705,7 +1705,7 @@ export class SchemaStatements {
         `Table '${tableName}' has no check constraint for ${expression ?? rbInspect(symbolizeKeys(options))}`,
       );
     }
-    return chk!;
+    return chk;
   }
 
   /** @internal */

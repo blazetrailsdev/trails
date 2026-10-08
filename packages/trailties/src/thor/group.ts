@@ -69,7 +69,7 @@ export class Group {
     if (!Object.hasOwn(this, "_invocations") || !rtest(this._invocations)) {
       this._invocations = this.fromSuperclass("invocations", new Map()) as Map<unknown, boolean>;
     }
-    return this._invocations!;
+    return this._invocations;
   }
 
   static invocationBlocks(this: GroupClass): Map<unknown, InvocationBlock> {
@@ -79,7 +79,7 @@ export class Group {
         InvocationBlock
       >;
     }
-    return this._invocationBlocks!;
+    return this._invocationBlocks;
   }
 
   static invoke(this: GroupClass, ...names: unknown[]): void {
@@ -271,7 +271,7 @@ export class Group {
     if (block !== undefined) block(instance);
 
     if (rtest(command)) {
-      return await instance.invokeCommand(this.allCommands()[command!]);
+      return await instance.invokeCommand(this.allCommands()[command]);
     } else {
       return await instance.invokeAll();
     }

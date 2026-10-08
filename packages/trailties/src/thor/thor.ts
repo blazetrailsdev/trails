@@ -110,7 +110,7 @@ export class Thor {
       if (!Object.hasOwn(this, "_defaultCommand") || !rtest(this._defaultCommand)) {
         this._defaultCommand = this.fromSuperclass("defaultCommand", "help") as string;
       }
-      return this._defaultCommand!;
+      return this._defaultCommand;
     }
   }
   declare static defaultTask: typeof Thor.defaultCommand;
@@ -146,7 +146,7 @@ export class Thor {
     options: DescOptions = {},
   ): void {
     if (rtest(options.for)) {
-      const command = this.findAndRefreshCommand(options.for!);
+      const command = this.findAndRefreshCommand(options.for);
       if (rtest(usage)) command.usage = usage;
       if (rtest(description)) command.description = description;
     } else {
@@ -162,7 +162,7 @@ export class Thor {
     options: LongDescOptions = {},
   ): void {
     if (rtest(options.for)) {
-      const command = this.findAndRefreshCommand(options.for!);
+      const command = this.findAndRefreshCommand(options.for);
       if (rtest(longDescription)) command.longDescription = longDescription;
     } else {
       this._longDesc = longDescription;
@@ -194,7 +194,7 @@ export class Thor {
       });
     }
 
-    return this._map!;
+    return this._map;
   }
 
   static methodOptions(
@@ -204,8 +204,8 @@ export class Thor {
     if (!Object.hasOwn(this, "_methodOptions") || !rtest(this._methodOptions)) {
       this._methodOptions = {};
     }
-    if (rtest(options)) this.buildOptions(options!, this._methodOptions!);
-    return this._methodOptions!;
+    if (rtest(options)) this.buildOptions(options, this._methodOptions);
+    return this._methodOptions;
   }
   declare static options: typeof Thor.methodOptions;
 
@@ -218,7 +218,7 @@ export class Thor {
       throw new ArgumentError(`Expected a Symbol or String, got ${rbInspect(name)}`);
     }
     const scope = rtest(options.for)
-      ? this.findAndRefreshCommand(options.for!).options
+      ? this.findAndRefreshCommand(options.for).options
       : this.methodOptions();
 
     return this.buildOption(name, options, scope);
@@ -250,7 +250,7 @@ export class Thor {
     if (rtest(command.longDescription)) {
       shell.say("Description:");
       if (rtest(command.wrapLongDescription)) {
-        shell.printWrapped(command.longDescription!, { indent: 2 });
+        shell.printWrapped(command.longDescription, { indent: 2 });
       } else {
         shell.say(command.longDescription);
       }
@@ -292,7 +292,7 @@ export class Thor {
         item.push(this.banner(command, false, subcommand));
         item.push(
           rtest(command.description)
-            ? `# ${command.description!.replace(/[ \t\r\n\f\v]+/g, " ")}`
+            ? `# ${command.description.replace(/[ \t\r\n\f\v]+/g, " ")}`
             : "",
         );
         return item;
@@ -305,7 +305,7 @@ export class Thor {
     if (!Object.hasOwn(this, "_subcommands") || !rtest(this._subcommands)) {
       this._subcommands = this.fromSuperclass("subcommands", []) as string[];
     }
-    return this._subcommands!;
+    return this._subcommands;
   }
   declare static subtasks: typeof Thor.subcommands;
 
@@ -313,7 +313,7 @@ export class Thor {
     if (!Object.hasOwn(this, "_subcommandClasses") || !rtest(this._subcommandClasses)) {
       this._subcommandClasses = {};
     }
-    return this._subcommandClasses!;
+    return this._subcommandClasses;
   }
 
   static subcommand(this: ThorClass, subcommand: string, subcommandClass: ThorClass): void {
@@ -366,7 +366,7 @@ export class Thor {
     const command = config.currentCommand;
     if (!rtest(command)) return true;
 
-    const name = command!.name;
+    const name = command.name;
 
     if (this.subcommands().includes(name)) {
       return false;
@@ -384,7 +384,7 @@ export class Thor {
   }
 
   static isStopOnUnknownOption(this: ThorClass, command: Command | null): boolean {
-    return rtest(command) && this.stopOnUnknownOption().includes(command!.name);
+    return rtest(command) && this.stopOnUnknownOption().includes(command.name);
   }
 
   static disableRequiredCheckBang(this: ThorClass, ...commandNames: string[]): string[] {
@@ -392,7 +392,7 @@ export class Thor {
   }
 
   static isDisableRequiredCheck(this: ThorClass, command: Command | null): boolean {
-    return rtest(command) && this.disableRequiredCheck().includes(command!.name);
+    return rtest(command) && this.disableRequiredCheck().includes(command.name);
   }
 
   static isCommandExists(this: ThorClass, commandName: string): boolean {
@@ -407,7 +407,7 @@ export class Thor {
     ) {
       this._methodExclusiveOptionNames = [];
     }
-    return this._methodExclusiveOptionNames!;
+    return this._methodExclusiveOptionNames;
   }
 
   /** @internal */
@@ -418,7 +418,7 @@ export class Thor {
     ) {
       this._methodAtLeastOneOptionNames = [];
     }
-    return this._methodAtLeastOneOptionNames!;
+    return this._methodAtLeastOneOptionNames;
   }
 
   /** @internal */
@@ -426,7 +426,7 @@ export class Thor {
     if (!Object.hasOwn(this, "_stopOnUnknownOption") || !rtest(this._stopOnUnknownOption)) {
       this._stopOnUnknownOption = [];
     }
-    return this._stopOnUnknownOption!;
+    return this._stopOnUnknownOption;
   }
 
   /** @internal */
@@ -434,7 +434,7 @@ export class Thor {
     if (!Object.hasOwn(this, "_disableRequiredCheck") || !rtest(this._disableRequiredCheck)) {
       this._disableRequiredCheck = ["help"];
     }
-    return this._disableRequiredCheck!;
+    return this._disableRequiredCheck;
   }
 
   /** @internal */
@@ -557,10 +557,10 @@ export class Thor {
       };
       this.commands()[meth] = new baseClass(
         meth,
-        this._desc!,
-        this._longDesc!,
+        this._desc,
+        this._longDesc,
         this._longDescWrap!,
-        this._usage!,
+        this._usage,
         this.methodOptions(),
         relations,
       );
@@ -592,7 +592,7 @@ export class Thor {
   /** @internal */
   static retrieveCommandName(this: ThorClass, args: unknown[]): string | null | undefined {
     const meth = !isEmpty(args) ? toS(first(args)) : null;
-    if (rtest(meth) && (rtest(this.map()[meth!]) || !/^-/m.test(meth!))) {
+    if (rtest(meth) && (rtest(this.map()[meth]) || !/^-/m.test(meth))) {
       return args.shift() as string | null | undefined;
     }
     return null;
@@ -604,7 +604,7 @@ export class Thor {
   static normalizeCommandName(this: ThorClass, meth: string | null | undefined): string {
     if (!rtest(meth)) return toS(this.defaultCommand()).replaceAll("-", "_");
 
-    const possibilities = this.findCommandPossibilities(meth!);
+    const possibilities = this.findCommandPossibilities(meth);
     if (possibilities.length > 1) {
       throw new AmbiguousTaskError(
         `Ambiguous command ${meth} matches [${possibilities.join(", ")}]`,
@@ -613,8 +613,8 @@ export class Thor {
 
     if (isEmpty(possibilities)) {
       meth ??= this.defaultCommand();
-    } else if (rtest(this.map()[meth!])) {
-      meth = this.map()[meth!];
+    } else if (rtest(this.map()[meth])) {
+      meth = this.map()[meth];
     } else {
       meth = first(possibilities);
     }
@@ -678,10 +678,10 @@ export class Thor {
     const klass = this.constructor as ThorClass;
     const shell = (this as unknown as Instance).shell;
     if (rtest(command)) {
-      if (klass.subcommands().includes(command!)) {
-        klass.subcommandClasses()[command!].help(shell, true);
+      if (klass.subcommands().includes(command)) {
+        klass.subcommandClasses()[command].help(shell, true);
       } else {
-        klass.commandHelp(shell, command!);
+        klass.commandHelp(shell, command);
       }
     } else {
       klass.help(shell, subcommand);

@@ -309,9 +309,7 @@ export class ConnectionPool implements ReapablePool {
 
   get migrationsPaths(): string | string[] {
     const migrationsPaths = this.dbConfig.migrationsPaths;
-    return (rtest(migrationsPaths) ? migrationsPaths : Migrator.migrationsPaths) as
-      | string
-      | string[];
+    return rtest(migrationsPaths) ? migrationsPaths : Migrator.migrationsPaths;
   }
 
   get schemaMigration(): SchemaMigration {

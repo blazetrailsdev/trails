@@ -137,7 +137,7 @@ export function buttonTo(
 ): SafeBuffer {
   if (block) [htmlOptions, options] = [options as HtmlOptions | null, name];
   if (!rtest(htmlOptions)) htmlOptions = {};
-  htmlOptions = stringifyKeys(htmlOptions!);
+  htmlOptions = stringifyKeys(htmlOptions);
 
   const url = options === false ? null : this.urlFor(options);
 
@@ -365,7 +365,7 @@ export function convertOptionsToDataAttributes(
   htmlOptions: HtmlOptions | null,
 ): HtmlOptions {
   if (rtest(htmlOptions)) {
-    htmlOptions = stringifyKeys(htmlOptions!);
+    htmlOptions = stringifyKeys(htmlOptions);
     if (isLinkToRemoteOptions(options) || isLinkToRemoteOptions(htmlOptions)) {
       htmlOptions["data-remote"] = "true";
     }
