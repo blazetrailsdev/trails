@@ -170,7 +170,7 @@ describe("SyncLogSubscriberTest", () => {
   });
 
   it.skip("event attributes", () => {
-    // BLOCKED: notifications-event-allocations-has-no-js-allocation-counter
+    // PERMANENT-SKIP: JS has no allocated-object counter (CLAUDE.md, "Runtime facts Node does not expose").
     const JRUBY_VERSION: string | null = null;
     MyLogSubscriber.attachTo("my_log_subscriber", logSubscriber);
     Notifications.instrument("some_event.my_log_subscriber", {}, () => {

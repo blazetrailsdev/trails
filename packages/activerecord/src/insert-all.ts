@@ -188,7 +188,7 @@ export class InsertAll {
     return (this._updatableColumns ??= [...this.keys].filter((k) => !exclude.has(k)));
   }
 
-  /** @missingRailsCall table_name — CONVERGEABLE insert-all-constructor-reads-the-schema-cache-at-its-rails-call-sites */
+  /** @missingRailsCall table_name — PERMANENT */
   primaryKeys(): string[] {
     return this._facts.primaryKeys;
   }

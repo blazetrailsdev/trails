@@ -762,7 +762,7 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-/** @inventedArm if — CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
+/** @inventedArm if — PERMANENT */
 export function constructor(
   this: CoreRecord & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;

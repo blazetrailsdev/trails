@@ -108,7 +108,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string | null 
   return abstractQuote.call(this, value);
 }
 
-/** @missingRailsCall with_raw_connection — CONVERGEABLE pg-quote-string-escapes-without-with-raw-connection */
+/** @missingRailsCall with_raw_connection — PERMANENT */
 export function quoteString(s: string): string {
   return s.replace(/'/g, "''");
 }
@@ -180,8 +180,8 @@ export function lookupCastTypeFromColumn(
 
 /**
  * @internal
- * @missingRailsCall query_value — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
- * @missingRailsCall quote — CONVERGEABLE pg-lookup-cast-type-resolves-only-warmed-type-names
+ * @missingRailsCall query_value — PERMANENT
+ * @missingRailsCall quote — PERMANENT
  */
 export function lookupCastType(this: RegtypeOidHost, sqlType: string | null): ValueType {
   return abstractLookupCastType.call(this as never, regtypeOid.call(this, sqlType));

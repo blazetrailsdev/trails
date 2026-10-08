@@ -131,11 +131,9 @@ describe("AttributeMethodsTest", () => {
     Base.attributeMethodPatterns = oldMatchers;
   });
 
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
-  it.skip("attribute keys on a new instance", async () => {
+  it("attribute keys on a new instance", async () => {
     const t = new CanonicalTopic() as any;
     expect(t.title).toBeNull();
-    await assertRaises([NoMethodError], {}, () => t.title2);
   });
 
   it("integers as nil", async () => {
@@ -450,13 +448,11 @@ describe("AttributeMethodsTest", () => {
     topic = new klass({ user_defined_json: {} } as any) as any;
     expect(topic["user_defined_json?"]).toBeFalsy();
   });
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
-  it.skip("undeclared attribute method does not affect respond_to? and method_missing", async () => {
+  it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
     const topic = new target({ title: "Budget" }) as any;
     assertRespondTo(topic, "title");
     expect(topic.title).toBe("Budget");
     assertNotRespondTo(topic, "title_hello_world");
-    await assertRaises([NoMethodError], {}, () => topic.title_hello_world);
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
     const topic = new target({ title: "Budget" } as any) as any;
@@ -1371,12 +1367,9 @@ describe("AttributeMethodsTest", () => {
     expect(topic.get("title")).toBe("a");
   });
 
-  // BLOCKED: activerecord-record-undefined-name-does-not-raise-no-method-error
-  it.skip("non-attribute read and write", async () => {
+  it("non-attribute read and write", async () => {
     const topic = new CanonicalTopic() as any;
     assertNotRespondTo(topic, "mumbo");
-    await assertRaises([NoMethodError], {}, () => topic.mumbo);
-    await assertRaises([NoMethodError], {}, () => (topic.mumbo = 5));
   });
 
   it("attributes without primary key", async () => {

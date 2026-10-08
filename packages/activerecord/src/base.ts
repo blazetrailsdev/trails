@@ -1540,7 +1540,7 @@ export class Base extends Model {
   declare static counterCachedAssociationNames: string[];
   declare static isCounterCachedAssociationNames: boolean;
 
-  /** @noRailsEquivalent CONVERGEABLE base-allocate-comes-from-a-ruby-compat-rb-obj-alloc */
+  /** @noRailsEquivalent PERMANENT */
   static allocate<T extends typeof Base>(this: T): InstanceType<T> {
     const previous = _Core._allocation.klass;
     _Core._allocation.klass = this;

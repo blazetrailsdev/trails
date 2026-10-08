@@ -9,12 +9,12 @@ const fixtureModules = new Map<string, Record<string, unknown>>();
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Enumerable` (fixture_set/file.rb:8); the class/interface merge is how `include()` surfaces on the type side.
 export class File {
-  /** @noRailsEquivalent CONVERGEABLE fixture-set-file-ts-fixture-module-registry-has-no-rails-counterpart */
+  /** @noRailsEquivalent PERMANENT */
   static registerModule(file: string, rows: Record<string, unknown>): void {
     fixtureModules.set(file, rows);
   }
 
-  /** @noRailsEquivalent CONVERGEABLE fixture-set-file-ts-fixture-module-registry-has-no-rails-counterpart */
+  /** @noRailsEquivalent PERMANENT */
   static modules(): string[] {
     return [...fixtureModules.keys()];
   }

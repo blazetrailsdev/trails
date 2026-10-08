@@ -31,6 +31,42 @@ export interface AssertionReceipt {
 
 /** Keyed by `<package>:<rails file> › <ancestors joined by " › "> › <test>`. */
 export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › attribute keys on a new instance":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:166 `assert_raise(NoMethodError) { t.title2 }` — an undefined name on a record reads `undefined`; the raise comes from `method_missing`, which needs a Proxy (CLAUDE.md, "Records are not Proxies")',
+      },
+    ],
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › non-attribute read and write": [
+    {
+      kind: "assert_raise",
+      value: null,
+      as: null,
+      reason:
+        'attribute_methods_test.rb:644 `assert_raise(NoMethodError) { topic.mumbo }` — an undefined name on a record reads `undefined` (CLAUDE.md, "Records are not Proxies")',
+    },
+    {
+      kind: "assert_raise",
+      value: null,
+      as: null,
+      reason:
+        'attribute_methods_test.rb:645 `assert_raise(NoMethodError) { topic.mumbo = 5 }` — an undefined name assigned on a record creates an own property (CLAUDE.md, "Records are not Proxies")',
+    },
+  ],
+  "activerecord:attribute_methods_test.rb › AttributeMethodsTest › undeclared attribute method does not affect respond_to? and method_missing":
+    [
+      {
+        kind: "assert_raise",
+        value: null,
+        as: null,
+        reason:
+          'attribute_methods_test.rb:653 `assert_raise(NoMethodError) { topic.title_hello_world }` — an undefined name on a record reads `undefined` (CLAUDE.md, "Records are not Proxies")',
+      },
+    ],
   "activerecord:attributes_test.rb › CustomPropertiesTest › overloaded properties save": [
     {
       kind: "assert_kind_of",

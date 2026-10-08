@@ -937,7 +937,7 @@ export class PostgreSQLAdapter
     );
     await this.reloadTypeMap();
   }
-  /** @missingRailsCall query_value — CONVERGEABLE pg-max-identifier-length-sync-async-split */
+  /** @missingRailsCall query_value — PERMANENT */
   maxIdentifierLength(): number {
     return this._maxIdentifierLength ?? 63;
   }
@@ -1774,7 +1774,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     ];
   }
 
-  /** @noRailsEquivalent CONVERGEABLE pg-max-identifier-length-sync-async-split */
+  /** @noRailsEquivalent PERMANENT */
   async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
       const value = await this.queryValue("SHOW max_identifier_length", "SCHEMA");

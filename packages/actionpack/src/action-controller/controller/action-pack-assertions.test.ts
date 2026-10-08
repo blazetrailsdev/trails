@@ -144,7 +144,7 @@ describe("ActionPackAssertionsControllerTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: port-action-pack-assertions-render-file-builder-and-api-skips
+  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
   it.skip("render file absolute path", () => {});
   it.skip("render file relative path", () => {});
 
@@ -465,7 +465,7 @@ describe("ActionPackHeaderTest", () => {
     await tc.beforeSetup();
   });
 
-  // BLOCKED: port-action-pack-assertions-render-file-builder-and-api-skips
+  // BLOCKED: action-pack-assertions-port-render-file-tests-and-park-the-builder-three
   it.skip("rendering xml sets content type", () => {});
   it.skip("rendering xml respects content type", () => {});
   it.skip("rendering xml respects content type when set in the header", () => {});
