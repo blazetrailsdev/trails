@@ -135,10 +135,10 @@ class ExpoSqliteStatement implements SqliteStatement {
 
   constructor(
     private readonly stmt: ExpoSQLiteStatement | null,
-    columnCount: number,
+    private readonly columnNames: string[],
     readonly remainder: string,
   ) {
-    this.reader = columnCount !== 0;
+    this.reader = columnNames.length !== 0;
     this._closed = stmt === null;
   }
 
@@ -211,7 +211,13 @@ class ExpoSqliteStatement implements SqliteStatement {
   }
 
   columns(): ColumnInfo[] {
-    return [];
+    return this.columnNames.map((name) => ({
+      name,
+      column: null,
+      table: null,
+      database: null,
+      type: null,
+    }));
   }
 
   setReadBigInts(_on: boolean): void {}
@@ -247,16 +253,16 @@ class ExpoSqliteConnection implements SqliteConnection {
     try {
       sql = sql.slice(0, tail);
       const stmt = empty ? null : await this.raw.prepareAsync(sql);
-      let columnCount = 0;
+      let columnNames: string[] = [];
       if (stmt !== null) {
         try {
-          columnCount = (await stmt.getColumnNamesAsync()).length;
+          columnNames = await stmt.getColumnNamesAsync();
         } catch (e) {
-          await stmt.finalizeAsync();
+          await stmt.finalizeAsync().catch(() => {});
           throw e;
         }
       }
-      return new ExpoSqliteStatement(stmt, columnCount, remainder);
+      return new ExpoSqliteStatement(stmt, columnNames, remainder);
     } catch (e) {
       rbSqlite3RaiseWithSql(e, sql);
     }

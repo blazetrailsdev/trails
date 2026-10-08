@@ -918,6 +918,7 @@ const includedKeys = Symbol.for("@blazetrails/ruby-compat:includedKeys");
 const extendedKeys = Symbol.for("@blazetrails/ruby-compat:extendedKeys");
 
 const includedModulesKey = Symbol.for("@blazetrails/ruby-compat:includedModules");
+const extendedOwners = new WeakMap<object, Map<string, object>>();
 
 const delegateClass = Symbol.for("@blazetrails/ruby-compat:delegateClass");
 
@@ -1058,6 +1059,12 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
  * @noRailsEquivalent PERMANENT
  */
 export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
+  if (
+    (typeof c === "function" || (typeof c === "object" && c !== null)) &&
+    singletonSearchAncestor(obj, c)
+  ) {
+    return true;
+  }
   const cl = rbObjClass(obj) as { prototype: object };
 
   if (cl === c) return true;
@@ -1067,6 +1074,29 @@ export function rbObjIsKindOf(obj: unknown, c: unknown): boolean {
   } else {
     throw new TypeError("class or module required");
   }
+}
+
+/**
+ * `class_search_ancestor` (`vendor/ruby/v3.3.11/object.c:935`) over the
+ * singleton class `CLASS_OF(obj)` starts at: the modules `obj` was `extend`ed
+ * with, and for a class those of its superclasses too.
+ */
+function singletonSearchAncestor(obj: unknown, c: object): boolean {
+  if (typeof obj !== "function" && (typeof obj !== "object" || obj === null)) return false;
+  for (
+    let p: object | null = obj;
+    p;
+    p = typeof p === "function" ? (Object.getPrototypeOf(p) as object | null) : null
+  ) {
+    if (!Object.hasOwn(p, extendedKeys) || !Object.hasOwn(p, includedModulesKey)) continue;
+    const mods = (p as Record<symbol, unknown>)[includedModulesKey] as Set<object>;
+    if (mods.has(c)) return true;
+    if (typeof c !== "object") continue;
+    for (const m of mods) {
+      if (typeof m === "object" && Object.prototype.isPrototypeOf.call(c, m)) return true;
+    }
+  }
+  return false;
 }
 
 /**
@@ -1154,45 +1184,67 @@ export interface UnboundMethod {
 }
 
 function mnewUnbound(start: object | null, mid: string): UnboundMethod | null {
+  const entry = methodEntry(start, mid);
+  if (entry === null) return null;
+  return {
+    owner: entryOwner(entry, mid),
+    superMethod: () => mnewUnbound(Object.getPrototypeOf(entry) as object | null, mid),
+    bindCall: (recv, ...args) => {
+      const desc = Object.getOwnPropertyDescriptor(entry, mid)!;
+      if (typeof desc.value === "function") {
+        return (desc.value as (...a: unknown[]) => unknown).apply(recv, args);
+      }
+      return desc.get ? desc.get.call(recv) : desc.value;
+    },
+  };
+}
+
+function methodEntry(start: object | null, mid: string): object | null {
   for (
     let link: object | null = start;
     link && link !== Object.prototype;
     link = Object.getPrototypeOf(link) as object | null
   ) {
-    if (!Object.hasOwn(link, mid)) continue;
-    const entry = link;
-    const method = (owner: object): UnboundMethod => ({
-      owner,
-      superMethod: () => mnewUnbound(Object.getPrototypeOf(entry) as object | null, mid),
-      bindCall: (recv, ...args) => {
-        const desc = Object.getOwnPropertyDescriptor(entry, mid)!;
-        if (typeof desc.value === "function") {
-          return (desc.value as (...a: unknown[]) => unknown).apply(recv, args);
-        }
-        return desc.get ? desc.get.call(recv) : desc.value;
-      },
-    });
-    const table = link as Record<symbol, unknown>;
-    if (Object.hasOwn(link, T_ICLASS)) return method(table[T_ICLASS] as object);
-    if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
-      const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
-      const owner = mods.find((m) => {
-        if (m instanceof Module) return false;
-        if (typeof m === "function") return Object.hasOwn(m.prototype as object, mid);
-        for (
-          let ancestor = m as object | null;
-          ancestor && ancestor !== Object.prototype;
-          ancestor = Object.getPrototypeOf(ancestor) as object | null
-        ) {
-          if (Object.hasOwn(ancestor, mid)) return true;
-        }
-        return false;
-      });
-      if (owner !== undefined) return method(owner);
-    }
-    return method(link.constructor);
+    if (Object.hasOwn(link, mid)) return link;
   }
   return null;
+}
+
+/**
+ * `method_owner` (`vendor/ruby/v3.3.11/proc.c:1988`) for the entry `mid` names from
+ * `start`, or nil when there is none. An entry `extend()` copied onto an
+ * object is owned by the module it came from, and a class's own static by the
+ * class, which stands for its singleton class.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function methodOwner(start: object, mid: string): object | null {
+  const entry = methodEntry(start, mid);
+  return entry === null ? null : entryOwner(entry, mid);
+}
+
+function entryOwner(link: object, mid: string): object {
+  const table = link as Record<symbol, unknown>;
+  if (Object.hasOwn(link, T_ICLASS)) return table[T_ICLASS] as object;
+  if (Object.hasOwn(link, includedKeys) && (table[includedKeys] as Set<string>).has(mid)) {
+    const mods = [...(table[includedModulesKey] as Set<object>)].reverse();
+    const owner = mods.find((m) => {
+      if (m instanceof Module) return false;
+      if (typeof m === "function") return Object.hasOwn(m.prototype as object, mid);
+      return methodEntry(m, mid) !== null;
+    });
+    if (owner !== undefined) return owner;
+  }
+  if (Object.hasOwn(link, extendedKeys) && (table[extendedKeys] as Set<string>).has(mid)) {
+    const defined = extendedOwners.get(link)?.get(mid);
+    if (defined !== undefined) return defined;
+    for (const m of [...(table[includedModulesKey] as Set<object>)].reverse()) {
+      const owner = m instanceof Module ? null : methodEntry(m, mid);
+      if (owner !== null) return owner;
+    }
+  }
+  if (typeof link === "function" && link !== Function.prototype) return link;
+  return link.constructor;
 }
 
 /**
@@ -1490,6 +1542,8 @@ export function rbObjClone<T>(obj: T): T {
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
   const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
+  const defined = extendedOwners.get(obj);
+  if (defined) extendedOwners.set(clone, new Map(defined));
   initCopyHook(clone, "initializeClone", obj);
   if (frozen) Object.freeze(clone);
   return clone as T;
@@ -1706,6 +1760,8 @@ export function extend<T extends AnyClass | object>(
     }
   }
   const installed = trackedKeys(klass, extendedKeys);
+  let defined = extendedOwners.get(klass);
+  if (!defined) extendedOwners.set(klass, (defined = new Map()));
 
   for (const [key, owner] of owners) {
     const modDesc = Object.getOwnPropertyDescriptor(owner, key);
@@ -1721,6 +1777,7 @@ export function extend<T extends AnyClass | object>(
       : { value: modDesc.value, writable: true, configurable: true, enumerable: false };
     if (!existing) {
       Object.defineProperty(klass, key, descriptor);
+      defined.set(key, owner);
       if (!modIsAccessor || modDesc.get != null) installed.add(key);
       if (modDesc.set != null) installed.add(writer);
       continue;
@@ -1735,10 +1792,14 @@ export function extend<T extends AnyClass | object>(
         configurable: true,
         enumerable: false,
       });
-      if (takeGetter) installed.add(key);
+      if (takeGetter) {
+        installed.add(key);
+        defined.set(key, owner);
+      }
       if (takeSetter) installed.add(writer);
     } else if (getterIsMixin && (!existingIsAccessor || existing.set == null || setterIsMixin)) {
       Object.defineProperty(klass, key, descriptor);
+      defined.set(key, owner);
       if (modDesc.set != null) installed.add(writer);
     }
   }

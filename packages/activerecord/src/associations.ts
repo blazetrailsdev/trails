@@ -3,7 +3,6 @@ import type { AssociationReflection, ThroughReflection } from "./reflection.js";
 import "./relation.js";
 import type { Relation } from "./relation.js";
 import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
-import { hasDefaultScopeOverride } from "./scoping/default.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { StatementCache } from "./statement-cache.js";
@@ -410,17 +409,7 @@ export function _skipSingularStatementCache(
     sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
   };
   if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
-  const klass = targetModel as unknown as {
-    currentScope?(): unknown;
-    defaultScopes?: unknown[];
-  };
-  if (
-    klass.currentScope?.() ||
-    (klass.defaultScopes?.length ?? 0) > 0 ||
-    hasDefaultScopeOverride(targetModel)
-  ) {
-    return true;
-  }
+  if (targetModel.isScopeAttributes()) return true;
   if ((refl.sourceReflection?.activeRecord?.defaultScopes?.length ?? 0) > 0) return true;
   return false;
 }

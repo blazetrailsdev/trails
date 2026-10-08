@@ -172,6 +172,7 @@ export {
   aryDeleteIf,
   aryFetch,
   aryIncludes,
+  aryJoin,
   aryPop,
   arySlice,
   compact,

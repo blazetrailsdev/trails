@@ -13,6 +13,7 @@ import {
   aryDeleteIf,
   aryFetch,
   aryIncludes,
+  aryJoin,
   aryPop,
   deleteAt,
   arySlice,
@@ -707,5 +708,29 @@ describe("deleteAt", () => {
     expect(deleteAt(ary, 1)).toBeNull();
     expect(deleteAt(ary, -2)).toBeNull();
     expect(ary).toEqual(["foo"]);
+  });
+});
+
+describe("aryJoin", () => {
+  it("sends each element to_s, so a Symbol contributes its name", () => {
+    expect(aryJoin([":analyze", ":verbose"], ", ")).toBe("analyze, verbose");
+    expect(aryJoin([":a", "b", null, 1], ", ")).toBe("a, b, , 1");
+  });
+
+  it("joins a nested array in place with the same separator", () => {
+    expect(aryJoin([":a", ["b", [":c"]], null, 1], ", ")).toBe("a, b, c, , 1");
+    expect(aryJoin([1, [], 2], ",")).toBe("1,,2");
+  });
+
+  it("puts nothing between the elements when no separator is given", () => {
+    expect(aryJoin([1, [2, 3]])).toBe("123");
+    expect(aryJoin([], "-")).toBe("");
+  });
+
+  it("raises ArgumentError for an array that contains itself", () => {
+    const ary: unknown[] = [1];
+    ary.push(ary);
+    expect(() => aryJoin(ary)).toThrow(ArgumentError);
+    expect(() => aryJoin(ary)).toThrow("recursive array join");
   });
 });
