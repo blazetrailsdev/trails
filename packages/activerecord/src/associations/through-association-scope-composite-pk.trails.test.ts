@@ -14,7 +14,7 @@ CpkOrder.hasMany(
     return this.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'");
   },
   {
-    className: "CpkTag",
+    className: "Cpk::Tag",
     through: "orderTags",
     source: "tag",
   },

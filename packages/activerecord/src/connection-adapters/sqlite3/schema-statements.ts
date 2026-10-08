@@ -28,6 +28,8 @@ import { quoteTableName } from "./quoting.js";
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   /** @internal */
   extractValueFromDefault(default_: string | null): unknown;
+  /** @internal */
+  extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null;
   addForeignKey(
     fromTable: string,
     toTable: string,
@@ -312,7 +314,7 @@ export function newColumnFromField(
   if (generatedType) {
     defaultFunction = default_;
   } else {
-    defaultFunction = extractDefaultFunction(defaultValue, default_);
+    defaultFunction = this.extractDefaultFunction(defaultValue, default_);
   }
 
   const rowid = isColumnTheRowid(field, definitions);
@@ -406,15 +408,4 @@ export function extractGeneratedType(
     default:
       return undefined;
   }
-}
-
-function extractDefaultFunction(defaultValue: unknown, dflt: string | null): string | null {
-  if (
-    defaultValue == null &&
-    dflt != null &&
-    /\w+\(.*\)|CURRENT_TIME|CURRENT_DATE|CURRENT_TIMESTAMP|\|\|/.test(dflt)
-  ) {
-    return dflt;
-  }
-  return null;
 }

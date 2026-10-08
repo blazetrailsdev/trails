@@ -1,4 +1,4 @@
-import { hasKey } from "@blazetrails/ruby-compat";
+import { hasKey, rbModName } from "@blazetrails/ruby-compat";
 import {
   foreignKey,
   underscore,
@@ -98,7 +98,7 @@ export class HasAndBelongsToMany {
 
   private middleOptions(joinModel: any): Record<string, unknown> {
     const middleOptions: Record<string, unknown> = {};
-    middleOptions.className = `${this.lhsModel.name}::${joinModel.name}`;
+    middleOptions.className = `${rbModName(this.lhsModel)}::${joinModel.name}`;
     if (hasKey(this.options, "foreignKey")) {
       middleOptions.foreignKey = this.options.foreignKey;
     }

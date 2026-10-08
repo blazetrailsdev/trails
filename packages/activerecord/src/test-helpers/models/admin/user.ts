@@ -37,7 +37,7 @@ export class AdminUser extends Base {
   }
 
   static {
-    this.belongsTo("account", { className: "AdminAccount" });
+    this.belongsTo("account", { className: "Admin::Account" });
 
     this.store("params", { accessors: ["token"], coder: YAMLColumn });
     this.store("settings", { accessors: ["color", "homepage"] });

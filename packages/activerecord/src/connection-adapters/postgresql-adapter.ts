@@ -21,7 +21,7 @@ import {
   underscore,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { IO, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -1142,7 +1142,7 @@ export class PostgreSQLAdapter
   }
   /** @internal */
   hasDefaultFunction(defaultValue: unknown, default_: string | null): boolean {
-    return !rtest(defaultValue) && default_ != null && DEFAULT_FUNCTION_RE.test(default_);
+    return !rtest(defaultValue) && rbRegMatchP(DEFAULT_FUNCTION_RE, default_);
   }
   /** @internal */
   translateException(

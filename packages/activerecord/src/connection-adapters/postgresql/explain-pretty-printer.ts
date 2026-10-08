@@ -1,16 +1,16 @@
-import { first } from "@blazetrails/ruby-compat";
+import { center, first, rstrip } from "@blazetrails/ruby-compat";
 import type { Result } from "../../result.js";
 
 export class ExplainPrettyPrinter {
   pp(result: Result): string {
     const header = first(result.columns)!;
-    const lines = result.rows.map((row) => String(first(row)));
+    const lines = result.rows.map(first) as string[];
 
     const width = Math.max(...[header, ...lines].map((line) => line.length)) + 2;
 
     const pp: string[] = [];
 
-    pp.push(" ".repeat(Math.floor((width - header.length) / 2)) + header);
+    pp.push(rstrip(center(header, width)));
     pp.push("-".repeat(width));
 
     pp.push(...lines.map((line) => ` ${line}`));

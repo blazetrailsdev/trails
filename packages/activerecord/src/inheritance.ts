@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { registerModelConstant } from "./associations.js";
+import { autoloadModel, registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { IndexedRow } from "./result.js";
@@ -30,7 +30,10 @@ export const Inheritance = {
   },
 };
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm autoloadModel — CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants
+ */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
     return constantize(typeName) as typeof Base;
@@ -56,6 +59,7 @@ export function computeType(baseClass: typeof Base, typeName: string): typeof Ba
     candidates.push(typeName);
 
     for (const candidate of candidates) {
+      autoloadModel(candidate);
       const constant = safeConstantize(candidate) as typeof Base | null | undefined;
       if (constant != null && candidate === rbModName(constant)) {
         klass._typeCandidatesCache.set(typeName, candidate);
@@ -121,7 +125,7 @@ export function polymorphicName(modelClass: typeof Base): string {
   return klass.storeFullClassName ? name : demodulize(name);
 }
 
-/** @noRailsEquivalent CONVERGEABLE model-class-names-resolve-through-constantize-not-a-model-registry */
+/** @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants */
 export function registerSubclass(klass: typeof Base): void {
   const parent = rbClassSuperclass(klass);
   if (!parent) return;

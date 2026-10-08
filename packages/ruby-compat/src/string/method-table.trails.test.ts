@@ -8,10 +8,12 @@ import { bytes } from "./bytes.js";
 import { rbObjClone } from "../include.js";
 import { rbHash } from "../rb-hash.js";
 import {
+  center,
   lastMatchGetter,
   matchOperator,
   rbObjNotMatch,
   rbStrSend,
+  rstrip,
   stringSuperclass,
   strip,
   type StringInstance,
@@ -1106,6 +1108,17 @@ describe("strip and matchOperator", () => {
     expect(strip("\u00a0a\u00a0")).toBe("\u00a0a\u00a0");
     expect(strip("\ufeffa\u2003")).toBe("\ufeffa\u2003");
     expect(strip(" \n")).toBe("");
+  });
+
+  it("rstrip removes trailing NUL and ASCII whitespace only, as MRI does", () => {
+    expect(rstrip("\0 yes \r\n\0")).toBe("\0 yes");
+    expect(rstrip("a\u00a0")).toBe("a\u00a0");
+  });
+
+  it("center pads both sides, the odd character on the right, as MRI does", () => {
+    expect(center("ab", 5)).toBe(" ab  ");
+    expect(center("x", 4, "12")).toBe("1x12");
+    expect(center("abc", 2)).toBe("abc");
   });
 
   it("matchOperator dispatches =~ on nil, a String and a receiver's own method", () => {

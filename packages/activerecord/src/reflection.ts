@@ -20,7 +20,6 @@ import {
   camelize,
   demodulize,
   constantize,
-  safeConstantize,
   foreignKey as deriveForeignKey,
   merge,
   DelegationError,
@@ -31,14 +30,17 @@ import {
 import {
   NotImplementedError,
   RuntimeError,
+  StandardError,
   except,
   mergeBang,
+  rbRegMatchP,
+  rtest,
   toS,
 } from "@blazetrails/ruby-compat";
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
-import { modelRegistry, autoloadModel } from "./associations.js";
+import { autoloadModel } from "./associations.js";
 import * as ReflectionModule from "./reflection.js";
 import { _setReflection } from "./reflection-slot.js";
 import {
@@ -52,7 +54,7 @@ import type { HasManyAssociation } from "./associations/has-many-association.js"
 import type { HasManyThroughAssociation } from "./associations/has-many-through-association.js";
 import type { HasOneAssociation } from "./associations/has-one-association.js";
 import type { HasOneThroughAssociation } from "./associations/has-one-through-association.js";
-import { Associations } from "./namespaces.js";
+import { ActiveRecord, Associations } from "./namespaces.js";
 import {
   AmbiguousSourceReflectionForThroughAssociation,
   HasManyThroughAssociationNotFoundError,
@@ -436,29 +438,15 @@ export class MacroReflection extends AbstractReflection {
     return resolved;
   }
 
-  /** @internal */
-  protected activeRecordRegistryName(): string {
-    const ar = this.activeRecord as any;
-    if (Object.prototype.hasOwnProperty.call(ar, "_registryKeys")) {
-      const matching = (ar._registryKeys as string[]).filter(
-        (k) => modelRegistry.get(k) === this.activeRecord,
-      );
-      if (matching.length > 0) {
-        return matching.reduce((best, k) =>
-          (k.match(/::/g) ?? []).length > (best.match(/::/g) ?? []).length ? k : best,
-        );
-      }
-    }
-    return this.activeRecord.name;
-  }
-
   _klass(className: string): typeof Base {
-    const arName = this.activeRecordRegistryName();
-    if (demodulize(arName) === className) {
+    if (demodulize(rbModName(this.activeRecord)!) === className) {
       try {
         return this.computeClass(`::${className}`);
-      } catch {}
+      } catch (error) {
+        if (!(error instanceof StandardError)) throw error;
+      }
     }
+
     return this.computeClass(className);
   }
 
@@ -928,50 +916,29 @@ export class AssociationReflection extends MacroReflection {
       throw new ArgumentError("Polymorphic associations do not support computing the class.");
     }
 
-    const isAbsolute = name.startsWith("::");
-    const simpleName = isAbsolute ? name.slice(2) : name;
-
-    if (!isAbsolute) {
-      const arName = this.activeRecordRegistryName();
-      const name = rbModName(this.activeRecord)!;
-      const nestingSource = arName.includes("::") ? arName : name;
-      if (nestingSource.includes("::")) {
-        const segments = nestingSource.split("::");
-        for (let i = segments.length; i > 0; i--) {
-          const candidate = [...segments.slice(0, i), simpleName].join("::");
-          autoloadModel(candidate);
-          const resolved = safeConstantize(candidate) as typeof Base | undefined;
-          if (resolved) {
-            if (!(resolved as any)._isActiveRecordBase) {
-              throw new ArgumentError(
-                `The ${candidate} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
-              );
-            }
-            return resolved;
-          }
-        }
-      }
-    }
-
-    autoloadModel(simpleName);
-    let resolved: typeof Base;
+    let klass: typeof Base;
     try {
-      resolved = constantize(simpleName) as typeof Base;
+      klass = this.activeRecord.computeType(name);
     } catch (error) {
       if (!(error instanceof NameError)) throw error;
-      if (!new RegExp(`(?:^|::)${simpleName}$`).test(error.constantName ?? "")) throw error;
-      let message = `Missing model class ${simpleName} for the ${this.activeRecord.name}#${this.nameString} association.`;
-      if (!this.options.className) {
-        message += " You can specify a different model class with the :class_name option.";
+      if (rbRegMatchP(new RegExp(`(?:^|::)${name}$`), error.constantName)) {
+        let message = `Missing model class ${name} for the ${rbModName(this.activeRecord)}#${this.name} association.`;
+        if (!rtest(this.options.className)) {
+          message += " You can specify a different model class with the :class_name option.";
+        }
+        throw new NameError(message, name);
+      } else {
+        throw error;
       }
-      throw new NameError(message, simpleName);
     }
-    if (!(resolved as any)._isActiveRecordBase) {
+
+    if (!(klass.prototype instanceof ActiveRecord.Base)) {
       throw new ArgumentError(
-        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
+        `The ${name} model class for the ${rbModName(this.activeRecord)}#${this.name} association is not an ActiveRecord::Base subclass.`,
       );
     }
-    return resolved;
+
+    return klass;
   }
 
   get strictLoading(): boolean {

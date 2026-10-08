@@ -1,6 +1,5 @@
 import type { Base } from "./base.js";
 import type { CollectionAssociation } from "./associations/collection-association.js";
-import { modelRegistry } from "./associations.js";
 import { ActiveRecordError, RecordNotFound } from "./errors.js";
 import {
   assertValidKeys,
@@ -352,7 +351,6 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  const collectionTargetModel = resolveCollectionTargetModel(record, associationName);
   const association = record.association(associationName) as CollectionAssociation;
 
   const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
@@ -370,13 +368,11 @@ export function assignNestedAttributesForCollectionAssociation(
           nestedTarget.push(null);
         }
       } else {
-        let existingRecord = collectionTargetModel
-          ? findRecordById(collectionTargetModel, existingRecords, (a as any).id)
-          : undefined;
+        let existingRecord = findRecordById(association.klass, existingRecords, (a as any).id);
         if (existingRecord) {
           if (!callRejectIf.call(record, associationName, a)) {
             const targetRecord = findRecordById(
-              collectionTargetModel!,
+              association.klass,
               association.target,
               (a as any).id,
             );
@@ -408,25 +404,14 @@ export function assignNestedAttributesForCollectionAssociation(
   if (association.isLoaded()) return assignRecords(association.target);
 
   const attributeIds = attrs.map((a) => (a as any).id).filter((id) => id != null && id !== "");
-  if (attributeIds.length === 0 || !collectionTargetModel) return assignRecords([]);
+  if (attributeIds.length === 0) return assignRecords([]);
 
-  const primaryKey = (collectionTargetModel as any).primaryKey;
+  const primaryKey = association.klass.primaryKey;
   const scope = association.scope();
   return scope
     .where(new Map([[primaryKey, attributeIds]]))
     .toArray()
     .then((existingRecords: Base[]) => assignRecords(existingRecords));
-}
-
-/** @internal */
-function resolveCollectionTargetModel(
-  record: Base,
-  associationName: string,
-): typeof Base | undefined {
-  const ctor = record.constructor as typeof Base;
-  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
-  if (!assocDef) return undefined;
-  return modelRegistry.get(assocDef.className);
 }
 
 export const NestedAttributes = {

@@ -38,6 +38,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   "to_s",
   "to_sym",
   "strip",
+  "rstrip",
 
   // ActiveSupport inflections — String core-exts, exported by
   // @blazetrails/activesupport as free functions of the string.
