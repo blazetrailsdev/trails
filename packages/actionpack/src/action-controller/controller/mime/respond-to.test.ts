@@ -328,9 +328,9 @@ class RespondToController extends Base {
     switch (this.actionName) {
       case "allTypesWithLayout":
       case "iphoneWithHtmlResponseType":
-        return "respond_to/layouts/standard";
+        return "respond-to/layouts/standard";
       case "iphoneWithHtmlResponseTypeWithoutLayout":
-        return "respond_to/layouts/missing";
+        return "respond-to/layouts/missing";
     }
   }
 }

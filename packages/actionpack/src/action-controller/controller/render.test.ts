@@ -101,8 +101,8 @@ class ImplicitRenderTestController extends Base {
   static {
     this.viewPaths([
       new FixtureResolver({
-        "implicit_render_test/hello-world.tse": "Hello world!",
-        "implicit_render_test/empty-action-with-template.html.tse":
+        "implicit-render-test/hello-world.tse": "Hello world!",
+        "implicit-render-test/empty-action-with-template.html.tse":
           "<h1>Empty action rendered this implicitly.</h1>\n",
       }),
     ]);
@@ -122,7 +122,7 @@ rbModConstSet(
     static {
       this.viewPaths([
         new FixtureResolver({
-          "namespaced/implicit_render_test/hello-world.tse": "Hello world!",
+          "namespaced/implicit-render-test/hello-world.tse": "Hello world!",
         }),
       ]);
     }
@@ -928,7 +928,7 @@ describe("NamespacedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "namespaced/implicit_render_test/hello-world", async () => {
+    await modifyTemplate(tc, "namespaced/implicit-render-test/hello-world", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");
@@ -957,7 +957,7 @@ describe("InheritedEtagRenderTest", () => {
     await tc.get("helloWorld");
     assertResponse("not_modified");
 
-    await modifyTemplate(tc, "implicit_render_test/hello-world", async () => {
+    await modifyTemplate(tc, "implicit-render-test/hello-world", async () => {
       tc.request.setIfNoneMatch(etag!);
       await tc.get("helloWorld");
       assertResponse("ok");

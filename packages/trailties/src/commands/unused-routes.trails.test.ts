@@ -98,6 +98,25 @@ describe("UnusedRoutesCommand", () => {
     expect(await uncovered.unused()).toBe(true);
   });
 
+  it("RouteInfo finds a multi-word controller's template in its kebab-case view directory", async () => {
+    class StoryPagesController extends ActionController.Metal {
+      static viewPaths(): ActionView.PathSet {
+        return new ActionView.PathSet([
+          new ActionView.FileSystemResolver(
+            new URL("./__fixtures__/views", import.meta.url).pathname,
+          ),
+        ]);
+      }
+    }
+    controllerConstants.set("admin/story_pages", StoryPagesController as never);
+
+    const covered = new RouteInfo(route({ controller: "admin/story_pages", action: "index" }));
+    const uncovered = new RouteInfo(route({ controller: "admin/story_pages", action: "show" }));
+
+    expect(await covered.unused()).toBe(false);
+    expect(await uncovered.unused()).toBe(true);
+  });
+
   it("RouteInfo does not count an inherited non-action method as the route's action", async () => {
     class PostsController extends ActionController.Metal {}
     controllerConstants.set("posts", PostsController as never);

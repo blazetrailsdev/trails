@@ -18,6 +18,7 @@ describe("PartialRenderer render blocks", () => {
     const resolver = new FixtureResolver({
       "layouts/_yield_only.html.tse": "<%= yield %>\n",
       "test/_partial.html.tse": "partial html",
+      "admin/line-items/_line_item.html.tse": "item <%= line_item.name %>;",
       "test/_layout_for_partial.html.tse": "Before (<%= name %>)\n<%= yield %>\nAfter",
     });
     lookupContext = new LookupContext(null, {}, []);
@@ -69,5 +70,13 @@ describe("PartialRenderer render blocks", () => {
     });
     expect(isHtmlSafe(body)).toBe(true);
     expect(String(body)).toBe("partial htmlpartial htmlpartial html");
+  });
+
+  it("finds a record's partial in the kebab-case directory of its partial path", async () => {
+    const item = (name: string) => ({ name, toPartialPath: () => "admin/line_items/line_item" });
+    expect(String(await renderer.renderPartial(view, { partial: item("one") }))).toBe("item one;");
+    const items = { toAry: () => [item("one"), item("two")] };
+    const body = await renderer.renderPartial(view, { partial: items });
+    expect(String(body)).toBe("item one;item two;");
   });
 });

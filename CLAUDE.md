@@ -1989,6 +1989,32 @@ or a locale key, and nowhere else. Each site carries
   (`abstract-controller/translation.ts`)
 - `RouteInfo#viewPath` (`trailties/src/commands/unused-routes.ts`)
 
+The DIRECTORY a controller's templates are looked up in is kebab-case too.
+`ViewPaths::ClassMethods#localPrefixes` (`actionview/src/view-paths.ts`; Rails'
+`local_prefixes`, `view_paths.rb:75-77`, returns `[controller_path]`) returns
+the controller path dasherized, namespaces kept: `Admin::StoryPagesController`
+renders from `admin/story-pages/`, beside `admin/story-pages-controller.ts`.
+It carries `@inventedArm dasherize — PERMANENT`. `controller_path` itself is
+unchanged and stays underscored: it names the controller in routes and URL
+generation, where a hyphen is not legal. The controller generator writes the
+kebab-case directory, the view compiler maps a controller to it, and
+`RouteInfo#viewPath` (`trails unused_routes`) looks for a route's template in
+it, dasherizing the route's controller as it already does the action.
+
+Two more sites name that directory and follow it. The scaffold's view generator
+(`trailties/src/generators/tse/scaffold/scaffold-generator.ts`; Rails'
+`erb/scaffold/scaffold_generator.rb` writes to `controller_file_path`) writes
+to the dasherized `controllerFilePath()`; `controllerFilePath` and
+`controllerI18nScope` themselves stay underscored. And a record rendered by
+itself (`render(lineItem)`) is looked up through `partialPath`
+(`actionview/src/renderer/abstract-renderer.ts`; Rails' `partial_path`,
+`renderer/abstract_renderer.rb`), which dasherizes the directory part of the
+record's `to_partial_path` and leaves the partial's own name alone:
+`line_items/line_item` is found at `line-items/_line_item`. `to_partial_path`
+is unchanged, as `controller_path` is. `partialPath` carries
+`@inventedArm dasherize — PERMANENT`; the scaffold generator's methods are not
+compared against Rails' and carry no receipt.
+
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal

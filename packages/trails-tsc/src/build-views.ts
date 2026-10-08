@@ -281,7 +281,7 @@ function bindCheckedTypes(
       prefix: path.posix.dirname(v.rel),
       inController: false,
     })),
-    ...controllers.map((c) => ({ file: c.file, prefix: c.path, inController: true })),
+    ...controllers.map((c) => ({ file: c.file, prefix: dasherize(c.path), inController: true })),
     ...helperFiles.map((file) => ({ file, inController: false })),
   ];
   for (const { file, prefix, inController } of sources) {
@@ -772,7 +772,8 @@ async function templateScope(
   );
   const prefix = path.posix.dirname(rel);
   const layout = /^layouts\/((?:[^/]+\/)*[^_/][^/.]*)\./u.exec(rel)?.[1];
-  const controller = layout === undefined ? controllers.find((c) => c.path === prefix) : undefined;
+  const controller =
+    layout === undefined ? controllers.find((c) => dasherize(c.path) === prefix) : undefined;
   const locals = new Map<string, Set<string>>();
   let modelClass: ViewShim["model"];
   const partial = /^_([a-z_]\w*)/u.exec(path.posix.basename(rel));

@@ -61,7 +61,7 @@ export class RouteInfo {
     const path = getPath();
     return path.join(
       root.path,
-      String(this.controllerName),
+      dasherize(String(this.controllerName)),
       dasherize(underscore(String(this.actionName))),
     );
   }

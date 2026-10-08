@@ -30,14 +30,15 @@ describe("ControllerGenerator view and controller file naming", () => {
   it("writes the view directory the implicit lookup asks for", async () => {
     const gen = makeGen();
     await gen.run("RfcPages", ["show"]);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(false);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages"))).toBe(false);
   });
 
-  it("keeps the controller file kebab-cased while its view directory is not", async () => {
+  it("names the controller file and its view directory alike, in kebab-case", async () => {
     const gen = makeGen();
     await gen.run("RfcPages", ["show"]);
     expect(fs.existsSync(path.join(tmpDir, "app/controllers/rfc-pages-controller.ts"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages"))).toBe(true);
   });
 
   it("draws a multi-word route under the underscored file_name, not a dasherized one", async () => {
@@ -56,7 +57,7 @@ describe("ControllerGenerator view and controller file naming", () => {
       "utf8",
     );
     expect(controller).toContain("class RfcPagesController");
-    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc_pages/show.html.tse"))).toBe(true);
+    expect(fs.existsSync(path.join(tmpDir, "app/views/rfc-pages/show.html.tse"))).toBe(true);
     expect(fs.existsSync(path.join(tmpDir, "test/controllers/rfc-pages-controller.test.ts"))).toBe(
       true,
     );
