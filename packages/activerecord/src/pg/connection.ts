@@ -74,13 +74,11 @@ type Client = Omit<pg.Client, "connection"> & {
   _ended?: boolean;
 };
 
-/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function status(this: pg.Client): number {
   const { _ending, _ended } = this as Client;
   return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
 }
 
-/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function transactionStatus(this: pg.Client): number {
   if ((this as Client)._activeQuery != null) return PQTRANS_ACTIVE;
   switch (READY_FOR_QUERY.get(this)) {
@@ -159,13 +157,11 @@ function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
   return new PG.Result(Array.isArray(raw) ? raw[raw.length - 1] : raw);
 }
 
-/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function escapeBytea(value: Buffer | Uint8Array | string): string {
   const buffer = typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value);
   return `\\x${buffer.toString("hex")}`;
 }
 
-/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function unescapeBytea(value: string | Uint8Array): Buffer {
   if (typeof value !== "string") value = Buffer.from(value).toString("latin1");
   if (value.startsWith("\\x")) return Buffer.from(value.slice(2), "hex");
@@ -210,7 +206,6 @@ function socketIo(this: pg.Client): { reopen(path: string): void } | null {
   };
 }
 
-/** @noRailsEquivalent CONVERGEABLE ruby-extractor-reads-c-defined-gem-methods */
 export function block(this: pg.Client, timeout: number | null = null): Promise<boolean> {
   if ((this as Client)._activeQuery == null) return Promise.resolve(true);
   const connection = (this as Client).connection;
