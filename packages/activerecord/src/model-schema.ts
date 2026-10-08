@@ -641,10 +641,10 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
     return false;
   }
   const cache = pool.schemaReflection.loadedCache;
-  if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
+  if (cache && typeof cache.getCachedColumnsHash !== "function") return false;
   const table = host.tableName;
   if (table == null) return false;
-  let hash: Record<string, unknown> | undefined = cache.getCachedColumnsHash(table);
+  let hash: Record<string, unknown> | undefined = cache?.getCachedColumnsHash(table);
   if (!hash) {
     let adapter: SchemaHost["connection"] | undefined;
     try {
@@ -664,12 +664,11 @@ function warmColumnsHashSync(
   cache: {
     setColumns?: (table: string, cols: any[]) => void;
     getCachedColumnsHash: (table: string) => Record<string, unknown> | undefined;
-  },
+  } | null,
   table: string,
 ): Record<string, unknown> | undefined {
-  if (typeof adapter.columns !== "function" || typeof cache.setColumns !== "function") {
-    return undefined;
-  }
+  if (typeof adapter.columns !== "function") return undefined;
+  if (cache && typeof cache.setColumns !== "function") return undefined;
   let cols: unknown;
   try {
     cols = adapter.columns(table);
@@ -681,7 +680,8 @@ function warmColumnsHashSync(
     return undefined;
   }
   if (!Array.isArray(cols) || cols.length === 0) return undefined;
-  cache.setColumns(table, cols);
+  if (!cache) return Object.fromEntries(cols.map((col) => [col.name, col]));
+  cache.setColumns!(table, cols);
   return cache.getCachedColumnsHash(table);
 }
 

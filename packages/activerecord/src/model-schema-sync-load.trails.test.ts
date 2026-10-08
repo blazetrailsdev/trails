@@ -354,3 +354,23 @@ describe("sync loadSchema / columnsHash", () => {
     expect(built.isWarm()).toBe(false);
   });
 });
+
+describe("sync loadSchema on a reflection that has not loaded its cache", () => {
+  it("reads a synchronous adapter's columns without seating a cache", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const cols = [{ sqlType: "integer", name: "id", default: null }];
+    await establishConnectionTo(
+      Post,
+      adapterDouble({
+        columns: () => cols,
+        lookupCastTypeFromColumn: () => defaultValue(),
+      }) as never,
+    );
+    await Post.leaseConnection();
+
+    expect(Post.columnsHash().id).toBe(cols[0]);
+    expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
+  });
+});
