@@ -866,16 +866,16 @@ export class AbstractAdapter implements Quoting {
   }
 
   static findCmdAndExec(commands: string | string[], ...args: string[]): never {
-    let cmds = kernelArray(commands);
+    commands = kernelArray(commands);
 
     const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
     const ext = RbConfig.CONFIG["EXEEXT"];
     if (!isEmpty(ext)) {
-      cmds = cmds.map((cmd) => `${cmd}${ext}`);
+      commands = commands.map((cmd) => `${cmd}${ext}`);
     }
 
     let fullPathCommand: string | null = null;
-    const found = cmds.find((cmd) =>
+    const found = commands.find((cmd) =>
       dirsOnPath.find((path) => {
         fullPathCommand = File.join(path, cmd);
         let stat;
@@ -891,7 +891,9 @@ export class AbstractAdapter implements Quoting {
     if (found != null) {
       exec(fullPathCommand!, ...args);
     } else {
-      abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
+      abort(
+        `Couldn't find database client: ${commands.join(", ")}. Check your $PATH and try again.`,
+      );
     }
   }
 

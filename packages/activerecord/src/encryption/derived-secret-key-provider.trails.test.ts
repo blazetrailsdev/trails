@@ -18,7 +18,7 @@ describe("DerivedSecretKeyProvider", () => {
     const keyGenerator = Configurable.keyGenerator as KeyGenerator;
     const keyProvider = new DerivedSecretKeyProvider(["first", "second"]);
     const secrets = keyProvider
-      .decryptionKeys(new Message({ payload: "some secret" }))
+      .decryptionKeys(new Message({ payload: "some secret" }))!
       .map((key) => key.secret);
     expect(secrets).toEqual([
       keyGenerator.deriveKeyFrom("first"),

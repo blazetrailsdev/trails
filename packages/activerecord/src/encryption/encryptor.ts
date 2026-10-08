@@ -34,7 +34,7 @@ export interface KeyProviderLike {
   encryptionKey(): { secret: string; publicTags: Record<string, unknown> | Properties };
   decryptionKeys(
     message: Message,
-  ): Array<{ secret: string; publicTags: Record<string, unknown> | Properties }>;
+  ): Array<{ secret: string; publicTags: Record<string, unknown> | Properties }> | undefined;
 }
 
 export class Encryptor {
@@ -73,7 +73,7 @@ export class Encryptor {
       const keys = keyProvider.decryptionKeys(message);
       if (!isPresent(keys)) throw new Decryption();
       return this.uncompressIfNeeded(
-        this.cipher().decrypt(message, { key: keys.map((key) => key.secret), ...cipherOptions }),
+        this.cipher().decrypt(message, { key: keys!.map((key) => key.secret), ...cipherOptions }),
         message.headers.compressed,
       );
     } catch (e) {
