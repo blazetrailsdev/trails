@@ -298,6 +298,7 @@ export const SOURCES: readonly UpstreamSource[] = [
       {
         name: "pg",
         libPath: "lib/pg",
+        libEntryFile: "lib/pg.rb",
       },
     ],
   },
