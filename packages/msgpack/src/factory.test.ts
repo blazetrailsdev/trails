@@ -1,11 +1,15 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { Time } from "@blazetrails/date";
 import {
   ArgumentError,
   FrozenError,
+  Hash,
   NoMethodError,
   NotImplementedError,
   RangeError,
   rbCInteger,
+  rbCSymbol,
+  rbEqual,
 } from "@blazetrails/ruby-compat";
 import { Factory, MessagePack, Packer, UnknownExtTypeError, Unpacker } from "./index.js";
 
@@ -35,6 +39,74 @@ class MyType {
 
 class MyType2 extends MyType {}
 
+class DummyTimeStamp1 {
+  static TYPE = 15;
+
+  readonly time: Time;
+
+  constructor(
+    readonly utime: number,
+    readonly usec: number,
+  ) {
+    this.time = Time.at(utime, usec);
+  }
+
+  equals(other: DummyTimeStamp1): boolean {
+    return this.utime === other.utime && this.usec === other.usec;
+  }
+
+  static typeId(): number {
+    return 15;
+  }
+
+  static fromMsgpackExt(data: Uint8Array): DummyTimeStamp1 {
+    return new this(...(new Uint32Array(data.slice().buffer) as unknown as [number, number]));
+  }
+
+  toMsgpackExt(): Uint8Array {
+    return new Uint8Array(Uint32Array.of(this.utime, this.usec).buffer);
+  }
+}
+
+class DummyTimeStamp2 {
+  static TYPE = 16;
+
+  readonly time: Time;
+
+  constructor(
+    readonly utime: number,
+    readonly usec: number,
+  ) {
+    this.time = Time.at(utime, usec);
+  }
+
+  equals(other: DummyTimeStamp2): boolean {
+    return this.utime === other.utime && this.usec === other.usec;
+  }
+
+  static deserialize(data: Uint8Array): DummyTimeStamp2 {
+    return new this(
+      ...(new TextDecoder().decode(data).split(",", 2).map(Number) as [number, number]),
+    );
+  }
+
+  serialize(): string {
+    return [this.utime, this.usec].map(String).join(",");
+  }
+}
+
+function expectToChange(block: () => void, value: () => unknown): void {
+  const before = value();
+  block();
+  expect(value()).not.toEqual(before);
+}
+
+function expectNotToChange(block: () => void, value: () => unknown): void {
+  const before = value();
+  block();
+  expect(value()).toEqual(before);
+}
+
 describe("MessagePack::Factory", () => {
   let subject: Factory;
   beforeEach(() => {
@@ -58,6 +130,111 @@ describe("MessagePack::Factory", () => {
 
     it("creates new instance", () => {
       expect(subject.unpacker()).not.toBe(subject.unpacker());
+    });
+
+    it("does not share the extension registry with unpackers", () => {
+      subject.registerType(0x00, rbCSymbol);
+      expectNotToChange(
+        () => {
+          const unpacker = subject.unpacker();
+          expectToChange(
+            () => {
+              unpacker.registerType(0x01, null, null, () => {});
+            },
+            () => unpacker.registeredTypes(),
+          );
+
+          const secondUnpacker = subject.unpacker();
+          expectNotToChange(
+            () => {
+              secondUnpacker.registerType(0x01, null, null, () => {});
+            },
+            () => unpacker.registeredTypes(),
+          );
+        },
+        () => subject.registeredTypes(),
+      );
+    });
+  });
+
+  describe("#freeze", () => {
+    it("can freeze factory instance to deny new registrations anymore", () => {
+      subject.registerType(0x00, rbCSymbol);
+      subject.freeze();
+      expect(Object.isFrozen(subject)).toBeTruthy();
+      expect(() => subject.registerType(0x01, Array)).toThrow(
+        new FrozenError("can't modify frozen MessagePack::Factory"),
+      );
+    });
+  });
+
+  describe("#registered_types", () => {
+    it("returns Array", () => {
+      expect(subject.registeredTypes()).toBeInstanceOf(Array);
+    });
+
+    it("returns Array of Hash contains :type, :class, :packer, :unpacker", () => {
+      subject.registerType(0x20, MyType);
+      subject.registerType(0x21, MyType2);
+
+      const list = subject.registeredTypes();
+
+      expect(list.length).toEqual(2);
+      expect(list[0]).toBeInstanceOf(Object);
+      expect(list[1]).toBeInstanceOf(Object);
+      expect(Object.keys(list[0]).sort()).toEqual(["type", "class", "packer", "unpacker"].sort());
+      expect(Object.keys(list[1]).sort()).toEqual(["type", "class", "packer", "unpacker"].sort());
+
+      expect(list[0].type).toEqual(0x20);
+      expect(list[0].class).toEqual(MyType);
+      expect(list[0].packer).toBeInstanceOf(Function);
+      expect(list[0].unpacker).toBeInstanceOf(Function);
+
+      expect(list[1].type).toEqual(0x21);
+      expect(list[1].class).toEqual(MyType2);
+      expect(list[1].packer).toBeInstanceOf(Function);
+      expect(list[1].unpacker).toBeInstanceOf(Function);
+    });
+
+    it("returns Array of Hash which has nil for unregistered feature", () => {
+      subject.registerType(0x20, MyType, { packer: "toMsgpackExt" });
+      subject.registerType(0x21, MyType2, { unpacker: "fromMsgpackExt" });
+
+      let list = subject.registeredTypes();
+
+      expect(list.length).toEqual(2);
+      expect(list[0]).toBeInstanceOf(Object);
+      expect(list[1]).toBeInstanceOf(Object);
+      expect(Object.keys(list[0]).sort()).toEqual(["type", "class", "packer", "unpacker"].sort());
+      expect(Object.keys(list[1]).sort()).toEqual(["type", "class", "packer", "unpacker"].sort());
+
+      expect(list[0].type).toEqual(0x20);
+      expect(list[0].class).toEqual(MyType);
+      expect(list[0].packer).toBeInstanceOf(Function);
+      expect(list[0].unpacker).toBeNull();
+
+      expect(list[1].type).toEqual(0x21);
+      expect(list[1].class).toEqual(MyType2);
+      expect(list[1].packer).toBeNull();
+      expect(list[1].unpacker).toBeInstanceOf(Function);
+
+      list = subject.registeredTypes("packer");
+      expect(list.length).toEqual(1);
+      expect(list[0]).toBeInstanceOf(Object);
+      expect(Object.keys(list[0]).sort()).toEqual(["type", "class", "packer"].sort());
+
+      expect(list[0].type).toEqual(0x20);
+      expect(list[0].class).toEqual(MyType);
+      expect(list[0].packer).toBeInstanceOf(Function);
+
+      list = subject.registeredTypes("unpacker");
+      expect(list.length).toEqual(1);
+      expect(list[0]).toBeInstanceOf(Object);
+      expect(Object.keys(list[0]).sort()).toEqual(["type", "class", "unpacker"].sort());
+
+      expect(list[0].type).toEqual(0x21);
+      expect(list[0].class).toEqual(MyType2);
+      expect(list[0].unpacker).toBeInstanceOf(Function);
     });
   });
 
@@ -243,9 +420,46 @@ describe("MessagePack::Factory", () => {
     });
   });
 
+  describe("under stressful GC", () => {
+    it("works well", () => {
+      const f = new Factory();
+      f.registerType(0x0a, rbCSymbol);
+    });
+
+    it("does not crash in recursive extensions", () => {
+      const myHashType = class extends Hash<unknown, unknown> {};
+      const factory = new Factory();
+      factory.registerType(7, myHashType, {
+        packer: (value: Hash<unknown, unknown>, packer: Packer) => packer.write(value.toH()),
+        unpacker: (unpacker: Unpacker) => new myHashType(unpacker.read()),
+        recursive: true,
+      });
+
+      const payload = factory.dump([new myHashType()]);
+
+      factory.load(payload);
+    });
+  });
+
   describe("DefaultFactory", () => {
     it("is a factory", () => {
       expect(MessagePack.DefaultFactory).toBeInstanceOf(MessagePack.Factory);
+    });
+
+    it("should be referred by MessagePack.pack and MessagePack.unpack", () => {
+      MessagePack.DefaultFactory.registerType(DummyTimeStamp1.TYPE, DummyTimeStamp1);
+      MessagePack.DefaultFactory.registerType(DummyTimeStamp2.TYPE, DummyTimeStamp2, {
+        packer: "serialize",
+        unpacker: "deserialize",
+      });
+
+      const t = Time.now();
+
+      const dm1 = new DummyTimeStamp1(t.toI(), t.usec);
+      expect(rbEqual(MessagePack.unpack(MessagePack.pack(dm1)), dm1)).toBe(true);
+
+      const dm2 = new DummyTimeStamp1(t.toI(), t.usec);
+      expect(rbEqual(MessagePack.unpack(MessagePack.pack(dm2)), dm2)).toBe(true);
     });
   });
 
