@@ -279,6 +279,71 @@ As a consequence:
 This is a genuine language shortcoming, ratified repo-wide here. There is no
 story to port `ActiveRecord::Promise` or `Promise::Complete`.
 
+## Adapter facts are prewarmed and peeked (`lookup_cast_type`, `max_identifier_length`, `quote_string`)
+
+Some synchronous Rails bodies ask the adapter a question only the server can
+answer, and ask it in line:
+
+- `PostgreSQL::Quoting#lookup_cast_type`
+  (`activerecord/lib/active_record/connection_adapters/postgresql/quoting.rb:195-197`)
+  is `super(query_value("SELECT #{quote(sql_type)}::regtype::oid", "SCHEMA").to_i)`,
+  reached from the String-returning `quote_default_expression`
+  (`abstract/quoting.rb:157-164`).
+- `PostgreSQLAdapter#max_identifier_length` (`postgresql_adapter.rb:620-622`)
+  memoizes `query_value("SHOW max_identifier_length", "SCHEMA")`. It is
+  PostgreSQL's `table_alias_length`, which `JoinDependency#initialize` reads
+  inside the synchronous eager builders § "`Relation` is evaluated by an async
+  query" ratifies.
+- `quote_string` (`postgresql/quoting.rb:127-131`,
+  `abstract_mysql_adapter.rb:695-699`) escapes through
+  `with_raw_connection { |connection| connection.escape(s) }`. It is reached
+  from `Quoting#quote`, Sanitization and the Arel visitor behind `to_sql`.
+- `InsertAll#primary_keys` (`insert_all.rb:61-63`) reads
+  `@model.schema_cache.primary_keys(model.table_name)`, and
+  `InsertAll#initialize` reads it and `supports_insert_returning?` (`:39`).
+
+In trails each answer is a query or a connection round-trip, and those are
+awaited. The settled shape is the one § "Schema reflection peeks at a warm
+cache" records for the schema cache: **an explicit async step warms the fact,
+and the synchronous body peeks at the warmed value.**
+
+- `warmMaxIdentifierLength` runs the `SHOW`, and `maxIdentifierLength` reads the
+  memo, answering PostgreSQL's default of 63 while it is cold.
+- The PostgreSQL type map and its regtype OIDs are warmed when the connection is
+  configured and by `reloadTypeMap`. `lookupCastType` reads them, and a type
+  created after the warm-up resolves to `ValueType` where Rails returns the
+  registered type.
+- `quoteString` escapes in process. PostgreSQL doubles the quote; MySQL reads
+  the warmed `NO_BACKSLASH_ESCAPES` state to choose between doubling the quote
+  and backslash escaping, which is the arm `connection.escape` takes inside the
+  client library.
+- `InsertAll` awaits its facts before construction, and `primaryKeys` returns
+  the warmed list.
+
+The alternative is making the callers async, which is the cascade through
+`quote`, the Arel visitor and `to_sql` that § "`Relation` is evaluated by an
+async query" rejects.
+
+This is a genuine language shortcoming, ratified repo-wide here. The omitted
+`query_value`, `quote`, `with_raw_connection` and `table_name` calls carry
+`@missingRailsCall … — PERMANENT`, `warmMaxIdentifierLength` carries
+`@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
+`@inventedArm if — PERMANENT`, all against this section. A new instance is not
+a new decision to argue.
+
+## Fixtures load from `.ts` modules as well as YAML (`FixtureSet::File`)
+
+Rails reads a fixture file through `FixtureSet::File#raw_rows`
+(`activerecord/lib/active_record/fixture_set/file.rb:51-53`), which is
+`ActiveSupport::ConfigurationFile.parse` over YAML. trails also accepts a
+fixture as a `.ts` module registered through `File.registerModule`, and the
+canonical test fixtures ship that way.
+
+The registry stays. A YAML-free ActiveRecord boot is a requirement (RFC 0170),
+and with the registry gone npm `yaml` would be the only fixture path.
+`File.registerModule` and `File.modules` carry `@noRailsEquivalent PERMANENT`
+against this section, and there is no story to convert the fixtures to `.yml`.
+
 ## Call-time constant resolution (activerecord)
 
 The activerecord inventory for root CLAUDE.md § "Call-time constant
