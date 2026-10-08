@@ -1,5 +1,5 @@
 import { Admin } from "../test-helpers/models/admin.js";
-import { kernelThrow, rbModConstSet } from "@blazetrails/ruby-compat";
+import { kernelThrow, rbModConstDefined, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
@@ -212,25 +212,6 @@ for (const m of [
 ]) {
   registerModel(m as any);
 }
-
-class AdminRegion extends Base {
-  static _tableName = "admin_regions";
-  static {
-    rbModConstSet(Admin, "Region", this);
-  }
-}
-
-class AdminRegionalUser extends AdminUser {
-  static {
-    rbModConstSet(Admin, "RegionalUser", this);
-  }
-
-  static {
-    this.belongsTo("region");
-  }
-}
-registerModel(AdminRegion as any);
-registerModel(AdminRegionalUser as any);
 
 async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
   const prev = (Base as any).hasManyInversing;
@@ -643,12 +624,44 @@ describe("BelongsToAssociationsTest", () => {
   it("raises type mismatch with namespaced class", async () => {
     expect(modelRegistry.get("Region")).toBeUndefined();
 
-    const e = await assertRaises([AssociationTypeMismatch], {}, () => {
-      new AdminRegionalUser({ region: "wrong value" });
-    });
-    expect(e.message).toMatch(
-      /^Region\([^)]+\) expected, got "wrong value" which is an instance of String\([^)]+\)$/,
-    );
+    const connection = (await Base.leaseConnection()) as any;
+    try {
+      await connection.createTable("admin_regions", { force: true }, (t: any) => {
+        t.string("name");
+      });
+      await connection.addColumn("admin_users", "region_id", "integer");
+      class AdminRegionalUser extends AdminUser {
+        static {
+          this.belongsTo("region");
+        }
+      }
+      rbModConstSet(Admin, "RegionalUser", AdminRegionalUser);
+      class AdminRegion extends Base {}
+      rbModConstSet(Admin, "Region", AdminRegion);
+      registerModel(AdminRegion as any);
+      registerModel(AdminRegionalUser as any);
+
+      const e = await assertRaises([AssociationTypeMismatch], {}, () => {
+        new AdminRegionalUser({ region: "wrong value" });
+      });
+      expect(e.message).toMatch(
+        /^Region\([^)]+\) expected, got "wrong value" which is an instance of String\([^)]+\)$/,
+      );
+    } finally {
+      if (rbModConstDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
+      if (rbModConstDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
+      modelRegistry.delete("AdminRegion");
+      modelRegistry.delete("AdminRegionalUser");
+      modelRegistry.delete("Admin::Region");
+      modelRegistry.delete("Admin::RegionalUser");
+
+      if (await connection.columnExists("admin_users", "region_id")) {
+        await connection.removeColumn("admin_users", "region_id");
+      }
+      await connection.dropTable("admin_regions", { ifExists: true });
+
+      await AdminUser.resetColumnInformation();
+    }
   });
 
   it("natural assignment", async () => {

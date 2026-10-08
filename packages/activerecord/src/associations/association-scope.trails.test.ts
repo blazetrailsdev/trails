@@ -665,71 +665,21 @@ describe("AssociationScope", () => {
   });
 
   it("hasOne :through chain emits a JOIN with LIMIT 1", () => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class HotUser extends Base {
-      static {
-        this.attribute("id", "integer");
-        this.hasOne("hot_account", {
-          className: "HotAccount",
-          foreignKey: "hot_user_id",
-        });
-        this.hasOne("hot_settings", {
-          className: "HotSettings",
-          through: "hot_account",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface HotUser {
-      get hot_account(): HotAccount | null | Promise<HotAccount | null>;
-      set hot_account(value: HotAccount | null);
-      get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
-      set hot_settings(value: HotSettings | null);
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    class HotAccount extends Base {
-      declare hot_user_id: number | null;
-
-      static {
-        this.attribute("id", "integer");
-        this.attribute("hot_user_id", "integer");
-        this.hasOne("hot_settings", {
-          className: "HotSettings",
-          foreignKey: "hot_account_id",
-        });
-      }
-    }
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-    interface HotAccount {
-      get hot_settings(): HotSettings | null | Promise<HotSettings | null>;
-      set hot_settings(value: HotSettings | null);
-    }
-    class HotSettings extends Base {
-      declare hot_account_id: number | null;
-
-      static {
-        this.attribute("hot_account_id", "integer");
-      }
-    }
-    registerModel(HotUser);
-    registerModel(HotAccount);
-    registerModel(HotSettings);
-
-    const user = new HotUser({ id: 5 });
-    const reflection = (HotUser as any)._reflectOnAssociation("hot_settings");
+    const member = new Member({ id: 5 });
+    const reflection = (Member as any)._reflectOnAssociation("club");
     const sql = (
       AssociationScope.scope({
-        owner: user,
+        owner: member,
         reflection,
         klass: reflection.klass,
       }) as any
     ).toSql();
-    expect(sql).toMatch(/FROM\s+["`]hot_settings["`]/);
-    expect(sql).toMatch(/INNER JOIN\s+["`]?hot_accounts["`]?/i);
+    expect(sql).toMatch(/FROM\s+["`]clubs["`]/);
+    expect(sql).toMatch(/INNER JOIN\s+["`]?memberships["`]?/i);
     expect(sql).toMatch(
-      /ON\s+["`]hot_settings["`]\.["`]hot_account_id["`]\s*=\s*["`]hot_accounts["`]\.["`]id["`]/,
+      /ON\s+["`]clubs["`]\.["`]id["`]\s*=\s*["`]memberships["`]\.["`]club_id["`]/,
     );
-    expect(sql).toMatch(/["`]hot_accounts["`]\.["`]hot_user_id["`]\s*=\s*5/);
+    expect(sql).toMatch(/["`]memberships["`]\.["`]member_id["`]\s*=\s*5/);
     expect(sql).toMatch(/LIMIT\s+1/);
   });
 

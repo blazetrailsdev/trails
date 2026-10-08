@@ -261,13 +261,8 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name", { null: true });
   });
 
-  await define("admin_regions", {}, (t) => {
-    t.string("name");
-  });
-
   await define("admin_users", {}, (t) => {
     t.string("name");
-    t.integer("region_id");
     t.string("settings", { limit: 1024, null: true });
     t.string("parent", { limit: 1024, null: true });
     t.string("spouse", { limit: 1024, null: true });
@@ -1720,40 +1715,6 @@ export async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.integer("account_id");
     t.text("settings");
   });
-
-  await define("catalog_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("catalog_products", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("clients", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("content_pages", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("firms", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("hot_accounts", {}, (t) => {
-    t.integer("hot_owner_id");
-  });
-
-  await define("orgs", {}, (t) => {});
-
-  await define("orphans", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("targets", {}, (t) => {});
-
-  await define("teams", {}, (t) => {});
 
   _registry = tables;
   return tables;
