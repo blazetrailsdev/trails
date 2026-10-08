@@ -177,13 +177,17 @@ export class Factory {
     return this.load(src, param);
   }
 
-  dump(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array {
+  dump(v: unknown): Uint8Array;
+  dump(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array | null;
+  dump(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array | null {
     const packer = this.packer(...rest);
     packer.write(v);
     return packer.fullPack();
   }
 
-  pack(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array {
+  pack(v: unknown): Uint8Array;
+  pack(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array | null;
+  pack(v: unknown, ...rest: ConstructorParameters<typeof Packer>): Uint8Array | null {
     return this.dump(v, ...rest);
   }
 
@@ -346,7 +350,7 @@ export class Pool {
   dump(object: unknown): Uint8Array {
     return this.packers.with((packer) => {
       packer.write(object);
-      return packer.fullPack();
+      return packer.fullPack() as Uint8Array;
     });
   }
 

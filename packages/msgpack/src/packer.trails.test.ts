@@ -24,7 +24,7 @@ import { toMsgpackExt } from "./symbol.js";
 
 const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
-const pack = (v: unknown) => hex(new Packer().write(v).fullPack());
+const pack = (v: unknown) => hex(new Packer().write(v).fullPack()!);
 const unpack = (...bytes: number[]) => new Unpacker().feed(Uint8Array.of(...bytes)).fullUnpack();
 
 class Pair {
@@ -93,7 +93,7 @@ describe("MessagePack::Packer", () => {
     ]);
 
     const src = [new Pair(5, new Pair("a", 2n ** 63n))];
-    const dumped = packer.write(src).fullPack();
+    const dumped = packer.write(src).fullPack()!;
     expect(hex(dumped)).toBe("91c70f0305c70b03a161cf8000000000000000");
     expect(unpacker.feed(dumped).fullUnpack()).toEqual(src);
   });

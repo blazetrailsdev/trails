@@ -6,7 +6,7 @@ function toMsgpack<T>(
   this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
   self: T,
   packerOrIo: unknown = null,
-): Uint8Array | Packer {
+): Uint8Array | Packer | null {
   if (packerOrIo != null && packerOrIo !== false) {
     if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
       return this.toMsgpackWithPacker(self, packerOrIo as Packer);

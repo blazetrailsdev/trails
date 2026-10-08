@@ -22,13 +22,25 @@ export function unpack(src: unknown, param: object | null = null): unknown {
   return load(src, param);
 }
 
-export function pack(v: unknown, io: unknown = null, options: object | null = null): Uint8Array {
+export function pack(v: unknown): Uint8Array;
+export function pack(v: unknown, io: unknown, options?: object | null): Uint8Array | null;
+export function pack(
+  v: unknown,
+  io: unknown = null,
+  options: object | null = null,
+): Uint8Array | null {
   const packer = DefaultFactory.packer(io, options);
   packer.write(v);
   return packer.fullPack();
 }
 
-export function dump(v: unknown, io: unknown = null, options: object | null = null): Uint8Array {
+export function dump(v: unknown): Uint8Array;
+export function dump(v: unknown, io: unknown, options?: object | null): Uint8Array | null;
+export function dump(
+  v: unknown,
+  io: unknown = null,
+  options: object | null = null,
+): Uint8Array | null {
   return pack(v, io, options);
 }
 
