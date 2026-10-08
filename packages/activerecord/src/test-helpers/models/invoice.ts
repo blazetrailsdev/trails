@@ -3,7 +3,6 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { LineItem } from "./line-item.js";
 import type { ShippingLine } from "./shipping-line.js";
 import { Base } from "../../base.js";
-import { collectionProxyFor as association } from "../../associations.js";
 
 export class Invoice extends Base {
   declare lineItems: AssociationProxy<LineItem>;
@@ -22,7 +21,7 @@ export class Invoice extends Base {
     );
     this.beforeSave(async function (this: any, record?: any) {
       const self = record ?? this;
-      const lineItems = await association(self, "lineItems");
+      const lineItems = await self.association("lineItems").reader;
       self.balance = lineItems
         .map((i: any) => i.amount)
         .filter((a: any) => a != null)

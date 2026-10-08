@@ -1,5 +1,5 @@
+import type { CollectionAssociation } from "../associations/collection-association.js";
 import { afterEach, describe, expect, it } from "vitest";
-import { collectionProxyFor as association } from "../associations.js";
 import "../support/canonical-model-index.js";
 import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
@@ -28,16 +28,16 @@ describe("AssociationValidationTest", () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");
     const t = await Topic.create({ title: "uhohuhoh", content: "whatever" });
-    const r = association(t, "replies").build({ title: "A reply" }) as Reply;
-    const r2 = association(t, "replies").build({
+    const r = t.replies.build({ title: "A reply" });
+    const r2 = t.replies.build({
       title: "Another reply",
       content: "non-empty",
-    }) as Reply;
-    const r3 = association(t, "replies").build({ title: "Yet another reply" }) as Reply;
-    const r4 = association(t, "replies").build({
+    });
+    const r3 = t.replies.build({ title: "Yet another reply" });
+    const r4 = t.replies.build({
       title: "The last reply",
       content: "non-empty",
-    }) as Reply;
+    });
 
     expect(await t.isValid()).toBeFalsy();
     expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
@@ -66,8 +66,8 @@ describe("AssociationValidationTest", () => {
     Topic.validatesAssociated(["replies"], "openReplies");
     Reply.validatesPresenceOf("content");
     const t = new Topic();
-    association(t, "replies").build({ title: "A reply" });
-    association(t, "openReplies").build({ title: "A reply" });
+    t.replies.build({ title: "A reply" });
+    t.openReplies.build({ title: "A reply" });
     expect(await t.isValid()).toBeFalsy();
     expect(t.errors.messagesFor("replies").length > 0).toBeTruthy();
     expect(t.errors.messagesFor("openReplies").length > 0).toBeTruthy();
@@ -77,7 +77,7 @@ describe("AssociationValidationTest", () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");
     const t = new Topic();
-    const reply = association(t, "replies").build() as Reply;
+    const reply = t.replies.build();
     expect(await t.isInvalid()).toBeTruthy();
     reply.markForDestruction();
     expect(await t.isValid()).toBeTruthy();
@@ -123,7 +123,9 @@ describe("AssociationValidationTest", () => {
     await repairValidations(Interest, async () => {
       Interest.validatesPresenceOf("human");
       const human = new Human({ name: "John" });
-      const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
+      const interest = (human.association("interests") as CollectionAssociation).reader.build({
+        topic: "Airplanes",
+      }) as Interest;
       expect(await interest.isValid()).toBeTruthy();
     });
   });
@@ -132,7 +134,9 @@ describe("AssociationValidationTest", () => {
     await repairValidations(Interest, async () => {
       Interest.validatesPresenceOf("human");
       const human = await Human.createBang({ name: "John" });
-      const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
+      const interest = (human.association("interests") as CollectionAssociation).reader.build({
+        topic: "Airplanes",
+      }) as Interest;
       expect(await interest.isValid()).toBeTruthy();
     });
   });

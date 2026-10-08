@@ -1,5 +1,6 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
-import { Base, collectionProxyFor as association } from "../index.js";
+import { Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { Interest } from "../test-helpers/models/interest.js";
@@ -29,7 +30,7 @@ describe("replace_on_target inversing (trails)", () => {
 
       expect(interestIds()).toEqual([interest.id]);
 
-      await association(human, "interests").push(interest);
+      await (human.association("interests") as CollectionAssociation).reader.push(interest);
 
       expect(interestIds()).toEqual([interest.id]);
     });
@@ -42,7 +43,7 @@ describe("CollectionAssociation#target= (trails)", () => {
   it("folds a lone record into the loaded target under has_many_inversing", async () => {
     await withHasManyInversing(Interest, async () => {
       const human = humans("gordon") as Base;
-      await association(human, "interests");
+      await (human.association("interests") as CollectionAssociation).reader;
       const assoc = (
         human as unknown as { association(name: string): { target: Base[] } }
       ).association("interests");

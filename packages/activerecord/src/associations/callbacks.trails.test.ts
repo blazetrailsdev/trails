@@ -1,5 +1,6 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect } from "vitest";
-import { Base, collectionProxyFor as association, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import type { Base as BaseRecord } from "../base.js";
 
 import { fixtures } from "../test-fixtures.js";
@@ -38,7 +39,7 @@ describe("association callbacks — object callbacks (trails)", () => {
     registerModel("ObjectCbAuthor", ObjectCbAuthor);
 
     const author = await ObjectCbAuthor.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     await proxy.push(new Post({ title: "Hello", body: "Body", author_id: author.id }));
 
     expect(log).toEqual(["beforeAdd:Hello", "afterAdd:Hello"]);

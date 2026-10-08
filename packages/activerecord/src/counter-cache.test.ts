@@ -1,7 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel, registerSubclass } from "./index.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply, SillyReply } from "./test-helpers/models/reply.js";
 import { Car } from "./test-helpers/models/car.js";
@@ -494,7 +493,7 @@ describe("CounterCacheTest", () => {
 
   it("counters are updated both in memory and in the database on create", async () => {
     const car = new Car({ engines_count: 0 });
-    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.engines.replace([new Engine(), new Engine()]);
     await car.save();
 
     expect(car.engines_count).toBe(2);
@@ -504,7 +503,7 @@ describe("CounterCacheTest", () => {
 
   it("counter caches are updated in memory when the default value is nil", async () => {
     const car = new Car({ engines_count: null });
-    await association(car, "engines").replace([new Engine(), new Engine()]);
+    await car.engines.replace([new Engine(), new Engine()]);
     await car.save();
 
     expect(car.engines_count).toBe(2);
@@ -744,7 +743,7 @@ describe("CounterCacheTest", () => {
 
   it("inactive counter cache", async () => {
     const car = new Car();
-    await association(car, "bulbs").replace([new Bulb(), new Bulb()]);
+    await car.bulbs.replace([new Bulb(), new Bulb()]);
     await car.save();
 
     expect(car.bulbs_count).toEqual(2);
@@ -761,7 +760,7 @@ describe("CounterCacheTest", () => {
 
   it("active counter cache", async () => {
     const car = new Car();
-    await association(car, "tyres").replace([new Tyre(), new Tyre()]);
+    await car.tyres.replace([new Tyre(), new Tyre()]);
     await car.save();
 
     expect(car.custom_tyres_count).toEqual(2);

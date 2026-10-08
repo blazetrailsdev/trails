@@ -1,11 +1,5 @@
 import { describe, it, expectTypeOf } from "vitest";
-import {
-  Base,
-  CollectionProxy,
-  AssociationProxy,
-  Relation,
-  collectionProxyFor as association,
-} from "@blazetrails/activerecord";
+import { Base, CollectionProxy, AssociationProxy, Relation } from "@blazetrails/activerecord";
 class User extends Base {
   declare name: string;
   declare email: string;
@@ -173,7 +167,7 @@ describe("declare patterns — typing runtime-attached members", () => {
 
   it("full CollectionProxy API via `association(record, name)` helper", async () => {
     const author = new Author({ name: "dean" });
-    const proxy = association<Comment>(author, "comments");
+    const proxy = author.comments;
     expectTypeOf(proxy).toMatchTypeOf<CollectionProxy<Comment>>();
     expectTypeOf(await proxy.first()).toEqualTypeOf<Comment | null>();
     expectTypeOf(await proxy.toArray()).toEqualTypeOf<Comment[]>();

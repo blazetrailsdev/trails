@@ -1,10 +1,11 @@
+import type { CollectionAssociation } from "./associations/collection-association.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "./active-record.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { SingularAssociation } from "./associations/singular-association.js";
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { I18n, Error as ModelError } from "@blazetrails/activemodel";
 import { Base, registerModel, RecordInvalid } from "./index.js";
-import { Associations, collectionProxyFor as association } from "./associations.js";
+import { Associations } from "./associations.js";
 
 import {
   Agency,
@@ -617,7 +618,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
 
     const pirate = new CanonicalPirate({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    await (pirate.association(associationNameWithCallbacks) as CollectionAssociation).reader.build({
+      name: "Crowe the One-Eyed",
+    });
 
     const expected = ["before_adding_method_parrot_<new>", "after_adding_method_parrot_<new>"];
 
@@ -628,7 +631,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithMethodCallbacks";
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const proxy = association(pirate, associationNameWithCallbacks);
+    const proxy = (pirate.association(associationNameWithCallbacks) as CollectionAssociation)
+      .reader;
     await proxy.create({ name: "Crowe the One-Eyed" });
     for (const parrot of await proxy) parrot.markForDestruction();
     const childId = (await proxy)[0].id;
@@ -648,7 +652,9 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithProcCallbacks";
 
     const pirate = new CanonicalPirate({ catchphrase: "Arr" });
-    await association(pirate, associationNameWithCallbacks).build({ name: "Crowe the One-Eyed" });
+    await (pirate.association(associationNameWithCallbacks) as CollectionAssociation).reader.build({
+      name: "Crowe the One-Eyed",
+    });
 
     const expected = ["before_adding_proc_parrot_<new>", "after_adding_proc_parrot_<new>"];
 
@@ -659,7 +665,8 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const associationNameWithCallbacks = "parrotsWithProcCallbacks";
 
     const pirate = await CanonicalPirate.create({ catchphrase: "Arr" });
-    const proxy = association(pirate, associationNameWithCallbacks);
+    const proxy = (pirate.association(associationNameWithCallbacks) as CollectionAssociation)
+      .reader;
     await proxy.create({ name: "Crowe the One-Eyed" });
     for (const parrot of await proxy) parrot.markForDestruction();
     const childId = (await proxy)[0].id;

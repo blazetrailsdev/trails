@@ -1,11 +1,7 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import {
-  Base,
-  collectionProxyFor as association,
-  registerModel,
-  registerSubclass,
-} from "../index.js";
+import { Base, registerModel, registerSubclass } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
@@ -204,7 +200,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Hello", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(log.length).toBe(1);
@@ -220,7 +216,7 @@ describe("AssociationCallbacksTest", () => {
     });
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "Bye", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     await proxy.delete(p);
     expect(log.length).toBe(1);
     expect(log[0]).toBe("removed:" + p.id);
@@ -237,7 +233,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Proc", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(log[0]).toMatch(/^before:/);
@@ -252,7 +248,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Str", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(log.length).toBe(1);
@@ -266,7 +262,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     proxy.build({ title: "Hello", body: "Body" });
     expect(log.length).toBe(1);
     expect(log[0]).toBe("added:<new>");
@@ -284,7 +280,7 @@ describe("AssociationCallbacksTest", () => {
     });
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "Hi", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     await proxy.delete(p);
     expect(log).toEqual(["removing:" + p.id, "removed:" + p.id]);
   });
@@ -297,7 +293,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "New", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(wasNew).toBe(true);
@@ -311,7 +307,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Saved", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(wasNew).toBe(false);
@@ -322,7 +318,7 @@ describe("AssociationCallbacksTest", () => {
       beforeAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Blocked", body: "Body", author_id: author.id });
     await proxy.push(p);
     const posts = await proxy;
@@ -337,7 +333,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "Confirm", body: "Body", author_id: author.id });
     await proxy.push(p);
     expect(log.length).toBe(1);
@@ -354,7 +350,7 @@ describe("AssociationCallbacksTest", () => {
     });
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "Del", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     await proxy.delete(p);
     expect(log).toEqual(["before_remove:" + p.id]);
   });
@@ -368,7 +364,7 @@ describe("AssociationCallbacksTest", () => {
     });
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "Del", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     await proxy.delete(p);
     expect(log).toEqual(["after_remove:" + p.id]);
   });
@@ -390,7 +386,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p1 = new (Post as any)({ title: "C1", body: "Body", author_id: author.id });
     await proxy.push(p1);
     expect(log).toContain("ba:<new>");
@@ -413,7 +409,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     proxy.build({ title: "Built", body: "Body" });
     expect(log).toEqual(["before:<new>", "after:<new>"]);
   });
@@ -423,7 +419,7 @@ describe("AssociationCallbacksTest", () => {
       beforeAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = await proxy.create({ title: "Blocked", body: "Body" });
     expect(p.isNewRecord()).toBe(true);
     const all = await (Post as any).where({ author_id: author.id }).toArray();
@@ -443,7 +439,7 @@ describe("AssociationCallbacksTest", () => {
       author_id: author.id,
     });
     const p2 = await (Post as any).create({ title: "keep", body: "Body", author_id: author.id });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     expect((await proxy).length).toBe(2);
     await proxy.delete(p1, p2);
     expect((await proxy).length).toBe(2);
@@ -460,7 +456,7 @@ describe("AssociationCallbacksTest", () => {
       },
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = await proxy.createBang({ title: "Hello", body: "Body" });
     expect(log).toEqual(["before_adding<new>", "after_adding" + p.id]);
   });
@@ -470,7 +466,7 @@ describe("AssociationCallbacksTest", () => {
       afterAdd: () => kernelThrow(":abort"),
     });
     const author = await Author.create({ name: "David" });
-    const proxy = association(author, "posts");
+    const proxy = (author.association("posts") as CollectionAssociation).reader;
     const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
     await expect(proxy.push(p)).rejects.toBeDefined();
   });
@@ -504,7 +500,7 @@ describe("AssociationCallbacksTest", () => {
     const david = developers("david");
     const ar = projects("active_record");
     assertEmpty(ar.developersLog);
-    const proxy = association(ar, "developersWithCallbacks");
+    const proxy = ar.developersWithCallbacks;
     await proxy.push(david);
     expect(ar.developersLog).toEqual([`before_adding${david.id}`, `after_adding${david.id}`]);
     await proxy.push(david);
@@ -538,7 +534,7 @@ describe("AssociationCallbacksTest", () => {
     registerModel("ProjectWithBeforeAddCallback", ProjectWithCallback);
     const rec = await ProjectWithCallback.create({ name: "ActiveRecord" });
     const alice = new Developer({ name: "alice" });
-    await association(rec, "developersWithCallbacks").push(alice);
+    await (rec.association("developersWithCallbacks") as CollectionAssociation).reader.push(alice);
     expect(dev).toBe(alice);
     expect(newDev).toBeDefined();
     expect(newDev).toBeTruthy();
@@ -548,7 +544,7 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many after add called after save", async () => {
     const ar = projects("active_record");
     assertEmpty(ar.developersLog);
-    const proxy = association(ar, "developersWithCallbacks");
+    const proxy = ar.developersWithCallbacks;
 
     const alice = new Developer({ name: "alice" });
     await proxy.push(alice);
@@ -566,7 +562,7 @@ describe("AssociationCallbacksTest", () => {
     const jamis = developers("jamis");
     const activerecord = projects("active_record");
     assertEmpty(activerecord.developersLog);
-    const proxy = association(activerecord, "developersWithCallbacks");
+    const proxy = activerecord.developersWithCallbacks;
     await proxy.delete(david);
     expect(activerecord.developersLog).toEqual([
       `before_removing${david.id}`,
@@ -585,11 +581,11 @@ describe("AssociationCallbacksTest", () => {
   it("has and belongs to many does not fire callbacks on clear", async () => {
     const activerecord = projects("active_record");
     assertEmpty(activerecord.developersLog);
-    const proxy = association(activerecord, "developersWithCallbacks");
+    const proxy = activerecord.developersWithCallbacks;
     // eslint-disable-next-line blazetrails/no-conditional-in-test
     if ((await proxy.size()) === 0) {
-      await association(activerecord, "developers").push(developers("david"));
-      await association(activerecord, "developers").push(developers("jamis"));
+      await activerecord.developers.push(developers("david"));
+      await activerecord.developers.push(developers("jamis"));
       await activerecord.reload();
       expect((await proxy.size()) === 2).toBeTruthy();
     }
@@ -600,7 +596,7 @@ describe("AssociationCallbacksTest", () => {
 
   it("has and belongs to many callbacks for save on parent", async () => {
     const project = new Project({ name: "Callbacks" });
-    const proxy = association(project, "developersWithCallbacks");
+    const proxy = project.developersWithCallbacks;
     proxy.build({ name: "Jack", salary: 95000 });
 
     const callbackLog = ["before_adding<new>", "after_adding<new>"];

@@ -1,15 +1,8 @@
+import type { CollectionAssociation } from "./associations/collection-association.js";
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
-import {
-  Base,
-  collectionProxyFor as association,
-  reflectOnAssociation,
-  registerModel,
-  NameError,
-  Relation,
-  pp,
-} from "./index.js";
+import { Base, reflectOnAssociation, registerModel, NameError, Relation, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertEmpty,
@@ -1782,13 +1775,17 @@ describe("AssociationsTest", () => {
 
   it("should construct new finder sql after create", async () => {
     const person = new Person({ first_name: "clark" });
-    expect(await association(person, "readers")).toEqual([]);
+    expect(await (person.association("readers") as CollectionAssociation).reader).toEqual([]);
     await person.save();
     const reader = await Reader.create({
       person,
       post: new Post({ title: "foo", body: "bar" }),
     });
-    expect(await association(person, "readers").find((reader as any).id)).toBeTruthy();
+    expect(
+      await (person.association("readers") as CollectionAssociation).reader.find(
+        (reader as any).id,
+      ),
+    ).toBeTruthy();
   });
 
   it("subselect", async () => {
@@ -1854,7 +1851,9 @@ describe("AssociationsTest", () => {
 
   it("association with references", async () => {
     const firm = companies("first_firm");
-    const scope = association(firm, "associationWithReferences").scope();
+    const scope = (
+      firm.association("associationWithReferences") as CollectionAssociation
+    ).reader.scope();
     expect(scope.referencesValues).toEqual([":foo"]);
   });
 
@@ -1889,9 +1888,9 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
     const comment = new ShardedComment({ body: "Great post! :clap:" });
     await comment.save();
-    await association(blogPost, "comments").push(comment);
+    await (blogPost.association("comments") as CollectionAssociation).reader.push(comment);
 
-    const comments = await association(blogPost, "comments");
+    const comments = await blogPost.comments;
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
     expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
@@ -2304,7 +2303,8 @@ describe("AssociationsTest", () => {
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;
       try {
-        await association(blogPost, "commentsWithCompositePkOwner");
+        await (blogPost.association("commentsWithCompositePkOwner") as CollectionAssociation)
+          .reader;
       } catch (e) {
         error = e;
       }
@@ -2396,7 +2396,7 @@ describe("AssociationsTest", () => {
       tag_id: (tag as any).id,
     });
 
-    await association(blogPost, "tags").delete(tag);
+    await (blogPost.association("tags") as CollectionAssociation).reader.delete(tag);
 
     expect(
       await ShardedBlogPostTag.where({

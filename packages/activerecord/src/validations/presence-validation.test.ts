@@ -1,7 +1,6 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { SingularAssociation } from "../associations/singular-association.js";
 import { Base, registerModel } from "../index.js";
-import { collectionProxyFor as association } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { repairValidations } from "../cases/validations-repair-helper.js";
 import { Human } from "../test-helpers/models/human.js";
@@ -66,7 +65,7 @@ describe("PresenceValidationTest", () => {
     const b = new Boy();
     const i1 = new Interest();
     const i2 = new Interest();
-    await association(b, "interests").concat(i1, i2);
+    await b.interests.concat(i1, i2);
     expect(await b.isValid()).toBeTruthy();
 
     i1.markForDestruction();

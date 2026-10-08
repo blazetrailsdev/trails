@@ -1,6 +1,7 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, collectionProxyFor as association, registerModel } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -58,7 +59,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     });
     let n: number;
     try {
-      n = (await association(author, "cpcPosts").count()) as number;
+      n = (await (
+        author.association("cpcPosts") as CollectionAssociation
+      ).reader.count()) as number;
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -69,7 +72,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
 
   it("size() on a new-record owner returns the buffered target without querying", async () => {
     const author = new CpcAuthor({ name: "unsaved" });
-    const proxy = association(author, "cpcPosts") as any;
+    const proxy = (author.association("cpcPosts") as CollectionAssociation).reader as any;
     proxy.build({ title: "b1" });
     proxy.build({ title: "b2" });
 
@@ -101,7 +104,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
       if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
     });
     try {
-      expect(await association(author, "cpcPosts").size()).toBe(3);
+      expect(await (author.association("cpcPosts") as CollectionAssociation).reader.size()).toBe(3);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -125,7 +128,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     await CpcPost.create({ author_id: author.id, title: "X", body: "b2" });
     await CpcPost.create({ author_id: author.id, title: "Y", body: "b3" });
 
-    const grouped = association(author, "cpcPostsByTitle") as any;
+    const grouped = (author.association("cpcPostsByTitle") as CollectionAssociation).reader as any;
     expect(grouped.groupValues).toEqual(["title"]);
     expect(await grouped.size()).toBe(2);
   });
@@ -146,7 +149,8 @@ describe("CollectionProxy#count — non-through fast path", () => {
     await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
     await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
 
-    const distinct = association(author, "cpcPostsDistinct") as any;
+    const distinct = (author.association("cpcPostsDistinct") as CollectionAssociation)
+      .reader as any;
     expect(distinct.distinctValue).toBe(true);
     distinct.build({ title: "buffered" });
     expect(await distinct.size()).toBe(2);
@@ -175,7 +179,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
-      const n = await association(author, "cpcCommentsThrough").count();
+      const n = await (
+        author.association("cpcCommentsThrough") as CollectionAssociation
+      ).reader.count();
       expect(n).toBe(2);
     } finally {
       Notifications.unsubscribe(sub);
@@ -200,7 +206,7 @@ describe("CollectionProxy#count — non-through fast path", () => {
     const author = await CpcAuthor.create({ name: "dedup" });
     const post = await CpcPost.create({ author_id: author.id, title: "p1", body: "b1" });
 
-    const proxy = association(author, "cpcPostsDedup") as any;
+    const proxy = (author.association("cpcPostsDedup") as CollectionAssociation).reader as any;
     await proxy.load();
     expect(proxy.target.length).toBe(1);
 
@@ -216,8 +222,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
     (newWithPk as any)._writeAttribute("id", 999);
     const newWithoutPk = new CpcAuthor({ name: "nopk" });
 
-    const withPkProxy = association(newWithPk, "cpcPosts") as any;
-    const withoutPkProxy = association(newWithoutPk, "cpcPosts") as any;
+    const withPkProxy = (newWithPk.association("cpcPosts") as CollectionAssociation).reader as any;
+    const withoutPkProxy = (newWithoutPk.association("cpcPosts") as CollectionAssociation)
+      .reader as any;
     expect(withPkProxy.isNullScope()).toBe(false);
     expect(withoutPkProxy.isNullScope()).toBe(true);
   });
@@ -236,7 +243,9 @@ describe("CollectionProxy#count — non-through fast path", () => {
       if (typeof event?.payload?.sql === "string") observed.push(event.payload.sql);
     });
     try {
-      expect(await association(post, "cpcCommentsCounted").size()).toBe(7);
+      expect(
+        await (post.association("cpcCommentsCounted") as CollectionAssociation).reader.size(),
+      ).toBe(7);
     } finally {
       Notifications.unsubscribe(sub);
     }
@@ -260,12 +269,14 @@ describe("CollectionProxy#count — non-through fast path", () => {
     await CpcPost.create({ author_id: author.id, title: "p2", body: "b2" });
     await CpcPost.create({ author_id: author.id, title: "p3", body: "b3" });
 
-    expect(await association(author, "cpcPostsLimited").size()).toBe(2);
+    expect(
+      await (author.association("cpcPostsLimited") as CollectionAssociation).reader.size(),
+    ).toBe(2);
   });
 
   it("count_records marks the target loaded and purges non-new records when the DB is empty", async () => {
     const author = await CpcAuthor.create({ name: "empty" });
-    const proxy = association(author, "cpcPosts") as any;
+    const proxy = (author.association("cpcPosts") as CollectionAssociation).reader as any;
 
     expect(await proxy.size()).toBe(0);
     expect(proxy.loaded).toBe(true);

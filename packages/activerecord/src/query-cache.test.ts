@@ -7,7 +7,6 @@ import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
-import { collectionProxyFor as association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
@@ -288,7 +287,7 @@ describe("QueryCacheTest", () => {
   it("cache passing a relation", async () => {
     const post = await Post.first();
     await Post.cache(async () => {
-      const query = association(post as never, "categories").select("post_id");
+      const query = post!.categories.select("post_id");
       assert((await (await Post.leaseConnection()).selectAll(query as never)) instanceof Result);
     });
   });

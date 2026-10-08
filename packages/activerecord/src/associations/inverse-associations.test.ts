@@ -1,8 +1,8 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
   Base,
-  collectionProxyFor as association,
   registerModel,
   registerSubclass,
   InverseOfAssociationNotFoundError,
@@ -234,7 +234,7 @@ describe("AutomaticInverseFindingTests", () => {
   it("has many with scoped belongs to does not find inverse automatically", async () => {
     const book = books("tlg");
     await (book as any).updateAttribute("author_visibility", 1);
-    expect(await (association(book, "subscriptions").build({}) as Subscription).book).toBeNull();
+    expect(await book.subscriptions.build({}).book).toBeNull();
 
     const subscriptionReflection = (Book as any).reflectOnAssociation("subscriptions");
     const bookReflection = (Subscription as any).reflectOnAssociation("book");
@@ -242,7 +242,7 @@ describe("AutomaticInverseFindingTests", () => {
     expect(bookReflection.scope).toBeTruthy();
 
     await withAutomaticScopeInversing([bookReflection, subscriptionReflection], async () => {
-      expect(await (association(book, "subscriptions").build({}) as Subscription).book).toBeNull();
+      expect(await book.subscriptions.build({}).book).toBeNull();
     });
   });
 
@@ -593,7 +593,9 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with newly block style built child", async () => {
     const human = (await Human.first())!;
-    const interest = association(human, "interests").build({ topic: "Industrial Revolution" });
+    const interest = (human.association("interests") as CollectionAssociation).reader.build({
+      topic: "Industrial Revolution",
+    });
     expect((interest as any).topic).not.toBeNull();
     expect((interest as any).human).not.toBeNull();
     expect((interest as any).human.name).toBe((human as any).name);
@@ -605,7 +607,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with newly created via bang method child", async () => {
     const human = (await Human.first())!;
-    const interest = await association(human, "interests").createBang({
+    const interest = await human.interests.createBang({
       topic: "Industrial Revolution Re-enactment",
     });
     expect((interest as any).human).not.toBeNull();
@@ -618,7 +620,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with newly block style created child", async () => {
     const human = (await Human.first())!;
-    const interest = await association(human, "interests").create({}, (ii: any) => {
+    const interest = await human.interests.create({}, (ii: any) => {
       ii.topic = "Industrial Revolution Re-enactment";
     });
     expect((interest as any).topic).not.toBeNull();
@@ -632,7 +634,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared within create block of new child", async () => {
     const human = (await Human.first())!;
-    const interest = await association(human, "interests").create({}, (i: any) => {
+    const interest = await human.interests.create({}, (i: any) => {
       assert(i.human === human, "Human of child should be the same instance as a parent");
     });
     assert(
@@ -643,7 +645,7 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared within build block of new child", async () => {
     const human = (await Human.first())!;
-    const interest = association(human, "interests").build({}, (i: any) => {
+    const interest = human.interests.build({}, (i: any) => {
       assert(i.human === human, "Human of child should be the same instance as a parent");
     });
     assert(
@@ -655,7 +657,7 @@ describe("InverseHasManyTests", () => {
   it("parent instance should be shared with poked in child", async () => {
     const human = humans("gordon");
     const interest = await Interest.create({ topic: "Industrial Revolution Re-enactment" });
-    await association(human, "interests").push(interest);
+    await human.interests.push(interest);
     expect((interest as any).human).not.toBeNull();
     expect((interest as any).human.name).toBe(human.name);
     (human as any).name = "Bongo";
@@ -667,7 +669,7 @@ describe("InverseHasManyTests", () => {
   it("parent instance should be shared with replaced via accessor children", async () => {
     const human = (await Human.first())!;
     const interest = new Interest({ topic: "Industrial Revolution Re-enactment" });
-    await association(human, "interests").replace([interest]);
+    await human.interests.replace([interest]);
     expect((interest as any).human).not.toBeNull();
     expect((interest as any).human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
@@ -678,14 +680,14 @@ describe("InverseHasManyTests", () => {
 
   it("parent instance should be shared with first and last child", async () => {
     const human = (await Human.first())!;
-    const interests = association(human, "interests");
+    const interests = human.interests;
     assert(((await interests.first()) as any).human === human);
     assert(((await interests.last()) as any).human === human);
   });
 
   it("parent instance should be shared with first n and last n children", async () => {
     const human = (await Human.first())!;
-    const interests = association(human, "interests");
+    const interests = human.interests;
     const firstTwo = (await interests.first(2)) as any[];
     assert(firstTwo[0].human === human);
     assert(firstTwo[1].human === human);
@@ -697,8 +699,8 @@ describe("InverseHasManyTests", () => {
   it("parent instance should find child instance using child instance id", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({});
-    await association(human, "interests").replace([interest]);
-    const proxy = association(human, "interests");
+    await human.interests.replace([interest]);
+    const proxy = human.interests;
     assert(interest === (await proxy.first()));
     assert(interest === (await proxy.find((interest as any).id)));
     assert(human === ((await proxy.first()) as any).human);
@@ -708,7 +710,7 @@ describe("InverseHasManyTests", () => {
   it("parent instance should find child instance using child instance id when created", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({ human_id: (human as any).id });
-    const proxy = association(human, "interests");
+    const proxy = human.interests;
     assert(human === ((await proxy.first()) as any).human);
     assert(human === ((await proxy.find((interest as any).id)) as any).human);
 
@@ -722,7 +724,7 @@ describe("InverseHasManyTests", () => {
   it("find on child instance with id should not load all child records", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({ human_id: (human as any).id });
-    const proxy = association(human, "interests");
+    const proxy = human.interests;
     await proxy.find((interest as any).id);
     assertNotPredicate(proxy, (p) => p.loaded);
   });
@@ -730,7 +732,7 @@ describe("InverseHasManyTests", () => {
   it("find on child instance with id should set inverse instances", async () => {
     const human = await Human.create({});
     const interest = await Interest.create({ human_id: (human as any).id });
-    const child = (await association(human, "interests").find((interest as any).id)) as any;
+    const child = (await human.interests.find((interest as any).id)) as any;
     assertPredicate(child.association("human"), (a: any) => a.isLoaded());
   });
 
@@ -738,7 +740,7 @@ describe("InverseHasManyTests", () => {
     const human = await Human.create({});
     const i1 = await Interest.create({ human_id: (human as any).id });
     const i2 = await Interest.create({ human_id: (human as any).id });
-    const children = (await association(human, "interests").find([
+    const children = (await (human.association("interests") as CollectionAssociation).reader.find([
       (i1 as any).id,
       (i2 as any).id,
     ])) as any[];
@@ -749,7 +751,10 @@ describe("InverseHasManyTests", () => {
 
   it("inverse should be set on composite primary key child", async () => {
     const author = new CpkAuthor({ name: "John" });
-    const book = association(author, "books").build({ id: [null, 1], title: "The Rails Way" });
+    const book = (author.association("books") as CollectionAssociation).reader.build({
+      id: [null, 1],
+      title: "The Rails Way",
+    });
     new CpkOrder({ book, status: "paid" });
     await (author as any).saveBang();
 
@@ -758,7 +763,7 @@ describe("InverseHasManyTests", () => {
 
   it("raise record not found error when no ids are passed", async () => {
     const human = await Human.create({});
-    const proxy = association(human, "interests");
+    const proxy = human.interests;
 
     const exception: any = await assertRaises([RecordNotFound], {}, async () => {
       await proxy.load();
@@ -779,7 +784,7 @@ describe("InverseHasManyTests", () => {
   it("child instance should point to parent without saving", async () => {
     const human = new Human();
     const interest = await Interest.create({ topic: "Industrial Revolution Re-enactment" });
-    await association(human, "interests").push(interest);
+    await human.interests.push(interest);
     expect((interest as any).human).not.toBeNull();
     (interest as any).human.name = "Charles";
     expect((interest as any).human.name).toBe((human as any).name);
@@ -959,10 +964,10 @@ describe("InverseBelongsToTests", () => {
   it("with has many inversing should have single record when setting record through attribute in build method", async () => {
     await withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
-      association(human, "interests").build({ human });
-      expect(await association(human, "interests").size()).toBe(1);
+      human.interests.build({ human });
+      expect(await human.interests.size()).toBe(1);
       await (human as any).saveBang();
-      expect(await association(human, "interests").size()).toBe(1);
+      expect(await human.interests.size()).toBe(1);
     });
   });
 
@@ -979,29 +984,29 @@ describe("InverseBelongsToTests", () => {
       const human = new Human();
       const interest = new Interest();
       (interest as any).human = human;
-      await association(human, "interests").push(interest);
-      expect(await association(human, "interests").size()).toBe(1);
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
     });
   });
 
   it("with has many inversing does not add unsaved duplicate records when collection is loaded", async () => {
     await withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
-      await association(human, "interests").load();
+      await human.interests.load();
       const interest = new Interest();
       (interest as any).human = human;
-      await association(human, "interests").push(interest);
-      expect(await association(human, "interests").size()).toBe(1);
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
     });
   });
 
   it("with has many inversing does not add saved duplicate records when collection is loaded", async () => {
     await withHasManyInversing(Interest, async () => {
       const human = await Human.create({});
-      await association(human, "interests").load();
+      await human.interests.load();
       const interest = await Interest.create({ human_id: (human as any).id });
-      await association(human, "interests").push(interest);
-      expect(await association(human, "interests").size()).toBe(1);
+      await human.interests.push(interest);
+      expect(await human.interests.size()).toBe(1);
     });
   });
 
@@ -1059,9 +1064,9 @@ describe("InverseBelongsToTests", () => {
     await withHasManyInversing(Interest, async () => {
       const interest = new Interest();
       (interest as any).buildHuman();
-      expect(await association((interest as any).human, "interests").size()).toBe(1);
+      expect(await (interest as any).human.association("interests").reader.size()).toBe(1);
       await (interest as any).saveBang();
-      expect(await association((interest as any).human, "interests").size()).toBe(1);
+      expect(await (interest as any).human.association("interests").reader.size()).toBe(1);
     });
   });
 });
@@ -1260,8 +1265,8 @@ describe("InverseBelongsToTests", () => {
   it("recursive model has many inversing", async () => {
     await withHasManyInversing(Branch, async () => {
       const main = await Branch.create({});
-      const feature = (await association(main, "branches").create({})) as any;
-      const topic = association(feature, "branches").build({}) as any;
+      const feature = (await main.branches.create({})) as any;
+      const topic = feature.association("branches").reader.build({});
       expect(topic.branch.branch).toBe(main);
     });
   });
@@ -1269,8 +1274,8 @@ describe("InverseBelongsToTests", () => {
   it("recursive inverse on recursive model has many inversing", async () => {
     await withHasManyInversing(BrokenBranch, async () => {
       const main = await BrokenBranch.create({});
-      const feature = await association(main, "branches").create({});
-      const topic = association(feature, "branches").build({});
+      const feature = await main.branches.create({});
+      const topic = (feature.association("branches") as CollectionAssociation).reader.build({});
       const error = await assertRaises([InverseOfAssociationRecursiveError], {}, () =>
         loadSingularTarget(topic, "branch"),
       );

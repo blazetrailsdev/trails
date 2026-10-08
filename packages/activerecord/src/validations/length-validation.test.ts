@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
-import { registerModel, collectionProxyFor as association } from "../associations.js";
+import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
@@ -26,7 +26,7 @@ describe("LengthValidationTest", () => {
     const o = new owner({ name: "nopets" });
     expect(await o.save()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
-    association(o, "pets").build({ name: "apet" });
+    o.pets.build({ name: "apet" });
     expect(await o.isValid()).toBeTruthy();
   });
 
@@ -37,10 +37,10 @@ describe("LengthValidationTest", () => {
     expect(await o.save()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
 
-    association(o, "pets").build({ name: "apet" });
+    o.pets.build({ name: "apet" });
     expect(await o.isValid()).toBeTruthy();
 
-    for (let i = 0; i < 2; i++) association(o, "pets").build({ name: "apet" });
+    for (let i = 0; i < 2; i++) o.pets.build({ name: "apet" });
     expect(await o.save()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
   });
@@ -51,7 +51,7 @@ describe("LengthValidationTest", () => {
     const o = new owner({ name: "あいうえおかきくけこ" });
     expect(await o.save()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
-    association(o, "pets").build({ name: "あいうえおかきくけこ" });
+    o.pets.build({ name: "あいうえおかきくけこ" });
     expect(await o.isValid()).toBeTruthy();
   });
 
@@ -61,7 +61,7 @@ describe("LengthValidationTest", () => {
     const o = new owner({ owner_id: 1 });
     expect(await o.save()).toBeFalsy();
     expect(o.errors.messagesFor("pets").length > 0).toBeTruthy();
-    const pet = association(o, "pets").build({ pet_id: 1 });
+    const pet = o.pets.build({ pet_id: 1 });
     expect(await o.isValid()).toBeTruthy();
     expect(await o.save()).toBeTruthy();
 

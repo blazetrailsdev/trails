@@ -1,7 +1,8 @@
+import type { CollectionAssociation } from "./collection-association.js";
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
-import { Associations, collectionProxyFor as association } from "../associations.js";
+import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
@@ -137,7 +138,9 @@ describe("DJAS routing widening — sourceType + polymorphic source", () => {
       const reflection = (RwAuthor as any)._reflectOnAssociation("noJoinsRwMembers");
       const members = (await author.association("noJoinsRwMembers").loadTarget()) as Base[];
       expect(members.map((m: any) => m.id).sort()).toEqual([m1.id, m2.id].sort());
-      const count = await association(author, "noJoinsRwMembers").count();
+      const count = await (
+        author.association("noJoinsRwMembers") as CollectionAssociation
+      ).reader.count();
       expect(count).toBe(2);
     } finally {
       Notifications.unsubscribe(sub);

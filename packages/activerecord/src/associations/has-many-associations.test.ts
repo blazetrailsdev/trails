@@ -7,7 +7,6 @@ import {
   SubclassNotFound,
   Base,
   CollectionProxy,
-  collectionProxyFor as association,
   registerModel,
   registerSubclass,
   RecordNotFound,
@@ -138,7 +137,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
   it("custom primary key on new record should fetch with query", async () => {
     const subscriber = new HmSubscriber({ nick: "webster132" });
-    const subscriptions = association(subscriber, "subscriptions");
+    const subscriptions = subscriber.subscriptions;
     expect(subscriptions.loaded).toBeFalsy();
 
     await assertQueriesCount(1, false, async () => {
@@ -152,7 +151,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
   it("association primary key on new record should fetch with query", async () => {
     const author = new HmAuthor({ name: "David" });
-    const essays = association(author, "essays");
+    const essays = author.essays;
     expect(essays.loaded).toBeFalsy();
 
     await assertQueriesCount(1, false, async () => {
@@ -167,7 +166,7 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
   it("has many custom primary key", async () => {
     const david = authors("david");
     const expected = (await HmEssay.where({ writer_id: "David" })).map((e) => e.id).sort();
-    const actual = (await association(david, "essays")).map((e) => e.id).sort();
+    const actual = (await david.essays).map((e) => e.id).sort();
     expect(actual).toEqual(expected);
   });
 
@@ -189,19 +188,19 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 
   it("has many assignment with custom primary key", async () => {
     const david = people("david");
-    const names = (await association(david, "essays")).map((e) => (e as HmEssay).name);
+    const names = (await david.essays).map((e) => e.name);
     expect(names).toEqual(["A Modest Proposal"]);
 
     const remote = await HmEssay.create({ name: "Remote Work" });
-    await association(david, "essays").replace([remote]);
+    await david.essays.replace([remote]);
 
-    const names2 = (await association(david, "essays")).map((e) => (e as HmEssay).name);
+    const names2 = (await david.essays).map((e) => e.name);
     expect(names2).toEqual(["Remote Work"]);
   });
 
   it("blank custom primary key on new record should not run queries", async () => {
     const author = new HmAuthor();
-    const essays = association(author, "essays");
+    const essays = author.essays;
     expect(essays.loaded).toBeFalsy();
 
     await assertQueriesCount(0, false, async () => {
@@ -1580,7 +1579,7 @@ describe("HasManyAssociationsTest", () => {
   it("create with bang on habtm when parent is new raises", async () => {
     const developer = new Developer({ name: "Aredridel" });
     const error = (await assertRaise([RecordNotSaved], {}, async () => {
-      await association(developer, "projects").createBang({});
+      await developer.projects.createBang({});
     })) as any;
 
     expect(error.message).toBe("You cannot call create unless the parent is saved");
@@ -2993,7 +2992,7 @@ describe("HasManyAssociationsTest", () => {
 
     expect(author.isAssociationCached("cache_posts")).toBe(false);
 
-    association(author, "cache_posts");
+    void author.cache_posts;
     expect(author.isAssociationCached("cache_posts")).toBe(true);
     expect(author.isAssociationCached("other")).toBe(false);
   });

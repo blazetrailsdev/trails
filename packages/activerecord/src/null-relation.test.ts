@@ -3,7 +3,7 @@ import "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { assertAsyncEqual } from "./support/async-helper.js";
-import { collectionProxyFor as association, registerModel } from "./associations.js";
+import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -68,7 +68,7 @@ describe("NullRelationTest", () => {
   it("null relation used with constraints", async () => {
     const post = await Post.first();
     await assertNoQueries(false, async () => {
-      let scope = association(post!, "comments").scope();
+      let scope = post!.comments.scope();
       const none = Post.none();
       scope = scope.merge(none);
       expect(await scope.size()).toBe(0);
