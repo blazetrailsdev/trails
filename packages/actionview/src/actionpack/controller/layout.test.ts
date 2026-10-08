@@ -1,6 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { describe, expect, test } from "vitest";
-import { extractOptionsBang, underscore } from "@blazetrails/activesupport";
+import { dasherize, extractOptionsBang, underscore } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/ruby-compat";
 import { ActionController, Request, Response, RouteSet } from "@blazetrails/actionpack";
 import { FixtureResolver } from "../../testing/resolvers.js";
@@ -15,7 +15,7 @@ class LayoutTest extends ActionController.Base {
     return "views";
   }
   static override _impliedLayoutName = function (this: { name: string }): string {
-    return underscore(this.name).replace(/_controller$/, "");
+    return dasherize(underscore(this.name).replace(/_controller$/, ""));
   };
 
   async hello(): Promise<void> {}
@@ -25,11 +25,11 @@ class LayoutTest extends ActionController.Base {
 LayoutTest.viewPaths(
   new FixtureResolver({
     "layouts/item.tse": "item.erb <%= yield %>",
-    "layouts/layout_test.tse": "layout_test.erb <%= yield %>",
-    "layouts/multiple_extensions.html.tse": "multiple_extensions.html.erb <%= yield %>\n",
-    "layouts/controller_name_space/nested.tse": "controller_name_space/nested.erb <%= yield %>",
+    "layouts/layout-test.tse": "layout_test.erb <%= yield %>",
+    "layouts/multiple-extensions.html.tse": "multiple_extensions.html.erb <%= yield %>\n",
+    "layouts/controller-name-space/nested.tse": "controller_name_space/nested.erb <%= yield %>",
     "layouts/symlinked/symlinked_layout.tse": "This is my layout\n\n<%= yield %>\n\nEnd.\n",
-    "layouts/third_party_template_library.mab": "layouts/third_party_template_library.mab",
+    "layouts/third-party-template-library.mab": "layouts/third_party_template_library.mab",
     "views/hello.tse": "hello.erb",
     "views/goodbye.tse": "goodbye.erb",
   }),
@@ -171,7 +171,7 @@ class ExceptLayoutController extends LayoutTest {
 
 class SetsLayoutInRenderController extends LayoutTest {
   override async hello(): Promise<void> {
-    await this.render({ layout: "third_party_template_library" });
+    await this.render({ layout: "third-party-template-library" });
   }
 }
 

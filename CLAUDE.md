@@ -2015,6 +2015,18 @@ is unchanged, as `controller_path` is. `partialPath` carries
 `@inventedArm dasherize — PERMANENT`; the scaffold generator's methods are not
 compared against Rails' and carry no receipt.
 
+A controller's implied layout follows the directory. `_impliedLayoutName`
+(`actionview/src/layouts.ts`; Rails' `_implied_layout_name`, `layouts.rb:345-347`,
+returns `controller_path`) returns the controller path dasherized, so
+`Admin::StoryPagesController` looks for `layouts/admin/story-pages`. It
+carries no `@inventedArm` receipt, and must not be given one: the arm-throw gate
+does not compare that declaration and fails a tag on it as stale
+(`_impliedLayoutName: dasherize (declaration not compared)`). This paragraph is
+its record until story
+`invented-arm-receipt-is-rejected-on-declarations-the-comparison-omits`
+makes the pair comparable; the tag goes on then and this note comes out. A layout the application names itself
+(`layout "line_items"`, `render layout: "line_items"`) is looked up as written.
+
 `trails-tsc`'s view compiler follows the same rule when it works out which
 template a controller's `render` call names (`trails-tsc/src/build-views.ts`):
 the enclosing method's name, or a literal `action:`, in kebab-case; a literal

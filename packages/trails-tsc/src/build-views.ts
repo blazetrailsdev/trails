@@ -475,7 +475,8 @@ function layoutsOf(
     for (let current = from; current; current = superclassOf(checker, current)) {
       const file = current.getSourceFile().fileName;
       const owner = controllers.find((c) => c.file === file && c.name === current.name?.text);
-      if (owner && existing.has(owner.path)) return void layouts.add(owner.path);
+      const name = owner && dasherize(owner.path);
+      if (name !== undefined && existing.has(name)) return void layouts.add(name);
     }
   };
   const declared = classMacros(checker, klass).filter((m) => m.name === "layout");

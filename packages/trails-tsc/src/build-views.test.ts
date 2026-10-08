@@ -816,6 +816,7 @@ describe("runCli", () => {
       ["comments", "CommentsController", "declare items: string[];"],
       ["posts", "PostsController", "private declare items: number[];"],
       ["admin/posts", "AdminPostsController", "declare items: boolean[];"],
+      ["story-pages", "StoryPagesController", "declare items: Date[];"],
     ]) {
       write(
         cwd,
@@ -829,12 +830,14 @@ describe("runCli", () => {
     write(cwd, "app/views/layouts/application.html.tse", "<%= this.items %>");
     write(cwd, "app/views/layouts/posts.html.tse", "<%= this.items %>");
     write(cwd, "app/views/layouts/admin/posts.html.tse", "<%= this.items %>");
+    write(cwd, "app/views/layouts/story-pages.html.tse", "<%= this.items %>");
     await buildViews({ cwd });
     const read = (rel: string): string =>
       fs.readFileSync(path.join(cwd, ".trails/views", `${rel}.ts`), "utf8");
     expect(read("layouts/application.html.tse")).toContain('{ "items": string[] | undefined }');
     expect(read("layouts/posts.html.tse")).toContain('{ "items": number[] }');
     expect(read("layouts/admin/posts.html.tse")).toContain('{ "items": boolean[] }');
+    expect(read("layouts/story-pages.html.tse")).toContain('{ "items": Date[] }');
     expect(fs.existsSync(path.join(cwd, "app/controllers/posts-controller.d.ts"))).toBe(false);
   }, 30_000);
 

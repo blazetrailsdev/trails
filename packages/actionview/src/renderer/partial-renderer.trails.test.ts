@@ -79,4 +79,12 @@ describe("PartialRenderer render blocks", () => {
     const body = await renderer.renderPartial(view, { partial: items });
     expect(String(body)).toBe("item one;item two;");
   });
+
+  it("renders a plain array of records as a collection", async () => {
+    const item = (name: string) => ({ name, toPartialPath: () => "admin/line_items/line_item" });
+    const body = await renderer.renderPartial(view, { partial: [item("one"), item("two")] });
+    expect(String(body)).toBe("item one;item two;");
+    expect(await renderer.renderPartial(view, { partial: [] })).toBeNull();
+    expect(String(body)).toBe("item one;item two;");
+  });
 });
