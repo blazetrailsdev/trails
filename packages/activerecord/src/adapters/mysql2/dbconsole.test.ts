@@ -10,7 +10,7 @@ describeIfMysqlAdapter("Mysql2DbConsoleTest", () => {
     new HashConfig("test", "primary", config as DatabaseConfigOptions);
 
   const assertFindCmdAndExecCalledWith = (args: unknown[], block: () => unknown) => {
-    const spy = vi.spyOn(Mysql2Adapter, "findCmdAndExec").mockImplementation(() => []);
+    const spy = vi.spyOn(Mysql2Adapter, "findCmdAndExec").mockReturnValue(undefined as never);
     try {
       block();
       expect(spy).toHaveBeenCalledWith(...args);

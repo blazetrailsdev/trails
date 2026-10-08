@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Errno, SystemCallError } from "./errno.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 import { RangeError } from "./range-error.js";
 import { TypeError } from "./type-error.js";
 import { RUBY_PLATFORM } from "./ruby-platform.js";
@@ -19,6 +20,7 @@ import {
   stdin,
   stdout,
   abort,
+  exec,
   SystemExit,
   type ProcessAdapter,
   type WriteStream,
@@ -83,6 +85,37 @@ function makeFakeAdapter(overrides: Partial<ProcessAdapter> = {}): ProcessAdapte
 describe("processAdapter", () => {
   afterEach(() => {
     __INTERNAL_resetProcessAdapter_TEST_ONLY();
+  });
+
+  describe("Kernel#exec", () => {
+    it("hands exe_path and its args to the adapter and does not return", () => {
+      const calls: (readonly string[])[] = [];
+      registerProcessAdapter(
+        makeFakeAdapter({
+          exec: (argv) => {
+            calls.push(argv);
+            throw new SystemExit(0);
+          },
+        }),
+      );
+      expect(() => exec("/usr/bin/sqlite3", "-header", "db.sqlite3")).toThrow(SystemExit);
+      expect(calls).toEqual([["/usr/bin/sqlite3", "-header", "db.sqlite3"]]);
+    });
+
+    it("raises NotImplementedError on an adapter that cannot exec", () => {
+      registerProcessAdapter(makeFakeAdapter());
+      expect(() => exec("/usr/bin/sqlite3")).toThrow(NotImplementedError);
+      expect(() => exec("/usr/bin/sqlite3")).toThrow(
+        "exec() function is unimplemented on this machine",
+      );
+    });
+
+    it("raises the SystemCallError of a command the Node adapter cannot run", () => {
+      expect(() => exec("/nonexistent-dir/no-such-client", "a")).toThrow(Errno.ENOENT);
+      expect(() => exec("/nonexistent-dir/no-such-client", "a")).toThrow(
+        "No such file or directory - /nonexistent-dir/no-such-client",
+      );
+    });
   });
 
   describe("env snapshot", () => {

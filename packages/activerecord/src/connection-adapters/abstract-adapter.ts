@@ -33,6 +33,7 @@ import {
   Process,
   RbConfig,
   abort,
+  exec,
   block,
   cmp,
   Concurrent,
@@ -864,8 +865,7 @@ export class AbstractAdapter implements Quoting {
     );
   }
 
-  /** @missingRailsCall exec — CONVERGEABLE find-cmd-and-exec-replaces-the-process-through-kernel-exec */
-  static findCmdAndExec(commands: string | string[], ...args: string[]): string[] {
+  static findCmdAndExec(commands: string | string[], ...args: string[]): never {
     let cmds = kernelArray(commands);
 
     const dirsOnPath = toS(env["PATH"]).split(File.PATH_SEPARATOR);
@@ -889,7 +889,7 @@ export class AbstractAdapter implements Quoting {
     );
 
     if (found != null) {
-      return [fullPathCommand!, ...args];
+      exec(fullPathCommand!, ...args);
     } else {
       abort(`Couldn't find database client: ${cmds.join(", ")}. Check your $PATH and try again.`);
     }

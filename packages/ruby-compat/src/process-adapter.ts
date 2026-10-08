@@ -1,4 +1,5 @@
 import { Errno, SystemCallError } from "./errno.js";
+import { NotImplementedError } from "./not-implemented-error.js";
 import { RuntimeError } from "./runtime-error.js";
 import { num2long, rbCheckStringType, stringValue } from "./string/support.js";
 
@@ -33,6 +34,13 @@ export interface ProcessAdapter {
   pid(): number;
   setEnv(key: string, value: string | undefined): void;
   exit(code?: number): never;
+  /**
+   * Runs `argv[0]` with `argv.slice(1)` on the parent's stdio and exits with
+   * its status, which is as near as a host with no `execve(2)` comes to
+   * `proc_exec_cmd` (`vendor/ruby/v3.3.11/process.c:1729`). A command that
+   * could not be run raises its `SystemCallError`.
+   */
+  exec?(argv: readonly string[]): never;
   setExitCode(code: number): void;
   onSignal(name: SignalName, handler: () => void): () => void;
   readonly stdout: WriteStream;
@@ -381,6 +389,26 @@ export function abort(message?: string): never {
   throw new SystemExit(1, message);
 }
 
+/**
+ * `Kernel#exec` (`vendor/ruby/v3.3.11/process.c:3015` `rb_f_exec`) for the
+ * `exec(exe_path, *args)` form: the process is replaced by `exe_path`, run
+ * with `args` and no shell, and the call does not return. A command that
+ * cannot be run raises its `SystemCallError` (`rb_syserr_fail_str`,
+ * `process.c:3041`), and a host with no way to run one raises
+ * `rb_notimplement`'s `NotImplementedError` (`vendor/ruby/v3.3.11/error.c:3498`).
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `Kernel#exec`
+ * (`vendor/ruby/v3.3.11/process.c:3015`).
+ */
+export function exec(...argv: [exePath: string, ...args: string[]]): never {
+  const adapter = requireAdapter();
+  if (adapter.exec === undefined) {
+    throw new NotImplementedError("exec() function is unimplemented on this machine");
+  }
+
+  return adapter.exec(argv);
+}
+
 /** @noRailsEquivalent PERMANENT */
 export function setEnv(key: string, value: string | undefined): void {
   requireAdapter().setEnv(key, value);
@@ -522,6 +550,26 @@ function buildNodeAdapter(proc: NodeProcessLike): ProcessAdapter {
       else proc.env[key] = value;
     },
     exit: (code) => proc.exit(code),
+    exec: (argv) => {
+      const childProcess = proc.getBuiltinModule?.("node:child_process") as
+        | {
+            spawnSync(
+              cmd: string,
+              args: string[],
+              opts: unknown,
+            ): { status: number | null; error?: Error & { code?: string } };
+          }
+        | undefined;
+      if (childProcess == null) {
+        throw new NotImplementedError("exec() function is unimplemented on this machine");
+      }
+      const result = childProcess.spawnSync(argv[0], argv.slice(1), { stdio: "inherit" });
+      if (result.error !== undefined) {
+        if (result.error.code === "ENOENT") throw new Errno.ENOENT(argv[0]);
+        throw new SystemCallError(`${result.error.message} - ${argv[0]}`);
+      }
+      return proc.exit(result.status ?? 1);
+    },
     setExitCode: (code) => {
       proc.exitCode = code;
     },

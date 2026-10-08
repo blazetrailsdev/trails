@@ -1,14 +1,13 @@
-import { groupBy, kernelArray } from "@blazetrails/activesupport";
-import { last } from "@blazetrails/ruby-compat";
+import { kernelArray } from "@blazetrails/activesupport";
+import { groupBy, last, rtest, type Hash } from "@blazetrails/ruby-compat";
 import { Key } from "./key.js";
-import { headerString } from "./encoding-helpers.js";
 import { Encryption } from "../namespaces.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
   protected _keys: Key[];
   private _encryptionKey: Key | undefined;
-  private _keysGroupedById: Map<string, Key[]> | undefined;
+  private _keysGroupedById: Hash<string, Key[]> | undefined;
 
   constructor(keys: Key | Key[]) {
     this._keys = kernelArray(keys);
@@ -25,15 +24,15 @@ export class KeyProvider {
   }
 
   decryptionKeys(encryptedMessage: Message): Key[] {
-    const rawKeyId = encryptedMessage.headers.encryptedDataKeyId as unknown;
-    if (rawKeyId != null && rawKeyId !== false) {
-      return this.keysGroupedById().get(headerString(rawKeyId)!) ?? [];
+    if (rtest(encryptedMessage.headers.encryptedDataKeyId)) {
+      return this.keysGroupedById().get(encryptedMessage.headers.encryptedDataKeyId!) ?? [];
+    } else {
+      return this._keys;
     }
-    return this._keys;
   }
 
   /** @internal */
-  private keysGroupedById(): Map<string, Key[]> {
+  private keysGroupedById(): Hash<string, Key[]> {
     return (this._keysGroupedById ??= groupBy(this._keys, (key) => key.id));
   }
 }

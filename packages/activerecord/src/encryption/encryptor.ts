@@ -3,6 +3,7 @@ import {
   Encoding as RbEncoding,
   EncodingError,
   OpenSSL,
+  encode,
   forceEncoding,
   rbObjClassname,
   rbObjEncoding,
@@ -14,7 +15,6 @@ import type { MessageSerializerLike } from "./message-serializer.js";
 import { Decryption, EncryptedContentIntegrity, Encoding, ForbiddenClass } from "./errors.js";
 import { type Compressor } from "./config.js";
 import { Encryption } from "../namespaces.js";
-import { encode } from "./encoding-helpers.js";
 
 const THRESHOLD_TO_JUSTIFY_COMPRESSION = 140;
 
@@ -210,7 +210,10 @@ export class Encryptor {
       value != null &&
       rbObjEncoding(value) !== RbEncoding.find(this.forcedEncodingForDeterministicEncryption())
     ) {
-      return encode(value, this.forcedEncodingForDeterministicEncryption());
+      return encode(value, this.forcedEncodingForDeterministicEncryption(), {
+        invalid: ":replace",
+        undef: ":replace",
+      });
     } else {
       return value;
     }
