@@ -1009,7 +1009,7 @@ export class Base extends Model {
   declare static generatedTokenVerifier: _MessageVerifier | null;
 
   declare static encrypts: (...args: Array<string | EncryptsOptions>) => void;
-  declare static deterministicEncryptedAttributes: () => Set<string> | undefined;
+  declare static deterministicEncryptedAttributes: () => string[] | undefined;
 
   static async suppress<R>(fn: () => R | Promise<R>): Promise<R> {
     return _suppressBlock(this, fn);

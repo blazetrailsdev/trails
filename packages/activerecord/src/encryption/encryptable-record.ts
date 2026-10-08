@@ -146,16 +146,14 @@ export function encrypts(this: any, ...names: unknown[]): void {
   }
 }
 
-export function deterministicEncryptedAttributes(this: any): Set<string> | undefined {
+export function deterministicEncryptedAttributes(this: any): string[] | undefined {
   return (
     Object.getOwnPropertyDescriptor(this, "_deterministicEncryptedAttributes")?.value ||
     (this._deterministicEncryptedAttributes =
       this.encryptedAttributes &&
-      new Set(
-        Array<string>(this.encryptedAttributes).filter(
-          (attributeName) =>
-            (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
-        ),
+      Array<string>(this.encryptedAttributes).filter(
+        (attributeName) =>
+          (this.typeForAttribute(attributeName) as EncryptedAttributeType).deterministic,
       ))
   );
 }

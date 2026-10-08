@@ -209,7 +209,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost();
     new Book();
     new Post();
-    expect(Book.deterministicEncryptedAttributes()).toEqual(new Set(["name"]));
+    expect(Book.deterministicEncryptedAttributes()).toEqual(["name"]);
     expect(Post.deterministicEncryptedAttributes()).not.toEqual(
       Book.deterministicEncryptedAttributes(),
     );

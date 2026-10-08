@@ -2807,6 +2807,23 @@ describe("Ruby extractor call-argument capture", { timeout: RUBY_SUBPROCESS_TIME
     ]);
   });
 
+  it("flags a product of literals and refs with its factors", () => {
+    const c = rubyCallArgs({
+      "foo.rb": `
+        class Foo
+          def backoff(counter)
+            sleep 0.1 * counter
+            wait(counter * jitter(counter))
+          end
+        end
+      `,
+    });
+    const flagsOf = (name: string) => c["Foo#backoff"]?.find((s) => s.name === name)?.flags;
+    expect(argsOf(c["Foo#backoff"], "sleep")).toEqual(["binop:*"]);
+    expect(flagsOf("sleep")).toContain("product=num:0.1*id:counter");
+    expect(flagsOf("wait")?.some((flag) => flag.startsWith("product="))).toBe(false);
+  });
+
   it("records keyword arguments as keys plus value descriptors", () => {
     const c = rubyCallArgs({
       "foo.rb": `

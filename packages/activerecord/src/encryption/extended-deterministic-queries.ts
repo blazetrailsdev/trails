@@ -38,7 +38,7 @@ export class EncryptedQuery {
   ): unknown[] {
     if (owner instanceof Relation) owner = owner.model;
 
-    if (owner.deterministicEncryptedAttributes()?.size === 0) return args;
+    if (owner.deterministicEncryptedAttributes()?.length === 0) return args;
 
     let options: Map<string, unknown> | Record<string, unknown>;
     if (
@@ -124,7 +124,7 @@ export const RelationQueries = {
   },
 
   scopeForCreate(this: any, super_: (...args: any[]) => unknown): Record<string, unknown> {
-    if (!any([...(this.model.deterministicEncryptedAttributes() ?? [])]))
+    if (!any(this.model.deterministicEncryptedAttributes() ?? []))
       return super_() as Record<string, unknown>;
 
     const scopeAttributes = super_() as Record<string, unknown>;
