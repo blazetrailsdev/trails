@@ -286,11 +286,10 @@ export async function prettyPrint(
           pp.text(attrName);
           pp.text(":");
           pp.breakable();
-          pp.text(
-            (
-              this as unknown as { attributeForInspect(attr: string): string | InspectionMask }
-            ).attributeForInspect(attrName) as string,
-          );
+          const value = (
+            this as unknown as { attributeForInspect(attr: string): string | InspectionMask }
+          ).attributeForInspect(attrName);
+          pp.text(String(value));
         });
       },
     );
