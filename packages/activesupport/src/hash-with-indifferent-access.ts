@@ -123,7 +123,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return super.delete(this.convertKey(key), block);
   }
 
-  key(key: string): boolean {
+  isKey(key: string): boolean {
     return this.has(key);
   }
 
@@ -132,15 +132,15 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
   }
 
   include(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   hasKey(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   member(key: string): boolean {
-    return this.key(key);
+    return this.isKey(key);
   }
 
   fetch(key: string, ...extras: (V | DefaultBlock<V>)[]): V {
@@ -204,7 +204,7 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
           ? otherHash
           : (otherHash as unknown as ToHash).toHash();
       const eachPairBlock = (key: string, value: V) => {
-        if (block && this.key(key)) {
+        if (block && this.isKey(key)) {
           value = block(this.convertKey(key), this.get(key)!, value);
         }
         this.regularWriter(this.convertKey(key), this.convertValue(value));

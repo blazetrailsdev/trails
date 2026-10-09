@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { Nodes, Table } from "@blazetrails/arel";
 
@@ -60,7 +61,7 @@ describe("joinType propagation in joinConstraints", () => {
   it("emits InnerJoin when joinType is InnerJoin", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.InnerJoin);
 
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);
     for (const join of joins) {
       expect(join).toBeInstanceOf(Nodes.InnerJoin);
@@ -70,7 +71,7 @@ describe("joinType propagation in joinConstraints", () => {
   it("emits OuterJoin when joinType is OuterJoin", () => {
     const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);
     for (const join of joins) {
       expect(join).toBeInstanceOf(Nodes.OuterJoin);

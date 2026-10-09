@@ -3,6 +3,7 @@ import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
+import { aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Table } from "@blazetrails/arel";
 
@@ -52,7 +53,7 @@ describe("JoinDependency walk() deduplication", () => {
     const jd1 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
     const jd2 = new JoinDependency(Post, null, "commentLikes", Nodes.OuterJoin);
 
-    const joins = jd1.joinConstraints([jd2]);
+    const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
     const tables = joins.map((j) => {
       const t = (j as Nodes.OuterJoin).left;
       return (t as any).tableAlias ?? (t as any).name;
@@ -67,7 +68,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const jd2 = new JoinDependency(Post, null, { comments: "likes" }, Nodes.OuterJoin);
 
-    const joins = jd1.joinConstraints([jd2]);
+    const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
 
     const joinTables = joins.map((j) => {
       const outerJoin = j as Nodes.OuterJoin;
@@ -96,7 +97,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const jd2 = new JoinDependency(Post, null, "tags", Nodes.OuterJoin);
 
-    const joins = jd1.joinConstraints([jd2]);
+    const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
 
     expect(joins).toHaveLength(2);
   });
@@ -108,7 +109,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const jd3 = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
 
-    const joins = jd1.joinConstraints([jd2, jd3]);
+    const joins = jd1.joinConstraints([jd2, jd3], aliasTrackerFor(jd1), []);
 
     const joinTables = joins.map((j) => {
       const table = (j as Nodes.OuterJoin).left;
@@ -128,7 +129,7 @@ describe("JoinDependency walk() deduplication", () => {
 
     const jd2 = new JoinDependency(Post, null, { reviews: "likes" }, Nodes.OuterJoin);
 
-    const joins = jd1.joinConstraints([jd2]);
+    const joins = jd1.joinConstraints([jd2], aliasTrackerFor(jd1), []);
 
     const likesJoin = joins.find((j) => {
       const table = (j as Nodes.OuterJoin).left;

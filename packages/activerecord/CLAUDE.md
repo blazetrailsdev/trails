@@ -218,10 +218,13 @@ clobbers what the class body already wrote.
   superclass (`core.rb:349-355`).
 - **What a link seeds is seeded at the subclass's first read.**
   `cachedFindByStatement` calls `initializeFindByCache` when the class has no
-  own `_findByStatementCache`, and the generated-module readers call
-  `initializeGeneratedModules` when it has no own `_generatedAttributeMethods`,
-  so the attribute module is included before the association one, as
-  `attribute_methods.rb:42-50` orders them. `set_base_class` is seeded the same
+  own `_findByStatementCache`, and `generatedAttributeMethods`
+  (`attribute-methods.ts`) calls `initializeGeneratedModules` when it has no own
+  `_generatedAttributeMethods`. That reader is the one seed site:
+  `generatedAssociationMethods` and encryption's
+  `overrideAccessorsToPreserveOriginal` call it first, so the attribute module
+  is included before the association one, as `attribute_methods.rb:42-50`
+  orders them. `set_base_class` is seeded the same
   way by `baseClass`, and `_typeCandidatesCache` by its reader.
 - **A parent is seeded by its own first read, not by its child's.** Rails runs
   each class's links once, in definition order. Here a leaf read before its

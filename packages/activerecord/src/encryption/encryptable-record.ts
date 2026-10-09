@@ -9,7 +9,6 @@ import {
   kernelArray as Array,
 } from "@blazetrails/activesupport";
 import { Module, include } from "@blazetrails/ruby-compat";
-import { initializeGeneratedModules } from "../attribute-methods.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Encryption } from "../encryption.js";
 
@@ -65,15 +64,16 @@ export function addLengthValidationForEncryptedColumns(this: any): void {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm generatedAttributeMethods — PERMANENT
+ */
 export function overrideAccessorsToPreserveOriginal(
   this: any,
   name: string,
   originalAttributeName: string,
 ): void {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
+  this.generatedAttributeMethods();
   include(
     this,
     new Module((mod) => {

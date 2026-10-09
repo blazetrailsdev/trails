@@ -2,7 +2,7 @@ import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
 import { rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
-import { rbEql } from "./rb-equal.js";
+import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
 
@@ -1094,6 +1094,32 @@ export class Hash<K, V> extends Map<K, V> {
    */
   override has(key: K): boolean {
     return super.has(this.hashStlikeLookup(key));
+  }
+
+  /**
+   * `Hash#has_value?` (`vendor/ruby/v3.3.11/hash.c:3697` `rb_hash_has_value`):
+   * `rb_hash_search_value` (`:3680`) compares each stored value with `==`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#has_value?` (`vendor/ruby/v3.3.11/hash.c:3697`).
+   */
+  hasValue(val: unknown): boolean {
+    for (const value of super.values()) {
+      if (rbEqual(value, val)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * `Hash#key` (`vendor/ruby/v3.3.11/hash.c:2354` `rb_hash_key`): the key of the
+   * first entry whose value is `==` to `value` (`key_i`, `:2329`), else `nil`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#key` (`vendor/ruby/v3.3.11/hash.c:2354`).
+   */
+  key(value: unknown): K | null {
+    for (const [key, val] of super.entries()) {
+      if (rbEqual(val, value)) return key;
+    }
+    return null;
   }
 
   /**

@@ -3,7 +3,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
-import { nodeAt, nodePaths } from "../test-helpers/join-dependency-paths.js";
+import { nodeAt, nodePaths, aliasTrackerFor } from "../test-helpers/join-dependency-paths.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
 import "../associations/collection-proxy.js";
@@ -42,7 +42,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
       "order",
       Nodes.OuterJoin,
     );
-    const joins = jd.joinConstraints([]);
+    const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const node = nodeAt(jd, "order");
     expect(node).not.toBeNull();
     const outerJoin = joins[0] as Nodes.OuterJoin;

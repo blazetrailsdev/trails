@@ -1,4 +1,4 @@
-import { basicObjRespondTo, rbInspect } from "@blazetrails/ruby-compat";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -39,29 +39,6 @@ describe("AttributeMethodsTest (trails)", () => {
 
     expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
     expect(new Legacy({ title: "t" }).heading).toBe("t");
-  });
-
-  it("initializeGeneratedModules replaces a module ActiveModel built first", () => {
-    class Legacy extends Base {
-      declare heading: unknown;
-      static {
-        this.attribute("title", "string");
-        this.aliasAttribute("heading", "title");
-      }
-    }
-    Legacy.generatedAttributeMethods().defineMethod("title", function () {
-      return "from the ActiveModel module";
-    });
-    Legacy.initializeGeneratedModules();
-    generatable(Legacy).defineAttributeMethods();
-
-    expect(Legacy._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
-    expect("title" in Legacy.prototype).toBe(true);
-
-    Legacy.undefineAttributeMethods();
-
-    expect(basicObjRespondTo(Legacy.prototype, "title")).toBe(false);
-    expect(basicObjRespondTo(Legacy.prototype, "heading")).toBe(false);
   });
 
   it("a class reached only through isInstanceMethodAlreadyImplemented holds a GeneratedAttributeMethods", () => {

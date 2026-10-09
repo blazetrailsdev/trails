@@ -1205,3 +1205,25 @@ describe("Hash#size", () => {
     expect(size({})).toBe(0);
   });
 });
+
+describe("Hash#key and Hash#has_value?", () => {
+  it("key answers the first key whose value is ==, else nil", () => {
+    const hash = new Hash<string, unknown>();
+    hash.set("foo", 0).set("bar", 2).set("baz", 2).set("pair", [1, "a"]);
+
+    expect(hash.key(0)).toBe("foo");
+    expect(hash.key(2)).toBe("bar");
+    expect(hash.key([1, "a"])).toBe("pair");
+    expect(hash.key(3)).toBeNull();
+  });
+
+  it("hasValue compares each value with ==", () => {
+    const hash = new Hash<string, unknown>();
+    hash.set("foo", 0).set("pair", [1, "a"]).set("none", null);
+
+    expect(hash.hasValue(0)).toBe(true);
+    expect(hash.hasValue([1, "a"])).toBe(true);
+    expect(hash.hasValue(null)).toBe(true);
+    expect(hash.hasValue("0")).toBe(false);
+  });
+});

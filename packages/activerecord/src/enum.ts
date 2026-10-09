@@ -38,7 +38,6 @@ export class EnumType extends ValueType<string> {
   /** @internal */
   readonly name: string;
   private _mapping: HashWithIndifferentAccess<EnumValue>;
-  private _reverseMapping: ReadonlyMap<EnumValue, string>;
   private _raiseOnInvalidValues: boolean;
   private _subtypeType: ValueType<unknown>;
 
@@ -51,13 +50,8 @@ export class EnumType extends ValueType<string> {
     super();
     this.name = name;
     this._mapping = mapping;
-    const reverse = new Map<EnumValue, string>();
-    for (const [k, v] of mapping.entries()) {
-      if (!reverse.has(v)) reverse.set(v, k);
-    }
-    this._reverseMapping = reverse;
-    this._raiseOnInvalidValues = raiseOnInvalidValues;
     this._subtypeType = subtype;
+    this._raiseOnInvalidValues = raiseOnInvalidValues;
   }
 
   override type(): string | undefined {
@@ -71,16 +65,15 @@ export class EnumType extends ValueType<string> {
   cast(value: unknown): string | null {
     if (this._mapping.hasKey(value as string)) {
       return toS(value);
-    } else if (this._reverseMapping.has(value as EnumValue)) {
-      return this._reverseMapping.get(value as EnumValue)!;
+    } else if (this._mapping.hasValue(value)) {
+      return this._mapping.key(value);
     } else {
       return (presence(value) ?? null) as string | null;
     }
   }
 
   deserialize(value: unknown): string | null {
-    const sub = this._subtypeType.deserialize(value) as EnumValue;
-    return this._reverseMapping.get(sub) ?? null;
+    return this._mapping.key(this._subtypeType.deserialize(value));
   }
 
   serialize(value: unknown): number | string | boolean | null {
@@ -102,11 +95,7 @@ export class EnumType extends ValueType<string> {
     if (!this._raiseOnInvalidValues) return;
 
     if (
-      !(
-        isBlank(value) ||
-        this._mapping.hasKey(value as string) ||
-        this._reverseMapping.has(value as EnumValue)
-      )
+      !(isBlank(value) || this._mapping.hasKey(value as string) || this._mapping.hasValue(value))
     ) {
       throw new ArgumentError(`'${value}' is not a valid ${this.name}`);
     }

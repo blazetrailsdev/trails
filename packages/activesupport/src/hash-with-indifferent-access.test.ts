@@ -527,7 +527,7 @@ describe("HashWithIndifferentAccessTest", () => {
       valuesAt: ["valuesAt", [1]],
       hasKey: ["hasKey", true],
       include: ["include", true],
-      key: ["key", true],
+      key: ["isKey", true],
       member: ["member", true],
     };
 
@@ -669,8 +669,8 @@ describe("HashWithIndifferentAccessTest", () => {
 
     const replaced = hash.replace({ ":b": 12 });
 
-    expect(hash.key("b")).toBeTruthy();
-    expect(hash.key(":a")).toBeFalsy();
+    expect(hash.isKey("b")).toBeTruthy();
+    expect(hash.isKey(":a")).toBeFalsy();
     expect(hash.get(":b")).toEqual(12);
     expect(replaced).toBe(hash);
   });
@@ -681,8 +681,8 @@ describe("HashWithIndifferentAccessTest", () => {
 
     const replaced = hash.replace(new HashByConversion({ ":b": 12 }) as never);
 
-    expect(hash.key("b")).toBeTruthy();
-    expect(hash.key(":a")).toBeFalsy();
+    expect(hash.isKey("b")).toBeTruthy();
+    expect(hash.isKey(":a")).toBeFalsy();
     expect(hash.get(":b")).toEqual(12);
     expect(replaced).toBe(hash);
   });
@@ -1177,7 +1177,7 @@ describe("HashWithIndifferentAccessTest", () => {
 
   it("new with to hash conversion", () => {
     const hash = new HashWithIndifferentAccess<unknown>(new HashByConversion({ ":a": 1 }) as never);
-    expect(hash.key("a")).toBeTruthy();
+    expect(hash.isKey("a")).toBeTruthy();
     expect(hash.get(":a")).toEqual(1);
   });
 

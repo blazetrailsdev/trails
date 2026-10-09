@@ -2,6 +2,7 @@ import {
   Autoload,
   extend,
   isPlainObject,
+  kernelArray,
   Notifications,
   type Extended,
 } from "@blazetrails/activesupport";
@@ -11,10 +12,10 @@ import {
   hasKey,
   isEmpty,
   partition,
-  rbEqual,
   rbInspect,
   rtest,
   symbolToS,
+  toS,
   toSym,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
@@ -26,11 +27,9 @@ import { Associations } from "../namespaces.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
-import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
-import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
-import { AliasTracker } from "./alias-tracker.js";
-
-const NO_PRIMARY_KEY_ID = Symbol("JoinDependency.noPrimaryKeyId");
+import { EagerLoadPolymorphicError } from "./errors.js";
+import { ConfigurationError } from "../errors.js";
+import type { AliasTracker } from "./alias-tracker.js";
 
 export class Aliases {
   private _tables: Aliases.Table[];
@@ -93,7 +92,7 @@ export namespace Aliases {
 export class JoinDependency {
   private _baseModel: typeof Base;
   private _baseAlias: string;
-  private _aliasTracker: AliasTracker;
+  private _aliasTracker!: AliasTracker;
   private _aliasesCache?: Aliases;
   private _joinRootAlias = true;
   private readonly _joinRoot: JoinBase;
@@ -111,26 +110,9 @@ export class JoinDependency {
     this._baseModel = base;
     table ??= (base as any).arelTable;
     this._baseAlias = (table as any).name ?? (base as any).tableName;
-    this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
     this._joinType = joinType ?? Nodes.OuterJoin;
     const tree = JoinDependency.makeTree(associations ?? []);
     this._joinRoot = new JoinBase(base, table as ArelTable, this.build(tree, base));
-  }
-
-  /** @internal */
-  private _baseTableAliasLength(): number | undefined {
-    try {
-      return (this._baseModel as any)
-        .connectionPool()
-        .withConnectionSync((connection: any) =>
-          typeof connection?.tableAliasLength === "function"
-            ? connection.tableAliasLength()
-            : undefined,
-        );
-    } catch (error) {
-      if (error instanceof ConnectionNotDefined) return undefined;
-      throw error;
-    }
   }
 
   /** @internal */
@@ -170,35 +152,34 @@ export class JoinDependency {
     return this._joinType;
   }
 
-  /** @inventedArm if — CONVERGEABLE join-dependency-optional-alias-tracker-and-row-hash-parent-key */
   joinConstraints(
     joinsToAdd: JoinDependency[],
-    aliasTracker?: AliasTracker,
-    references?: Array<string | Nodes.SqlLiteral>,
+    aliasTracker: AliasTracker,
+    references: Array<string | Nodes.SqlLiteral>,
   ): Nodes.Join[] {
-    if (aliasTracker) {
-      this._aliasTracker = aliasTracker;
-    } else {
-      this._aliasTracker = new AliasTracker(this._baseTableAliasLength(), this._baseAliases());
-    }
-    this._references = new Map();
+    this._aliasTracker = aliasTracker;
     this._joinedTables = new Hash();
-    if (references) {
+    this._references = new Map();
+
+    if (!isEmpty(references)) {
       for (const tableName of references) {
-        if (tableName instanceof Nodes.SqlLiteral)
+        if (tableName instanceof Nodes.SqlLiteral) {
           this._references.set(tableName.toString(), tableName.toString());
+        }
       }
     }
+
     const joins = this.makeJoinConstraints(this.joinRoot, this.joinType);
 
-    for (const oj of joinsToAdd) {
-      if (this.joinRoot.isMatch(oj.joinRoot)) {
-        joins.push(...this.walk(this.joinRoot, oj.joinRoot, oj.joinType));
-      } else {
-        joins.push(...this.makeJoinConstraints(oj.joinRoot, oj.joinType));
-      }
-    }
-    return joins;
+    return joins.concat(
+      joinsToAdd.flatMap((oj) => {
+        if (this.joinRoot.isMatch(oj.joinRoot)) {
+          return this.walk(this.joinRoot, oj.joinRoot, oj.joinType);
+        } else {
+          return this.makeJoinConstraints(oj.joinRoot, oj.joinType);
+        }
+      }),
+    );
   }
 
   /** @internal */
@@ -274,7 +255,6 @@ export class JoinDependency {
     return joins.concat(child.children.flatMap((c) => this.makeConstraints(child, c, joinType)));
   }
 
-  /** @inventedArm if — CONVERGEABLE join-dependency-optional-alias-tracker-and-row-hash-parent-key */
   instantiate(
     resultSet: Result,
     strictLoadingValue?: boolean | null,
@@ -282,11 +262,22 @@ export class JoinDependency {
   ): any[] {
     const primaryKey = this.aliases().columnAlias(this.joinRoot, this.joinRoot.primaryKey);
 
-    const seen = new Map<any, Map<JoinPart, Map<unknown, any>>>();
+    const seen: Seen = new Hash<any, Hash<JoinPart, Hash<unknown, any>>>((i, parent) => {
+      const j = new Hash<JoinPart, Hash<unknown, any>>((j, childClass) => {
+        const models = new Hash<unknown, any>();
+        j.set(childClass, models);
+        return models;
+      });
+      i.set(parent, j);
+      return j;
+    }).compareByIdentity();
 
-    const modelCache = new Map<JoinPart, Map<unknown, any>>();
-    const parents = new Map<unknown, any>();
-    modelCache.set(this.joinRoot, parents);
+    const modelCache: ModelCache = new Hash((h, klass) => {
+      const models = new Hash<unknown, any>();
+      h.set(klass, models);
+      return models;
+    });
+    const parents = modelCache.get(this.joinRoot)!;
 
     let columnAliases = this.aliases().columnAliases(this.joinRoot)!;
     const columnNames: string[] = [];
@@ -322,30 +313,19 @@ export class JoinDependency {
       class_name: this.joinRoot.baseKlass.name,
     };
 
-    const rowHashKeys: Record<string, unknown>[] = [];
-
     Notifications.instrument("instantiation.active_record", payload, () => {
       for (const rowHash of rows) {
-        let parentKey: unknown;
-        if (primaryKey) {
-          parentKey = rowHash[primaryKey];
-        } else {
-          parentKey = rowHashKeys.find((key) => rbEqual(key, rowHash));
-          if (parentKey === undefined) {
-            rowHashKeys.push(rowHash);
-            parentKey = rowHash;
-          }
-        }
-        let parent = parents.get(parentKey);
-        if (!parent) {
-          parent = this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block);
-          parents.set(parentKey, parent);
-        }
+        const parentKey = primaryKey != null ? rowHash[primaryKey] : rowHash;
+        const parent =
+          parents.get(parentKey) ||
+          parents
+            .set(parentKey, this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block))
+            .get(parentKey);
         this.construct(parent, this.joinRoot, rowHash, seen, modelCache, strictLoadingValue);
       }
     });
 
-    return [...parents.values()];
+    return parents.values();
   }
 
   applyColumnAliases(relation: any): any {
@@ -386,83 +366,54 @@ export class JoinDependency {
     arParent: any,
     parent: JoinPart,
     row: Record<string, unknown>,
-    seen: Map<any, Map<JoinPart, Map<unknown, any>>>,
-    modelCache: Map<JoinPart, Map<unknown, any>>,
+    seen: Seen,
+    modelCache: ModelCache,
     strictLoadingValue?: boolean | null,
   ): void {
     if (arParent == null) return;
-    const aliases = this.aliases();
-    for (const node of parent.children) {
-      if (!(node instanceof JoinAssociation)) continue;
 
-      const isCollection = node.reflection.isCollection();
-      if (isCollection) {
-        this._markCollectionLoaded(arParent, node);
+    for (const node of parent.children) {
+      if (node.reflection.isCollection()) {
+        const other = arParent.association((node.reflection as any).name);
+        other.loadedBang();
       } else if (arParent.isAssociationCached((node.reflection as any).name)) {
-        const model = arParent.association?.((node.reflection as any).name)?.target;
+        const model = arParent.association((node.reflection as any).name).target;
         this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;
       }
 
-      const nodePk = (node.baseKlass as any).primaryKey;
       let keys: string[];
-      if (nodePk) {
-        keys = (Array.isArray(nodePk) ? nodePk : [nodePk]).map(
-          (column) => aliases.columnAlias(node, String(column))!,
+      let id: unknown[];
+      if (rtest(node.primaryKey)) {
+        keys = kernelArray(node.primaryKey).map(
+          (column: string) => this.aliases().columnAlias(node, column)!,
         );
+        id = keys.map((key) => row[key]);
       } else {
-        const jpk = (node.reflection as any).joinPrimaryKey() as string | string[];
-        keys = (Array.isArray(jpk) ? jpk : [jpk]).map(
-          (column) => aliases.columnAlias(node, String(column))!,
+        keys = kernelArray((node.reflection as any).joinPrimaryKey()).map(
+          (column: unknown) => this.aliases().columnAlias(node, toS(column))!,
         );
+        id = keys.map(() => null);
       }
-      const keyVals = keys.map((key) => row[key]);
-      if (keyVals.some((v) => v === null || v === undefined)) {
-        this._markAssociationLoaded(arParent, node);
+
+      if (keys.some((key) => row[key] == null)) {
+        const nilAssociation = arParent.association((node.reflection as any).name);
+        nilAssociation.loadedBang();
         continue;
       }
-      const id = nodePk ? this._keyFor(keyVals) : NO_PRIMARY_KEY_ID;
 
-      let parentSeen = seen.get(arParent);
-      if (!parentSeen) {
-        parentSeen = new Map();
-        seen.set(arParent, parentSeen);
-      }
-      let nodeSeen = parentSeen.get(node);
-      if (!nodeSeen) {
-        nodeSeen = new Map();
-        parentSeen.set(node, nodeSeen);
-      }
-      let model = nodeSeen.get(id);
-      if (!model) {
+      let model = seen.get(arParent)!.get(node)!.get(id);
+      if (model == null) {
         model = this.constructModel(arParent, node, row, modelCache, id, strictLoadingValue);
-        nodeSeen.set(id, model);
+        if (id != null) seen.get(arParent)!.get(node)!.set(id, model);
       }
 
       this.construct(model, node, row, seen, modelCache, strictLoadingValue);
     }
   }
 
-  /** @internal */
-  private _keyFor(vals: unknown[]): unknown {
-    if (vals.length === 1) return vals[0];
-    let key = this._compositeKeys.find((k) => rbEqual(k, vals));
-    if (!key) this._compositeKeys.push((key = vals));
-    return key;
-  }
-
-  /** @internal */
-  private _compositeKeys: unknown[][] = [];
-
   protected get joinRootAlias(): string {
     return this._baseAlias;
-  }
-
-  /** @internal */
-  private _baseAliases(): Hash<string, number> {
-    const aliases = new Hash<string, number>(0);
-    aliases.set(this._baseAlias, 1);
-    return aliases;
   }
 
   private get aliasTracker(): AliasTracker {
@@ -503,99 +454,35 @@ export class JoinDependency {
     record: any,
     node: JoinAssociation,
     row: Record<string, unknown>,
-    modelCache: Map<JoinPart, Map<unknown, any>>,
-    id: unknown,
+    modelCache: ModelCache,
+    id: unknown[],
     strictLoadingValue?: boolean | null,
   ): any {
-    let nodeCache = modelCache.get(node);
-    if (!nodeCache) {
-      nodeCache = new Map();
-      modelCache.set(node, nodeCache);
-    }
-    let model = nodeCache.get(id);
-    if (!model) {
-      model = node.instantiate(row, this.aliases().columnAliases(node)!, {}, (built: any) => {
-        if (strictLoadingValue && typeof built.strictLoadingBang === "function") {
-          built.strictLoadingBang();
-        }
-        this._setInverseBeforeCallbacks(record, node, built);
+    const other = record.association((node.reflection as any).name);
+
+    let model = modelCache.get(node)!.get(id);
+    if (model == null) {
+      model = node.instantiate(row, this.aliases().columnAliases(node)!, {}, (m: any) => {
+        if (rtest(strictLoadingValue)) m.strictLoadingBang();
+        other.setInverseInstance(m);
       });
-      if (id != null) nodeCache.set(id, model);
+      if (id != null) modelCache.get(node)!.set(id, model);
     }
 
-    this._wireAssociationProxy(record, node, model);
-
-    if (node.isReadonly()) model._readonly = true;
-    if (node.isStrictLoading() && typeof model.strictLoadingBang === "function") {
-      model.strictLoadingBang();
+    if (node.reflection.isCollection()) {
+      other.target.push(model);
+    } else {
+      other.target = model;
     }
+
+    if (node.isReadonly()) model.readonlyBang();
+    if (node.isStrictLoading()) model.strictLoadingBang();
     return model;
   }
-
-  /** @internal */
-  private _setInverseBeforeCallbacks(parent: any, node: JoinAssociation, child: any): void {
-    if (typeof parent.association !== "function") return;
-    try {
-      const proxy = parent.association((node.reflection as any).name);
-      if (proxy && typeof proxy.setInverseInstance === "function") {
-        proxy.setInverseInstance(child);
-      }
-    } catch (e) {
-      if (!(e instanceof AssociationNotFoundError)) throw e;
-    }
-  }
-
-  /** @internal */
-  private _wireAssociationProxy(parent: any, node: JoinAssociation, child: any): void {
-    if (typeof parent.association !== "function") return;
-    try {
-      const proxy = parent.association((node.reflection as any).name);
-      if (!proxy) return;
-      const isCollection = node.reflection.isCollection();
-      if (isCollection) {
-        if (!proxy.loaded) {
-          proxy.target = [];
-        }
-        if (Array.isArray(proxy.target)) {
-          proxy.target.push(child);
-        }
-      } else {
-        proxy.target = child;
-      }
-      proxy.loadedBang();
-      if (typeof proxy.setInverseInstance === "function") {
-        proxy.setInverseInstance(child);
-      }
-    } catch (e) {
-      if (!(e instanceof AssociationNotFoundError)) throw e;
-    }
-  }
-
-  /** @internal */
-  private _markCollectionLoaded(parent: any, node: JoinAssociation): void {
-    if (typeof parent.association !== "function") return;
-    try {
-      const proxy = parent.association((node.reflection as any).name);
-      if (!proxy || proxy.loaded) return;
-      proxy.target = [];
-    } catch (e) {
-      if (!(e instanceof AssociationNotFoundError)) throw e;
-    }
-  }
-
-  /** @internal */
-  private _markAssociationLoaded(parent: any, node: JoinAssociation): void {
-    if (typeof parent.association !== "function") return;
-    try {
-      const proxy = parent.association((node.reflection as any).name);
-      if (!proxy || proxy.loaded) return;
-      const isCollection = node.reflection.isCollection();
-      proxy.target = isCollection ? [] : null;
-    } catch (e) {
-      if (!(e instanceof AssociationNotFoundError)) throw e;
-    }
-  }
 }
+
+type ModelCache = Hash<JoinPart, Hash<unknown, any>>;
+type Seen = Hash<any, Hash<JoinPart, Hash<unknown, any>>>;
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace JoinDependency {
