@@ -6193,6 +6193,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       visitCatchArms(alternate, bound);
       return;
     }
+    if (!ts.isIfStatement(alternate)) tokens.push("rescue");
     visit(alternate);
   };
   // The body ITSELF, not just its children: an expression-bodied arrow

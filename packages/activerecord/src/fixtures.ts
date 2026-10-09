@@ -358,7 +358,8 @@ export class FixtureSet {
 
     if (yamlFiles.length === 0) throw new ArgumentError(`No fixture files found for ${this.name}`);
 
-    return yamlFiles.reduce<Record<string, Fixture>>((fixtures, file) => {
+    const fixtures: Record<string, Fixture> = {};
+    for (const file of yamlFiles) {
       File.open(file, (fh) => {
         if (this.modelClass == null && fh.modelClass) this.setModelClass(fh.modelClass as string);
         if (this.modelClass == null) this.setModelClass(this.defaultFixtureModelClass());
@@ -367,8 +368,8 @@ export class FixtureSet {
           fixtures[fixtureName] = new Fixture(row as FixtureAttrs, this.modelClass);
         });
       });
-      return fixtures;
-    }, {});
+    }
+    return fixtures;
   }
 
   private defaultFixtureModelClass(): BaseClass | null {

@@ -53,6 +53,17 @@ export function rbStrSNew(str: string = ""): string {
 }
 
 /**
+ * `String#-@` (`str_uminus`, `vendor/ruby/v3.3.11/string.c:3059`): the frozen,
+ * interned String with `str`'s content. A JS string is already immutable and
+ * compared by value, so the value is its own interned copy.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function strUminus(str: string): string {
+  return str;
+}
+
+/**
  * `rb_str_sublen` (`vendor/ruby/v3.3.11/string.c:2841`): a UTF-16 offset as a character offset.
  *
  * @noRailsEquivalent PERMANENT

@@ -102,13 +102,15 @@ export class Merger {
     if (other.model === rel.model) {
       rel.joinsValues = union(rel.joinsValues, other.joinsValues);
     } else {
-      const [associations, others] = partition(
-        other.joinsValues as unknown[],
-        (join) =>
+      const [associations, others] = partition(other.joinsValues as unknown[], (join) => {
+        if (
           isPlainObject(join) ||
           (typeof join === "string" && join.startsWith(":")) ||
-          Array.isArray(join),
-      );
+          Array.isArray(join)
+        ) {
+          return true;
+        }
+      });
 
       const joinDependency = constructJoinDependency.call(
         other,
@@ -126,13 +128,15 @@ export class Merger {
     if (other.model === rel.model) {
       rel.leftOuterJoinsValues = union(rel.leftOuterJoinsValues, other.leftOuterJoinsValues);
     } else {
-      const [associations, others] = partition(
-        other.leftOuterJoinsValues as unknown[],
-        (join) =>
+      const [associations, others] = partition(other.leftOuterJoinsValues as unknown[], (join) => {
+        if (
           isPlainObject(join) ||
           (typeof join === "string" && join.startsWith(":")) ||
-          Array.isArray(join),
-      );
+          Array.isArray(join)
+        ) {
+          return true;
+        }
+      });
 
       const joinDependency = constructJoinDependency.call(
         other,
