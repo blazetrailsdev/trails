@@ -134,11 +134,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     };
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-includes-enumerable-over-an-async-each */
-  [Symbol.iterator](): IterableIterator<T> {
-    return this.target[Symbol.iterator]();
-  }
-
   /** @internal */
   static _targetModelFor(
     record: Base,

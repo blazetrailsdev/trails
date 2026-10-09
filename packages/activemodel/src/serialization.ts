@@ -358,6 +358,7 @@ function isSerializableCollection(value: unknown): value is Iterable<unknown> {
   if (Array.isArray(value)) return true;
   if (value == null || typeof value !== "object") return false;
   if ((value as SerializationRecord)._attributes) return false;
+  if (typeof (value as { toArray?: unknown }).toArray === "function") return true;
   return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
 }
 

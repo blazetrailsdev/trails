@@ -1,6 +1,12 @@
 import { MessagePack } from "@blazetrails/activesupport/message-pack";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { RuntimeError, hasKey, type Bytes } from "@blazetrails/ruby-compat";
+import {
+  RuntimeError,
+  hasKey,
+  transformValues,
+  type Bytes,
+  type Hash,
+} from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, ForbiddenClass } from "./errors.js";
@@ -30,19 +36,17 @@ export class MessagePackMessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private messageToHash(message: Message): Record<string, unknown> {
-    return Object.assign(Object.create(null) as Record<string, unknown>, {
+    return {
       p: message.payload,
       h: this.headersToHash(message.headers),
-    });
+    };
   }
 
   /** @internal */
-  private headersToHash(headers: Properties): Record<string, unknown> {
-    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    headers.each((key, value) => {
-      result[key] = value instanceof Message ? this.messageToHash(value) : value;
-    });
-    return result;
+  private headersToHash(headers: Properties): Hash<string, unknown> {
+    return transformValues(headers.toH(), (value) =>
+      value instanceof Message ? this.messageToHash(value) : value,
+    );
   }
 
   /** @internal */

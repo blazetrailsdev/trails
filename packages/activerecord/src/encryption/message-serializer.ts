@@ -1,6 +1,6 @@
 import { Encryption } from "../namespaces.js";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { JSON, hasKey, type Bytes } from "@blazetrails/ruby-compat";
+import { JSON, hasKey, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -74,20 +74,17 @@ export class MessageSerializer implements MessageSerializerLike {
 
   /** @internal */
   private messageToJson(message: Message): Record<string, unknown> {
-    return Object.assign(Object.create(null) as Record<string, unknown>, {
+    return {
       p: this.encodeIfNeeded(message.payload),
       h: this.headersToJson(message.headers),
-    });
+    };
   }
 
   /** @internal */
-  private headersToJson(headers: Properties): Record<string, unknown> {
-    const result: Record<string, unknown> = Object.create(null) as Record<string, unknown>;
-    headers.each((key, value) => {
-      result[key] =
-        value instanceof Message ? this.messageToJson(value) : this.encodeIfNeeded(value);
-    });
-    return result;
+  private headersToJson(headers: Properties): Hash<string, unknown> {
+    return transformValues(headers.toH(), (value) =>
+      value instanceof Message ? this.messageToJson(value) : this.encodeIfNeeded(value),
+    );
   }
 
   /** @internal */

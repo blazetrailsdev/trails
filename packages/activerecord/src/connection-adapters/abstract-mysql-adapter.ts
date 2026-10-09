@@ -1318,7 +1318,10 @@ WHERE fk.referenced_column_name IS NOT NULL
     return options;
   }
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm then — PERMANENT
+   */
   protected mismatchedForeignKey(
     message: string,
     {

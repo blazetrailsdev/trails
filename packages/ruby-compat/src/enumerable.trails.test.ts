@@ -16,6 +16,68 @@ class Bag {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+class LazyBag {
+  constructor(private readonly items: unknown[]) {}
+
+  each(block: (i: unknown) => void): Promise<void> {
+    return Promise.resolve().then(() => this.items.forEach((i) => block(i)));
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+interface LazyBag {
+  [Symbol.iterator](): IterableIterator<unknown>;
+  map<R>(block: (i: unknown) => R): Promise<R[]>;
+  findAll(block: (i: unknown) => unknown): Promise<unknown[]>;
+  drop(n: number): Promise<unknown[]>;
+  sum(): Promise<unknown>;
+  first(n?: number): Promise<unknown>;
+  isAny(): Promise<boolean>;
+  isInclude(val: unknown): Promise<boolean>;
+}
+
+include(LazyBag, Enumerable);
+
+describe("Enumerable over an each that answers a promise", () => {
+  it("each member answers a promise of what it answers over a synchronous each", async () => {
+    const bag = new LazyBag([1, null, 2, 3]);
+    expect(await bag.map((i) => i)).toEqual([1, null, 2, 3]);
+    expect(await bag.findAll((i) => i)).toEqual([1, 2, 3]);
+    expect(await bag.drop(2)).toEqual([2, 3]);
+    expect(await new LazyBag([1, 2, 3]).sum()).toBe(6);
+  });
+
+  it("a member that breaks out of each still answers", async () => {
+    const bag = new LazyBag([1, 2, 3]);
+    expect(await bag.first()).toBe(1);
+    expect(await bag.first(2)).toEqual([1, 2]);
+    expect(await bag.isAny()).toBe(true);
+    expect(await bag.isInclude(2)).toBe(true);
+  });
+
+  it("an error raised by the block rejects", async () => {
+    const boom = new Error("boom");
+    await expect(
+      new LazyBag([1]).map(() => {
+        throw boom;
+      }),
+    ).rejects.toBe(boom);
+  });
+
+  it("Symbol.iterator raises, since each has yielded nothing yet", () => {
+    expect(() => [...new LazyBag([1])]).toThrow(TypeError);
+  });
+
+  it("Symbol.iterator raises over an each that rejects, and leaves no unhandled rejection", async () => {
+    const bag = new LazyBag([1]);
+    const boom = new Error("boom");
+    bag.each = () => Promise.reject(boom);
+    expect(() => [...bag]).toThrow(TypeError);
+    await expect(bag.map((i) => i)).rejects.toBe(boom);
+  });
+});
+
 describe("Enumerable", () => {
   it("findAll keeps each element whose block result RTESTs", () => {
     expect(Enumerable.findAll.call(new Bag([1, null, 0, false, ""]), (i) => i)).toEqual([1, 0, ""]);

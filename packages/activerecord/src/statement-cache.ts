@@ -26,12 +26,10 @@ export class PartialQuery extends Query {
   constructor(values: unknown[]) {
     super("");
     this._values = values;
-    this._indexes = [];
-    for (let i = 0; i < values.length; i++) {
-      if (values[i] instanceof Substitute) {
-        this._indexes.push(i);
-      }
-    }
+    this._indexes = values
+      .map((thing, i): [unknown, number] => [thing, i])
+      .filter(([thing]) => thing instanceof Substitute)
+      .map(([, i]) => i);
   }
 
   override sqlFor(binds: unknown[], connection: unknown): string {

@@ -467,9 +467,10 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 });
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
-  if (host.isLoaded && !host.isScheduled && !host._loadResult)
-    return fn([...(host.target ?? host._records ?? [])]);
-  return host.records().then((records) => fn([...records]));
+  const loaded = (): boolean => host.isLoaded && !host.isScheduled && !host._loadResult;
+  const records = loaded() ? null : host.records();
+  if (records === null || loaded()) return fn([...(host.target ?? host._records ?? [])]);
+  return records.then((records) => fn([...records]));
 }
 
 function shuffleInPlace<T>(array: T[]): T[] {

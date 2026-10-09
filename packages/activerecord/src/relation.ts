@@ -11,7 +11,7 @@ import {
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
+import { Enumerable, isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
@@ -258,8 +258,20 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
+function isRecordsLoaded(relation: any): boolean {
+  return relation.isLoaded && !relation.isScheduled && !relation._loadResult;
+}
+
+function isEachSynchronous(relation: any): boolean {
+  if (isRecordsLoaded(relation)) return true;
+  if (relation.target === undefined) return false;
+  const association = relation.proxyAssociation;
+  return !association.isStaleTarget() && !association.isFindTarget();
+}
+
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
   get(target: any, prop: string | symbol, receiver: any) {
+    if (prop === Symbol.iterator && !isEachSynchronous(target)) return undefined;
     const value = Reflect.get(target, prop, receiver);
     if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
       return value;
@@ -272,7 +284,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
       return (...args: any[]) =>
-        target.isLoaded && !target.isScheduled && !target._loadResult
+        isRecordsLoaded(target)
           ? enumerable([...(target.target ?? target._records)], args)
           : target.records().then((records: any[]) => enumerable([...records], args));
     }
@@ -282,6 +294,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     return value;
   },
   has(target: any, prop: string | symbol) {
+    if (prop === Symbol.iterator && !isEachSynchronous(target)) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
     if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
@@ -2017,6 +2030,13 @@ export interface Relation<T extends Base, G extends boolean = false>
 }
 
 export interface Relation<T extends Base, G extends boolean = false> {
+  [Symbol.iterator](): IterableIterator<T>;
+  map<R>(block: (record: T) => R): R[] | Promise<R[]>;
+  findAll(block: (record: T) => unknown): T[] | Promise<T[]>;
+  drop(n: number): T[] | Promise<T[]>;
+}
+
+export interface Relation<T extends Base, G extends boolean = false> {
   length(): Promise<number>;
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
@@ -2079,14 +2099,12 @@ const ENUMERABLE_METHODS: Record<string, (records: any[], args: any[]) => unknow
   toSet: (records) => new Set(records),
 };
 ENUMERABLE_METHODS.collect = (records, args) => records.map(...(args as [any]));
-ENUMERABLE_METHODS.findAll = (records, args) => records.filter(...(args as [any]));
 for (const name of [
   "forEach",
   "at",
   "indexOf",
   "lastIndexOf",
   "concat",
-  "map",
   "filter",
   "some",
   "every",
@@ -2097,6 +2115,7 @@ for (const name of [
   ENUMERABLE_METHODS[name] = (records, args) => (records as any)[name](...args);
 }
 
+include(Relation, Enumerable);
 include(Relation, Delegation);
 include(Relation, Explain);
 include(Relation, Batches);

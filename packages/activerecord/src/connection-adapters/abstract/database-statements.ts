@@ -1121,7 +1121,11 @@ export function defaultInsertValue(_column: unknown): Nodes.SqlLiteral {
   return DEFAULT_INSERT_VALUE;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ * @inventedArm verifyBang — PERMANENT
+ */
 export async function buildFixtureSql(
   this: BuildFixtureHost,
   fixtures: Record<string, unknown>[],
