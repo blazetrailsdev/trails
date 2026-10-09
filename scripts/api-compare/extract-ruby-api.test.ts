@@ -312,6 +312,38 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#discard"]!.filter((t) => t === "if")).toEqual(["if"]);
   });
 
+  it("reads the arms of a String handed to class_eval / module_eval", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def self.add_jobs(mixin)
+            mixin.class_eval <<-CODE, __FILE__, __LINE__ + 1
+              def _after_commit_jobs
+                raise Boom unless ready
+                @_after_commit_jobs ||= []
+              end
+            CODE
+          end
+
+          def self.paren
+            module_eval("def a; b && c; end")
+          end
+
+          def self.interpolated(name)
+            class_eval <<-CODE
+              def #{"#"}{name}
+                @x ||= []
+              end
+            CODE
+          end
+        end
+      `,
+    });
+    expect(s["Foo#add_jobs"]).toEqual(["ref:class_eval", "if", "throw:Boom", "or"]);
+    expect(s["Foo#paren"]).toEqual(["ref:module_eval", "and"]);
+    expect(s["Foo#interpolated"]).toEqual(["ref:class_eval"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const s = rubySkeletons({
       "foo.rb": `

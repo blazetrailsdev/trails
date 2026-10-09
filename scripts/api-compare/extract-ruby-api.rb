@@ -3290,6 +3290,44 @@ class ApiExtractor
   def walk_for_skeleton(node, tokens)
     return unless node.is_a?(Array)
 
+    walk_node_for_skeleton(node, tokens)
+    source = skeleton_string_eval_source(node)
+    tokens.concat(skeleton_string_eval_arms(source)) if source
+  end
+
+  SKELETON_STRING_EVAL_ARMS = /\A(?:if|loop|try|rescue|or|and|throw(?::.*)?)\z/.freeze
+
+  def skeleton_string_eval_arms(source)
+    sexp = Ripper.sexp(source)
+    return [] unless sexp
+
+    arms = []
+    with_capture_locals { walk_for_skeleton(sexp, arms) }
+    arms.grep(SKELETON_STRING_EVAL_ARMS)
+  end
+
+  def skeleton_string_eval_source(node)
+    name, args =
+      case node[0]
+      when :command then [node[1], node[2]]
+      when :command_call then [node[3], node[4]]
+      when :method_add_arg
+        callee = node[1]
+        [callee.is_a?(Array) ? { fcall: callee[1], call: callee[3] }[callee[0]] : nil, node[2]]
+      end
+    return unless name.is_a?(Array) && STRING_EVAL_CALLS.include?(ident_name(name))
+
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    first = args[1].first if args.is_a?(Array) && args[0] == :args_add_block && args[1].is_a?(Array)
+    return unless first.is_a?(Array) && first[0] == :string_literal && first[1].is_a?(Array)
+
+    parts = first[1].drop(1)
+    return if parts.empty? || !parts.all? { |part| part[0] == :@tstring_content }
+
+    parts.map { |part| part[1] }.join
+  end
+
+  def walk_node_for_skeleton(node, tokens)
     kind = node[0]
     tokens << "send:setter" if setter_send?(node)
     if SKELETON_IF_NODES.include?(kind)

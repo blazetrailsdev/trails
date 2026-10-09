@@ -6,13 +6,12 @@
  *     committed mark, in the package total or in any one TS file. The fix is to
  *     raise what Rails raises, where Rails raises it, never to raise the mark;
  *   - UNMEASURED — a gated package the run never reported, which would
- *     otherwise disarm the gate silently.
- *
- * A mark left ABOVE the measurement is reported, not failed: narrow it in the
- * same PR that restored the raise with `pnpm parity:api:arms:throws:tighten`,
- * which writes each dimension DOWN and never up. There is no reseed — the same
- * rule the call baselines carry, for the same reason: a whole-file rewrite
- * buries the one row you meant to retire.
+ *     otherwise disarm the gate silently;
+ *   - STALE — a mark left ABOVE the measurement. Narrow it in the same PR that
+ *     restored the raise with `pnpm parity:api:arms:throws:tighten`, which
+ *     writes each dimension DOWN and never up. There is no reseed — the same
+ *     rule the call baselines carry, for the same reason: a whole-file rewrite
+ *     buries the one row you meant to retire.
  *
  * The other four arm tokens — `if`, `loop`, `try`, `rescue` — are report-only
  * and stay that way: `if` alone is 1,891 of the 2,141 rows and measured 70%
@@ -35,6 +34,7 @@ import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import { compareArms, staleArmReceipts, type SkeletonArtifact } from "./report-arms.js";
 import { TAG as INVENTED_ARM_TAG } from "./invented-arm-tags.js";
+import { staleMarkFailure } from "./param-name-mark.js";
 import {
   MARK_PATH,
   exceedances,
@@ -134,11 +134,10 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `arm-throw gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:arms:throws:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("arm-throw gate", "parity:api:arms:throws:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const summary = Object.entries(current)
     .filter(([, m]) => m.total > 0)

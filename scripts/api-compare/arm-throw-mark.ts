@@ -138,9 +138,8 @@ export function exceedances(marks: ArmThrowMarks, current: ArmThrowMarks): MarkV
   return violations;
 }
 
-/** Marks sitting ABOVE a clean measurement. Not a failure — the gate only
- *  forbids growth — but reported so a converged PR narrows its own mark
- *  instead of leaving slack for the next one to spend. */
+/** Marks sitting ABOVE a clean measurement. The gate fails on one: slack
+ *  above the measurement is a regression of that size it would wave through. */
 export function staleMarks(marks: ArmThrowMarks, current: ArmThrowMarks): MarkViolation[] {
   const stale: MarkViolation[] = [];
   for (const name of GATED_PACKAGES) {

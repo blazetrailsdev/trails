@@ -6,8 +6,8 @@
  *
  * Same contract as the parameter-name mark (lint-param-names.ts), whose mark
  * module this reuses over its own file: a committed per-package, per-Ruby-file
- * count, CI failing on ANY increase, `--tighten` narrowing and never widening,
- * and no reseed.
+ * count, CI failing on ANY increase and on a mark left above the measurement,
+ * `--tighten` narrowing and never widening, and no reseed.
  *
  * Usage:
  *   pnpm parity:api:blocks            # gate (CI)
@@ -28,6 +28,7 @@ import {
   exceedances,
   loadMarks,
   measure,
+  staleMarkFailure,
   staleMarks,
   tightened,
   unmarkedPackages,
@@ -92,11 +93,10 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `block-param gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:blocks:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("block-param gate", "parity:api:blocks:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const total = Object.values(current).reduce((n, m) => n + m.total, 0);
   console.log(`block-param gate: OK (${total} dropped block arm(s) under the mark)`);

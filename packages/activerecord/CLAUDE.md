@@ -184,19 +184,62 @@ to restore `NullLock`.
 
 ## `inherited` is deferred to own-property memo guards (`ModelSchema.inherited`)
 
-Rails' `ModelSchema.inherited`
-(`activerecord/lib/active_record/model_schema.rb:574-580`) runs at
-class-definition time and gives the child a fresh load-schema monitor, calls
-`reload_schema_from_cache(false)` and clears `@ignored_columns`, so a subclass
-never observes its parent's `@columns_hash`, `@schema_loaded` or attribute
-builder. JS has no definition-time hook and a static field read on the child
-walks the prototype chain to the parent's memo, so the deferral is the
-own-property guard the root CLAUDE.md ratifies: `ownSchemaMemo`
-(`model-schema.ts`) answers a memo only when it is an own property of the class
-being asked, and `_schemaLoaded`, `_columnsHash`, `_columns`,
-`_attributesBuilder` and `_yamlEncoder` are all read through it. An
-own-property memo guard in `model-schema.ts` is the port of `inherited`, not a
-deviation to retire.
+Eight modules under `ActiveRecord::Base` define `inherited`, and each runs at
+class-definition time, `super` first: `Core` (`activerecord/lib/active_record/core.rb:412-430`),
+`AttributeMethods` (`attribute_methods.rb:265-272`), `PrimaryKey`
+(`attribute_methods/primary_key.rb:143-150`), `Persistence`
+(`persistence.rb:301-307`), `Inheritance` (`inheritance.rb:287-294`),
+`ModelSchema` (`model_schema.rb:574-580`), `Reflection` (`reflection.rb:142-147`)
+and `Locking::Optimistic` (`locking/optimistic.rb:194-199`). Between them they
+reset a subclass's memos to `nil` or a default and seed two things: the
+find-by statement cache and the generated modules. JS has no definition-time
+hook, and a static read on the child walks the prototype chain to the parent's
+value.
+
+**The whole chain is ported as the own-property guard the root CLAUDE.md
+ratifies. No link is ported as a method, and nothing dispatches the chain.**
+Ruled by the repo owner (2026-10-09), over a single first-read dispatch on
+`Base` that would run each ported link in Rails' order: that needs every ivar
+below to be an accessor that triggers it, and a reset that runs at first read
+clobbers what the class body already wrote.
+
+- **An ivar a link resets** is answered only when it is an own property of the
+  class being asked. An inherited value reads as the reset one: `nil`, so the
+  memo is rebuilt (`_arelTable`, `_predicateBuilder`, `_inspectionFilter`,
+  `_attributeNamesMemo`, `_finderNeedsTypeCondition`, `_queryConstraintsList`,
+  and through `ownSchemaMemo` in `model-schema.ts` the schema memos
+  `_schemaLoaded`, `_columnsHash`, `_columns`, `_attributesBuilder` and
+  `_yamlEncoder`), or the link's default (`_lockingColumn` reads
+  `DEFAULT_LOCKING_COLUMN`, `_hasQueryConstraints` and
+  `_aliasAttributesMassGenerated` read `false`).
+- **An ivar a link leaves alone when it is set** (`@filter_attributes ||= nil`,
+  `@generated_association_methods ||= nil`) is the same own-property read, and
+  the reader's own Rails body does the rest: `filter_attributes` asks the
+  superclass (`core.rb:349-355`).
+- **What a link seeds is seeded at the subclass's first read.**
+  `cachedFindByStatement` calls `initializeFindByCache` when the class has no
+  own `_findByStatementCache`, and the generated-module readers call
+  `initializeGeneratedModules` when it has no own `_generatedAttributeMethods`,
+  so the attribute module is included before the association one, as
+  `attribute_methods.rb:42-50` orders them. `set_base_class` is seeded the same
+  way by `baseClass`, and `_typeCandidatesCache` by its reader.
+- **A parent is seeded by its own first read, not by its child's.** Rails runs
+  each class's links once, in definition order. Here a leaf read before its
+  parent seeds only the leaf, and the parent's later read does not disturb it.
+  `core.trails.test.ts` covers a three-level hierarchy read leaf first.
+- **`Reflection`'s `@__reflections`** is a `WeakMap` keyed by the class
+  (`reflection.ts`), which is per-class without a guard.
+
+One thing Rails does at definition time has no counterpart: `Core`'s loop that
+re-initializes every ancestor's find-by cache up to the base class
+(`core.rb:417-423`) never runs, so a parent keeps its cached statements when a
+subclass is defined.
+
+The guard is the port of `inherited`, not a deviation to retire. Where the arms
+report flags a guarded read or a first-read seed in one of these readers, it
+carries `@inventedArm … — PERMANENT` against this section. `PrimaryKey`'s `_primaryKey`
+is still read through the prototype chain, which is debt, tracked by
+`primary-key-reset-is-read-through-the-prototype-chain`.
 
 ## A model is seated by `registerModel` (the `class` keyword's constant and its `inherited`)
 

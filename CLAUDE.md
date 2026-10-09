@@ -1167,7 +1167,8 @@ a genuine language shortcoming, ratified repo-wide; an own-property memo guard
 is the port of `inherited`, not a deviation to retire, and there is no story to
 port `inherited` as a hook.
 
-The ModelSchema instance is in
+`ActiveRecord::Base`'s chain, all eight modules that define `inherited` under
+it, is in
 [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#inherited-is-deferred-to-own-property-memo-guards-modelschemainherited);
 the `Class#subclasses` seat is in
 [packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#classsubclasses-is-seated-on-a-classs-first-own-write-callbacksclassmethodsset_callbacks);

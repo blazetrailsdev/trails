@@ -429,10 +429,8 @@ export class PostgreSQLAdapter
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   /** @internal */
   declare _statements: StatementPool;
-  private _closed = false;
   private _acquireGeneration = 0;
   private _acquiringGen = -1;
-  private _discardedAcquireGeneration = -1;
   private _acquiring: Promise<pg.Client> | null = null;
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
 
@@ -603,7 +601,7 @@ export class PostgreSQLAdapter
 
   override async active(): Promise<boolean> {
     const rawConnection = this._rawConnection;
-    if (rawConnection === null || this._closed || this._pgClientOptions == null) return false;
+    if (rawConnection === null || this._pgClientOptions == null) return false;
     try {
       await rawConnection.query(";");
       this.verifiedBang();
@@ -661,9 +659,6 @@ export class PostgreSQLAdapter
       this._rawConnection?.socketIo()?.reopen(IO.NULL);
     } catch {}
     this._rawConnection = null;
-    this._statements.reset();
-    this._closed = true;
-    this._discardedAcquireGeneration = this._acquireGeneration++;
   }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
@@ -1504,6 +1499,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
   /** @internal */
   set _rawConnection(value: PGConnection | null) {
+    this._acquireGeneration++;
     this._connection = value && pgConnection(value);
   }
 
@@ -1552,7 +1548,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   private async _acquireFreshClient(): Promise<pg.Client> {
-    if (this._closed || this._pgClientOptions == null) {
+    if (this._pgClientOptions == null) {
       throw new ConnectionNotEstablished("connection is closed");
     }
     if (this._rawConnection) {
@@ -1581,17 +1577,10 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         }
         throw error;
       }
-      const racedDiscard = acquireGen <= this._discardedAcquireGeneration;
       const staleGeneration = acquireGen !== this._acquireGeneration;
-      if (
-        this._closed ||
-        this._pgClientOptions == null ||
-        this._rawConnection != null ||
-        racedDiscard ||
-        staleGeneration
-      ) {
-        this._teardownRacedClient(newClient, acquireGen);
-        if (this._closed || this._pgClientOptions == null || racedDiscard || staleGeneration) {
+      if (this._pgClientOptions == null || this._rawConnection != null || staleGeneration) {
+        newClient.end().catch(() => {});
+        if (this._pgClientOptions == null || staleGeneration) {
           throw new ConnectionNotEstablished("connection is closed");
         }
         client = this._rawConnection!;
@@ -1602,16 +1591,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
       }
     }
     return client;
-  }
-
-  private _teardownRacedClient(client: pg.Client, acquireGen: number): void {
-    if (acquireGen <= this._discardedAcquireGeneration) {
-      try {
-        pgConnection(client).socketIo()?.reopen(IO.NULL);
-      } catch {}
-    } else {
-      client.end().catch(() => {});
-    }
   }
 
   /** @internal */
@@ -1699,7 +1678,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._statements.reset();
-    this._closed = false;
     conn?.end().catch(() => {});
   }
 

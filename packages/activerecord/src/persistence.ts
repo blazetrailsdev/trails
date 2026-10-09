@@ -246,7 +246,7 @@ export function queryConstraints(this: PersistenceHost, ...columnsList: string[]
 }
 
 export function hasQueryConstraints(this: PersistenceHost): boolean {
-  return !!this._hasQueryConstraints;
+  return Object.hasOwn(this, "_hasQueryConstraints") && this._hasQueryConstraints === true;
 }
 
 export function queryConstraintsList(this: PersistenceHost): string[] | null {
