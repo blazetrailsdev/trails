@@ -29,6 +29,7 @@ import { DangerousAttributeError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
+  type InspectionMask,
   initializeGeneratedModules as _coreInitializeGeneratedModules,
   inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
@@ -549,7 +550,11 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
 }
 
 /** @internal */
-export function formatForInspect(this: InstanceMethodHost, name: string, value: unknown): string {
+export function formatForInspect(
+  this: InstanceMethodHost,
+  name: string,
+  value: unknown,
+): string | InspectionMask {
   if (value == null) {
     return inspect(value);
   } else {
@@ -566,7 +571,9 @@ export function formatForInspect(this: InstanceMethodHost, name: string, value: 
       inspectedValue = inspect(value);
     }
 
-    return _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue) as string;
+    return _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue) as
+      | string
+      | InspectionMask;
   }
 }
 
@@ -619,7 +626,10 @@ export const ClassMethods = {
   _hasAttribute: classHasAttribute,
 };
 
-export function attributeForInspect(this: InstanceMethodHost, attrName: string): string {
+export function attributeForInspect(
+  this: InstanceMethodHost,
+  attrName: string,
+): string | InspectionMask {
   attrName = String(attrName);
   attrName =
     (this.constructor as unknown as { attributeAliases: Record<string, string> }).attributeAliases[

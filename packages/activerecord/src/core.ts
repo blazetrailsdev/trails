@@ -287,9 +287,9 @@ export async function prettyPrint(
           pp.text(":");
           pp.breakable();
           pp.text(
-            (this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(
-              attrName,
-            ),
+            (
+              this as unknown as { attributeForInspect(attr: string): string | InspectionMask }
+            ).attributeForInspect(attrName) as string,
           );
         });
       },
@@ -885,7 +885,7 @@ export function inspectWithAttributes(
     ? filterMap(attributesToList, (name) => {
         name = String(name);
         if (this._hasAttribute(name)) {
-          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`;
+          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string | InspectionMask }).attributeForInspect(name)}`;
         }
       }).join(", ")
     : "not initialized";

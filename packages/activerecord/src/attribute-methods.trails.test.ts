@@ -1,4 +1,4 @@
-import { basicObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbInspect } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -96,6 +96,12 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Object.prototype.hasOwnProperty.call(Animal, "_attributeMethodsGenerated")).toBe(true);
     expect(generatable(Animal)._attributeMethodsGenerated).toBe(true);
     expect(generatable(Dog)._attributeMethodsGenerated).toBe(true);
+  });
+
+  it("formatForInspect inspects a JS Date as any other object", () => {
+    class M extends Base {}
+    const date = new Date("2026-04-15T12:00:00.000Z");
+    expect(formatForInspect.call(new M(), "x", date)).toBe(rbInspect(date));
   });
 
   it("formatForInspect does not crash for array containing an object with bigint values", () => {

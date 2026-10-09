@@ -50,7 +50,7 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
 };
 
 export function toFs(
-  date: Date | Temporal.Instant | Temporal.PlainDate | RubyTime,
+  date: Date | Temporal.Instant | Temporal.PlainDate | RubyTime | TimeWithZone,
   format: string = "default",
 ): string {
   if (date instanceof TimeWithZone) return date.toFs(format);

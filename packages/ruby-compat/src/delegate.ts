@@ -51,7 +51,7 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * `Delegator.public_api`, which is every `::Object` public method
  * (`:242-245`); what is left of that list is `to_s` / `inspect`, and its
  * `=~`, `!~` and `===` have no JS spelling. Ruby undefines `to_s` on
- * `Delegator` (`:46-48`) so it reaches the delegate through `method_missing`;
+ * `Delegator` (`:47-49`) so it reaches the delegate through `method_missing`;
  * `Object.prototype.toString` is always found first here, so `toString`
  * forwards explicitly. Ruby takes public and protected
  * but never private, and a `_`-prefixed name is how trails spells private —
