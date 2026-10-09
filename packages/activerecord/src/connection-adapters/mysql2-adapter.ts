@@ -31,39 +31,13 @@ import {
   performQuery as mysql2PerformQuery,
   selectAll as mysql2SelectAll,
 } from "./mysql2/database-statements.js";
-import { mysql2Client, type Mysql2Client, type Mysql2Result } from "./mysql2/mysql2-client.js";
+import {
+  Mysql2,
+  mysql2Client,
+  type Mysql2Client,
+  type Mysql2Result,
+} from "./mysql2/mysql2-client.js";
 import { defaultTimezone } from "../active-record.js";
-
-const CLIENT_FLAGS: Record<string, number> = {
-  LONG_PASSWORD: 0x00000001,
-  FOUND_ROWS: 0x00000002,
-  LONG_FLAG: 0x00000004,
-  CONNECT_WITH_DB: 0x00000008,
-  NO_SCHEMA: 0x00000010,
-  COMPRESS: 0x00000020,
-  ODBC: 0x00000040,
-  LOCAL_FILES: 0x00000080,
-  IGNORE_SPACE: 0x00000100,
-  PROTOCOL_41: 0x00000200,
-  INTERACTIVE: 0x00000400,
-  SSL: 0x00000800,
-  IGNORE_SIGPIPE: 0x00001000,
-  TRANSACTIONS: 0x00002000,
-  RESERVED: 0x00004000,
-  SECURE_CONNECTION: 0x00008000,
-  MULTI_STATEMENTS: 0x00010000,
-  MULTI_RESULTS: 0x00020000,
-  PS_MULTI_RESULTS: 0x00040000,
-  PLUGIN_AUTH: 0x00080000,
-  CONNECT_ATTRS: 0x00100000,
-  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
-  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
-  SESSION_TRACK: 0x00800000,
-  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
-  SSL_VERIFY_SERVER_CERT: 0x40000000,
-  REMEMBER_OPTIONS: 0x80000000,
-};
-const FOUND_ROWS = CLIENT_FLAGS.FOUND_ROWS;
 
 let mysql2TypeMap: TypeMap | null = null;
 
@@ -76,71 +50,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static readonly ER_CONN_HOST_ERROR = 2003;
   static readonly ER_UNKNOWN_HOST_ERROR = 2005;
 
-  /**
-   * @inventedArm filter — CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem
-   * @inventedArm if — CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem
-   */
   static async newClient(
     config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
-  ): Promise<mysql.Connection> {
-    const {
-      adapter: _adapter,
-      statementLimit: _statementLimit,
-      preparedStatements: _preparedStatements,
-      advisoryLocks: _advisoryLocks,
-      strict: _strict,
-      waitTimeout: _wt,
-      readTimeout: _readTimeout,
-      encoding: _encoding,
-      collation: _collation,
-      variables: _vars,
-      _fakeConnection: _fake,
-      connectionLimit: _connLimit,
-      queueLimit: _queueLimit,
-      waitForConnections: _waitFor,
-      username,
-      socket,
-      flags,
-      ...connOptions
-    } = config as mysql.PoolOptions &
-      MysqlAdapterOptions & {
-        adapter?: string;
-        connectionLimit?: number;
-        queueLimit?: number;
-        waitForConnections?: boolean;
-        username?: string;
-        socket?: string;
-      };
-    if (rtest(username)) connOptions.user = username;
-    if (rtest(socket)) connOptions.socketPath = socket;
-
+  ): Promise<Mysql2Client> {
     try {
-      return await mysql.createConnection({
-        supportBigNumbers: true,
-        ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(
-          Array.isArray(flags)
-            ? flags
-            : Object.keys(CLIENT_FLAGS).filter(
-                (name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0,
-              ),
-        ),
-      });
+      return await Mysql2.Client.new(config);
     } catch (err) {
       switch ((err as { errno?: number }).errno) {
         case Mysql2Adapter.ER_BAD_DB_ERROR:
-          throw NoDatabaseError.dbError(
-            (connOptions as { database?: string }).database ?? "unknown",
-          );
+          throw NoDatabaseError.dbError((config as { database?: string }).database ?? "unknown");
         case Mysql2Adapter.ER_DBACCESS_DENIED_ERROR:
         case Mysql2Adapter.ER_ACCESS_DENIED_ERROR:
           throw DatabaseConnectionError.usernameError(
-            connOptions.user ?? parseUriField(config, "username") ?? "unknown",
+            (config as { username?: string }).username ??
+              config.user ??
+              parseUriField(config, "username") ??
+              "unknown",
           );
         case Mysql2Adapter.ER_CONN_HOST_ERROR:
         case Mysql2Adapter.ER_UNKNOWN_HOST_ERROR:
           throw DatabaseConnectionError.hostnameError(
-            connOptions.host ?? parseUriField(config, "hostname") ?? "unknown",
+            config.host ?? parseUriField(config, "hostname") ?? "unknown",
           );
         default:
           throw new ConnectionNotEstablished((err as Error).message, { cause: err });
@@ -178,7 +108,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (Array.isArray(this._config.flags)) {
       this._config.flags.push("FOUND_ROWS");
     } else {
-      this._config.flags = (this._config.flags as number) | FOUND_ROWS;
+      this._config.flags = (this._config.flags as number) | Mysql2.Client.FOUND_ROWS;
     }
 
     this._connectionParameters ||= this._config;
@@ -359,7 +289,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return this._connection as Mysql2Client | null;
   }
   /** @internal */
-  set _rawConnection(value: mysql.Connection | null) {
+  set _rawConnection(value: mysql.Connection | Mysql2Client | null) {
     this._connection = value && mysql2Client(value);
   }
 
@@ -372,7 +302,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (this._rawConnection) return this._rawConnection;
     if (rtest(this._config._fakeConnection))
       throw new RuntimeError("Mysql2Adapter: fake connection has no client");
-    let conn: mysql.Connection;
+    let conn: Mysql2Client;
     try {
       conn = await Mysql2Adapter.newClient(
         this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
@@ -391,7 +321,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       throw err;
     }
     this._rawConnection = conn;
-    this._rawConnection!.readTimeout = this._config.readTimeout as number | undefined;
     this._statements.reset();
     return conn;
   }
@@ -405,11 +334,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   affectedRows(rawResult: Mysql2Result | null): number | null {
     return mysql2AffectedRows.call(this as any, rawResult);
   }
-}
-
-/** @internal */
-function withoutDefaultIgnoreSpace(list: string[]): string[] {
-  return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
 
 /** @internal */

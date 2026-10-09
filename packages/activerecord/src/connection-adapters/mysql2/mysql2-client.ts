@@ -1,4 +1,6 @@
-import type mysql from "mysql2/promise";
+import mysql from "mysql2/promise";
+import { rtest } from "@blazetrails/ruby-compat";
+import type { MysqlAdapterOptions } from "../pool-config.js";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { quotedDate } from "../abstract/quoting.js";
@@ -276,6 +278,89 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   return Object.defineProperty(client, "automaticClose", automaticClose) as T & Mysql2Client;
 }
 
+function withoutDefaultIgnoreSpace(list: string[]): string[] {
+  return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
+}
+
+const CLIENT_FLAGS: Record<string, number> = {
+  LONG_PASSWORD: 0x00000001,
+  FOUND_ROWS: 0x00000002,
+  LONG_FLAG: 0x00000004,
+  CONNECT_WITH_DB: 0x00000008,
+  NO_SCHEMA: 0x00000010,
+  COMPRESS: 0x00000020,
+  ODBC: 0x00000040,
+  LOCAL_FILES: 0x00000080,
+  IGNORE_SPACE: 0x00000100,
+  PROTOCOL_41: 0x00000200,
+  INTERACTIVE: 0x00000400,
+  SSL: 0x00000800,
+  IGNORE_SIGPIPE: 0x00001000,
+  TRANSACTIONS: 0x00002000,
+  RESERVED: 0x00004000,
+  SECURE_CONNECTION: 0x00008000,
+  MULTI_STATEMENTS: 0x00010000,
+  MULTI_RESULTS: 0x00020000,
+  PS_MULTI_RESULTS: 0x00040000,
+  PLUGIN_AUTH: 0x00080000,
+  CONNECT_ATTRS: 0x00100000,
+  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
+  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
+  SESSION_TRACK: 0x00800000,
+  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
+  SSL_VERIFY_SERVER_CERT: 0x40000000,
+  REMEMBER_OPTIONS: 0x80000000,
+};
+
+async function newClient(
+  config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
+): Promise<Mysql2Client> {
+  const {
+    adapter: _adapter,
+    statementLimit: _statementLimit,
+    preparedStatements: _preparedStatements,
+    advisoryLocks: _advisoryLocks,
+    strict: _strict,
+    waitTimeout: _wt,
+    readTimeout,
+    encoding: _encoding,
+    collation: _collation,
+    variables: _vars,
+    _fakeConnection: _fake,
+    connectionLimit: _connLimit,
+    queueLimit: _queueLimit,
+    waitForConnections: _waitFor,
+    username,
+    socket,
+    flags,
+    ...connOptions
+  } = config as mysql.PoolOptions &
+    MysqlAdapterOptions & {
+      adapter?: string;
+      connectionLimit?: number;
+      queueLimit?: number;
+      waitForConnections?: boolean;
+      username?: string;
+      socket?: string;
+    };
+  if (rtest(username)) connOptions.user = username;
+  if (rtest(socket)) connOptions.socketPath = socket;
+
+  const client = mysql2Client(
+    await mysql.createConnection({
+      supportBigNumbers: true,
+      ...(connOptions as mysql.ConnectionOptions),
+      flags: withoutDefaultIgnoreSpace(
+        Array.isArray(flags)
+          ? flags
+          : Object.keys(CLIENT_FLAGS).filter((name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0),
+      ),
+    }),
+  );
+  client.readTimeout = readTimeout;
+  return client;
+}
+
 export const Mysql2 = {
   Error: class {
     static [Symbol.hasInstance](e: unknown): boolean {
@@ -283,7 +368,9 @@ export const Mysql2 = {
     }
   },
   Client: {
-    MULTI_STATEMENTS: 0x10000,
+    new: newClient,
+    FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
+    MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
     OPTION_MULTI_STATEMENTS_ON: 0,
     OPTION_MULTI_STATEMENTS_OFF: 1,
   },
