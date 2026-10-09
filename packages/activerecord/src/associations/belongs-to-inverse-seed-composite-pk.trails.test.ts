@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
-import * as associationsModule from "../associations.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 
 class CompositePkParent extends Base {
@@ -61,7 +60,10 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
     const holder = child.association("compositePkParent");
 
-    const spy = vi.spyOn(associationsModule, "autoloadModel");
+    const spy = vi.spyOn(
+      holder.reflection as unknown as { computeClass(name: string): unknown },
+      "computeClass",
+    );
     try {
       holder.setTarget(parent);
       expect(spy).not.toHaveBeenCalled();

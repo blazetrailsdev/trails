@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Human } from "./human.js";
 import { Base } from "../../base.js";
 
@@ -12,6 +13,7 @@ export class MixedCaseMonkey extends Base {
     this.belongsTo("human");
   }
 }
+registerConstant("MixedCaseMonkey", MixedCaseMonkey);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MixedCaseMonkey {
   get human(): Human | null | Promise<Human | null>;

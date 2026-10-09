@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { UuidEntry } from "./uuid-entry.js";
 import { Base } from "../../base.js";
 
@@ -7,6 +8,7 @@ export class UuidMessage extends Base {
     this.hasOne("uuidEntry", { as: "entryable" });
   }
 }
+registerConstant("UuidMessage", UuidMessage);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface UuidMessage {
   get uuidEntry(): UuidEntry | null | Promise<UuidEntry | null>;

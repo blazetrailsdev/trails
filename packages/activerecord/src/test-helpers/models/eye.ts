@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
@@ -60,6 +61,7 @@ export class Eye extends Base {
     });
   }
 }
+registerConstant("Eye", Eye);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Eye {
   get irisWithReadOnlyForeignKey():
@@ -115,6 +117,7 @@ export class Iris extends Base {
     });
   }
 }
+registerConstant("Iris", Iris);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Iris {
   get eye(): Eye | null | Promise<Eye | null>;
@@ -126,3 +129,4 @@ export class IrisWithReadOnlyForeignKey extends Iris {
     this.attrReadonly("eye_id");
   }
 }
+registerConstant("IrisWithReadOnlyForeignKey", IrisWithReadOnlyForeignKey);

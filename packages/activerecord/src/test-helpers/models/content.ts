@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -14,6 +14,7 @@ export class Content extends Base {
     });
   }
 }
+registerConstant("Content", Content);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Content {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
@@ -39,6 +40,7 @@ export class ContentWhichRequiresTwoDestroyCalls extends Base {
     });
   }
 }
+registerConstant("ContentWhichRequiresTwoDestroyCalls", ContentWhichRequiresTwoDestroyCalls);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentWhichRequiresTwoDestroyCalls {
   get contentPosition(): ContentPosition | null | Promise<ContentPosition | null>;
@@ -58,6 +60,7 @@ export class ContentPosition extends Base {
     });
   }
 }
+registerConstant("ContentPosition", ContentPosition);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContentPosition {
   get content(): Content | null | Promise<Content | null>;

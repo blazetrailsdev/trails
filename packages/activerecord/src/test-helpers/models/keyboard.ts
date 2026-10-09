@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Keyboard extends Base {
@@ -6,3 +7,4 @@ export class Keyboard extends Base {
 
   static _primaryKey = "key_number";
 }
+registerConstant("Keyboard", Keyboard);

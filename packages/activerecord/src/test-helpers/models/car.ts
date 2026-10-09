@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Bulb } from "./bulb.js";
@@ -111,6 +112,7 @@ export class Car extends Base {
     this.attribute("wheels_owned_at", "datetime", { default: () => RubyTime.now() });
   }
 }
+registerConstant("Car", Car);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Car {
   get person(): Person | null | Promise<Person | null>;
@@ -126,6 +128,7 @@ export class CoolCar extends Car {
     });
   }
 }
+registerConstant("CoolCar", CoolCar);
 
 export class FastCar extends Car {
   static {
@@ -134,3 +137,4 @@ export class FastCar extends Car {
     });
   }
 }
+registerConstant("FastCar", FastCar);

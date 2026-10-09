@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Family } from "./family.js";
@@ -43,6 +44,7 @@ export class User extends Base {
     this.hasOne("rentedRoom", { className: "Room", foreignKey: "tenant_id", dependent: "destroy" });
   }
 }
+registerConstant("User", User);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface User {
   get room(): Room | null | Promise<Room | null>;
@@ -71,12 +73,14 @@ export class UserWithNotification extends User {
     });
   }
 }
+registerConstant("UserWithNotification", UserWithNotification);
 
 export class NestedUser extends Base {
   static {
     this.tableName = "users";
   }
 }
+registerConstant("NestedUser", NestedUser);
 
 export class NestedNestedUser extends Base {
   declare nestedUsers: AssociationProxy<NestedUser>;
@@ -85,3 +89,4 @@ export class NestedNestedUser extends Base {
     this.hasMany("nestedUsers");
   }
 }
+registerConstant("NestedNestedUser", NestedNestedUser);

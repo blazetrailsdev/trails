@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
@@ -18,6 +19,7 @@ export class ShardedBlog extends Base {
     });
   }
 }
+registerConstant("ShardedBlog", ShardedBlog);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPost extends Base {
@@ -71,6 +73,7 @@ export class ShardedBlogPost extends Base {
     });
   }
 }
+registerConstant("ShardedBlogPost", ShardedBlogPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedBlogPost {
   get parent(): Base | null | Promise<Base | null>;
@@ -94,6 +97,7 @@ export class ShardedBlogPostWithRevision extends Base {
     });
   }
 }
+registerConstant("ShardedBlogPostWithRevision", ShardedBlogPostWithRevision);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedComment extends Base {
@@ -121,6 +125,7 @@ export class ShardedComment extends Base {
     this.belongsTo("blog", { className: "ShardedBlog" });
   }
 }
+registerConstant("ShardedComment", ShardedComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedComment {
   get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
@@ -151,6 +156,7 @@ export class ShardedTag extends Base {
     this.hasMany("blogPosts", { through: "blogPostTags", className: "ShardedBlogPost" });
   }
 }
+registerConstant("ShardedTag", ShardedTag);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPostTag extends Base {
@@ -163,6 +169,7 @@ export class ShardedBlogPostTag extends Base {
     this.belongsTo("tag", { className: "ShardedTag" });
   }
 }
+registerConstant("ShardedBlogPostTag", ShardedBlogPostTag);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShardedBlogPostTag {
   get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { DogLover } from "./dog-lover.js";
 import { Base } from "../../base.js";
 
@@ -18,6 +19,7 @@ export class Dog extends Base {
     });
   }
 }
+registerConstant("Dog", Dog);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Dog {
   get breeder(): DogLover | null | Promise<DogLover | null>;

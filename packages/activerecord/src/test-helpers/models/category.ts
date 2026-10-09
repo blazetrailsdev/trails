@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Author } from "./author.js";
@@ -106,7 +107,9 @@ export class Category extends Base {
     return "a category...";
   }
 }
+registerConstant("Category", Category);
 
 export class SpecialCategory extends Category {}
+registerConstant("SpecialCategory", SpecialCategory);
 
 registerSubclass(SpecialCategory);

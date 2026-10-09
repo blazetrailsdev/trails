@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Electron } from "./electron.js";
 import type { Liquid } from "./liquid.js";
@@ -15,6 +16,7 @@ export class Molecule extends Base {
     this.acceptsNestedAttributesFor("electrons");
   }
 }
+registerConstant("Molecule", Molecule);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Molecule {
   get liquid(): Liquid | null | Promise<Liquid | null>;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Molecule } from "./molecule.js";
 import { Base } from "../../base.js";
@@ -13,3 +14,4 @@ export class Liquid extends Base {
     });
   }
 }
+registerConstant("Liquid", Liquid);

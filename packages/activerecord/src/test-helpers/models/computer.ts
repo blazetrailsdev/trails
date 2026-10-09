@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
 import type { Firm } from "./company.js";
@@ -16,6 +17,7 @@ export class Computer extends Base {
     this.hasOne("firm", { through: "developer" });
   }
 }
+registerConstant("Computer", Computer);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Computer {
   get developer(): Developer | null | Promise<Developer | null>;

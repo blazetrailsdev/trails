@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class LegacyThing extends Base {
@@ -8,3 +9,4 @@ export class LegacyThing extends Base {
     this.lockingColumn = "version";
   }
 }
+registerConstant("LegacyThing", LegacyThing);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Human } from "./human.js";
 import type { Interest } from "./interest.js";
@@ -13,3 +14,4 @@ export class Zine extends Base {
     this.hasMany("polymorphicHumans", { through: "interests", sourceType: "Human" });
   }
 }
+registerConstant("Zine", Zine);

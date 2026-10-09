@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Post } from "./post.js";
 import type { Tagging } from "./tagging.js";
@@ -33,6 +34,7 @@ export class Tag extends Base {
     });
   }
 }
+registerConstant("Tag", Tag);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tag {
   get tagging(): Tagging | null | Promise<Tagging | null>;
@@ -62,3 +64,4 @@ export class OrderedTag extends Tag {
     });
   }
 }
+registerConstant("OrderedTag", OrderedTag);

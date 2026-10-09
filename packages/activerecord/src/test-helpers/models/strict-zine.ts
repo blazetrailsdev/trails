@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Zine } from "./zine.js";
 
 export class StrictZine extends Zine {
@@ -5,3 +6,4 @@ export class StrictZine extends Zine {
     this.strictLoadingByDefault = true;
   }
 }
+registerConstant("StrictZine", StrictZine);

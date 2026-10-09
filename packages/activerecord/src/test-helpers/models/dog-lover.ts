@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Dog } from "./dog.js";
 import { Base } from "../../base.js";
@@ -20,3 +21,4 @@ export class DogLover extends Base {
     this.hasMany("dogs");
   }
 }
+registerConstant("DogLover", DogLover);

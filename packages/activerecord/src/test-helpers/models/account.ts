@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Company } from "./company.js";
@@ -68,6 +69,7 @@ export class Account extends Base {
     return "Sir, yes sir!";
   }
 }
+registerConstant("Account", Account);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Account {
   get firm(): Company | null | Promise<Company | null>;
@@ -77,3 +79,4 @@ export interface Account {
 }
 
 export class SubAccount extends Account {}
+registerConstant("SubAccount", SubAccount);

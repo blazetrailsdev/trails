@@ -28,7 +28,6 @@ import {
   publicInstanceMethods,
 } from "@blazetrails/activesupport";
 import type { AssociationDefinition } from "../associations.js";
-import { autoloadModel } from "../associations.js";
 import { Associations } from "../namespaces.js";
 
 // @ts-expect-error declaration-merge load() divergence — permanent, see class override
@@ -146,7 +145,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     };
     const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
     if (richKlass) return richKlass;
-    autoloadModel(className);
     return constantize(className) as typeof Base;
   }
 

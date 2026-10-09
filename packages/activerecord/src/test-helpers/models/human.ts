@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Face } from "./face.js";
 import type { Interest } from "./interest.js";
@@ -59,6 +60,7 @@ export class Human extends Base {
     this.addCallbackCalled = true;
   }
 }
+registerConstant("Human", Human);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Human {
   get face(): Face | null | Promise<Face | null>;
@@ -76,3 +78,4 @@ export interface Human {
 }
 
 export class SuperHuman extends Human {}
+registerConstant("SuperHuman", SuperHuman);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Attachment } from "./attachment.js";
 import { Base } from "../../base.js";
 
@@ -16,6 +17,7 @@ export class Translation extends Base {
     this.validates("value", { presence: true });
   }
 }
+registerConstant("Translation", Translation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Translation {
   get attachment(): Attachment | null | Promise<Attachment | null>;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -61,6 +62,7 @@ export class Owner extends Base {
     this._blocks = [];
   }
 }
+registerConstant("Owner", Owner);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Owner {
   get lastPet(): Pet | null | Promise<Pet | null>;
@@ -74,3 +76,4 @@ export class InvalidOwner extends Owner {
     });
   }
 }
+registerConstant("InvalidOwner", InvalidOwner);

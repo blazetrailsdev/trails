@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class ContextualCallbacksDeveloper extends Base {
@@ -40,3 +41,4 @@ export class ContextualCallbacksDeveloper extends Base {
     return (this._history ??= []);
   }
 }
+registerConstant("ContextualCallbacksDeveloper", ContextualCallbacksDeveloper);

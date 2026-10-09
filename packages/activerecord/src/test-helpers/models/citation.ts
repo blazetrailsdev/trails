@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Book } from "./book.js";
 import { Base } from "../../base.js";
@@ -15,6 +16,7 @@ export class Citation extends Base {
     this.hasMany("citations");
   }
 }
+registerConstant("Citation", Citation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Citation {
   get book(): Book | null | Promise<Book | null>;

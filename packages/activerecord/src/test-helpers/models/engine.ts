@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
@@ -13,6 +14,7 @@ export class Engine extends Base {
     });
   }
 }
+registerConstant("Engine", Engine);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Engine {
   get myCar(): Car | null | Promise<Car | null>;

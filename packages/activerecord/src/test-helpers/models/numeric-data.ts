@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 
@@ -32,3 +33,4 @@ export class NumericData extends Base {
     this.aliasAttribute("new_bank_balance", "bank_balance");
   }
 }
+registerConstant("NumericData", NumericData);

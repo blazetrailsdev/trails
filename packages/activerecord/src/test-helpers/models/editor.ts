@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Editorship } from "./editorship.js";
 import type { Publication } from "./publication.js";
@@ -15,6 +16,7 @@ export class Editor extends Base {
     this.hasMany("editorships");
   }
 }
+registerConstant("Editor", Editor);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Editor {
   get publication(): Publication | null | Promise<Publication | null>;

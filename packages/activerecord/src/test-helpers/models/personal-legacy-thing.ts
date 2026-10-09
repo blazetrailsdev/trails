@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
 
@@ -12,6 +13,7 @@ export class PersonalLegacyThing extends Base {
     this.belongsTo("person", { counterCache: true });
   }
 }
+registerConstant("PersonalLegacyThing", PersonalLegacyThing);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PersonalLegacyThing {
   get person(): Person | null | Promise<Person | null>;

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Carrier } from "./carrier.js";
 import type { Customer } from "./customer.js";
 import { Base } from "../../base.js";
@@ -21,6 +22,7 @@ export class CustomerCarrier extends Base {
     });
   }
 }
+registerConstant("CustomerCarrier", CustomerCarrier);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CustomerCarrier {
   get customer(): Customer | null | Promise<Customer | null>;

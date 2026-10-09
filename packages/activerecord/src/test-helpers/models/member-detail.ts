@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Member } from "./member.js";
 import type { Membership } from "./membership.js";
@@ -24,6 +25,7 @@ export class MemberDetail extends Base {
     });
   }
 }
+registerConstant("MemberDetail", MemberDetail);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface MemberDetail {
   get member(): Member | null | Promise<Member | null>;

@@ -23,7 +23,6 @@ import {
   Module,
   include,
   rbInspect,
-  RuntimeError,
   rbModConstSet,
   rbModName,
   registerConstant,
@@ -135,28 +134,15 @@ function assertActiveRecordBase(model: typeof Base): void {
   }
 }
 
-/** @internal */
-function guardCanonicalNameShadow(name: string, model: typeof Base): void {
-  const canonical = canonicalModelAutoloadIndex?.get(name);
-  if (canonical && canonical !== model) {
-    throw new RuntimeError(
-      `Registering a class under ${JSON.stringify(name)} would shadow the canonical model of the ` +
-        `same name in the global registry, poisoning every later test that resolves it as an ` +
-        `association target. Use the canonical model, or a distinct non-canonical name.`,
-    );
-  }
-}
-
 /**
  * @internal
- * @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants
+ * @noRailsEquivalent CONVERGEABLE model-registry-and-register-model-are-deleted
  */
 export function registerModelConstant(name: string, model: typeof Base): void {
-  guardCanonicalNameShadow(name, model);
   registerConstant(name, model);
 }
 
-/** @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants */
+/** @noRailsEquivalent CONVERGEABLE model-registry-and-register-model-are-deleted */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -188,27 +174,6 @@ export function registerModel(
     }
     flushPendingCounterCacheColumns(nameOrModel, nameOrModel.name);
   }
-}
-
-/** @internal */
-let canonicalModelAutoloadIndex: ReadonlyMap<string, typeof Base> | undefined;
-
-/** @internal */
-export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeof Base>): void {
-  canonicalModelAutoloadIndex = index;
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE model-registry-writers-are-deleted-models-seat-as-constants
- */
-export function autoloadModel(name: string): void {
-  const bare = name.replace(/^::/, "");
-  if (modelRegistry.has(bare)) return;
-  const autoloaded = canonicalModelAutoloadIndex?.get(bare);
-  if (!autoloaded) return;
-  if (frameworkBase(autoloaded)) registerModel(autoloaded);
-  else modelRegistry.set(bare, autoloaded);
 }
 
 /** @internal */
@@ -297,8 +262,6 @@ export class Associations {
     const joinModel = builder.throughModel();
 
     rbModConstSet(self, joinModel.name, joinModel);
-
-    modelRegistry.set(`${rbModName(self)}::${joinModel.name}`, joinModel);
 
     const middleReflection = builder.middleReflection(joinModel);
     HasManyBuilder.defineCallbacks(self, middleReflection);

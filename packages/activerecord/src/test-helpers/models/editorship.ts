@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Editor } from "./editor.js";
 import type { Publication } from "./publication.js";
 import { Base } from "../../base.js";
@@ -12,6 +13,7 @@ export class Editorship extends Base {
     this.belongsTo("editor");
   }
 }
+registerConstant("Editorship", Editorship);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Editorship {
   get publication(): Publication | null | Promise<Publication | null>;

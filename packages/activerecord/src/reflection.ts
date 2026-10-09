@@ -40,7 +40,6 @@ import {
 import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
-import { autoloadModel } from "./associations.js";
 import * as ReflectionModule from "./reflection.js";
 import { _setReflection } from "./reflection-slot.js";
 import {
@@ -451,7 +450,6 @@ export class MacroReflection extends AbstractReflection {
   }
 
   computeClass(name: string): typeof Base {
-    autoloadModel(name);
     return constantize(name) as typeof Base;
   }
 

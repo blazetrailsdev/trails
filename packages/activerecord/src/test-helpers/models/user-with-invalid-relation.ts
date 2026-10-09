@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class UserWithInvalidRelation extends Base {
@@ -19,10 +20,13 @@ export class UserWithInvalidRelation extends Base {
     });
   }
 }
+registerConstant("UserWithInvalidRelation", UserWithInvalidRelation);
 
 export class AccountInvalid {}
+registerConstant("AccountInvalid", AccountInvalid);
 
 export class InfoInvalid {}
+registerConstant("InfoInvalid", InfoInvalid);
 
 export class UserInfoInvalid extends Base {
   static {
@@ -30,3 +34,4 @@ export class UserInfoInvalid extends Base {
     this.belongsTo("userInvalid");
   }
 }
+registerConstant("UserInfoInvalid", UserInfoInvalid);

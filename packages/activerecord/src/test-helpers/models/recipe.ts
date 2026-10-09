@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Chef } from "./chef.js";
 import { Base } from "../../base.js";
 
@@ -10,6 +11,7 @@ export class Recipe extends Base {
     this.belongsTo("chef");
   }
 }
+registerConstant("Recipe", Recipe);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Recipe {
   get chef(): Chef | null | Promise<Chef | null>;

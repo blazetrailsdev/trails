@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 
 export class Notification extends Base {
@@ -7,3 +8,4 @@ export class Notification extends Base {
     this.validates("message", { presence: true });
   }
 }
+registerConstant("Notification", Notification);

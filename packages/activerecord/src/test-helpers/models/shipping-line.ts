@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Discount } from "./discount.js";
 import type { Invoice } from "./invoice.js";
@@ -14,6 +15,7 @@ export class ShippingLine extends Base {
     this.hasMany("discountApplications", { className: "ShippingLineDiscountApplication" });
   }
 }
+registerConstant("ShippingLine", ShippingLine);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShippingLine {
   get invoice(): Invoice | null | Promise<Invoice | null>;
@@ -30,6 +32,7 @@ export class ShippingLineDiscountApplication extends Base {
     this.belongsTo("discount");
   }
 }
+registerConstant("ShippingLineDiscountApplication", ShippingLineDiscountApplication);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ShippingLineDiscountApplication {
   get shippingLine(): ShippingLine | null | Promise<ShippingLine | null>;

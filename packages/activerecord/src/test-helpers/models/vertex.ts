@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Edge } from "./edge.js";
 import { Base } from "../../base.js";
@@ -20,3 +21,4 @@ export class Vertex extends Base {
     });
   }
 }
+registerConstant("Vertex", Vertex);

@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Car } from "./car.js";
 import { Base } from "../../base.js";
 
@@ -17,6 +18,7 @@ export class Tyre extends Base {
     return this.findBy(args);
   }
 }
+registerConstant("Tyre", Tyre);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Tyre {
   get car(): Car | null | Promise<Car | null>;

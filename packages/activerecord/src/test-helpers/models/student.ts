@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { College } from "./college.js";
 import type { Lesson } from "./lesson.js";
@@ -15,6 +16,7 @@ export class Student extends Base {
     this.belongsTo("college");
   }
 }
+registerConstant("Student", Student);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Student {
   get college(): College | null | Promise<College | null>;

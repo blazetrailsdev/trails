@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Recipe } from "./recipe.js";
@@ -19,6 +20,7 @@ export class Chef extends Base {
     this.hasMany("recipes");
   }
 }
+registerConstant("Chef", Chef);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Chef {
   get employable(): Base | null | Promise<Base | null>;
@@ -31,6 +33,7 @@ export class ChefList extends Chef {
     this.belongsTo("employableList", { polymorphic: true });
   }
 }
+registerConstant("ChefList", ChefList);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefList {
   get employableList(): Base | null | Promise<Base | null>;
@@ -76,6 +79,7 @@ export class ChefWithPolymorphicInverseOf extends Chef {
     });
   }
 }
+registerConstant("ChefWithPolymorphicInverseOf", ChefWithPolymorphicInverseOf);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ChefWithPolymorphicInverseOf {
   get employable(): Base | null | Promise<Base | null>;

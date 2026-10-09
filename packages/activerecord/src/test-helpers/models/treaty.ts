@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Country } from "./country.js";
 import { Base } from "../../base.js";
@@ -11,3 +12,4 @@ export class Treaty extends Base {
     this.hasAndBelongsToMany("countries");
   }
 }
+registerConstant("Treaty", Treaty);

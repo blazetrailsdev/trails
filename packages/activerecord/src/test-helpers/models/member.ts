@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Category } from "./category.js";
@@ -126,6 +127,7 @@ export class Member extends Base {
     });
   }
 }
+registerConstant("Member", Member);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Member {
   get currentMembership(): CurrentMembership | null | Promise<CurrentMembership | null>;
@@ -183,3 +185,4 @@ export class SelfMember extends Base {
     });
   }
 }
+registerConstant("SelfMember", SelfMember);

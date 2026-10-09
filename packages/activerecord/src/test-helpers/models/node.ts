@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Tree } from "./tree.js";
@@ -17,6 +18,7 @@ export class Node extends Base {
     this.hasMany("children", { className: "Node", foreignKey: "parent_id", dependent: "destroy" });
   }
 }
+registerConstant("Node", Node);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Node {
   get tree(): Tree | null | Promise<Tree | null>;

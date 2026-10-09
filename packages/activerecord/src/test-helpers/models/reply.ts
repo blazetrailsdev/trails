@@ -1,4 +1,4 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
 import { registerSubclass } from "../../inheritance.js";
 
@@ -34,6 +34,7 @@ export class Reply extends Topic {
     return (this as any).approved();
   }
 }
+registerConstant("Reply", Reply);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Reply {
   get topic(): Topic | null | Promise<Topic | null>;
@@ -45,6 +46,7 @@ export class SillyReply extends Topic {
     this.belongsTo("reply", { foreignKey: "parent_id", counterCache: "replies_count" });
   }
 }
+registerConstant("SillyReply", SillyReply);
 
 export class UniqueReply extends Reply {
   static {
@@ -52,12 +54,14 @@ export class UniqueReply extends Reply {
     this.validatesUniquenessOf("content", { scope: "parent_id" });
   }
 }
+registerConstant("UniqueReply", UniqueReply);
 
 export class SillyUniqueReply extends UniqueReply {
   static {
     this.validates("content", { uniqueness: true });
   }
 }
+registerConstant("SillyUniqueReply", SillyUniqueReply);
 
 export class WrongReply extends Reply {
   static {
@@ -109,6 +113,7 @@ export class WrongReply extends Reply {
     }
   }
 }
+registerConstant("WrongReply", WrongReply);
 
 export class WebReply extends WebTopic {
   static {

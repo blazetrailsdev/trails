@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { User } from "./user.js";
 import { Base } from "../../base.js";
 
@@ -24,6 +25,7 @@ export class Room extends Base {
     });
   }
 }
+registerConstant("Room", Room);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Room {
   get user(): User | null | Promise<User | null>;

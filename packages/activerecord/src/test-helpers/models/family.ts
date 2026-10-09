@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { FamilyTree } from "./family-tree.js";
 import type { Member } from "./member.js";
@@ -14,3 +15,4 @@ export class Family extends Base {
     this.hasMany("members", { through: "familyTrees" });
   }
 }
+registerConstant("Family", Family);

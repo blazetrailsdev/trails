@@ -1,3 +1,4 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import type { UuidParent } from "./uuid-parent.js";
 import { Base } from "../../base.js";
 
@@ -7,6 +8,7 @@ export class UuidChild extends Base {
     this.belongsTo("uuidParent");
   }
 }
+registerConstant("UuidChild", UuidChild);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface UuidChild {
   get uuidParent(): UuidParent | null | Promise<UuidParent | null>;
