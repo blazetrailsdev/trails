@@ -256,19 +256,20 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   Encryption.encryptedAttributeWasDeclared(this, name);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE preserve-original-encrypted-skips-its-column-check-on-a-cold-schema-cache
+ */
 export function preserveOriginalEncrypted(this: any, name: string): void {
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
 
   const columnNames: string[] = this.columnNames();
-  if (
-    !Encryption.config.supportUnencryptedData &&
-    columnNames.length !== 0 &&
-    !columnNames.includes(originalAttributeName)
-  ) {
-    throw new Configuration(
-      `To use :ignore_case for '${name}' you must create an additional column named '${originalAttributeName}'`,
-    );
+  if (columnNames.length !== 0) {
+    if (!Encryption.config.supportUnencryptedData && !columnNames.includes(originalAttributeName)) {
+      throw new Configuration(
+        `To use :ignore_case for '${name}' you must create an additional column named '${originalAttributeName}'`,
+      );
+    }
   }
 
   encrypts.call(this, originalAttributeName);
