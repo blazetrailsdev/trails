@@ -49,16 +49,14 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     await DatabaseTasks.migrateAll();
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    const languageWas = SchemaDumper.language;
-    SchemaDumper.language = "js";
-    let dumped: string;
-    try {
-      dumped = (
-        await SchemaDumper.dump(DatabaseTasks.migrationConnectionPool(), new StringIO())
-      ).string();
-    } finally {
-      SchemaDumper.language = languageWas;
-    }
+    const dumped = (
+      await SchemaDumper.dump(
+        DatabaseTasks.migrationConnectionPool(),
+        new StringIO(),
+        undefined,
+        "js",
+      )
+    ).string();
     expect(dumped).toMatch(/export const defineParams = \{ version: /);
 
     const schemaFile = join(dir, "schema.js");
@@ -67,7 +65,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
     const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env });
-    await DatabaseTasks.loadSchema(fresh, "ruby", schemaFile);
+    await DatabaseTasks.loadSchema(fresh, "js", schemaFile);
 
     const pending =
       await DatabaseTasks.migrationConnectionPool().migrationContext.pendingMigrationVersions();

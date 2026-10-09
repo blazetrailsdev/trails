@@ -14,6 +14,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import type { Column } from "./connection-adapters/column.js";
 import { any, camelize, cattrAccessor, isBlank, isPresent } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
+import { schemaFormat } from "./active-record.js";
+import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { Base } from "./base.js";
 import type {
   CheckConstraintDefinition,
@@ -72,10 +74,7 @@ export interface SchemaSource {
   lookupCastTypeFromColumn(column: Column): ValueType;
 }
 
-export type SchemaDumpLanguage = "ts" | "js";
-
 export interface SchemaDumperOptions {
-  language?: SchemaDumpLanguage;
   version?: string;
 }
 
@@ -148,8 +147,6 @@ class AdapterSchemaSource implements SchemaSource {
 
 export abstract class SchemaDumper {
   static ignoreTables: (string | RegExp)[] = [];
-  /** @noRailsEquivalent CONVERGEABLE schema-dumper-dump-language-is-a-class-static-rails-has-no-seat-for */
-  static language: SchemaDumpLanguage = "ts";
   declare static fkIgnorePattern: RegExp;
   declare static chkIgnorePattern: RegExp;
   declare static exclIgnorePattern: RegExp;
@@ -165,7 +162,7 @@ export abstract class SchemaDumper {
   protected connection?: unknown;
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
-  private _language: SchemaDumpLanguage;
+  private _format: SchemaFormat;
   private _tableName?: string;
   private _version?: string;
   private _ignoreTables: (string | RegExp)[];
@@ -175,10 +172,7 @@ export abstract class SchemaDumper {
     this.connection = connection;
     this._source = isDatabaseAdapter(connection) ? new AdapterSchemaSource(connection) : connection;
     this._options = options;
-    const lang =
-      (options.language as SchemaDumpLanguage | undefined) ??
-      (this.constructor as typeof SchemaDumper).language;
-    this._language = lang;
+    this._format = (options.format as SchemaFormat | undefined) ?? schemaFormat();
     this._version = typeof options.version === "string" ? options.version : undefined;
     const subclassIgnore = (this.constructor as typeof SchemaDumper).ignoreTables ?? [];
     const base = baseClass();
@@ -218,7 +212,6 @@ export abstract class SchemaDumper {
     return {
       tableNamePrefix: config.tableNamePrefix ?? "",
       tableNameSuffix: config.tableNameSuffix ?? "",
-      language: config.language,
       version: config.version,
     };
   }
@@ -238,8 +231,10 @@ export abstract class SchemaDumper {
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
     stream: S = STDOUT as S,
     config: SchemaDumperConfig = baseClass(),
+    format: SchemaFormat = schemaFormat(),
   ): Promise<S> {
     const options = this.generateOptions(config);
+    options.format = format;
     if (isDatabaseAdapter(pool)) {
       const source = new AdapterSchemaSource(pool);
       return (async () => {
@@ -260,7 +255,7 @@ export abstract class SchemaDumper {
     if (isConnectionPool(pool)) {
       return pool
         .withConnection(async (connection) => {
-          await this.dump(connection, stream, config);
+          await this.dump(connection, stream, config, format);
         })
         .then(() => stream);
     }
@@ -302,7 +297,7 @@ export abstract class SchemaDumper {
     stream.puts("// This file is auto-generated from the current state of the database.");
     stream.puts("// Instead of editing this file, please use the migrations feature.");
     stream.puts("");
-    if (this._language === "ts") {
+    if (this._format === "ts") {
       stream.puts(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
       stream.puts("");
     }
@@ -311,7 +306,7 @@ export abstract class SchemaDumper {
       stream.puts(`export const defineParams = { ${params} };`);
       stream.puts("");
     }
-    if (this._language === "ts") {
+    if (this._format === "ts") {
       stream.puts("export default async function defineSchema(ctx: DatabaseAdapter) {");
     } else {
       stream.puts("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");

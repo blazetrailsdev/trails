@@ -141,6 +141,7 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     fs.writeFileSync(
       filename,
       [
+        "--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache",
         "columns:",
         "  people:",
         "    - !ruby/object:ActiveRecord::ConnectionAdapters::Column",
@@ -176,6 +177,16 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     expect(index).toBeInstanceOf(IndexDefinition);
     expect(index.name).toBe("index_people_on_id");
     expect(index.nullsNotDistinct).toBe(true);
+  });
+
+  it("_load_from raises on a cache file it cannot load", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-corrupt-"));
+    const filename = path.join(tmpDir, "schema_cache.yml");
+    fs.writeFileSync(filename, "--- !ruby/object:NoSuchSchemaCacheClass\ncolumns: {}\n");
+
+    await expect(SchemaCache._loadFrom(filename)).rejects.toThrow(/NoSuchSchemaCacheClass/);
+    expect(await SchemaCache._loadFrom(path.join(tmpDir, "missing.yml"))).toBeNull();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("deduplication leaves indexes as IndexDefinition instances", () => {
