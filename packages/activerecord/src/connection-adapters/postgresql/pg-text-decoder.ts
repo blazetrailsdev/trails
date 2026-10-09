@@ -1,11 +1,6 @@
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
-import {
-  parsePostgresInstant,
-  parsePostgresTimestampAsInstant,
-  parsePostgresDate,
-  timeFromInstant,
-} from "../abstract/temporal-wire.js";
+import { Rational } from "@blazetrails/ruby-compat";
 import { unescapeBytea } from "../../pg/connection.js";
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
@@ -64,28 +59,67 @@ class Boolean extends PGSimpleDecoder {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class TimestampUtc extends PGSimpleDecoder {
+const TIMESTAMP_DB_LOCAL = 0x1;
+const TIMESTAMP_APP_LOCAL = 0x2;
+
+const TIMESTAMP =
+  /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
+
+class Timestamp extends PGSimpleDecoder {
+  protected flags = 0;
+
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
-    return timeFromInstant(parsePostgresTimestampAsInstant(string, "UTC"));
+    const m = TIMESTAMP.exec(string);
+    let year = Number(m?.[1]);
+
+    if (year > 0 && m) {
+      const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
+      if (m[12]) year = -year + 1;
+      const secValue = nsec
+        ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
+        : Number(m[6]);
+
+      if (m[8]) {
+        let gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
+        if (m[8] === "-") gmtOffset = -gmtOffset;
+        return Time.new(
+          year,
+          Number(m[2]),
+          Number(m[3]),
+          Number(m[4]),
+          Number(m[5]),
+          secValue,
+          gmtOffset,
+        );
+      }
+      const res = Time.new(
+        year,
+        Number(m[2]),
+        Number(m[3]),
+        Number(m[4]),
+        Number(m[5]),
+        secValue,
+        this.flags & TIMESTAMP_DB_LOCAL ? null : 0,
+      );
+      if (this.flags & TIMESTAMP_DB_LOCAL && this.flags & TIMESTAMP_APP_LOCAL) {
+        return res;
+      } else if (this.flags & TIMESTAMP_APP_LOCAL) {
+        return res.getlocal();
+      } else {
+        return res.utc();
+      }
+    }
+
+    return string;
   }
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class TimestampWithoutTimeZone extends PGSimpleDecoder {
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  decode(string: string): unknown {
-    return timeFromInstant(parsePostgresTimestampAsInstant(string, Temporal.Now.timeZoneId()));
-  }
-}
+class TimestampUtc extends Timestamp {}
 
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-class TimestampWithTimeZone extends PGSimpleDecoder {
-  /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
-  decode(string: string): unknown {
-    return timeFromInstant(parsePostgresInstant(string));
-  }
+class TimestampLocal extends Timestamp {
+  protected override flags = TIMESTAMP_DB_LOCAL | TIMESTAMP_APP_LOCAL;
 }
 
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
@@ -100,7 +134,12 @@ class Bytea extends PGSimpleDecoder {
 class Date extends PGSimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
-    return parsePostgresDate(string);
+    const m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(string);
+    if (m) {
+      return new RubyDate(Number(m[1]), Number(m[2]), Number(m[3])).toDate();
+    } else {
+      return string;
+    }
   }
 }
 
@@ -111,8 +150,8 @@ export const PGTextDecoder = {
   Numeric,
   Boolean,
   TimestampUtc,
-  TimestampWithoutTimeZone,
-  TimestampWithTimeZone,
+  TimestampWithoutTimeZone: TimestampLocal,
+  TimestampWithTimeZone: Timestamp,
   Bytea,
   Date,
 };

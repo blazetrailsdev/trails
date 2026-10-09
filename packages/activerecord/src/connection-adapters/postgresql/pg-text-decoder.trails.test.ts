@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import pg from "pg";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { PGTextDecoder, PGTypeMapByOid } from "./pg-text-decoder.js";
 import { pgConnection } from "../../pg/connection.js";
 
@@ -36,12 +35,12 @@ describe("PGTextDecoder — timestamptz (OID 1184)", () => {
     );
   });
 
-  it("returns DateInfinity for 'infinity'", () => {
-    expect(parse(OID_TIMESTAMPTZ, "infinity")).toBe(DateInfinity);
+  it("leaves 'infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_TIMESTAMPTZ, "infinity")).toBe("infinity");
   });
 
-  it("returns DateNegativeInfinity for '-infinity'", () => {
-    expect(parse(OID_TIMESTAMPTZ, "-infinity")).toBe(DateNegativeInfinity);
+  it("leaves '-infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_TIMESTAMPTZ, "-infinity")).toBe("-infinity");
   });
 
   it("handles BC timestamps", () => {
@@ -59,12 +58,12 @@ describe("PGTextDecoder — timestamp (OID 1114)", () => {
     );
   });
 
-  it("returns DateInfinity for 'infinity'", () => {
-    expect(parse(OID_TIMESTAMP, "infinity")).toBe(DateInfinity);
+  it("leaves 'infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_TIMESTAMP, "infinity")).toBe("infinity");
   });
 
-  it("returns DateNegativeInfinity for '-infinity'", () => {
-    expect(parse(OID_TIMESTAMP, "-infinity")).toBe(DateNegativeInfinity);
+  it("leaves '-infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_TIMESTAMP, "-infinity")).toBe("-infinity");
   });
 });
 
@@ -75,12 +74,12 @@ describe("PGTextDecoder — date (OID 1082)", () => {
     expect((result as Temporal.PlainDate).toString()).toBe("2026-04-26");
   });
 
-  it("returns DateInfinity for 'infinity'", () => {
-    expect(parse(OID_DATE, "infinity")).toBe(DateInfinity);
+  it("leaves 'infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_DATE, "infinity")).toBe("infinity");
   });
 
-  it("returns DateNegativeInfinity for '-infinity'", () => {
-    expect(parse(OID_DATE, "-infinity")).toBe(DateNegativeInfinity);
+  it("leaves '-infinity' a String for the OID type to cast", () => {
+    expect(parse(OID_DATE, "-infinity")).toBe("-infinity");
   });
 });
 
