@@ -1,27 +1,23 @@
-/**
- * The `@inlinedFrom <Ruby::Module>#<hook> <source>/<version>/<file>:<first>-<last>`
- * JSDoc tag (RFC 0188): names the Ruby body a segment of a constructor came
- * from when that body lives in another Ruby file. A constructor carries one
- * tag per inlined segment, in chain order, so the list is ordered and is not
- * deduplicated.
- *
- * The citation is the span of the `def`, relative to `vendor/` and not
- * spelling it. The tag carries nothing else: no prose, no story id, no
- * permanence token.
- *
- * Hard rules: no node:* imports, no process.* references, async fs.
- */
-
 import type { InlinedFrom } from "@blazetrails/parity/types";
 import type { JsdocOrigin } from "./missing-rails-call-tags.js";
 
+/**
+ * The `@inlinedFrom <Ruby::Module>#<hook> <source>/<version>/<file>:<first>-<last>`
+ * JSDoc tag (RFC 0188): names the Ruby body a segment of a constructor came
+ * from when that body lives in another Ruby file. The citation is the span of
+ * the `def`, relative to `vendor/` and not spelling it, and the tag carries
+ * nothing else.
+ */
 export const TAG = "@inlinedFrom";
 
 const TAG_LINE = /^@inlinedFrom(?:\s+(.*))?$/;
 const RUBY_NAME = /^([A-Z]\w*(?:::[A-Z]\w*)*)#(initialize|new)$/;
 const CITATION = /^([\w.-]+)\/([\w.-]+)\/(\S+\.rb):(\d+)-(\d+)$/;
 
-/** The tags one JSDoc comment carries, in written order. Throws on a malformed one. */
+/**
+ * The tags one JSDoc comment carries, one per inlined segment in chain order,
+ * so the list is neither sorted nor deduplicated. Throws on a malformed one.
+ */
 export function inlinedFromIn(comment: string, origin?: JsdocOrigin): InlinedFrom[] {
   const tags: InlinedFrom[] = [];
   const lines = comment

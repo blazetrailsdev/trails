@@ -1,17 +1,3 @@
-/**
- * The Rails side of a constructor that inlines module bodies (RFC 0188).
- *
- * A module's `initialize` is inlined into the constructor of each class that
- * includes it, at the position Ruby's `super` occupies. So the Rails body such
- * a constructor answers to is not one `def` but a chain of them: the class's
- * own `initialize`, the modules defined in the class's own Ruby file (joined by
- * convention, in ancestor order), then the cross-file ones its `@inlinedFrom`
- * tags name, in tag order. Each segment's `super` is the call INTO the next
- * segment, which the inlining spends; only the last one's leaves the chain.
- *
- * Hard rules: no node:* imports, no process.* references, async fs.
- */
-
 import type {
   ApiManifest,
   CallSite,
@@ -77,9 +63,10 @@ export function sameFileInitializeModules(
 }
 
 /**
- * The chain a constructor answers to: the class's own `initialize`, its
- * same-file modules', then the tagged bodies. Empty when the class has neither
- * a same-file module nor a tag, which leaves the pair to the ordinary gate.
+ * The Rails chain a constructor that inlines module bodies answers to
+ * (RFC 0188): the class's own `initialize`, then its same-file modules', then
+ * the bodies its `@inlinedFrom` tags name. Empty when the class has neither a
+ * same-file module nor a tag, which leaves the pair to the ordinary gate.
  */
 export function inlinedSegments(
   own: MethodInfo | undefined,
@@ -94,7 +81,10 @@ export function inlinedSegments(
 const consumesSuper = (segments: readonly MethodInfo[], index: number): boolean =>
   index < segments.length - 1;
 
-/** The union call set of a chain, with each consumed `super` dropped. */
+/**
+ * The union call set of a chain. A segment's `super` is the call into the next
+ * segment, which the inlining spends, so only the last segment's is kept.
+ */
 export function inlinedRubyBody(segments: readonly MethodInfo[]): RubyBody {
   const calls = new Set<string>();
   const strong = new Set<string>();

@@ -4632,7 +4632,6 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
-    // (file → owner → the `@inlinedFrom` tags on its constructor, in order).
     const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
@@ -5516,10 +5515,6 @@ export function main() {
         return { tsClass, ambiguous };
       };
 
-      // The Rails bodies a class's constructor answers to when module bodies
-      // are inlined into it (RFC 0188, inlined-bodies.ts): the class's own
-      // `initialize`, its same-file modules' and the ones its `@inlinedFrom`
-      // tags name. Empty for every other pair.
       const inlinedSegmentsFor = (
         rubyName: string,
         tsName: string,

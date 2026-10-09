@@ -26,15 +26,12 @@ function entity(file: string, includes: string[], methods: MethodInfo[] = []): C
   return { file, includes, extends: [], instanceMethods: methods, classMethods: [] } as ClassInfo;
 }
 
-// activemodel/lib/active_model/api.rb:80-84
 const api = body(["assign_attributes", "super"]);
-// activerecord/lib/active_record/core.rb:471-482
 const core = body(["init_internals", "initialize_internals_callback", "super", "run_callbacks"]);
 const own = body(["build_reflection", "super"]);
 
 const camel = (rc: string) => [rc.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())];
 const significant = { has: () => true };
-/** What the call gate flags for a constructor making `tsCalls` against a chain. */
 function flagged(segments: MethodInfo[], tsCalls: string[]): string[] {
   const ruby = inlinedRubyBody(segments);
   return significantMissingCalls(
@@ -106,7 +103,6 @@ describe("a tagged constructor's Rails call set", () => {
 });
 
 describe("same-file module bodies join by convention", () => {
-  // i18n/lib/i18n/backend/chain.rb: `Chain` includes `Implementation`, same file.
   const implementation = body(["backends", "super"]);
   const modules: Record<string, ClassInfo> = {
     "I18n::Backend::Chain::Implementation": entity("backend/chain.rb", ["Base"], [implementation]),

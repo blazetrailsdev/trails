@@ -272,7 +272,6 @@ function keptLines(comment) {
  * ruby_call NAMES which Rails call is unmade and is the tag's whole subject, so
  * it is data and stays. `@noRailsEquivalent` takes the permanence token
  * directly. Everything after the permanence claim is the English reason.
- * `@inlinedFrom` is its Ruby name and source citation and nothing else.
  */
 function renderTag({ name, text }) {
   if (name === "inlinedFrom") {

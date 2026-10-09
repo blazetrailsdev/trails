@@ -258,8 +258,6 @@ def strip_sexp_positions(node)
   node.map { |child| strip_sexp_positions(child) }
 end
 
-# The hooks an `@inlinedFrom` tag may cite (RFC 0188). Their `def` span is
-# recorded so the tag's citation can be derived from the manifest.
 INLINED_HOOKS = %w[initialize new].freeze
 
 def body_digest(body)
@@ -4565,8 +4563,6 @@ class ApiExtractor
     nil
   end
 
-  # Latest source line under `node`, read off the same scanner events as
-  # `first_line`.
   def last_line(node)
     return nil unless node.is_a?(Array)
 
@@ -4582,10 +4578,6 @@ class ApiExtractor
     node.filter_map { |child| last_line(child) }.max
   end
 
-  # The line a `def`'s closing `end` sits on. Ripper records no position for
-  # the keyword, so it is the first line at or after the body's last token
-  # that is an `end` at the `def`'s own indentation. An endless `def`, and one
-  # closed on its own first line, end on their last token's line.
   def def_end_line(node, line)
     last = last_line(node)
     return nil unless line && last && @source_lines
