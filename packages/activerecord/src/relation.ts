@@ -766,7 +766,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.limit(2).count() as Promise<number>;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE relation-async-iterator-has-no-rails-counterpart */
+  /** @noRailsEquivalent PERMANENT */
   async *[Symbol.asyncIterator](): AsyncIterableIterator<T> {
     const records = await this.toArray();
     for (const record of records) {
