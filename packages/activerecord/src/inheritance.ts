@@ -29,7 +29,10 @@ export const Inheritance = {
   },
 };
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export function computeType(baseClass: typeof Base, typeName: string): typeof Base {
   if (typeName.startsWith("::")) {
     return constantize(typeName) as typeof Base;

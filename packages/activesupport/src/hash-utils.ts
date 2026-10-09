@@ -96,7 +96,7 @@ export function deepDup<T>(obj: T): T {
     return (obj as unknown as { deepDup(): T }).deepDup();
   }
   if (isDuplicable(obj)) {
-    return rbObjRespondTo(obj, "dup") ? (obj as unknown as { dup(): T }).dup() : rbObjDup(obj);
+    return rbObjRespondTo(obj, "dup") ? (rbFSend(obj, "dup") as T) : rbObjDup(obj);
   }
   return obj;
 }

@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { Fixture } from "../fixtures.js";
 import { Time as RubyTime } from "@blazetrails/date";
-import { Hash } from "@blazetrails/ruby-compat";
+import { Hash, rbFSend, transformValues } from "@blazetrails/ruby-compat";
 import { defaultTimezone } from "../active-record.js";
 import { TableRow } from "./table-row.js";
 import { ModelMetadata } from "./model-metadata.js";
@@ -28,12 +28,10 @@ export class TableRows {
     this.buildTableRowsFrom(tableName, fixtures);
   }
 
-  toHash(): Record<string, Record<string, unknown>[]> {
-    const hash: Record<string, Record<string, unknown>[]> = {};
-    for (const [table, rows] of this.tables) {
-      hash[table] = (rows ?? []).map((row) => (row instanceof TableRow ? row.toHash() : row));
-    }
-    return hash;
+  toHash(): Hash<string, Record<string, unknown>[]> {
+    return transformValues(this.tables, (rows) =>
+      rows!.map((row) => rbFSend(row, "toHash") as Record<string, unknown>),
+    );
   }
 
   get modelMetadata(): ModelMetadata {

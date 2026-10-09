@@ -25,6 +25,9 @@ import {
   rbFPublicSend,
   rbInspect,
   rbObjRespondTo,
+  block as rbBlock,
+  rbBlockGivenP,
+  rbStrSend,
   toI,
 } from "@blazetrails/ruby-compat";
 import {
@@ -836,28 +839,32 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return this._name;
   }
 
-  async revert(...migrationClasses: Array<MigrationClass | (() => Promise<void>)>): Promise<void> {
-    const last = migrationClasses[migrationClasses.length - 1];
-    const fn =
-      typeof last === "function" && last !== Migration && !(last.prototype instanceof Migration)
-        ? (last as () => Promise<void>)
-        : undefined;
-    const klasses = (fn ? migrationClasses.slice(0, -1) : migrationClasses) as MigrationClass[];
-    if (klasses.length > 0) {
-      await this.run(...[...klasses].reverse(), { revert: true });
+  async revert(
+    ...migrationClasses: Array<MigrationClass | ((...args: never[]) => Promise<void>)>
+  ): Promise<void> {
+    const block = (
+      rbBlockGivenP(migrationClasses[migrationClasses.length - 1])
+        ? migrationClasses.pop()
+        : undefined
+    ) as (() => Promise<void>) | undefined;
+    if (migrationClasses.length !== 0) {
+      await this.run(...([...migrationClasses].reverse() as MigrationClass[]), { revert: true });
     }
-    if (fn === undefined) return;
-    if (isCommandRecorder(this.connection)) {
-      await this.connection.revert(fn);
-      return;
+    if (block !== undefined) {
+      if (rbObjRespondTo(this.connection, "revert")) {
+        await (this.connection as unknown as CommandRecorder).revert(block);
+      } else {
+        const recorder = await this.commandRecorder();
+        this._connectionOverride = recorder;
+        await this.suppressMessages(async () => {
+          await recorder.revert(block);
+        });
+        this._connectionOverride = recorder.delegate as DatabaseAdapter;
+        await recorder.replay(
+          this as unknown as Record<string, (...a: unknown[]) => Promise<void>>,
+        );
+      }
     }
-    const recorder = await this.commandRecorder();
-    this._connectionOverride = recorder;
-    await this.suppressMessages(async () => {
-      await recorder.revert(fn);
-    });
-    this._connectionOverride = recorder.delegate as DatabaseAdapter;
-    await recorder.replay(this as unknown as Record<string, (...a: unknown[]) => Promise<void>>);
   }
 
   async run(...migrationClasses: Array<MigrationClass | MigrationRunOptions>): Promise<void> {
@@ -866,9 +873,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     let dir = opts.direction ?? "up";
     if (opts.revert) dir = dir === "down" ? "up" : "down";
     if (this.isReverting()) {
-      await this.revert(async () => {
-        await this.run(...klasses, { direction: dir, revert: true });
-      });
+      await this.revert(
+        rbBlock(async () => {
+          await this.run(...klasses, { direction: dir, revert: true });
+        }),
+      );
     } else {
       for (const migrationClass of klasses) {
         await new migrationClass().execMigration(await this.connection, dir);
@@ -1003,7 +1012,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       const self = this as unknown as { change?: () => Promise<void> };
       if (rbObjRespondTo(this, "change")) {
         if (direction === "down") {
-          await this.revert(() => self.change!());
+          await this.revert(rbBlock(() => self.change!()));
         } else {
           await self.change!();
         }
@@ -1031,7 +1040,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     this._disableDdlTransaction = true;
   }
 
-  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/;
+  static readonly MigrationFilenameRegexp = /^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)\.(?:ts|js)$/;
 
   static isValidVersionFormat(versionString: string): boolean {
     return [Migration.MigrationFilenameRegexp, /^\d(_?\d)*$/].some((pattern) =>
@@ -1078,9 +1087,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       onCopy?: (scope: string, migration: MigrationProxy, oldPath: string) => void;
     } = {},
   ): Promise<MigrationProxy[]> {
-    if (!File.isExist(destination)) {
-      FileUtils.mkdirP(destination);
-    }
+    const copied: MigrationProxy[] = [];
+
+    if (!File.isExist(destination)) FileUtils.mkdirP(destination);
 
     const schemaMigration = new NullSchemaMigration();
     const internalMetadata = new NullInternalMetadata();
@@ -1092,47 +1101,58 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     ).migrations;
     let last: MigrationProxy | undefined = destinationMigrations[destinationMigrations.length - 1];
 
-    const copied: MigrationProxy[] = [];
-    for (const [scope, sourcePath] of Object.entries(sources)) {
-      if (!/^[a-z0-9_]+$/.test(scope)) {
-        throw new ArgumentError(
-          `Invalid migration scope '${scope}': must match /^[a-z0-9_]+$/ to be discoverable by MigrationContext#migrations.`,
-        );
-      }
-      if (!File.isExist(sourcePath)) continue;
-      const sourceMigrations = new MigrationContext([sourcePath], schemaMigration, internalMetadata)
+    for (const [scope, path] of Object.entries(sources)) {
+      const sourceMigrations = new MigrationContext([path], schemaMigration, internalMetadata)
         .migrations;
 
-      for (const source of sourceMigrations) {
-        const body = File.binread(source.filename);
-        const inserted = `// This migration comes from ${scope} (originally ${source.version})\n`;
+      for (const migration of sourceMigrations) {
+        let source = File.binread(migration.filename);
+        const insertedComment = `// This migration comes from ${scope} (originally ${migration.version})\n`;
+        let magicComments = "";
+        let substituted: unknown;
+        do {
+          [substituted, source] = rbStrSend(
+            source,
+            "subBang",
+            /^\/\/ @ts-(?:no)?check.*\n/,
+            rbBlock((magicComment: string) => {
+              magicComments += magicComment;
+              return "";
+            }),
+          );
+        } while (substituted !== null);
 
-        const duplicate = destinationMigrations.find((m) => m.name === source.name);
+        if (magicComments.length !== 0 && source.startsWith("\n")) {
+          magicComments += "\n";
+          source = source.slice(1);
+        }
+
+        source = `${magicComments}${insertedComment}${source}`;
+
+        const duplicate = destinationMigrations.find((m) => m.name === migration.name);
         if (duplicate) {
           if (options.onSkip && duplicate.scope !== scope) {
-            options.onSkip(scope, source);
+            options.onSkip(scope, migration);
           }
           continue;
         }
 
-        const nextNumber = last ? last.version + 1 : 0;
-        source.version = toInteger(Migration.nextMigrationNumber(nextNumber));
-        const fileBase = underscore(source.name);
-        const ext = File.extname(source.filename) || ".ts";
-        const newPath = File.join(destination, `${source.version}_${fileBase}.${scope}${ext}`);
-        const oldPath = source.filename;
-        source.filename = newPath;
-        last = source;
+        migration.version = toInteger(Migration.nextMigrationNumber(last ? last.version + 1 : 0));
+        const newPath = File.join(
+          destination,
+          `${migration.version}_${underscore(migration.name)}.${scope}${File.extname(migration.filename)}`,
+        );
+        const oldPath = migration.filename;
+        migration.filename = newPath;
+        last = migration;
 
-        const magicMatch = /^((?:\/\/ @ts-(?:no)?check[^\n]*\n)+\n?)/.exec(body);
-        const magic = magicMatch ? magicMatch[1] : "";
-        const rest = magic.length > 0 ? body.slice(magic.length) : body;
-        File.binwrite(source.filename, `${magic}${inserted}${rest}`);
-        copied.push(source);
-        options.onCopy?.(scope, source, oldPath);
-        destinationMigrations.push(source);
+        File.binwrite(migration.filename, source);
+        copied.push(migration);
+        if (options.onCopy) options.onCopy(scope, migration, oldPath);
+        destinationMigrations.push(migration);
       }
     }
+
     return copied;
   }
 
@@ -1535,11 +1555,7 @@ export class MigrationContext<
       name: "********** NO FILE **********",
     }));
 
-    return [...noFileList, ...fileList].sort((a, b) => {
-      const va = toInteger(a.version);
-      const vb = toInteger(b.version);
-      return va < vb ? -1 : va > vb ? 1 : 0;
-    });
+    return [...noFileList, ...fileList].sort((a, b) => toInteger(a.version) - toInteger(b.version));
   }
 
   get currentEnvironment(): string {
@@ -1612,28 +1628,18 @@ export class MigrationContext<
   /** @internal */
   protected migrationFiles(): string[] {
     const paths = wrap(this.migrationsPaths);
-    const files = paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
-
-    const isTs = (file: string): boolean => file.endsWith(".ts");
-    const byBasename = new Map<string, string>();
-    for (const file of files.sort()) {
-      const parsed = this.parseMigrationFilename(file);
-      if (!parsed) continue;
-      const key = `${parsed[0]}_${parsed[1]}`;
-      const kept = byBasename.get(key);
-      if (kept === undefined || (isTs(file) && !isTs(kept))) {
-        byBasename.set(key, file);
-      }
-    }
-    return [...byBasename.values()].sort();
+    return paths.flatMap((path) => Dir.glob(`${path}/**/[0-9]*_*.{ts,js}`));
   }
 
   /** @internal */
-  protected parseMigrationFilename(filename: string): [string, string, string] | null {
-    const base = filename.replace(/.*[/\\]/, "");
-    const m = base.match(/^([0-9]+)_([_a-z0-9]*)\.?([_a-z0-9]*)?\.(?:ts|js)$/);
-    if (!m) return null;
-    return [m[1], m[2], m[3] ?? ""];
+  protected parseMigrationFilename(filename: string): [string, string, string] | undefined {
+    return (
+      rbFSend(File.basename(filename), "scan", Migration.MigrationFilenameRegexp) as [
+        string,
+        string,
+        string,
+      ][]
+    )[0];
   }
 
   /** @internal */

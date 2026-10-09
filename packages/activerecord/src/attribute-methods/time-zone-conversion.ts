@@ -1,15 +1,16 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { actsLike, TimeWithZone, zone as timeZone } from "@blazetrails/activesupport";
+import { actsLike, zone as timeZone } from "@blazetrails/activesupport";
 import {
   type DateOrTime,
   inTimeZone,
 } from "@blazetrails/activesupport/core-ext/date-and-time/zones";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { type Time as RubyTime } from "@blazetrails/date";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   DelegateClass,
   rbEqual,
+  rbObjRespondTo,
   registerConstant,
   rtest,
 } from "@blazetrails/ruby-compat";
@@ -62,8 +63,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     const subtype = this.__getobj__() as TimeValueSubtype;
     if (isPlainObject(value)) {
       return setTimeZoneWithoutConversion(super.cast(value));
-    }
-    if (value instanceof TimeWithZone || value instanceof RubyTime || typeof value === "string") {
+    } else if (rbObjRespondTo(value, "inTimeZone")) {
       try {
         const casted = super.cast(subtype.userInputInTimeZone(value));
         return rtest(casted) ? casted : super.cast(value);
@@ -71,20 +71,11 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
         if (e instanceof ArgumentError) return null;
         throw e;
       }
-    }
-    if (value instanceof Temporal.ZonedDateTime) {
-      return this.convertTimeToTimeZone(value.toInstant());
-    }
-    if (value instanceof Temporal.Instant) {
-      return this.convertTimeToTimeZone(super.cast(value));
-    }
-    if (value instanceof Temporal.PlainDateTime) {
-      return setTimeZoneWithoutConversion(value.toZonedDateTime("UTC").toInstant());
-    }
-    if (isInfinite(value)) {
+    } else if (isInfinite(value)) {
       return value;
+    } else {
+      return this.map(super.cast(value), (v) => this.cast(v));
     }
-    return this.map(super.cast(value), (v) => this.cast(v));
   }
 
   override equals(other: ValueType): boolean {

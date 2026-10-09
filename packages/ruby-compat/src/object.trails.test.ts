@@ -258,6 +258,26 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "toAry")).toBe(false);
   });
 
+  it("answers a String for the method table rb_f_send dispatches it through", () => {
+    // vendor/ruby/v3.3.11/vm_method.c:2864 basic_obj_respond_to.
+    expect(basicObjRespondTo("abc", "upcase")).toBe(true);
+    expect(basicObjRespondTo("abc", "dup")).toBe(true);
+    expect(basicObjRespondTo("abc", "nope")).toBe(false);
+    expect(basicObjRespondTo(1, "upcase")).toBe(false);
+    expect(toS("abc")).toBe("abc");
+  });
+
+  it("answers to_hash for a Hash with the receiver, which a plain object does not define", () => {
+    // vendor/ruby/v3.3.11/hash.c:3497 rb_hash_to_hash.
+    const hash = { a: 1 };
+    const map = new Map([["a", 1]]);
+    expect(basicObjRespondTo(hash, "toHash")).toBe(true);
+    expect(basicObjRespondTo(map, "toHash")).toBe(true);
+    expect(basicObjRespondTo([], "toHash")).toBe(false);
+    expect(rbFSend(hash, "toHash")).toBe(hash);
+    expect(rbFSend(map, "toHash")).toBe(map);
+  });
+
   it("answers [] for an Array, a Hash and a String, whose JS values index without a method", () => {
     for (const obj of ["abc", [1], new Map(), {}]) {
       expect(basicObjRespondTo(obj, "get")).toBe(true);

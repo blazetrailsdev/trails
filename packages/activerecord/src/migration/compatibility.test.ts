@@ -1,3 +1,4 @@
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertDifference, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
 import { rbInspect, StandardError } from "@blazetrails/ruby-compat";
@@ -486,9 +487,11 @@ describe("Migration", () => {
     itIfSupports("comments", "change column comment can be reverted", async () => {
       const migration = new (class extends Migration.get(5.2) {
         override async migrate(_x: unknown): Promise<void> {
-          await this.revert(async () => {
-            await this.changeColumnComment("testings", "foo", "comment");
-          });
+          await this.revert(
+            rbBlock(async () => {
+              await this.changeColumnComment("testings", "foo", "comment");
+            }),
+          );
         }
       })();
 
@@ -501,9 +504,11 @@ describe("Migration", () => {
     itIfSupports("comments", "change table comment can be reverted", async () => {
       const migration = new (class extends Migration.get(5.2) {
         override async migrate(_x: unknown): Promise<void> {
-          await this.revert(async () => {
-            await this.changeTableComment("testings", "comment");
-          });
+          await this.revert(
+            rbBlock(async () => {
+              await this.changeTableComment("testings", "comment");
+            }),
+          );
         }
       })();
 
