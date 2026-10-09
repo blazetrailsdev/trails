@@ -127,7 +127,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("change table supports hstore", async () => {
-      await connection.changeTable("hstores", async (t) => {
+      await connection.changeTable("hstores", {}, async (t) => {
         await t.hstore("users", { default: "" });
       });
       void Hstore.resetColumnInformation();
@@ -139,7 +139,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("hstore migration", async () => {
       class HstoreMigration extends Migration<PostgreSQLAdapter> {
         async change() {
-          await this.changeTable("hstores", async (t) => {
+          await this.changeTable("hstores", {}, async (t) => {
             await t.hstore("keys");
           });
         }

@@ -760,13 +760,15 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   async changeTable(
-    ...args: [
-      tableName: string,
-      options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
-      fn?: (t: TableOf<A>) => void | Promise<void>,
-    ]
+    tableName: string,
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    await this.methodMissing("changeTable", ...args);
+    if (typeof options === "function") {
+      await this.methodMissing("changeTable", tableName, {}, options);
+    } else {
+      await this.methodMissing("changeTable", tableName, options ?? {}, fn);
+    }
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {

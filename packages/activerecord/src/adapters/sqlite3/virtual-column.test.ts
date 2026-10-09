@@ -104,7 +104,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   });
 
   itIfSupports("virtual_columns", "change table with stored generated column", async () => {
-    await adapter.changeTable("virtual_columns", async (t) => {
+    await adapter.changeTable("virtual_columns", {}, async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
     });
     await reloadColumnInformation();
@@ -118,7 +118,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     "virtual_columns",
     "change table with explicit virtual generated column",
     async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("incr_column1", { type: "integer", as: "column1 + 1", stored: false });
       });
       await reloadColumnInformation();
@@ -133,7 +133,7 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     "virtual_columns",
     "change table with implicit virtual generated column",
     async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("sqr_column1", { type: "integer", as: "pow(column1, 2)" });
       });
       await reloadColumnInformation();

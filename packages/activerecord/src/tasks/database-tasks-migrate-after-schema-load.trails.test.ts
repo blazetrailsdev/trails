@@ -6,6 +6,7 @@ import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
+import { schemaFormat, setSchemaFormat } from "../active-record.js";
 
 const MIGRATIONS_ROOT = new URL("../test-helpers/migrations", import.meta.url).pathname;
 
@@ -49,14 +50,16 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     await DatabaseTasks.migrateAll();
 
     const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-    const dumped = (
-      await SchemaDumper.dump(
-        DatabaseTasks.migrationConnectionPool(),
-        new StringIO(),
-        undefined,
-        "js",
-      )
-    ).string();
+    const schemaFormatWas = schemaFormat();
+    setSchemaFormat("js");
+    let dumped: string;
+    try {
+      dumped = (
+        await SchemaDumper.dump(DatabaseTasks.migrationConnectionPool(), new StringIO())
+      ).string();
+    } finally {
+      setSchemaFormat(schemaFormatWas);
+    }
     expect(dumped).toMatch(/export const defineParams = \{ version: /);
 
     const schemaFile = join(dir, "schema.js");

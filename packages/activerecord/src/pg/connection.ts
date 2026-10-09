@@ -123,7 +123,7 @@ async function execPrepared(
     await (this.query as unknown as Query)({
       name: stmtName,
       text,
-      values: params,
+      values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
       rowMode: "array",
       types: types(this),
     }),
@@ -146,7 +146,7 @@ async function execParams(
   return result(
     await (this.query as unknown as Query)({
       text: sql,
-      values: params,
+      values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
       rowMode: "array",
       types: types(this),
     }),

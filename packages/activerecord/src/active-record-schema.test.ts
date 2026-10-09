@@ -199,7 +199,7 @@ describe("ActiveRecordSchemaTest", () => {
     await Schema.define(async (schema) => {
       await schema.createTable("has_timestamps");
 
-      await schema.changeTable("has_timestamps", async (t) => {
+      await schema.changeTable("has_timestamps", {}, async (t) => {
         await t.timestamps({ default: RubyTime.now() });
       });
     });

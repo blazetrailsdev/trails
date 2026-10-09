@@ -263,7 +263,13 @@ async function runProtectedEnvCheck(config: HashConfig, envName: string): Promis
 async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): Promise<void> {
   if (!dumpSchemaAfterMigration()) return;
   const config = hashConfig ?? toDbConfig(raw);
-  await DatabaseTasks.dumpSchema(config, await resolveSchemaFormat({}));
+  const schemaFormatWas = schemaFormat();
+  try {
+    setSchemaFormat(await resolveSchemaFormat({}));
+    await DatabaseTasks.dumpSchema(config);
+  } finally {
+    setSchemaFormat(schemaFormatWas);
+  }
 }
 
 interface RunOptions {
@@ -864,9 +870,15 @@ export function dbCommand(): Command {
     .option("--database <name>", "Target a specific named database")
     .action(async (opts) => {
       await forEachDatabase(opts, async ({ config, prefix }) => {
-        const format = await resolveSchemaFormat(opts);
-        const filename = DatabaseTasks.schemaDumpPath(config, format);
-        await DatabaseTasks.dumpSchema(config, format);
+        const schemaFormatWas = schemaFormat();
+        let filename: string | null;
+        try {
+          setSchemaFormat(await resolveSchemaFormat(opts));
+          filename = DatabaseTasks.schemaDumpPath(config);
+          await DatabaseTasks.dumpSchema(config);
+        } finally {
+          setSchemaFormat(schemaFormatWas);
+        }
         console.log(`${prefix}Schema dumped to ${filename ?? "(skipped — schemaDump disabled)"}`);
       });
     });

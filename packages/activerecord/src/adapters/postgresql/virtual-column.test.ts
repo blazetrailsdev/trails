@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "change table", async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: true });
       });
       adapter.schemaCache.clearBang();
@@ -93,7 +93,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     itIfSupports("virtual_columns", "non persisted column", async () => {
       await expect(
-        adapter.changeTable("virtual_columns", async (t) => {
+        adapter.changeTable("virtual_columns", {}, async (t) => {
           await t.virtual("invalid_definition", { type: "string", as: "LOWER(name)" });
         }),
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);

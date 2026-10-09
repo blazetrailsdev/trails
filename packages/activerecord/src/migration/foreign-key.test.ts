@@ -373,7 +373,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("foreign key exists in change table", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        await conn.changeTable("astronauts", async (t) => {
+        await conn.changeTable("astronauts", {}, async (t) => {
           await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
 
           expect(await t.foreignKeyExists({ column: "rocket_id" })).toBeTruthy();
@@ -1124,7 +1124,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 
@@ -1234,7 +1234,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 
@@ -1344,7 +1344,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const rocket = await Rocket.createBang({ name: "myrocket" });
       await rocket.astronauts.push(await Astronaut.createBang());
 
-      await connection.changeTable(Astronaut.tableName!, async (t) => {
+      await connection.changeTable(Astronaut.tableName!, {}, async (t) => {
         await t.removeForeignKey({ column: "rocket_id" });
       });
 

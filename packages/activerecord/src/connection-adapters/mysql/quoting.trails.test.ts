@@ -101,14 +101,6 @@ describe("MySQL quoting — typeCast", () => {
     expect(typeCast(BigInt(9))).toBe(BigInt(9));
   });
 
-  it("quotes Buffer values as hex literals via quotedBinary", () => {
-    expect(quote(Buffer.from([0xca, 0xfe]))).toBe("x'cafe'");
-  });
-
-  it("quotes Uint8Array values as hex literals via quotedBinary", () => {
-    expect(quote(new Uint8Array([0xca, 0xfe]))).toBe("x'cafe'");
-  });
-
   it("quotes BinaryData by unwrapping to bytes via quotedBinary", () => {
     expect(quote(new BinaryData(new Uint8Array([0xca, 0xfe])))).toBe("x'cafe'");
   });

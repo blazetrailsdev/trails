@@ -206,7 +206,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("schema load", async () => {
       await Schema.define<PostgreSQLAdapter>(async (schema) => {
         await schema.createEnum("color", ["blue", "green"]);
-        await schema.changeTable("postgresql_enums", async (t) => {
+        await schema.changeTable("postgresql_enums", {}, async (t) => {
           await t.enum("best_color", {
             enumType: "color",
             default: "blue",

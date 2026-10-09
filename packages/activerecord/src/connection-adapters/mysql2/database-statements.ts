@@ -153,7 +153,9 @@ export async function performQuery(
     value instanceof RubyTime ||
     value instanceof Temporal.PlainDate
       ? this.quotedDate(value)
-      : value,
+      : value instanceof Number
+        ? value.valueOf()
+        : value,
   );
 
   const readTimeout = this._config?.readTimeout;

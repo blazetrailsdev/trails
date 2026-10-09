@@ -4,6 +4,7 @@ import {
   hashAref,
   block as rbBlock,
   rbObjAsString,
+  rbClassSuperclass,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "./namespaces.js";
@@ -258,14 +259,14 @@ export function quotedTableName(this: SchemaHost): string {
 
 export function resetTableName(this: SchemaHost): string | null {
   const klass = this as unknown as typeof Base;
-  const superclass = Object.getPrototypeOf(klass) as typeof Base | null;
+  const superclass = rbClassSuperclass(klass) as typeof Base;
   setTableName.call(
     this,
-    Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase")
+    klass === ActiveRecord.Base
       ? null
       : klass.abstractClass
-        ? (superclass?.tableName ?? null)
-        : superclass?.abstractClass
+        ? superclass.tableName
+        : superclass.abstractClass
           ? superclass.tableName || computeTableName.call(klass)
           : computeTableName.call(klass),
   );

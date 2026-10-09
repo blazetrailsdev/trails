@@ -11,7 +11,13 @@ import {
   rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
-import { Enumerable, isEmpty, rbDefineAllocFunc, rbObjClone } from "@blazetrails/ruby-compat";
+import {
+  Enumerable,
+  isEmpty,
+  rbDefineAllocFunc,
+  rbEqq,
+  rbObjClone,
+} from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
 import { first } from "@blazetrails/ruby-compat";
@@ -258,20 +264,9 @@ const ENUMERABLE_DELEGATES = {
   compactBlank,
 };
 
-function isRecordsLoaded(relation: any): boolean {
-  return relation.isLoaded && !relation.isScheduled && !relation._loadResult;
-}
-
-function isEachSynchronous(relation: any): boolean {
-  if (isRecordsLoaded(relation)) return true;
-  if (relation.target === undefined) return false;
-  const association = relation.proxyAssociation;
-  return !association.isStaleTarget() && !association.isFindTarget();
-}
-
 const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
   get(target: any, prop: string | symbol, receiver: any) {
-    if (prop === Symbol.iterator && !isEachSynchronous(target)) return undefined;
+    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return undefined;
     const value = Reflect.get(target, prop, receiver);
     if (typeof prop === "symbol" || Reflect.has(target, prop) || value !== undefined) {
       return value;
@@ -283,10 +278,12 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
-      return (...args: any[]) =>
-        isRecordsLoaded(target)
-          ? enumerable([...(target.target ?? target._records)], args)
-          : target.records().then((records: any[]) => enumerable([...records], args));
+      return (...args: any[]) => {
+        const records = target.each(() => {});
+        return records instanceof Promise
+          ? records.then((records: any[]) => enumerable([...records], args))
+          : enumerable([...records], args);
+      };
     }
     if (target.respondToMissing(prop, false)) {
       return (...args: any[]) => target.methodMissing(prop, ...args);
@@ -294,7 +291,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     return value;
   },
   has(target: any, prop: string | symbol) {
-    if (prop === Symbol.iterator && !isEachSynchronous(target)) return false;
+    if (prop === Symbol.iterator && !target._isRecordsSynchronous) return false;
     if (Reflect.has(target, prop)) return true;
     if (typeof prop === "symbol") return false;
     if (Object.prototype.hasOwnProperty.call(ENUMERABLE_METHODS, prop)) return true;
@@ -479,6 +476,10 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._records;
   }
 
+  get _isRecordsSynchronous(): boolean {
+    return this.isLoaded && !this.isScheduled && !this._loadResult;
+  }
+
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!c.asyncEnabled()) {
@@ -576,10 +577,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
     if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
+      const matches = (record: T): boolean => rbEqq(args, record);
       return (await this.toArray()).some(matches);
     }
     return !(await this.isEmpty());
@@ -596,10 +594,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   async isOne(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return false;
     if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
+      const matches = (record: T): boolean => rbEqq(args, record);
       let count = 0;
       for (const record of await this.toArray()) {
         if (matches(record) && ++count === 2) break;
@@ -660,7 +655,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   toAry(): T[] | null {
-    return isEachSynchronous(this) ? Array.from(this as Iterable<T>) : null;
+    return this._isRecordsSynchronous ? Array.from(this as Iterable<T>) : null;
   }
 
   async toArray(): Promise<T[]> {
@@ -1450,10 +1445,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   async isNone(args?: EnumerablePattern<T>): Promise<boolean> {
     if (this.isNullRelation()) return true;
     if (args !== undefined) {
-      const matches = (record: T): boolean =>
-        (args as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true
-          ? record instanceof (args as new (...args: never[]) => Base)
-          : (args as (record: T) => boolean)(record);
+      const matches = (record: T): boolean => rbEqq(args, record);
       return !(await this.toArray()).some(matches);
     }
     return this.isEmpty();

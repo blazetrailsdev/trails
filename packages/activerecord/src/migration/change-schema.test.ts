@@ -541,7 +541,7 @@ describe("Migration", () => {
       await connection.createTable("testings", (t) => {
         t.string("foo");
       });
-      await connection.changeTable("testings", async (t) => {
+      await connection.changeTable("testings", {}, async (t) => {
         expect(await t.columnExists("foo")).toBeTruthy();
         expect(await t.columnExists("bar")).toBeFalsy();
       });

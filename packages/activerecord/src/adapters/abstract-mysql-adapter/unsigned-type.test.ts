@@ -60,7 +60,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema definition can use unsigned as the type", async () => {
-      await adapter.changeTable("unsigned_types", async (t: any) => {
+      await adapter.changeTable("unsigned_types", {}, async (t: any) => {
         await t.unsignedInteger("unsigned_integer_t");
         await t.unsignedBigint("unsigned_bigint_t");
       });
@@ -73,7 +73,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("deprecate unsigned_float and unsigned_decimal", async () => {
-      await adapter.changeTable("unsigned_types", async (t: any) => {
+      await adapter.changeTable("unsigned_types", {}, async (t: any) => {
         await assertDeprecated(deprecator(), async () => {
           await t.unsignedFloat("unsigned_float_t");
         });

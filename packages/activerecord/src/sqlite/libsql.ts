@@ -58,7 +58,11 @@ class LibsqlStatement implements SqliteStatement, SyncSqliteStatement {
   private boundParams: SqliteBinds | undefined;
 
   bindParams(binds: SqliteBinds): void {
-    this.boundParams = binds;
+    this.boundParams = Array.isArray(binds)
+      ? binds.map((value: unknown) =>
+          value instanceof Number ? value.valueOf() : (value as SqliteBindValue),
+        )
+      : binds;
   }
 
   step(): null {

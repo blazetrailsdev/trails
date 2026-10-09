@@ -52,7 +52,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("change table supports json", async () => {
       try {
         await connection.transaction(async () => {
-          await connection.changeTable("citexts", async (t) => {
+          await connection.changeTable("citexts", {}, async (t) => {
             await t.citext("username");
           });
           await Citext.resetColumnInformation();

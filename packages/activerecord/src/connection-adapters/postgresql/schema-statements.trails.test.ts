@@ -934,7 +934,7 @@ describe("SchemaStatements#changeTable", () => {
     const { adapter } = makeAdapter();
     const ss = withSchemaStatements(adapter);
     let yielded: unknown;
-    await ss.changeTable("things", (t) => {
+    await ss.changeTable("things", {}, (t) => {
       yielded = t;
     });
     expect(yielded).toBeInstanceOf(PgTable);
