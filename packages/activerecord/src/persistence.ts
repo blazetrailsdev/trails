@@ -34,6 +34,7 @@ import { attributesForUpdate, attributesWithValues } from "./attribute-methods.j
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isDefaultScopes } from "./scoping/default.js";
 import { RecordInvalid } from "./validations.js";
+import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
@@ -99,6 +100,118 @@ export async function createBang(
   await yielded;
   await record.saveBang();
   return record;
+}
+
+export class ClassMethods {
+  static update<T extends typeof Base>(
+    this: T,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: ":all",
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: unknown[],
+    attributes: Record<string, unknown>[],
+  ): Promise<InstanceType<T>[]>;
+  static update<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>>;
+  static async update<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
+    if (Array.isArray(id)) {
+      if (id.some((oneId) => oneId instanceof ActiveRecord.Base)) {
+        throw new ArgumentError(
+          "You are passing an array of ActiveRecord::Base instances to `update`. " +
+            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+        );
+      }
+      const objects: InstanceType<T>[] = [];
+      for (const oneId of id) objects.push(await this.find(oneId));
+      for (const [idx, object] of objects.entries()) {
+        await object.update((attributes as Record<string, unknown>[])[idx]);
+      }
+      return objects;
+    } else if (id === ":all") {
+      const records = await this.all();
+      for (const record of records) await record.update(attributes as Record<string, unknown>);
+      return records;
+    } else {
+      if (id instanceof ActiveRecord.Base) {
+        throw new ArgumentError(
+          "You are passing an instance of ActiveRecord::Base to `update`. " +
+            "Please pass the id of the object by calling `.id`.",
+        );
+      }
+      const object = await this.find(id);
+      await object.update(attributes as Record<string, unknown>);
+      return object;
+    }
+  }
+
+  static updateBang<T extends typeof Base>(
+    this: T,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: ":all",
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown[],
+    attributes: Record<string, unknown>[],
+  ): Promise<InstanceType<T>[]>;
+  static updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes: Record<string, unknown>,
+  ): Promise<InstanceType<T>>;
+  static async updateBang<T extends typeof Base>(
+    this: T,
+    id: unknown,
+    attributes?: Record<string, unknown> | Record<string, unknown>[],
+  ): Promise<InstanceType<T> | InstanceType<T>[]> {
+    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
+    if (Array.isArray(id)) {
+      if (id.some((oneId) => oneId instanceof ActiveRecord.Base)) {
+        throw new ArgumentError(
+          "You are passing an array of ActiveRecord::Base instances to `update!`. " +
+            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+        );
+      }
+      const objects: InstanceType<T>[] = [];
+      for (const oneId of id) objects.push(await this.find(oneId));
+      for (const [idx, object] of objects.entries()) {
+        await object.updateBang((attributes as Record<string, unknown>[])[idx]);
+      }
+      return objects;
+    } else if (id === ":all") {
+      const records = await this.all();
+      for (const record of records) await record.updateBang(attributes as Record<string, unknown>);
+      return records;
+    } else {
+      if (id instanceof ActiveRecord.Base) {
+        throw new ArgumentError(
+          "You are passing an instance of ActiveRecord::Base to `update!`. " +
+            "Please pass the id of the object by calling `.id`.",
+        );
+      }
+      const object = await this.find(id);
+      await object.updateBang(attributes as Record<string, unknown>);
+      return object;
+    }
+  }
 }
 
 export function build(
