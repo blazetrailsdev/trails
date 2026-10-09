@@ -19,6 +19,7 @@ import {
   rbBlockGivenP,
   rbEql,
   rbEqual,
+  rbFSend,
   rbHash,
   rbInspect,
   rbModConstSet,
@@ -586,12 +587,12 @@ export class Parameters {
     return duplicate;
   }
 
-  /** @missingRailsArgs split — PERMANENT */
   extractValue(
     key: string,
     { delimiter = "_" }: { delimiter?: string | RegExp } = {},
-  ): string[] | undefined {
-    return (this.parameters.get(key) as string | null | undefined)?.split(delimiter);
+  ): string[] | null {
+    const value = this.parameters.get(key);
+    return value == null ? null : (rbFSend(value, "split", delimiter, -1) as string[]);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
