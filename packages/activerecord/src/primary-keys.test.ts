@@ -339,7 +339,7 @@ describe("PrimaryKeysTest", () => {
     class AnonCpkBooks extends Base {
       static {
         this._tableName = "cpk_books";
-        this._primaryKey = ["author_id", "id"] as string[];
+        this.primaryKey = ["author_id", "id"];
       }
     }
     expect(AnonCpkBooks.compositePrimaryKey).toBeTruthy();
@@ -438,7 +438,9 @@ describe("PrimaryKeyAnyTypeTest", () => {
 
   class Barcode extends Base {
     static _tableName = "barcodes";
-    static _primaryKey = "code";
+    static {
+      this.primaryKey = "code";
+    }
   }
 
   let connection: any;
@@ -603,7 +605,7 @@ describe("CompositePrimaryKeyTest", () => {
     class AnonUberBarcodes extends Base {
       static {
         this._tableName = "uber_barcodes";
-        this._primaryKey = ["region", "code"] as string[];
+        this.primaryKey = ["region", "code"];
       }
     }
     expect(AnonUberBarcodes.primaryKey).toEqual(["region", "code"]);

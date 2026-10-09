@@ -1,5 +1,5 @@
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { foreignKey, kernelArray } from "@blazetrails/activesupport";
+import { foreignKey, include, kernelArray } from "@blazetrails/activesupport";
 import { rtest } from "@blazetrails/ruby-compat";
 import {
   dangerousAttributeMethods,
@@ -107,7 +107,9 @@ interface CachedSchemaSource {
 
 interface PrimaryKeyHost {
   primaryKey: string | string[];
-  _primaryKey?: string | string[];
+  _primaryKey?: string | string[] | null;
+  _compositePrimaryKey: boolean;
+  _attributesBuilder?: unknown;
   name: string;
   tableName?: string | null;
   connectionPool?(): { schemaReflection?: { loadedCache: CachedSchemaSource | null } };
@@ -146,38 +148,55 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
   const configured = this._primaryKey;
   if (configured !== undefined) return configured;
-  const base = baseClass.call(this as unknown as typeof Base) as unknown as PrimaryKeyHost & {
-    primaryKeyPrefixType?: string | null;
-  };
-  let reflected = base.primaryKeyPrefixType != null;
-  try {
-    const tableName = base.tableName;
-    reflected ||=
-      tableName != null &&
-      cachedSchemaCacheFor(base)?.getCachedPrimaryKeys?.(tableName) !== undefined;
-  } catch {}
-  if (reflected) {
+  if (isPrimaryKeyReflected(this)) {
     resetPrimaryKey.call(this);
     return this._primaryKey as string | string[] | null;
   }
-  return getPrimaryKey.call(this, (base as unknown as typeof Base).name);
+  const base = baseClass.call(this as unknown as typeof Base);
+  return getPrimaryKey.call(this, base.name);
+}
+
+function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
+  const base = baseClass.call(host as unknown as typeof Base) as unknown as PrimaryKeyHost & {
+    primaryKeyPrefixType?: string | null;
+  };
+  if (base.primaryKeyPrefixType != null) return true;
+  try {
+    const tableName = base.tableName;
+    return (
+      tableName != null &&
+      cachedSchemaCacheFor(base)?.getCachedPrimaryKeys?.(tableName) !== undefined
+    );
+  } catch {
+    return false;
+  }
 }
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
- *
- * `Base` already exposes the Rails-named `static set primaryKey` accessor
- * (base.ts:1157) that delegates here, so this export is redundant public
- * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
+ * (attribute_methods/primary_key.rb:130-140), as a this-typed function behind
+ * the Rails-named `static set primaryKey` accessor on `Base`.
  * @internal
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
  */
-export function setPrimaryKeyAttr(this: PrimaryKeyHost, key: string | string[]): void {
-  this._primaryKey = key;
+export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[] | null): void {
+  if (Array.isArray(value)) {
+    include(this, AttributeMethods.CompositePrimaryKey);
+    this._primaryKey = Object.freeze(value.map((v) => String(v))) as string[];
+  } else if (value != null) {
+    this._primaryKey = String(value);
+  } else {
+    this._primaryKey = null;
+  }
+
+  this._compositePrimaryKey = Array.isArray(value);
+  this._attributesBuilder = undefined;
 }
 
+/** @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  return Array.isArray(getPrimaryKeyAttr.call(this));
+  if (this._primaryKey === undefined && isPrimaryKeyReflected(this)) resetPrimaryKey.call(this);
+  return this._compositePrimaryKey;
 }
 
 export function primaryKey(this: PrimaryKeyHost, value?: string | string[]): string | string[] {

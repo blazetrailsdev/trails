@@ -24,7 +24,9 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 
   class Ebook extends Base {
     static override _tableName = "ebooks'";
-    static override _primaryKey = "id";
+    static {
+      this.primaryKey = "id";
+    }
   }
 
   beforeAll(async () => {
@@ -161,7 +163,9 @@ describe("UpdateableViewTest", () => {
 
   class PrintedBook extends Base {
     static override _tableName = "printed_books";
-    static override _primaryKey = "id";
+    static {
+      this.primaryKey = "id";
+    }
   }
 
   beforeAll(async () => {

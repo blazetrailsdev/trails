@@ -8,7 +8,7 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 class CompositePkParent extends Base {
   static _tableName = "cpk_seed_parents";
   static {
-    this._primaryKey = ["shop_id", "id"];
+    this.primaryKey = ["shop_id", "id"];
     this.attribute("shop_id", "integer");
     this.attribute("id", "integer");
   }
@@ -25,7 +25,7 @@ class CpkSeedChild extends Base {
 class TenantPkParent extends Base {
   static _tableName = "cpk_tenant_parents";
   static {
-    this._primaryKey = ["shop_id", "tenant_id"];
+    this.primaryKey = ["shop_id", "tenant_id"];
     this.attribute("shop_id", "integer");
     this.attribute("tenant_id", "integer");
   }

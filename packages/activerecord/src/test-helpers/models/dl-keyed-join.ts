@@ -9,7 +9,9 @@ export class DlKeyedJoin extends Base {
   declare dl_keyed_has_many_through_id: number;
   declare joins_key: number;
 
-  static _primaryKey = "joins_key";
+  static {
+    this.primaryKey = "joins_key";
+  }
 
   static {
     this.belongsTo("destroyAsyncParent", { primaryKey: "parent_id" });

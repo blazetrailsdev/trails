@@ -4,6 +4,8 @@ import { Base } from "../../base.js";
 export class DlKeyedHasManyThrough extends Base {
   declare through_key: number;
 
-  static _primaryKey = "through_key";
+  static {
+    this.primaryKey = "through_key";
+  }
 }
 registerConstant("DlKeyedHasManyThrough", DlKeyedHasManyThrough);

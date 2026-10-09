@@ -188,7 +188,7 @@ describe("AssociationScope", () => {
 
       static {
         this._tableName = "owners";
-        this._primaryKey = "owner_id";
+        this.primaryKey = "owner_id";
         this.hasMany("very_special_clients", {
           className: "VerySpecialClient",
           foreignKey: "client_of",

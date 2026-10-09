@@ -40,7 +40,7 @@ export class CpkBook extends Base {
   declare failDestroy: boolean | undefined;
 
   static {
-    this._primaryKey = ["author_id", "id"];
+    this.primaryKey = ["author_id", "id"];
     this.belongsTo("order", {
       autosave: true,
       foreignKey: ["shop_id", "order_id"],
@@ -116,7 +116,7 @@ export class CpkNonCpkBook extends CpkBook {
     rbModConstSet(Cpk, "NonCpkBook", this);
   }
   static {
-    this._primaryKey = "id";
+    this.primaryKey = "id";
     this.belongsTo("nonCpkOrder", { foreignKey: ["order_id"] });
   }
 }
@@ -191,7 +191,7 @@ export class CpkChapter extends Base {
   static _tableName = "cpk_chapters";
 
   static {
-    this._primaryKey = ["author_id", "id"];
+    this.primaryKey = ["author_id", "id"];
     this.belongsTo("book", { foreignKey: ["author_id", "book_id"] });
   }
 }
@@ -209,7 +209,7 @@ export class CpkChapterDestroyAsync extends Base {
   static _tableName = "cpk_chapters";
 
   static {
-    this._primaryKey = ["author_id", "id"];
+    this.primaryKey = ["author_id", "id"];
     this.belongsTo("book", {
       foreignKey: ["author_id", "book_id"],
       className: "Cpk::BookDestroyAsync",
@@ -238,7 +238,7 @@ export class CpkOrder extends Base {
   }
 
   static {
-    this._primaryKey = ["shop_id", "id"];
+    this.primaryKey = ["shop_id", "id"];
     this.aliasAttribute("id_value", "id");
     this.hasMany("orderAgreements", {
       foreignKey: "order_id",
@@ -263,7 +263,7 @@ export class CpkBrokenOrder extends CpkOrder {
     rbModConstSet(Cpk, "BrokenOrder", this);
   }
   static {
-    this._primaryKey = ["shop_id", "status"];
+    this.primaryKey = ["shop_id", "status"];
     this.hasMany("books");
     this.hasOne("book");
   }
@@ -280,7 +280,7 @@ export class CpkOrderWithSpecialPrimaryKey extends CpkOrder {
     rbModConstSet(Cpk, "OrderWithSpecialPrimaryKey", this);
   }
   static {
-    this._primaryKey = ["shop_id", "status"];
+    this.primaryKey = ["shop_id", "status"];
     this.hasMany("books", { foreignKey: ["shop_id", "status"] });
     this.hasOne("book", { foreignKey: ["shop_id", "status"] });
   }
@@ -297,7 +297,7 @@ export class CpkBrokenOrderWithNonCpkBooks extends CpkOrder {
     rbModConstSet(Cpk, "BrokenOrderWithNonCpkBooks", this);
   }
   static {
-    this._primaryKey = ["shop_id", "status"];
+    this.primaryKey = ["shop_id", "status"];
     this.hasMany("books", { className: "Cpk::NonCpkBook" });
     this.hasOne("book", { className: "Cpk::NonCpkBook" });
   }
@@ -313,7 +313,7 @@ export class CpkNonCpkOrder extends CpkOrder {
     rbModConstSet(Cpk, "NonCpkOrder", this);
   }
   static {
-    this._primaryKey = "id";
+    this.primaryKey = "id";
   }
 }
 
@@ -392,7 +392,9 @@ export class CpkOrderTag extends Base {
     rbModConstSet(Cpk, "OrderTag", this);
   }
   static _tableName = "cpk_order_tags";
-  static _primaryKey = ["order_id", "tag_id"];
+  static {
+    this.primaryKey = ["order_id", "tag_id"];
+  }
 
   static {
     this.belongsTo("tag");

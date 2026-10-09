@@ -5,6 +5,8 @@ export class Cart extends Base {
   declare shop_id: bigint;
   declare title: string;
 
-  static _primaryKey = "id";
+  static {
+    this.primaryKey = "id";
+  }
 }
 registerConstant("Cart", Cart);

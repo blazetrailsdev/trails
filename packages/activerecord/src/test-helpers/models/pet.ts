@@ -25,7 +25,7 @@ export class Pet extends Base {
   static afterDestroyOutput: any;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.attribute("current_user", "string");
     this.belongsTo("owner", { touch: true });
     this.hasMany("toys");
@@ -51,7 +51,7 @@ export class PetTouchHappyAt extends Base {
   declare pet_id: number;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.tableName = "pets";
     this.belongsTo("owner", { touch: "happy_at" });
   }
@@ -64,7 +64,7 @@ export class PetCounterCacheTouch extends Base {
   declare pet_id: number;
 
   static {
-    this._primaryKey = "pet_id";
+    this.primaryKey = "pet_id";
     this.tableName = "pets";
     this.belongsTo("owner", { counterCache: "use_count", touch: true });
   }

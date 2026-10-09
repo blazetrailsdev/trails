@@ -6,7 +6,7 @@ import { registerModel } from "../associations.js";
 class BigIntCpkBlogPost extends Base {
   static _tableName = "bigint_cpk_blog_posts";
   static {
-    this._primaryKey = ["blog_id", "id"];
+    this.primaryKey = ["blog_id", "id"];
     this.attribute("blog_id", "integer");
     this.attribute("id", "integer");
   }

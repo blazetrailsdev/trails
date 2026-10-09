@@ -1619,7 +1619,7 @@ describe("TransactionTest", () => {
       class K extends Base {
         static {
           this._tableName = "transaction_without_primary_keys";
-          this._primaryKey = null as any;
+          this.primaryKey = null as any;
           this.attribute("thing_id", "integer");
           this.afterCommit(() => {});
         }

@@ -8,7 +8,9 @@ export class DlKeyedBelongsTo extends Base {
   declare belongs_key: number;
   declare destroy_async_parent_id: number;
 
-  static _primaryKey = "belongs_key";
+  static {
+    this.primaryKey = "belongs_key";
+  }
 
   static {
     this.belongsTo("destroyAsyncParent", {

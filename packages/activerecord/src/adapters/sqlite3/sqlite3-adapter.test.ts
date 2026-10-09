@@ -127,7 +127,7 @@ class Barcode extends Base {
 class BarcodeCustomPk extends Base {
   static {
     this._tableName = "barcode_custom_pks";
-    this._primaryKey = "code";
+    this.primaryKey = "code";
   }
 }
 
@@ -137,7 +137,7 @@ class BarcodeCpk extends Base {
 
   static {
     this._tableName = "barcode_cpks";
-    this._primaryKey = ["region", "code"];
+    this.primaryKey = ["region", "code"];
   }
 }
 
@@ -306,7 +306,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("default pragmas", async () => {
-    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:155)
     if (inMemoryDb()) {
       expect(await adapter.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
       expect(await adapter.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
@@ -354,7 +353,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("overriding default journal mode pragma", async () => {
-    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:190)
     if (inMemoryDb()) {
       await withMemoryConnection({ pragmas: { journal_mode: "delete" } }, async (conn) => {
         expect(await conn.execute("PRAGMA journal_mode")).toEqual([{ journal_mode: "memory" }]);
@@ -478,7 +476,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("overriding default mmap size pragma", async () => {
-    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:302)
     if (inMemoryDb()) {
       await withMemoryConnection({ pragmas: { mmap_size: 100 } }, async (conn) => {
         expect(await conn.execute("PRAGMA mmap_size")).toEqual([]);
@@ -553,7 +550,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("setting new pragma", async () => {
-    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:380)
     if (inMemoryDb()) {
       await withMemoryConnection({ pragmas: { temp_store: ":memory" } }, async (conn) => {
         expect(await conn.execute("PRAGMA foreign_keys")).toEqual([{ foreign_keys: 1 }]);
@@ -582,7 +578,6 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("setting invalid pragma", async () => {
-    // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors Rails' `if in_memory_db?` (sqlite3_adapter_test.rb:404)
     if (inMemoryDb()) {
       const warning = await capture(":stderr", async () => {
         await withMemoryConnection({ pragmas: { invalid: true } }, async (conn) => {
