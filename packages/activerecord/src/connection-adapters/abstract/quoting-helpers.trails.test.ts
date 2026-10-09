@@ -57,6 +57,14 @@ describe("quotedDate", () => {
     expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 
+  it("formats in local time when the connection's default_timezone is local", () => {
+    const v = RubyTime.utc(2026, 4, 26, 14, 23, 55, 123456);
+    const local = v.getlocal();
+    expect(quotedDateFn.call({ defaultTimezone: "local" }, v)).toBe(
+      `${local.strftime("%Y-%m-%d %H:%M:%S")}.123456`,
+    );
+  });
+
   it("throws for unrecognised types", () => {
     expect(() => quotedDate("2026-04-26" as never)).toThrow(TypeError);
   });

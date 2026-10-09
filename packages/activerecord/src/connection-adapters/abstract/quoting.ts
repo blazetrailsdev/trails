@@ -193,7 +193,7 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
   }
 
   const result = toFs(value, "db");
-  if (isRespondToUsec(value) && usec(value) > 0) {
+  if (!(value instanceof Temporal.PlainDate) && usec(value) > 0) {
     return result + "." + sprintf("%06d", usec(value));
   } else {
     return result;
@@ -270,7 +270,7 @@ function instantOf(value: TimeLike): Temporal.Instant {
 function isUtc(value: TimeLike): boolean {
   if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
   if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
-  return true;
+  return false;
 }
 
 /** Ruby's `Time#getutc` (`vendor/ruby/v3.3.11/time.c:4425`). */
@@ -292,19 +292,12 @@ function toFs(value: TemporalDateLike, format: string): string {
   return timeToFs(value, format);
 }
 
-function isRespondToUsec(
-  value: TemporalDateLike,
-): value is Exclude<TemporalDateLike, Temporal.PlainDate> {
-  return !(value instanceof Temporal.PlainDate);
-}
-
 /** Ruby's `Time#usec` (`vendor/ruby/v3.3.11/time.c:3861`) and `DateTime#usec` (`activesupport/lib/active_support/core_ext/date_time/conversions.rb:89`). */
 function usec(value: Exclude<TemporalDateLike, Temporal.PlainDate>): number {
-  if (value instanceof TimeWithZone || value instanceof RubyTime) return value.usec;
   if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
     return dateTimeUsec(value);
   }
-  return dateTimeUsec(getutc(value));
+  return (value as TimeWithZone | RubyTime).usec;
 }
 
 /** @internal */

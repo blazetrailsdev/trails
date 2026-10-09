@@ -324,8 +324,8 @@ export function newColumnFromField(
     defaultValue,
     typeMetadata,
     Number(field["notnull"]) === 0,
+    defaultFunction,
     {
-      defaultFunction,
       collation: field["collation"] as string | null,
       autoIncrement: field["auto_increment"] as boolean | undefined,
       rowid,

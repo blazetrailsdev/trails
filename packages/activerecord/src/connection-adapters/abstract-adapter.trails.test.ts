@@ -32,9 +32,13 @@ class TestAdapter extends AbstractAdapter {
 describe("AbstractAdapter#returnValueAfterInsert", () => {
   it("returns true when column isAutoPopulated (has default function)", async () => {
     const adapter = new TestAdapter({});
-    const col = new Column("id", null, new SqlTypeMetadata({ sqlType: "uuid" }), false, {
-      defaultFunction: "gen_random_uuid()",
-    });
+    const col = new Column(
+      "id",
+      null,
+      new SqlTypeMetadata({ sqlType: "uuid" }),
+      false,
+      "gen_random_uuid()",
+    );
     expect(await adapter.returnValueAfterInsert(col)).toBe(true);
   });
 

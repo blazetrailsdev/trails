@@ -27,6 +27,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
       null,
       new TypeMetadata({ sqlType: "character varying[]", type: "string" }, { oid: 1015, fmod: -1 }),
       true,
+      null,
       { serial: false, identity: "a", generated: "s" },
     );
 

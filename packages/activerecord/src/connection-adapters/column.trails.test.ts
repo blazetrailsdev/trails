@@ -60,9 +60,7 @@ describe("Column", () => {
   });
 
   it("isAutoPopulated returns true when default function set", () => {
-    const col = new Column("created_at", null, makeMetadata(), true, {
-      defaultFunction: "now()",
-    });
+    const col = new Column("created_at", null, makeMetadata(), true, "now()");
     expect(col.isAutoPopulated()).toBe(true);
   });
 
