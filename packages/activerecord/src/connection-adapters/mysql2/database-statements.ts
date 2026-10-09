@@ -5,8 +5,6 @@ import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-s
 import { anybits } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import type { Mysql2Client } from "./mysql2-client.js";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
 import { ExplainRegistry } from "../../explain-registry.js";
 
@@ -34,7 +32,6 @@ interface PerformQueryHost {
   handleWarnings?(sql: string): void | Promise<void>;
   verified?(): void;
   _trackPrepared?(conn: unknown, sql: string): void;
-  quotedDate(value: unknown): string;
   _config?: { readTimeout?: number };
 }
 
@@ -148,16 +145,6 @@ export async function performQuery(
 
   if (prepare) this._trackPrepared?.(rawConnection, sql);
 
-  const driverBinds = typeCastedBinds.map((value) =>
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Temporal.PlainDate
-      ? this.quotedDate(value)
-      : value instanceof Number
-        ? value.valueOf()
-        : value,
-  );
-
   const readTimeout = this._config?.readTimeout;
   const timeoutOption = readTimeout != null ? { timeout: readTimeout * 1000 } : {};
   let rawResult: unknown;
@@ -173,7 +160,7 @@ export async function performQuery(
     try {
       [rawResult, rawFields] = (await rawConnection.execute(
         { sql, rowsAsArray: true, ...timeoutOption } as any,
-        driverBinds as any[],
+        typeCastedBinds as any[],
       )) as [unknown, mysql.FieldPacket[]];
     } catch (err) {
       this._statements?.delete(sql);
@@ -182,10 +169,10 @@ export async function performQuery(
   } else {
     const stmt = { sql, rowsAsArray: true, ...timeoutOption };
     try {
-      [rawResult, rawFields] = (await rawConnection.execute(stmt as any, driverBinds as any[])) as [
-        unknown,
-        mysql.FieldPacket[],
-      ];
+      [rawResult, rawFields] = (await rawConnection.execute(
+        stmt as any,
+        typeCastedBinds as any[],
+      )) as [unknown, mysql.FieldPacket[]];
       if (Array.isArray(rawResult)) {
         stmtToClose = { close: () => void rawConnection.unprepare(stmt as any) };
       } else {

@@ -37,6 +37,13 @@ describeIfMysqlAdapter("Mysql2AdapterPerformQueryTest (trails)", () => {
     ).toBeNull();
   });
 
+  it("a whole-valued Float bound to a DOUBLE round-trips", async () => {
+    const result = await adapter.execQuery(`SELECT CAST(? AS DOUBLE) AS ratio`, null, [
+      new Number(3),
+    ]);
+    expect(result.rows.map(([ratio]) => Number(ratio))).toEqual([3]);
+  });
+
   it("execute still returns rows for a row-returning statement", async () => {
     await adapter.execute(`INSERT INTO pq (nick) VALUES ('a')`);
     expect(((await adapter.execute(`SELECT nick FROM pq`)) as Mysql2RawResult).rows).toEqual([

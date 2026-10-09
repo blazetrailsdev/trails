@@ -1,7 +1,8 @@
 import type mysql from "mysql2/promise";
-import { Date as RubyDate, Time } from "@blazetrails/date";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
+import { quotedDate } from "../abstract/quoting.js";
 
 interface QueryOptions {
   as?: "array";
@@ -63,6 +64,20 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
   }
 }
 
+type Execute = (sql: unknown, values?: unknown[]) => unknown;
+
+function bind(value: unknown): unknown {
+  if (value instanceof Number) return value.valueOf();
+  if (
+    value instanceof TimeWithZone ||
+    value instanceof Time ||
+    value instanceof Temporal.PlainDate
+  ) {
+    return quotedDate.call({ defaultTimezone: defaultTimezone() }, value);
+  }
+  return value;
+}
+
 const QUERY_OPTIONS = new WeakSet<object>();
 
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
@@ -90,6 +105,11 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     QUERY_OPTIONS.add(client);
     const queryOptions: QueryOptions = {};
     Object.defineProperty(client, "queryOptions", { configurable: true, value: queryOptions });
+    const execute = (client as { execute?: unknown }).execute;
+    if (typeof execute === "function") {
+      (client as { execute?: Execute }).execute = (sql, values) =>
+        (execute as Execute).call(client, sql, values?.map(bind));
+    }
     const config = (client as { config?: { typeCast?: unknown } }).config;
     if (config) {
       const typeCast = config.typeCast;

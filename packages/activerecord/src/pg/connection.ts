@@ -1,6 +1,6 @@
 import type pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { pgError } from "./exceptions.js";
+import { connectionBad, pgError } from "./exceptions.js";
 import { PG } from "./pg.js";
 
 export interface PGConnection extends pg.Client {
@@ -11,6 +11,7 @@ export interface PGConnection extends pg.Client {
   unescapeBytea(value: string | Uint8Array): Buffer;
   transactionStatus(): number;
   status(): number;
+  reset(): Promise<void>;
   cancel(): Promise<string | null>;
   asyncCancel(): Promise<string | null>;
   block(timeout?: number | null): Promise<boolean>;
@@ -51,6 +52,7 @@ function types(client: pg.Client): { getTypeParser(oid: number, format?: string)
   };
 }
 
+const STREAM = new WeakMap<object, unknown>();
 const PREPARED = new WeakMap<object, Map<string, string>>();
 const READY_FOR_QUERY = new WeakMap<object, string>();
 
@@ -63,6 +65,9 @@ const CONNECTION_OK = 0;
 const CONNECTION_BAD = 1;
 
 type Protocol = pg.Connection & {
+  ssl?: unknown;
+  _keepAlive?: unknown;
+  _keepAliveInitialDelayMillis?: unknown;
   connect(portOrPath: string | number, host?: string): void;
   cancel(processID: number, secretKey: number): void;
 };
@@ -78,6 +83,49 @@ type Client = Omit<pg.Client, "connection"> & {
 export function status(this: pg.Client): number {
   const { _ending, _ended } = this as Client;
   return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
+}
+
+export async function reset(this: pg.Client): Promise<void> {
+  try {
+    await this.end();
+    const { connection } = this as Client;
+    Object.assign(this, {
+      connection: new (connection!.constructor as new (config: object) => Protocol)({
+        stream: STREAM.get(this),
+        ssl: connection!.ssl,
+        keepAlive: connection!._keepAlive,
+        keepAliveInitialDelayMillis: connection!._keepAliveInitialDelayMillis,
+      }),
+      _ending: false,
+      _ended: false,
+      _connecting: false,
+      _connected: false,
+      _connectionError: false,
+      _queryable: true,
+      _activeQuery: null,
+      _queryQueue: [],
+      processID: null,
+      secretKey: null,
+    });
+    PREPARED.delete(this);
+    READY_FOR_QUERY.set(this, "I");
+    readyForQuery(this);
+    await this.connect();
+  } catch (error) {
+    throw connectionBad(error);
+  }
+}
+
+function readyForQuery(client: object): void {
+  const connection = (client as Client).connection;
+  if (typeof connection?.on === "function") {
+    connection.on("readyForQuery", (message: { status?: string }) => {
+      if (typeof message?.status === "string") READY_FOR_QUERY.set(client, message.status);
+    });
+    connection.on("errorMessage", () => {
+      if (READY_FOR_QUERY.get(client) === "T") READY_FOR_QUERY.set(client, "E");
+    });
+  }
 }
 
 export function transactionStatus(this: pg.Client): number {
@@ -260,22 +308,18 @@ export async function cancel(this: pg.Client): Promise<string | null> {
 
 export const asyncCancel = cancel;
 
-export function pgConnection<T extends object>(client: T): T & PGConnection {
+export function pgConnection<T extends object>(
+  client: T,
+  stream?: pg.ClientConfig["stream"],
+): T & PGConnection {
+  if (stream !== undefined) STREAM.set(client, stream);
   if (!READY_FOR_QUERY.has(client)) {
     READY_FOR_QUERY.set(client, "I");
     const native = (client as { query?: unknown }).query;
     if (typeof native === "function") {
       (client as { query?: unknown }).query = query(native as (...args: unknown[]) => unknown);
     }
-    const connection = (client as unknown as Client).connection;
-    if (typeof connection?.on === "function") {
-      connection.on("readyForQuery", (message: { status?: string }) => {
-        if (typeof message?.status === "string") READY_FOR_QUERY.set(client, message.status);
-      });
-      connection.on("errorMessage", () => {
-        if (READY_FOR_QUERY.get(client) === "T") READY_FOR_QUERY.set(client, "E");
-      });
-    }
+    readyForQuery(client);
   }
   return Object.defineProperty(
     Object.assign(client, {
@@ -287,6 +331,7 @@ export function pgConnection<T extends object>(client: T): T & PGConnection {
       socketIo,
       transactionStatus,
       status,
+      reset,
       cancel,
       asyncCancel,
       block,

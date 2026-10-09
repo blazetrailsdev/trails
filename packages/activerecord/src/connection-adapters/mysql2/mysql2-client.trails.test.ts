@@ -1,4 +1,5 @@
 import { it, expect, describe, vi } from "vitest";
+import { Temporal, Time } from "@blazetrails/date";
 import { mysql2Client } from "./mysql2-client.js";
 
 describe("mysql2Client", () => {
@@ -24,5 +25,30 @@ describe("mysql2Client", () => {
   it("answers for a client with no socket", () => {
     const client = mysql2Client({});
     expect(() => (client.automaticClose = false)).not.toThrow();
+  });
+
+  it("execute unboxes a Float carrier and formats temporals, and leaves the rest alone", async () => {
+    const execute = vi.fn(async () => []);
+    const client = mysql2Client({ execute });
+    const binds = [
+      new Number(3),
+      Time.utc(2020, 1, 2, 3, 4, 5, 6),
+      Temporal.PlainDate.from("2020-01-02"),
+      "a",
+      1n,
+      null,
+    ];
+    await (
+      client as unknown as { execute(sql: string, values: unknown[]): Promise<unknown> }
+    ).execute("SELECT ?", binds);
+    expect(execute).toHaveBeenCalledWith("SELECT ?", [
+      3,
+      "2020-01-02 03:04:05.000006",
+      "2020-01-02",
+      "a",
+      1n,
+      null,
+    ]);
+    expect(mysql2Client(client).execute).toBe(client.execute);
   });
 });

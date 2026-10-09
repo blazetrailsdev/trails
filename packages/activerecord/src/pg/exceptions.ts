@@ -36,3 +36,10 @@ export function pgError(error: unknown): unknown {
     configurable: true,
   });
 }
+
+export function connectionBad(error: unknown): Error {
+  const bad = error instanceof Error ? error : new Error(String(error));
+  pgError(bad);
+  CONNECTION_BAD.set(bad, true);
+  return bad;
+}
