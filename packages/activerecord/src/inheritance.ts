@@ -1,5 +1,4 @@
 import type { Base } from "./base.js";
-import { registerModelConstant } from "./associations.js";
 import { ActiveRecordError, NameError, SubclassNotFound } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
 import type { IndexedRow } from "./result.js";
@@ -121,11 +120,10 @@ export function polymorphicName(modelClass: typeof Base): string {
   return klass.storeFullClassName ? name : demodulize(name);
 }
 
-/** @noRailsEquivalent CONVERGEABLE model-registry-and-register-model-are-deleted */
+/** @noRailsEquivalent CONVERGEABLE register-model-wrapper-is-deleted-tests-seat-constants */
 export function registerSubclass(klass: typeof Base): void {
   const parent = rbClassSuperclass(klass);
   if (!parent) return;
-  if (klass.name) registerModelConstant(klass.name, klass);
   DescendantsTracker.registerSubclass(parent as never, klass as never);
 }
 

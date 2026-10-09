@@ -5,13 +5,18 @@ import { PredicateBuilder } from "./predicate-builder.js";
 import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
 import { TableMetadata } from "../table-metadata.js";
-import { Base, registerModel, modelRegistry } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName } from "../support/quote-regex.js";
-import { regexpEscape, Range } from "@blazetrails/ruby-compat";
+import {
+  regexpEscape,
+  Range,
+  registeredConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import { ValueType } from "@blazetrails/activemodel";
 
 function compileWithBinds(visitor: Visitors.ToSql, node: unknown): [string, unknown[]] {
@@ -43,8 +48,8 @@ describe("PredicateBuilderTest", () => {
   });
 
   afterAll(() => {
-    modelRegistry.delete("Topic");
-    modelRegistry.delete("Reply");
+    unregisterConstant("Topic", registeredConstant("Topic"));
+    unregisterConstant("Reply", registeredConstant("Reply"));
   });
 
   it("registering new handlers", () => {
@@ -98,7 +103,7 @@ describe("PredicateBuilderTest", () => {
         new RegExp(`${regexpEscape(quoteTableName("regexp_topic.title"))} ~ 'rails'`, "i"),
       );
     } finally {
-      modelRegistry.delete("RegexpReply");
+      unregisterConstant("RegexpReply", registeredConstant("RegexpReply"));
       (Topic as any)._predicateBuilder = null;
     }
   });
@@ -335,8 +340,8 @@ describe("PredicateBuilderTest", () => {
     });
 
     afterAll(() => {
-      modelRegistry.delete("Author");
-      modelRegistry.delete("Post");
+      unregisterConstant("Author", registeredConstant("Author"));
+      unregisterConstant("Post", registeredConstant("Post"));
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
@@ -386,7 +391,7 @@ describe("PredicateBuilderTest", () => {
         expect(sql).toContain('"products"."price"');
         expect(sql).not.toContain('"price"."foo"');
       } finally {
-        modelRegistry.delete("PbTestProduct");
+        unregisterConstant("PbTestProduct", registeredConstant("PbTestProduct"));
       }
     });
   });

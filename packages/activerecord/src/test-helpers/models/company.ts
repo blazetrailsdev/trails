@@ -15,7 +15,6 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
@@ -745,29 +744,6 @@ export class NewlyContractedCompany extends Company {
   }
 }
 registerConstant("NewlyContractedCompany", NewlyContractedCompany);
-
-for (const klass of [
-  Company,
-  AbstractCompany,
-  SpecialCo,
-  Firm,
-  DependentFirm,
-  RestrictedWithExceptionFirm,
-  RestrictedWithErrorFirm,
-  Agency,
-  Client,
-  ExclusivelyDependentFirm,
-  LargeClient,
-  SpecialClient,
-  VerySpecialClient,
-  NewlyContractedCompany,
-]) {
-  registerModel(klass);
-}
-
-for (const klass of [NamespacedCompany, NamespacedFirm, NamespacedClient]) {
-  registerModel(klass);
-}
 
 Company.inheritanceColumn = "type";
 

@@ -22,6 +22,7 @@ export class AdminUserJson extends Base {
   static _tableName = "admin_user_jsons";
   static {
     rbModConstSet(Admin, "UserJSON", this);
+    rbModConstSet(this, "Coder", Coder);
   }
 
   static {

@@ -1,5 +1,11 @@
 import { Admin } from "../test-helpers/models/admin.js";
-import { kernelThrow, rbModConstDefined, rbModConstSet } from "@blazetrails/ruby-compat";
+import {
+  kernelThrow,
+  rbModConstDefined,
+  rbModConstSet,
+  registeredConstant,
+  unregisterConstant,
+} from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "./collection-proxy.js";
 import type { Category } from "../test-helpers/models/category.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
@@ -11,7 +17,6 @@ import {
   RecordInvalid,
   registerModel,
   AssociationTypeMismatch,
-  modelRegistry,
 } from "../index.js";
 import {
   assertNoQueries,
@@ -622,7 +627,7 @@ describe("BelongsToAssociationsTest", () => {
   });
 
   it("raises type mismatch with namespaced class", async () => {
-    expect(modelRegistry.get("Region")).toBeUndefined();
+    expect(registeredConstant("Region")).toBeUndefined();
 
     const connection = (await Base.leaseConnection()) as any;
     try {
@@ -650,10 +655,8 @@ describe("BelongsToAssociationsTest", () => {
     } finally {
       if (rbModConstDefined(Admin, "Region")) Reflect.deleteProperty(Admin, "Region");
       if (rbModConstDefined(Admin, "RegionalUser")) Reflect.deleteProperty(Admin, "RegionalUser");
-      modelRegistry.delete("AdminRegion");
-      modelRegistry.delete("AdminRegionalUser");
-      modelRegistry.delete("Admin::Region");
-      modelRegistry.delete("Admin::RegionalUser");
+      unregisterConstant("AdminRegion", registeredConstant("AdminRegion"));
+      unregisterConstant("AdminRegionalUser", registeredConstant("AdminRegionalUser"));
 
       if (await connection.columnExists("admin_users", "region_id")) {
         await connection.removeColumn("admin_users", "region_id");
@@ -2043,7 +2046,7 @@ describe("BelongsToAssociationsTest", () => {
         );
       });
     } finally {
-      (Base as any)._modelRegistry?.delete("SponsorWithTouchInverse");
+      unregisterConstant("SponsorWithTouchInverse", registeredConstant("SponsorWithTouchInverse"));
     }
   });
 

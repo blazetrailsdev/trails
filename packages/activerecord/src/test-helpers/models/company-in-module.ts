@@ -1,5 +1,4 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { registerModel } from "../../associations.js";
 import { Base } from "../../base.js";
 import { Module, Range, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
 
@@ -245,24 +244,4 @@ export interface MyAppBillingAccount {
   set qualifiedBillingFirm(value: MyAppBillingFirm | null);
   get unqualifiedBillingFirm(): MyAppBillingFirm | null | Promise<MyAppBillingFirm | null>;
   set unqualifiedBillingFirm(value: MyAppBillingFirm | null);
-}
-
-for (const klass of [
-  MyAppBusinessCompany,
-  MyAppBusinessFirm,
-  MyAppBusinessClient,
-  MyAppBusinessClientContact,
-  MyAppBusinessDeveloper,
-  MyAppBusinessProject,
-  MyAppBusinessPrefixedCompany,
-  MyAppBusinessPrefixedFirm,
-  MyAppBusinessPrefixedNestedCompany,
-  MyAppBusinessSuffixedCompany,
-  MyAppBusinessSuffixedFirm,
-  MyAppBusinessSuffixedNestedCompany,
-  MyAppBillingFirm,
-  MyAppBillingNestedFirm,
-  MyAppBillingAccount,
-]) {
-  registerModel(klass);
 }

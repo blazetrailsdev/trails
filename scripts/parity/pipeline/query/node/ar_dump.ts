@@ -118,7 +118,7 @@ async function main(): Promise<void> {
   // (and fail) at module load, replacing the "missing dist/" hint with a bare
   // module-not-found. Specifiers are package names, not dist paths, so Node ESM
   // dedupes them with the fixture models' own imports to one module instance.
-  const { Base, modelRegistry } = await import("@blazetrails/activerecord");
+  const { Base } = await import("@blazetrails/activerecord");
 
   try {
     // 1. Apply schema.sql to a fresh temp SQLite file.
@@ -158,7 +158,7 @@ async function main(): Promise<void> {
     //    table qualification. Locked by the ar-12 test in ar_dump.test.ts.
     const modelsUrl = pathToFileURL(join(fixtureDirAbs, "models.ts")).href;
     const modelsMod = (await import(modelsUrl)) as Record<string, unknown>;
-    const toWarm = new Map<string, unknown>(modelRegistry as Iterable<[string, unknown]>);
+    const toWarm = new Map<string, unknown>();
     for (const [name, exported] of Object.entries(modelsMod)) {
       if (typeof exported === "function" && exported.prototype instanceof Base) {
         toWarm.set(name, exported);
