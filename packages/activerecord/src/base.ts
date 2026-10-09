@@ -1228,115 +1228,8 @@ export class Base extends Model {
     return all.where(conditionsOrSql, ...rest);
   }
 
-  static update<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    sentinel: ":all",
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    ids: unknown[],
-    attrs: Record<string, unknown>[],
-  ): Promise<InstanceType<T>[]>;
-  static update<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>>;
-  static async update<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
-  ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
-    if (Array.isArray(id)) {
-      if (id.some((oneId) => oneId instanceof Base)) {
-        throw new ArgumentError(
-          "You are passing an array of ActiveRecord::Base instances to `update`. " +
-            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
-        );
-      }
-      const objects: InstanceType<T>[] = [];
-      for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.update((attributes as Record<string, unknown>[])[idx]);
-      }
-      return objects;
-    } else if (id === ":all") {
-      const records = await this.all();
-      for (const record of records) await record.update(attributes as Record<string, unknown>);
-      return records;
-    } else {
-      if (id instanceof Base) {
-        throw new ArgumentError(
-          "You are passing an instance of ActiveRecord::Base to `update`. " +
-            "Please pass the id of the object by calling `.id`.",
-        );
-      }
-      const object = await this.find(id);
-      await object.update(attributes as Record<string, unknown>);
-      return object;
-    }
-  }
-
-  static updateBang<T extends typeof Base>(
-    this: T,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    sentinel: ":all",
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    ids: unknown[],
-    attrs: Record<string, unknown>[],
-  ): Promise<InstanceType<T>[]>;
-  static updateBang<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attrs: Record<string, unknown>,
-  ): Promise<InstanceType<T>>;
-  static async updateBang<T extends typeof Base>(
-    this: T,
-    id: unknown,
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
-  ): Promise<InstanceType<T> | InstanceType<T>[]> {
-    if (attributes === undefined) [id, attributes] = [":all", id as Record<string, unknown>];
-    if (Array.isArray(id)) {
-      if (id.some((oneId) => oneId instanceof Base)) {
-        throw new ArgumentError(
-          "You are passing an array of ActiveRecord::Base instances to `update!`. " +
-            "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
-        );
-      }
-      const objects: InstanceType<T>[] = [];
-      for (const oneId of id) objects.push(await this.find(oneId));
-      for (const [idx, object] of objects.entries()) {
-        await object.updateBang((attributes as Record<string, unknown>[])[idx]);
-      }
-      return objects;
-    } else if (id === ":all") {
-      const records = await this.all();
-      for (const record of records) await record.updateBang(attributes as Record<string, unknown>);
-      return records;
-    } else {
-      if (id instanceof Base) {
-        throw new ArgumentError(
-          "You are passing an instance of ActiveRecord::Base to `update!`. " +
-            "Please pass the id of the object by calling `.id`.",
-        );
-      }
-      const object = await this.find(id);
-      await object.updateBang(attributes as Record<string, unknown>);
-      return object;
-    }
-  }
+  declare static update: typeof _Persistence.ClassMethods.update;
+  declare static updateBang: typeof _Persistence.ClassMethods.updateBang;
 
   static createOrFindBy<T extends typeof Base>(
     this: T,
@@ -2147,6 +2040,7 @@ extend(Base, Inheritance.ClassMethods);
 prepend(Base, { initializeClone: Inheritance.initializeClone as PrependMethod });
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
+extend(Base, _Persistence.ClassMethods);
 extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
 include(Base, Inheritance.Inheritance);

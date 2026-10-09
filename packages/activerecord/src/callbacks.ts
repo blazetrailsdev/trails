@@ -234,7 +234,7 @@ export async function _updateRecord(
   return await this.runCallbacks("update", () =>
     recordUpdateTimestamps.call(this, () =>
       dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
-        Persistence._updateRecord.call(this, names, block),
+        Persistence.instanceMethod("_updateRecord")!.value.call(this, names, block),
       ),
     ),
   );
