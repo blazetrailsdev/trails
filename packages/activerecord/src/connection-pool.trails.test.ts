@@ -226,19 +226,19 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(pool.stat().connections).toBe(0);
 });
 
-it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", () => {
+it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", async () => {
   const pool = makePool(2) as any;
   const seen: number[] = [];
   pool.checkoutNewConnection = () => {
     seen.push(pool._nowConnecting);
     throw new ConnectionNotEstablished("boom");
   };
-  expect(() => pool.tryToCheckoutNewConnection()).toThrow("boom");
+  await expect(pool.tryToCheckoutNewConnection()).rejects.toThrow("boom");
   expect(seen).toEqual([1]);
   expect(pool._nowConnecting).toBe(0);
 
   pool._nowConnecting = 2;
-  expect(pool.tryToCheckoutNewConnection()).toBeNull();
+  expect(await pool.tryToCheckoutNewConnection()).toBeNull();
 });
 
 it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
@@ -531,7 +531,7 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        await vi.waitFor(() => expect(pool.schemaReflection.loadedCache).not.toBeNull());
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
         expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
           true,
@@ -555,7 +555,7 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        await vi.waitFor(() => expect(pool.schemaReflection.loadedCache).not.toBeNull());
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
@@ -693,15 +693,27 @@ describe("ConnectionPoolConfiguration query cache", () => {
         (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
       try {
+        let firstPinned!: () => void;
+        const first = new Promise<void>((resolve) => {
+          firstPinned = resolve;
+        });
+        let secondPinned!: () => void;
+        const second = new Promise<void>((resolve) => {
+          secondPinned = resolve;
+        });
         await Promise.all([
           new Thread(async () => {
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            firstPinned();
+            await second;
             await pool.unpinConnectionBang();
           }).value(),
           new Thread(async () => {
+            await first;
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            secondPinned();
             await pool.unpinConnectionBang();
           }).value(),
         ]);

@@ -35,7 +35,7 @@ export async function establishConnectionTo(
   const restore = async () => {
     if (restored) return;
     restored = true;
-    pool.remove(connection);
+    await pool.remove(connection);
     try {
       connection.expire();
     } catch {}

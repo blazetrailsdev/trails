@@ -1447,8 +1447,8 @@ export class AbstractAdapter implements Quoting {
     await this.attemptConfigureConnection();
   }
 
-  throwAwayBang(): void | Promise<void> {
-    this.pool.remove(this);
+  async throwAwayBang(): Promise<void> {
+    await this.pool.remove(this);
     return this.disconnectBang();
   }
 

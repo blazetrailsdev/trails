@@ -242,7 +242,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
         expect(firstBeginFailed).toBeTruthy();
       } finally {
-        pool.remove(connection);
+        await pool.remove(connection);
         await connection.disconnectBang();
         Sample.releaseConnection();
       }

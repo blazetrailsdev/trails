@@ -20,6 +20,7 @@ import {
 import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
+  aryReject,
   initialize,
   kernelInteger,
   rbInspect,
@@ -1132,9 +1133,10 @@ export async function buildFixtureSql(
   tableName: string,
 ): Promise<string> {
   if (this.typeMap == null) await this.verifyBang?.();
-  const supportsVirtualColumns = await this.supportsVirtualColumns();
-  const columns = Object.entries(await this.schemaCache.columnsHash(tableName)).filter(
-    ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),
+  const columns = await aryReject(
+    Object.entries(await this.schemaCache.columnsHash(tableName)),
+    async ([, column]) =>
+      (await this.supportsVirtualColumns()) && (column as { isVirtual(): boolean }).isVirtual(),
   );
   const columnNames = columns.map(([name]) => name);
 

@@ -516,7 +516,7 @@ export class ConnectionPool implements ReapablePool {
     this._available!.add(conn);
   }
 
-  remove(conn: DatabaseAdapter): void {
+  async remove(conn: DatabaseAdapter): Promise<void> {
     let needsNewConnection = false;
 
     removeConnectionFromThreadCache(this, conn);
@@ -527,7 +527,7 @@ export class ConnectionPool implements ReapablePool {
 
     needsNewConnection = this._available!.isAnyWaiting();
 
-    if (needsNewConnection) this.bulkMakeNewConnections(1);
+    if (needsNewConnection) await this.bulkMakeNewConnections(1);
   }
 
   async reap(): Promise<void> {
@@ -545,7 +545,7 @@ export class ConnectionPool implements ReapablePool {
         await conn.resetBang();
         this.checkin(conn);
       } else {
-        this.remove(conn);
+        await this.remove(conn);
       }
     }
   }
@@ -640,7 +640,7 @@ export class ConnectionPool implements ReapablePool {
       });
       return c;
     } catch (err) {
-      this.remove(c);
+      this._trackCloseDrain(this.remove(c));
       this._trackCloseDrain(c.disconnectBang());
       throw err;
     }
@@ -713,12 +713,30 @@ export class ConnectionPool implements ReapablePool {
     if (this.isDiscarded()) {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
-    let conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
+    const tryToCheckoutNewConnection = (): DatabaseAdapter | null => {
+      if (
+        this._threadsBlockingNewConnections !== 0 ||
+        this._connections!.length + this._nowConnecting >= this.size
+      ) {
+        return null;
+      }
+      this._nowConnecting += 1;
+      try {
+        const conn = this.checkoutNewConnection();
+        void this.adoptConnection(conn);
+        this._checkedOut.add(conn);
+        conn.lease();
+        return conn;
+      } finally {
+        this._nowConnecting -= 1;
+      }
+    };
+    let conn = this._available?.poll() ?? tryToCheckoutNewConnection();
     if (!conn) {
       void this.reap().catch((err) => {
         console.warn(`[trails] reap failed: ${err instanceof Error ? err.message : String(err)}`);
       });
-      conn = this._available?.poll() ?? this.tryToCheckoutNewConnection();
+      conn = this._available?.poll() ?? tryToCheckoutNewConnection();
     }
     if (!conn) {
       throw new ConnectionTimeoutError(
@@ -772,9 +790,9 @@ function buildAsyncExecutor(_pool: Pool): null {
 }
 
 /** @internal */
-function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): void {
+async function bulkMakeNewConnections(this: Pool, numNewConnsNeeded: number): Promise<void> {
   for (let i = 0; i < numNewConnsNeeded; i++) {
-    const conn = this.tryToCheckoutNewConnection();
+    const conn = await this.tryToCheckoutNewConnection();
     if (conn) this.checkin(conn);
   }
 }
@@ -888,7 +906,7 @@ async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>)
           need -= 1;
         }
       }
-      if (need > 0) this.bulkMakeNewConnections(need);
+      if (need > 0) await this.bulkMakeNewConnections(need);
     }
   }
 }
@@ -914,13 +932,13 @@ async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<D
     ensureLive();
     let conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
-    conn = this.tryToCheckoutNewConnection() ?? undefined;
+    conn = (await this.tryToCheckoutNewConnection()) ?? undefined;
     if (conn) return conn;
     await this.reap();
     ensureLive();
     conn = this._available?.poll() as DatabaseAdapter | undefined;
     if (conn) return accept(conn);
-    conn = this.tryToCheckoutNewConnection() ?? undefined;
+    conn = (await this.tryToCheckoutNewConnection()) ?? undefined;
     if (conn) return conn;
     const polled = this._available?.poll(checkoutTimeout);
     const waited = polled instanceof Promise;
@@ -955,7 +973,7 @@ function release(pool: Pool, conn: DatabaseAdapter, ownerThread?: Thread | Fiber
 }
 
 /** @internal */
-function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
+async function tryToCheckoutNewConnection(this: Pool): Promise<DatabaseAdapter | null> {
   let doCheckout = false;
   if (
     this._threadsBlockingNewConnections === 0 &&
@@ -969,23 +987,25 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
   try {
     conn = this.checkoutNewConnection();
   } finally {
-    if (conn) {
-      this.adoptConnection(conn);
-      this._checkedOut.add(conn);
-      (conn as unknown as PoolManagedConnection).lease?.();
-    }
-    this._nowConnecting -= 1;
+    await synchronize.call(this, async () => {
+      if (conn) {
+        await this.adoptConnection(conn);
+        this._checkedOut.add(conn);
+        (conn as unknown as PoolManagedConnection).lease?.();
+      }
+      this._nowConnecting -= 1;
+    });
   }
   return conn!;
 }
 
 /** @internal */
-function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
+async function adoptConnection(this: Pool, conn: DatabaseAdapter): Promise<void> {
   conn.pool = this;
   this._connections.push(conn);
 
   if (this._boundSchemaCache == null && lazilyLoadSchemaCache()) {
-    void this.schemaCache.loadBang();
+    await this.schemaCache.loadBang();
   }
 }
 
