@@ -968,6 +968,33 @@ export async function createOrUpdate(
   return result !== false;
 }
 
+export const Persistence = new Module((mod) => {
+  mod.defineMethod(
+    "_updateRecord",
+    /** @internal */
+    async function _updateRecord(
+      this: PersistenceInstanceChainHost,
+      attributeNames?: string[],
+      block?: (record: any) => void,
+    ): Promise<number> {
+      attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
+
+      let affectedRows: number;
+      if (attributeNames.length === 0) {
+        affectedRows = 0;
+        (this as any)._triggerUpdateCallback = true;
+      } else {
+        affectedRows = await (this as any)._updateRow(attributeNames);
+        (this as any)._triggerUpdateCallback = affectedRows === 1;
+      }
+
+      this._previouslyNewRecord = false;
+      block?.(this);
+      return affectedRows;
+    },
+  );
+});
+
 /** @internal */
 export async function _createRecord(
   this: PersistenceInstanceChainHost,
@@ -1084,30 +1111,3 @@ export function buildDefaultConstraint(this: {
   const defaultWhereClause = this.defaultScoped({ allQueries: true }).whereClause;
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
-
-export const Persistence = new Module((mod) => {
-  mod.defineMethod(
-    "_updateRecord",
-    /** @internal */
-    async function _updateRecord(
-      this: PersistenceInstanceChainHost,
-      attributeNames?: string[],
-      block?: (record: any) => void,
-    ): Promise<number> {
-      attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
-
-      let affectedRows: number;
-      if (attributeNames.length === 0) {
-        affectedRows = 0;
-        (this as any)._triggerUpdateCallback = true;
-      } else {
-        affectedRows = await (this as any)._updateRow(attributeNames);
-        (this as any)._triggerUpdateCallback = affectedRows === 1;
-      }
-
-      this._previouslyNewRecord = false;
-      block?.(this);
-      return affectedRows;
-    },
-  );
-});
