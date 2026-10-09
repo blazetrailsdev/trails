@@ -62,6 +62,7 @@ import {
   filterMap,
   foreignKey,
   included,
+  indexWith,
   isBlank,
   kernelArray,
   transformKeys,
@@ -84,26 +85,24 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
-  /** @inventedArm if — CONVERGEABLE where-chain-associated-missing-take-the-association-symbol */
   associated(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      const reflectionName = `:${reflection.name}`;
       if (
-        !scope.joinsValues.includes(reflectionName) &&
-        !scope.leftOuterJoinsValues.includes(reflectionName)
+        !(
+          scope.joinsValues.includes(`:${reflection.name}`) ||
+          scope.leftOuterJoinsValues.includes(`:${reflection.name}`)
+        )
       ) {
-        joinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
+        joinsBang.call(scope, association);
       }
 
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
+        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
       );
       if (reflection.options.className) {
-        this.not({
-          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
-        });
+        this.not({ [association]: associationConditions });
       } else {
         this.not({ [reflection.tableName]: associationConditions });
       }
@@ -112,19 +111,16 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
-  /** @inventedArm if — CONVERGEABLE where-chain-associated-missing-take-the-association-symbol */
   missing(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
       const reflection = this.scopeAssociationReflection(association);
-      leftOuterJoinsBang.call(scope, isRubySymbol(association) ? association : `:${association}`);
+      leftOuterJoinsBang.call(scope, association);
       const associationConditions = Object.fromEntries(
-        wrap(reflection.associationPrimaryKey()).map((pk) => [pk, null]),
+        indexWith(kernelArray(reflection.associationPrimaryKey()), null),
       );
       if (reflection.options.className) {
-        whereBang.call(scope, {
-          [isRubySymbol(association) ? association : `:${association}`]: associationConditions,
-        });
+        whereBang.call(scope, { [association]: associationConditions });
       } else {
         whereBang.call(scope, { [reflection.tableName]: associationConditions });
       }
@@ -135,10 +131,10 @@ export class WhereChain<R = any> {
 
   private scopeAssociationReflection(association: string): WhereChainReflection {
     const model = (this._scope as unknown as QueryMethodsHost).model as any;
-    const reflection = model?._reflectOnAssociation?.(association);
+    const reflection = model._reflectOnAssociation(association);
     if (!reflection) {
       throw new ArgumentError(
-        `An association named \`:${association}\` does not exist on the model \`${model?.name}\`.`,
+        `An association named \`:${toS(association)}\` does not exist on the model \`${model.name}\`.`,
       );
     }
     return reflection;

@@ -482,7 +482,8 @@ by the module that defines it:
 
 - `ActiveRecord.Base`, `.Encryption`, `.Associations`, `.ConnectionAdapters`,
   `.ConnectionHandling` (`DEFAULT_ENV`), `.ModelSchema` (`derive_join_table_name`),
-  `.Migration`, `.Relation`, `.AssociationRelation` and
+  `.Reflection` (`create`, read by `Builder::Association.create_reflection`,
+  `associations/builder/association.rb:40-51`), `.Migration`, `.Relation`, `.AssociationRelation` and
   `.DisableJoinsAssociationRelation` (read by `Delegation.delegated_classes`,
   `relation/delegation.rb:7-15`), and `.Fixture` (Rails has no
   `autoload :Fixture`; it is defined in `fixtures.rb`, loaded through
@@ -512,7 +513,10 @@ by the module that defines it:
 
 The cycles these seats break: `base.ts` importing every `self == Base` reader;
 `class SingularAssociation` / `CollectionAssociation extends Association`
-reaching `reflection.ts`; `class AssociationRelation extends Relation`;
+reaching `reflection.ts`; `builder/singular-association.ts ->
+builder/association.ts -> reflection.ts -> associations.ts -> builder/has-one.ts`,
+whose `class HasOne extends SingularAssociation` reads `SingularAssociation` in
+TDZ when a builder is the entry module; `class AssociationRelation extends Relation`;
 `V8_0 = Current`; `schema-statements.ts -> join-table.ts -> model-schema.ts ->
 connection-handling.ts -> … -> abstract-adapter.ts`, whose module-scope
 `include(AbstractAdapter, SchemaStatements)` reads `SchemaStatements` in TDZ;
@@ -532,15 +536,8 @@ exception only when that lane is shown to reach it. A seat on the
 it; `Base` holds none of them) needs no guard: the module is a plain import and
 holds the Rails default.
 
-The two remaining zero-import slots, and the cycles they break:
+The one remaining zero-import slot, and the cycle it breaks:
 
-- `activerecord/src/reflection-slot.ts` — the `Reflection` module, read by
-  `associations/builder/association.ts` for `Builder::Association.create_reflection`
-  (`associations/builder/association.rb:40-51`). The cycle is
-  `builder/singular-association.ts -> builder/association.ts -> reflection.ts ->
-associations.ts -> builder/has-one.ts`, whose `class HasOne extends
-SingularAssociation` reads `SingularAssociation` in TDZ when a builder is the
-  entry module.
 - `activerecord/src/tasks/database-tasks-slot.ts` — `DatabaseTasks`, read by
   `migration.ts` for `ActiveRecord::Tasks::DatabaseTasks`
   (`migration.rb:151-183,696,750,1037-1041,1361-1365`). `database-tasks.ts`

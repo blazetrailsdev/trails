@@ -161,7 +161,10 @@ export namespace Delegation {
         Object.defineProperty(owner, methodName, {
           configurable: true,
           enumerable: false,
-          get: value,
+          get(this: Record<string, unknown>) {
+            const _ = resolve(this);
+            return _ == null ? undefined : (_ as Record<string, unknown>)[method];
+          },
         });
         continue;
       }

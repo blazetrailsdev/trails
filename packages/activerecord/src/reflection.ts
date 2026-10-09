@@ -1696,7 +1696,8 @@ export function _reflectOnAssociation(
 ): AssociationReflection | ThroughReflection | null {
   const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
   return (
-    (rawReflections[association] as AssociationReflection | ThroughReflection | undefined) ?? null
+    (rawReflections[toS(association)] as AssociationReflection | ThroughReflection | undefined) ??
+    null
   );
 }
 
