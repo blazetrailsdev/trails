@@ -259,6 +259,8 @@ export class Parameters {
     return aryIncludes(this.values, converted);
   }
 
+  declare isValue: Parameters["hasValue"];
+
   include(key: string): boolean {
     return this.parameters.include(key);
   }
@@ -459,12 +461,12 @@ export class Parameters {
     );
   }
 
-  dig(...keys: string[]): unknown {
+  dig(...keys: (string | number)[]): unknown {
     if (keys.length === 0) {
       throw new Error("wrong number of arguments (given 0, expected 1+)");
     }
-    this._convertHashesToParameters(keys[0], this.parameters.get(keys[0]));
-    return this.parameters.dig(...(keys as [string, ...string[]]));
+    this._convertHashesToParameters(keys[0] as string, this.parameters.get(keys[0] as string));
+    return this.parameters.dig(...(keys as [string, ...(string | number)[]]));
   }
 
   delete(key: string, ...args: unknown[]): unknown {
@@ -588,7 +590,7 @@ export class Parameters {
   }
 
   /** @missingRailsArgs split — PERMANENT */
-  extractValue(key: string, delimiter = "_"): string[] | null {
+  extractValue(key: string, { delimiter = "_" }: { delimiter?: string } = {}): string[] | null {
     const val = this.parameters.get(key);
     if (val === null || val === undefined) return null;
     return String(val).split(delimiter);
@@ -1011,6 +1013,7 @@ export class Parameters {
 
 Parameters.prototype.hasKey = Parameters.prototype.include;
 Parameters.prototype.isKey = Parameters.prototype.include;
+Parameters.prototype.isValue = Parameters.prototype.hasValue;
 Parameters.prototype.member = Parameters.prototype.include;
 Parameters.prototype.toParam = Parameters.prototype.toQuery;
 Parameters.prototype.toUnsafeHash = Parameters.prototype.toUnsafeH;
