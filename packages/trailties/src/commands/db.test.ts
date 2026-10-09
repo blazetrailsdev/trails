@@ -1938,6 +1938,26 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
     ]);
   });
 
+  it("leaves no connection open after the command finishes", async () => {
+    const dbFile = path.join(tmpDir, "primary.sqlite3");
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+  test: { adapter: "sqlite3", database: ${JSON.stringify(dbFile)} },
+};`,
+    );
+
+    await runDb(["create"]);
+
+    const { Base } = await import("@blazetrails/activerecord");
+    const connected = Base.connectionHandler
+      .connectionPoolList()
+      .filter((pool) => pool.isConnected());
+
+    expect(connected.map((pool) => String(pool.dbConfig.database))).toEqual([]);
+  });
+
   it("db create + migrate fans out across every multi-DB config", async () => {
     const primaryDb = path.join(tmpDir, "primary.sqlite3");
     const animalsDb = path.join(tmpDir, "animals.sqlite3");
