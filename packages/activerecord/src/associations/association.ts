@@ -404,11 +404,13 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     );
 
     const binds = AssociationScope.getBindValues(this.owner, this.reflection.chain as never);
-    return this.klass.withConnection(async (c) =>
-      (await sc).execute(binds, c, { async }, (record) => {
-        this.setInverseInstance(record);
-        this.setStrictLoading(record);
-      }),
+    return sc.then((sc) =>
+      this.klass.withConnection((c) =>
+        sc.execute(binds, c, { async }, (record) => {
+          this.setInverseInstance(record);
+          this.setStrictLoading(record);
+        }),
+      ),
     );
   }
 
