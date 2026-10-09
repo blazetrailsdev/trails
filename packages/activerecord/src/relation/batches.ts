@@ -126,7 +126,10 @@ export class Batches {
     this: any,
     opts?: InBatchesOptions,
   ): BatchEnumerator<LoadedRelation<Relation<T>>>;
-  /** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+  /**
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
+   * @inventedArm indexes — PERMANENT
+   */
   inBatches<T extends Base>(
     this: any,
     {
