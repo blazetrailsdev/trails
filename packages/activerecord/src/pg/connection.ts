@@ -127,7 +127,7 @@ async function execPrepared(
       values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
       rowMode: "array",
       types: types(this),
-    }),
+    }).catch(raise),
   );
 }
 
@@ -135,7 +135,7 @@ async function asyncExec(this: pg.Client, sql: string | null): Promise<PG.Result
   return result(
     await (this.query as unknown as Query)(
       sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
-    ),
+    ).catch(raise),
   );
 }
 
@@ -150,7 +150,7 @@ async function execParams(
       values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
       rowMode: "array",
       types: types(this),
-    }),
+    }).catch(raise),
   );
 }
 
@@ -158,10 +158,12 @@ function query(native: (...args: unknown[]) => unknown) {
   return function (this: pg.Client, ...args: unknown[]): unknown {
     const pending = native.apply(this, args) as { catch?: unknown } | null | undefined;
     if (typeof pending?.catch !== "function") return pending;
-    return (pending as Promise<unknown>).catch((error: unknown) => {
-      throw pgError(error);
-    });
+    return (pending as Promise<unknown>).catch(raise);
   };
+}
+
+function raise(error: unknown): never {
+  throw pgError(error);
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {

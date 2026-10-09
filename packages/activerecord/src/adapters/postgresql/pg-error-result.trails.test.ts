@@ -1,7 +1,7 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { ConnectionNotEstablished, StatementInvalid } from "../../errors.js";
+import { ConnectionFailed, ConnectionNotEstablished, StatementInvalid } from "../../errors.js";
 import type { PGConnection } from "../../pg/connection.js";
 import { PG } from "../../pg/pg.js";
 import { fixtures } from "../../test-fixtures.js";
@@ -71,6 +71,14 @@ describeIfPg("PG::Error#result (trails)", () => {
     )) as Stamped;
     expect("result" in error).toBe(true);
     expect(error.result).toBeNull();
+  });
+
+  it("a severed connection met by a mocked raw query is still a ConnectionFailed", async () => {
+    const conn = await rawConnection();
+    vi.spyOn(conn, "query").mockRejectedValue(new Error("Connection terminated unexpectedly"));
+    const error = await adapter.execute("SELECT 1").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ConnectionFailed);
+    expect((error as Error).cause).toBeInstanceOf(PG.ConnectionBad);
   });
 
   it("an error raised anywhere else does not answer result", () => {

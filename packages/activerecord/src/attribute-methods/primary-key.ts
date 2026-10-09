@@ -174,10 +174,8 @@ function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
 
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key=
- *
- * `Base` already exposes the Rails-named `static set primaryKey` accessor
- * (base.ts:1157) that delegates here, so this export is redundant public
- * surface; unexporting it is RFC 0081 shape-1 work, not a seam.
+ * (attribute_methods/primary_key.rb:130-140), as a this-typed function behind
+ * the Rails-named `static set primaryKey` accessor on `Base`.
  * @internal
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key= (attribute_methods/primary_key.rb:130) as a this-typed function behind the Rails-named Base accessor.
  */
