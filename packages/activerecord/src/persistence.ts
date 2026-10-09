@@ -31,7 +31,7 @@ import {
   Nodes,
 } from "@blazetrails/arel";
 import { ActiveRecordError, ReadOnlyRecord, RecordNotDestroyed, RecordNotSaved } from "./errors.js";
-import { attributesForUpdate, attributesWithValues } from "./attribute-methods.js";
+import { attributesWithValues } from "./attribute-methods.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isDefaultScopes } from "./scoping/default.js";
 import { RecordInvalid } from "./validations.js";
@@ -814,6 +814,7 @@ type PersistenceInstanceChainHost = {
   _writeAttribute(name: string, value: unknown): void;
   typeForAttribute(name: string): { deserialize(value: unknown): unknown };
   attributesForCreate(attributeNames: string[]): string[];
+  attributesForUpdate(attributeNames: string[]): string[];
   attributesWithValues(attributeNames: string[]): Hash<string, unknown>;
 };
 
@@ -968,28 +969,6 @@ export async function createOrUpdate(
 }
 
 /** @internal */
-async function instanceUpdateRecord(
-  this: PersistenceInstanceChainHost,
-  attributeNames?: string[],
-  block?: (record: any) => void,
-): Promise<number> {
-  attributeNames = attributesForUpdate.call(this as any, attributeNames ?? this.attributeNames());
-
-  let affectedRows: number;
-  if (attributeNames.length === 0) {
-    affectedRows = 0;
-    (this as any)._triggerUpdateCallback = true;
-  } else {
-    affectedRows = await (this as any)._updateRow(attributeNames);
-    (this as any)._triggerUpdateCallback = affectedRows === 1;
-  }
-
-  this._previouslyNewRecord = false;
-  block?.(this);
-  return affectedRows;
-}
-
-/** @internal */
 export async function _createRecord(
   this: PersistenceInstanceChainHost,
   attributeNames: string[] = this.attributeNames(),
@@ -1107,5 +1086,28 @@ export function buildDefaultConstraint(this: {
 }
 
 export const Persistence = new Module((mod) => {
-  mod.defineMethod("_updateRecord", instanceUpdateRecord);
+  mod.defineMethod(
+    "_updateRecord",
+    /** @internal */
+    async function _updateRecord(
+      this: PersistenceInstanceChainHost,
+      attributeNames?: string[],
+      block?: (record: any) => void,
+    ): Promise<number> {
+      attributeNames = this.attributesForUpdate(attributeNames ?? this.attributeNames());
+
+      let affectedRows: number;
+      if (attributeNames.length === 0) {
+        affectedRows = 0;
+        (this as any)._triggerUpdateCallback = true;
+      } else {
+        affectedRows = await (this as any)._updateRow(attributeNames);
+        (this as any)._triggerUpdateCallback = affectedRows === 1;
+      }
+
+      this._previouslyNewRecord = false;
+      block?.(this);
+      return affectedRows;
+    },
+  );
 });
