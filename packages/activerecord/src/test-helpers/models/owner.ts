@@ -22,7 +22,7 @@ export class Owner extends Base {
   private _blocks?: Array<(owner: Owner) => void | Promise<void>>;
 
   static {
-    this._primaryKey = "owner_id";
+    this.primaryKey = "owner_id";
     this.hasMany("pets", function (this: any) {
       return this.order("pets.name desc");
     });

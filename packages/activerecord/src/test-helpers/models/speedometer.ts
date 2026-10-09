@@ -12,7 +12,7 @@ export class Speedometer extends Base {
   declare speedometer_id: string;
 
   static {
-    this._primaryKey = "speedometer_id";
+    this.primaryKey = "speedometer_id";
     this.belongsTo("dashboard");
     this.hasMany("minivans");
   }

@@ -6,14 +6,16 @@ describe("per-instance @primary_key slot", () => {
   it("seats the record's primary key from the class at init_internals", async () => {
     class SeatedToy extends Base {
       static override tableName = "toys";
-      static _primaryKey = "toy_id";
+      static {
+        this.primaryKey = "toy_id";
+      }
     }
 
     const record = new SeatedToy();
 
     expect((record as unknown as { _primaryKey?: string })._primaryKey).toBe("toy_id");
 
-    SeatedToy._primaryKey = "id";
+    SeatedToy.primaryKey = "id";
     const spy = vi.spyOn(
       record as unknown as { _readAttribute(n: string): unknown },
       "_readAttribute",

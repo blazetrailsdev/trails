@@ -2296,10 +2296,10 @@ describe("AssociationsTest", () => {
 
   it("query constraints that dont include a composite primary key raise", async () => {
     const originalList = (ShardedBlogPost as any)._queryConstraintsList;
-    const originalPk = (ShardedBlogPost as any)._primaryKey;
+    const originalPk = (ShardedBlogPost as any).primaryKey;
     const originalReflections = { ...((ShardedBlogPost as any)._reflections ?? {}) };
     try {
-      (ShardedBlogPost as any)._primaryKey = ["blog_id", "id"];
+      (ShardedBlogPost as any).primaryKey = ["blog_id", "id"];
       (ShardedBlogPost as any)._queryConstraintsList = ["blog_id", "id"];
       (ShardedBlogPost as any)._hasQueryConstraints = true;
       (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
@@ -2318,7 +2318,7 @@ describe("AssociationsTest", () => {
       expect((error as Error).message).toContain("does not include the primary key");
     } finally {
       (ShardedBlogPost as any)._queryConstraintsList = originalList;
-      (ShardedBlogPost as any)._primaryKey = originalPk;
+      (ShardedBlogPost as any).primaryKey = originalPk;
       (ShardedBlogPost as any)._reflections = originalReflections;
       clearReflectionsCache(ShardedBlogPost as any);
     }

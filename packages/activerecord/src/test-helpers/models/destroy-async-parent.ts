@@ -15,7 +15,9 @@ export class DestroyAsyncParent extends Base {
   declare parent_id: number;
   declare tags_count: number | null;
 
-  static _primaryKey = "parent_id";
+  static {
+    this.primaryKey = "parent_id";
+  }
 
   static {
     this.hasOne("dlKeyedHasOne", {

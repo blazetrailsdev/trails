@@ -6,7 +6,7 @@ export class Movie extends Base {
   declare name: string;
 
   static {
-    this._primaryKey = "movieid";
+    this.primaryKey = "movieid";
     this.validates("name", { presence: true });
   }
 }

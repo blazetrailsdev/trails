@@ -816,7 +816,9 @@ describe("FinderTest", () => {
 
   it("find one message with custom primary key", async () => {
     class MercedesCar extends Toy {
-      static _primaryKey = "name";
+      static {
+        this.primaryKey = "name";
+      }
     }
     await expect(MercedesCar.find("Hello World!")).rejects.toThrow(RecordNotFound);
     const e = await MercedesCar.find("Hello World!").catch((err: unknown) => err);
@@ -825,7 +827,9 @@ describe("FinderTest", () => {
 
   it("find some message with custom primary key", async () => {
     class MercedesCar extends Toy {
-      static _primaryKey = "name";
+      static {
+        this.primaryKey = "name";
+      }
     }
     await expect(MercedesCar.find("Hello", "World!")).rejects.toThrow(RecordNotFound);
     const e = await MercedesCar.find("Hello", "World!").catch((err: unknown) => err);

@@ -11,7 +11,7 @@ export class Minivan extends Base {
   declare speedometer_id: string;
 
   static {
-    this._primaryKey = "minivan_id";
+    this.primaryKey = "minivan_id";
     this.belongsTo("speedometer");
     this.hasOne("dashboard", { through: "speedometer" });
     this.attrReadonly("color");

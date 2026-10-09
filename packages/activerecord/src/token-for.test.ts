@@ -166,7 +166,9 @@ describe("TokenForTest", () => {
 
   it("finds record with a custom primary key", async () => {
     class CustomPk extends TokenUser {
-      static _primaryKey = "auth_token";
+      static {
+        this.primaryKey = "auth_token";
+      }
     }
     const customPkUser = await CustomPk.find((user as any).auth_token);
     const customPkLookupToken = (customPkUser as any).generateTokenFor("lookup");

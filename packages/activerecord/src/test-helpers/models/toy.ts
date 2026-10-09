@@ -16,7 +16,9 @@ export class Toy extends Base {
   declare toy_id: number;
   declare updated_at: RubyTime | Temporal.PlainDateTime;
 
-  static _primaryKey = "toy_id";
+  static {
+    this.primaryKey = "toy_id";
+  }
 
   static {
     this.belongsTo("pet");
@@ -39,7 +41,7 @@ export class ToyTouchPet extends Base {
   declare toy_id: number;
 
   static {
-    this._primaryKey = "toy_id";
+    this.primaryKey = "toy_id";
     this.tableName = "toys";
     this.belongsTo("pet", { touch: true });
   }

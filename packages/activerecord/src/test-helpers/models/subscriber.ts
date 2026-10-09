@@ -12,7 +12,9 @@ export class Subscriber extends Base {
   declare nick: string;
   declare update_count: number;
 
-  static _primaryKey = "nick";
+  static {
+    this.primaryKey = "nick";
+  }
 
   static {
     this.hasMany("subscriptions");

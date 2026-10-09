@@ -585,7 +585,8 @@ export class Base extends Model {
   declare static hasAndBelongsToMany: typeof _Associations.hasAndBelongsToMany;
 
   static _tableName: string | null = null;
-  declare static _primaryKey?: string | string[];
+  declare static _primaryKey?: string | string[] | null;
+  static _compositePrimaryKey = false;
 
   declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 

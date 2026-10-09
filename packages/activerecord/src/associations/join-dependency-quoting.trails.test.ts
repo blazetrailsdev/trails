@@ -21,7 +21,7 @@ describe("JoinDependency Arel node construction", () => {
 
   class Owner extends Base {
     static {
-      this._primaryKey = "owner_id";
+      this.primaryKey = "owner_id";
       this.attribute("owner_id", "integer");
       this.attribute("name", "string");
     }
@@ -107,7 +107,7 @@ describe("JoinDependency Arel node construction", () => {
     class ClientOwner extends Base {
       static {
         this._tableName = "owners";
-        this._primaryKey = "owner_id";
+        this.primaryKey = "owner_id";
         this.hasMany("clients", { className: "Client", foreignKey: "owner_id" });
       }
     }

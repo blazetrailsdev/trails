@@ -88,7 +88,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
       static tableName = "pets";
       declare name: string | null;
       static {
-        this._primaryKey = "pet_id";
+        this.primaryKey = "pet_id";
         this.validates("name", { presence: true });
       }
     }
@@ -96,7 +96,7 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
     class PetOwner extends Base {
       static tableName = "owners";
       static {
-        this._primaryKey = "owner_id";
+        this.primaryKey = "owner_id";
         this.hasOne("pet", { className: "NestedErrorValidatedPet", foreignKey: "owner_id" });
         this.acceptsNestedAttributesFor("pet");
         this.validatesAssociated("pet");

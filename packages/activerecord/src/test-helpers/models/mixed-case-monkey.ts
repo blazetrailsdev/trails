@@ -7,7 +7,9 @@ export class MixedCaseMonkey extends Base {
   declare fleaCount: number;
   declare monkeyID: number;
 
-  static _primaryKey = "monkeyID";
+  static {
+    this.primaryKey = "monkeyID";
+  }
 
   static {
     this.belongsTo("human");
