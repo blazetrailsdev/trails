@@ -1,6 +1,6 @@
 import { it, expect, describe, vi } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { mysql2Client } from "./mysql2-client.js";
+import { Mysql2, mysql2Client } from "./mysql2-client.js";
 
 describe("mysql2Client", () => {
   it("automatic_close = false unrefs and strips listeners, and never closes the socket", () => {
@@ -50,5 +50,15 @@ describe("mysql2Client", () => {
       null,
     ]);
     expect(mysql2Client(client).execute).toBe(client.execute);
+  });
+
+  it("Mysql2.Error is an error the client raised, not any error with a code", async () => {
+    const raised = Object.assign(new Error("gone"), { code: "PROTOCOL_CONNECTION_LOST" });
+    const client = mysql2Client({ query: () => Promise.reject(raised) });
+    await expect(client.query("SELECT 1")).rejects.toBe(raised);
+    expect(raised instanceof Mysql2.Error).toBe(true);
+    expect(Object.assign(new Error("missing"), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(
+      false,
+    );
   });
 });

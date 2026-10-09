@@ -11,56 +11,68 @@ interface QueryOptions {
 
 type Native = [unknown, mysql.FieldPacket[] | undefined];
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
-export class Mysql2Result {
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+export interface Mysql2Result {
+  readonly fields: string[];
+  readonly size: number;
+  toA(): unknown[][];
+  free(): void;
+}
+
+export interface Mysql2Statement {
+  affectedRows: number;
+  execute(...args: unknown[]): Promise<Mysql2Result | null>;
+  close(): void;
+}
+
+const ERRORS = new WeakSet<object>();
+
+function driverError(e: unknown): never {
+  const { code, fatal } = (e ?? {}) as { code?: unknown; fatal?: unknown };
+  if (e instanceof Error && (typeof code === "string" || fatal === true)) ERRORS.add(e);
+  throw e;
+}
+
+class Result implements Mysql2Result {
   readonly fields: string[];
   private rows: unknown[][];
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   constructor(fields: string[], rows: unknown[][]) {
     this.fields = fields;
     this.rows = rows;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   get size(): number {
     return this.rows.length;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   toA(): unknown[][] {
     return this.rows;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   free(): void {
     this.rows = [];
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
-export class Mysql2Statement {
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+class Statement implements Mysql2Statement {
   affectedRows = 0;
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   constructor(
     private client: Mysql2Client,
     private sql: string,
   ) {}
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   async execute(...args: unknown[]): Promise<Mysql2Result | null> {
     const result = storeResult(
       this.client,
-      (await this.client.execute(options(this.client, this.sql) as never, args as never)) as Native,
+      (await this.client
+        .execute(options(this.client, this.sql) as never, args as never)
+        .catch(driverError)) as Native,
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
     return result;
   }
 
-  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
   close(): void {
     this.client.unprepare(options(this.client, this.sql) as never);
   }
@@ -94,7 +106,7 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
     result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
   }
   if (Array.isArray(result)) {
-    return new Mysql2Result(
+    return new Result(
       (fields ?? []).map((field) => field.name),
       result,
     );
@@ -138,7 +150,7 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
 }
 
 function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
-  return new Mysql2Statement(this, sql);
+  return new Statement(this, sql);
 }
 
 function abandonResultsBang(): void {}
@@ -240,7 +252,7 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     }
     const native = (client as { query?: (options: object) => Promise<Native> }).query;
     const query = async function (this: Mysql2Client, sql: string) {
-      return storeResult(this, await native!.call(this, options(this, sql)));
+      return storeResult(this, await native!.call(this, options(this, sql)).catch(driverError));
     };
     for (const [name, value] of Object.entries({
       queryOptions,
@@ -269,8 +281,7 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
 export const Mysql2 = {
   Error: class {
     static [Symbol.hasInstance](e: unknown): boolean {
-      const { code, fatal } = (e ?? {}) as { code?: unknown; fatal?: unknown };
-      return e instanceof Error && (typeof code === "string" || fatal === true);
+      return typeof e === "object" && e !== null && ERRORS.has(e);
     }
   },
   Client: {
