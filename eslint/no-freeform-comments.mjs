@@ -105,7 +105,7 @@ const DIRECTIVE_RE =
  * them and they are English by construction.
  */
 const KEPT_TAG_NAMES =
-  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|inventedArm|empty|deprecated";
+  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|inventedArm|inlinedFrom|empty|deprecated";
 
 const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
 
@@ -274,6 +274,9 @@ function keptLines(comment) {
  * directly. Everything after the permanence claim is the English reason.
  */
 function renderTag({ name, text }) {
+  if (name === "inlinedFrom") {
+    return [`@${name}`, ...text.trim().split(/\s+/u).slice(0, 2)].filter(Boolean).join(" ");
+  }
   const [subject, rest = ""] = text.split(/\s+—\s+/u, 2);
   const takesSubject =
     name === "missingRailsCall" ||

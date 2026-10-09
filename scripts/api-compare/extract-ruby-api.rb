@@ -258,6 +258,29 @@ def strip_sexp_positions(node)
   node.map { |child| strip_sexp_positions(child) }
 end
 
+INLINED_HOOKS = %w[initialize new].freeze
+VENDOR_ROOT = File.expand_path("../../vendor", __dir__)
+
+class DefEndLines < Ripper
+  attr_reader :ends
+
+  def initialize(*)
+    super
+    @ends = {}
+    @starts = []
+  end
+
+  def on_kw(tok)
+    @starts << lineno if tok == "def"
+    tok
+  end
+
+  def on_def(*)
+    @ends[@starts.pop] = lineno
+  end
+  alias on_defs on_def
+end
+
 def body_digest(body)
   return nil if body.nil?
   Digest::SHA256.hexdigest(strip_sexp_positions(body).inspect)[0, 16]
@@ -464,6 +487,8 @@ class ApiExtractor
     @source_lines = source.lines
     @source = source
     @string_openers = nil
+    @def_end_lines = nil
+    @vendor_file = filepath.start_with?("#{VENDOR_ROOT}/") ? filepath.delete_prefix("#{VENDOR_ROOT}/") : nil
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -883,6 +908,12 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
+    if INLINED_HOOKS.include?(name)
+      @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
+      end_line = @def_end_lines[method_info[:line]]
+      method_info[:endLine] = end_line if end_line
+      method_info[:vendorFile] = @vendor_file if @vendor_file
+    end
     if name == "method_missing" && !@in_sclass
       reader = method_missing_send_receiver(node[3], find_params(node))
       (target[:methodMissingSends] ||= []) << reader if reader

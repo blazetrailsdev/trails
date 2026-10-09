@@ -2,6 +2,21 @@
 
 // --- Extracted API manifest ---
 
+/** One `@inlinedFrom` tag (RFC 0188) — see api-compare/inlined-from-tags.ts. */
+export interface InlinedFrom {
+  /** The Ruby module, fully qualified (`ActiveModel::API`). */
+  module: string;
+  /** `initialize` on a module, `new` on a `ClassMethods` module. */
+  hook: "initialize" | "new";
+  /** The vendored source (`rails`) and the version the span was read at (`v8.0.2`). */
+  source: string;
+  version: string;
+  /** The Ruby file, relative to `vendor/<source>/<version>/`. */
+  file: string;
+  firstLine: number;
+  lastLine: number;
+}
+
 /** A recorded literal value — a parameter default or constant RHS. `expr` marks
  *  a non-literal (call/ref/lambda), recorded so the comparer skips it rather
  *  than confusing it with "no default". See literals.ts. */
@@ -197,6 +212,14 @@ export interface MethodInfo {
   /** TS-side only: the skeleton tokens this declaration receipts as arms or
    *  calls its body adds to Rails', via `@inventedArm`. */
   inventedArms?: string[];
+  /** TS-side only (RFC 0188): the Ruby bodies a constructor names as inlined
+   *  into it, via `@inlinedFrom`, in written order. */
+  inlinedFrom?: InlinedFrom[];
+  /** Ruby-side only (RFC 0188): the line an `initialize` / `new` `def` closes
+   *  on, so an `@inlinedFrom` citation's span can be derived. */
+  endLine?: number;
+  /** Ruby-side only (RFC 0188): that `def`'s file, relative to `vendor/`. */
+  vendorFile?: string;
   /**
    * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
    * suppression above, keyed by Ruby call. Carried so a receipt's permanence

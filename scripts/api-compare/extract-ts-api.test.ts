@@ -7428,3 +7428,35 @@ describe("staticClassExpressions", () => {
     expect(nested.cls.members.map((member) => member.name?.getText())).toEqual(["shouldMultipart"]);
   });
 });
+
+describe("extractClass — @inlinedFrom on a constructor", () => {
+  const api = "ActiveModel::API#initialize rails/v8.0.2/activemodel/lib/active_model/api.rb:80-84";
+  const core =
+    "ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482";
+
+  it("registers the one-line form", () => {
+    const [ctor] = extractFromSource(
+      `class Foo {\n  /** @inlinedFrom ${api} */\n  constructor() {}\n}`,
+    ).instanceMethods;
+    expect(ctor.inlinedFrom?.map((t) => `${t.module}#${t.hook}`)).toEqual([
+      "ActiveModel::API#initialize",
+    ]);
+  });
+
+  it("registers the multi-line form, in chain order", () => {
+    const [ctor] = extractFromSource(
+      `class Foo {\n  /**\n   * @inlinedFrom ${core}\n   * @inlinedFrom ${api}\n   */\n  constructor() {}\n}`,
+    ).instanceMethods;
+    expect(ctor.inlinedFrom?.map((t) => [t.module, t.firstLine, t.lastLine])).toEqual([
+      ["ActiveRecord::Core", 471, 482],
+      ["ActiveModel::API", 80, 84],
+    ]);
+  });
+
+  it("records nothing on an untagged constructor or a tagged method", () => {
+    const got = extractFromSource(
+      `class Foo {\n  constructor() {}\n  /** @inlinedFrom ${api} */\n  save() {}\n}`,
+    ).instanceMethods;
+    expect(got.map((m) => m.inlinedFrom)).toEqual([undefined, undefined]);
+  });
+});
