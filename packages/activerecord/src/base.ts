@@ -189,6 +189,7 @@ import {
   aliasAttribute as _aliasAttribute,
   undefineAttributeMethods as _undefineAttributeMethods,
   initializeGeneratedModules as _initializeGeneratedModules,
+  generatedAttributeMethods as _generatedAttributeMethods,
   GeneratedAttributeMethods,
   generateAliasAttributes as _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods as _eagerlyGenerateAliasAttributeMethods,
@@ -841,7 +842,7 @@ export class Base extends Model {
   /** @internal */
   declare static _aliasesByAttributeName: Hash<string, string[]>;
   /** @internal */
-  declare static generatedAttributeMethods: AttributeMethodsClassHalf["generatedAttributeMethods"];
+  declare static generatedAttributeMethods: typeof _generatedAttributeMethods;
   /** @internal */
   declare static attributeMethodPatternsCache: AttributeMethodsClassHalf["attributeMethodPatternsCache"];
   /** @internal */
@@ -2206,6 +2207,7 @@ extend(Base, {
   undefineAttributeMethods: _undefineAttributeMethods,
   aliasAttribute: _aliasAttribute,
   initializeGeneratedModules: _initializeGeneratedModules,
+  generatedAttributeMethods: _generatedAttributeMethods,
   generatedAssociationMethods: _Core.generatedAssociationMethods,
   generateAliasAttributes: _generateAliasAttributes,
   eagerlyGenerateAliasAttributeMethods: _eagerlyGenerateAliasAttributeMethods,

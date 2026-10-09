@@ -1,3 +1,4 @@
+import { generatedAttributeMethods } from "../attribute-methods.js";
 import { OpenSSL } from "@blazetrails/ruby-compat";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
@@ -882,6 +883,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
     }
     return Object.assign(MockModel, {
       columnNames: () => columns,
+      generatedAttributeMethods,
     }) as any;
   }
 

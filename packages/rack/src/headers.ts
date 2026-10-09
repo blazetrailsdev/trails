@@ -139,20 +139,6 @@ export class Headers extends Hash<string, string> {
     return undefined;
   }
 
-  key(value: string): string | undefined {
-    for (const [k, v] of this) {
-      if (v === value) return k;
-    }
-    return undefined;
-  }
-
-  hasValue(value: string): boolean {
-    for (const v of this.values()) {
-      if (v === value) return true;
-    }
-    return false;
-  }
-
   merge(
     hash: Record<string, string> | Headers,
     fn?: (key: string, oldVal: string, newVal: string) => string,

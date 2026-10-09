@@ -698,14 +698,9 @@ export function initializeGeneratedModules(this: CoreHost): void {
   generatedAssociationMethods.call(this);
 }
 
-/**
- * @inventedArm if — PERMANENT
- * @inventedArm initializeGeneratedModules — PERMANENT
- */
+/** @inventedArm generatedAttributeMethods — PERMANENT */
 export function generatedAssociationMethods(this: CoreHost): Module {
-  if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
-    (this as unknown as { initializeGeneratedModules(): void }).initializeGeneratedModules();
-  }
+  (this as unknown as { generatedAttributeMethods(): Module }).generatedAttributeMethods();
   return (
     (Object.hasOwn(this, "_generatedAssociationMethods")
       ? this._generatedAssociationMethods

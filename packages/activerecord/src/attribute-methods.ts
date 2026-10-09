@@ -256,17 +256,8 @@ export function dangerousAttributeMethods(): Set<string> {
   ]));
 }
 
-/**
- * @missingRailsName generatedAttributeMethods — PERMANENT
- * @inventedArm if — CONVERGEABLE attribute-methods-initialize-generated-modules-deferral-guards
- */
+/** @missingRailsName generatedAttributeMethods — PERMANENT */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  const previous = Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")
-    ? this._generatedAttributeMethods
-    : undefined;
-  if (previous instanceof Module) {
-    previous.removeMethod(...previous.instanceMethods());
-  }
   this._generatedAttributeMethods = rbModConstSet(
     this,
     "GeneratedAttributeMethods",
@@ -275,16 +266,24 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   include(this, this._generatedAttributeMethods);
+
   _coreInitializeGeneratedModules.call(
     this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
   );
 }
 
-/** @inventedArm if — CONVERGEABLE attribute-methods-initialize-generated-modules-deferral-guards */
-export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
+/**
+ * @internal
+ * @noRailsEquivalent PERMANENT
+ */
+export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
   }
+  return this._generatedAttributeMethods!;
+}
+
+export function aliasAttribute(this: AttributeMethodsHost, newName: string, oldName: string): void {
   AttributeMethods.ClassMethods.aliasAttribute.call(this as never, newName, oldName);
 
   if (
@@ -347,8 +346,11 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+    this._attributeMethodsGenerated
+  ) {
+    return false;
   }
   if (
     Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
@@ -370,11 +372,7 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   return true;
 }
 
-/** @inventedArm if — CONVERGEABLE attribute-methods-initialize-generated-modules-deferral-guards */
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
   if (rbClassSuperclass(this) !== ActiveRecord.Base) {
     rbClassSuperclass(this)!.generateAliasAttributes!();
   }
@@ -429,14 +427,10 @@ function instanceMethodOwner(klass: any, name: string): unknown {
   return undefined;
 }
 
-/** @inventedArm if — CONVERGEABLE attribute-methods-initialize-generated-modules-deferral-guards */
 export function isInstanceMethodAlreadyImplemented(
   this: AttributeMethodsHost,
   methodName: string,
 ): boolean {
-  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
-    initializeGeneratedModules.call(this);
-  }
   if (isDangerousAttributeMethod.call(this, methodName)) {
     throw new DangerousAttributeError(
       `${methodName} is defined by Active Record. Check to make sure that you don't have an attribute or method with the same name.`,

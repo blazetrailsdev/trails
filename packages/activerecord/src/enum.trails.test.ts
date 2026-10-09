@@ -1,12 +1,12 @@
 import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from "vitest";
-import { Inflections, camelize } from "@blazetrails/activesupport";
+import { HashWithIndifferentAccess, Inflections, camelize } from "@blazetrails/activesupport";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
   detectNegativeEnumConditionsBang,
   EnumType,
 } from "./enum.js";
-import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
+import { ArgumentError, DecimalType, IntegerType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-fixtures.js";
@@ -470,5 +470,19 @@ describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
 
   it("builds a new Lion without routing the parent's default scope through a tableless class", () => {
     expect(() => new Lion()).not.toThrow();
+  });
+});
+
+describe("EnumType reads its mapping at call time", () => {
+  it("answers for a mapping filled after the type is built", () => {
+    const mapping = new HashWithIndifferentAccess<number | string | boolean | null>();
+    const type = new EnumType("status", mapping, new IntegerType());
+    mapping.set("proposed", 0);
+    mapping.set("written", 1);
+
+    expect(type.cast(1)).toBe("written");
+    expect(type.deserialize(0)).toBe("proposed");
+    expect(() => type.assertValidValue(1)).not.toThrow();
+    expect(() => type.assertValidValue(2)).toThrow(ArgumentError);
   });
 });
