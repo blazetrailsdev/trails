@@ -39,7 +39,7 @@ interface FinderRelation {
     compositePrimaryKey: boolean;
     implicitOrderColumn?: string | null;
     createBang(attrs: any): Promise<any>;
-    connectionPool(): { withConnectionSync<R>(block: (c: DatabaseAdapter) => R): R };
+    withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
     transaction<R>(
       fn: (tx: any) => Promise<R>,
       options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
@@ -495,10 +495,7 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
   return relation;
 }
 
-/**
- * @internal
- * @missingRailsCall with_connection — CONVERGEABLE relation-layer-with-connection-receipts-are-not-the-tosql-sites
- */
+/** @internal */
 export function applyJoinDependency<R>(
   this: FinderRelation,
   { eagerLoading = this.groupValues.length === 0 }: { eagerLoading?: boolean } = {},
@@ -534,7 +531,7 @@ export function applyJoinDependency<R>(
   ) {
     return Promise.resolve(
       this.skipQueryCacheIfNecessary(() =>
-        this.model.connectionPool().withConnectionSync((c: DatabaseAdapter) =>
+        this.model.withConnection((c: DatabaseAdapter) =>
           (
             c as unknown as {
               distinctRelationForPrimaryKey(rel: unknown): Promise<void>;

@@ -37,7 +37,7 @@ import {
   StandardError,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { NoMethodError, rbFSend, rbObjClassname, Zlib } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbFSend, rbObjClassname, Struct, Zlib } from "@blazetrails/ruby-compat";
 import { Temporal, Time } from "@blazetrails/date";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -273,21 +273,15 @@ function announceMigrationText(header: string, message: string): string {
   return `== ${text} ${"=".repeat(pad)}`;
 }
 
-/** @internal */
-const toRun = Symbol("toRun");
+export class ReversibleBlockHelper extends Struct.new("reverting") {
+  declare reverting: boolean;
 
-export class ReversibleBlockHelper {
-  /** @noRailsEquivalent CONVERGEABLE reversible-block-helper-up-down-yield-in-line */
-  [toRun]: Array<() => Promise<void>> = [];
-
-  constructor(public reverting: boolean) {}
-
-  up(fn: () => Promise<void>): void {
-    if (!this.reverting) this[toRun].push(fn);
+  up<T>(block: () => T): T | undefined {
+    if (!this.reverting) return block();
   }
 
-  down(fn: () => Promise<void>): void {
-    if (this.reverting) this[toRun].push(fn);
+  down<T>(block: () => T): T | undefined {
+    if (this.reverting) return block();
   }
 }
 
@@ -880,13 +874,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
   }
 
-  async reversible(fn?: (dir: ReversibleBlockHelper) => void | Promise<void>): Promise<void> {
-    if (!fn) return;
+  async reversible(fn: (dir: ReversibleBlockHelper) => void | Promise<void>): Promise<void> {
     const helper = new ReversibleBlockHelper(this.isReverting());
-    await this.executeBlock(async () => {
-      await fn(helper);
-      for (const f of helper[toRun]) await f();
-    });
+    await this.executeBlock(async () => fn(helper));
   }
 
   async upOnly(fn?: () => Promise<void>): Promise<void> {
