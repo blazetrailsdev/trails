@@ -19,6 +19,7 @@ import {
   rbBlockGivenP,
   rbEql,
   rbEqual,
+  rbFSend,
   rbHash,
   rbInspect,
   rbModConstSet,
@@ -26,7 +27,6 @@ import {
   rbObjClass,
   rbObjDup,
   rbObjRespondTo,
-  stringSplit,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -592,7 +592,7 @@ export class Parameters {
     { delimiter = "_" }: { delimiter?: string | RegExp } = {},
   ): string[] | null {
     const value = this.parameters.get(key);
-    return value == null ? null : stringSplit(value as string, delimiter, -1);
+    return value == null ? null : (rbFSend(value, "split", delimiter, -1) as string[]);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
