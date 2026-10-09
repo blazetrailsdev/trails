@@ -21,15 +21,21 @@ export const yaml: typeof import("yaml") = await import("yaml").catch(() => {
  * `require 'psych.so'`. Not `Psych.parse` (`:398`), which answers a node tree.
  * libyaml reads the source's bytes (`yaml_parser_set_input_string`,
  * `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`), so a source held as its
- * bytes is decoded here.
+ * bytes is decoded here, and a malformed one raises `SyntaxError`, JS's
+ * `Psych::SyntaxError`, with libyaml's reader message.
  *
  * @noRailsEquivalent PERMANENT
  */
-export const parse = ((src: string | Uint8Array, ...options: unknown[]) =>
-  (yaml.parse as (...args: unknown[]) => unknown)(
-    src instanceof Uint8Array ? new TextDecoder().decode(src) : src,
-    ...options,
-  )) as typeof import("yaml").parse;
+export const parse = ((src: string | Uint8Array, ...options: unknown[]) => {
+  if (src instanceof Uint8Array) {
+    try {
+      src = new TextDecoder("utf-8", { fatal: true }).decode(src);
+    } catch {
+      throw new SyntaxError("invalid leading UTF-8 octet");
+    }
+  }
+  return (yaml.parse as (...args: unknown[]) => unknown)(src, ...options);
+}) as typeof import("yaml").parse;
 
 /**
  * The backend's own emitter, behind `vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:13`

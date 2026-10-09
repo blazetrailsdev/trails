@@ -29,3 +29,12 @@ describe("Psych with Date, DateTime and Time unseated", () => {
     expect(Psych.unsafeLoad(yaml)).toEqual({ a: [1, "x", null] });
   });
 });
+
+describe("psych-adapter parse on a source held as its bytes", () => {
+  it("decodes UTF-8 and raises SyntaxError for malformed bytes", async () => {
+    const { parse } = await import("./psych-adapter.js");
+    const load = parse as (src: unknown) => unknown;
+    expect(load(new TextEncoder().encode("a: é\n"))).toEqual({ a: "é" });
+    expect(() => load(Uint8Array.from([0x61, 0x3a, 0x20, 0xff]))).toThrow(SyntaxError);
+  });
+});

@@ -19,9 +19,11 @@ function stripJsonComments(value: string): string {
     } else if (char === "/" && value[index + 1] === "*") {
       const end = value.indexOf("*/", index + 2);
       index = end === -1 ? value.length : end + 2;
+      out += " ";
     } else if (char === "/" && value[index + 1] === "/") {
       const end = value.indexOf("\n", index + 2);
       index = end === -1 ? value.length : end;
+      out += " ";
     } else {
       out += char;
       index++;
