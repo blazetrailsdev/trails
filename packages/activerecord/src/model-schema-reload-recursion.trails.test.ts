@@ -3,7 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { reloadSchemaFromCache } from "./model-schema.js";
-import { registerSubclass } from "./inheritance.js";
+import { registerModel } from "./associations.js";
 
 class UuidType extends ValueType {
   override type(): string {
@@ -39,11 +39,11 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerSubclass(Circle);
+    registerModel(Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -73,11 +73,11 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       }
     }
     class Circle extends Shape {}
-    registerSubclass(Circle);
+    registerModel(Circle);
     class Ticket extends Circle {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Circle, Ticket]) {
@@ -102,7 +102,7 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     class Ticket extends Shape {
       static override tableName = "tickets";
     }
-    registerSubclass(Ticket);
+    registerModel(Ticket);
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     for (const klass of [Shape, Ticket]) {

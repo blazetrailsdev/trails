@@ -5,7 +5,7 @@ import {
   assertRespondTo,
 } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import { Table } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
@@ -44,9 +44,6 @@ describe("LeftOuterJoinAssociationTest", () => {
   registerModel(SpecialComment);
   registerModel(SubSpecialComment);
   registerModel(VerySpecialComment);
-  registerSubclass(SpecialComment);
-  registerSubclass(SubSpecialComment);
-  registerSubclass(VerySpecialComment);
   registerModel(Rating);
   registerModel(Essay);
   registerModel(Categorization);

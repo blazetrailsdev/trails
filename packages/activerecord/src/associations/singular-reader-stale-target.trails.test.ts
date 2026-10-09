@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { Company, Firm, Client } from "../test-helpers/models/company.js";
 import { fixtures } from "../test-fixtures.js";
 
@@ -17,8 +17,8 @@ describe("BelongsToAssociationsTest", () => {
     registerModel(Firm);
     registerModel(Client);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(Client);
     await Company.loadSchema();
   });
 

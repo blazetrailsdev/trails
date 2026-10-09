@@ -439,12 +439,14 @@ describe("PreloaderTest", () => {
     ShippingLine = slMod.ShippingLine as never;
     ShippingLineDiscountApplication = slMod.ShippingLineDiscountApplication as never;
     Discount = (await import("./test-helpers/models/discount.js")).Discount as never;
-    const shardedMod = await import("./test-helpers/models/sharded.js");
-    ShardedBlogPL = shardedMod.ShardedBlog as never;
-    ShardedBlogPostPL = shardedMod.ShardedBlogPost as never;
-    ShardedCommentPL = shardedMod.ShardedComment as never;
-    ShardedTagPL = shardedMod.ShardedTag as never;
-    ShardedBlogPostTagPL = shardedMod.ShardedBlogPostTag as never;
+    ShardedBlogPL = (await import("./test-helpers/models/sharded/blog.js")).ShardedBlog as never;
+    ShardedBlogPostPL = (await import("./test-helpers/models/sharded/blog-post.js"))
+      .ShardedBlogPost as never;
+    ShardedCommentPL = (await import("./test-helpers/models/sharded/comment.js"))
+      .ShardedComment as never;
+    ShardedTagPL = (await import("./test-helpers/models/sharded/tag.js")).ShardedTag as never;
+    ShardedBlogPostTagPL = (await import("./test-helpers/models/sharded/blog-post-tag.js"))
+      .ShardedBlogPostTag as never;
     const cpkMod = await import("./test-helpers/models/cpk.js");
     CpkOrderPL = cpkMod.CpkOrder as never;
     CpkOrderAgreementPL = cpkMod.CpkOrderAgreement as never;
@@ -1685,19 +1687,23 @@ describe("AssociationsTest", () => {
   let Post: typeof Base;
 
   beforeAll(async () => {
-    const shardedMod = await import("./test-helpers/models/sharded.js");
-    ShardedBlog = shardedMod.ShardedBlog as never;
-    ShardedBlogPost = shardedMod.ShardedBlogPost as never;
-    ShardedBlogPostWithRevision = shardedMod.ShardedBlogPostWithRevision as never;
+    ShardedBlog = (await import("./test-helpers/models/sharded/blog.js")).ShardedBlog as never;
+    ShardedBlogPost = (await import("./test-helpers/models/sharded/blog-post.js"))
+      .ShardedBlogPost as never;
+    ShardedBlogPostWithRevision = (
+      await import("./test-helpers/models/sharded/blog-post-with-revision.js")
+    ).ShardedBlogPostWithRevision as never;
     if (!reflectOnAssociation(ShardedBlogPostWithRevision, "commentsWithoutQueryConstraints")) {
       (ShardedBlogPostWithRevision as any).hasMany("commentsWithoutQueryConstraints", {
         primaryKey: ["blog_id", "id"],
-        className: "ShardedComment",
+        className: "Sharded::Comment",
       });
     }
-    ShardedComment = shardedMod.ShardedComment as never;
-    ShardedTag = shardedMod.ShardedTag as never;
-    ShardedBlogPostTag = shardedMod.ShardedBlogPostTag as never;
+    ShardedComment = (await import("./test-helpers/models/sharded/comment.js"))
+      .ShardedComment as never;
+    ShardedTag = (await import("./test-helpers/models/sharded/tag.js")).ShardedTag as never;
+    ShardedBlogPostTag = (await import("./test-helpers/models/sharded/blog-post-tag.js"))
+      .ShardedBlogPostTag as never;
     const authorMod = await import("./test-helpers/models/author.js");
     Author = authorMod.Author as never;
     AuthorFavorite = authorMod.AuthorFavorite as never;
@@ -2246,7 +2252,7 @@ describe("AssociationsTest", () => {
       if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutSingleColumnQueryConstraints")) {
         (ShardedBlogPost as any).hasMany("commentsWithoutSingleColumnQueryConstraints", {
           primaryKey: ["blog_id", "id"],
-          className: "ShardedComment",
+          className: "Sharded::Comment",
         });
       }
       const blogPost = shardedBlogPosts("great_post_blog_one") as any;
@@ -2271,7 +2277,7 @@ describe("AssociationsTest", () => {
       if (!reflectOnAssociation(ShardedBlogPost, "commentsWithoutMultipleColumnQueryConstraints")) {
         (ShardedBlogPost as any).hasMany("commentsWithoutMultipleColumnQueryConstraints", {
           primaryKey: ["blog_id", "id"],
-          className: "ShardedComment",
+          className: "Sharded::Comment",
         });
       }
       const blogPost = shardedBlogPosts("great_post_blog_one") as any;
@@ -2298,7 +2304,7 @@ describe("AssociationsTest", () => {
       (ShardedBlogPost as any)._hasQueryConstraints = true;
       (ShardedBlogPost as any).hasMany("commentsWithCompositePkOwner", {
         primaryKey: ["blog_id", "id"],
-        className: "ShardedComment",
+        className: "Sharded::Comment",
       });
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;

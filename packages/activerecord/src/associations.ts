@@ -10,8 +10,7 @@ import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
-import { Autoload } from "@blazetrails/activesupport";
-import { registerSubclass } from "./inheritance.js";
+import { Autoload, DescendantsTracker } from "@blazetrails/activesupport";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
@@ -102,7 +101,7 @@ function assertActiveRecordBase(model: typeof Base): void {
   }
 }
 
-/** @noRailsEquivalent CONVERGEABLE register-model-wrapper-is-deleted-tests-seat-constants */
+/** @noRailsEquivalent PERMANENT */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -111,12 +110,7 @@ export function registerModel(
   model?: typeof Base,
 ): void {
   if (Array.isArray(nameOrModel)) {
-    for (const m of nameOrModel) {
-      registerModel(m);
-      if (rbClassSuperclass(m) !== ActiveRecord.Base) {
-        registerSubclass(m);
-      }
-    }
+    for (const m of nameOrModel) registerModel(m);
     return;
   }
   if (typeof nameOrModel === "string") {
@@ -124,13 +118,14 @@ export function registerModel(
     assertActiveRecordBase(model);
     registerConstant(nameOrModel, model);
   } else {
-    assertActiveRecordBase(nameOrModel);
-    registerConstant(nameOrModel.name, nameOrModel);
-    const qualified = rbModName(nameOrModel)!;
-    if (qualified !== nameOrModel.name) {
-      registerModel(qualified, nameOrModel);
-    }
+    model = nameOrModel;
+    assertActiveRecordBase(model);
+    registerConstant(model.name, model);
+    const qualified = rbModName(model)!;
+    if (qualified !== model.name) registerConstant(qualified, model);
   }
+  if (model === ActiveRecord.Base) return;
+  DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 
 /** @internal */

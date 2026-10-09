@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import {
-  registerModel,
-  registerSubclass,
-  RecordNotSaved,
-  RecordNotFound,
-  type Base,
-} from "../index.js";
+import { registerModel, RecordNotSaved, RecordNotFound, type Base } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   Company,
@@ -48,12 +42,12 @@ describe("has_one set#{Name} awaitable accessor", () => {
     registerModel(Client);
     registerModel(Account);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(DependentFirm);
-    registerSubclass(ExclusivelyDependentFirm);
-    registerSubclass(RestrictedWithExceptionFirm);
-    registerSubclass(RestrictedWithErrorFirm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(DependentFirm);
+    registerModel(ExclusivelyDependentFirm);
+    registerModel(RestrictedWithExceptionFirm);
+    registerModel(RestrictedWithErrorFirm);
+    registerModel(Client);
     registerModel(Pirate);
     registerModel(Ship);
   });

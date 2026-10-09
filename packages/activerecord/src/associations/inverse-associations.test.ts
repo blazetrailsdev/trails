@@ -4,7 +4,6 @@ import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import {
   Base,
   registerModel,
-  registerSubclass,
   InverseOfAssociationNotFoundError,
   InverseOfAssociationRecursiveError,
   RecordNotFound,
@@ -340,7 +339,7 @@ describe("InverseAssociationTests", () => {
       (m) => registerModel(m),
     );
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
+    registerModel(Firm);
   });
 
   it("should allow for inverse of options in associations", () => {

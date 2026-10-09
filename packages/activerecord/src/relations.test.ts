@@ -6,7 +6,6 @@ import {
   IrreversibleOrderError,
   UnmodifiableRelation,
   registerModel,
-  registerSubclass,
   Base,
 } from "./index.js";
 import {
@@ -108,9 +107,7 @@ describe("RelationTest", () => {
     registerModel(Author);
     registerModel(Comment);
     registerModel(SpecialComment);
-    registerSubclass(SpecialComment);
     registerModel(VerySpecialComment);
-    registerSubclass(VerySpecialComment);
     registerModel(Topic);
     registerModel(Bird);
     registerModel(Car);

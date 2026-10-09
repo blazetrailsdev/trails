@@ -6,7 +6,6 @@ import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activem
 import {
   Base,
   registerModel,
-  registerSubclass,
   SubclassNotFound,
   AssociationTypeMismatch,
   RecordNotFound,
@@ -88,12 +87,12 @@ function registerCompanyModels(): void {
   registerModel(Client);
   registerModel(Account);
   Company.inheritanceColumn = "type";
-  registerSubclass(Firm);
-  registerSubclass(DependentFirm);
-  registerSubclass(ExclusivelyDependentFirm);
-  registerSubclass(RestrictedWithExceptionFirm);
-  registerSubclass(RestrictedWithErrorFirm);
-  registerSubclass(Client);
+  registerModel(Firm);
+  registerModel(DependentFirm);
+  registerModel(ExclusivelyDependentFirm);
+  registerModel(RestrictedWithExceptionFirm);
+  registerModel(RestrictedWithErrorFirm);
+  registerModel(Client);
 }
 
 class SpecialBook extends Base {

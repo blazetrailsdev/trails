@@ -4,7 +4,7 @@ import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Club } from "./club.js";
 import type { Member } from "./member.js";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Membership extends Base {
@@ -67,8 +67,7 @@ export interface Membership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CurrentMembership extends Membership {
   static {
-    registerConstant("CurrentMembership", this);
-    registerSubclass(CurrentMembership);
+    registerModel(CurrentMembership);
     this.belongsTo("member");
     this.belongsTo("club", { inverseOf: "membership" });
   }
@@ -84,8 +83,7 @@ export interface CurrentMembership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SuperMembership extends Membership {
   static {
-    registerConstant("SuperMembership", this);
-    registerSubclass(SuperMembership);
+    registerModel(SuperMembership);
     this.belongsTo("member", function (this: any) {
       return this.order("members.id DESC");
     });
@@ -102,8 +100,7 @@ export interface SuperMembership {
 
 export class SelectedMembership extends Membership {
   static {
-    registerConstant("SelectedMembership", this);
-    registerSubclass(SelectedMembership);
+    registerModel(SelectedMembership);
     this.defaultScope(function (this: any) {
       return this.select("'1' as foo");
     });
@@ -115,8 +112,7 @@ export class TenantMembership extends Membership {
   static currentMember: any = null;
 
   static {
-    registerConstant("TenantMembership", this);
-    registerSubclass(TenantMembership);
+    registerModel(TenantMembership);
     this.belongsTo("member");
     this.belongsTo("club");
     this.defaultScope(function (this: any) {

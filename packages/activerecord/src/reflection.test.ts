@@ -32,7 +32,7 @@ import { Firm, Client } from "./test-helpers/models/company.js";
 import { Sponsor } from "./test-helpers/models/sponsor.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Edge } from "./test-helpers/models/edge.js";
-import { ShardedComment } from "./test-helpers/models/sharded.js";
+import { ShardedComment } from "./test-helpers/models/sharded/comment.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { HasManyThroughSourceAssociationNotFoundError } from "./associations/errors.js";

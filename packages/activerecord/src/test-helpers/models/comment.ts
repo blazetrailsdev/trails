@@ -10,7 +10,7 @@ import type { Post } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 export class OopsError extends Error {}
 registerConstant("OopsError", OopsError);
@@ -184,7 +184,6 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
-registerConstant("SpecialComment", SpecialComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
@@ -194,10 +193,8 @@ export interface SpecialComment {
 }
 
 export class SubSpecialComment extends SpecialComment {}
-registerConstant("SubSpecialComment", SubSpecialComment);
 
 export class VerySpecialComment extends Comment {}
-registerConstant("VerySpecialComment", VerySpecialComment);
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
   static {
@@ -211,7 +208,6 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
     });
   }
 }
-registerConstant("CommentThatAutomaticallyAltersPostBody", CommentThatAutomaticallyAltersPostBody);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
@@ -239,7 +235,6 @@ export class CommentWithAfterCreateUpdate extends Comment {
     });
   }
 }
-registerConstant("CommentWithAfterCreateUpdate", CommentWithAfterCreateUpdate);
 
 for (const klass of [
   SpecialComment,
@@ -249,5 +244,5 @@ for (const klass of [
   CommentWithDefaultScopeReferencesAssociation,
   CommentWithAfterCreateUpdate,
 ]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

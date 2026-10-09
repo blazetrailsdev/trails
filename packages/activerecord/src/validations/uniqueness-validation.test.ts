@@ -3,7 +3,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { Base, StatementInvalid, UnknownPrimaryKey, ValueTooLong } from "../index.js";
 import { registerModel } from "../associations.js";
-import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
 import { itIfSupports } from "../support/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
@@ -92,10 +91,10 @@ class BookWithUniqueRevision extends CpkBook {
 }
 
 for (const klass of [ReplyWithTitleObject, CoolTopic, TopicWithAfterCreate]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }
 for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }
 
 describe("UniquenessValidationTest", () => {
@@ -1035,5 +1034,5 @@ class TopicWithUniqEvent extends Topic {
 }
 
 for (const klass of [BigIntTest, BigIntReverseTest, TopicWithEvent, TopicWithUniqEvent]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

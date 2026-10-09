@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { resetCallbacks } from "../support/reset-callbacks.js";
 import { fixtures } from "../test-fixtures.js";
 import { Base } from "../base.js";
@@ -47,18 +47,13 @@ describe("CascadedEagerLoadingTest", () => {
   Comment.inheritanceColumn = "type";
   registerModel(Comment);
   registerModel(SpecialComment);
-  registerSubclass(SpecialComment);
   registerModel(SubSpecialComment);
-  registerSubclass(SubSpecialComment);
   registerModel(VerySpecialComment);
-  registerSubclass(VerySpecialComment);
   registerModel(Categorization);
   registerModel(Category);
   registerModel(Topic);
   registerModel(Reply);
-  registerSubclass(Reply);
   registerModel(SillyReply);
-  registerSubclass(SillyReply);
   registerModel(Vertex);
   registerModel(Edge);
   registerModel(Company);

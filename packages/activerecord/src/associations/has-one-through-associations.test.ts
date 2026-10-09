@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { Base, registerModel, registerSubclass, RecordInvalid } from "../index.js";
+import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   assertQueriesMatch,
@@ -112,7 +112,6 @@ describe("HasOneThroughAssociationsTest", () => {
   Category.inheritanceColumn = "type";
   registerModel(Category);
   registerModel(SpecialCategory);
-  registerSubclass(SpecialCategory);
   registerModel(Author);
   registerModel(AuthorAddress);
   registerModel(Essay);

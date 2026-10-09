@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Base, registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { fixtures } from "../test-fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
@@ -78,7 +78,7 @@ describe("JoinDependency Arel node construction", () => {
     }
     class StiSubOwner extends StiOwner {}
     StiOwner.inheritanceColumn = "type";
-    registerSubclass(StiSubOwner);
+    registerModel(StiSubOwner);
     (StiOwner as any)._reflections = {};
     (StiSubOwner as any)._reflections = {};
     registerModel(StiOwner);

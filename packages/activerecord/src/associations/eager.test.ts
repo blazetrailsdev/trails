@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   Base,
   registerModel,
-  registerSubclass,
   AssociationNotFoundError,
   EagerLoadPolymorphicError,
 } from "../index.js";
@@ -57,7 +56,9 @@ import { Citation } from "../test-helpers/models/citation.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Subscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription } from "../test-helpers/models/subscription.js";
-import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/models/sharded.js";
+import { ShardedBlog } from "../test-helpers/models/sharded/blog.js";
+import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
+import { ShardedComment } from "../test-helpers/models/sharded/comment.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Rating } from "../test-helpers/models/rating.js";
@@ -2292,9 +2293,9 @@ describe("EagerAssociationTest", () => {
 
   Post.inheritanceColumn = "type";
   Comment.inheritanceColumn = "type";
-  registerSubclass(SpecialPost);
-  registerSubclass(StiPost);
-  registerSubclass(SpecialComment);
+  registerModel(SpecialPost);
+  registerModel(StiPost);
+  registerModel(SpecialComment);
 
   it("preloading with has one through an sti with after initialize", async () => {
     const authorA = await Author.create({ name: "A" });
@@ -2337,11 +2338,11 @@ describe("EagerAssociationTest", () => {
   });
 
   Post.inheritanceColumn = "type";
-  registerSubclass(SpecialPost);
+  registerModel(SpecialPost);
   Comment.inheritanceColumn = "type";
-  registerSubclass(SpecialComment);
-  registerSubclass(SubSpecialComment);
-  registerSubclass(VerySpecialComment);
+  registerModel(SpecialComment);
+  registerModel(SubSpecialComment);
+  registerModel(VerySpecialComment);
 
   it("eager with inheritance", async () => {
     const loaded = await SpecialPost.all().includes(":comments");
@@ -2363,8 +2364,8 @@ describe("EagerAssociationTest", () => {
   });
 
   Post.inheritanceColumn = "type";
-  registerSubclass(SpecialPost);
-  registerSubclass(StiPost);
+  registerModel(SpecialPost);
+  registerModel(StiPost);
 
   it("eager with has many through", async () => {
     const michael = people("michael") as any;
@@ -2474,8 +2475,8 @@ describe("EagerAssociationTest", () => {
   });
 
   Company.inheritanceColumn = "type";
-  registerSubclass(Firm);
-  registerSubclass(Client);
+  registerModel(Firm);
+  registerModel(Client);
 
   it("eager with has one dependent does not destroy dependent", async () => {
     const firstFirm = companies("first_firm") as Firm;
@@ -2702,28 +2703,40 @@ describe("EagerAssociationTest", () => {
   ]);
 
   beforeAll(async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    registerModel("ShardedBlog", sharded.ShardedBlog);
-    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
-    registerModel("ShardedComment", sharded.ShardedComment);
-    registerModel("ShardedTag", sharded.ShardedTag);
-    registerModel("ShardedBlogPostTag", sharded.ShardedBlogPostTag);
+    registerModel(
+      "ShardedBlog",
+      (await import("../test-helpers/models/sharded/blog.js")).ShardedBlog,
+    );
+    registerModel(
+      "ShardedBlogPost",
+      (await import("../test-helpers/models/sharded/blog-post.js")).ShardedBlogPost,
+    );
+    registerModel(
+      "ShardedComment",
+      (await import("../test-helpers/models/sharded/comment.js")).ShardedComment,
+    );
+    registerModel("ShardedTag", (await import("../test-helpers/models/sharded/tag.js")).ShardedTag);
+    registerModel(
+      "ShardedBlogPostTag",
+      (await import("../test-helpers/models/sharded/blog-post-tag.js")).ShardedBlogPostTag,
+    );
     const cpk = await import("../test-helpers/models/cpk.js");
     registerModel("CpkPost", cpk.CpkPost);
     registerModel("CpkComment", cpk.CpkComment);
   });
 
   it("preloading belongs_to association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const posts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
-      ":comments",
-    )) as any[];
+    const posts = (await (
+      await import("../test-helpers/models/sharded/blog-post.js")
+    ).ShardedBlogPost.where({ blog_id: blogIds }).includes(":comments")) as any[];
     expect(posts.every((post) => post.association("comments").isLoaded())).toBeTruthy();
 
     const greatPostId = shardedBlogPosts("great_post_blog_one").id;
     const post = posts.find((p) => p.id === greatPostId);
-    const expectedComments = (await sharded.ShardedComment.where({
+    const expectedComments = (await (
+      await import("../test-helpers/models/sharded/comment.js")
+    ).ShardedComment.where({
       blog_id: post.blog_id,
       blog_post_id: post.id,
     })) as any[];
@@ -2732,11 +2745,10 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_many association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const comments = (await sharded.ShardedComment.where({ blog_id: blogIds }).includes(
-      ":blogPost",
-    )) as any[];
+    const comments = (await (
+      await import("../test-helpers/models/sharded/comment.js")
+    ).ShardedComment.where({ blog_id: blogIds }).includes(":blogPost")) as any[];
     expect(comments.every((comment) => comment.association("blogPost").isLoaded())).toBeTruthy();
 
     const greatCommentId = shardedComments("great_comment_blog_post_one").id;
@@ -2746,15 +2758,16 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_many through association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
     const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const blogPosts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
-      ":tags",
-    )) as any[];
+    const blogPosts = (await (
+      await import("../test-helpers/models/sharded/blog-post.js")
+    ).ShardedBlogPost.where({ blog_id: blogIds }).includes(":tags")) as any[];
     expect(blogPosts.every((post) => post.association("tags").isLoaded())).toBeTruthy();
 
     const expectedPost = shardedBlogPosts("great_post_blog_one");
-    const expectedTags = (await sharded.ShardedBlogPostTag.where({
+    const expectedTags = (await (
+      await import("../test-helpers/models/sharded/blog-post-tag.js")
+    ).ShardedBlogPostTag.where({
       blog_id: expectedPost.blog_id,
       blog_post_id: expectedPost.id,
     })) as any[];

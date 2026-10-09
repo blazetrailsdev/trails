@@ -8,7 +8,6 @@ import {
   isMethodDefinedWithin,
 } from "./attribute-methods.js";
 import { formatForInspect } from "./attribute-methods.js";
-import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-fixtures.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
@@ -248,7 +247,7 @@ describe("AttributeMethodsTest (trails)", () => {
     class Topic extends Base {}
     class ImportantTopic extends Topic {
       static {
-        registerSubclass(this);
+        registerModel(this);
       }
     }
     await Topic.loadSchema();

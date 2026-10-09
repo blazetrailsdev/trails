@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import {
   Company,
   Firm,
@@ -103,12 +103,12 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     registerModel(RestrictedWithErrorFirm);
     registerModel(Client);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(DependentFirm);
-    registerSubclass(ExclusivelyDependentFirm);
-    registerSubclass(RestrictedWithExceptionFirm);
-    registerSubclass(RestrictedWithErrorFirm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(DependentFirm);
+    registerModel(ExclusivelyDependentFirm);
+    registerModel(RestrictedWithExceptionFirm);
+    registerModel(RestrictedWithErrorFirm);
+    registerModel(Client);
     registerModel("ArrowFieldAccount", ArrowFieldAccount);
     registerModel("ProtoHelperAccount", ProtoHelperAccount);
     registerModel("ReentrantDestroyAccount", ReentrantDestroyAccount);

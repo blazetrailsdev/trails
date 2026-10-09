@@ -15,7 +15,7 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -97,7 +97,6 @@ export interface Company {
 }
 
 export class SpecialCo extends Company {}
-registerConstant("SpecialCo", SpecialCo);
 
 export const Namespaced = new Module();
 registerConstant("Namespaced", Namespaced);
@@ -394,7 +393,6 @@ export class Firm extends Company {
     this.log.push(`after_remove${record.id}`);
   }
 }
-registerConstant("Firm", Firm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Firm {
   get account(): Account | null | Promise<Account | null>;
@@ -442,7 +440,6 @@ export class DependentFirm extends Company {
     this.hasOne("company", { foreignKey: "client_of", dependent: "nullify" });
   }
 }
-registerConstant("DependentFirm", DependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -478,7 +475,6 @@ export class RestrictedWithExceptionFirm extends Company {
     );
   }
 }
-registerConstant("RestrictedWithExceptionFirm", RestrictedWithExceptionFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithExceptionFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -512,7 +508,6 @@ export class RestrictedWithErrorFirm extends Company {
     );
   }
 }
-registerConstant("RestrictedWithErrorFirm", RestrictedWithErrorFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RestrictedWithErrorFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -525,7 +520,6 @@ export class Agency extends Firm {
     this.acceptsNestedAttributesFor("projects");
   }
 }
-registerConstant("Agency", Agency);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Client extends Company {
   declare accounts: AssociationProxy<Account>;
@@ -646,7 +640,6 @@ export class Client extends Company {
 
   overwriteToRaise(): void {}
 }
-registerConstant("Client", Client);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Client {
   get firm(): Firm | null | Promise<Firm | null>;
@@ -702,7 +695,6 @@ export class ExclusivelyDependentFirm extends Company {
     );
   }
 }
-registerConstant("ExclusivelyDependentFirm", ExclusivelyDependentFirm);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ExclusivelyDependentFirm {
   get account(): Account | null | Promise<Account | null>;
@@ -723,13 +715,10 @@ export class LargeClient extends Client {
     (this as any)["extraSize"] = 50;
   }
 }
-registerConstant("LargeClient", LargeClient);
 
 export class SpecialClient extends Client {}
-registerConstant("SpecialClient", SpecialClient);
 
 export class VerySpecialClient extends SpecialClient {}
-registerConstant("VerySpecialClient", VerySpecialClient);
 
 export class NewlyContractedCompany extends Company {
   declare newContracts: AssociationProxy<NewContract>;
@@ -743,7 +732,6 @@ export class NewlyContractedCompany extends Company {
     });
   }
 }
-registerConstant("NewlyContractedCompany", NewlyContractedCompany);
 
 Company.inheritanceColumn = "type";
 
@@ -764,5 +752,5 @@ for (const klass of [
   VerySpecialClient,
   NewlyContractedCompany,
 ]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

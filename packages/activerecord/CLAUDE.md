@@ -198,6 +198,56 @@ being asked, and `_schemaLoaded`, `_columnsHash`, `_columns`,
 own-property memo guard in `model-schema.ts` is the port of `inherited`, not a
 deviation to retire.
 
+## A model is seated by `registerModel` (the `class` keyword's constant and its `inherited`)
+
+A Ruby `class Foo < ActiveRecord::Base` does two things at the `class` keyword.
+It binds the constant `Foo`, which is what `compute_type`
+(`activerecord/lib/active_record/inheritance.rb:242-268`) and `constantize`
+later resolve a `class_name:` or a stored STI / polymorphic type against. And
+it makes `Foo` a subclass of its parent as Ruby sees it: `inherited`
+(`inheritance.rb:287-294`) fires, and `Foo` is in the parent's
+`Class#subclasses`, which `DescendantsTracker` reads.
+
+A JS `class Foo extends Base {}` does neither. It binds a module-scope
+identifier, seats nothing a `rbConstGet` / `computeType` lookup can find, and
+fires no hook. trails has no autoloader to seat it either (root CLAUDE.md
+§ "Trails has no autoloader"), and no `inherited` (§ "`inherited` is deferred
+to own-property memo guards" above).
+
+**`registerModel` (`associations.ts`) is the port of that pair.** One call
+seats the constant and registers the subclass:
+
+- `registerModel(Foo)` seats `Foo` under its JS name, and under its `rbModName`
+  when a namespace gives it a different one. `registerModel("Name", Foo)` seats
+  it under the name given. `registerModel([Foo, Bar])` is one call per model.
+- Every form then registers the model with its `rbClassSuperclass` through
+  `DescendantsTracker.registerSubclass`, for every model, a direct child of
+  `Base` included, as Ruby does for every subclass. `Base` itself registers
+  nothing: Rails' `Base` has no model superclass
+  (`activerecord/lib/active_record/base.rb:282`), where trails' extends
+  ActiveModel's `Model`.
+
+`registerModel` is the interface application and test code uses to define a
+model, and its call sites in the test suite are correct as written. There is no
+separate one-argument `registerSubclass`: activesupport's two-argument
+`registerSubclass(parent, child)` is the port of
+`DescendantsTracker.register_subclass`, and the callers that have a parent and a
+child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
+calling it.
+
+`registerConstant` (ruby-compat) stays the general seat for a constant that is
+not a model, the namespace module a model sits in included: a namespaced model
+is `registerModel(rbModConstSet(Sharded, "Blog", this))`, as
+`test-helpers/models/sharded/*.ts` do.
+
+This is a genuine language shortcoming, ratified here by the repo owner
+(2026-10-09). The ruling is recorded in the tasks-repo story
+`register-model-wrapper-is-deleted-tests-seat-constants` (RFC 0180), under
+"Direction change (Dean, 2026-10-09)" and "Register always, as `inherited`
+does". `registerModel` carries `@noRailsEquivalent PERMANENT` against
+this section; there is no story to delete it or to rewrite its callers to
+`registerConstant`.
+
 ## A create path awaits its block before saving (`create`'s `&block`)
 
 Rails' create paths yield the caller's block synchronously while building the
@@ -336,9 +386,14 @@ and the synchronous body peeks at the warmed value.**
 
 - `lookupCastTypeFromColumn` keeps Rails' line and cannot await it. On a cold
   type map it starts `verifyBang` and the lookup raises `TypeError` off the
-  unset map. A caller that can reach it on a connection nothing has verified
-  warms first: `buildFixtureSql` awaits `verifyBang` when the type map is
-  unset.
+  unset map. That `TypeError` is the error the caller sees, where Rails raises
+  `ConnectionNotEstablished` from `verify!`: the started verify has not
+  settled when the lookup runs, so its failure cannot be the one raised. The
+  started promise carries a handler that drops its rejection, so a failed
+  connect is not also an unhandled rejection. A caller that can reach it on a
+  connection nothing has verified warms first: `buildFixtureSql` awaits
+  `verifyBang` when the type map is unset, and that await is where the
+  connection error surfaces.
 - `mismatchedForeignKey` has no fact to warm, because the table and column are
   only known once the failed statement is in hand. It is the one member here
   that answers a value or a promise of it: the `sql` arm returns a promise of
