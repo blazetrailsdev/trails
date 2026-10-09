@@ -6,9 +6,9 @@
     }
   },
   "actioncontroller": {
-    "total": 3,
+    "total": 2,
     "byFile": {
-      "metal/strong_parameters.rb": 3
+      "metal/strong_parameters.rb": 2
     }
   },
   "actiondispatch": {
