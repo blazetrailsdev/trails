@@ -30,7 +30,6 @@ import { assertNoChanges, include } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
 import { fixtures } from "../test-fixtures.js";
 import {
-  EncryptableRecord,
   cantModifyEncryptedAttributesWhenFrozen,
   decryptAttributes,
   encryptAttributes,
@@ -907,6 +906,21 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
       encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
     ).toThrow(/must create an additional column named 'original_name'/);
   });
+
+  it("does not raise while no columns are known (schema not loaded yet)", () => {
+    const modelClass = makeMockModel([]);
+    expect(() =>
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).not.toThrow();
+  });
+
+  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
+    Configurable.config.supportUnencryptedData = true;
+    const modelClass = makeMockModel(["id", "name"]);
+    expect(() =>
+      encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
+    ).not.toThrow();
+  });
 });
 
 describe("EncryptableRecord — ignore_case original_<name> column requirement", () => {
@@ -922,66 +936,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     restoreEncryptionConfig(configSnapshot);
   });
 
-  it("raises when columns are known and the original_<name> column is missing", () => {
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
-    ).toThrow(/must create an additional column named 'original_name'/);
-  });
-
-  it("does not raise when the original_<name> column is present", () => {
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", [
-        "id",
-        "name",
-        "original_name",
-      ]),
-    ).not.toThrow();
-  });
-
-  it("defers (no raise) when no columns are known (schema not loaded yet)", () => {
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", []),
-    ).not.toThrow();
-  });
-
-  it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
-    Configurable.config.supportUnencryptedData = true;
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnPresent({} as any, "name", ["id", "name"]),
-    ).not.toThrow();
-  });
-
-  it("post-reflection re-check raises when a preserved attribute's original_<name> column is absent", () => {
-    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, ["id", "name"]),
-    ).toThrow(/must create an additional column named 'original_name'/);
-  });
-
-  it("post-reflection re-check does not raise when the original_<name> column is present", () => {
-    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, [
-        "id",
-        "name",
-        "original_name",
-      ]),
-    ).not.toThrow();
-  });
-
-  it("post-reflection re-check is a no-op when no ignoreCase attributes were preserved", () => {
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnsAfterReflection({} as any, ["id", "name"]),
-    ).not.toThrow();
-  });
-
-  it("post-reflection re-check defers when the reflected column set is empty (schema not loaded)", () => {
-    const modelClass = { _ignoreCasePreservedAttributes: new Set(["name"]) } as any;
-    expect(() =>
-      EncryptableRecord.requireOriginalColumnsAfterReflection(modelClass, []),
-    ).not.toThrow();
-  });
-
   it("Base.encrypts ignoreCase raises ConfigurationError when original_<name> is missing", async () => {
     const adapter = await freshAdapter();
     const Model = class extends Base {
@@ -991,41 +945,6 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
     expect(() => {
       Model.encrypts("name", { deterministic: true, ignoreCase: true });
     }).toThrow(/must create an additional column named 'original_name'/);
-  });
-
-  it("Base.encrypts ignoreCase declared before the adapter connects raises after schema reflection", async () => {
-    const adapter = await freshAdapter();
-    Configurable.config.supportUnencryptedData = true;
-    const Model = class extends Base {
-      static _tableName = "authors";
-      static {
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.encrypts("name", { deterministic: true, ignoreCase: true });
-      }
-    } as any;
-    Configurable.config.supportUnencryptedData = false;
-    void Model.resetColumnInformation();
-    await expect(async () => {
-      await Model.loadSchema();
-      new Model();
-    }).rejects.toThrow(/must create an additional column named 'original_name'/);
-  });
-
-  it("Base.encrypts ignoreCase with a genuinely-disconnected adapter is fail-closed", async () => {
-    const adapter = await freshAdapter();
-    await expect(async () => {
-      const Model = class extends Base {
-        static _tableName = "authors";
-        static {
-          this.encrypts("name", { deterministic: true, ignoreCase: true });
-          this.attribute("id", "integer");
-          this.attribute("name", "string");
-        }
-      } as any;
-      await Model.loadSchema();
-      new Model();
-    }).rejects.toThrow(/must create an additional column named 'original_name'/);
   });
 
   it("Base.encrypts ignoreCase does not raise after reflection when original_<name> is present", async () => {

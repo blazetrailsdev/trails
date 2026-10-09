@@ -305,10 +305,6 @@ describe("libsqlRemoteDriver — capabilities and async-open dispatch", () => {
     expect(libsqlRemoteDriver.capabilities.loadExtension).toBe(false);
   });
 
-  it("omits openSync so the async-open path is used", () => {
-    expect(libsqlRemoteDriver.openSync).toBeUndefined();
-  });
-
   it("omits databaseExists", () => {
     expect(libsqlRemoteDriver.databaseExists).toBeUndefined();
   });
@@ -351,10 +347,6 @@ describe("isReplicaConfig — embedded-replica mode selection", () => {
 describe("libsqlReplicaDriver — capabilities and async-open dispatch", () => {
   it("has inProcessSync: false", () => {
     expect(libsqlReplicaDriver.capabilities.inProcessSync).toBe(false);
-  });
-
-  it("omits openSync so the async-open path is used", () => {
-    expect(libsqlReplicaDriver.openSync).toBeUndefined();
   });
 
   it("omits databaseExists and restoreFromPath", () => {

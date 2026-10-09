@@ -65,7 +65,7 @@ export class AssociationQueryValue {
 
   /** @internal */
   private primaryKey(): string | string[] {
-    return this.associatedTable.joinPrimaryKey() ?? "id";
+    return this.associatedTable.joinPrimaryKey()!;
   }
 
   /** @internal */

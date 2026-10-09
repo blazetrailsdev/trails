@@ -238,7 +238,6 @@ function openDatabase(config: SqliteOpenConfig): import("node:sqlite").DatabaseS
     readOnly: config.readOnly ?? false,
     enableForeignKeyConstraints: false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   opts.enableDoubleQuotedStringLiterals = !(config.strict ?? false);
   try {
     return new nodeSqlite.DatabaseSync(sharedCacheDatabase(config), opts);
@@ -272,10 +271,6 @@ export const nodeSqliteDriver: SqliteDriver = {
   capabilities,
 
   async open(config: SqliteOpenConfig): Promise<SqliteConnection> {
-    return new NodeSqliteConnection(openDatabase(config));
-  },
-
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
     return new NodeSqliteConnection(openDatabase(config));
   },
 

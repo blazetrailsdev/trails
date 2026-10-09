@@ -29,7 +29,6 @@ import {
 import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { TableNotSpecified } from "./errors.js";
-import { EncryptableRecord } from "./encryption/encryptable-record.js";
 import { NullColumn } from "./connection-adapters/column.js";
 import { withConnection, isConnected } from "./connection-handling.js";
 
@@ -554,9 +553,6 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _attributeMethodsGenerated?: boolean;
   };
   methodHost._attributeMethodsGenerated = false;
-
-  const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
-  EncryptableRecord.requireOriginalColumnsAfterReflection(host, reflectedColumnNames);
 }
 
 /**

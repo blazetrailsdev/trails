@@ -230,7 +230,6 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   try {
     return new Database(sharedCacheDatabase(config), opts);
   } catch (e) {
@@ -251,7 +250,6 @@ function openRemoteDatabase(config: SqliteOpenConfig): Database.Database {
   if (config.authToken !== undefined) {
     (opts as LibsqlReplicaOptions).authToken = config.authToken;
   }
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   return new Database(config.remoteUrl!, opts);
 }
 
@@ -297,7 +295,6 @@ export function buildReplicaOptions(config: SqliteOpenConfig): LibsqlReplicaOpti
   };
   if (config.syncUrl !== undefined) opts.syncUrl = config.syncUrl;
   if (config.authToken !== undefined) opts.authToken = config.authToken;
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   if (opts.syncPeriod !== undefined) {
     if (
       typeof opts.syncPeriod !== "number" ||
@@ -351,10 +348,6 @@ export const libsqlDriver: SqliteDriver = {
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     return Promise.resolve(new LibsqlConnection(openDatabase(config)));
-  },
-
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
-    return new LibsqlConnection(openDatabase(config));
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {
