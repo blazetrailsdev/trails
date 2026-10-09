@@ -1,12 +1,7 @@
 import type mysql from "mysql2/promise";
-import { Temporal } from "@blazetrails/date";
+import { Date as RubyDate, Time } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
-import {
-  parseMysqlInstant,
-  parseMysqlDatetimeAsInstant,
-  parseMysqlDate,
-  timeFromInstant,
-} from "../abstract/temporal-wire.js";
+import { defaultTimezone } from "../../active-record.js";
 
 interface QueryOptions {
   databaseTimezone?: "utc" | "local";
@@ -23,27 +18,33 @@ type TypeCast = (field: Field, next: () => unknown) => unknown;
 function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): unknown {
   switch (field.type) {
     case "TIMESTAMP":
-    case "TIMESTAMP2": {
-      const raw = field.string();
-      if (raw === null) return null;
-      return timeFromInstant(parseMysqlInstant(raw));
-    }
+    case "TIMESTAMP2":
     case "DATETIME":
     case "DATETIME2": {
       const raw = field.string();
       if (raw === null) return null;
-      return timeFromInstant(
-        parseMysqlDatetimeAsInstant(
-          raw,
-          queryOptions.databaseTimezone === "utc" ? "UTC" : Temporal.Now.timeZoneId(),
-        ),
-      );
+      const tokens =
+        /^(\d{1,4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?/.exec(raw);
+      if (!tokens) return null;
+      const [year, month, day, hour, min, sec] = tokens.slice(1, 7).map(Number);
+      if (year + month + day + hour + min + sec === 0) return null;
+      const msec = Number((tokens[7] ?? "").padEnd(6, "0"));
+      const dbTimezone =
+        field.type.startsWith("TIMESTAMP") || queryOptions.databaseTimezone === "utc"
+          ? "utc"
+          : "local";
+      const val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
+      return defaultTimezone() === "utc" ? val.getutc() : val.getlocal();
     }
     case "DATE":
     case "NEWDATE": {
       const raw = field.string();
       if (raw === null) return null;
-      return parseMysqlDate(raw);
+      const tokens = /^(\d{1,4})-(\d{1,2})-(\d{1,2})/.exec(raw);
+      if (!tokens) return null;
+      const [year, month, day] = tokens.slice(1, 4).map(Number);
+      if (year + month + day === 0) return null;
+      return new RubyDate(year, month, day).toDate();
     }
     case "DECIMAL":
     case "NEWDECIMAL": {
