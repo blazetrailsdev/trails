@@ -142,13 +142,19 @@ describe("same-file module bodies join by convention", () => {
     packages: {
       i18n: { classes: {}, modules },
       activemodel: {
-        libDir: "rails/v8.0.2/activemodel/lib/active_model",
         classes: {},
         modules: {
           "ActiveModel::API": entity(
             "api.rb",
             [],
-            [{ ...api, file: "api.rb", line: 80, endLine: 84 }],
+            [
+              {
+                ...api,
+                vendorFile: "rails/v8.0.2/activemodel/lib/active_model/api.rb",
+                line: 80,
+                endLine: 84,
+              },
+            ],
           ),
         },
       },

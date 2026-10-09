@@ -28,7 +28,7 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
     const body = mod?.instanceMethods.find((m) => m.name === tag.hook);
     if (!body) continue;
     const cited = `${tag.source}/${tag.version}/${tag.file}:${tag.firstLine}-${tag.lastLine}`;
-    const actual = `${pkg.libDir}/${body.file ?? mod?.file}:${body.line}-${body.endLine}`;
+    const actual = `${body.vendorFile}:${body.line}-${body.endLine}`;
     if (cited !== actual) {
       throw new Error(
         `${TAG} citation is stale: ${where} — \`${name}\` is cited at ${cited}, and the ` +

@@ -259,6 +259,7 @@ def strip_sexp_positions(node)
 end
 
 INLINED_HOOKS = %w[initialize new].freeze
+VENDOR_ROOT = File.expand_path("../../vendor", __dir__)
 
 class DefEndLines < Ripper
   attr_reader :ends
@@ -487,6 +488,7 @@ class ApiExtractor
     @source = source
     @string_openers = nil
     @def_end_lines = nil
+    @vendor_file = filepath.start_with?("#{VENDOR_ROOT}/") ? filepath.delete_prefix("#{VENDOR_ROOT}/") : nil
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -910,6 +912,7 @@ class ApiExtractor
       @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
       end_line = @def_end_lines[method_info[:line]]
       method_info[:endLine] = end_line if end_line
+      method_info[:vendorFile] = @vendor_file if @vendor_file
     end
     if name == "method_missing" && !@in_sclass
       reader = method_missing_send_receiver(node[3], find_params(node))
@@ -4862,7 +4865,6 @@ def run
     end
 
     manifest[:packages][pkg_name] = {
-      libDir: pkg_dir[%r{/vendor/(.+?)/?\z}, 1],
       classes: classes,
       modules: modules,
       fileConstants: extractor.file_constants,

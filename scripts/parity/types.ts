@@ -218,6 +218,8 @@ export interface MethodInfo {
   /** Ruby-side only (RFC 0188): the line an `initialize` / `new` `def` closes
    *  on, so an `@inlinedFrom` citation's span can be derived. */
   endLine?: number;
+  /** Ruby-side only (RFC 0188): that `def`'s file, relative to `vendor/`. */
+  vendorFile?: string;
   /**
    * TS-side only (RFC 0099): the REASON behind each `@missingRailsCall`
    * suppression above, keyed by Ruby call. Carried so a receipt's permanence
@@ -514,9 +516,6 @@ export interface ClassInfo {
 }
 
 export interface PackageInfo {
-  /** Ruby-side only (RFC 0188): the directory every `file` in this package is
-   *  relative to, itself relative to `vendor/` (`rails/v8.0.2/activemodel/lib/active_model`). */
-  libDir?: string;
   classes: Record<string, ClassInfo>;
   modules: Record<string, ClassInfo>;
   fileFunctions?: Record<string, MethodInfo[]>;
