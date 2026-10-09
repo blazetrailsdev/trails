@@ -267,6 +267,12 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
 }
 
 export const Mysql2 = {
+  Error: class {
+    static [Symbol.hasInstance](e: unknown): boolean {
+      const { code, fatal } = (e ?? {}) as { code?: unknown; fatal?: unknown };
+      return e instanceof Error && (typeof code === "string" || fatal === true);
+    }
+  },
   Client: {
     MULTI_STATEMENTS: 0x10000,
     OPTION_MULTI_STATEMENTS_ON: 0,

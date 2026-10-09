@@ -610,10 +610,6 @@ than binding it anywhere. **`Kernel#load` is `rbFLoad` in ruby-compat**
 - `loadMigration` is Rails' three lines in Rails' order and is async, as every
   caller of `MigrationProxy#migration` already is.
 
-The call gate reads Rails' `load` as the ported `Relation#load`, so
-`loadMigration` carries `@missingRailsCall load — PERMANENT` against this
-section.
-
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). It covers `Kernel#load` of a file Rails loads by path at run
 time. A `require` is not ported this way on the strength of this section; see

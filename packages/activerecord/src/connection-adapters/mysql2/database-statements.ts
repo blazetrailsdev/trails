@@ -151,6 +151,7 @@ export async function performQuery(
         result = await stmt.execute(...typeCastedBinds);
         this._affectedRowsBeforeWarnings = stmt.affectedRows;
       } catch (e) {
+        if (!(e instanceof Mysql2.Error)) throw e;
         this._statements.delete(sql);
         throw e;
       }
@@ -167,6 +168,7 @@ export async function performQuery(
           stmt.close();
         }
       } catch (e) {
+        if (!(e instanceof Mysql2.Error)) throw e;
         stmt.close();
         throw e;
       }
@@ -209,10 +211,10 @@ export function castResult(rawResult: Mysql2Result | null): Result {
 export function affectedRows(
   this: { _affectedRowsBeforeWarnings: number | null },
   rawResult: Mysql2Result | null,
-): number {
+): number | null {
   if (rawResult != null) freeRawResult(rawResult);
 
-  return this._affectedRowsBeforeWarnings ?? 0;
+  return this._affectedRowsBeforeWarnings;
 }
 
 /** @internal */

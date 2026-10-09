@@ -1407,10 +1407,7 @@ export class MigrationProxy {
     return this._migration;
   }
 
-  /**
-   * @internal
-   * @missingRailsCall load — PERMANENT
-   */
+  /** @internal */
   async loadMigration(): Promise<Migration> {
     try {
       rbModRemoveConst(Object, this.name);
