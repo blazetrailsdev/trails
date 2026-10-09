@@ -450,31 +450,20 @@ export function isInstanceMethodAlreadyImplemented(
   }
 
   const superclass = rbClassSuperclass(this);
-  if (Object.prototype.hasOwnProperty.call(superclass ?? {}, "_isActiveRecordBase")) {
+  if (superclass === ActiveRecord.Base) {
     return AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(
       this as any,
       methodName,
     );
   } else {
-    const base = frameworkBase(this);
     const defined =
-      base != null &&
-      isMethodDefinedWithin.call(this, methodName, superclass, base) &&
+      isMethodDefinedWithin.call(this, methodName, superclass, ActiveRecord.Base) &&
       !isOwnedByGeneratedAttributeMethods(superclass, methodName);
     return (
       defined ||
       AttributeMethods.ClassMethods.isInstanceMethodAlreadyImplemented.call(this as any, methodName)
     );
   }
-}
-
-function frameworkBase(klass: unknown): any {
-  let c: unknown = klass;
-  while (typeof c === "function" && c !== Function.prototype) {
-    if (Object.prototype.hasOwnProperty.call(c, "_isActiveRecordBase")) return c;
-    c = Object.getPrototypeOf(c);
-  }
-  return null;
 }
 
 export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: string): boolean {

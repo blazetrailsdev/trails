@@ -586,7 +586,6 @@ export class Base extends Model {
 
   static _tableName: string | null = null;
   declare static _primaryKey?: string | string[];
-  static readonly _isActiveRecordBase = true;
 
   declare static filterAttributes: (string | RegExp | ((key: string, value: unknown) => unknown))[];
 

@@ -428,6 +428,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
     return this.loadTarget();
   }
 
+  override get _isRecordsSynchronous(): boolean {
+    return super._isRecordsSynchronous || !this._association.isFindTarget();
+  }
+
   override async equals(other: unknown): Promise<boolean | undefined> {
     const loadTarget = await this.loadTarget();
     if (Array.isArray(other)) {

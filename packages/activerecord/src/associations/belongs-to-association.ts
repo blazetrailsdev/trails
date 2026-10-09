@@ -150,7 +150,8 @@ export class BelongsToAssociation extends SingularAssociation {
     );
   }
 
-  protected override isFindTarget(): boolean {
+  /** @internal */
+  override isFindTarget(): boolean {
     return !this.isLoaded() && this.foreignKeyPresent() && !!this.klass;
   }
 

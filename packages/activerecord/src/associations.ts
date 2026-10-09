@@ -21,6 +21,8 @@ import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import {
   Module,
   include,
+  rbClassInheritedP,
+  rbClassSuperclass,
   rbInspect,
   rbModConstSet,
   rbModName,
@@ -92,18 +94,8 @@ export interface ReflectionLike {
 }
 
 /** @internal */
-function frameworkBase(model: typeof Base): typeof Base | null {
-  let c: unknown = model;
-  while (typeof c === "function" && c !== Function.prototype) {
-    if (Object.prototype.hasOwnProperty.call(c, "_isActiveRecordBase")) return c as typeof Base;
-    c = Object.getPrototypeOf(c);
-  }
-  return null;
-}
-
-/** @internal */
 function assertActiveRecordBase(model: typeof Base): void {
-  if (!frameworkBase(model)) {
+  if (typeof model !== "function" || rbClassInheritedP(model, ActiveRecord.Base) !== true) {
     throw new ArgumentError(
       `registerModel expects an ActiveRecord::Base subclass, got ${String(model?.name ?? model)}`,
     );
@@ -121,8 +113,7 @@ export function registerModel(
   if (Array.isArray(nameOrModel)) {
     for (const m of nameOrModel) {
       registerModel(m);
-      const proto = Object.getPrototypeOf(m) as typeof Base;
-      if (proto && proto !== Function.prototype && proto !== frameworkBase(m)) {
+      if (rbClassSuperclass(m) !== ActiveRecord.Base) {
         registerSubclass(m);
       }
     }

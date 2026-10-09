@@ -13,6 +13,7 @@ import {
   isEmpty,
   isSymbol,
   merge,
+  rbClassInheritedP,
   rbEql,
   rbObjClassname,
   symbolToS,
@@ -660,7 +661,7 @@ async function resolveFixtureClassNames(klass: TestCaseClass): Promise<void> {
   }
   if (Object.keys(classNames).length > 0) klass.setFixtureClass(classNames);
   for (const model of Object.values(klass.fixtureClassNames)) {
-    if (typeof model === "function" && "_isActiveRecordBase" in model) {
+    if (typeof model === "function" && rbClassInheritedP(model, Base) === true) {
       registerModel(model as BaseClass);
     }
   }
