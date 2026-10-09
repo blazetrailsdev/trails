@@ -6,6 +6,7 @@ import {
   isEmpty,
   keys,
   merge,
+  Module,
   rbEqual,
   rbObjAsString,
   rbObjSingletonClass,
@@ -1105,6 +1106,6 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
-export const Persistence = {
-  _updateRecord: instanceUpdateRecord,
-};
+export const Persistence = new Module((mod) => {
+  mod.defineMethod("_updateRecord", instanceUpdateRecord);
+});
