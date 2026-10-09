@@ -1,4 +1,4 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
@@ -12,7 +12,7 @@ export class ShardedComment extends Base {
 
   static _tableName = "sharded_comments";
   static {
-    registerConstant("Sharded::Comment", this);
+    registerModel("Sharded::Comment", this);
   }
 
   static {
@@ -24,12 +24,6 @@ export class ShardedComment extends Base {
       foreignKey: "blog_post_id",
       primaryKey: "id",
     });
-    this.belongsTo("blogPostWithInverse", {
-      className: "Sharded::BlogPost",
-      foreignKey: ["blog_id", "blog_post_id"],
-      primaryKey: ["blog_id", "id"],
-      inverseOf: "commentsWithInverse",
-    });
     this.belongsTo("blog", { className: "Sharded::Blog" });
   }
 }
@@ -39,8 +33,6 @@ export interface ShardedComment {
   set blogPost(value: ShardedBlogPost | null);
   get blogPostById(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
   set blogPostById(value: ShardedBlogPost | null);
-  get blogPostWithInverse(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
-  set blogPostWithInverse(value: ShardedBlogPost | null);
   get blog(): ShardedBlog | null | Promise<ShardedBlog | null>;
   set blog(value: ShardedBlog | null);
 }

@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
+import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlogPost } from "./blog-post.js";
@@ -13,7 +13,7 @@ export class ShardedTag extends Base {
 
   static _tableName = "sharded_tags";
   static {
-    registerConstant("Sharded::Tag", this);
+    registerModel("Sharded::Tag", this);
   }
 
   static {

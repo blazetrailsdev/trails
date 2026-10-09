@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
+import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
@@ -14,8 +14,6 @@ export class ShardedBlogPost extends Base {
   declare children: AssociationProxy<ShardedBlogPost>;
   declare blogPostTags: AssociationProxy<ShardedBlogPostTag>;
   declare tags: AssociationProxy<ShardedTag>;
-  declare commentsWithCompositePk: AssociationProxy<ShardedComment>;
-  declare commentsWithInverse: AssociationProxy<ShardedComment>;
   declare blog_id: number;
   declare parent_id: number;
   declare parent_type: string;
@@ -24,7 +22,7 @@ export class ShardedBlogPost extends Base {
 
   static _tableName = "sharded_blog_posts";
   static {
-    registerConstant("Sharded::BlogPost", this);
+    registerModel("Sharded::BlogPost", this);
   }
 
   static {
@@ -48,18 +46,6 @@ export class ShardedBlogPost extends Base {
       foreignKey: ["blog_id", "blog_post_id"],
     });
     this.hasMany("tags", { through: "blogPostTags", className: "Sharded::Tag" });
-
-    this.hasMany("commentsWithCompositePk", {
-      className: "Sharded::Comment",
-      primaryKey: ["blog_id", "id"],
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
-
-    this.hasMany("commentsWithInverse", {
-      className: "Sharded::Comment",
-      foreignKey: ["blog_id", "blog_post_id"],
-      inverseOf: "blogPostWithInverse",
-    });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

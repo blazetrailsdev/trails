@@ -1,11 +1,11 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
 export class ShardedCommentDestroyAsync extends Base {
   static _tableName = "sharded_comments";
   static {
-    registerConstant("Sharded::CommentDestroyAsync", this);
+    registerModel("Sharded::CommentDestroyAsync", this);
   }
 
   static {

@@ -222,8 +222,10 @@ seats the constant and registers the subclass:
   it under the name given. `registerModel([Foo, Bar])` is one call per model.
 - Every form then registers the model with its `rbClassSuperclass` through
   `DescendantsTracker.registerSubclass`, for every model, a direct child of
-  `Base` included, as Ruby does for every subclass. `rbClassSuperclass` answers
-  `null` at the top of the chain, so `Base` itself registers nothing.
+  `Base` included, as Ruby does for every subclass. `Base` itself registers
+  nothing: Rails' `Base` has no model superclass
+  (`activerecord/lib/active_record/base.rb:282`), where trails' extends
+  ActiveModel's `Model`.
 
 `registerModel` is the interface application and test code uses to define a
 model, and its call sites in the test suite are correct as written. There is no
@@ -234,8 +236,8 @@ child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
 calling it.
 
 `registerConstant` (ruby-compat) stays the general seat for a constant that is
-not a model, and for a model file that seats its class under a path of its own,
-as `test-helpers/models/sharded/*.ts` seat `Sharded::Blog`.
+not a model. A model whose Ruby path its JS name cannot spell is seated by name,
+as `test-helpers/models/sharded/*.ts` call `registerModel("Sharded::Blog", this)`.
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). `registerModel` carries `@noRailsEquivalent PERMANENT` against
