@@ -879,10 +879,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.executeBlock(async () => fn(helper));
   }
 
-  async upOnly(fn?: () => Promise<void>): Promise<void> {
-    if (!this.isReverting() && fn) {
-      await this.executeBlock(fn);
-    }
+  async upOnly(block: () => Promise<void>): Promise<void> {
+    if (!this.isReverting()) await this.executeBlock(block);
   }
 
   async migrate(direction: "up" | "down"): Promise<void> {

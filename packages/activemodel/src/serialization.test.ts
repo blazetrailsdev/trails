@@ -169,8 +169,8 @@ describe("SerializationTest", () => {
       this.friends = friends;
     }
 
-    [Symbol.iterator](): Iterator<unknown> {
-      return this.friends[Symbol.iterator]();
+    toAry(): unknown[] {
+      return this.friends;
     }
   }
 

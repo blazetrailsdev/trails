@@ -383,15 +383,9 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return SQLite3Adapter.NATIVE_DATABASE_TYPES;
   }
 
-  get encoding(): string | Promise<string> {
-    const read = (rawConnection: SqliteConnection): string | Promise<string> => {
-      const result = rawConnection.pragma("encoding");
-      return result instanceof Promise
-        ? result.then(SQLite3Adapter.parseEncoding)
-        : SQLite3Adapter.parseEncoding(result);
-    };
-    const rawConnection = this.anyRawConnection() as SqliteConnection | Promise<SqliteConnection>;
-    return rawConnection instanceof Promise ? rawConnection.then(read) : read(rawConnection);
+  async encoding(): Promise<string> {
+    const rawConnection = (await this.anyRawConnection()) as SqliteConnection;
+    return SQLite3Adapter.parseEncoding(await rawConnection.pragma("encoding"));
   }
 
   override supportsExplain(): boolean {

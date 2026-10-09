@@ -221,7 +221,7 @@ describeIfSqlite("SqliteDBCharsetTest", () => {
 
   it("db retrieves charset", async () => {
     const connection = await Base.connectionPool().leaseConnection();
-    const encoding = vi.spyOn(connection as unknown as { encoding: string }, "encoding", "get");
+    const encoding = vi.spyOn(connection as unknown as { encoding(): Promise<string> }, "encoding");
 
     await DatabaseTasks.charset(configuration);
 

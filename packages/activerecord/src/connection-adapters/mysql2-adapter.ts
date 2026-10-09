@@ -96,7 +96,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       collation: _collation,
       variables: _vars,
       _fakeConnection: _fake,
-      initSql,
       connectionLimit: _connLimit,
       queueLimit: _queueLimit,
       waitForConnections: _waitFor,
@@ -116,9 +115,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (rtest(username)) connOptions.user = username;
     if (rtest(socket)) connOptions.socketPath = socket;
 
-    let conn: mysql.Connection;
     try {
-      conn = await mysql.createConnection({
+      return await mysql.createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
         flags: withoutDefaultIgnoreSpace(
@@ -131,7 +129,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         multipleStatements: true,
       });
     } catch (err) {
-      if (!(err instanceof Error)) throw new ConnectionNotEstablished(String(err));
       switch ((err as { errno?: number }).errno) {
         case Mysql2Adapter.ER_BAD_DB_ERROR:
           throw NoDatabaseError.dbError(
@@ -148,19 +145,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             connOptions.host ?? parseUriField(config, "hostname") ?? "unknown",
           );
         default:
-          throw new ConnectionNotEstablished(err.message, { cause: err });
+          throw new ConnectionNotEstablished((err as Error).message, { cause: err });
       }
     }
-
-    if (initSql) {
-      try {
-        await conn.query(initSql);
-      } catch (err) {
-        conn.end().catch(() => {});
-        throw err;
-      }
-    }
-    return conn;
   }
 
   /** @internal */
@@ -431,11 +418,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       throw new RuntimeError("Mysql2Adapter: fake connection has no client");
     const gen = this._connectGeneration;
     this._connectingPromiseGen = gen;
-    this._connectingPromise = Mysql2Adapter.newClient({
-      ...(this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions),
-      initSql: "SET time_zone = '+00:00'",
-    }).then(
+    this._connectingPromise = Mysql2Adapter.newClient(
+      this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
+    ).then(
       async (conn): Promise<mysql.Connection> => {
+        try {
+          await conn.query("SET time_zone = '+00:00'");
+        } catch (err) {
+          conn.end().catch(() => {});
+          throw err;
+        }
         if (this._connectGeneration !== gen) {
           if (this._connectingPromiseGen === gen) this._connectingPromise = null;
           const discardErr = new ConnectionNotEstablished(

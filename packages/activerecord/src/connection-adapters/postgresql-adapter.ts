@@ -647,7 +647,7 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      if (this._acquiring) this._acquireGeneration++;
+      this._acquireGeneration++;
       try {
         await this._rawConnection?.end();
       } catch {}
@@ -663,8 +663,7 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     void this._statements.reset();
     this._closed = true;
-    if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
-    this._acquireGeneration++;
+    this._discardedAcquireGenerations.add(this._acquireGeneration++);
   }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {

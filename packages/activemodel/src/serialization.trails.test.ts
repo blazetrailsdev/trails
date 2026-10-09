@@ -235,6 +235,14 @@ describe("Serialization — trails-only coverage", () => {
     expect((result.comments as any[])[0].author).toBeUndefined();
   });
 
+  it("include naming a method that returns a Set raises NoMethodError", async () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: new Set([new Tag({ name: "rails" })]) });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+    await expect(p.serializableHash({ include: "tags" })).rejects.toThrow(NoMethodError);
+  });
+
   it("awaited nested include preloads through an attributes-less PORO", async () => {
     const comment = { _attributes: new Map([["text", "Nice"]]) };
     const comments = {
@@ -242,6 +250,9 @@ describe("Serialization — trails-only coverage", () => {
       load(): Promise<void> {
         this.loaded = true;
         return Promise.resolve();
+      },
+      toArray(): Promise<unknown[]> {
+        return Promise.resolve([comment]);
       },
       [Symbol.iterator](): Iterator<unknown> {
         return [comment][Symbol.iterator]();

@@ -60,7 +60,7 @@ export class SQLiteDatabaseTasks {
   }
 
   async charset(): Promise<string> {
-    return ((await this.connection()) as SQLite3Adapter).encoding;
+    return ((await this.connection()) as SQLite3Adapter).encoding();
   }
 
   async structureDump(filename: string, extraFlags: string | string[] | null): Promise<void> {
