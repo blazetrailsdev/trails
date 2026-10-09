@@ -1,3 +1,10 @@
+import {
+  Module,
+  rbModConstSet,
+  rbModName,
+  registerConstant,
+  registeredConstant,
+} from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../../associations/collection-proxy.js";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
@@ -6,6 +13,9 @@ import type { ShardedBlog } from "./blog.js";
 import type { ShardedBlogPostTag } from "./blog-post-tag.js";
 import type { ShardedComment } from "./comment.js";
 import type { ShardedTag } from "./tag.js";
+
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+registerConstant("Sharded", Sharded);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPost extends Base {
@@ -22,30 +32,19 @@ export class ShardedBlogPost extends Base {
 
   static _tableName = "sharded_blog_posts";
   static {
-    registerModel("Sharded::BlogPost", this);
+    registerModel(rbModConstSet(Sharded, "BlogPost", this));
   }
 
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    this.belongsTo("parent", { polymorphic: true });
-    this.belongsTo("blog", { className: "Sharded::Blog" });
-    this.hasMany("comments", {
-      className: "Sharded::Comment",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
-    this.hasMany("deleteComments", {
-      className: "Sharded::Comment",
-      foreignKey: ["blog_id", "blog_post_id"],
-      dependent: "deleteAll",
-    });
-    this.hasMany("children", { className: "Sharded::BlogPost", as: "parent" });
-
-    this.hasMany("blogPostTags", {
-      className: "Sharded::BlogPostTag",
-      foreignKey: ["blog_id", "blog_post_id"],
-    });
-    this.hasMany("tags", { through: "blogPostTags", className: "Sharded::Tag" });
+    this.belongsTo("parent", { className: rbModName(this)!, polymorphic: true });
+    this.belongsTo("blog");
+    this.hasMany("comments");
+    this.hasMany("deleteComments", { className: "Sharded::Comment", dependent: "deleteAll" });
+    this.hasMany("children", { className: rbModName(this)!, as: "parent" });
+    this.hasMany("blogPostTags");
+    this.hasMany("tags", { through: "blogPostTags" });
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

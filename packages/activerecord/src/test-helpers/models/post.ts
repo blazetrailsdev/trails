@@ -712,7 +712,6 @@ export interface Post {
 }
 
 export class SpecialPost extends Post {}
-registerConstant("SpecialPost", SpecialPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class StiPost extends Post {
@@ -720,7 +719,6 @@ export class StiPost extends Post {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
 }
-registerConstant("StiPost", StiPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface StiPost {
   get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
@@ -732,21 +730,18 @@ export class AbstractStiPost extends Post {
     this.abstractClass = true;
   }
 }
-registerConstant("AbstractStiPost", AbstractStiPost);
 
 export class SubStiPost extends StiPost {
   static {
     this._tableName = "posts";
   }
 }
-registerConstant("SubStiPost", SubStiPost);
 
 export class SubAbstractStiPost extends AbstractStiPost {
   static {
     this._tableName = "posts";
   }
 }
-registerConstant("SubAbstractStiPost", SubAbstractStiPost);
 
 export class NullPost extends Post {
   static {
@@ -755,7 +750,6 @@ export class NullPost extends Post {
     });
   }
 }
-registerConstant("NullPost", NullPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FirstPost extends Base {
@@ -812,7 +806,6 @@ export class TaggedPost extends Post {
     this.hasMany("tags", { through: "taggings" });
   }
 }
-registerConstant("TaggedPost", TaggedPost);
 
 export class PostWithDefaultInclude extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -840,7 +833,6 @@ export class PostWithSpecialCategorization extends Post {
     });
   }
 }
-registerConstant("PostWithSpecialCategorization", PostWithSpecialCategorization);
 
 export class PostWithDefaultScope extends Base {
   static {
@@ -977,10 +969,8 @@ export class ConditionalStiPost extends Post {
     });
   }
 }
-registerConstant("ConditionalStiPost", ConditionalStiPost);
 
 export class SubConditionalStiPost extends ConditionalStiPost {}
-registerConstant("SubConditionalStiPost", SubConditionalStiPost);
 
 export class PostWithDestroyCallback extends Base {
   static {

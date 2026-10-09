@@ -67,7 +67,6 @@ export interface Membership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CurrentMembership extends Membership {
   static {
-    registerConstant("CurrentMembership", this);
     registerModel(CurrentMembership);
     this.belongsTo("member");
     this.belongsTo("club", { inverseOf: "membership" });
@@ -84,7 +83,6 @@ export interface CurrentMembership {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class SuperMembership extends Membership {
   static {
-    registerConstant("SuperMembership", this);
     registerModel(SuperMembership);
     this.belongsTo("member", function (this: any) {
       return this.order("members.id DESC");
@@ -102,7 +100,6 @@ export interface SuperMembership {
 
 export class SelectedMembership extends Membership {
   static {
-    registerConstant("SelectedMembership", this);
     registerModel(SelectedMembership);
     this.defaultScope(function (this: any) {
       return this.select("'1' as foo");
@@ -115,7 +112,6 @@ export class TenantMembership extends Membership {
   static currentMember: any = null;
 
   static {
-    registerConstant("TenantMembership", this);
     registerModel(TenantMembership);
     this.belongsTo("member");
     this.belongsTo("club");

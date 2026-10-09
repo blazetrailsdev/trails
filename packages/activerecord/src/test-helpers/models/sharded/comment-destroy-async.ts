@@ -1,11 +1,20 @@
+import {
+  Module,
+  rbModConstSet,
+  registerConstant,
+  registeredConstant,
+} from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+registerConstant("Sharded", Sharded);
+
 export class ShardedCommentDestroyAsync extends Base {
   static _tableName = "sharded_comments";
   static {
-    registerModel("Sharded::CommentDestroyAsync", this);
+    registerModel(rbModConstSet(Sharded, "CommentDestroyAsync", this));
   }
 
   static {
@@ -20,6 +29,6 @@ export class ShardedCommentDestroyAsync extends Base {
       className: "Sharded::BlogPostDestroyAsync",
       foreignKey: "blog_post_id",
     });
-    this.belongsTo("blog", { className: "Sharded::Blog" });
+    this.belongsTo("blog");
   }
 }

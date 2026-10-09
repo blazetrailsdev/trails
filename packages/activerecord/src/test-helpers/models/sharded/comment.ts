@@ -1,8 +1,17 @@
+import {
+  Module,
+  rbModConstSet,
+  registerConstant,
+  registeredConstant,
+} from "@blazetrails/ruby-compat";
 import { registerModel } from "../../../associations.js";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 import type { ShardedBlog } from "./blog.js";
 import type { ShardedBlogPost } from "./blog-post.js";
+
+const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
+registerConstant("Sharded", Sharded);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedComment extends Base {
@@ -12,19 +21,19 @@ export class ShardedComment extends Base {
 
   static _tableName = "sharded_comments";
   static {
-    registerModel("Sharded::Comment", this);
+    registerModel(rbModConstSet(Sharded, "Comment", this));
   }
 
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    this.belongsTo("blogPost", { className: "Sharded::BlogPost" });
+    this.belongsTo("blogPost");
     this.belongsTo("blogPostById", {
       className: "Sharded::BlogPost",
       foreignKey: "blog_post_id",
       primaryKey: "id",
     });
-    this.belongsTo("blog", { className: "Sharded::Blog" });
+    this.belongsTo("blog");
   }
 }
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging

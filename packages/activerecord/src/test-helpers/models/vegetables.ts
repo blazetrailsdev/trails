@@ -19,16 +19,12 @@ export class Vegetable extends Base {
 registerConstant("Vegetable", Vegetable);
 
 export class Cucumber extends Vegetable {}
-registerConstant("Cucumber", Cucumber);
 
 export class Cabbage extends Vegetable {}
-registerConstant("Cabbage", Cabbage);
 
 export class GreenCabbage extends Cabbage {}
-registerConstant("GreenCabbage", GreenCabbage);
 
 export class KingCole extends GreenCabbage {}
-registerConstant("KingCole", KingCole);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class RedCabbage extends Cabbage {
@@ -36,7 +32,6 @@ export class RedCabbage extends Cabbage {
     this.belongsTo("seller", { className: "Company" });
   }
 }
-registerConstant("RedCabbage", RedCabbage);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface RedCabbage {
   get seller(): Company | null | Promise<Company | null>;

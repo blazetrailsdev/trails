@@ -184,7 +184,6 @@ export class SpecialComment extends Comment {
     return "a special comment...";
   }
 }
-registerConstant("SpecialComment", SpecialComment);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface SpecialComment {
   get ordinaryPost(): Post | null | Promise<Post | null>;
@@ -194,10 +193,8 @@ export interface SpecialComment {
 }
 
 export class SubSpecialComment extends SpecialComment {}
-registerConstant("SubSpecialComment", SubSpecialComment);
 
 export class VerySpecialComment extends Comment {}
-registerConstant("VerySpecialComment", VerySpecialComment);
 
 export class CommentThatAutomaticallyAltersPostBody extends Comment {
   static {
@@ -211,7 +208,6 @@ export class CommentThatAutomaticallyAltersPostBody extends Comment {
     });
   }
 }
-registerConstant("CommentThatAutomaticallyAltersPostBody", CommentThatAutomaticallyAltersPostBody);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CommentWithDefaultScopeReferencesAssociation extends Comment {
@@ -239,7 +235,6 @@ export class CommentWithAfterCreateUpdate extends Comment {
     });
   }
 }
-registerConstant("CommentWithAfterCreateUpdate", CommentWithAfterCreateUpdate);
 
 for (const klass of [
   SpecialComment,

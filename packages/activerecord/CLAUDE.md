@@ -236,8 +236,9 @@ child in hand (`attributes.ts`, activemodel's `attribute-registration.ts`) keep
 calling it.
 
 `registerConstant` (ruby-compat) stays the general seat for a constant that is
-not a model. A model whose Ruby path its JS name cannot spell is seated by name,
-as `test-helpers/models/sharded/*.ts` call `registerModel("Sharded::Blog", this)`.
+not a model, the namespace module a model sits in included: a namespaced model
+is `registerModel(rbModConstSet(Sharded, "Blog", this))`, as
+`test-helpers/models/sharded/*.ts` do.
 
 This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-09). `registerModel` carries `@noRailsEquivalent PERMANENT` against

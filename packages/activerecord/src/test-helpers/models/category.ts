@@ -110,6 +110,5 @@ export class Category extends Base {
 registerConstant("Category", Category);
 
 export class SpecialCategory extends Category {}
-registerConstant("SpecialCategory", SpecialCategory);
 
 registerModel(SpecialCategory);

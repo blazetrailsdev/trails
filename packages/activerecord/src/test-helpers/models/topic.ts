@@ -262,14 +262,12 @@ export class DefaultRejectedTopic extends Topic {
     });
   }
 }
-registerConstant("DefaultRejectedTopic", DefaultRejectedTopic);
 
 export class BlankTopic extends Topic {
   blank() {
     return true;
   }
 }
-registerConstant("BlankTopic", BlankTopic);
 
 export class TitlePrimaryKeyTopic extends Topic {
   static {
@@ -277,7 +275,6 @@ export class TitlePrimaryKeyTopic extends Topic {
     this.aliasAttribute("id_value", "id");
   }
 }
-registerConstant("TitlePrimaryKeyTopic", TitlePrimaryKeyTopic);
 
 export const Web = new Module();
 registerConstant("Web", Web);
