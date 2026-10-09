@@ -198,7 +198,7 @@ export abstract class SchemaDumper {
   }
 
   private async tables(stream: IO | StringIO): Promise<void> {
-    const sortedTables = (await this.connection.tables()).sort();
+    const sortedTables = [...(await this.connection.tables())].sort();
 
     const notIgnoredTables = sortedTables.filter((tableName) => !this.isIgnored(tableName));
 

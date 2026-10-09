@@ -196,12 +196,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async schemaTypeWithVirtual(column: Column): Promise<string> {
-    if ((await this.connection.supportsVirtualColumns()) && column.isVirtual()) return ":virtual";
-    return this.schemaType(column);
-  }
-
-  /** @internal */
   protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
     return this.connection.tableOptions(tableName);
   }
