@@ -298,6 +298,7 @@ function isRespondToUsec(
   return !(value instanceof Temporal.PlainDate);
 }
 
+/** Ruby's `Time#usec` (`vendor/ruby/v3.3.11/time.c:3861`) and `DateTime#usec` (`activesupport/lib/active_support/core_ext/date_time/conversions.rb:89`). */
 function usec(value: Exclude<TemporalDateLike, Temporal.PlainDate>): number {
   if (value instanceof TimeWithZone || value instanceof RubyTime) return value.usec;
   if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
