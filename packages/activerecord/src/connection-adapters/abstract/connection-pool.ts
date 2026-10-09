@@ -641,7 +641,7 @@ export class ConnectionPool implements ReapablePool {
       return c;
     } catch (err) {
       await this.remove(c);
-      await c.disconnectBang();
+      this._trackCloseDrain(c.disconnectBang());
       throw err;
     }
   }
