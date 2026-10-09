@@ -5,7 +5,7 @@ import {
   leaseMysqlAdapter,
   Mysql2Adapter,
 } from "../abstract-mysql-adapter/test-helper.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
+import type { Mysql2Result } from "../../connection-adapters/mysql2/mysql2-client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -32,28 +32,24 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     it("preserves exact value above Number.MAX_SAFE_INTEGER via BigIntegerType", async () => {
       const unsafe = 9007199254740993n;
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [unsafe]);
-      const result = (await adapter.execute(
-        `SELECT \`score\` FROM \`bigint_rt\``,
-      )) as Mysql2RawResult;
-      expect(type.cast(result.rows![0][0])).toBe(unsafe);
+      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result;
+      expect(type.cast(result.toA()[0][0])).toBe(unsafe);
     });
 
     it("update round-trip preserves value", async () => {
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [BIG]);
       await adapter.execUpdate(`UPDATE \`bigint_rt\` SET \`score\` = ?`, null, [BIG + 1n]);
-      const result = (await adapter.execute(
-        `SELECT \`score\` FROM \`bigint_rt\``,
-      )) as Mysql2RawResult;
-      expect(type.cast(result.rows![0][0])).toBe(BIG + 1n);
+      const result = (await adapter.execute(`SELECT \`score\` FROM \`bigint_rt\``)) as Mysql2Result;
+      expect(type.cast(result.toA()[0][0])).toBe(BIG + 1n);
     });
 
     it("safe-range BIGINT returns as number (auto-increment IDs unaffected)", async () => {
       await adapter.execInsert(`INSERT INTO \`bigint_rt\` (\`score\`) VALUES (?)`, null, [42]);
       const result = (await adapter.execute(
         `SELECT \`id\`, \`score\` FROM \`bigint_rt\``,
-      )) as Mysql2RawResult;
-      expect(typeof result.rows![0][0]).toBe("number");
-      expect(typeof result.rows![0][1]).toBe("number");
+      )) as Mysql2Result;
+      expect(typeof result.toA()[0][0]).toBe("number");
+      expect(typeof result.toA()[0][1]).toBe("number");
     });
 
     it("INT column is unaffected by supportBigNumbers", async () => {
@@ -62,11 +58,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         null,
         [BIG, 42],
       );
-      const result = (await adapter.execute(
-        `SELECT \`count\` FROM \`bigint_rt\``,
-      )) as Mysql2RawResult;
-      expect(typeof result.rows![0][0]).toBe("number");
-      expect(result.rows![0][0]).toBe(42);
+      const result = (await adapter.execute(`SELECT \`count\` FROM \`bigint_rt\``)) as Mysql2Result;
+      expect(typeof result.toA()[0][0]).toBe("number");
+      expect(result.toA()[0][0]).toBe(42);
     });
   });
 });

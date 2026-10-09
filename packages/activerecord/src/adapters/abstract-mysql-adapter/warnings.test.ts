@@ -8,7 +8,7 @@ import {
 } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 import { Base } from "../../base.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
+import type { Mysql2Result } from "../../connection-adapters/mysql2/mysql2-client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -33,8 +33,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action :ignore on warning", async () => {
       await withDbWarningsAction("ignore", async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
-        expect(result.rows?.[0]).toEqual([1]);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        expect(result.toA()[0]).toEqual([1]);
       });
     });
 
@@ -96,15 +96,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action allows a list of warnings to ignore", async () => {
       await withDbWarningsAction("raise", [/Truncated incorrect DOUBLE value/], async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
-        expect(result.rows?.[0]).toEqual([1]);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        expect(result.toA()[0]).toEqual([1]);
       });
     });
 
     it("db_warnings_action allows a list of codes to ignore", async () => {
       await withDbWarningsAction("raise", ["1292"], async () => {
-        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2RawResult;
-        expect(result.rows?.[0]).toEqual([1]);
+        const result = (await adapter.execute(`SELECT 1 + 'foo' AS v`)) as Mysql2Result;
+        expect(result.toA()[0]).toEqual([1]);
       });
     });
 
@@ -112,9 +112,9 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await withDbWarningsAction("raise", async () => {
         const result = (await adapter.execute(
           "DROP TABLE IF EXISTS non_existent_table_warnings_test",
-        )) as Mysql2RawResult;
+        )) as Mysql2Result | null;
 
-        expect(result.rows ?? []).toEqual([]);
+        expect(result?.toA() ?? []).toEqual([]);
       });
     });
 

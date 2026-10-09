@@ -1310,6 +1310,18 @@ The one-line rule: ESM has no synchronous `require`, so
 `ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`, and
 no other `require` is ported that way.
 
+## A migration file is loaded by `Kernel#load` (`MigrationProxy#load_migration`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-migration-file-is-loaded-by-kernelload-migrationproxyload_migration).
+The one-line rule: `Kernel#load` is ruby-compat's `rbFLoad`, an awaited
+`import()` that evaluates the file again and seats its constant-named exports.
+
+## A dumped statement wraps its trailing options in braces (`SchemaDumper`'s `parts.join(", ")`)
+
+Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#a-dumped-statement-wraps-its-trailing-options-in-braces-schemadumpers-partsjoin-).
+The one-line rule: a dumped TypeScript call needs `{ }` around its options only
+when it has any, and that one arm is permanent.
+
 ## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
 
 Moved to [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#activerecordpromise-is-the-native-promise-promiserb-promisecomplete).

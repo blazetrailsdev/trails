@@ -1,18 +1,147 @@
 import type mysql from "mysql2/promise";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { defaultTimezone } from "../../active-record.js";
 import { quotedDate } from "../abstract/quoting.js";
+import { defaultTimezone } from "../../active-record.js";
 
 interface QueryOptions {
   as?: "array";
   databaseTimezone?: "utc" | "local";
 }
 
-export type Mysql2Client = mysql.Connection & {
+type Native = [unknown, mysql.FieldPacket[] | undefined];
+
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+export class Mysql2Result {
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  readonly fields: string[];
+  private rows: unknown[][];
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  constructor(fields: string[], rows: unknown[][]) {
+    this.fields = fields;
+    this.rows = rows;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  get size(): number {
+    return this.rows.length;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  toA(): unknown[][] {
+    return this.rows;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  free(): void {
+    this.rows = [];
+  }
+}
+
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+export class Mysql2Statement {
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  affectedRows = 0;
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  constructor(
+    private client: Mysql2Client,
+    private sql: string,
+  ) {}
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  async execute(...args: unknown[]): Promise<Mysql2Result | null> {
+    const result = storeResult(
+      this.client,
+      (await this.client.execute(options(this.client, this.sql) as never, args as never)) as Native,
+    );
+    this.affectedRows = result?.size ?? this.client.affectedRows;
+    return result;
+  }
+
+  /** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
+  close(): void {
+    this.client.unprepare(options(this.client, this.sql) as never);
+  }
+}
+
+export type Mysql2Client = Omit<mysql.Connection, "query" | "prepare"> & {
   automaticClose: boolean;
   queryOptions: QueryOptions;
+  readTimeout?: number | null;
+  affectedRows: number;
+  lastId?: number;
+  query(sql: string): Promise<Mysql2Result | null>;
+  prepare(sql: string): Mysql2Statement;
+  abandonResultsBang(): void;
+  setServerOption(value: number): Promise<true>;
 };
+
+function options(client: Mysql2Client, sql: string): Record<string, unknown> {
+  return client.readTimeout != null
+    ? { sql, rowsAsArray: true, timeout: client.readTimeout * 1000 }
+    : { sql, rowsAsArray: true };
+}
+
+function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
+  let result = rawResult as unknown[][] | mysql.ResultSetHeader;
+  let fields = rawFields;
+  if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
+    result = (rawResult as unknown[])[0] as unknown[][];
+    fields = rawFields[0] as mysql.FieldPacket[];
+  } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
+    result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
+  }
+  if (Array.isArray(result)) {
+    return new Mysql2Result(
+      (fields ?? []).map((field) => field.name),
+      result,
+    );
+  }
+  client.affectedRows = result.affectedRows ?? 0;
+  if (result.insertId !== undefined) client.lastId = result.insertId;
+  return null;
+}
+
+const COM_SET_OPTION = 0x1b;
+
+type Protocol = {
+  clientEncoding: string;
+  addCommand(command: object): void;
+  writePacket(packet: object): void;
+  _resetSequenceId(): void;
+};
+type Packet = { isError(): boolean; asError(encoding: string): Error };
+
+function setServerOption(this: Mysql2Client, value: number): Promise<true> {
+  return new Promise((resolve, reject) => {
+    (this as unknown as { connection: Protocol }).connection.addCommand({
+      onResult: reject,
+      execute(packet: Packet | undefined, connection: Protocol): boolean {
+        if (packet === undefined) {
+          const buffer = Buffer.from([3, 0, 0, 0, COM_SET_OPTION, value, 0]);
+          connection._resetSequenceId();
+          connection.writePacket({
+            buffer,
+            length: () => buffer.length,
+            writeHeader: (sequenceId: number) => buffer.writeUInt8(sequenceId, 3),
+          });
+          return false;
+        }
+        if (packet.isError()) reject(packet.asError(connection.clientEncoding));
+        else resolve(true);
+        return true;
+      },
+    });
+  });
+}
+
+function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
+  return new Mysql2Statement(this, sql);
+}
+
+function abandonResultsBang(): void {}
 
 type Field = { type: string; string: () => string | null };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
@@ -99,16 +228,29 @@ const automaticClose: PropertyDescriptor = {
   },
 };
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection */
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
 export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   if (!QUERY_OPTIONS.has(client)) {
     QUERY_OPTIONS.add(client);
     const queryOptions: QueryOptions = {};
-    Object.defineProperty(client, "queryOptions", { configurable: true, value: queryOptions });
     const execute = (client as { execute?: unknown }).execute;
     if (typeof execute === "function") {
       (client as { execute?: Execute }).execute = (sql, values) =>
         (execute as Execute).call(client, sql, values?.map(bind));
+    }
+    const native = (client as { query?: (options: object) => Promise<Native> }).query;
+    const query = async function (this: Mysql2Client, sql: string) {
+      return storeResult(this, await native!.call(this, options(this, sql)));
+    };
+    for (const [name, value] of Object.entries({
+      queryOptions,
+      affectedRows: 0,
+      query,
+      prepare,
+      abandonResultsBang,
+      setServerOption,
+    })) {
+      Object.defineProperty(client, name, { configurable: true, writable: true, value });
     }
     const config = (client as { config?: { typeCast?: unknown } }).config;
     if (config) {
@@ -123,3 +265,11 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   }
   return Object.defineProperty(client, "automaticClose", automaticClose) as T & Mysql2Client;
 }
+
+export const Mysql2 = {
+  Client: {
+    MULTI_STATEMENTS: 0x10000,
+    OPTION_MULTI_STATEMENTS_ON: 0,
+    OPTION_MULTI_STATEMENTS_OFF: 1,
+  },
+};

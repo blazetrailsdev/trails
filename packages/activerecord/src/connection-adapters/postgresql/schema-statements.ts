@@ -1204,13 +1204,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
     await this.validateConstraint(fromTable, fkNameToValidate);
   }
 
-  /** @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms */
   async validateCheckConstraint(
     tableName: string,
-    options: string | { name: string; expression?: string },
+    options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<void> {
-    const opts = typeof options === "string" ? { name: options } : options;
-    const chkNameToValidate = (await this.checkConstraintForBang(tableName, opts)).name;
+    const chkNameToValidate = (await this.checkConstraintForBang(tableName, options)).name;
     await this.validateConstraint(tableName, chkNameToValidate);
   }
 
@@ -1525,25 +1523,16 @@ export class SchemaStatements extends AbstractSchemaStatements {
     return constraints.find((c) => c.definedFor(coreHashMergeKwd({ name }, options)));
   }
 
-  /**
-   * @internal
-   * @inventedArm if — CONVERGEABLE pg-schema-dumper-option-hash-and-constraint-lookup-residual-arms
-   */
+  /** @internal */
   async uniqueConstraintForBang(
     tableName: string,
     { column = null, ...options }: Record<string, unknown>,
   ): Promise<UniqueConstraintDefinition> {
     const uniqueConstraint = await this.uniqueConstraintFor(tableName, { column, ...options });
     if (!rtest(uniqueConstraint)) {
-      const columnToS =
-        column == null
-          ? rbInspect(symbolizeKeys(options))
-          : Array.isArray(column)
-            ? `[${(column as string[])
-                .map((c) => (String(c).startsWith(":") ? String(c) : `:${String(c)}`))
-                .join(", ")}]`
-            : String(column).replace(/^:/, "");
-      throw new ArgumentError(`Table '${tableName}' has no unique constraint for ${columnToS}`);
+      throw new ArgumentError(
+        `Table '${tableName}' has no unique constraint for ${rbObjAsString(rtest(column) ? column : symbolizeKeys(options))}`,
+      );
     }
     return uniqueConstraint;
   }

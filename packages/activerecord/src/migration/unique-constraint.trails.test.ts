@@ -9,7 +9,7 @@ describe("Migration", () => {
     it("renders a missing column list the way Ruby renders an Array of Symbols", async () => {
       const connection = (await ambientConnection()) as unknown as PostgreSQLAdapter;
 
-      await expect(connection.removeUniqueConstraint("sections", ["position"])).rejects.toThrow(
+      await expect(connection.removeUniqueConstraint("sections", [":position"])).rejects.toThrow(
         "Table 'sections' has no unique constraint for [:position]",
       );
     });

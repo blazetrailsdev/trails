@@ -30,9 +30,8 @@ import {
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
   selectAll as mysql2SelectAll,
-  type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
-import { mysql2Client, type Mysql2Client } from "./mysql2/mysql2-client.js";
+import { mysql2Client, type Mysql2Client, type Mysql2Result } from "./mysql2/mysql2-client.js";
 import { defaultTimezone } from "../active-record.js";
 
 const CLIENT_FLAGS: Record<string, number> = {
@@ -78,8 +77,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   static readonly ER_UNKNOWN_HOST_ERROR = 2005;
 
   /**
-   * @inventedArm filter — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection
-   * @inventedArm if — CONVERGEABLE mysql2-perform-query-takes-rails-control-flow-over-a-gem-shaped-raw-connection
+   * @inventedArm filter — CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem
+   * @inventedArm if — CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem
    */
   static async newClient(
     config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
@@ -125,8 +124,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             : Object.keys(CLIENT_FLAGS).filter(
                 (name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0,
               ),
-        ).filter((flag) => flag.toUpperCase() !== "-MULTI_STATEMENTS"),
-        multipleStatements: true,
+        ),
       });
     } catch (err) {
       switch ((err as { errno?: number }).errno) {
@@ -193,7 +191,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   supportsComments(): boolean {
     return true;
   }
-  declare _statements: MysqlStatementPool | null;
+  declare _statements: MysqlStatementPool;
 
   declare _affectedRowsBeforeWarnings: number | null;
 
@@ -365,32 +363,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connection = value && mysql2Client(value);
   }
 
-  private _getStmtPool(): MysqlStatementPool {
-    if (!this._statements) {
-      this._statements = this.buildStatementPool();
-    }
-    return this._statements;
-  }
-
-  _trackPrepared(conn: mysql.Connection, sql: string): void {
-    const pool = this._getStmtPool();
-    if (pool.get(sql)) return;
-    pool.set(sql, {
-      sql,
-      close(): void {
-        try {
-          (conn as unknown as { unprepare: (sql: string) => void }).unprepare(sql);
-        } catch {}
-      },
-    });
-  }
-
   /** @internal */
-  _clientForTest(): mysql.Connection | null {
+  _clientForTest(): Mysql2Client | null {
     return this._rawConnection;
   }
 
-  private async _ensureClient(): Promise<mysql.Connection> {
+  private async _ensureClient(): Promise<unknown> {
     if (this._rawConnection) return this._rawConnection;
     if (rtest(this._config._fakeConnection))
       throw new RuntimeError("Mysql2Adapter: fake connection has no client");
@@ -413,7 +391,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       throw err;
     }
     this._rawConnection = conn;
-    this._statements = null;
+    this._rawConnection!.readTimeout = this._config.readTimeout as number | undefined;
+    this._statements.reset();
     return conn;
   }
 
@@ -423,7 +402,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  affectedRows(rawResult: Mysql2RawResult): number {
+  affectedRows(rawResult: Mysql2Result | null): number {
     return mysql2AffectedRows.call(this as any, rawResult);
   }
 }

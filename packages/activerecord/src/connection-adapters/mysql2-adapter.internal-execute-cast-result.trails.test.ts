@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Result } from "../result.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import type { Mysql2RawResult } from "./mysql2/database-statements.js";
+import type { Mysql2Result } from "./mysql2/mysql2-client.js";
 
 describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () => {
   afterEach(() => {
@@ -39,12 +39,12 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
 
     const rawResult = (await adapter.internalExecute("SELECT 1 AS a, 2 AS a", "SQL", [], {
       materializeTransactions: false,
-    })) as Mysql2RawResult;
+    })) as Mysql2Result;
 
     expect(rawResult.fields).toEqual(["a", "a"]);
-    expect(rawResult.rows).toEqual([[1, 2]]);
+    expect(rawResult.toA()).toEqual([[1, 2]]);
 
-    const result = (adapter as unknown as { castResult(r: Mysql2RawResult): Result }).castResult(
+    const result = (adapter as unknown as { castResult(r: Mysql2Result): Result }).castResult(
       rawResult,
     );
     expect(result).toBeInstanceOf(Result);

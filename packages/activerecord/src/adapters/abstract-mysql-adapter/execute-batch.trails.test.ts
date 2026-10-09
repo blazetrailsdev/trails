@@ -5,7 +5,6 @@ import {
   Mysql2Adapter,
   MYSQL_TEST_URL,
 } from "./test-helper.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
 
 describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
   let adapter: Mysql2Adapter;
@@ -34,10 +33,8 @@ describeIfMysqlAdapter("Mysql2Adapter#executeBatch", () => {
         multipleStatements: false,
       } as never);
       try {
-        const result = (await testAdapter.execute(
-          "SELECT 1 AS v;\nSELECT 2 AS v",
-        )) as Mysql2RawResult;
-        expect(result.rows!.length).toBeGreaterThan(0);
+        await testAdapter.executeBatch(["SELECT 1 AS v", "SELECT 2 AS v"], "Batch");
+        await expect(testAdapter.execute("SELECT 1;\nSELECT 2")).rejects.toThrow(/SQL syntax/);
       } finally {
         await testAdapter.disconnectBang();
       }

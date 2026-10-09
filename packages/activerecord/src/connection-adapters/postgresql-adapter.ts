@@ -1954,7 +1954,7 @@ export interface PostgreSQLAdapter {
 
   validateCheckConstraint(
     tableName: string,
-    options: string | { name: string; expression?: string },
+    options?: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<void>;
 
   validateForeignKey(

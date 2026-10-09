@@ -349,7 +349,7 @@ export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
   ): Promise<void>;
   removeUniqueConstraint(tableName: string, options?: { name?: string }): Promise<void>;
   validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
-  validateCheckConstraint(tableName: string, constraintName: string): Promise<void>;
+  validateCheckConstraint(tableName: string, ...args: unknown[]): Promise<void>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
@@ -383,8 +383,8 @@ export class Table extends AbstractTable {
     return this._pgSchema.validateConstraint(this._pgTableName, constraintName);
   }
 
-  validateCheckConstraint(constraintName: string): Promise<void> {
-    return this._pgSchema.validateCheckConstraint(this._pgTableName, constraintName);
+  validateCheckConstraint(...args: unknown[]): Promise<void> {
+    return this._pgSchema.validateCheckConstraint(this._pgTableName, ...args);
   }
 }
 
