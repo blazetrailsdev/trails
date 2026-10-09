@@ -297,6 +297,21 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(s["Foo#mixed"]).toEqual(["or"]);
   });
 
+  it("counts a safe-navigation assignment as the conditional write it is", () => {
+    const s = rubySkeletons({
+      "foo.rb": `
+        class Foo
+          def discard
+            @raw&.automatic_close = false
+            @raw&.close
+            @other.automatic_close = false
+          end
+        end
+      `,
+    });
+    expect(s["Foo#discard"]!.filter((t) => t === "if")).toEqual(["if"]);
+  });
+
   it("emits an ordered control + call skeleton, with duplicates, alongside calls", () => {
     const s = rubySkeletons({
       "foo.rb": `

@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, stripThenable, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, isPresent, stripThenable, toFs } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -15,8 +15,9 @@ import {
   Enumerable,
   isEmpty,
   rbDefineAllocFunc,
-  rbEqq,
   rbObjClone,
+  toS,
+  type Each,
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
@@ -62,6 +63,7 @@ import {
   type ToXmlOptions,
 } from "./relation/delegation.js";
 import { ActiveRecord, Associations } from "./namespaces.js";
+import { Preloader } from "./associations/preloader.js";
 import { InsertAll, type InsertAllOptions } from "./insert-all.js";
 import { Result } from "./result.js";
 import { FutureResult, Complete } from "./future-result.js";
@@ -574,12 +576,14 @@ export class Relation<T extends Base, G extends boolean = false> {
     }
   }
 
-  async isAny(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isAny(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (args !== undefined) {
-      const matches = (record: T): boolean => rbEqq(args, record);
-      return (await this.toArray()).some(matches);
-    }
+
+    if (isPresent(args))
+      return Enumerable.isAny.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     return !(await this.isEmpty());
   }
 
@@ -591,16 +595,14 @@ export class Relation<T extends Base, G extends boolean = false> {
     return (await this.limitedCount()) > 1;
   }
 
-  async isOne(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isOne(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return false;
-    if (args !== undefined) {
-      const matches = (record: T): boolean => rbEqq(args, record);
-      let count = 0;
-      for (const record of await this.toArray()) {
-        if (matches(record) && ++count === 2) break;
-      }
-      return count === 1;
-    }
+
+    if (isPresent(args))
+      return Enumerable.isOne.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     if (this.isLoaded) return (await this.records()).length === 1;
     return (await this.limitedCount()) === 1;
   }
@@ -749,7 +751,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
     return !isEmpty(
       this.referencesValues
-        .map((ref) => (typeof ref === "string" && ref.startsWith(":") ? ref.slice(1) : String(ref)))
+        .map((ref) => toS(ref))
         .filter((ref) => !joinedTables.includes(ref)),
     );
   }
@@ -1070,17 +1072,16 @@ export class Relation<T extends Base, G extends boolean = false> {
   /**
    * @missingRailsCall apply_join_dependency — PERMANENT
    * @missingRailsCall with_connection — PERMANENT
-   * @missingRailsArgs to_sql — PERMANENT
    */
   toSql(): string {
     return this._model.connectionPool().withConnectionSync(
       (conn: DatabaseAdapter) =>
         conn.unpreparedStatement(() => {
           if (this.isEagerLoading) {
-            const manager = this._buildEagerOperandManager();
-            if (manager !== null) return conn.toSql(manager);
+            return conn.toSql(this._buildEagerOperandManager());
+          } else {
+            return conn.toSql(this.arel());
           }
-          return conn.toSql(this.arel());
         }) as string,
     );
   }
@@ -1238,12 +1239,8 @@ export class Relation<T extends Base, G extends boolean = false> {
     return Array.isArray(values) ? values.join(", ") : values;
   }
 
-  private _buildEagerOperandManager(): SelectManager | null {
-    const allEager = [...new Set([...this.eagerLoadValues, ...this.includesValues])];
-    if (allEager.length === 0) return null;
-
+  private _buildEagerOperandManager(): SelectManager {
     return this._applyEagerJoinDependency({}, (eagerRelation, jd) => {
-      if (jd.reflections.length === 0) return null;
       jd.applyColumnAliases(eagerRelation);
       return eagerRelation.arel();
     });
@@ -1254,16 +1251,13 @@ export class Relation<T extends Base, G extends boolean = false> {
       ...this.preloadValues,
       ...(this.isEagerLoading ? [] : this.includesValues),
     ];
-    if (preload.length === 0) return;
-    const { Preloader } = await import("./associations/preloader.js");
     const scope = this.strictLoadingValue ? StrictLoadingScope : undefined;
     for (const associations of preload) {
-      const preloader = Preloader.new({
+      await Preloader.new({
         records: records as unknown as import("./base.js").Base[],
         associations: [associations],
         scope,
-      });
-      await preloader.call();
+      }).call();
     }
   }
 
@@ -1442,12 +1436,14 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this._loaded;
   }
 
-  async isNone(args?: EnumerablePattern<T>): Promise<boolean> {
+  async isNone(...args: EnumerablePattern<T>[]): Promise<boolean> {
     if (this.isNullRelation()) return true;
-    if (args !== undefined) {
-      const matches = (record: T): boolean => rbEqq(args, record);
-      return !(await this.toArray()).some(matches);
-    }
+
+    if (isPresent(args))
+      return Enumerable.isNone.call<Each<T, Promise<T[]>>, unknown[], Promise<boolean>>(
+        this,
+        ...args,
+      );
     return this.isEmpty();
   }
 

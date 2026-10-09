@@ -198,7 +198,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _connectingPromiseGen = -1;
   private _discardedConnectGenerations = new Set<number>();
   private _endingClient: Promise<void> | null = null;
-  private _connectionConfigured = false;
   declare _statements: MysqlStatementPool | null;
 
   declare _affectedRowsBeforeWarnings: number | null;
@@ -254,11 +253,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return false;
   }
 
+  declare resetBang: AbstractMysqlAdapter["reconnectBang"];
+
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
       this._connectGeneration++;
-      this._connectionConfigured = false;
       this._statements = null;
       this._endRawConnection();
       this._rawConnection = null;
@@ -269,11 +269,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override discardBang(): void {
     void this.lock.synchronize(() => {
       super.discardBang();
-      if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
-        this._discardedConnectGenerations.add(this._connectGeneration);
-      }
-      this._connectGeneration++;
-      this._connectionConfigured = false;
+      this._discardedConnectGenerations.add(this._connectGeneration++);
       this._statements = null;
       if (this._rawConnection) this._rawConnection.automaticClose = false;
       this._rawConnection = null;
@@ -302,7 +298,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async reconnect(): Promise<void> {
     return this.lock.synchronize(async () => {
       this._connectGeneration++;
-      this._connectionConfigured = false;
       this._statements = null;
       this._endRawConnection();
       this._rawConnection = null;
@@ -312,10 +307,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async configureConnection(): Promise<void> {
-    if (!this._rawConnection) return;
-    this._rawConnection.queryOptions.databaseTimezone = defaultTimezone();
-    if (this._connectionConfigured) return;
-    this._connectionConfigured = true;
+    this._rawConnection!.queryOptions.databaseTimezone = defaultTimezone();
     await super.configureConnection();
     await this.loadEscapeState();
   }
@@ -538,6 +530,8 @@ function isMysql2ConnectionError(e: unknown): boolean {
   mysql2CastResult;
 
 Mysql2Adapter.prototype.performQuery = mysql2PerformQuery;
+
+Mysql2Adapter.prototype.resetBang = Mysql2Adapter.prototype.reconnectBang;
 
 Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
   return new ImmutableStringType({

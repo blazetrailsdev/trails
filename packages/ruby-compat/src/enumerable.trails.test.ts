@@ -110,11 +110,24 @@ describe("Enumerable", () => {
     expect(() => Enumerable.drop.call(bag, -1)).toThrow(ArgumentError);
   });
 
+  it("any? / one? / none? test pattern === element for an argument", () => {
+    class Klass {}
+    const bag = new Bag([new Klass(), 1, new Klass()]);
+    expect(Enumerable.isAny.call(bag, Klass)).toBe(true);
+    expect(Enumerable.isAny.call(bag, String)).toBe(false);
+    expect(Enumerable.isOne.call(bag, Klass)).toBe(false);
+    expect(Enumerable.isOne.call(bag, (i: unknown) => i === 1)).toBe(true);
+    expect(Enumerable.isOne.call(new Bag([null, 1]))).toBe(true);
+    expect(Enumerable.isNone.call(bag, String)).toBe(true);
+    expect(Enumerable.isNone.call(bag, Klass)).toBe(false);
+    expect(Enumerable.isNone.call(new Bag([null, false]))).toBe(true);
+  });
+
   it("isAny? RTESTs the element, or the block's result", () => {
     expect(Enumerable.isAny.call(new Bag([null, false, 0]))).toBe(true);
     expect(Enumerable.isAny.call(new Bag([null, false]))).toBe(false);
     const bag = new Bag([1, 2, 3]);
-    expect(Enumerable.isAny.call(bag, (i) => i === 1)).toBe(true);
+    expect(Enumerable.isAny.call(bag, (i: unknown) => i === 1)).toBe(true);
     expect(bag.yielded).toBe(1);
   });
 
