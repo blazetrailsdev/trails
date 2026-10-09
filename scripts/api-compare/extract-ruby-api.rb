@@ -3295,12 +3295,6 @@ class ApiExtractor
     tokens.concat(skeleton_string_eval_arms(source)) if source
   end
 
-  # The arms a String handed to `module_eval` / `class_eval` evaluates:
-  # `mixin.class_eval <<-CODE … @_after_commit_jobs ||= [] … CODE`
-  # (`activerecord/lib/active_record/associations/builder/association.rb:155-159`)
-  # is an `or` Ripper never sees, where the port's `moduleEval` callback is
-  # walked in place. Only the control and short-circuit tokens are taken: the
-  # calls are `stringEvalCalls`' business (compare.ts#reorderedCalls).
   SKELETON_STRING_EVAL_ARMS = /\A(?:if|loop|try|rescue|or|and|throw(?::.*)?)\z/.freeze
 
   def skeleton_string_eval_arms(source)
@@ -3312,8 +3306,6 @@ class ApiExtractor
     arms.grep(SKELETON_STRING_EVAL_ARMS)
   end
 
-  # The String a `module_eval` / `class_eval` call is handed, when it is a
-  # literal with no interpolation — the only kind that parses on its own.
   def skeleton_string_eval_source(node)
     name, args =
       case node[0]
