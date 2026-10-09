@@ -7,7 +7,7 @@ export class JSON {
   }
 
   static load(json: unknown): unknown {
-    return isBlank(json) ? null : ActiveSupportJSON.decode(json as string);
+    return isBlank(json) ? null : ActiveSupportJSON.decode(json as string | Uint8Array);
   }
 }
 

@@ -6,10 +6,12 @@ import {
   hasKey,
   isEmpty,
   keys as hashKeys,
+  objRespondToMissing,
   rbClassSuperclass,
   rbFCaller,
   rbInspect as inspect,
   rbModConstSet,
+  rbModMethodDefined,
   rbModPublicInstanceMethod,
   rbObjIvarGet,
   rbObjIvarSet,
@@ -72,6 +74,23 @@ export interface InstanceMethodHost {
   columnForAttribute(name: string): { isVirtual(): boolean };
   /** @internal */
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
+}
+
+/** @missingRailsCall private_method_defined? — PERMANENT */
+export function respondToMissing(
+  this: AttributeRecord & InstanceMethodHost,
+  name: string,
+  includePrivate: boolean = false,
+): boolean {
+  const klass = this.constructor as unknown as {
+    prototype: object;
+    defineAttributeMethods(): boolean;
+  };
+  if (klass.defineAttributeMethods()) {
+    if (rbModMethodDefined(klass, name)) return true;
+  }
+
+  return objRespondToMissing(this, name, includePrivate);
 }
 
 export function methodMissing(

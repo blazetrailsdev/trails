@@ -63,6 +63,10 @@ import type * as Reflection from "./reflection.js";
 import type { Relation } from "./relation.js";
 import type { Default } from "./scoping/default.js";
 import type * as Named from "./scoping/named.js";
+import type { DatabaseTasks } from "./tasks/database-tasks.js";
+import type { MySQLDatabaseTasks } from "./tasks/mysql-database-tasks.js";
+import type { PostgreSQLDatabaseTasks } from "./tasks/postgresql-database-tasks.js";
+import type { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 
 type AutoloadModule = Autoload.Autoload & Extended<typeof Autoload>;
 
@@ -172,6 +176,11 @@ const loadPath: Record<string, () => Promise<unknown>> = {
     import("./encryption/read-only-null-encryptor.js"),
   "active_record/encryption/scheme": () => import("./encryption/scheme.js"),
   "active_record/migration": () => import("./migration.js"),
+  "active_record/tasks/database_tasks": () => import("./tasks/database-tasks.js"),
+  "active_record/tasks/mysql_database_tasks": () => import("./tasks/mysql-database-tasks.js"),
+  "active_record/tasks/postgresql_database_tasks": () =>
+    import("./tasks/postgresql-database-tasks.js"),
+  "active_record/tasks/sqlite_database_tasks": () => import("./tasks/sqlite-database-tasks.js"),
   "active_record/connection_adapters/abstract/connection_pool": () =>
     import("./connection-adapters/abstract/connection-pool.js"),
 };
@@ -193,6 +202,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Locking: typeof Locking;
   Relation: typeof Relation;
   Scoping: typeof Scoping;
+  Tasks: typeof Tasks;
   Point: new (x: number, y: number) => { x: number; y: number };
 };
 registerConstant("ActiveRecord", ActiveRecord);
@@ -292,6 +302,19 @@ Scoping.eagerAutoload(() => {
   Scoping.autoload("Default");
   Scoping.autoload("Named");
 });
+
+export const Tasks = { name: "ActiveRecord::Tasks", loadPath } as AutoloadModule & {
+  DatabaseTasks: typeof DatabaseTasks;
+  MySQLDatabaseTasks: typeof MySQLDatabaseTasks;
+  PostgreSQLDatabaseTasks: typeof PostgreSQLDatabaseTasks;
+  SQLiteDatabaseTasks: typeof SQLiteDatabaseTasks;
+};
+extend(Tasks, Autoload);
+Tasks.autoload("DatabaseTasks");
+Tasks.autoload("MySQLDatabaseTasks", "active_record/tasks/mysql_database_tasks");
+Tasks.autoload("PostgreSQLDatabaseTasks", "active_record/tasks/postgresql_database_tasks");
+Tasks.autoload("SQLiteDatabaseTasks", "active_record/tasks/sqlite_database_tasks");
+ActiveRecord.Tasks = Tasks;
 
 export const ConnectionAdapters = {
   name: "ActiveRecord::ConnectionAdapters",

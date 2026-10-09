@@ -16,6 +16,7 @@ import {
   rbClassInheritedP,
   rbEql,
   rbObjClassname,
+  strUminus,
   symbolToS,
 } from "@blazetrails/ruby-compat";
 import {
@@ -112,8 +113,10 @@ export const ClassMethods = {
     fixtureSetNames = [fixtureSetNames ?? this.fixtureTableNames].flat();
     if (fixtureSetNames.length !== 0) {
       this.fixtureSets = { ...this.fixtureSets };
-      for (const fsName of fixtureSetNames) {
-        const key = fsName.includes("/") ? fsName.replaceAll("/", "_") : fsName;
+      for (let fsName of fixtureSetNames) {
+        let key = fsName.includes("/") ? strUminus(fsName.replaceAll("/", "_")) : fsName;
+        if (isSymbol(key)) key = strUminus(symbolToS(key));
+        if (isSymbol(fsName)) fsName = strUminus(symbolToS(fsName));
         this.fixtureSets[key] = fsName;
       }
     }

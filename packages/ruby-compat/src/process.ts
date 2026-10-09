@@ -7,25 +7,38 @@ interface SystemCallError extends Error {
 }
 
 /**
- * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`) for the
- * `[env, ] command_line` form: `rb_exec_getargs` (`process.c:2511`) takes a
- * leading Hash as the environment, and `rb_execarg_addopt`'s env arm lays it
- * over `ENV`, a `nil` value unsetting the name.
+ * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`):
+ * `rb_exec_getargs` (`process.c:2511-2538`) takes a trailing Hash as the
+ * options and a leading Hash as the environment, which `rb_execarg_addopt`'s
+ * env arm lays over `ENV`, a `nil` value unsetting the name. One remaining
+ * argument is a command line and `args` is `null`; more are a program and its
+ * argv (`process.c:2531-2536`).
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
  * (`vendor/ruby/v3.3.11/process.c:2767`).
  */
 export function rbExecargNew(
   argv: readonly unknown[],
-): [command: string, env: Record<string, string | undefined>] {
+): [
+  prog: string,
+  env: Record<string, string | undefined>,
+  args: string[] | null,
+  opthash: { out?: string },
+] {
+  const rest = [...argv];
+  let opthash: { out?: string } = {};
+  if (rest.length > 0 && typeof rest[rest.length - 1] === "object") {
+    opthash = rest.pop() as { out?: string };
+  }
   const env: Record<string, string | undefined> = { ...processEnv };
-  if (argv.length > 1) {
-    for (const [name, value] of Object.entries(argv[0] as Record<string, string | null>)) {
+  if (rest.length > 0 && typeof rest[0] === "object") {
+    for (const [name, value] of Object.entries(rest.shift() as Record<string, string | null>)) {
       if (value == null) delete env[name];
       else env[name] = value;
     }
   }
-  return [argv[argv.length - 1] as string, env];
+  const [prog, ...args] = rest as string[];
+  return [prog, env, args.length === 0 ? null : args, opthash];
 }
 
 /**

@@ -1,4 +1,5 @@
 import { Date as RubyDate } from "@blazetrails/date";
+import { JSON as RbJSON } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding, type EncodeOptions } from "./json/encoding.js";
 import { zone } from "./time-zone-config.js";
@@ -47,31 +48,6 @@ function convertDatesFrom(data: unknown): unknown {
   }
 }
 
-function stripJsonComments(value: string): string {
-  let out = "";
-  let index = 0;
-  while (index < value.length) {
-    const char = value[index];
-    if (char === '"') {
-      const start = index++;
-      while (index < value.length && value[index] !== '"') {
-        index += value[index] === "\\" ? 2 : 1;
-      }
-      out += value.slice(start, ++index);
-    } else if (char === "/" && value[index + 1] === "*") {
-      const end = value.indexOf("*/", index + 2);
-      index = end === -1 ? value.length : end + 2;
-    } else if (char === "/" && value[index + 1] === "/") {
-      const end = value.indexOf("\n", index + 2);
-      index = end === -1 ? value.length : end;
-    } else {
-      out += char;
-      index++;
-    }
-  }
-  return out;
-}
-
 export namespace ActiveSupportJSON {
   export function encode(value: unknown, options?: EncodeOptions): string {
     return new Encoding.jsonEncoder(options).encode(value);
@@ -79,14 +55,8 @@ export namespace ActiveSupportJSON {
 
   export const dump = encode;
 
-  export function decode(json: string): unknown {
-    let data: unknown;
-    try {
-      data = JSON.parse(json);
-    } catch (error) {
-      if (!(error instanceof SyntaxError)) throw error;
-      data = JSON.parse(stripJsonComments(json));
-    }
+  export function decode(json: string | Uint8Array): unknown {
+    const data = RbJSON.parse(json);
 
     if (parseJsonTimes != null && parseJsonTimes !== false) {
       return convertDatesFrom(data);

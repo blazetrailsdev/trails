@@ -36,11 +36,20 @@ export interface WaitStatus {
 export interface ChildProcessAdapter {
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
   /**
-   * Runs `command` through `/bin/sh -c` with the parent's stdio, as
-   * `proc_exec_sh` does (`vendor/ruby/v3.3.11/process.c:1788`), and resolves
-   * once it has been waited for.
+   * Runs the child with the parent's stdio and resolves once it has been
+   * waited for. With no `args`, `command` is a command line run through
+   * `/bin/sh -c`, as `proc_exec_sh` does
+   * (`vendor/ruby/v3.3.11/process.c:1788`); with `args` it is the program,
+   * exec'd with that argv and no shell (`proc_exec_cmd`, `process.c:1741`).
+   * `options.out` is `out: filename`: stdout opened on that file, truncated
+   * (`check_exec_redirect`, `process.c:1985`).
    */
-  system?(command: string, env: Record<string, string | undefined>): Promise<WaitStatus>;
+  system?(
+    command: string,
+    env: Record<string, string | undefined>,
+    args?: string[] | null,
+    options?: { out?: string },
+  ): Promise<WaitStatus>;
   /**
    * Runs `command` through `/bin/sh -c` with stdout and stderr on one pipe,
    * as `Open3.popen2e` wires them (`vendor/ruby/v3.3.11/lib/open3.rb:508-523`),
@@ -115,15 +124,16 @@ type NodeChildProcess = {
   spawn: (cmd: string, args: string[], opts?: unknown) => NodeChild;
 };
 
-function spawnSh(
+function spawnChild(
   cp: NodeChildProcess,
+  file: string,
   args: string[],
   env: Record<string, string | undefined>,
   stdio: unknown,
   read: (chunk: string) => void,
 ): Promise<WaitStatus> {
   return new Promise((resolve) => {
-    const child = cp.spawn("/bin/sh", args, { env, stdio });
+    const child = cp.spawn(file, args, { env, stdio });
     child.stdin?.end();
     child.stdout?.setEncoding("utf8");
     child.stdout?.on("data", read);
@@ -162,15 +172,28 @@ function wrap(cp: NodeChildProcess): ChildProcessAdapter {
         error: result.error,
       };
     },
-    system(command, env) {
-      return spawnSh(cp, ["-c", command], env, "inherit", () => {});
+    system(command, env, args, options) {
+      const outFile = options?.out != null ? File.open(options.out, "w") : null;
+      const stdio = outFile === null ? "inherit" : ["inherit", outFile.fileno(), "inherit"];
+      const status =
+        args == null
+          ? spawnChild(cp, "/bin/sh", ["-c", command], env, stdio, () => {})
+          : spawnChild(cp, command, args, env, stdio, () => {});
+      return status.finally(() => outFile?.close());
     },
     async capture2e(command, env) {
       let output = "";
       const args = ["-c", 'exec 2>&1; eval "$1"', "sh", command];
-      const status = await spawnSh(cp, args, env, ["pipe", "pipe", "ignore"], (chunk) => {
-        output += chunk;
-      });
+      const status = await spawnChild(
+        cp,
+        "/bin/sh",
+        args,
+        env,
+        ["pipe", "pipe", "ignore"],
+        (chunk) => {
+          output += chunk;
+        },
+      );
       return [output, status];
     },
   };

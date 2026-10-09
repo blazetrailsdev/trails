@@ -1,4 +1,4 @@
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbInspect, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -441,6 +441,22 @@ describe("AttributeMethodsTest (trails)", () => {
       isInstanceMethodAlreadyImplemented(n: string): boolean;
     };
     expect(host.isInstanceMethodAlreadyImplemented("nickname")).toBe(true);
+  });
+});
+
+describe("AttributeMethods#respond_to_missing? (trails)", () => {
+  fixtures([]);
+
+  it("defines the attribute methods for a record built before its schema loaded", async () => {
+    class Topic extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const topic = new Topic();
+
+    await Topic.loadSchema();
+    expect(basicObjRespondTo(topic, "title", true)).toBe(true);
+    expect(basicObjRespondTo(topic, "mumbo", true)).toBe(false);
+    expect(rbObjRespondTo(topic, "title")).toBe(false);
+    expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
   });
 });
 

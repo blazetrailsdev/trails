@@ -2,19 +2,18 @@ import { isBlank, kernelArray, Tempfile } from "@blazetrails/activesupport";
 import {
   File,
   FileUtils,
-  getChildProcessAsync,
   merge,
   rbEqq,
+  rbFSystem,
+  rbModConstSet,
   RuntimeError,
-  stderr,
-  stdout,
-  type SpawnSyncResult,
 } from "@blazetrails/ruby-compat";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
+import { Tasks } from "../namespaces.js";
 import { dumpSchemas } from "../active-record.js";
 
 const DEFAULT_ENCODING_FALLBACK = "utf8";
@@ -135,10 +134,8 @@ export class PostgreSQLDatabaseTasks {
     return (await Base.connectionPool().leaseConnection()) as PostgreSQLAdapter;
   }
 
-  private psqlEnv(): NodeJS.ProcessEnv {
-    const env: NodeJS.ProcessEnv = {
-      ...((globalThis as { process?: { env?: NodeJS.ProcessEnv } }).process?.env ?? {}),
-    };
+  private psqlEnv(): Record<string, string> {
+    const env: Record<string, string> = {};
     const c = this.configurationHash;
     if (this.dbConfig.host) env.PGHOST = String(this.dbConfig.host);
     if (c.port != null) env.PGPORT = String(c.port);
@@ -151,16 +148,10 @@ export class PostgreSQLDatabaseTasks {
     return env;
   }
 
-  /** @inventedArm write — CONVERGEABLE tasks-run-cmd-through-kernel-system-inherited-stdio */
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
-    const childProcess = await getChildProcessAsync();
-    const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
-      env: this.psqlEnv(),
-      encoding: "utf8",
-    });
-    stdout.write(result.stdout ?? "");
-    stderr.write(result.stderr ?? "");
-    if (result.status !== 0) throw new RuntimeError(runCmdError(cmd, args, action));
+    if (!(await rbFSystem(this.psqlEnv(), cmd, ...args))) {
+      throw new RuntimeError(runCmdError(cmd, args, action));
+    }
   }
 
   private removeSqlHeaderComments(filename: string): void {
@@ -199,4 +190,5 @@ export function runCmdError(cmd: string, args: string[], _action: string): strin
   );
 }
 
+rbModConstSet(Tasks, "PostgreSQLDatabaseTasks", PostgreSQLDatabaseTasks);
 DatabaseTasks.registerTask(/postgres/, PostgreSQLDatabaseTasks);

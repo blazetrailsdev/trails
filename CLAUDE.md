@@ -785,10 +785,9 @@ Two shapes are sanctioned, and only these:
 - **A zero-import slot module**: a file with no runtime imports at all (so it
   cannot join any cycle) exporting a mutable binding plus a `_setX()` setter,
   which the defining module calls at the bottom of its own body. Readers import
-  the binding from the slot and use it at call time. One instance exists and
-  is the only one (`activerecord/src/tasks/database-tasks-slot.ts`); everything
-  else has converged onto a namespace seat, which is the shape the remaining
-  slot converges onto.
+  the binding from the slot and use it at call time. No instance remains:
+  every slot has converged onto a namespace seat, which is the shape to reach
+  for first.
 
 The per-package inventories of namespace objects, seats and the cycles they
 break live in [packages/arel/CLAUDE.md](packages/arel/CLAUDE.md#call-time-constant-resolution-arel),

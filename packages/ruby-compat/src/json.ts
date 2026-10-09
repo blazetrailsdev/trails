@@ -5,6 +5,31 @@ import { rbObjClassname } from "./object.js";
 
 const globalJSON = globalThis.JSON;
 
+function stripJsonComments(value: string): string {
+  let out = "";
+  let index = 0;
+  while (index < value.length) {
+    const char = value[index];
+    if (char === '"') {
+      const start = index++;
+      while (index < value.length && value[index] !== '"') {
+        index += value[index] === "\\" ? 2 : 1;
+      }
+      out += value.slice(start, ++index);
+    } else if (char === "/" && value[index + 1] === "*") {
+      const end = value.indexOf("*/", index + 2);
+      index = end === -1 ? value.length : end + 2;
+    } else if (char === "/" && value[index + 1] === "/") {
+      const end = value.indexOf("\n", index + 2);
+      index = end === -1 ? value.length : end;
+    } else {
+      out += char;
+      index++;
+    }
+  }
+  return out;
+}
+
 /**
  * Ruby's stdlib `JSON` module, the two entry points Rails hands to a
  * `serializer:` kwarg — `ActiveRecord::SignedId#signed_id_verifier` passes the
@@ -46,6 +71,7 @@ export namespace JSON {
    * takes the source through `StringValue` and `convert_encoding`
    * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:673-687,805`), which reads an
    * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
+   * It also skips block and line comments (`ignore`, `parser.rl:105-108`).
    * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`.
    *
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
@@ -62,7 +88,12 @@ export namespace JSON {
     if (typeof source !== "string") {
       throw new TypeError(`no implicit conversion of ${rbObjClassname(source)} into String`);
     }
-    return globalJSON.parse(source);
+    try {
+      return globalJSON.parse(source);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      return globalJSON.parse(stripJsonComments(source));
+    }
   }
 
   export function dump(value: unknown): string {

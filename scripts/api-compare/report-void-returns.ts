@@ -18,6 +18,13 @@
  * the package. A setter (`x=`) and `initialize` are left out. The TS half is
  * `returnsVoid` (`extract-ts-api.ts#signatureReturnsVoid`).
  *
+ * A name is not an owner, so two rules keep a read off its homonyms. A
+ * receiverless read in a file that defines a method of that name is that
+ * file's definition's alone (`FixtureSet::File#raw_rows` calling its own
+ * `validate`, `fixture_set/file.rb:55`, is no read of `Migrator#validate`).
+ * And a read through an explicit receiver is no read of a method Rails
+ * declares private, which no receiver can reach.
+ *
  * The population is the skeleton artifact's pairs: every compared pair with a
  * body on both sides. A Ruby name defined twice in one file answers with its
  * first definition, as compare.ts' first-sighting maps do.
@@ -50,14 +57,27 @@ export interface ApiManifest {
   packages: Record<string, ApiPackage>;
 }
 
-/** One Rails read of a method's return value: how many, and the first. */
+/** The Rails reads attributed to one method: how many, and the first. */
 export interface ReturnUse {
   count: number;
   site: string;
 }
 
-/** `extract-return-uses.rb`'s output: package → Ruby method name → reads. */
-export type ReturnUses = Record<string, Record<string, ReturnUse>>;
+/** One read: the Rails file and line, and whether the call is receiverless. */
+export type ReturnRead = [file: string, line: number, bare: boolean];
+
+/**
+ * `extract-return-uses.rb`'s output for one package: Ruby method name → reads,
+ * and Rails file → the method names it defines. `lib` is the package's lib
+ * root, which a skeleton row's `rubyFile` is relative to.
+ */
+export interface PackageReturnUses {
+  lib: string;
+  reads: Record<string, ReturnRead[]>;
+  defs: Record<string, string[]>;
+}
+
+export type ReturnUses = Record<string, PackageReturnUses>;
 
 export interface VoidReturnRow extends SkeletonRow {
   use: ReturnUse;
@@ -89,18 +109,36 @@ export function tsVoidReturns(tsApi: ApiManifest): Set<string> {
   return new Set([...voids].filter((k) => !values.has(k)));
 }
 
+/** (package, Ruby file, name) keys of the methods Rails declares private. */
+export function rubyPrivates(rubyApi: ApiManifest): Set<string> {
+  const privates = new Set<string>();
+  for (const [pkg, info] of Object.entries(rubyApi.packages)) {
+    for (const m of methodsOf(info)) {
+      if (m.visibility === "private") privates.add(key(pkg, m.file ?? "", m.name));
+    }
+  }
+  return privates;
+}
+
 export function voidReturnRows(
   skeletons: readonly SkeletonRow[],
   uses: ReturnUses,
   voids: ReadonlySet<string>,
+  privates: ReadonlySet<string> = new Set(),
 ): VoidReturnRow[] {
   const rows: VoidReturnRow[] = [];
   for (const row of skeletons) {
     if (row.rubyName === "initialize" || row.rubyName.endsWith("=")) continue;
-    const use = uses[row.package]?.[row.rubyName];
-    if (use === undefined) continue;
+    const pkg = uses[row.package];
+    if (pkg === undefined) continue;
+    const own = `${pkg.lib}/${row.rubyFile}`;
+    const isPrivate = privates.has(key(row.package, row.rubyFile, row.rubyName));
+    const reads = (pkg.reads[row.rubyName] ?? []).filter(([file, , bare]) =>
+      bare ? file === own || !pkg.defs[file]?.includes(row.rubyName) : !isPrivate,
+    );
+    if (reads.length === 0) continue;
     if (!voids.has(key(row.package, row.tsFile, row.tsName))) continue;
-    rows.push({ ...row, use });
+    rows.push({ ...row, use: { count: reads.length, site: `${reads[0][0]}:${reads[0][1]}` } });
   }
   return rows;
 }
@@ -151,24 +189,34 @@ async function readJson<T>(file: string): Promise<T | undefined> {
 async function railsReturnUses(packages: readonly string[]): Promise<ReturnUses> {
   const libs = libPathsManifest();
   const tests = testPathsManifest();
+  const present = packages.filter((pkg) => libs[pkg] !== undefined);
   const roots = Object.fromEntries(
-    packages.map((pkg) => [pkg, [libs[pkg], tests[pkg]].filter((d) => d !== undefined)]),
+    present.map((pkg) => [pkg, [libs[pkg], tests[pkg]].filter((d) => d !== undefined)]),
   );
   const { stdout } = await promisify(execFile)(
     "ruby",
     [path.join(SCRIPT_DIR, "extract-return-uses.rb"), JSON.stringify(roots)],
     { maxBuffer: 256 * 1024 * 1024 },
   );
-  return JSON.parse(stdout) as ReturnUses;
+  const uses = JSON.parse(stdout) as Record<string, Omit<PackageReturnUses, "lib">>;
+  return Object.fromEntries(
+    present.map((pkg) => [
+      pkg,
+      { ...uses[pkg], lib: libs[pkg].replace(/^.*\/vendor\/[^/]+\/[^/]+\//, "") },
+    ]),
+  );
 }
 
 async function main(argv: string[]): Promise<number> {
-  const files = ["call-skeletons.json", "ts-api.json"].map((f) => path.join(OUTPUT_DIR, f));
-  const [artifact, tsApi] = await Promise.all([
+  const files = ["call-skeletons.json", "ts-api.json", "rails-api.json"].map((f) =>
+    path.join(OUTPUT_DIR, f),
+  );
+  const [artifact, tsApi, rubyApi] = await Promise.all([
     readJson<SkeletonArtifact>(files[0]),
     readJson<ApiManifest>(files[1]),
+    readJson<ApiManifest>(files[2]),
   ]);
-  if (artifact === undefined || tsApi === undefined) {
+  if (artifact === undefined || tsApi === undefined || rubyApi === undefined) {
     console.error(
       `void-return report: ${files.map((f) => path.relative(ROOT_DIR, f)).join(", ")} ` +
         "must all exist — run `pnpm parity:api --calls` first.",
@@ -179,6 +227,7 @@ async function main(argv: string[]): Promise<number> {
     artifact.skeletons,
     await railsReturnUses(artifact.packages),
     tsVoidReturns(tsApi),
+    rubyPrivates(rubyApi),
   );
   const raw = argv.find((a) => a.startsWith("--sample="))?.slice("--sample=".length);
   console.log(

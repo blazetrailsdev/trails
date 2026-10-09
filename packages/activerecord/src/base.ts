@@ -174,6 +174,7 @@ import {
 } from "@blazetrails/activesupport";
 import {
   isRespondTo as _isRespondTo,
+  respondToMissing as _respondToMissing,
   methodMissing as _methodMissing,
   hasAttribute as _hasAttribute,
   _hasAttribute as _privateHasAttribute,
@@ -2298,6 +2299,7 @@ include(Base, {
   serializableHash: Serialization.serializableHash,
   readAttributeBeforeTypeCast: _readAttributeBeforeTypeCast,
   isRespondTo: _isRespondTo,
+  respondToMissing: _respondToMissing,
   methodMissing: _methodMissing,
   hasAttribute: _hasAttribute,
   attributePresent: _attributePresent,

@@ -72,7 +72,6 @@ import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { ActiveRecord } from "./namespaces.js";
 import type * as CompatibilityModule from "./migration/compatibility.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
-import { _DatabaseTasks } from "./tasks/database-tasks-slot.js";
 import type { SchemaFormat } from "./tasks/database-tasks.js";
 import { ExecutionStrategy } from "./migration/execution-strategy.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
@@ -911,7 +910,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     }
 
     let timeElapsed: number | null = null;
-    const pool = (await _DatabaseTasks!.migrationConnection()).pool as ConnectionPool;
+    const pool = (await ActiveRecord.Tasks.DatabaseTasks.migrationConnection())
+      .pool as ConnectionPool;
     await pool.withConnection(async (conn) => {
       timeElapsed = await Benchmark.realtime(() => this.execMigration(conn, direction));
     });
@@ -998,7 +998,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   get connection(): A | Promise<A> {
     return (
       (this._connectionOverride as A | undefined) ??
-      (_DatabaseTasks!.migrationConnection() as Promise<A>)
+      (ActiveRecord.Tasks.DatabaseTasks.migrationConnection() as Promise<A>)
     );
   }
 
@@ -1007,7 +1007,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   }
 
   get connectionPool(): ConnectionPool {
-    return this._poolOverride ?? _DatabaseTasks!.migrationConnectionPool();
+    return this._poolOverride ?? ActiveRecord.Tasks.DatabaseTasks.migrationConnectionPool();
   }
 
   async execMigration(conn: DatabaseAdapter, direction: "up" | "down"): Promise<void> {
@@ -1172,10 +1172,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   static async checkAllPendingBang(): Promise<void> {
     const pendingMigrations: MigrationProxy[][] = [];
 
-    await _DatabaseTasks!.withTemporaryPoolForEach({ env: this.env() }, async (pool) => {
-      const pending = await pool.migrationContext.open().pendingMigrations();
-      if (pending != null) pendingMigrations.push(pending);
-    });
+    await ActiveRecord.Tasks.DatabaseTasks.withTemporaryPoolForEach(
+      { env: this.env() },
+      async (pool) => {
+        const pending = await pool.migrationContext.open().pendingMigrations();
+        if (pending != null) pendingMigrations.push(pending);
+      },
+    );
 
     const migrations = pendingMigrations.flat();
 
@@ -1282,7 +1285,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async anySchemaNeedsUpdate(): Promise<boolean> {
-    const databaseTasks = _DatabaseTasks!;
+    const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     for (const dbConfig of this.dbConfigsInCurrentEnv()) {
       if (!(await databaseTasks.schemaUpToDate(dbConfig, _schemaFormat()))) return true;
@@ -1316,7 +1319,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   /** @internal */
   private static async loadSchemaBang(): Promise<void> {
-    const databaseTasks = _DatabaseTasks!;
+    const databaseTasks = ActiveRecord.Tasks.DatabaseTasks;
 
     await ActiveRecord.Base.connectionHandler.clearAllConnectionsBang("all");
 
@@ -1460,7 +1463,7 @@ export class MigrationContext<
   }
 
   private connectionPool(): ConnectionPool {
-    return _DatabaseTasks!.migrationConnectionPool();
+    return ActiveRecord.Tasks.DatabaseTasks.migrationConnectionPool();
   }
 
   async migrate(
@@ -1791,7 +1794,7 @@ export class Migrator {
 
   /** @internal */
   private get connection(): Promise<DatabaseAdapter> {
-    return _DatabaseTasks!.migrationConnection();
+    return ActiveRecord.Tasks.DatabaseTasks.migrationConnection();
   }
 
   /** @internal */
