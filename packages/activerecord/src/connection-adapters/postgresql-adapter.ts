@@ -645,6 +645,7 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
+      this._acquireGeneration++;
       try {
         await this._rawConnection?.end();
       } catch {}
@@ -1498,7 +1499,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
   /** @internal */
   set _rawConnection(value: PGConnection | null) {
-    if (value === null) this._acquireGeneration++;
+    this._acquireGeneration++;
     this._connection = value && pgConnection(value);
   }
 
@@ -1576,13 +1577,18 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         }
         throw error;
       }
-      if (this._pgClientOptions == null || acquireGen !== this._acquireGeneration) {
+      const staleGeneration = acquireGen !== this._acquireGeneration;
+      if (this._pgClientOptions == null || this._rawConnection != null || staleGeneration) {
         newClient.end().catch(() => {});
-        throw new ConnectionNotEstablished("connection is closed");
+        if (this._pgClientOptions == null || staleGeneration) {
+          throw new ConnectionNotEstablished("connection is closed");
+        }
+        client = this._rawConnection!;
+      } else {
+        newClient.on("error", () => {});
+        this._rawConnection = newClient as PGConnection;
+        client = newClient;
       }
-      newClient.on("error", () => {});
-      this._rawConnection = newClient as PGConnection;
-      client = newClient;
     }
     return client;
   }
