@@ -25,13 +25,11 @@ describe("DbVersionTest", () => {
   let err: string[];
   let currentVersionSpy: ReturnType<typeof vi.fn>;
   let withTemporaryPoolFn: ReturnType<typeof vi.fn>;
-  let priorDefaultEnv: string;
   let priorTrailsEnv: string | undefined;
 
   beforeEach(() => {
     out = [];
     err = [];
-    priorDefaultEnv = DatabaseTasks.env;
     priorTrailsEnv = process.env["TRAILS_ENV"];
     vi.spyOn(console, "log").mockImplementation((m) => void out.push(String(m)));
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
@@ -42,12 +40,12 @@ describe("DbVersionTest", () => {
       .mockImplementation(async (_config: unknown, fn: () => unknown) => fn());
     vi.spyOn(DatabaseTasks, "withTemporaryPool").mockImplementation(withTemporaryPoolFn);
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    DatabaseTasks.env = priorDefaultEnv;
+    vi.unstubAllEnvs();
     if (priorTrailsEnv === undefined) delete process.env["TRAILS_ENV"];
     else process.env["TRAILS_ENV"] = priorTrailsEnv;
     DatabaseTasks.databaseConfiguration = null;
@@ -133,7 +131,7 @@ export default config;
   it("--env overrides TRAILS_ENV for the invocation", async () => {
     const dir = await makeFakeProject();
     delete process.env["TRAILS_ENV"];
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     await run(["db:version", "--env", "test"], dir);
     expect(process.env["TRAILS_ENV"]).toBe("test");
   });

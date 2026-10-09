@@ -469,7 +469,7 @@ export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void 
   this._columnsHash = undefined;
   this._schemaLoaded = false;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  (this as SchemaHost & { _attributeNamesMemo?: unknown })._attributeNamesMemo = undefined;
+  (this as SchemaHost & { _attributeNames?: unknown })._attributeNames = undefined;
   this._yamlEncoder = undefined;
   if (recursive) {
     for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
@@ -535,7 +535,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _columnNames?: unknown;
     _contentColumns?: unknown;
     _symbolColumnToStringNameHash?: unknown;
-    _attributeNamesMemo?: unknown;
+    _attributeNames?: unknown;
   };
   const bag = host as CacheBag;
   bag._attributesBuilder = undefined;
@@ -546,7 +546,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._columnNames = undefined;
   bag._contentColumns = undefined;
   bag._symbolColumnToStringNameHash = undefined;
-  bag._attributeNamesMemo = undefined;
+  bag._attributeNames = undefined;
   host._columnsHash = filteredHash;
 
   const methodHost = host as unknown as {

@@ -27,6 +27,8 @@ import {
   rbEql,
   rbFPublicSend,
   rbModConstSet,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjRespondTo,
   uniq,
 } from "@blazetrails/ruby-compat";
@@ -58,7 +60,6 @@ export function uncacheableMethods(): Set<string> {
 }
 
 const _relationDelegateCache = new WeakMap<typeof Base, Map<FamilyCtor, FamilyCtor>>();
-const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
 
 export class DelegateCache {
   static delegateBaseMethods = true;
@@ -100,12 +101,12 @@ export class DelegateCache {
 
   /** @internal */
   static generatedRelationMethods(this: typeof Base): GeneratedRelationMethods {
-    return (
-      _generatedRelationMethodsByModel.get(this) ??
-      _generatedRelationMethodsByModel
-        .set(this, rbModConstSet(this, "GeneratedRelationMethods", new GeneratedRelationMethods()))
-        .get(this)!
-    );
+    return (rbObjIvarGet(this, "@generated_relation_methods") ??
+      rbObjIvarSet(
+        this,
+        "@generated_relation_methods",
+        rbModConstSet(this, "GeneratedRelationMethods", new GeneratedRelationMethods()),
+      )) as GeneratedRelationMethods;
   }
 }
 

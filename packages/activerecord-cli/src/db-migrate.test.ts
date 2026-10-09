@@ -60,18 +60,20 @@ describe("DbMigrateTest", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
     DatabaseTasks.seedLoader = null;
   });
 
   it("db:migrate calls migrate with no args", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(0);
     expect(migrateSpy).toHaveBeenCalledWith({ skipInitialize: true });
   });
 
   it("db:migrate --version passes version string", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
     let seenTargetVersion: number | null = null;
     migrateSpy.mockImplementation(async () => {
       seenTargetVersion = DatabaseTasks.targetVersion();
@@ -85,7 +87,7 @@ describe("DbMigrateTest", () => {
 
   it("db:migrate calls MigrationContext#migrations before migrate", async () => {
     vi.mocked(DatabaseTasks.migrate).mockRestore();
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const discoverSpy = vi
       .spyOn(MigrationContext.prototype, "migrations", "get")
       .mockReturnValue([]);
@@ -94,7 +96,7 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate takes the multi-database path when the env has several configs", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     expect(await run(["db:migrate"], await makeMultiDbFakeProject())).toBe(0);
     expect(DatabaseTasks.configsFor({ envName: "development" })).toHaveLength(2);
     expect(migrateSpy).not.toHaveBeenCalled();
@@ -107,19 +109,20 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:migrate exits 1 when migrate throws", async () => {
+    vi.stubEnv("TRAILS_ENV", "development");
     migrateSpy.mockRejectedValueOnce(new Error("boom"));
     expect(await run(["db:migrate"], await makeFakeProject())).toBe(1);
     expect(err.join("\n")).toContain("db:migrate failed");
   });
 
   it("db:rollback calls rollback with step 1 by default", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     expect(await run(["db:rollback"], await makeFakeProject())).toBe(0);
     expect(rollbackSpy).toHaveBeenCalledWith(1);
   });
 
   it("db:rollback runs with the environment connection established", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     let connected = false;
     rollbackSpy.mockImplementationOnce(() => {
       connected = Base.connectionPool() != null;
@@ -141,7 +144,7 @@ describe("DbMigrateTest", () => {
   });
 
   it("db:schema:load calls loadSchemaCurrent", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     expect(await run(["db:schema:load"], await makeFakeProject())).toBe(0);
     expect(loadSchemaCurrentSpy).toHaveBeenCalledOnce();
   });

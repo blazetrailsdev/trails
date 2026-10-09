@@ -59,7 +59,7 @@ export function rbStrSNew(str: string = ""): string {
  *
  * @noRailsEquivalent PERMANENT
  */
-export function strUminus(str: string): string {
+export function strUminus<T extends string | Uint8Array>(str: T): T {
   return str;
 }
 

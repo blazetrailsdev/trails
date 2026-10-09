@@ -10,7 +10,7 @@ export class Column extends BaseColumn {
 
   constructor(
     name: string,
-    defaultValue: unknown,
+    defaultValue: string | Uint8Array | null,
     sqlTypeMetadata: {
       sqlType?: string | null;
       type?: string;

@@ -1061,7 +1061,7 @@ export class PostgreSQLAdapter
     await this.loadAdditionalTypes();
   }
   /** @internal */
-  extractValueFromDefault(default_: string | null): unknown {
+  extractValueFromDefault(default_: string | null): string | null {
     let m: RegExpExecArray | null;
     if ((m = /^[(B]?'([\s\S]*)'.*::"?([\w. ]+)"?(?:\[\])?$/.exec(default_!))) {
       if (m[1] === "now" && m[2] === "date") {

@@ -37,7 +37,7 @@ import * as os from "os";
 function makeColumn(
   name: string,
   sqlType: string,
-  opts: { default?: unknown; null?: boolean } = {},
+  opts: { default?: string | null; null?: boolean } = {},
 ): Column {
   return new Column(
     name,

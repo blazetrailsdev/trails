@@ -710,7 +710,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
 
   /** @internal */
-  extractValueFromDefault(default_: string | null): unknown {
+  extractValueFromDefault(default_: string | null): string | Uint8Array | null {
     let m: RegExpExecArray | null;
     if (default_ == null || /^null$/im.test(default_)) {
       return null;

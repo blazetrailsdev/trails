@@ -7,7 +7,6 @@ import {
   type CallbackObject,
 } from "@blazetrails/activemodel";
 import {
-  IsolatedExecutionState,
   extractOptionsBang,
   included,
   kernelArray,
@@ -21,19 +20,11 @@ import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
-import {
-  CURRENT_TRANSACTION_KEY,
-  Transaction,
-} from "./connection-adapters/abstract/transaction.js";
 import { Transaction as PublicTransaction } from "./transaction.js";
 import { transaction as dbTransaction } from "./connection-adapters/abstract/database-statements.js";
 import { runAfterTransactionCallbacksInOrderDefined } from "./active-record.js";
 
 type TransactionAction = "create" | "update" | "destroy";
-
-export function currentTransaction(): Transaction | null {
-  return IsolatedExecutionState.get<Transaction | null>(CURRENT_TRANSACTION_KEY) ?? null;
-}
 
 export async function transaction<T>(
   modelClass: typeof Base,

@@ -1,7 +1,7 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import { describe, it, expect, vi } from "vitest";
-import { Base, transaction, currentTransaction, Rollback, registerModel } from "./index.js";
+import { Base, transaction, Rollback, registerModel } from "./index.js";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -115,13 +115,13 @@ describe("TransactionCallbacksTest", () => {
       throw new Error("better pop this txn from the stack!");
     });
 
-    const originalTxn = currentTransaction();
+    const originalTxn = (await TopicWithCallbacks.leaseConnection()).currentTransaction();
 
     try {
       await first.saveBang();
       throw new Error("fail");
     } catch {
-      expect(currentTransaction()).toBe(originalTxn);
+      expect((await TopicWithCallbacks.leaseConnection()).currentTransaction()).toBe(originalTxn);
     }
   });
 

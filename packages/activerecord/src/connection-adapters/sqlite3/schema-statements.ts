@@ -27,7 +27,7 @@ import { quoteTableName } from "./quoting.js";
 
 interface SQLite3SchemaAdapter extends DatabaseAdapter {
   /** @internal */
-  extractValueFromDefault(default_: string | null): unknown;
+  extractValueFromDefault(default_: string | null): string | Uint8Array | null;
   /** @internal */
   extractDefaultFunction(defaultValue: unknown, default_: string | null): string | null;
   addForeignKey(

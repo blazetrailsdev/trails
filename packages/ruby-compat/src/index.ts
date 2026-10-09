@@ -107,6 +107,7 @@ export {
   rbHashSRuby2KeywordsHash,
   rbHashSRuby2KeywordsHashP,
   reject,
+  size,
   slice,
   transformValues,
   update,

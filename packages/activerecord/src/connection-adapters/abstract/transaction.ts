@@ -29,9 +29,6 @@ interface TransactionRecord {
   }): Promise<void>;
 }
 
-/** @internal */
-export const CURRENT_TRANSACTION_KEY = Symbol.for("ar_current_transaction");
-
 export class TransactionState {
   private _state:
     | "committed"

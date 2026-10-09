@@ -3,7 +3,7 @@ import "../associations/collection-proxy.js";
 import "../association-relation.js";
 import "../associations/disable-joins-association-scope.js";
 import { afterAll, afterEach, expect } from "vitest";
-import { Timeout } from "@blazetrails/ruby-compat";
+import { Timeout, getOs } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
@@ -12,6 +12,8 @@ import { I18n } from "@blazetrails/activemodel";
 import { afterTeardown, zone as timeZone, setZone } from "@blazetrails/activesupport";
 import { DelegateCache } from "../relation/delegation.js";
 import { registerFakeAdapter } from "../support/fake-adapter.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
+import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "../encryption/extended-deterministic-queries.js";
 import { ExtendedDeterministicUniquenessValidator } from "../encryption/extended-deterministic-uniqueness-validator.js";
@@ -22,6 +24,10 @@ import {
 } from "../active-record.js";
 
 registerFakeAdapter();
+
+DatabaseTasks.env = DEFAULT_ENV();
+DatabaseTasks.root = getOs().cwd();
+DatabaseTasks.dbDir = "db";
 
 expect.addEqualityTesters([
   function recordEquals(a: unknown, b: unknown): boolean | undefined {
