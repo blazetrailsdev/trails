@@ -331,6 +331,7 @@ export const ClassMethods = {
     this.attributeMethodPatternsCache().clear();
   },
 
+  /** @inventedArm if — PERMANENT */
   aliasesByAttributeName(this: ClassMethodsHost): Hash<string, string[]> {
     if (!Object.prototype.hasOwnProperty.call(this, "_aliasesByAttributeName")) {
       this._aliasesByAttributeName = new Hash<string, string[]>((h, k) => {
@@ -369,7 +370,10 @@ export const ClassMethods = {
     return this.generatedAttributeMethods().isMethodDefined(methodName);
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   attributeMethodPatternsCache(
     this: ClassMethodsHost,
   ): InstanceType<typeof Concurrent.Map<string, Array<AttributeMethod>>> {

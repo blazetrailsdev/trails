@@ -191,7 +191,10 @@ export const ClassMethods = {
     }
   },
 
-  /** @internal */
+  /**
+   * @internal
+   * @inventedArm if — PERMANENT
+   */
   pendingAttributeModifications(this: AttributeHostInternals): PendingModification[] {
     if (!Object.hasOwn(this, "_pendingAttributeModifications")) {
       this._pendingAttributeModifications = [];
