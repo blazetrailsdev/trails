@@ -152,7 +152,20 @@ export namespace Delegation {
         const member = (_ as Record<string, unknown>)[method];
         return typeof member === "function" ? member.apply(_, args) : member;
       };
-      const methodObject = (receiverClass as Record<string, unknown> | undefined)?.[method];
+      let descriptor: PropertyDescriptor | undefined;
+      for (let o = receiverClass as object | null | undefined; o != null && !descriptor; ) {
+        descriptor = Object.getOwnPropertyDescriptor(o, method);
+        o = Object.getPrototypeOf(o);
+      }
+      if (descriptor?.get) {
+        Object.defineProperty(owner, methodName, {
+          configurable: true,
+          enumerable: false,
+          get: value,
+        });
+        continue;
+      }
+      const methodObject = descriptor?.value;
       if (typeof methodObject === "function") {
         Object.defineProperty(value, "length", { value: methodObject.length });
       }

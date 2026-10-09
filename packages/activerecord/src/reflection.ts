@@ -41,7 +41,6 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
 import * as ReflectionModule from "./reflection.js";
-import { _setReflection } from "./reflection-slot.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -1809,4 +1808,4 @@ export const ClassMethods = {
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
 
-_setReflection(ReflectionModule);
+ActiveRecord.Reflection = ReflectionModule;

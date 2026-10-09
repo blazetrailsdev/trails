@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { currentPreventingWrites } from "./core.js";
-import { DatabaseSelector } from "./middleware/database-selector.js";
+import { DatabaseSelector, type MiddlewareRequest } from "./middleware/database-selector.js";
 import { seconds, TopLevel, type Duration } from "@blazetrails/activesupport";
 import { Resolver, type ResolverContext } from "./middleware/database-selector/resolver.js";
 import { Session } from "./middleware/database-selector/resolver/session.js";
@@ -11,6 +11,12 @@ import { Time } from "@blazetrails/date";
 class TestRequest {
   readonly method: string;
   readonly session: Hash<string, unknown>;
+  isGet(): boolean {
+    return this.method === "GET";
+  }
+  isHead(): boolean {
+    return this.method === "HEAD";
+  }
   constructor(env: Record<string, unknown>) {
     this.method = env["REQUEST_METHOD"] as string;
     this.session = env["rack.session"] as Hash<string, unknown>;
@@ -246,7 +252,7 @@ describe("DatabaseSelectorTest", () => {
       static override call(ctx: ResolverContext, opts: Record<string, unknown>): ReadonlyResolver {
         return new ReadonlyResolver(ctx, opts as { delay?: Duration });
       }
-      override isReadingRequest(_r: { method: string }): boolean {
+      override isReadingRequest(_request: MiddlewareRequest): boolean {
         return true;
       }
     }

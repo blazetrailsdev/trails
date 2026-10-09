@@ -1,5 +1,5 @@
 import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
-import { Enumerable, include, rtest } from "@blazetrails/ruby-compat";
+import { Enumerable, include, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { FormatError } from "../fixtures.js";
@@ -65,23 +65,23 @@ export class File {
   /** @inventedArm if — PERMANENT */
   private rawRows(): [string, unknown][] {
     return (this.#rawRows ??= (() => {
-      let data: unknown;
-      const rows = fixtureModules.get(this.file);
-      if (rows !== undefined) {
-        data = Object.fromEntries(
-          Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
-        );
-      } else {
-        try {
+      try {
+        let data: unknown;
+        const rows = fixtureModules.get(this.file);
+        if (rows !== undefined) {
+          data = Object.fromEntries(
+            Object.entries(rows).map(([key, row]) => [key, isPlainObject(row) ? { ...row } : row]),
+          );
+        } else {
           data = ConfigurationFile.parse(this.file, {
             context: new (RenderContext.createSubclass())().getBinding(),
           });
-        } catch (error: unknown) {
-          if (!(error instanceof ConfigurationFile.FormatError)) throw error;
-          throw new FormatError(error.message);
         }
+        return rtest(data) ? toA(this.validate(data)) : [];
+      } catch (error: unknown) {
+        if (!(error instanceof RuntimeError)) throw error;
+        throw new FormatError(error.message);
       }
-      return rtest(data) ? toA(this.validate(data)) : [];
     })());
   }
 

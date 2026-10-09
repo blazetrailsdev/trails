@@ -5,7 +5,8 @@ import type { ResolverContext } from "./database-selector/resolver.js";
 import { Session } from "./database-selector/resolver/session.js";
 
 export interface MiddlewareRequest {
-  method: string;
+  isGet(): boolean;
+  isHead(): boolean;
   session: Pick<Hash<string, unknown>, "get" | "set">;
 }
 

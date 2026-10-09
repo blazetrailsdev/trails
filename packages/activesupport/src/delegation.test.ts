@@ -43,6 +43,23 @@ describe("Delegation.generate", () => {
     expect(record.tableName()).toBe("records");
   });
 
+  it("defines an accessor when the delegated class member is an accessor", () => {
+    class Record {
+      static get jobClass() {
+        return `${this.name}Job`;
+      }
+      declare jobClass: string;
+    }
+    class Child extends Record {}
+    Delegation.generate(Record.prototype, ["jobClass"], { to: "class" });
+
+    expect(Object.getOwnPropertyDescriptor(Record.prototype, "jobClass")!.get).toBeTypeOf(
+      "function",
+    );
+    expect(new Record().jobClass).toBe("RecordJob");
+    expect(new Child().jobClass).toBe("ChildJob");
+  });
+
   it("delegates method to target", () => {
     class Greeter {
       greet() {

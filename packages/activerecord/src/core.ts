@@ -36,6 +36,7 @@ import {
   ParameterFilter,
   isPlainObject,
   constantize,
+  delegate,
   filterMap,
 } from "@blazetrails/activesupport";
 import { AsynchronousQueriesTracker, type Session } from "./asynchronous-queries-tracker.js";
@@ -91,12 +92,7 @@ export const Core = {
       get: destroyAssociationAsyncJob,
       set: Object.getOwnPropertyDescriptor(base, "_destroyAssociationAsyncJob")!.set,
     });
-    Object.defineProperty((base as CoreHost).prototype, "destroyAssociationAsyncJob", {
-      configurable: true,
-      get(this: { constructor: CoreHost }) {
-        return this.constructor.destroyAssociationAsyncJob;
-      },
-    });
+    delegate.call((base as CoreHost).prototype, "destroyAssociationAsyncJob", { to: "class" });
     classAttribute.call(base, "destroyAssociationAsyncBatchSize", {
       instanceWriter: false,
       instancePredicate: false,

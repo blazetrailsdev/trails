@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { File as RubyFile, Tempfile } from "@blazetrails/ruby-compat";
+import { File as RubyFile, RuntimeError, Tempfile } from "@blazetrails/ruby-compat";
+import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
 import { File } from "./file.js";
 import { RenderContext } from "./render-context.js";
-import { FixtureSet } from "../fixtures.js";
+import { FixtureSet, FormatError } from "../fixtures.js";
 
 function tmpYaml<T>(name: [string, string], contents: string, block: (t: Tempfile) => T): T {
   const t = Tempfile.new(name);
@@ -80,5 +81,43 @@ describe("FixtureSet.contextClass (trails)", () => {
     expect(FixtureSet.contextClass).toBe(FixtureSet.contextClass);
     expect(SubSet.contextClass).toBe(SubSet.contextClass);
     expect(SubSet.contextClass).not.toBe(FixtureSet.contextClass);
+  });
+});
+
+describe("FixtureSet::File#raw_rows rescue (trails)", () => {
+  function withHelper<T>(raised: Error, block: () => T): T {
+    const proto = FixtureSet.contextClass.prototype as Record<string, unknown>;
+    proto["raisingHelper"] = function raisingHelper(): never {
+      throw raised;
+    };
+    try {
+      return block();
+    } finally {
+      delete proto["raisingHelper"];
+    }
+  }
+
+  it("converts a RuntimeError raised while rendering into Fixture::FormatError", () => {
+    withHelper(new RuntimeError("boom"), () => {
+      tmpYaml(["raising", "yml"], "one:\n  name: <%= raisingHelper() %>\n", (t) => {
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(new FormatError("boom"));
+      });
+    });
+  });
+
+  it("converts the YAML syntax error ConfigurationFile raises", () => {
+    tmpYaml(["broken", "yml"], "one:\n\t- [unclosed\n", (t) => {
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(FormatError);
+      expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(/YAML syntax error/);
+    });
+  });
+
+  it("lets a ConfigurationFile::FormatError through unchanged", () => {
+    const raised = new ConfigurationFile.FormatError("not a RuntimeError");
+    withHelper(raised, () => {
+      tmpYaml(["raising", "yml"], "one:\n  name: <%= raisingHelper() %>\n", (t) => {
+        expect(() => File.open(t.path()!, (fh) => [...fh])).toThrow(raised);
+      });
+    });
   });
 });
