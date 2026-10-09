@@ -37,10 +37,7 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
     }
     return body;
   }
-  throw new Error(
-    `${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`. A tag cites a ` +
-      "module that defines the hook itself.",
-  );
+  throw new Error(`${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`.`);
 }
 
 /**

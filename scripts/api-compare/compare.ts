@@ -6637,10 +6637,8 @@ export function main() {
 
     const uncomparedInlined = uncomparedInlinedTags(tsInlinedFromByFileOwner, inlinedTagsCompared);
     if (callsGate && uncomparedInlined.length > 0) {
-      throw new Error(
-        `@inlinedFrom was never compared: ${uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ")} — ` +
-          "the call gate paired no Rails `initialize` with this constructor, so its tags were not checked.",
-      );
+      const where = uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ");
+      throw new Error(`@inlinedFrom was never compared, no Rails \`initialize\` paired: ${where}`);
     }
     results.push({
       package: pkg,
