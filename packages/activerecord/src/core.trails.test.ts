@@ -10,6 +10,7 @@ import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
 import { rbHash, uniq } from "@blazetrails/ruby-compat";
 import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
+import { hasQueryConstraints, queryConstraints } from "./persistence.js";
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);
@@ -595,5 +596,74 @@ describe("arelTable memo", () => {
   it("does not hand a subclass its parent's table", () => {
     expect(Reply.arelTable).toBe(Reply.arelTable);
     expect(Reply.arelTable).not.toBe(Topic.arelTable);
+  });
+});
+
+describe("Base's inherited chain is deferred to own-property memo guards", () => {
+  fixtures(["topics"]);
+
+  const memos = [
+    "_generatedAttributeMethods",
+    "_generatedAssociationMethods",
+    "_arelTable",
+    "_predicateBuilder",
+    "_findByStatementCache",
+  ];
+  const ownMemos = (klass: object) => memos.filter((memo) => Object.hasOwn(klass, memo));
+  const read = async (klass: typeof Topic) => {
+    await klass.findBy({ id: 1 });
+    const associationMethods = klass.generatedAssociationMethods();
+    return {
+      associationMethods,
+      attributeMethods: (klass as unknown as { _generatedAttributeMethods: object })
+        ._generatedAttributeMethods,
+      arelTable: klass.arelTable,
+      predicateBuilder: klass.predicateBuilder,
+      findByCache: (klass as unknown as { _findByStatementCache: object })._findByStatementCache,
+    };
+  };
+
+  it("seeds each class of a three-level hierarchy on its own first read, leaf before parent", async () => {
+    class Middle extends Topic {}
+    class Leaf extends Middle {}
+
+    const leaf = await read(Leaf);
+    expect(ownMemos(Leaf)).toEqual(memos);
+    expect(ownMemos(Middle)).toEqual([]);
+
+    const middle = await read(Middle);
+    const root = await read(Topic);
+    expect(ownMemos(Middle)).toEqual(memos);
+    for (const memo of Object.keys(leaf) as (keyof typeof leaf)[]) {
+      expect(middle[memo]).not.toBe(leaf[memo]);
+      expect(middle[memo]).not.toBe(root[memo]);
+    }
+    expect(await read(Leaf)).toEqual(leaf);
+  });
+
+  it("resets locking_column and has_query_constraints? for a subclass", () => {
+    class Middle extends Topic {}
+    Middle.lockingColumn = "custom_lock_version";
+    queryConstraints.call(Middle as never, "author_name", "id");
+    class Leaf extends Middle {}
+
+    expect(Middle.lockingColumn).toBe("custom_lock_version");
+    expect(Leaf.lockingColumn).toBe("lock_version");
+    expect(hasQueryConstraints.call(Middle as never)).toBe(true);
+    expect(hasQueryConstraints.call(Leaf as never)).toBe(false);
+  });
+
+  it("answers an unset filter_attributes from the superclass after the leaf was read", () => {
+    class Middle extends Topic {}
+    class Leaf extends Middle {}
+
+    const inherited = Leaf.filterAttributes;
+    const filter = Leaf.inspectionFilter();
+    Middle.filterAttributes = ["title"];
+
+    expect(Topic.filterAttributes).toBe(inherited);
+    expect(Leaf.filterAttributes).toEqual(["title"]);
+    expect(Leaf.inspectionFilter()).not.toBe(filter);
+    expect(Leaf.inspectionFilter()).toBe(Middle.inspectionFilter());
   });
 });

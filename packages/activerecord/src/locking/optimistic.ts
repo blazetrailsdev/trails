@@ -96,7 +96,9 @@ export function resetLockingColumn(this: LockingHost): void {
 
 export class ClassMethods {
   static get lockingColumn(): string {
-    return (this as any)._lockingColumn ?? DEFAULT_LOCKING_COLUMN;
+    return Object.hasOwn(this, "_lockingColumn")
+      ? (this as any)._lockingColumn
+      : DEFAULT_LOCKING_COLUMN;
   }
 
   static set lockingColumn(column: string) {
