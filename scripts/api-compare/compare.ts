@@ -2262,6 +2262,11 @@ export function skeletonsByOwner(
  * synthesized file module re-lists every top-level function, so the by-name
  * list carries a lone `export function` twice. Otherwise a class owner still
  * reads by name, and so does a name whose owners share one body.
+ *
+ * The caller reads these maps for the file the `.rb` path mirrors where that
+ * file holds the name's one body, past a `RUBY_FILE_TS_OVERRIDES` entry:
+ * `String#camelize` (`core_ext/string/inflections.rb:101`) is
+ * `core-ext/string/inflections.ts`'s, not `Inflector.camelize`'s.
  */
 export function skeletonsOfOwner(
   byName: string[][] | undefined,
@@ -5615,10 +5620,6 @@ export function main() {
         const rubySkeleton = ownsBody(rubyName)
           ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
           : rubySkeletonByName.get(rubyName);
-        // A file-level override sends every method of the `.rb` to one TS file.
-        // Where the file the path mirrors holds the name's one body, that body
-        // is the port: `String#camelize` (`core_ext/string/inflections.rb:101`)
-        // is `core-ext/string/inflections.ts`'s, not `Inflector.camelize`'s.
         const mirrorFile = rubyFileToTs(rubyFile, pkg, false);
         const mirrored =
           mirrorFile === tsFile
