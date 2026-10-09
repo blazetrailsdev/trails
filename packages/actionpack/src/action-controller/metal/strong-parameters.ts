@@ -19,6 +19,7 @@ import {
   rbBlockGivenP,
   rbEql,
   rbEqual,
+  rbFSend,
   rbHash,
   rbInspect,
   rbModConstSet,
@@ -259,6 +260,8 @@ export class Parameters {
     return aryIncludes(this.values, converted);
   }
 
+  declare isValue: Parameters["hasValue"];
+
   include(key: string): boolean {
     return this.parameters.include(key);
   }
@@ -459,12 +462,9 @@ export class Parameters {
     );
   }
 
-  dig(...keys: string[]): unknown {
-    if (keys.length === 0) {
-      throw new Error("wrong number of arguments (given 0, expected 1+)");
-    }
-    this._convertHashesToParameters(keys[0], this.parameters.get(keys[0]));
-    return this.parameters.dig(...(keys as [string, ...string[]]));
+  dig(...keys: (string | number)[]): unknown {
+    this._convertHashesToParameters(keys[0] as string, this.parameters.get(keys[0] as string));
+    return this.parameters.dig(...(keys as [string, ...(string | number)[]]));
   }
 
   delete(key: string, ...args: unknown[]): unknown {
@@ -587,11 +587,12 @@ export class Parameters {
     return duplicate;
   }
 
-  /** @missingRailsArgs split — PERMANENT */
-  extractValue(key: string, delimiter = "_"): string[] | null {
-    const val = this.parameters.get(key);
-    if (val === null || val === undefined) return null;
-    return String(val).split(delimiter);
+  extractValue(
+    key: string,
+    { delimiter = "_" }: { delimiter?: string | RegExp } = {},
+  ): string[] | null {
+    const value = this.parameters.get(key);
+    return value == null ? null : (rbFSend(value, "split", delimiter, -1) as string[]);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
@@ -1011,6 +1012,7 @@ export class Parameters {
 
 Parameters.prototype.hasKey = Parameters.prototype.include;
 Parameters.prototype.isKey = Parameters.prototype.include;
+Parameters.prototype.isValue = Parameters.prototype.hasValue;
 Parameters.prototype.member = Parameters.prototype.include;
 Parameters.prototype.toParam = Parameters.prototype.toQuery;
 Parameters.prototype.toUnsafeHash = Parameters.prototype.toUnsafeH;

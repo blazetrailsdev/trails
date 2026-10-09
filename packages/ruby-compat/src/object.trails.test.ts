@@ -404,6 +404,12 @@ describe("rbFPublicSend include?", () => {
 });
 
 describe("rbFSend", () => {
+  it("answers a String receiver with the Ruby method over String.prototype's", () => {
+    expect(rbFSend("a  b", "split", " ", -1)).toEqual(["a", "b"]);
+    expect(rbFSend(",a,,b,", "split", ",", -1)).toEqual(["", "a", "", "b", ""]);
+    expect(rbFSend(",a,,b,", "split", ",")).toEqual(["", "a", "", "b"]);
+  });
+
   it("raises NoMethodError carrying the receiver and args for an undefined method", () => {
     for (const [recv, d] of [
       [null, "nil"],

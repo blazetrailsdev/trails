@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import { rbObjDup } from "@blazetrails/ruby-compat";
+import { ArgumentError, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
 import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
 import { Parameters, UnpermittedParameters } from "./strong-parameters.js";
@@ -137,5 +137,20 @@ describe("ActionController::Parameters", () => {
       parameters: { key: ":value" },
       permitted: true,
     });
+  });
+});
+
+describe("Parameters#extract_value", () => {
+  it("splits as String#split does and sends split to a non-String value", () => {
+    const params = new Parameters({ words: "a  b", id: "1x2", count: 42 });
+    expect(params.extractValue("words", { delimiter: " " })).toEqual(["a", "b"]);
+    expect(params.extractValue("id", { delimiter: /x/ })).toEqual(["1", "2"]);
+    expect(() => params.extractValue("count")).toThrow(NoMethodError);
+  });
+});
+
+describe("Parameters#dig", () => {
+  it("raises ArgumentError when given no keys", () => {
+    expect(() => new Parameters({ a: "1" }).dig()).toThrow(ArgumentError);
   });
 });

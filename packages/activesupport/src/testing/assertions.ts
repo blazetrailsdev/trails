@@ -796,14 +796,14 @@ export function assertKindOf(
   cls: abstract new (...args: never) => unknown,
   obj: unknown,
   msg: string | (() => string) | null = null,
-): void {
+): true {
   msg = message(
     msg,
     null,
     () => `Expected ${inspect(obj)} to be a kind of ${rbModToS(cls)}, not ${rbObjClassname(obj)}`,
   );
 
-  assert(Object(obj) instanceof cls, msg);
+  return assert(Object(obj) instanceof cls, msg);
 }
 
 export function assertMatch(
