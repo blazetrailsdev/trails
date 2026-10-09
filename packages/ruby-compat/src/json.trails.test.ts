@@ -28,6 +28,7 @@ describe("JSON.parse comments and byte sources", () => {
     const { JSON: RbJSON } = await import("./json.js");
     expect(RbJSON.parse("[1, /* x */ 2] // y\n")).toEqual([1, 2]);
     expect(() => RbJSON.parse("[1/*x*/2]")).toThrow(SyntaxError);
+    expect(() => RbJSON.parse("1/*")).toThrow(SyntaxError);
   });
 
   it("reads a source held as its bytes as UTF-8", async () => {
