@@ -29,7 +29,7 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("a server error from perform_query carries the SQLSTATE through result", async () => {
     const error = (await adapter
-      .execute("SELECT * FROM pg_error_result_missing")
+      .execute("SELECT * FROM missing_error_result_table")
       .catch((e: unknown) => e)) as StatementInvalid;
     expect(error).toBeInstanceOf(StatementInvalid);
     const cause = error.cause as Stamped;
