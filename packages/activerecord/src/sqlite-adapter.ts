@@ -136,7 +136,6 @@ export interface SqliteOpenConfig {
   flags?: number;
   readOnly?: boolean;
   noMutex?: boolean;
-  timeout?: number;
   strict?: boolean;
   authToken?: string;
   syncUrl?: string;
@@ -157,8 +156,6 @@ export interface SqliteDriver {
   readonly name: string;
   readonly capabilities: SqliteDriverCapabilities;
   open(config: SqliteOpenConfig): Promise<SqliteConnection>;
-  /** @internal */
-  openSync?(config: SqliteOpenConfig): SyncSqliteConnection;
   databaseExists?(config: SqliteOpenConfig): boolean | Promise<boolean>;
   restoreFromPath?(sourcePath: string, destination: string): Promise<void>;
 }

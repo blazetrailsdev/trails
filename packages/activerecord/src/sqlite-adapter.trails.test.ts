@@ -26,8 +26,8 @@ async function registerTestAdapter(build: () => DatabaseAdapter): Promise<string
   return adapter;
 }
 
-const openVia = async (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
-  betterSqlite3Driver.openSync!(config) as unknown as SqliteConnection;
+const openVia = (config: Parameters<SqliteDriver["open"]>[0]): Promise<SqliteConnection> =>
+  betterSqlite3Driver.open(config);
 const asyncDriver = (open: SqliteDriver["open"]): SqliteDriver => ({
   name: "async-stub",
   capabilities: { ...betterSqlite3Driver.capabilities, inProcessSync: false },
@@ -103,7 +103,7 @@ describe("SQLite adapter driver binding", () => {
     await adapter.disconnectBang();
   });
 
-  it("forwards driver-specific open config (timeout, driverOptions) to open()", async () => {
+  it("forwards driver-specific open config (driverOptions) to open() and applies the busy timeout in configureConnection", async () => {
     let seen: Record<string, unknown> | undefined;
     const driver = asyncDriver((config) => {
       seen = config as unknown as Record<string, unknown>;
@@ -115,7 +115,7 @@ describe("SQLite adapter driver binding", () => {
       timeout: 1234,
       driverOptions: { foo: "bar" },
     }).connectBang();
-    expect(seen?.timeout).toBe(1234);
+    expect(await adapter.selectValue("PRAGMA busy_timeout")).toBe(1234);
     expect(seen?.driverOptions).toEqual({ foo: "bar" });
     await adapter.disconnectBang();
   });
@@ -628,7 +628,7 @@ describe("SQLite3Adapter connection parameters", () => {
     const conn = await BetterSQLite3Adapter.newClient(params);
     expect(conn.isOpen()).toBe(true);
     await conn.close();
-    expect(() => SQLite3Adapter.newClient(params)).toThrow(/No SQLite driver configured/);
+    await expect(SQLite3Adapter.newClient(params)).rejects.toThrow(/No SQLite driver configured/);
   });
 
   it("does not expand or mkdir a libsql remote URL as a local path", () => {

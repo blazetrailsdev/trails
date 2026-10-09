@@ -250,7 +250,6 @@ function openDatabase(config: SqliteOpenConfig): Database.Database {
     ...(config.driverOptions as Database.Options | undefined),
     readonly: config.readOnly ?? false,
   };
-  if (config.timeout !== undefined) opts.timeout = config.timeout;
   try {
     if (opts.readonly && config.database === ":memory:") {
       return new Database(new Database(":memory:").serialize(), opts);
@@ -276,10 +275,6 @@ export const betterSqlite3Driver: SqliteDriver = {
 
   open(config: SqliteOpenConfig): Promise<SqliteConnection> {
     return Promise.resolve(new BetterSqlite3Connection(openDatabase(config)));
-  },
-
-  openSync(config: SqliteOpenConfig): SyncSqliteConnection {
-    return new BetterSqlite3Connection(openDatabase(config));
   },
 
   databaseExists(config: SqliteOpenConfig): boolean {

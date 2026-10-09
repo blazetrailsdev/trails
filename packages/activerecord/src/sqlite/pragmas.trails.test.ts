@@ -1,11 +1,14 @@
 import { describe, expect, it } from "vitest";
 
+import type { SyncSqliteConnection } from "../sqlite-adapter.js";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 import { Pragmas } from "./pragmas.js";
 
 describe("SQLite3::Pragmas readers", () => {
   it("read back what the setters write, through the raw connection's getFirstValue", async () => {
-    const db = betterSqlite3Driver.openSync!({ database: ":memory:" });
+    const db = (await betterSqlite3Driver.open({
+      database: ":memory:",
+    })) as unknown as SyncSqliteConnection;
     try {
       Pragmas.setUserVersion.call(db, 7);
       Pragmas.setForeignKeys.call(db, "on");
@@ -32,7 +35,9 @@ describe("SQLite3::Pragmas readers", () => {
 
 describe("SQLite3::Pragmas getters on an async host", () => {
   it("resolve to the same values the sync host returns", async () => {
-    const db = betterSqlite3Driver.openSync!({ database: ":memory:" });
+    const db = (await betterSqlite3Driver.open({
+      database: ":memory:",
+    })) as unknown as SyncSqliteConnection;
     const host = {
       execute: async (sql: string, bindVars?: never[], block?: (row: unknown) => void) =>
         db.execute(sql, bindVars, block),

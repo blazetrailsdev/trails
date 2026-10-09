@@ -194,8 +194,5 @@ export function sqlJsDriver(db: Database): SqliteDriver {
     async open() {
       return new SqlJsConnection(db);
     },
-    openSync() {
-      return new SqlJsConnection(db);
-    },
   };
 }

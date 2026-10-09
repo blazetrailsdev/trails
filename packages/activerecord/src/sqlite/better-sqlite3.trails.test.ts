@@ -320,14 +320,4 @@ describe("SqliteDriver — better-sqlite3 open under a missing directory", () =>
       );
     expectCantOpen(error);
   });
-
-  it("openSync raises SQLite3::CantOpenException", () => {
-    let error: unknown = null;
-    try {
-      betterSqlite3Driver.openSync!({ database });
-    } catch (e) {
-      error = e;
-    }
-    expectCantOpen(error);
-  });
 });

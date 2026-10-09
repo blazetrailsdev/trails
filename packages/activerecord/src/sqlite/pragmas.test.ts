@@ -8,8 +8,10 @@ import { Pragmas } from "./pragmas.js";
 describe("SQLite3::TestPragmas", () => {
   let db: SyncSqliteConnection & { testStatements: string[] };
 
-  beforeEach(() => {
-    const conn = betterSqlite3Driver.openSync!({ database: ":memory:" });
+  beforeEach(async () => {
+    const conn = (await betterSqlite3Driver.open({
+      database: ":memory:",
+    })) as unknown as SyncSqliteConnection;
     const execute = conn.execute.bind(conn);
     db = Object.assign(conn, {
       testStatements: [] as string[],

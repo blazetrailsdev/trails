@@ -9,12 +9,7 @@ import {
   rbStrPartition,
   registerConstant,
 } from "@blazetrails/ruby-compat";
-import type {
-  SqliteConnection,
-  SqliteDriver,
-  SqliteOpenConfig,
-  SqliteStatement,
-} from "../sqlite-adapter.js";
+import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
 import { Pragmas } from "../sqlite/pragmas.js";
 import { BusyException } from "../sqlite/errors.js";
@@ -140,35 +135,27 @@ let sqlite3TypeMap: TypeMap | undefined;
 export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   static override readonly ADAPTER_NAME = "SQLite";
 
-  static newClient(
+  static async newClient(
     this: typeof SQLite3Adapter,
     config: SQLite3ConnectionParameters,
-  ): SqliteConnection | Promise<SqliteConnection> {
-    const rescue = (error: unknown): never => {
+  ): Promise<SqliteConnection> {
+    try {
+      return await this.resolveDriverFactory(config).open({
+        ...config,
+        database: String(config.database),
+        readOnly: config.readonly ?? false,
+        strict: config.strict,
+        flags: config.flags,
+        noMutex: (config as { noMutex?: boolean }).noMutex,
+        driverOptions: config.driverOptions,
+      });
+    } catch (error) {
       if (!(error instanceof Errno.ENOENT)) throw error;
-      if ((error as Error).message.includes("No such file or directory")) {
+      if (error.message.includes("No such file or directory")) {
         throw new NoDatabaseError();
       } else {
         throw error;
       }
-    };
-    const timeout = SQLite3Adapter.typeCastConfigToInteger(config.timeout);
-    const openConfig: SqliteOpenConfig = {
-      ...config,
-      database: String(config.database),
-      readOnly: config.readonly ?? false,
-      strict: config.strict,
-      timeout: typeof timeout === "number" && Number.isInteger(timeout) ? timeout : undefined,
-      flags: config.flags,
-      noMutex: (config as { noMutex?: boolean }).noMutex,
-      driverOptions: config.driverOptions,
-    };
-    try {
-      const driver = this.resolveDriverFactory(config);
-      if (!driver.openSync) return driver.open(openConfig).catch(rescue);
-      return driver.openSync(openConfig) as SqliteConnection;
-    } catch (error) {
-      return rescue(error);
     }
   }
 
@@ -1057,6 +1044,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       if (typeof timeout !== "number" || !Number.isInteger(timeout)) {
         throw new TypeError(`timeout must be integer, not ${String(timeout)}`);
       }
+      await Pragmas.setBusyTimeout.call(this._rawConnection!, timeout);
     } else if (rtest(cfg.retries)) {
       deprecator().warn(
         "The retries option is deprecated and will be removed in Rails 8.1. Use timeout instead.\n",
