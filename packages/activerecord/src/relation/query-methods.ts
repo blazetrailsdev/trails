@@ -85,6 +85,7 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
+  /** @inventedArm fromEntries — CONVERGEABLE predicate-builder-nested-hash-arm-accepts-a-ruby-hash */
   associated(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
@@ -111,6 +112,7 @@ export class WhereChain<R = any> {
     return this._scope;
   }
 
+  /** @inventedArm fromEntries — CONVERGEABLE predicate-builder-nested-hash-arm-accepts-a-ruby-hash */
   missing(...associations: string[]): R {
     const scope = this._scope as unknown as QueryMethodsHost;
     for (const association of associations) {
