@@ -18,7 +18,8 @@ import {
   rbPlus,
 } from "./numeric.js";
 import { Rational } from "./rational.js";
-import { rbEqual } from "./rb-equal.js";
+import { checkArity } from "./string/support.js";
+import { rbEqq, rbEqual } from "./rb-equal.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface Each<T, E = unknown> {
@@ -139,22 +140,71 @@ function drop<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]> {
   );
 }
 
+function enumfunc<T>(args: unknown[]): (i: T) => unknown {
+  checkArity(args.length, 0, 1);
+  return args.length > 0 ? (i) => rbEqq(args[0], i) : (i) => i;
+}
+
 /**
  * Mirrors: Ruby's Enumerable#any? — `vendor/ruby/v3.3.11/enum.c:1861` `enum_any`,
- * `RTEST`ing the block's result, or the element itself with no block.
+ * `RTEST`ing `pattern === element`, or the element itself with no argument.
  * @noRailsEquivalent PERMANENT
  */
-function isAny<T, E = unknown>(
-  this: Each<T, E>,
-  block?: (i: T) => unknown,
-): Enumerated<E, boolean> {
+function isAny<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+  const func = enumfunc<T>(args);
   let memo = false;
   return rbBlockCall(
     this,
     (i) => {
-      const result = block ? block(i) : i;
+      const result = func(i);
       if (result != null && result !== false) {
         memo = true;
+        throw iterBreak;
+      }
+    },
+    () => memo,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#one? — `vendor/ruby/v3.3.11/enum.c:2148` `enum_one`, which
+ * breaks on the second match (`:1869`).
+ * @noRailsEquivalent PERMANENT
+ */
+function isOne<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+  const func = enumfunc<T>(args);
+  let memo: boolean | undefined = undefined;
+  return rbBlockCall(
+    this,
+    (i) => {
+      const result = func(i);
+      if (result != null && result !== false) {
+        if (memo === undefined) {
+          memo = true;
+        } else if (memo === true) {
+          memo = false;
+          throw iterBreak;
+        }
+      }
+    },
+    () => memo === true,
+  );
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#none? — `vendor/ruby/v3.3.11/enum.c:2210` `enum_none`
+ * (`:2160`).
+ * @noRailsEquivalent PERMANENT
+ */
+function isNone<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): Enumerated<E, boolean> {
+  const func = enumfunc<T>(args);
+  let memo = true;
+  return rbBlockCall(
+    this,
+    (i) => {
+      const result = func(i);
+      if (result != null && result !== false) {
+        memo = false;
         throw iterBreak;
       }
     },
@@ -361,6 +411,8 @@ export const Enumerable = {
   first,
   drop,
   isAny,
+  isOne,
+  isNone,
   isInclude,
   sum,
   [Symbol.iterator]: iterator,

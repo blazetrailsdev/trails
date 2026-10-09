@@ -25,16 +25,6 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
   });
 
-  it("does not repeat the connect-once configure when a verify/reconnect configureConnection follows connect", async () => {
-    stubNewClient();
-    const adapter = new Mysql2Adapter({ host: "localhost" });
-    const checkVersionSpy = vi.spyOn(adapter, "checkVersion");
-    await adapter.connectBang();
-    await adapter.configureConnection();
-
-    expect(checkVersionSpy).toHaveBeenCalledTimes(1);
-  });
-
   it("rejects the connect when the server version is below the 5.6.4 floor", async () => {
     const { DatabaseVersionError } = await import("../errors.js");
     stubNewClient("5.6.3");

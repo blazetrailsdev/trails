@@ -3323,6 +3323,9 @@ class ApiExtractor
       return
     elsif kind == :opassign && SKELETON_LOGICAL_OP_ASSIGNS.key?(op_assign_op(node[2]).to_s)
       tokens << SKELETON_LOGICAL_OP_ASSIGNS[op_assign_op(node[2]).to_s]
+    elsif kind == :assign && node[1].is_a?(Array) && node[1][0] == :field &&
+          node[1][2].is_a?(Array) && node[1][2][1] == "&."
+      tokens << "if"
     elsif kind == :aref
       # Receiver, then the `[]` reach, then the index — as
       # extract-ts-api.ts#extractSkeleton emits an ElementAccessExpression.
