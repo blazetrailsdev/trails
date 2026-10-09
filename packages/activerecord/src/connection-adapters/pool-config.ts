@@ -131,9 +131,6 @@ export interface MysqlAdapterOptions extends TrailsAdapterOptions {
   encoding?: string;
   collation?: string;
   variables?: Record<string, string | number | boolean | null | ":default">;
-  /** @internal */
-  /** @internal */
-  _fakeConnection?: boolean;
 }
 
 export interface PostgreSQLAdapterOptions extends TrailsAdapterOptions {

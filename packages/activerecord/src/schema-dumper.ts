@@ -24,8 +24,6 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
-import { schemaFormat } from "./active-record.js";
-import type { SchemaFormat } from "./tasks/database-tasks.js";
 import type { Base } from "./base.js";
 import type {
   CheckConstraintDefinition,
@@ -65,7 +63,6 @@ export abstract class SchemaDumper {
 
   protected connection: DatabaseAdapter;
   protected _options: Record<string, unknown>;
-  private _format: SchemaFormat;
   private _tableName?: string;
   private _version: Promise<number | null | undefined> | null;
   private _ignoreTables: (string | RegExp)[];
@@ -81,7 +78,6 @@ export abstract class SchemaDumper {
       this._version = null;
     }
     this._options = options;
-    this._format = schemaFormat();
     this._ignoreTables = [
       baseClass().schemaMigrationsTableName,
       baseClass().internalMetadataTableName,
@@ -174,23 +170,14 @@ export abstract class SchemaDumper {
     return Promise.resolve();
   }
 
-  /** @inventedArm if — CONVERGEABLE schema-dumper-header-branches-on-the-ts-js-dump-language */
   private async header(stream: IO | StringIO): Promise<void> {
     stream.puts("// This file is auto-generated from the current state of the database.");
     stream.puts("// Instead of editing this file, please use the migrations feature.");
     stream.puts("");
-    if (this._format === "ts") {
-      stream.puts(`import type { DatabaseAdapter } from "@blazetrails/activerecord";`);
-      stream.puts("");
-    }
     stream.puts(`export const defineParams = { ${await this.defineParams()} };`);
     stream.puts("");
-    if (this._format === "ts") {
-      stream.puts("export default async function defineSchema(ctx: DatabaseAdapter) {");
-    } else {
-      stream.puts("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
-      stream.puts("export default async function defineSchema(ctx) {");
-    }
+    stream.puts("/** @param {import('@blazetrails/activerecord').DatabaseAdapter} ctx */");
+    stream.puts("export default async function defineSchema(ctx) {");
   }
 
   private trailer(stream: IO | StringIO): void {

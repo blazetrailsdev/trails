@@ -113,9 +113,7 @@ describe("deprecated raw-connection initialize overload", () => {
     });
 
     it("does not warn for the modern config-hash signature", () => {
-      const { messages } = captureDeprecations(
-        () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }),
-      );
+      const { messages } = captureDeprecations(() => new Mysql2Adapter({ database: "blog" }));
       expect(messages).toEqual([]);
     });
 
@@ -130,7 +128,7 @@ describe("deprecated raw-connection initialize overload", () => {
     });
 
     it("leaves the caller's hash alone on every config arm, as symbolize_keys copies", () => {
-      const config = { database: "blog", _fakeConnection: true };
+      const config = { database: "blog" };
       new Mysql2Adapter(config);
       expect(config).not.toHaveProperty("flags");
 
@@ -146,7 +144,7 @@ describe("deprecated raw-connection initialize overload", () => {
     it("raises ArgumentError when a config hash is passed with extra arguments", () => {
       expect(
         // @ts-expect-error — the overload signatures forbid a second arg for the
-        () => new Mysql2Adapter({ database: "blog", _fakeConnection: true }, { database: "blog" }),
+        () => new Mysql2Adapter({ database: "blog" }, { database: "blog" }),
       ).toThrow(ArgumentError);
     });
   });
@@ -171,12 +169,12 @@ describe("config-hash constructor retains foreignKeys in _config", () => {
   });
 
   it("Mysql2Adapter honors foreignKeys:false and defaults to true", () => {
-    const disabled = new Mysql2Adapter({ foreignKeys: false, _fakeConnection: true } as never);
+    const disabled = new Mysql2Adapter({ foreignKeys: false } as never);
     expect(disabled.supportsForeignKeys()).toBe(true);
     expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
     expect(guards(disabled).useForeignKeys()).toBe(false);
 
-    const enabled = new Mysql2Adapter({ _fakeConnection: true } as never);
+    const enabled = new Mysql2Adapter({});
     expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
     expect(guards(enabled).useForeignKeys()).toBe(true);
   });

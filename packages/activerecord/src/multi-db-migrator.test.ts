@@ -147,10 +147,10 @@ describe("MultiDbMigratorTest", () => {
       internalMetadataA,
     ).migrationsStatus();
     expect(statusA).toEqual([
-      { status: "down", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
-      { status: "up", version: "010", name: "********** NO FILE **********" },
+      ["down", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
+      ["up", "010", "********** NO FILE **********"],
     ]);
 
     await schemaMigrationB.createVersion("4");
@@ -160,9 +160,9 @@ describe("MultiDbMigratorTest", () => {
       internalMetadataB,
     ).migrationsStatus();
     expect(statusB).toEqual([
-      { status: "down", version: "001", name: "People have hobbies" },
-      { status: "down", version: "002", name: "People have descriptions" },
-      { status: "up", version: "004", name: "********** NO FILE **********" },
+      ["down", "001", "People have hobbies"],
+      ["down", "002", "People have descriptions"],
+      ["up", "004", "********** NO FILE **********"],
     ]);
   });
 

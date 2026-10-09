@@ -27,7 +27,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
   }
 
   function makeAdapter(): Mysql2Adapter {
-    const adapter = new Mysql2Adapter({ host: "localhost", _fakeConnection: true } as never);
+    const adapter = new Mysql2Adapter({ host: "localhost" } as never);
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
     (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeConn;
     (adapter as unknown as { _verified: boolean })._verified = true;

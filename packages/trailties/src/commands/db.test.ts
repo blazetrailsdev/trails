@@ -698,12 +698,12 @@ export class CreatePosts extends Migration {
 
     const beforeStatus = await context.migrationsStatus();
     expect(beforeStatus).toHaveLength(1);
-    expect(beforeStatus[0].status).toBe("down");
+    expect(beforeStatus[0][0]).toBe("down");
 
     await context.migrate();
 
     const afterStatus = await context.migrationsStatus();
-    expect(afterStatus[0].status).toBe("up");
+    expect(afterStatus[0][0]).toBe("up");
 
     const tables = (await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
@@ -713,7 +713,7 @@ export class CreatePosts extends Migration {
     await context.rollback(1);
 
     const rollbackStatus = await context.migrationsStatus();
-    expect(rollbackStatus[0].status).toBe("down");
+    expect(rollbackStatus[0][0]).toBe("down");
 
     const tablesAfter = (await adapter.execute(
       `SELECT name FROM sqlite_master WHERE type='table' AND name='posts'`,
