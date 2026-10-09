@@ -71,7 +71,7 @@ export function serializableHash(
             `includes / preload) — synchronous serialization cannot query the database.`,
         );
       }
-      const items = rbCheckArrayType(records) ?? Array.from(records);
+      const items = rbCheckArrayType(records) ?? [...records];
       hashAset(
         result,
         assocName,
@@ -251,7 +251,7 @@ async function preloadIncludes(
   for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
-      ? (rbCheckArrayType(records) ?? Array.from(records))
+      ? (rbCheckArrayType(records) ?? [...records])
       : records != null && typeof records === "object"
         ? [records]
         : [];

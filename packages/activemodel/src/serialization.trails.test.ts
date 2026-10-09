@@ -243,6 +243,20 @@ describe("Serialization — trails-only coverage", () => {
     await expect(p.serializableHash({ include: "tags" })).rejects.toThrow(NoMethodError);
   });
 
+  it("include naming a to_ary that answers nil raises rather than serializing nothing", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toAry: () => null } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(TypeError);
+  });
+
+  it("include naming a loaded collection that cannot be read raises rather than serializing nothing", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { loaded: true, toArray: () => Promise.resolve([]) } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(TypeError);
+  });
+
   it("awaited nested include preloads through an attributes-less PORO", async () => {
     const comment = { _attributes: new Map([["text", "Nice"]]) };
     const comments = {
