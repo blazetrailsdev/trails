@@ -241,7 +241,10 @@ is `registerModel(rbModConstSet(Sharded, "Blog", this))`, as
 `test-helpers/models/sharded/*.ts` do.
 
 This is a genuine language shortcoming, ratified here by the repo owner
-(2026-10-09). `registerModel` carries `@noRailsEquivalent PERMANENT` against
+(2026-10-09). The ruling is recorded in the tasks-repo story
+`register-model-wrapper-is-deleted-tests-seat-constants` (RFC 0180), under
+"Direction change (Dean, 2026-10-09)" and "Register always, as `inherited`
+does". `registerModel` carries `@noRailsEquivalent PERMANENT` against
 this section; there is no story to delete it or to rewrite its callers to
 `registerConstant`.
 

@@ -11,6 +11,7 @@ import { queryConstraints } from "../../../persistence.js";
 const Sharded = (registeredConstant("Sharded") as Module | undefined) ?? new Module();
 registerConstant("Sharded", Sharded);
 
+/** @missingRailsArgs has_many — CONVERGEABLE port-destroy-association-async-test-and-flip-models */
 export class ShardedBlogPostDestroyAsync extends Base {
   static _tableName = "sharded_blog_posts";
   static {
