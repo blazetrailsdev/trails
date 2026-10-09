@@ -509,13 +509,14 @@ describe("ConnectionPool schema cache", () => {
   ): Promise<void> {
     await writeFile(
       cacheFile,
-      JSON.stringify({
-        columns: { [tableName]: [realisticColumnJson] },
-        primary_keys: { [tableName]: "id" },
-        data_sources: { [tableName]: true },
-        indexes: {},
-        version,
-      }),
+      "--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache\n" +
+        JSON.stringify({
+          columns: { [tableName]: [realisticColumnJson] },
+          primary_keys: { [tableName]: "id" },
+          data_sources: { [tableName]: true },
+          indexes: {},
+          version,
+        }),
     );
   }
 
