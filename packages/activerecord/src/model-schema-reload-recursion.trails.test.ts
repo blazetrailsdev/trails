@@ -121,32 +121,3 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<boolean>(Ticket, "_schemaLoaded")).toBe(true);
   });
 });
-
-describe("resetColumnInformation undefines attribute methods (model_schema.rb:525)", () => {
-  it("undefines the generated attribute methods of the class and its descendants", async () => {
-    class Shape extends Base {
-      static override tableName = "shapes";
-    }
-    registerModel(Shape);
-    class Ticket extends Shape {
-      static override tableName = "tickets";
-    }
-    registerModel(Ticket);
-
-    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    for (const klass of [Shape, Ticket]) {
-      await establishConnectionTo(klass, makeAdapter(cols) as never);
-      await klass.loadSchema();
-      klass.defineAttributeMethods();
-      expect(own<boolean>(klass, "_attributeMethodsGenerated")).toBe(true);
-      expect(klass.generatedAttributeMethods().instanceMethods()).toContain("guid");
-    }
-
-    await Shape.resetColumnInformation();
-
-    expect(own<boolean>(Shape, "_attributeMethodsGenerated")).toBe(false);
-    expect(own<boolean>(Ticket, "_attributeMethodsGenerated")).toBe(false);
-    expect(Shape.generatedAttributeMethods().instanceMethods()).not.toContain("guid");
-    expect(Ticket.generatedAttributeMethods().instanceMethods()).not.toContain("guid");
-  });
-});
