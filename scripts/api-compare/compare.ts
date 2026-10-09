@@ -185,11 +185,11 @@ import {
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
 import {
-  inlinedHookBody,
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedSegments,
   sameFileInitializeModules,
+  taggedBodies,
 } from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
@@ -5536,18 +5536,19 @@ export function main() {
           (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
         );
         const byOwner = tsInlinedFromByFileOwner.get(tsFile);
-        const tags =
+        const tsClass =
           byOwner === undefined
-            ? []
-            : (byOwner.get(
-                resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass ?? "",
-              ) ?? []);
+            ? undefined
+            : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),
-          sameFile.map(initializeOf),
-          tags
-            .filter((tag) => !sameFile.includes(tag.module))
-            .map((tag) => inlinedHookBody(ruby, tag)),
+          sameFile.map(initializeOf).filter((m) => m !== undefined),
+          taggedBodies(
+            ruby,
+            byOwner?.get(tsClass ?? "") ?? [],
+            sameFile,
+            `${pkg}/${tsFile} ${tsClass}#constructor`,
+          ),
         );
       };
 

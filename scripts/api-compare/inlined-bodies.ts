@@ -5,6 +5,7 @@ import type {
   InlinedFrom,
   MethodInfo,
 } from "@blazetrails/parity/types";
+import { TAG } from "./inlined-from-tags.js";
 
 /** The Ruby call-set facts of one body, as compare.ts's call gate reads them. */
 export interface RubyBody {
@@ -15,17 +16,35 @@ export interface RubyBody {
   stringEvals: string[];
 }
 
-/** The `def` a tag cites, from whichever package's manifest defines the module. */
-export function inlinedHookBody(
-  ruby: ApiManifest,
-  tag: Pick<InlinedFrom, "module" | "hook">,
-): MethodInfo | undefined {
+/**
+ * The `def` a tag cites, from whichever package's manifest defines the module.
+ * Throws, naming `where` the tag sits, when the manifest holds no such `def`
+ * or the tag's citation is not that `def`'s file and line span.
+ */
+export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: string): MethodInfo {
+  const name = `${tag.module}#${tag.hook}`;
   for (const pkg of Object.values(ruby.packages)) {
     const mod = pkg.modules[tag.module] as unknown as ClassInfo | undefined;
     const body = mod?.instanceMethods.find((m) => m.name === tag.hook);
-    if (body) return body;
+    if (!body) continue;
+    const file = body.file ?? mod?.file;
+    const cited = `${tag.file}:${tag.firstLine}-${tag.lastLine}`;
+    if (
+      (file !== undefined && tag.file !== file && !tag.file.endsWith(`/${file}`)) ||
+      (body.line !== undefined && body.line !== tag.firstLine) ||
+      (body.endLine !== undefined && body.endLine !== tag.lastLine)
+    ) {
+      throw new Error(
+        `${TAG} citation is stale: ${where} — \`${name}\` is cited at ${cited}, and the ` +
+          `manifest has it at ${file}:${body.line}-${body.endLine}.`,
+      );
+    }
+    return body;
   }
-  return undefined;
+  throw new Error(
+    `${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`. A tag cites a ` +
+      "module that defines the hook itself.",
+  );
 }
 
 /**
@@ -63,19 +82,47 @@ export function sameFileInitializeModules(
 }
 
 /**
+ * The bodies a constructor's tags cite, in tag order. Throws on a tag naming a
+ * module in `sameFile`: a same-file body joins the chain untagged, so the tag
+ * is redundant.
+ */
+export function taggedBodies(
+  ruby: ApiManifest,
+  tags: readonly InlinedFrom[],
+  sameFile: readonly string[],
+  where: string,
+): MethodInfo[] {
+  return tags.map((tag) => {
+    if (sameFile.includes(tag.module)) {
+      throw new Error(
+        `${TAG} is redundant: ${where} — \`${tag.module}\` is defined in the Ruby file this ` +
+          "constructor's file mirrors, and a same-file body is inlined untagged.",
+      );
+    }
+    return inlinedHookBody(ruby, tag, where);
+  });
+}
+
+/**
  * The Rails chain a constructor that inlines module bodies answers to
- * (RFC 0188): the class's own `initialize`, then its same-file modules', then
- * the bodies its `@inlinedFrom` tags name. Empty when the class has neither a
- * same-file module nor a tag, which leaves the pair to the ordinary gate.
+ * (RFC 0188), in the order Ruby runs it: a tagged `ClassMethods#new`, which
+ * `Class#new` enters before any `initialize`, then the class's own
+ * `initialize`, its same-file modules', and the tagged `initialize` bodies in
+ * tag order. Empty when the class has neither a same-file module nor a tag,
+ * which leaves the pair to the ordinary gate.
  */
 export function inlinedSegments(
   own: MethodInfo | undefined,
-  sameFile: readonly (MethodInfo | undefined)[],
-  tagged: readonly (MethodInfo | undefined)[],
+  sameFile: readonly MethodInfo[],
+  tagged: readonly MethodInfo[],
 ): MethodInfo[] {
-  const inlined = [...sameFile, ...tagged].filter((m) => m !== undefined);
-  if (inlined.length === 0) return [];
-  return own === undefined ? inlined : [own, ...inlined];
+  if (sameFile.length + tagged.length === 0) return [];
+  return [
+    ...tagged.filter((m) => m.name === "new"),
+    ...(own === undefined ? [] : [own]),
+    ...sameFile,
+    ...tagged.filter((m) => m.name !== "new"),
+  ];
 }
 
 const consumesSuper = (segments: readonly MethodInfo[], index: number): boolean =>

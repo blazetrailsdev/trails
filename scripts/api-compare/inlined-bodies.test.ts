@@ -1,12 +1,18 @@
 import { describe, it, expect } from "vitest";
-import type { ApiManifest, CallSite, ClassInfo, MethodInfo } from "@blazetrails/parity/types";
+import type {
+  ApiManifest,
+  CallSite,
+  ClassInfo,
+  InlinedFrom,
+  MethodInfo,
+} from "@blazetrails/parity/types";
 import { dropWeakCalls, significantMissingCalls } from "./compare.js";
 import {
-  inlinedHookBody,
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedSegments,
   sameFileInitializeModules,
+  taggedBodies,
 } from "./inlined-bodies.js";
 
 const site = (name: string, args: string[] = []): CallSite => ({ name, args, flags: [] });
@@ -105,7 +111,7 @@ describe("a tagged constructor's Rails call set", () => {
 
   it("leaves a class with no same-file module and no tag to the ordinary gate", () => {
     expect(inlinedSegments(own, [], [])).toEqual([]);
-    expect(inlinedSegments(own, [undefined], [undefined])).toEqual([]);
+    expect(inlinedSegments(undefined, [], [])).toEqual([]);
   });
 });
 
@@ -131,19 +137,65 @@ describe("same-file module bodies join by convention", () => {
     expect(flagged(segments, ["super"])).toEqual(["backends → backends"]);
   });
 
-  it("joins a cross-file module only through its tag", () => {
-    const ruby = {
-      packages: {
-        i18n: { classes: {}, modules },
-        activemodel: { classes: {}, modules: { "ActiveModel::API": entity("api.rb", [], [api]) } },
+  const ruby = {
+    packages: {
+      i18n: { classes: {}, modules },
+      activemodel: {
+        classes: {},
+        modules: {
+          "ActiveModel::API": entity(
+            "api.rb",
+            [],
+            [{ ...api, file: "api.rb", line: 80, endLine: 84 }],
+          ),
+        },
       },
-    } as unknown as ApiManifest;
-    const tagged = inlinedHookBody(ruby, { module: "ActiveModel::API", hook: "initialize" });
-    expect(tagged).toBe(api);
-    expect(inlinedHookBody(ruby, { module: "ActiveModel::Missing", hook: "initialize" })).toBe(
-      undefined,
+    },
+  } as unknown as ApiManifest;
+  const tag = (module: string, firstLine = 80, lastLine = 84, file = "api.rb"): InlinedFrom => ({
+    module,
+    hook: "initialize",
+    source: "rails",
+    version: "v8.0.2",
+    file: `activemodel/lib/active_model/${file}`,
+    firstLine,
+    lastLine,
+  });
+  const at = "activemodel/model.ts Model#constructor";
+
+  it("joins a cross-file module only through its tag", () => {
+    const tagged = taggedBodies(ruby, [tag("ActiveModel::API")], sameFile, at);
+    expect(tagged.map((m) => m.calls)).toEqual([api.calls]);
+    expect(inlinedSegments(undefined, [], tagged)).toEqual(tagged);
+  });
+
+  it("reds on a tag that resolves to no Ruby body", () => {
+    expect(() => taggedBodies(ruby, [tag("ActiveModel::Missing")], [], at)).toThrow(
+      /@inlinedFrom names no Ruby body: activemodel\/model\.ts Model#constructor/,
     );
-    expect(inlinedSegments(undefined, [], [tagged])).toEqual([api]);
+  });
+
+  it.each([
+    ["first line", tag("ActiveModel::API", 81)],
+    ["last line", tag("ActiveModel::API", 80, 85)],
+    ["file", tag("ActiveModel::API", 80, 84, "model.rb")],
+  ])("reds on a citation whose %s is not the def's", (_what, stale) => {
+    expect(() => taggedBodies(ruby, [stale], [], at)).toThrow(
+      /@inlinedFrom citation is stale: .* the manifest has it at api\.rb:80-84/,
+    );
+  });
+
+  it("reds on a tag naming a same-file module", () => {
+    expect(() => taggedBodies(ruby, [tag(sameFile[0])], sameFile, at)).toThrow(
+      /@inlinedFrom is redundant/,
+    );
+  });
+
+  it("runs a tagged ClassMethods#new ahead of every initialize, its super consumed", () => {
+    const klassNew = { ...body(["subclass_from_attributes", "super"]), name: "new" };
+    const segments = inlinedSegments(own, [], [core, klassNew, api]);
+    expect(segments).toEqual([klassNew, own, core, api]);
+    expect(inlinedRubyBody(segments).calls.filter((c) => c === "super")).toHaveLength(1);
   });
 
   it("orders a class with both: own, same-file, then tagged", () => {

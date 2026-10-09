@@ -744,26 +744,37 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     const ends = rubyField(
       {
         "foo.rb": `class Foo
-  def initialize(attributes = nil)
+  def initialize(attributes = nil,
+                 options = {}) # reaches the end
+    sql = <<~SQL
+      select 1
+    end
+    SQL
+    def helper; end
     assign_attributes(attributes) if attributes
-
     super()
-  end
+  end # trailing
 
   def save
     true
   end
-
-  def self.new(*) = super
 end
 class Bar
   def initialize; end
+end
+class Baz
+  def initialize(x) = @x =
+    x
 end
 `,
       },
       "endLine",
     );
-    expect(ends).toMatchObject({ "Foo#initialize": 6, "Bar#initialize": 15 });
+    expect(ends).toMatchObject({
+      "Foo#initialize": 11,
+      "Bar#initialize": 18,
+      "Baz#initialize": 22,
+    });
     expect(ends["Foo#save"]).toBeNull();
   });
 

@@ -260,6 +260,26 @@ end
 
 INLINED_HOOKS = %w[initialize new].freeze
 
+class DefEndLines < Ripper
+  attr_reader :ends
+
+  def initialize(*)
+    super
+    @ends = {}
+    @starts = []
+  end
+
+  def on_kw(tok)
+    @starts << lineno if tok == "def"
+    tok
+  end
+
+  def on_def(*)
+    @ends[@starts.pop] = lineno
+  end
+  alias on_defs on_def
+end
+
 def body_digest(body)
   return nil if body.nil?
   Digest::SHA256.hexdigest(strip_sexp_positions(body).inspect)[0, 16]
@@ -466,6 +486,7 @@ class ApiExtractor
     @source_lines = source.lines
     @source = source
     @string_openers = nil
+    @def_end_lines = nil
     sexp = Ripper.sexp(source)
     return unless sexp
 
@@ -886,7 +907,8 @@ class ApiExtractor
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
     if INLINED_HOOKS.include?(name)
-      end_line = def_end_line(node, method_info[:line])
+      @def_end_lines ||= DefEndLines.new(@source).tap(&:parse).ends
+      end_line = @def_end_lines[method_info[:line]]
       method_info[:endLine] = end_line if end_line
     end
     if name == "method_missing" && !@in_sclass
@@ -4561,31 +4583,6 @@ class ApiExtractor
       return line if line
     end
     nil
-  end
-
-  def last_line(node)
-    return nil unless node.is_a?(Array)
-
-    head = node[0]
-    if head.is_a?(Symbol) && head.to_s.start_with?("@")
-      tail = node.last
-      if tail.is_a?(Array) && tail.length == 2 &&
-         tail[0].is_a?(Integer) && tail[1].is_a?(Integer)
-        return tail[0]
-      end
-    end
-
-    node.filter_map { |child| last_line(child) }.max
-  end
-
-  def def_end_line(node, line)
-    last = last_line(node)
-    return nil unless line && last && @source_lines
-    return last unless node.last.is_a?(Array) && node.last[0] == :bodystmt
-    return last if @source_lines[line - 1] =~ /\bend\s*(#.*)?$/
-
-    indent = @source_lines[line - 1][/^\s*/]
-    (last..@source_lines.length).find { |n| @source_lines[n - 1] =~ /^#{indent}end\b/ } || last
   end
 
   def new_class_info(name, fqn)
