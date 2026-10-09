@@ -56,6 +56,28 @@ describe("Mysql2Adapter base _connection field", () => {
     expect(adapter.isConnected()).toBe(true);
   });
 
+  it("discardBang during an in-flight reconnect abandons the client the connect installs", async () => {
+    const end = vi.fn(() => Promise.resolve());
+    const fakeConn = { end, query: () => Promise.resolve([[]]) };
+    let resolve!: (conn: never) => void;
+    const spy = vi
+      .spyOn(Mysql2Adapter, "newClient")
+      .mockReturnValue(new Promise((r) => (resolve = r)) as never);
+    const adapter = new Mysql2Adapter({ host: "localhost" });
+
+    const reconnect = adapter.reconnect();
+    for (let i = 0; i < 1000 && spy.mock.calls.length < 1; i++) await Promise.resolve();
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    adapter.discardBang();
+    resolve(fakeConn as never);
+    await reconnect;
+    await adapter.lock.synchronize(() => {});
+
+    expect(connectionOf(adapter)).toBeNull();
+    expect(end).not.toHaveBeenCalled();
+  });
+
   it("nulls _connection on discardBang", async () => {
     stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });

@@ -1262,6 +1262,31 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
 
+    it("discardBang orphans an in-flight acquire so no live client is installed", async () => {
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(orphan, "end");
+      const first = defer();
+      const spy = vi
+        .spyOn(PostgreSQLAdapter, "newClient")
+        .mockImplementationOnce(() => first.promise);
+      try {
+        const firstAcquire = a.connect();
+        await waitForNewClientCalls(spy, 1);
+
+        a.discardBang();
+
+        first.resolve(orphan);
+        await expect(firstAcquire).rejects.toBeTruthy();
+
+        expect(endSpy).toHaveBeenCalled();
+        expect(a._rawConnectionForTest()).toBeNull();
+      } finally {
+        spy.mockRestore();
+        await orphan.end().catch(() => {});
+      }
+    });
+
     it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
       const a = new PostgreSQLAdapter(PG_TEST_URL);
       const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
