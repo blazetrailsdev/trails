@@ -529,20 +529,25 @@ export class DatabaseTasks {
     if (filename == null) return;
 
     FileUtils.mkdirP(this.dbDir);
-    if (format === "ts" || format === "js") {
-      const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-      const migrationConnectionPool = this.migrationConnectionPool();
-      await File.open(filename, "w:utf-8", async (file) => {
-        await SchemaDumper.dump(migrationConnectionPool, file, undefined, format);
-      });
-    } else if (format === "sql") {
-      await this.structureDump(dbConfig, filename);
-      if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
-        await File.open(filename, "a", async (f) => {
-          f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
-          f.print("\n");
+    switch (format) {
+      case "ts":
+      case "js": {
+        const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+        const migrationConnectionPool = this.migrationConnectionPool();
+        await File.open(filename, "w:utf-8", async (file) => {
+          await SchemaDumper.dump(migrationConnectionPool, file, undefined, format);
         });
+        break;
       }
+      case "sql":
+        await this.structureDump(dbConfig, filename);
+        if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
+          await File.open(filename, "a", async (f) => {
+            f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
+            f.print("\n");
+          });
+        }
+        break;
     }
   }
 
