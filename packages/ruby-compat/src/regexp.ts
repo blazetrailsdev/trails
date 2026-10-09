@@ -19,6 +19,55 @@ export function regexpEscape(string: string): string {
 }
 
 /**
+ * `Regexp.union` (`rb_reg_s_union_m` / `rb_reg_s_union`,
+ * `vendor/ruby/v3.3.11/re.c:4192`): the alternation of `args0`, or of the one
+ * array passed alone. A String is escaped ({@link regexpEscape}) and a Regexp
+ * is embedded as its `to_s` ({@link rbRegToS}), which carries its own options
+ * in JS's modifier syntax, so the union is a pattern only where the engine has
+ * modifiers. No pattern is `/(?!)/`, and a lone Regexp is returned itself. MRI's
+ * encoding compatibility checks have nothing to read (CLAUDE.md, "A String has
+ * no encoding tag either").
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbRegSUnion(
+  ...args0: (string | RegExp)[] | [readonly (string | RegExp)[]]
+): RegExp {
+  const args = (args0.length === 1 && Array.isArray(args0[0]) ? args0[0] : args0) as readonly (
+    | string
+    | RegExp
+  )[];
+  const argc = args.length;
+
+  if (argc === 0) {
+    return new RegExp("(?!)");
+  } else if (argc === 1) {
+    const arg = args[0];
+    if (arg instanceof RegExp) return arg;
+    else {
+      const quoted = regexpEscape(arg);
+      return new RegExp(quoted);
+    }
+  } else {
+    let source = "";
+    for (let i = 0; i < argc; i++) {
+      const e = args[i];
+
+      if (0 < i) source += "|";
+
+      let v: string;
+      if (e instanceof RegExp) {
+        v = rbRegToS(e);
+      } else {
+        v = regexpEscape(e);
+      }
+      source += v;
+    }
+    return new RegExp(source);
+  }
+}
+
+/**
  * `rb_reg_to_s` (`vendor/ruby/v3.3.11/re.c:565`): the source in a non-capturing
  * group carrying the pattern's own options, so it means the same spliced into
  * another pattern. Ruby's `m` is JS's `s`, and JS's `m` (Ruby's always-on line

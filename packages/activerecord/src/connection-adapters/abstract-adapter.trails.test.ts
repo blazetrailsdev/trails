@@ -453,3 +453,12 @@ describe("AbstractAdapter.buildReadQueryRegexp", () => {
     expect(re.test("/* comment */ DELETE FROM posts")).toBe(false);
   });
 });
+
+describe("AbstractAdapter.buildReadQueryRegexp comment prefix", () => {
+  it("carries the i option on each part and none on the whole pattern", () => {
+    const re = AbstractAdapter.buildReadQueryRegexp();
+    expect(re.flags).toBe("");
+    expect(re.source).toContain("(?i-ms:begin)|(?i-ms:commit)");
+    expect(re.test("SeLeCt 1")).toBe(true);
+  });
+});

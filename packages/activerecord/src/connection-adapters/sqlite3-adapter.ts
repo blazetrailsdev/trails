@@ -75,7 +75,7 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { File, FileUtils } from "@blazetrails/ruby-compat";
+import { File, FileUtils, rbRegSUnion } from "@blazetrails/ruby-compat";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -986,10 +986,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     });
   }
 
-  /**
-   * @internal
-   * @missingRailsCall union — CONVERGEABLE regexp-union-comes-from-ruby-compat
-   */
+  /** @internal */
   private async tableStructureSql(tableName: string, columnNames?: string[]): Promise<string[]> {
     if (!columnNames) {
       const columnInfo = await this.tableInfo(tableName);
@@ -1004,13 +1001,9 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
     if (!result) return [];
 
-    const union =
-      columnNames.length > 0
-        ? columnNames.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")
-        : "(?!)";
     return last(rbStrPartition(result, SQLite3Adapter.UNQUOTED_OPEN_PARENS_REGEX))!
       .replace(SQLite3Adapter.FINAL_CLOSE_PARENS_REGEX, "")
-      .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${union})"))`, "i"))
+      .split(new RegExp(`,(?=\\s(?:CONSTRAINT|"(?:${rbRegSUnion(columnNames).source})"))`, "i"))
       .map((columnString) => columnString.trim());
   }
 

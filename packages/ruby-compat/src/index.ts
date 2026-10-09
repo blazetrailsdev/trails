@@ -313,7 +313,14 @@ export {
   rbObjProtectedMethods,
   rbObjPublicMethods,
 } from "./method.js";
-export { rbRegEqual, rbRegInitStr, rbRegMatchP, rbRegToS, regexpEscape } from "./regexp.js";
+export {
+  rbRegEqual,
+  rbRegInitStr,
+  rbRegMatchP,
+  rbRegSUnion,
+  rbRegToS,
+  regexpEscape,
+} from "./regexp.js";
 export { Pathname } from "./pathname.js";
 export { Range } from "./range.js";
 export { Rational, ZeroDivisionError, rational } from "./rational.js";

@@ -1,6 +1,6 @@
 import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
-import { LocalJumpError, rtest } from "@blazetrails/ruby-compat";
+import { LocalJumpError, rbRegSUnion, rbRegToS, rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type * as Arel from "@blazetrails/arel";
@@ -857,12 +857,11 @@ export class AbstractAdapter implements Quoting {
     }
   }
 
-  /** @missingRailsCall union — CONVERGEABLE regexp-union-comes-from-ruby-compat */
   static buildReadQueryRegexp(...parts: string[]): RegExp {
     parts = parts.concat(AbstractAdapter.DEFAULT_READ_QUERY);
+    const res = parts.map((part) => new RegExp(part, "i"));
     return new RegExp(
-      `^(?:[(\\s]|${AbstractAdapter.COMMENT_REGEX.source})*(?:${parts.join("|")})`,
-      "i",
+      `^(?:[(\\s]|${rbRegToS(AbstractAdapter.COMMENT_REGEX)})*${rbRegToS(rbRegSUnion(...res))}`,
     );
   }
 

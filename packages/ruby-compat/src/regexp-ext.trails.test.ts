@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { toS } from "./object.js";
 import { rbEqual } from "./rb-equal.js";
-import { rbRegEqual, rbRegInitStr, rbRegMatchP, rbRegToS, regexpEscape } from "./regexp.js";
+import {
+  rbRegEqual,
+  rbRegInitStr,
+  rbRegMatchP,
+  rbRegSUnion,
+  rbRegToS,
+  regexpEscape,
+} from "./regexp.js";
 
 describe("regexpEscape", () => {
   it("escapes the characters a JS RegExp gives meaning to", () => {
@@ -110,5 +117,44 @@ describe("rbRegMatchP", () => {
     re.lastIndex = 2;
     expect(rbRegMatchP(re, "abc")).toBe(true);
     expect(re.lastIndex).toBe(2);
+  });
+});
+
+describe("rbRegSUnion", () => {
+  it("escapes and joins Strings", () => {
+    expect(rbRegSUnion("a.b").source).toBe("a\\.b");
+    expect(rbRegSUnion(["a.b"]).source).toBe("a\\.b");
+    expect(rbRegSUnion("skiing", "sledding").source).toBe("skiing|sledding");
+    expect(rbRegSUnion(["id", "na|me"]).source).toBe("id|na\\|me");
+    expect(rbRegSUnion(["id", "na|me"]).test("na|me")).toBe(true);
+    expect(rbRegSUnion(["id", "na|me"]).test("me")).toBe(false);
+  });
+
+  it("returns a lone Regexp itself", () => {
+    const re = /c/i;
+    expect(rbRegSUnion(re)).toBe(re);
+    expect(rbRegSUnion([re])).toBe(re);
+  });
+
+  it("embeds each Regexp with its own options", () => {
+    const re = rbRegSUnion(/a/i, /b/);
+    expect(re.source).toBe("(?i-ms:a)|(?-ims:b)");
+    expect(re.flags).toBe("");
+    expect(re.test("A")).toBe(true);
+    expect(re.test("B")).toBe(false);
+  });
+
+  it("mixes Strings and Regexps", () => {
+    const re = rbRegSUnion("a.b", /c/i, /d/s);
+    expect(re.source).toBe("a\\.b|(?i-ms:c)|(?s-im:d)");
+    expect(re.test("a.b")).toBe(true);
+    expect(re.test("axb")).toBe(false);
+    expect(re.test("C")).toBe(true);
+  });
+
+  it("is /(?!)/ for no patterns", () => {
+    expect(rbRegSUnion().source).toBe("(?!)");
+    expect(rbRegSUnion([]).source).toBe("(?!)");
+    expect(rbRegSUnion().test("")).toBe(false);
   });
 });
