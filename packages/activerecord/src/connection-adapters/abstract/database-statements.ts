@@ -1132,7 +1132,7 @@ export async function buildFixtureSql(
   tableName: string,
 ): Promise<string> {
   if (this.typeMap == null) await this.verifyBang?.();
-  const supportsVirtualColumns = (await this.supportsVirtualColumns?.()) ?? false;
+  const supportsVirtualColumns = await this.supportsVirtualColumns();
   const columns = Object.entries(await this.schemaCache.columnsHash(tableName)).filter(
     ([, column]) => !(supportsVirtualColumns && (column as { isVirtual(): boolean }).isVirtual()),
   );
@@ -1151,7 +1151,7 @@ export async function buildFixtureSql(
         const type = this.lookupCastTypeFromColumn(column);
         return withYamlFallback(type.serialize(fixture[name]));
       }
-      return (this.defaultInsertValue ?? defaultInsertValue).call(this, column);
+      return this.defaultInsertValue(column);
     });
   });
 
@@ -1174,10 +1174,7 @@ export async function buildFixtureSql(
 
   manager.values = manager.createValuesList(valuesList);
 
-  const visitor =
-    ((this as any)?.visitor as Visitors.ToSql | undefined) ??
-    new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
-  return visitor.compile(manager.ast);
+  return this.visitor.compile(manager.ast);
 }
 
 /** @internal */
@@ -1208,8 +1205,9 @@ export function buildTruncateStatement(
 type BuildFixtureHost = DatabaseStatementsHost &
   Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
     schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
-    supportsVirtualColumns?(): Promise<boolean> | boolean;
-    defaultInsertValue?(column: unknown): unknown;
+    supportsVirtualColumns(): Promise<boolean>;
+    defaultInsertValue(column: unknown): unknown;
+    visitor: Visitors.ToSql;
     lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     typeMap?: unknown;
     verifyBang?(): Promise<void>;

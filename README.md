@@ -16,14 +16,13 @@ the exact build they were verified against:
 
 | package                         | `typescript`                                    | why                                                                                                               |
 | ------------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| `@blazetrails/activerecord`     | optional peer, `7.1.0-dev.20260920.1`           | the `./type-virtualization/*` subpath parses and walks model source through the 7.1 API.                          |
 | `@blazetrails/trailties`        | optional peer, `7.1.0-dev.20260920.1`           | `./template-builder/testing`'s `parseTs()` uses `API#transpileModule`.                                            |
 | `@blazetrails/activerecord-cli` | dependency, `7.1.0-dev.20260920.1`              | the `trails-tsc` typecheck bin runs on the 7.1 API.                                                               |
 | `@blazetrails/trails-tsc`       | dependency, `typescript-5@npm:typescript@5.9.3` | it drives a programmatic `--build` and hosts a language-service plugin, neither of which TypeScript 7 offers yet. |
 
-For `activerecord` and `trailties` the peer is **optional** — neither runtime
-needs the compiler, only the two subpaths named above do — so a project that
-imports neither never has to install TypeScript at all.
+For `trailties` the peer is **optional** — its runtime does not need the
+compiler, only the subpath named above does — so a project that does not
+import it never has to install TypeScript at all.
 
 `trails-tsc`'s 5.9.3 is an alias, so it never collides with a project's own
 `typescript`; `activerecord-cli`'s `--build` mode reaches it through

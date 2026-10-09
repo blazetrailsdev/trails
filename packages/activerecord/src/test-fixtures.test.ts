@@ -15,7 +15,11 @@ import { Post } from "./test-helpers/models/post.js";
 import { LiveParrot, DeadParrot } from "./test-helpers/models/parrot.js";
 import { Cucumber, Cabbage, RedCabbage } from "./test-helpers/models/vegetables.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
+import {
+  defaultInsertValue,
+  insertFixturesSet,
+} from "./connection-adapters/abstract/database-statements.js";
+import { Visitors } from "@blazetrails/arel";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
 
@@ -53,6 +57,11 @@ function makeAdapter(): DatabaseAdapter {
       primaryKeys: async () => "id",
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    supportsVirtualColumns: async () => false,
+    defaultInsertValue,
+    get visitor() {
+      return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+    },
     quoteString: (v: string) => v.replace(/'/g, "''"),
     transaction: async <T>(fn: () => Promise<T> | T) => fn(),
     quote: (v: unknown) => (typeof v === "string" ? `'${v}'` : String(v)),

@@ -1,5 +1,5 @@
 import * as ts from "typescript/unstable/ast";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
 import { singularize } from "@blazetrails/activesupport";
 import { getCrypto } from "@blazetrails/ruby-compat";
 import { ForeignKeyDefinition, type ReferentialAction } from "@blazetrails/activerecord";

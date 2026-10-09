@@ -1,4 +1,3 @@
-/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree MOVED-BY-SHORT-NAME: walk. */
 import * as ts from "typescript/unstable/ast";
 
 export type AssociationKind = "hasMany" | "hasAndBelongsToMany" | "belongsTo" | "hasOne";
@@ -364,10 +363,7 @@ function readRecordLiteral(node: ts.Expression | undefined): RecordLiteral {
   return out;
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree
- */
+/** @internal */
 export function findIncludeCalls(sourceFile: ts.SourceFile): IncludeCall[] {
   let includeImported = false;
   for (const stmt of sourceFile.statements) {

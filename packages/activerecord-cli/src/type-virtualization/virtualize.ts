@@ -1,4 +1,3 @@
-/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 import * as ts from "typescript/unstable/ast";
 import { walk, findIncludeCalls, type WalkOptions, type ClassInfo } from "./walker.js";
 import { synthesizeDeclares } from "./synthesize.js";

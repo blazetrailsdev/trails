@@ -38,7 +38,6 @@ import {
   ExclusiveConnectionTimeoutError,
 } from "../../errors.js";
 import { SchemaReflection, BoundSchemaReflection } from "../schema-cache.js";
-import { AbstractAdapter } from "../abstract-adapter.js";
 import { Reaper, type ReapablePool } from "./connection-pool/reaper.js";
 import { ConnectionLeasingQueue } from "./connection-pool/queue.js";
 import { ConnectionPoolConfiguration } from "./query-cache.js";
@@ -265,10 +264,6 @@ export class ConnectionPool implements ReapablePool {
   set schemaReflection(value: SchemaReflection) {
     this.poolConfig.schemaReflection = value;
     this._boundSchemaCache = undefined;
-    this._lazyLoadTriggered = false;
-    this._lazyLoadPromise = null;
-    this._eagerWarmTriggered = false;
-    this._eagerWarmPromise = null;
   }
 
   serverVersion(connection: DatabaseAdapter): unknown {
@@ -606,64 +601,14 @@ export class ConnectionPool implements ReapablePool {
   }
 
   newConnection(): DatabaseAdapter {
-    let conn: DatabaseAdapter;
     try {
-      conn = this.dbConfig.newConnection() as DatabaseAdapter;
-      if (conn instanceof AbstractAdapter) {
-        (conn as unknown as { pool: unknown }).pool = this;
-      }
+      const connection = this.dbConfig.newConnection() as DatabaseAdapter;
+      connection.pool = this;
+      return connection;
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this);
       throw ex;
     }
-    if (
-      lazilyLoadSchemaCache() &&
-      !SchemaReflection.eagerLoadSchemaCache &&
-      !this._lazyLoadTriggered &&
-      !this.poolConfig.schemaReflection.loadedCache
-    ) {
-      this._lazyLoadTriggered = true;
-      const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
-      this._lazyLoadPromise = loneRef
-        .loadBang()
-        .then(() => {
-          const loaded = this.schemaReflection.loadedCache;
-          if (loaded) {
-            this.poolConfig.schemaReflection.loadedCache = loaded;
-          }
-        })
-        .catch((err) => {
-          console.warn(
-            `[trails] Failed to lazily load schema cache for pool ` +
-              `${this.poolConfig.dbConfig.name}: ` +
-              `${err instanceof Error ? err.message : String(err)}`,
-          );
-        });
-    }
-    if (
-      SchemaReflection.eagerLoadSchemaCache &&
-      !this._eagerWarmTriggered &&
-      !this.poolConfig.schemaReflection.loadedCache
-    ) {
-      this._eagerWarmTriggered = true;
-      const loneRef = BoundSchemaReflection.forLoneConnection(this.schemaReflection, conn);
-      this._eagerWarmPromise = loneRef
-        .loadAllBang()
-        .then(() => {
-          const loaded = this.schemaReflection.loadedCache;
-          if (loaded) {
-            this.poolConfig.schemaReflection.loadedCache = loaded;
-          }
-        })
-        .catch((err) => {
-          console.warn(
-            `[trails] Failed to eagerly warm schema cache for pool ` +
-              `${this.poolConfig.dbConfig.name}: ` +
-              `${err instanceof Error ? err.message : String(err)}`,
-          );
-        });
-    }
-    return conn;
   }
 
   private connectionLease(): Lease {
@@ -687,16 +632,6 @@ export class ConnectionPool implements ReapablePool {
         return null;
     }
   }
-
-  private _lazyLoadTriggered = false;
-
-  /** @internal */
-  _lazyLoadPromise: Promise<void> | null = null;
-
-  private _eagerWarmTriggered = false;
-
-  /** @internal */
-  _eagerWarmPromise: Promise<void> | null = null;
 
   private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
     try {
@@ -1046,11 +981,13 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
 
 /** @internal */
 function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
-  if (conn instanceof AbstractAdapter) {
-    (conn as unknown as { pool?: ConnectionPool }).pool = this;
-  }
+  conn.pool = this;
   if (this._connections && !this._connections.includes(conn)) {
     this._connections.push(conn);
+  }
+
+  if (this._boundSchemaCache == null && lazilyLoadSchemaCache()) {
+    void this.schemaCache.loadBang();
   }
 }
 

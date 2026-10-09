@@ -531,9 +531,8 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        await pool._lazyLoadPromise;
+        await vi.waitFor(() => expect(pool.schemaReflection.loadedCache).not.toBeNull());
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
           true,
         );
@@ -556,8 +555,7 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).not.toBeNull();
-        await pool._lazyLoadPromise;
+        await vi.waitFor(() => expect(pool.schemaReflection.loadedCache).not.toBeNull());
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
@@ -577,74 +575,12 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
+        expect(pool.schemaReflection.loadedCache).toBeNull();
         expect(await pool.schemaCache.isCached("widgets")).toBeNull();
       } finally {
         await closePoolConnections(pool);
       }
     });
-  });
-
-  it.skipIf(inMemoryDb())(
-    "eagerly warms the schema cache by introspection on first connection when enabled",
-    async () => {
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
-        expect(
-          await pool.poolConfig.schemaReflection.loadedCache!.isColumnsHash(null, "posts"),
-        ).toBe(true);
-      } finally {
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it.skipIf(inMemoryDb())(
-    "lets eager warming win when both lazy and eager flags are on",
-    async () => {
-      const prevLazy = lazilyLoadSchemaCache();
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      setLazilyLoadSchemaCache(true);
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-      } finally {
-        setLazilyLoadSchemaCache(prevLazy);
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it("does not eagerly warm when the flag is off (default)", async () => {
-    expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
-
-    const pool = makeAmbientPool({ schemaCachePath: "" });
-    try {
-      await pool.leaseConnection();
-      pool.releaseConnection();
-      expect(pool._eagerWarmPromise).toBeNull();
-      expect(await pool.schemaCache.isCached("posts")).toBeNull();
-    } finally {
-      await closePoolConnections(pool);
-    }
   });
 
   it.skipIf(inMemoryDb())(

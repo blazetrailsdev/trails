@@ -458,6 +458,11 @@ describe("DatabaseStatements", () => {
           columnsHash: async () => ({ name: { name: "name" } }),
         },
         lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
+        supportsVirtualColumns: async () => false,
+        defaultInsertValue,
+        get visitor() {
+          return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+        },
         executeBatch: async (statements: string[]) => {
           executed.push(...statements);
         },
@@ -982,8 +987,9 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
   type FixtureHost = DatabaseStatementsHost &
     Pick<Quoting, "quote" | "quoteTableName" | "quoteColumnName" | "quoteString"> & {
       schemaCache: { columnsHash(tableName: string): Promise<Record<string, unknown>> };
-      supportsVirtualColumns?(): Promise<boolean> | boolean;
-      defaultInsertValue?(column: unknown): unknown;
+      supportsVirtualColumns(): Promise<boolean>;
+      defaultInsertValue(column: unknown): unknown;
+      visitor: Visitors.ToSql;
       lookupCastTypeFromColumn(column: unknown): { serialize(value: unknown): unknown };
     };
 
@@ -1023,6 +1029,11 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
       quoteColumnName: q,
       quoteString: (s: string) => s.replace(/'/g, "''"),
       lookupCastTypeFromColumn: () => ({ serialize: (value: unknown) => value }),
+      supportsVirtualColumns: async () => false,
+      defaultInsertValue,
+      get visitor() {
+        return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+      },
     };
   }
 
@@ -1131,6 +1142,7 @@ describe("buildFixtureSql / buildFixtureStatements / buildTruncateStatement(s) /
         ...makeHost(),
         quote: (v: unknown) => (typeof v === "string" ? `E'${v}'` : String(v)),
       };
+      host.visitor = new Visitors.ToSql(host as unknown as Visitors.ArelConnection);
       const sql = await buildFixtureSql.call(host, [{ val: "x" }], "t");
       expect(sql).toContain("E'x'");
     });
