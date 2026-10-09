@@ -1,11 +1,4 @@
-import {
-  CodeGenerator,
-  include,
-  indexWith,
-  Module,
-  TimeWithZone,
-  toFs,
-} from "@blazetrails/activesupport";
+import { CodeGenerator, include, indexWith, Module, toFs } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import {
   type Concurrent,
@@ -34,10 +27,8 @@ import {
 } from "@blazetrails/activemodel";
 import { DangerousAttributeError } from "./errors.js";
 import { ActiveRecord } from "./namespaces.js";
-import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import {
-  InspectionMask,
   initializeGeneratedModules as _coreInitializeGeneratedModules,
   inspectionFilter as _coreInspectionFilter,
 } from "./core.js";
@@ -557,10 +548,7 @@ export function attributesForCreate(this: InstanceMethodHost, attributeNames: st
   );
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE format-for-inspect-single-to-fs-arm-and-mask-return
- */
+/** @internal */
 export function formatForInspect(this: InstanceMethodHost, name: string, value: unknown): string {
   if (value == null) {
     return inspect(value);
@@ -568,23 +556,17 @@ export function formatForInspect(this: InstanceMethodHost, name: string, value: 
     let inspectedValue: string;
     if (typeof value === "string" && value.length > 50) {
       inspectedValue = inspect(`${value.slice(0, 50)}...`);
-    } else if (value instanceof Temporal.PlainDate) {
-      inspectedValue = `"${dateToFs(value, "inspect")}"`;
-    } else if (value instanceof TimeWithZone) {
-      inspectedValue = `"${value.toFs("inspect")}"`;
-    } else if (value instanceof Temporal.Instant || value instanceof RubyTime) {
+    } else if (
+      value instanceof Temporal.PlainDate ||
+      value instanceof RubyTime ||
+      value instanceof Temporal.Instant
+    ) {
       inspectedValue = `"${toFs(value, "inspect")}"`;
-      // boundary: legacy custom-typed attributes may still be JS Date.
-    } else if (value instanceof Date) {
-      inspectedValue = Number.isNaN(value.getTime())
-        ? `"${String(value)}"`
-        : `"${value.toISOString()}"`;
     } else {
       inspectedValue = inspect(value);
     }
 
-    const filtered = _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue);
-    return filtered instanceof InspectionMask ? String(filtered.__getobj__()) : String(filtered);
+    return _coreInspectionFilter.call(this as never).filterParam(name, inspectedValue) as string;
   }
 }
 

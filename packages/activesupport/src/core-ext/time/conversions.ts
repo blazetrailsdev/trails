@@ -1,5 +1,6 @@
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
+import { toFs as dateToFs } from "../date/conversions.js";
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -48,7 +49,12 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
     ).iso8601(),
 };
 
-export function toFs(date: Date | Temporal.Instant | RubyTime, format: string = "default"): string {
+export function toFs(
+  date: Date | Temporal.Instant | Temporal.PlainDate | RubyTime,
+  format: string = "default",
+): string {
+  if (date instanceof TimeWithZone) return date.toFs(format);
+  if (date instanceof Temporal.PlainDate) return dateToFs(date, format);
   let time: RubyTime;
   if (date instanceof RubyTime) {
     time = date;

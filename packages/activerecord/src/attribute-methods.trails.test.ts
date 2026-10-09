@@ -98,18 +98,6 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(generatable(Dog)._attributeMethodsGenerated).toBe(true);
   });
 
-  it("formatForInspect renders a valid Date as a quoted ISO string", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date("2026-04-15T12:00:00.000Z"));
-    expect(out).toBe('"2026-04-15T12:00:00.000Z"');
-  });
-
-  it("formatForInspect renders an invalid Date as quoted 'Invalid Date'", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date(NaN));
-    expect(out).toBe('"Invalid Date"');
-  });
-
   it("formatForInspect does not crash for array containing an object with bigint values", () => {
     class M extends Base {}
     expect(() => formatForInspect.call(new M(), "x", [{ a: 1n }])).not.toThrow();

@@ -700,8 +700,8 @@ export function initializeGeneratedModules(this: CoreHost): void {
 }
 
 /**
- * @inventedArm if — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
- * @inventedArm initializeGeneratedModules — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
+ * @inventedArm if — PERMANENT
+ * @inventedArm initializeGeneratedModules — PERMANENT
  */
 export function generatedAssociationMethods(this: CoreHost): Module {
   if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
@@ -728,7 +728,7 @@ export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
 
-/** @inventedArm initializeFindByCache — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers */
+/** @inventedArm initializeFindByCache — PERMANENT */
 export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
