@@ -982,9 +982,7 @@ function tryToCheckoutNewConnection(this: Pool): DatabaseAdapter | null {
 /** @internal */
 function adoptConnection(this: Pool, conn: DatabaseAdapter): void {
   conn.pool = this;
-  if (this._connections && !this._connections.includes(conn)) {
-    this._connections.push(conn);
-  }
+  this._connections.push(conn);
 
   if (this._boundSchemaCache == null && lazilyLoadSchemaCache()) {
     void this.schemaCache.loadBang();
