@@ -606,6 +606,14 @@ export class SchemaCache {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._indexes.get(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   setColumns(tableName: string, cols: Column[]): void {
     this._columns.set(tableName, cols);
     const hash: Record<string, Column> = {};

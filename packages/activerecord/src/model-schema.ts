@@ -2,6 +2,7 @@ import {
   type Hash,
   fetch,
   hashAref,
+  isEmpty,
   block as rbBlock,
   rbObjAsString,
   rbObjRespondTo,
@@ -10,7 +11,7 @@ import { ActiveRecord } from "./namespaces.js";
 import * as ModelSchemaModule from "./model-schema.js";
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
-import { indexBy, pluralize, underscore } from "@blazetrails/activesupport";
+import { indexBy, kernelArray, pluralize, underscore } from "@blazetrails/activesupport";
 import {
   AttributeSetBuilder,
   YAMLEncoder,
@@ -294,30 +295,22 @@ export function realInheritanceColumn(this: SchemaHost, value: string | null): v
 
 export const _inheritanceColumn = realInheritanceColumn;
 
+/** @inventedArm loop — PERMANENT */
 export async function _returningColumnsForInsert(
   this: SchemaHost,
-  connection: { returnValueAfterInsert?(column: { name: string }): Promise<boolean> },
+  connection: { returnValueAfterInsert(column: { name: string }): Promise<boolean> },
 ): Promise<string[]> {
-  if (Object.prototype.hasOwnProperty.call(this, "_returningColumnsForInsertCache")) {
-    const memo = this._returningColumnsForInsertCache;
-    if (memo !== undefined) return memo;
-  }
-  const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
-  const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
-  const autoPopulated: string[] = [];
-  for (const c of cols) {
-    if (
-      typeof c.isAutoPopulated === "function" &&
-      ((await connection.returnValueAfterInsert?.(c)) ?? false)
-    ) {
-      autoPopulated.push(c.name);
-    }
-  }
-  if (autoPopulated.length > 0) return memoize(autoPopulated);
-  const colNames = new Set(cols.map((c) => c.name));
-  const pk = this.primaryKey;
-  const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
-  return memoize(pkArr.filter((p) => colNames.has(p)));
+  return (
+    ownSchemaMemo(this, "_returningColumnsForInsertCache") ??
+    (this._returningColumnsForInsertCache = await (async () => {
+      const autoPopulatedColumns: string[] = [];
+      for (const c of columns.call(this) as { name: string }[]) {
+        if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
+      }
+
+      return isEmpty(autoPopulatedColumns) ? kernelArray(this.primaryKey) : autoPopulatedColumns;
+    })())
+  );
 }
 
 /** @inventedArm if — PERMANENT */
@@ -446,6 +439,10 @@ function rewarmDataSourceCache(host: SchemaHost): PromiseLike<void> | void {
   };
 }
 
+/**
+ * @inventedArm try — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
+ * @inventedArm rescue — CONVERGEABLE reset-column-information-rewarm-is-not-in-rails
+ */
 export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | void {
   try {
     void (
@@ -697,7 +694,6 @@ export function setTableName(this: SchemaHost, value: string | null): void {
   (this as { _arelTable?: unknown })._arelTable = null;
   if (!ownSchemaMemo(this, "_explicitSequenceName")) this._sequenceName = null;
   (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
-  (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
 }
 
 export function protectedEnvironments(this: SchemaHost, value?: string[]): string[] {
