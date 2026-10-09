@@ -247,7 +247,6 @@ describe("SQLite3::Quoting", () => {
     });
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
-      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]), {})).toBe("x'dead'");
       expect(
         quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])), {}),
       ).toBe("x'dead'");

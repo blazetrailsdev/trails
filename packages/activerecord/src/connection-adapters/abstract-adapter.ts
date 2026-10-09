@@ -88,6 +88,7 @@ import {
   typeCast as abstractTypeCast,
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
+  ClassMethods as QuotingClassMethods,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
@@ -1971,7 +1972,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   static quoteColumnName(columnName: unknown): string {
-    return abstractQuoteColumnName(columnName);
+    return QuotingClassMethods.quoteColumnName(columnName);
   }
 
   private static readonly DEFAULT_READ_QUERY = [
@@ -1994,7 +1995,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteColumnName(columnName: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
+    return abstractQuoteColumnName.call(this, columnName);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {

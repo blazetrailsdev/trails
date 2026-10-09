@@ -138,20 +138,6 @@ describe("quote dispatches through quoted_binary", () => {
     expect(received).toBe(data);
   });
 
-  it("passes normalized bytes to this.quotedBinary for a raw byte view", () => {
-    let received: unknown;
-    const host = quotingHost({
-      quotedBinary: (value: unknown) => {
-        received = value;
-        return "";
-      },
-    });
-    const bytes = new Uint8Array([0xde, 0xad]);
-    quote.call(host, bytes);
-    expect(received).toBeInstanceOf(BinaryData);
-    expect((received as BinaryData).toString()).toEqual(bytes);
-  });
-
   it("falls back to the module quoted_binary helper without a host", () => {
     expect(quote.call(quotingHost(), new BinaryData("ab"))).toBe("'ab'");
   });

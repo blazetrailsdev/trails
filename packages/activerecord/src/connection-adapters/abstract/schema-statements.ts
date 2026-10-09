@@ -1,3 +1,4 @@
+import { extractBang } from "@blazetrails/activesupport/core-ext/hash/slice";
 import {
   block,
   except,
@@ -952,26 +953,16 @@ export class SchemaStatements {
     fn?: (td: TableDefinitionOf<this>) => void | Promise<void>,
   ): Promise<TableDefinitionOf<this>> {
     const { id = "primary_key", primaryKey, force: _force, ...options } = kwargs;
-    const tdOptions: Record<string, unknown> = {};
-    for (const key of [...this.validTableDefinitionOptions(), "_skipValidateOptions"]) {
-      if (key in options) {
-        tdOptions[key] = options[key];
-        delete options[key];
-      }
-    }
-    const pkOptions: Record<string, unknown> = {};
-    for (const key of [...this.validPrimaryKeyOptions(), "_skipValidateOptions"]) {
-      if (key in options) {
-        pkOptions[key] = options[key];
-        delete options[key];
-      }
-    }
-
     const tableDefinition = this.createTableDefinition(
       tableName,
-      tdOptions,
+      extractBang(options, ...this.validTableDefinitionOptions(), "_skipValidateOptions"),
     ) as TableDefinitionOf<this>;
-    tableDefinition.setPrimaryKey(tableName, id, primaryKey, pkOptions);
+    tableDefinition.setPrimaryKey(
+      tableName,
+      id,
+      primaryKey,
+      extractBang(options, ...this.validPrimaryKeyOptions(), "_skipValidateOptions"),
+    );
 
     if (fn) await fn(tableDefinition);
 

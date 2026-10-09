@@ -114,7 +114,7 @@ describe("QuotingTest", () => {
   });
 
   it("quote column name", () => {
-    expect(() => quoteColumnName("foo")).toThrow(NotImplementedError);
+    expect(() => quoteColumnName.call(HOST, "foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name", () => {

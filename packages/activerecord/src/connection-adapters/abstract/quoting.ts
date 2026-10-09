@@ -50,6 +50,13 @@ export interface QuotingDispatchHost {
   unquotedFalse(): boolean | number;
 }
 
+export const ClassMethods = {
+  quoteColumnName(_columnName: unknown): string {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
+    throw new NotImplementedError();
+  },
+};
+
 export type QuotedTimeValue = TimeValue | TimeWithZone | RubyTime;
 
 export type TemporalDateLike =
@@ -63,19 +70,16 @@ export type TemporalDateLike =
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "string" || value instanceof Chars) {
-    return `'${this.quoteString(value instanceof Chars ? value.toS() : value)}'`;
+    return `'${this.quoteString(rbObjAsString(value))}'`;
   }
-  if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
+  if (value === true) return this.quotedTrue();
+  if (value === false) return this.quotedFalse();
   if (value === null || value === undefined) return "NULL";
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint" || value instanceof Number) {
     return rbObjAsString(value);
   }
   if (value instanceof BinaryData) return this.quotedBinary(value);
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return this.quotedBinary(new BinaryData(bytes));
-  }
   if (value instanceof TimeValue) return `'${this.quotedTime(value)}'`;
   if (
     value instanceof TimeWithZone ||
@@ -94,15 +98,22 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
+/** @inventedArm if — CONVERGEABLE activerecord-converge-invented-arms-change-table-drop-table-and-float-type-cast */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value instanceof Chars) return value.toS();
-  if (value instanceof BinaryData) return value.toString();
-  if (typeof value === "boolean") return value ? this.unquotedTrue() : this.unquotedFalse();
-  if (value === null || value === undefined) return value;
+  if (value instanceof Chars || value instanceof BinaryData) return rbObjAsString(value);
+  if (value === true) return this.unquotedTrue();
+  if (value === false) return this.unquotedFalse();
   if (value instanceof BigDecimal) return value.toString("F");
-  if (typeof value === "number" || typeof value === "bigint") return value;
   if (value instanceof Number) return value.valueOf();
-  if (typeof value === "string") return value;
+  if (
+    value === null ||
+    value === undefined ||
+    typeof value === "number" ||
+    typeof value === "bigint" ||
+    typeof value === "string"
+  ) {
+    return value;
+  }
   if (value instanceof TimeValue) return this.quotedTime(value);
   if (
     value instanceof TimeWithZone ||
@@ -138,9 +149,8 @@ export interface QuotingHost {
   lookupCastType(sqlType: string | null): ValueType;
 }
 
-export function quoteColumnName(_columnName: unknown): string {
-  // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/abstract/quoting.rb:61
-  throw new NotImplementedError();
+export function quoteColumnName(this: object, columnName: unknown): string {
+  return (this.constructor as unknown as QuotingClassMethods).quoteColumnName(columnName);
 }
 
 export function quoteTableName(this: QuotingClassMethods, tableName: unknown): string {
