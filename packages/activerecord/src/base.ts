@@ -1643,7 +1643,7 @@ export class Base extends Model {
 
   declare inspect: () => string;
   declare prettyPrint: typeof _Core.prettyPrint;
-  declare attributeForInspect: (attrName: string) => string;
+  declare attributeForInspect: (attrName: string) => string | _Core.InspectionMask;
 
   declare toGlobalId: typeof Identification.toGlobalId;
   declare toGid: typeof Identification.toGid;

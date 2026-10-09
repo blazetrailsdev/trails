@@ -40,4 +40,11 @@ describe("DelegateClass (trails)", () => {
     new Wrapper(new Target());
     expect(initialized).toBe(1);
   });
+
+  it("answers toString from the delegate, as Delegator#to_s reaches method_missing", () => {
+    class Mask extends DelegateClass(String) {}
+    const mask = new Mask("[FILTERED]");
+    expect(String(mask)).toBe("[FILTERED]");
+    expect(`name: ${mask}`).toBe("name: [FILTERED]");
+  });
 });

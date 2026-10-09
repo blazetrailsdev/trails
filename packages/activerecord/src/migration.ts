@@ -1110,7 +1110,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         const insertedComment = `// This migration comes from ${scope} (originally ${migration.version})\n`;
         let magicComments = "";
         let substituted: unknown;
-        do {
+        for (;;) {
           [substituted, source] = rbStrSend(
             source,
             "subBang",
@@ -1120,7 +1120,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
               return "";
             }),
           );
-        } while (substituted !== null);
+          if (substituted === null) break;
+        }
 
         if (magicComments.length !== 0 && source.startsWith("\n")) {
           magicComments += "\n";

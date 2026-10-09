@@ -1172,7 +1172,7 @@ export class PostgreSQLAdapter
   }
   /**
    * @internal
-   * @inventedArm _captureRegtypeOids — CONVERGEABLE pg-load-additional-types-runs-an-extra-regtype-query
+   * @inventedArm _captureRegtypeOids — PERMANENT
    */
   async loadAdditionalTypes(oids?: number[]): Promise<void> {
     const initializer = new TypeMapInitializer(this.typeMap);
@@ -1185,7 +1185,7 @@ export class PostgreSQLAdapter
       initializer.run(records);
     });
   }
-  /** @inventedArm nativeTypeNamesQuery — CONVERGEABLE pg-load-additional-types-runs-an-extra-regtype-query */
+  /** @inventedArm nativeTypeNamesQuery — PERMANENT */
   private async loadTypesQueries(
     initializer: TypeMapInitializer,
     oids: number[] | null | undefined,

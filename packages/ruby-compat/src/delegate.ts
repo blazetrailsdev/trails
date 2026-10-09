@@ -50,7 +50,10 @@ type Delegating<T extends MixinBase> = new (obj: unknown) => InstanceType<T> & {
  * It stops at `Object.prototype` because `ignores` (`:396`) subtracts
  * `Delegator.public_api`, which is every `::Object` public method
  * (`:242-245`); what is left of that list is `to_s` / `inspect`, and its
- * `=~`, `!~` and `===` have no JS spelling. Ruby takes public and protected
+ * `=~`, `!~` and `===` have no JS spelling. Ruby undefines `to_s` on
+ * `Delegator` (`:47-49`) so it reaches the delegate through `method_missing`;
+ * `Object.prototype.toString` is always found first here, so `toString`
+ * forwards explicitly. Ruby takes public and protected
  * but never private, and a `_`-prefixed name is how trails spells private —
  * the same reading `methodMissingProxy` takes of `respond_to?`. A TS
  * `protected` member carries no prefix and is an ordinary prototype property,
@@ -103,6 +106,10 @@ export function DelegateClass<T extends MixinBase>(
     __setobj__(obj: unknown): void {
       if ((this as unknown) === obj) throw new ArgumentError("cannot delegate to self");
       this.delegateDcObj = obj;
+    }
+
+    toString(): string {
+      return String(this.__getobj__());
     }
   };
 

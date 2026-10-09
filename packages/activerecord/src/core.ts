@@ -286,11 +286,10 @@ export async function prettyPrint(
           pp.text(attrName);
           pp.text(":");
           pp.breakable();
-          pp.text(
-            (this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(
-              attrName,
-            ),
-          );
+          const value = (
+            this as unknown as { attributeForInspect(attr: string): string | InspectionMask }
+          ).attributeForInspect(attrName);
+          pp.text(String(value));
         });
       },
     );
@@ -700,8 +699,8 @@ export function initializeGeneratedModules(this: CoreHost): void {
 }
 
 /**
- * @inventedArm if — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
- * @inventedArm initializeGeneratedModules — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers
+ * @inventedArm if — PERMANENT
+ * @inventedArm initializeGeneratedModules — PERMANENT
  */
 export function generatedAssociationMethods(this: CoreHost): Module {
   if (!Object.hasOwn(this, "_generatedAttributeMethods")) {
@@ -728,7 +727,7 @@ export function typeCaster(this: CoreHost): TypeCasterMap {
   return new TypeCasterMap(this);
 }
 
-/** @inventedArm initializeFindByCache — CONVERGEABLE core-inherited-seeding-leaves-the-generated-modules-and-find-by-cache-readers */
+/** @inventedArm initializeFindByCache — PERMANENT */
 export function cachedFindByStatement(
   this: CoreHost,
   connection: any,
@@ -885,7 +884,7 @@ export function inspectWithAttributes(
     ? filterMap(attributesToList, (name) => {
         name = String(name);
         if (this._hasAttribute(name)) {
-          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`;
+          return `${name}: ${(this as unknown as { attributeForInspect(attr: string): string | InspectionMask }).attributeForInspect(name)}`;
         }
       }).join(", ")
     : "not initialized";

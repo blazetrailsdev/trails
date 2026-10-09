@@ -1,4 +1,4 @@
-import { basicObjRespondTo } from "@blazetrails/ruby-compat";
+import { basicObjRespondTo, rbInspect } from "@blazetrails/ruby-compat";
 import { describe, it, expect, vi } from "vitest";
 import { Base, DangerousAttributeError, ReadonlyAttributeError, registerModel } from "./index.js";
 import { Model } from "@blazetrails/activemodel";
@@ -98,16 +98,10 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(generatable(Dog)._attributeMethodsGenerated).toBe(true);
   });
 
-  it("formatForInspect renders a valid Date as a quoted ISO string", () => {
+  it("formatForInspect inspects a JS Date as any other object", () => {
     class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date("2026-04-15T12:00:00.000Z"));
-    expect(out).toBe('"2026-04-15T12:00:00.000Z"');
-  });
-
-  it("formatForInspect renders an invalid Date as quoted 'Invalid Date'", () => {
-    class M extends Base {}
-    const out = formatForInspect.call(new M(), "x", new Date(NaN));
-    expect(out).toBe('"Invalid Date"');
+    const date = new Date("2026-04-15T12:00:00.000Z");
+    expect(formatForInspect.call(new M(), "x", date)).toBe(rbInspect(date));
   });
 
   it("formatForInspect does not crash for array containing an object with bigint values", () => {

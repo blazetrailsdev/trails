@@ -44,7 +44,7 @@ describe("FilterAttributesTest", () => {
 
   it("filter_attributes affects attribute_for_inspect", async () => {
     for (const user of await AdminUser.all()) {
-      expect(user.attributeForInspect("name")).toBe("[FILTERED]");
+      expect(String(user.attributeForInspect("name"))).toBe("[FILTERED]");
     }
   });
 
