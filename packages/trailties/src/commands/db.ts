@@ -519,10 +519,17 @@ async function establishTaskConnection(): Promise<void> {
   await Base.establishConnection(toDbConfig(raw, envName));
 }
 
+/** @noRailsEquivalent PERMANENT */
+async function releaseTaskConnections(): Promise<void> {
+  const { Base } = await import("@blazetrails/activerecord");
+  await Base.connectionHandler.clearAllConnectionsBang();
+}
+
 export function dbCommand(): Command {
   const cmd = new Command("db");
   cmd.description("Database management commands");
   cmd.hook("preSubcommand", establishTaskConnection);
+  cmd.hook("postAction", releaseTaskConnections);
 
   cmd
     .command("migrate")
