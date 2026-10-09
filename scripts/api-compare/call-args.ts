@@ -471,13 +471,17 @@ function kwargsDifferByRefOnly(rubyKey: string, tsKey: string): boolean {
   const ruby = kwargPairs(rubyKey);
   const ts = kwargPairs(tsKey);
   if (ruby.size !== ts.size) return false;
+  const rubyRefs: string[] = [];
+  const tsRefs: string[] = [];
   for (const [key, rubyValue] of ruby) {
     const tsValue = ts.get(key);
     if (tsValue === undefined) return false;
     if (argKeysEqual(rubyValue, tsValue)) continue;
     if (!rubyValue.startsWith("ref:") || !tsValue.startsWith("ref:")) return false;
+    rubyRefs.push(rubyValue);
+    tsRefs.push(tsValue);
   }
-  return true;
+  return !isPermutation(rubyRefs, tsRefs);
 }
 
 /** Whether the two lists hold the same argument keys in a different order.

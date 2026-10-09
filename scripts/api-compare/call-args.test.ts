@@ -246,6 +246,14 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     expect(result.verdict === "mismatch" && result.class).toBe("shape");
   });
 
+  it("keeps the same refs swapped between two kwargs keys as shape", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:a,reflection=id:b}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:b,reflection=id:a}"]),
+    );
+    expect(result.verdict === "mismatch" && result.class).toBe("shape");
+  });
+
   it("still reports a genuine rename of a non-reserved name", () => {
     const result = compareCallArgs(
       site("change_column_null", ["id:column_name"]),
