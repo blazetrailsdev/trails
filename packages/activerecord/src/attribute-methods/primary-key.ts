@@ -195,6 +195,7 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[]
   this._attributesBuilder = undefined;
 }
 
+/** @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
   if (this._primaryKey === undefined && isPrimaryKeyReflected(this)) resetPrimaryKey.call(this);
   return this._compositePrimaryKey;
