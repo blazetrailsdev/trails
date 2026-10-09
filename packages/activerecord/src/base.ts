@@ -583,9 +583,6 @@ export class Base extends Model {
   declare static hasOne: typeof _Associations.hasOne;
   declare static hasMany: typeof _Associations.hasMany;
   declare static hasAndBelongsToMany: typeof _Associations.hasAndBelongsToMany;
-  static get i18nScope(): string {
-    return Translation.i18nScope.call(this);
-  }
 
   static _tableName: string | null = null;
   declare static _primaryKey?: string | string[];
