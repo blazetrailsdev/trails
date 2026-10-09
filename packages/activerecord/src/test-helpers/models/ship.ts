@@ -7,7 +7,6 @@ import type { Pirate } from "./pirate.js";
 import type { ShipPart } from "./ship-part.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Ship extends Base {
@@ -112,4 +111,4 @@ export interface FamousShip {
   set famousPirate(value: FamousPirate | null);
 }
 
-registerModel(Ship);
+registerConstant("Ship", Ship);

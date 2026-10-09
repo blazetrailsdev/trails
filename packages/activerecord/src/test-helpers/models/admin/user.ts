@@ -34,6 +34,7 @@ export class AdminUser extends Base {
   static _tableName = "admin_users";
   static {
     rbModConstSet(Admin, "User", this);
+    rbModConstSet(this, "Coder", Coder);
   }
 
   static {

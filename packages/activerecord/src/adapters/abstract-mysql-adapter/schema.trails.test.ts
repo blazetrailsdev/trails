@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter } from "./test-helper.js";
 import { Base } from "../../base.js";
-import { modelRegistry, registerModel } from "../../associations.js";
+import { registerModel } from "../../associations.js";
+import { registeredConstant } from "@blazetrails/ruby-compat";
 import { Post } from "../../test-helpers/models/post.js";
 
 describeIfMysqlAdapter("SchemaTestTrails", () => {
@@ -17,7 +18,7 @@ describeIfMysqlAdapter("SchemaTestTrails", () => {
       Object.defineProperty(omgpost, "name", { value: "Post" });
 
       expect(omgpost.name).toBe("Post");
-      expect(modelRegistry.get("Post")).toBe(Post);
+      expect(registeredConstant("Post")).toBe(Post);
       expect(Post.tableName).toBe("posts");
     });
   });

@@ -1,8 +1,7 @@
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { queryConstraints } from "../../persistence.js";
 import { registerSubclass } from "../../inheritance.js";
-import { registerModel } from "../../associations.js";
 
 export class ClothingItem extends Base {
   declare clothing_type: string;
@@ -16,7 +15,7 @@ export class ClothingItem extends Base {
   }
 }
 
-registerModel(ClothingItem);
+registerConstant("ClothingItem", ClothingItem);
 
 export class ClothingItemUsed extends ClothingItem {
   static {
@@ -34,8 +33,6 @@ export class ClothingItemSized extends ClothingItem {
   }
 }
 
-registerModel("ClothingItem::Used", ClothingItemUsed);
-registerModel("ClothingItem::Sized", ClothingItemSized);
 for (const klass of [ClothingItemUsed, ClothingItemSized]) {
   registerSubclass(klass);
 }

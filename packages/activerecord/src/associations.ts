@@ -12,7 +12,6 @@ import type { Association as AssociationInstance } from "./associations/associat
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import { Autoload } from "@blazetrails/activesupport";
 import { registerSubclass } from "./inheritance.js";
-import { flushPendingCounterCacheColumns } from "./counter-cache.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
 import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
@@ -26,7 +25,6 @@ import {
   rbModConstSet,
   rbModName,
   registerConstant,
-  unregisterConstant,
 } from "@blazetrails/ruby-compat";
 
 export type CollectionCallback<K extends string> =
@@ -94,28 +92,6 @@ export interface ReflectionLike {
 }
 
 /** @internal */
-class ModelRegistry extends Map<string, typeof Base> {
-  override set(name: string, model: typeof Base): this {
-    registerModelConstant(name, model);
-    return super.set(name, model);
-  }
-
-  override delete(name: string): boolean {
-    const model = super.get(name);
-    const deleted = super.delete(name);
-    if (deleted) unregisterConstant(name, model);
-    return deleted;
-  }
-
-  override clear(): void {
-    for (const [name, model] of this) unregisterConstant(name, model);
-    super.clear();
-  }
-}
-
-export const modelRegistry = new ModelRegistry();
-
-/** @internal */
 function frameworkBase(model: typeof Base): typeof Base | null {
   let c: unknown = model;
   while (typeof c === "function" && c !== Function.prototype) {
@@ -134,15 +110,7 @@ function assertActiveRecordBase(model: typeof Base): void {
   }
 }
 
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE model-registry-and-register-model-are-deleted
- */
-export function registerModelConstant(name: string, model: typeof Base): void {
-  registerConstant(name, model);
-}
-
-/** @noRailsEquivalent CONVERGEABLE model-registry-and-register-model-are-deleted */
+/** @noRailsEquivalent CONVERGEABLE register-model-wrapper-is-deleted-tests-seat-constants */
 export function registerModel(model: typeof Base): void;
 export function registerModel(name: string, model: typeof Base): void;
 export function registerModel(models: (typeof Base)[]): void;
@@ -163,16 +131,14 @@ export function registerModel(
   if (typeof nameOrModel === "string") {
     if (!model) throw new ArgumentError("registerModel(name, model) requires a model class");
     assertActiveRecordBase(model);
-    modelRegistry.set(nameOrModel, model);
-    flushPendingCounterCacheColumns(model, nameOrModel);
+    registerConstant(nameOrModel, model);
   } else {
     assertActiveRecordBase(nameOrModel);
-    modelRegistry.set(nameOrModel.name, nameOrModel);
+    registerConstant(nameOrModel.name, nameOrModel);
     const qualified = rbModName(nameOrModel)!;
     if (qualified !== nameOrModel.name) {
       registerModel(qualified, nameOrModel);
     }
-    flushPendingCounterCacheColumns(nameOrModel, nameOrModel.name);
   }
 }
 

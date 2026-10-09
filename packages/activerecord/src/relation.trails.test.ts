@@ -1,8 +1,9 @@
+import { registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { isPresent, presence } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { registerModel, modelRegistry } from "./associations.js";
+import { registerModel } from "./associations.js";
 import { merge, SpawnMethods } from "./relation/spawn-methods.js";
 import { reverseSqlOrder, QueryMethods } from "./relation/query-methods.js";
 import { Relation } from "./relation.js";
@@ -379,8 +380,8 @@ describe("RelationTest", () => {
       expect(sql).toContain("LIMIT 10");
       expect(sql).not.toContain(" IN (SELECT");
     } finally {
-      modelRegistry.delete("Author");
-      modelRegistry.delete("Book");
+      unregisterConstant("Author", registeredConstant("Author"));
+      unregisterConstant("Book", registeredConstant("Book"));
     }
   });
 
@@ -409,8 +410,8 @@ describe("RelationTest", () => {
       expect(sql).toContain(" IN (SELECT");
       expect(sql).toMatch(/IN \(SELECT .* LIMIT 5\)/s);
     } finally {
-      modelRegistry.delete("EagerComment");
-      modelRegistry.delete("EagerArticle");
+      unregisterConstant("EagerComment", registeredConstant("EagerComment"));
+      unregisterConstant("EagerArticle", registeredConstant("EagerArticle"));
     }
   });
 
@@ -483,10 +484,10 @@ describe("RelationTest", () => {
         .limit(5);
       expect((singularNestedJoin as any)._isDeferredDistinctPkSubquery()).toBe(false);
     } finally {
-      modelRegistry.delete("JlComment");
-      modelRegistry.delete("JlProfile");
-      modelRegistry.delete("JlAuthor");
-      modelRegistry.delete("JlArticle");
+      unregisterConstant("JlComment", registeredConstant("JlComment"));
+      unregisterConstant("JlProfile", registeredConstant("JlProfile"));
+      unregisterConstant("JlAuthor", registeredConstant("JlAuthor"));
+      unregisterConstant("JlArticle", registeredConstant("JlArticle"));
     }
   });
 });

@@ -1,7 +1,6 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Bird extends Base {
@@ -49,4 +48,4 @@ export interface Bird {
   set pirate(value: Pirate | null);
 }
 
-registerModel(Bird);
+registerConstant("Bird", Bird);

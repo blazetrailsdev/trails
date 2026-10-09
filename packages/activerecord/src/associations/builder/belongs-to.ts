@@ -11,7 +11,6 @@ import {
 import { safeConstantize } from "@blazetrails/activesupport";
 import type { AssociationInstanceHost } from "./association.js";
 import { SingularAssociation } from "./singular-association.js";
-import { pendingCounterCacheColumns } from "../../counter-cache-state.js";
 import { belongsToRequiredValidatesForeignKey } from "../../active-record.js";
 
 export class BelongsTo extends SingularAssociation {
@@ -44,7 +43,6 @@ export class BelongsTo extends SingularAssociation {
     if (reflection.options.default) this.addDefaultCallbacks(model, reflection);
   }
 
-  /** @inventedArm if — CONVERGEABLE eliminate-pending-counter-cache-deferral-via-lazy-target-resolution */
   static addCounterCacheCallbacks(model: any, reflection: any): void {
     const cacheColumn = reflection.counterCacheColumn();
 
@@ -60,12 +58,6 @@ export class BelongsTo extends SingularAssociation {
     const klass = safeConstantize(reflection.className) as any;
     if (klass && rbObjRespondTo(klass, "_counterCacheColumns")) {
       klass._counterCacheColumns = union(klass._counterCacheColumns, [cacheColumn]);
-    }
-    if (!klass) {
-      const pending =
-        pendingCounterCacheColumns.get(reflection.className) ?? new Set<() => string>();
-      pending.add(() => cacheColumn);
-      pendingCounterCacheColumns.set(reflection.className, pending);
     }
     model.counterCachedAssociationNames = union(model.counterCachedAssociationNames, [
       reflection.name,

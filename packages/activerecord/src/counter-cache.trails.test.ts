@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
@@ -26,53 +26,5 @@ describe("CounterCacheTest (trails)", () => {
 
     expect(ChildModel.counterCachedAssociationNames).toEqual(["post"]);
     expect(ParentModel.counterCachedAssociationNames).toEqual([]);
-  });
-});
-
-describe("CounterCacheTest deferred resolution (trails)", () => {
-  fixtures([]);
-  afterAll(async () => {
-    const { modelRegistry } = await import("./associations.js");
-    modelRegistry.delete("Reply");
-    modelRegistry.delete("Topic");
-    modelRegistry.delete("Order");
-  });
-
-  it("counter cache on unloaded association class works", async () => {
-    class Reply extends Base {
-      static _tableName = "topics";
-      static {
-        this.attribute("content", "text");
-        this.attribute("parent_id", "integer");
-        this.belongsTo("topic", { counterCache: true, foreignKey: "parent_id" });
-      }
-    }
-    const { modelRegistry } = await import("./associations.js");
-    modelRegistry.delete("Topic");
-    registerModel(Reply);
-
-    class Topic extends Base {
-      declare replies_count: number;
-      static {
-        this.attribute("title", "string");
-        this.attribute("replies_count", "integer", { default: 0 });
-      }
-    }
-    registerModel(Topic);
-
-    expect(Topic.isCounterCacheColumn("replies_count")).toBe(true);
-    const t = await Topic.create({ title: "x" });
-    await Reply.create({ content: "r", parent_id: t.id });
-    const reloaded = await Topic.find(t.id);
-    expect(reloaded.replies_count).toBe(1);
-  });
-
-  it("flushed counter cache column uses demodulized name when owner is defined before target", async () => {
-    await import("./test-helpers/models/cpk.js");
-    const { Order } = await import("./test-helpers/models/order.js");
-    registerModel(Order);
-    const cols = (Order as unknown as { _counterCacheColumns: string[] })._counterCacheColumns;
-    expect(cols).toContain("books_count");
-    expect(cols).not.toContain("cpk_books_count");
   });
 });

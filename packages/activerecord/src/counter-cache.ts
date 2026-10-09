@@ -10,7 +10,6 @@ import {
 } from "@blazetrails/activesupport";
 import { rbEqual, rbFSend, rtest, toSym } from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
-import { pendingCounterCacheColumns } from "./counter-cache-state.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
 export const CounterCache = {
@@ -132,16 +131,6 @@ export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
     if (!names.includes(name)) names = [...names, name];
   }
   this.counterCachedAssociationNames = names;
-}
-
-/** @noRailsEquivalent CONVERGEABLE eliminate-pending-counter-cache-deferral-via-lazy-target-resolution */
-export function flushPendingCounterCacheColumns(modelClass: typeof Base, key: string): void {
-  for (const cacheColumn of pendingCounterCacheColumns.get(key) ?? []) {
-    const column = cacheColumn();
-    if (!modelClass._counterCacheColumns.includes(column)) {
-      modelClass._counterCacheColumns = [...modelClass._counterCacheColumns, column];
-    }
-  }
 }
 
 export const ClassMethods = {

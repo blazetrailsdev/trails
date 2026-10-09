@@ -1,7 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 export class ShopCollection extends Base {
   declare products: AssociationProxy<ShopProduct>;
@@ -52,5 +51,3 @@ export class ShopVariant extends Base {
   }
 }
 registerConstant("ShopVariant", ShopVariant);
-
-registerModel([ShopCollection, ShopProductType, ShopProduct, ShopVariant]);

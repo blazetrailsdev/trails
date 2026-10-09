@@ -16,7 +16,6 @@ import type { Reference } from "./reference.js";
 import type { SecureReader } from "./reader.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -345,7 +344,7 @@ export class SerializedPerson extends Base {
 }
 registerConstant("SerializedPerson", SerializedPerson);
 
-registerModel(Person);
+registerConstant("Person", Person);
 
 export class PersonWithTimestampInCreate extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;

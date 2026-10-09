@@ -1,7 +1,6 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Company } from "./company.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 import { registerSubclass } from "../../inheritance.js";
 
 export class Vegetable extends Base {
@@ -44,7 +43,6 @@ export interface RedCabbage {
   set seller(value: Company | null);
 }
 
-registerModel([Vegetable, Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]);
 for (const klass of [Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]) {
   registerSubclass(klass);
 }

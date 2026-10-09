@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { modelRegistry } from "@blazetrails/activerecord";
+import { registeredConstant } from "@blazetrails/ruby-compat";
+import type { Base } from "@blazetrails/activerecord";
 import { Application } from "./application.js";
 import { Trails } from "./rails.js";
 
@@ -16,8 +17,8 @@ describe("a generated app's models resolve string association targets", () => {
 
     await Trails.initialize();
 
-    const Post = modelRegistry.get("Post")!;
-    const Comment = modelRegistry.get("Comment")!;
+    const Post = registeredConstant("Post") as typeof Base;
+    const Comment = registeredConstant("Comment") as typeof Base;
     expect(Post).toBeDefined();
     expect(Comment).toBeDefined();
     expect(Post.reflectOnAssociation("comments")!.klass).toBe(Comment);

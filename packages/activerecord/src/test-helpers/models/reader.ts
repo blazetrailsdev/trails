@@ -4,7 +4,6 @@ import type { FirstPost } from "./post.js";
 import type { Person } from "./person.js";
 import type { Post } from "./post.js";
 import { Base } from "../../base.js";
-import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reader extends Base {
@@ -84,4 +83,4 @@ export interface LazyReader {
   set person(value: Person | null);
 }
 
-registerModel(Reader);
+registerConstant("Reader", Reader);

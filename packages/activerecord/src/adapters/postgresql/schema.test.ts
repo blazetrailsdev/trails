@@ -1,5 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, registeredConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -11,7 +11,7 @@ import { fixtures } from "../../test-fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
-import { Base, registerModel, modelRegistry } from "../../index.js";
+import { Base, registerModel } from "../../index.js";
 import { Default } from "../../test-helpers/models/default.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 
@@ -80,9 +80,9 @@ function makeSongAlbumModels(): {
     Song: Song as unknown as ModelCtor,
     Album: Album as unknown as ModelCtor,
     cleanup: () => {
-      modelRegistry.delete("Song");
-      modelRegistry.delete("Album");
-      modelRegistry.delete("Song::HABTM_Albums");
+      unregisterConstant("Song", registeredConstant("Song"));
+      unregisterConstant("Album", registeredConstant("Album"));
+      unregisterConstant("Song::HABTM_Albums", registeredConstant("Song::HABTM_Albums"));
     },
   };
 }
