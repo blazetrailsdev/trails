@@ -462,9 +462,6 @@ export class Parameters {
   }
 
   dig(...keys: (string | number)[]): unknown {
-    if (keys.length === 0) {
-      throw new Error("wrong number of arguments (given 0, expected 1+)");
-    }
     this._convertHashesToParameters(keys[0] as string, this.parameters.get(keys[0] as string));
     return this.parameters.dig(...(keys as [string, ...(string | number)[]]));
   }
@@ -590,10 +587,11 @@ export class Parameters {
   }
 
   /** @missingRailsArgs split — PERMANENT */
-  extractValue(key: string, { delimiter = "_" }: { delimiter?: string } = {}): string[] | null {
-    const val = this.parameters.get(key);
-    if (val === null || val === undefined) return null;
-    return String(val).split(delimiter);
+  extractValue(
+    key: string,
+    { delimiter = "_" }: { delimiter?: string | RegExp } = {},
+  ): string[] | undefined {
+    return (this.parameters.get(key) as string | null | undefined)?.split(delimiter);
   }
 
   private _permittedScalarFilter(params: Parameters, permittedKey: string): void {

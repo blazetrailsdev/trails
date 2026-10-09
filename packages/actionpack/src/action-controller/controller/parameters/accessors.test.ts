@@ -419,9 +419,7 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("transform_values! converts hashes to parameters", () => {
-    params.transformValuesBang((value) => {
-      assertKindOf(Parameters, value);
-    });
+    params.transformValuesBang((value) => assertKindOf(Parameters, value));
   });
 
   // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
