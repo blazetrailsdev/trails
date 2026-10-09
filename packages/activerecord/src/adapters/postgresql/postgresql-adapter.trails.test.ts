@@ -1,5 +1,6 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import pg from "pg";
+import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
@@ -1333,6 +1334,24 @@ describeIfPg("PostgreSQLAdapter", () => {
         expect(a._rawConnectionForTest()).toBe(raw);
         expect(raw.transactionStatus()).toBe(0);
         expect((await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid).not.toBe(pid);
+      } finally {
+        await a.disconnectBang();
+      }
+    });
+
+    it("reconnect resets onto a stream from the configured factory", async () => {
+      const stream = vi.fn(() => new Socket());
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL, stream });
+      try {
+        await a.connect();
+        const raw = a._rawConnectionForTest()!;
+        expect(stream).toHaveBeenCalledTimes(1);
+
+        await a.reconnect();
+
+        expect(a._rawConnectionForTest()).toBe(raw);
+        expect(stream).toHaveBeenCalledTimes(2);
+        expect((await raw.query("SELECT 1 AS one")).rows[0].one).toBe(1);
       } finally {
         await a.disconnectBang();
       }

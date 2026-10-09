@@ -52,6 +52,7 @@ function types(client: pg.Client): { getTypeParser(oid: number, format?: string)
   };
 }
 
+const STREAM = new WeakMap<object, unknown>();
 const PREPARED = new WeakMap<object, Map<string, string>>();
 const READY_FOR_QUERY = new WeakMap<object, string>();
 
@@ -90,6 +91,7 @@ export async function reset(this: pg.Client): Promise<void> {
     const { connection } = this as Client;
     Object.assign(this, {
       connection: new (connection!.constructor as new (config: object) => Protocol)({
+        stream: STREAM.get(this),
         ssl: connection!.ssl,
         keepAlive: connection!._keepAlive,
         keepAliveInitialDelayMillis: connection!._keepAliveInitialDelayMillis,
@@ -306,7 +308,11 @@ export async function cancel(this: pg.Client): Promise<string | null> {
 
 export const asyncCancel = cancel;
 
-export function pgConnection<T extends object>(client: T): T & PGConnection {
+export function pgConnection<T extends object>(
+  client: T,
+  stream?: pg.ClientConfig["stream"],
+): T & PGConnection {
+  if (stream !== undefined) STREAM.set(client, stream);
   if (!READY_FOR_QUERY.has(client)) {
     READY_FOR_QUERY.set(client, "I");
     const native = (client as { query?: unknown }).query;
