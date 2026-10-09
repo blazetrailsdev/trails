@@ -318,8 +318,9 @@ export class JoinDependency {
         const parentKey = primaryKey != null ? rowHash[primaryKey] : rowHash;
         const parent =
           parents.get(parentKey) ||
-          this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block);
-        parents.set(parentKey, parent);
+          parents
+            .set(parentKey, this.joinRoot.instantiate(rowHash, columnAliases, columnTypes, block))
+            .get(parentKey);
         this.construct(parent, this.joinRoot, rowHash, seen, modelCache, strictLoadingValue);
       }
     });

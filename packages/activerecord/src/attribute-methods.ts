@@ -352,12 +352,6 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   ) {
     return false;
   }
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-    this._attributeMethodsGenerated
-  ) {
-    return false;
-  }
   if (!this.isBaseClass()) rbClassSuperclass(this)!.defineAttributeMethods!();
   if (!this.abstractClass) {
     loadSchema.call(this as never);
