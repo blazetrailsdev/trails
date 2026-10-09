@@ -616,18 +616,23 @@ export const ClassMethods = {
         this.columnNames().includes(String(attribute).replace(/=$/, "")))
     );
   },
-  /** @missingRailsCall table_exists? — PERMANENT */
+  /**
+   * @missingRailsCall table_exists? — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   attributeNames(this: AttributeNamesHost): string[] {
     return (rbObjIvarGet(this, "@attribute_names") ??
-      rbObjIvarSet(
-        this,
-        "@attribute_names",
-        Object.freeze(
-          !this.abstractClass && cachedTableExists.call(this as never) !== false
-            ? hashKeys(this.attributeTypes())
-            : [],
-        ),
-      )) as string[];
+      (!this.abstractClass && cachedTableExists.call(this as never) === undefined
+        ? hashKeys(this.attributeTypes())
+        : rbObjIvarSet(
+            this,
+            "@attribute_names",
+            Object.freeze(
+              !this.abstractClass && cachedTableExists.call(this as never)
+                ? hashKeys(this.attributeTypes())
+                : [],
+            ),
+          ))) as string[];
   },
   _hasAttribute: classHasAttribute,
 };

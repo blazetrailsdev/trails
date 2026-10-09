@@ -530,7 +530,7 @@ export class DatabaseTasks {
     format: SchemaFormat = schemaFormat(),
     file?: string,
   ): Promise<void> {
-    let verboseWas!: boolean;
+    let verboseWas: boolean | undefined;
     try {
       file ??= this.schemaDumpPath(dbConfig, format) ?? undefined;
       if (file == null) return;

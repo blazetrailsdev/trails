@@ -26,7 +26,7 @@ describe("ActiveRecordSchemaTest", () => {
 
   let adapter: DatabaseAdapter;
   let schemaMigration: SchemaMigration;
-  let originalVerbose: boolean;
+  let originalVerbose: boolean | undefined;
 
   beforeEach(async () => {
     originalVerbose = Migration.verbose;
