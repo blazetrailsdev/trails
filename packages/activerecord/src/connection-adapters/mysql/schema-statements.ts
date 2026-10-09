@@ -370,8 +370,7 @@ export async function newColumnFromField(
     [def, defFn] = [null, def];
   }
 
-  return Column.new(fieldName, def, meta, field["Null"] === "YES", {
-    defaultFunction: defFn ?? undefined,
+  return Column.new(fieldName, def, meta, field["Null"] === "YES", defFn, {
     collation: field["Collation"] ?? null,
     comment: presence(field["Comment"] as string | undefined) ?? null,
   });

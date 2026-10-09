@@ -20,18 +20,23 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, rbObjClassname, TypeError } from "@blazetrails/ruby-compat";
+import { rbObjAsString, rbObjClassname, sprintf, TypeError } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
-import { formatPlainDateTimeForSql, formatPlainDateForSql } from "./sql-datetime.js";
 import { Value as TimeValue } from "../../type/time.js";
-import { defaultTimezone } from "../../active-record.js";
+import { toFs as timeToFs } from "@blazetrails/activesupport";
+import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
+import {
+  toFs as dateTimeToFs,
+  usec as dateTimeUsec,
+} from "@blazetrails/activesupport/core-ext/date-time/conversions";
 
 export interface QuotingClassMethods {
   quoteColumnName(columnName: unknown): string;
 }
 
 export interface QuotingDispatchHost {
+  readonly defaultTimezone: string;
   quote(value: unknown): string;
   quotedDate(value: TemporalDateLike): string;
   quotedTime(value: QuotedTimeValue): string;
@@ -178,16 +183,21 @@ export function unquotedFalse(): boolean {
   return false;
 }
 
-export function quotedDate(value: TemporalDateLike): string {
+export function quotedDate(this: { defaultTimezone: string }, value: TemporalDateLike): string {
   if (actsLikeTime(value)) {
-    if (defaultTimezone() === "utc") {
+    if (this.defaultTimezone === "utc") {
       if (!isUtc(value)) value = getutc(value);
     } else {
       value = getlocal(value);
     }
   }
 
-  return toFsDb(value);
+  const result = toFs(value, "db");
+  if (!(value instanceof Temporal.PlainDate) && usec(value) > 0) {
+    return result + "." + sprintf("%06d", usec(value));
+  } else {
+    return result;
+  }
 }
 
 export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): string {
@@ -260,7 +270,7 @@ function instantOf(value: TimeLike): Temporal.Instant {
 function isUtc(value: TimeLike): boolean {
   if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
   if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
-  return true;
+  return false;
 }
 
 /** Ruby's `Time#getutc` (`vendor/ruby/v3.3.11/time.c:4425`). */
@@ -273,23 +283,21 @@ function getlocal(value: TimeLike): Temporal.ZonedDateTime {
   return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
 }
 
-function toFsDb(value: TemporalDateLike): string {
-  if (
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Date ||
-    value instanceof Temporal.Instant
-  ) {
-    value = getutc(value);
+function toFs(value: TemporalDateLike, format: string): string {
+  if (value instanceof TimeWithZone) return value.toFs(format);
+  if (value instanceof Temporal.PlainDate) return dateToFs(value, format);
+  if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
+    return dateTimeToFs(value, format);
   }
+  return timeToFs(value, format);
+}
 
-  if (value instanceof Temporal.ZonedDateTime)
-    return formatPlainDateTimeForSql(value.toPlainDateTime());
-  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTimeForSql(value);
-  if (value instanceof Temporal.PlainDate) return formatPlainDateForSql(value);
-  throw new TypeError(
-    `quotedDate: cannot format ${(value as object).constructor?.name ?? typeof value}`,
-  );
+/** Ruby's `Time#usec` (`vendor/ruby/v3.3.11/time.c:3861`) and `DateTime#usec` (`activesupport/lib/active_support/core_ext/date_time/conversions.rb:89`). */
+function usec(value: Exclude<TemporalDateLike, Temporal.PlainDate>): number {
+  if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
+    return dateTimeUsec(value);
+  }
+  return (value as TimeWithZone | RubyTime).usec;
 }
 
 /** @internal */

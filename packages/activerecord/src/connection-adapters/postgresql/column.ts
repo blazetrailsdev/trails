@@ -22,18 +22,17 @@ export class Column extends BaseColumn {
     defaultValue: unknown,
     sqlTypeMetadata: TypeMetadata | null = null,
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
       collation?: string | null;
-      defaultFunction?: string | null;
       comment?: string | null;
       serial?: boolean;
       identity?: string | null;
       generated?: string | null;
     } = {},
   ) {
-    super(name, defaultValue, sqlTypeMetadata, null_, {
+    super(name, defaultValue, sqlTypeMetadata, null_, defaultFunction, {
       collation: options.collation,
-      defaultFunction: options.defaultFunction,
       comment: options.comment,
     });
     this._serial = options.serial ?? false;

@@ -3,15 +3,30 @@ import { describe, expect, it } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Value as TimeValue } from "../../type/time.js";
 import {
-  formatPlainDateTimeForSql,
-  formatPlainDateForSql,
-  formatPlainTimeForSql,
-} from "./sql-datetime.js";
-import { quote as quoteFn, quotedDate, typeCast as typeCastFn } from "./quoting.js";
+  quote as quoteFn,
+  quotedDate as quotedDateFn,
+  quotedTime as quotedTimeFn,
+  typeCast as typeCastFn,
+} from "./quoting.js";
 import { quotedTime as sqliteQuotedTime } from "../sqlite3/quoting.js";
 
 const quote = (value: unknown): string => quoteFn.call(quotingHost(), value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(quotingHost(), value);
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(quotingHost(), value);
+const quotedTime = (value: Temporal.PlainTime): string =>
+  quotedTimeFn.call(
+    quotingHost(),
+    RubyTime.utc(
+      2026,
+      4,
+      26,
+      value.hour,
+      value.minute,
+      value.second,
+      value.millisecond * 1_000 + value.microsecond + value.nanosecond / 1_000,
+    ),
+  );
 
 describe("quotedDate", () => {
   it("formats a whole-second instant", () => {
@@ -45,56 +60,54 @@ describe("quotedDate", () => {
   });
 });
 
-describe("formatPlainDateTimeForSql", () => {
+describe("quotedDate of a PlainDateTime", () => {
   it("formats a whole-second datetime", () => {
     const v = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
-    expect(formatPlainDateTimeForSql(v)).toBe("2026-04-26 14:23:55");
+    expect(quotedDate(v)).toBe("2026-04-26 14:23:55");
   });
 
   it("preserves microsecond precision", () => {
     const v = Temporal.PlainDateTime.from("2024-12-31T23:59:59.999999");
-    expect(formatPlainDateTimeForSql(v)).toBe("2024-12-31 23:59:59.999999");
+    expect(quotedDate(v)).toBe("2024-12-31 23:59:59.999999");
   });
 
   it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
     const v = Temporal.PlainDateTime.from("2024-01-01T00:00:00.000000001");
-    expect(formatPlainDateTimeForSql(v)).toBe("2024-01-01 00:00:00");
+    expect(quotedDate(v)).toBe("2024-01-01 00:00:00");
   });
 });
 
-describe("formatPlainDateForSql", () => {
+describe("quotedDate of a PlainDate", () => {
   it("formats a date", () => {
-    expect(formatPlainDateForSql(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
+    expect(quotedDate(Temporal.PlainDate.from("2026-04-26"))).toBe("2026-04-26");
   });
 
   it("zero-pads month and day", () => {
-    expect(formatPlainDateForSql(Temporal.PlainDate.from("2026-01-05"))).toBe("2026-01-05");
+    expect(quotedDate(Temporal.PlainDate.from("2026-01-05"))).toBe("2026-01-05");
   });
 
   it("formats a negative (BCE) year the way the date gem's %Y does", () => {
-    expect(formatPlainDateForSql(Temporal.PlainDate.from({ year: -43, month: 3, day: 15 }))).toBe(
+    expect(quotedDate(Temporal.PlainDate.from({ year: -43, month: 3, day: 15 }))).toBe(
       "-0043-03-15",
     );
   });
 });
 
-describe("formatPlainTimeForSql", () => {
+describe("quotedTime", () => {
   it("formats a whole-second time", () => {
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("14:23:55"))).toBe("14:23:55");
+    expect(quotedTime(Temporal.PlainTime.from("14:23:55"))).toBe("14:23:55");
   });
 
   it("preserves microseconds", () => {
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("14:23:55.123456"))).toBe(
-      "14:23:55.123456",
-    );
+    expect(quotedTime(Temporal.PlainTime.from("14:23:55.123456"))).toBe("14:23:55.123456");
   });
 
   it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("00:00:00.000000001"))).toBe("00:00:00");
+    expect(quotedTime(Temporal.PlainTime.from("00:00:00.000000001"))).toBe("00:00:00");
   });
 
   it("pads to a fixed 6-digit microsecond field", () => {
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100000");
+    expect(quotedTime(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100000");
   });
 });
 
@@ -136,12 +149,12 @@ describe("typeCast of Temporal bind values", () => {
 describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
   it("formatPlainTimeForSqlMysql drops nanoseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000000001");
-    expect(formatPlainTimeForSql(v)).toBe("14:23:55");
+    expect(quotedTime(v)).toBe("14:23:55");
   });
 
   it("formatPlainTimeForSqlMysql preserves microseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000001");
-    expect(formatPlainTimeForSql(v)).toBe("14:23:55.000001");
+    expect(quotedTime(v)).toBe("14:23:55.000001");
   });
 });
 
@@ -158,7 +171,7 @@ describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
 
   it("omits the fractional part for a whole-second PlainTime (.000 → omitted)", () => {
     const v = Temporal.PlainTime.from("14:23:55.000");
-    expect(formatPlainTimeForSql(v)).toBe("14:23:55");
+    expect(quotedTime(v)).toBe("14:23:55");
   });
 });
 

@@ -14,9 +14,13 @@ function col(
   meta: Meta,
   options: { null?: boolean; defaultFunction?: string | null } = {},
 ): Column {
-  return new Column(name, null, new SqlTypeMetadata(meta), options.null ?? true, {
-    defaultFunction: options.defaultFunction ?? null,
-  });
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata(meta),
+    options.null ?? true,
+    options.defaultFunction ?? null,
+  );
 }
 
 const emptySource: SchemaSource = {

@@ -7,8 +7,7 @@ function col(
   type: string,
   options: { defaultFunction?: string; generatedType?: "stored" | "virtual" } = {},
 ): Column {
-  return new Column(name, null, { sqlType: type, type }, true, {
-    defaultFunction: options.defaultFunction ?? null,
+  return new Column(name, null, { sqlType: type, type }, true, options.defaultFunction ?? null, {
     generatedType: options.generatedType ?? null,
   });
 }

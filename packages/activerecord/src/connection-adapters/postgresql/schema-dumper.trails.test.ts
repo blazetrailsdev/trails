@@ -32,6 +32,7 @@ function makeColumn(
       type: options.type ?? "integer",
     }),
     true,
+    null,
     { serial: options.serial, generated: options.generated },
   );
 }
@@ -139,8 +140,8 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "integer", type: "integer" }),
         true,
+        "(a + b)",
         {
-          defaultFunction: "(a + b)",
           generated: "s",
         },
       );
@@ -164,8 +165,8 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "mood", type: "enum" }),
         true,
+        "('happy'::mood)",
         {
-          defaultFunction: "('happy'::mood)",
           generated: "s",
         },
       );
@@ -182,7 +183,8 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "bit varying", type: "bit_varying" }),
         true,
-        { defaultFunction: "(a)", generated: "s" },
+        "(a)",
+        { generated: "s" },
       );
       expect(dumper.schemaType(col)).toBe(":bit_varying");
       expect((await dumper.prepareColumnOptions(col))["type"]).toBe('"bit_varying"');
@@ -202,8 +204,8 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "integer", type: "integer" }),
         true,
+        "(a + b)",
         {
-          defaultFunction: "(a + b)",
           generated: "s",
         },
       );
@@ -218,7 +220,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "mood", type: "enum" }),
         true,
-        {},
+        null,
       );
       const spec = await dumper.prepareColumnOptions(col);
       expect(spec["enumType"]).toBe(JSON.stringify("mood"));
@@ -234,6 +236,7 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "integer", type: "integer" }),
         true,
+        null,
         {
           generated: "s",
         },
@@ -256,8 +259,8 @@ describe("PostgreSQL::SchemaDumper", () => {
         null,
         new TypeMetadata({ sqlType: "text", type: "string" }),
         true,
+        "concat(first_name, ' ', last_name)",
         {
-          defaultFunction: "concat(first_name, ' ', last_name)",
           generated: "s",
         },
       );

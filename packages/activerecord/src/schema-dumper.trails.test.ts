@@ -15,9 +15,13 @@ import {
 import { dumpTableSchema } from "./support/schema-dumping-helper.js";
 
 function column(name: string, type: string, defaultFunction: string | null = null): Column {
-  return new Column(name, null, new SqlTypeMetadata({ sqlType: type, type }), true, {
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata({ sqlType: type, type }),
+    true,
     defaultFunction,
-  });
+  );
 }
 
 const PRIMARY_KEY_ADAPTER = {

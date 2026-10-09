@@ -2022,7 +2022,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   quotedDate(value: Parameters<typeof abstractQuotedDate>[0]): string {
-    return abstractQuotedDate(value);
+    return abstractQuotedDate.call(this, value);
   }
 
   quotedTime(value: QuotedTimeValue): string {

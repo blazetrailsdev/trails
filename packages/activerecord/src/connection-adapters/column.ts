@@ -51,8 +51,8 @@ export class Column {
     defaultValue: unknown,
     sqlTypeMetadata: SqlTypeMetadata | null = null,
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
-      defaultFunction?: string | null;
       collation?: string | null;
       comment?: string | null;
     } = {},
@@ -61,7 +61,7 @@ export class Column {
     this.default = defaultValue;
     this.sqlTypeMetadata = sqlTypeMetadata;
     this.null = null_;
-    this.defaultFunction = options.defaultFunction ?? null;
+    this.defaultFunction = defaultFunction;
     this.collation = options.collation ?? null;
     this.comment = options.comment ?? null;
   }

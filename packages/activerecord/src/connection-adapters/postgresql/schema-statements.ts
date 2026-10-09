@@ -1298,8 +1298,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
       serial = this.sequenceNameFromParts(tableName, columnName, suffix) === sequenceName;
     }
 
-    return Column.new(columnName, defaultValue, typeMetadata, !notnull, {
-      defaultFunction: defaultFunction ?? undefined,
+    return Column.new(columnName, defaultValue, typeMetadata, !notnull, defaultFunction, {
       collation: collation ?? undefined,
       comment: comment || null,
       serial,

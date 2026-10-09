@@ -69,7 +69,7 @@ const col = (
     limit: o.limit ?? null,
     precision: o.precision ?? null,
   };
-  return new Column(o.name ?? "col", null, new TypeMetadata(meta, { extra }), true, {
+  return new Column(o.name ?? "col", null, new TypeMetadata(meta, { extra }), true, null, {
     collation: o.collation ?? null,
   });
 };

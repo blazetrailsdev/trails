@@ -20,7 +20,7 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
     null,
     new TypeMetadata({ sqlType: "bigint" }, { extra: opts.autoIncrement ? "auto_increment" : "" }),
     false,
-    { defaultFunction: opts.defaultFunction ?? null },
+    opts.defaultFunction ?? null,
   );
 }
 
@@ -206,9 +206,9 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
       "hello",
       new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
       true,
+      opts.defaultFunction ?? null,
       {
         collation: opts.collation ?? "utf8mb4_unicode_ci",
-        defaultFunction: opts.defaultFunction ?? null,
       },
     );
   }

@@ -19,9 +19,9 @@ export class Column extends BaseColumn {
       scale?: number | null;
     } = {},
     null_: boolean = true,
+    defaultFunction: string | null = null,
     options: {
       collation?: string | null;
-      defaultFunction?: string | null;
       autoIncrement?: boolean;
       rowid?: boolean;
       generatedType?: "stored" | "virtual" | null;
@@ -34,10 +34,7 @@ export class Column extends BaseColumn {
       limit: sqlTypeMetadata.limit ?? undefined,
       scale: sqlTypeMetadata.scale ?? undefined,
     });
-    super(name, defaultValue, meta, null_, {
-      collation: options.collation,
-      defaultFunction: options.defaultFunction,
-    });
+    super(name, defaultValue, meta, null_, defaultFunction, { collation: options.collation });
     this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;

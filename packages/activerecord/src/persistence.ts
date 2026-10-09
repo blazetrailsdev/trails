@@ -681,7 +681,7 @@ type PersistenceInternalHost = PersistencePrivateHost & {
   _writeAttribute(name: string, val: unknown): void;
   _triggerUpdateCallback?: boolean | null;
   _attributes?: { keys?(): Iterable<string> };
-  currentTimeFromProperTimezone(): RubyTime;
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
   constructor: PersistencePrivateHost["constructor"] & {
     columnNames?(): string[];
     _counterCacheColumns?: string[];
@@ -807,12 +807,12 @@ export async function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
 }
 
 /** @internal */
-export function _touchRow(
+export async function _touchRow(
   this: PersistenceInternalHost,
   attributeNames: string[],
   time?: RubyTime | null,
 ): Promise<number> {
-  time ||= this.currentTimeFromProperTimezone();
+  time ||= await this.currentTimeFromProperTimezone();
 
   for (const attrName of attributeNames) {
     this._writeAttribute(attrName, time);

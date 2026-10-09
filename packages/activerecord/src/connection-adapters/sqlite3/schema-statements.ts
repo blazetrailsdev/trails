@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { any, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
+import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import {
   except,
   hashDelete,
@@ -304,14 +304,14 @@ export function newColumnFromField(
   field: Record<string, unknown>,
   definitions: Record<string, unknown>[],
 ): Column {
-  const default_ = (field["dflt_value"] as string | null) ?? null;
-  const sqlType = String(field["type"] ?? "");
-  const typeMetadata = this.fetchTypeMetadata(sqlType) as SqlTypeMetadata;
+  const default_ = field["dflt_value"] as string | null;
+
+  const typeMetadata = this.fetchTypeMetadata(field["type"] as string) as SqlTypeMetadata;
   const defaultValue = this.extractValueFromDefault(default_);
   const generatedType = extractGeneratedType(field);
 
-  let defaultFunction: string | null = null;
-  if (generatedType) {
+  let defaultFunction: string | null;
+  if (isPresent(generatedType)) {
     defaultFunction = default_;
   } else {
     defaultFunction = this.extractDefaultFunction(defaultValue, default_);
@@ -320,14 +320,14 @@ export function newColumnFromField(
   const rowid = isColumnTheRowid(field, definitions);
 
   return Column.new(
-    String(field["name"]),
+    field["name"] as string,
     defaultValue,
     typeMetadata,
     Number(field["notnull"]) === 0,
+    defaultFunction,
     {
-      defaultFunction: defaultFunction ?? undefined,
-      collation: field["collation"] as string | undefined,
-      autoIncrement: Boolean(field["auto_increment"]),
+      collation: field["collation"] as string | null,
+      autoIncrement: field["auto_increment"] as boolean | undefined,
       rowid,
       generatedType,
     },

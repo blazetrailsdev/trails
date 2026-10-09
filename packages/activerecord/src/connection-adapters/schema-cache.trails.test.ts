@@ -411,6 +411,7 @@ describe("SchemaCacheMarshalDumpTest", () => {
               { extra: "auto_increment" },
             ),
             true,
+            null,
             { comment },
           ),
         ],

@@ -8,7 +8,6 @@ import {
   indexWith,
 } from "@blazetrails/activesupport";
 import { reloadSchemaFromCache as attributesReloadSchemaFromCache } from "./attributes.js";
-import { defaultTimezone } from "./active-record.js";
 
 export interface TouchOptions {
   time?: RubyTime | null;
@@ -30,7 +29,8 @@ export interface TimestampHost {
   timestampAttributesForCreateInModel(): readonly string[];
   timestampAttributesForUpdateInModel(): readonly string[];
   allTimestampAttributesInModel(): readonly string[];
-  currentTimeFromProperTimezone(): RubyTime;
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
+  withConnection<T>(fn: (c: { defaultTimezone: string }) => T): Promise<T>;
 }
 
 interface TimestampInstanceHost {
@@ -45,7 +45,7 @@ interface TimestampInstanceHost {
   recordTimestamps: boolean;
   timestampAttributesForUpdateInModel(): readonly string[];
   allTimestampAttributesInModel(): readonly string[];
-  currentTimeFromProperTimezone(): RubyTime;
+  currentTimeFromProperTimezone(): Promise<RubyTime>;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
 }
 
@@ -53,17 +53,17 @@ export type TouchAllOptions = { time?: RubyTime };
 
 export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
-export function touchAttributesWithTime(
+export async function touchAttributesWithTime(
   this: TimestampHost,
   ...args: [...names: string[], time: RubyTime | undefined]
-): Record<string, RubyTime> {
+): Promise<Record<string, RubyTime>> {
   let names = args.slice(0, -1) as string[];
   const time = args[args.length - 1] as RubyTime | undefined;
   names = names.map((name) => this.attributeAliases?.[name] ?? name);
   let attributeNames = this.timestampAttributesForUpdateInModel();
   attributeNames = [...new Set([...attributeNames, ...names])];
   return Object.fromEntries(
-    indexWith(attributeNames, time ?? this.currentTimeFromProperTimezone()),
+    indexWith(attributeNames, time ?? (await this.currentTimeFromProperTimezone())),
   );
 }
 
@@ -92,10 +92,11 @@ export function allTimestampAttributesInModel(this: TimestampHost): readonly str
   ]));
 }
 
-/** @missingRailsCall with_connection — CONVERGEABLE timestamp-current-time-from-proper-timezone-reads-the-connection-default-timezone */
-export function currentTimeFromProperTimezone(): RubyTime {
-  const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
-  return defaultTimezone() === "utc" ? now.getutc() : now.getlocal();
+export function currentTimeFromProperTimezone(this: TimestampHost): Promise<RubyTime> {
+  return this.withConnection((c) => {
+    const now = RubyTime.at(new Rational(currentTimeInstant().epochNanoseconds, 1_000_000_000n));
+    return c.defaultTimezone === "utc" ? now.getutc() : now.getlocal();
+  });
 }
 
 /** @internal */
@@ -139,7 +140,7 @@ export async function _createRecord(
   superFn: () => Promise<unknown>,
 ): Promise<unknown> {
   if (this.recordTimestamps) {
-    const currentTime = this.currentTimeFromProperTimezone();
+    const currentTime = await this.currentTimeFromProperTimezone();
 
     for (const column of this.allTimestampAttributesInModel()) {
       if (this._readAttribute?.(column) == null) {
@@ -177,7 +178,7 @@ export async function recordUpdateTimestamps<T>(
   block?: () => Promise<T>,
 ): Promise<T | undefined> {
   if (this._touchRecord && shouldRecordTimestamps.call(this)) {
-    const currentTime = this.currentTimeFromProperTimezone();
+    const currentTime = await this.currentTimeFromProperTimezone();
 
     for (const column of this.timestampAttributesForUpdateInModel()) {
       if (this.isWillSaveChangeToAttribute?.(column)) continue;
@@ -228,7 +229,7 @@ export const Timestamp = {
   allTimestampAttributesInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.allTimestampAttributesInModel();
   },
-  currentTimeFromProperTimezone(this: { constructor: TimestampHost }): RubyTime {
+  currentTimeFromProperTimezone(this: { constructor: TimestampHost }): Promise<RubyTime> {
     return this.constructor.currentTimeFromProperTimezone();
   },
   maxUpdatedColumnTimestamp,

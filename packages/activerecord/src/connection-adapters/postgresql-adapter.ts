@@ -1722,7 +1722,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   quotedDate(value: Parameters<typeof pgQuotedDate>[0]): string {
-    return pgQuotedDate(value);
+    return pgQuotedDate.call(this, value);
   }
 
   override typeCast(value: unknown): unknown {

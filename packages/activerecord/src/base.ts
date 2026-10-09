@@ -103,7 +103,7 @@ import {
   resetDefaultAttributes as _resetDefaultAttributes,
 } from "./attributes.js";
 import * as Timestamp from "./timestamp.js";
-import * as TouchLater from "./touch-later.js";
+import * as _TouchLater from "./touch-later.js";
 import { Association as AssociationInstance } from "./associations/association.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
@@ -1759,8 +1759,8 @@ export class Base extends Model {
   declare toSgidParam: typeof Identification.toSgidParam;
 
   declare touch: typeof _Persistence.touch;
-  declare touchLater: typeof TouchLater.touchLater;
-  declare beforeCommittedBang: typeof TouchLater.beforeCommittedBang;
+  declare touchLater: typeof _TouchLater.touchLater;
+  declare beforeCommittedBang: typeof _TouchLater.beforeCommittedBang;
 
   declare hasAttribute: (attrName: string) => boolean;
   declare attributePresent: (attrName: string) => boolean;
@@ -2246,6 +2246,7 @@ Object.assign(Base, {
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
 });
+include(Base, new Module((mod) => mod.defineMethod("touch", _Persistence.touch)));
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
@@ -2427,7 +2428,8 @@ include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
-include(Base, TouchLater.InstanceMethods);
+include(Base, _TouchLater.TouchLater);
+include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
@@ -2440,7 +2442,7 @@ prepend(Base.prototype, { initInternals: Timestamp.initInternals as PrependMetho
 prepend(Base.prototype, { initInternals: _associationsInitInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _autosaveInitInternals as PrependMethod });
 prepend(Base.prototype, { initInternals: _transactionsInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: TouchLater.initInternals as PrependMethod });
+prepend(Base.prototype, { initInternals: _TouchLater.initInternals as PrependMethod });
 prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: Inheritance.initializeDup as PrependMethod });
 prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
@@ -2525,7 +2527,7 @@ include(Base, {
   attributeNamesForPartialInserts: _attributeNamesForPartialInserts,
   isSavedChanges: _isSavedChanges,
   hasDeferTouchAttrs(this: Base) {
-    return TouchLater.hasDeferTouchAttrs(this);
+    return _TouchLater.hasDeferTouchAttrs(this);
   },
   _foreignKeysEqual: CounterCache._foreignKeysEqual,
   isAssociationCached: _isAssociationCached,
@@ -2547,8 +2549,8 @@ include(Base, {
   rememberTransactionRecordState: _rememberTransactionRecordState,
   restoreTransactionRecordState: _restoreTransactionRecordState,
   isTransactionIncludeAnyAction: _isTransactionIncludeAnyAction,
-  surreptitiouslyTouch: TouchLater.surreptitiouslyTouch,
-  touchDeferredAttributes: TouchLater.touchDeferredAttributes,
+  surreptitiouslyTouch: _TouchLater.surreptitiouslyTouch,
+  touchDeferredAttributes: _TouchLater.touchDeferredAttributes,
 });
 
 for (const [name, fn] of [
@@ -2611,28 +2613,6 @@ for (const [name, fn] of [
         await this["_preloadBelongsToForDestroyCallbacks"]();
         return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
       });
-    },
-  ],
-  [
-    "touchLater",
-    function (this: Base, ...names: string[]): Promise<void> | undefined {
-      return _NoTouching.touchLater.call(this, names, () =>
-        TouchLater.touchLater.call(this, ...names),
-      );
-    },
-  ],
-  [
-    "touch",
-    function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
-      return _NoTouching.touch.call(this, args, () =>
-        TouchLater.touch.call(this, args as any, (laterArgs: unknown[]) =>
-          _Transactions.touch.call(this, laterArgs, () =>
-            _Callbacks.touch.call(this, laterArgs, () =>
-              _Persistence.touch.call(this, ...(laterArgs as any)),
-            ),
-          ),
-        ),
-      );
     },
   ],
   [

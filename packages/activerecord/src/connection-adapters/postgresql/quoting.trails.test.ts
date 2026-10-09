@@ -23,7 +23,7 @@ import {
   quoteDefaultExpression,
   type CastTypeLookupHost,
   quotedBinary,
-  quotedDate,
+  quotedDate as quotedDateFn,
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast as typeCastFn,
@@ -31,7 +31,9 @@ import {
 } from "./quoting.js";
 import { Range } from "@blazetrails/ruby-compat";
 
-const HOST = quotingHost({ quotedDate, quotedBinary });
+const HOST = quotingHost({ quotedDate: quotedDateFn, quotedBinary });
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(HOST, value);
 const quote = (value: unknown): string | null => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -364,7 +366,7 @@ ActiveRecord.raiseIntWiderThan64bit to false.
 
   it("quote dispatches Date/Time through this.quoted_date (BC suffix)", () => {
     const v = Temporal.PlainDate.from("-000043-03-15");
-    expect(quoteFn.call(quotingHost({ quotedDate }), v)).toBe("'0044-03-15 BC'");
+    expect(quoteFn.call(quotingHost({ quotedDate: quotedDateFn }), v)).toBe("'0044-03-15 BC'");
   });
 
   it("typeCast hands the infinity sentinels to super as Numerics", () => {

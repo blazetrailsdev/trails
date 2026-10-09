@@ -11,6 +11,7 @@ function makeColumn(options: {
     options.defaultValue ?? null,
     new SqlTypeMetadata({ sqlType: "text" }),
     true,
+    null,
     {
       generatedType: options.generatedType,
     },
@@ -43,7 +44,7 @@ describe("SQLite3::Column#hasDefault", () => {
 
 describe("SQLite3::Column JSON round-trip", () => {
   it("preserves the subclass and its state through the schema-cache dump", () => {
-    const col = new Column("id", null, { sqlType: "INTEGER", type: "integer" }, false, {
+    const col = new Column("id", null, { sqlType: "INTEGER", type: "integer" }, false, null, {
       autoIncrement: true,
       rowid: true,
       generatedType: "stored",
