@@ -295,22 +295,21 @@ export function realInheritanceColumn(this: SchemaHost, value: string | null): v
 
 export const _inheritanceColumn = realInheritanceColumn;
 
-/** @inventedArm loop — PERMANENT */
 export async function _returningColumnsForInsert(
   this: SchemaHost,
   connection: { returnValueAfterInsert(column: { name: string }): Promise<boolean> },
 ): Promise<string[]> {
-  return (
-    ownSchemaMemo(this, "_returningColumnsForInsertCache") ??
-    (this._returningColumnsForInsertCache = await (async () => {
-      const autoPopulatedColumns: string[] = [];
-      for (const c of columns.call(this) as { name: string }[]) {
-        if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
-      }
+  const memo = ownSchemaMemo(this, "_returningColumnsForInsertCache");
+  if (memo) return memo;
 
-      return isEmpty(autoPopulatedColumns) ? kernelArray(this.primaryKey) : autoPopulatedColumns;
-    })())
-  );
+  const autoPopulatedColumns: string[] = [];
+  for (const c of columns.call(this) as { name: string }[]) {
+    if (await connection.returnValueAfterInsert(c)) autoPopulatedColumns.push(c.name);
+  }
+
+  return (this._returningColumnsForInsertCache = isEmpty(autoPopulatedColumns)
+    ? kernelArray(this.primaryKey)
+    : autoPopulatedColumns);
 }
 
 /** @inventedArm if — PERMANENT */

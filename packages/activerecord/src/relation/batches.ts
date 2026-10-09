@@ -128,7 +128,7 @@ export class Batches {
   ): BatchEnumerator<LoadedRelation<Relation<T>>>;
   /**
    * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
-   * @inventedArm indexes — PERMANENT
+   * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
    */
   inBatches<T extends Base>(
     this: any,
@@ -267,8 +267,8 @@ export class Batches {
 
 /**
  * @internal
- * @missingRailsCall indexes — PERMANENT
- * @inventedArm if — PERMANENT
+ * @missingRailsCall indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ * @inventedArm if — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
  */
 export function ensureValidOptionsForBatchingBang(
   this: any,
@@ -286,9 +286,7 @@ export function ensureValidOptionsForBatchingBang(
   }
 
   if (Array<string>(this.primaryKey).some((key) => !cursor.includes(key))) {
-    const indexes = this.model
-      .connectionPool()
-      .schemaReflection.loadedCache?.getCachedIndexes(this.tableName) as
+    const indexes = this.model.schemaCache().getCachedIndexes(this.tableName) as
       | { unique: boolean; where?: string | null; columns: string[] }[]
       | undefined;
     if (indexes !== undefined) {

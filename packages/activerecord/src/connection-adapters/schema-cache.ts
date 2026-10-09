@@ -267,6 +267,14 @@ export class BoundSchemaReflection {
    * @internal
    * @noRailsEquivalent PERMANENT
    */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._schemaReflection.loadedCache?.getCachedIndexes(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
   async loadAllBang(): Promise<this> {
     await this._schemaReflection.loadAllBang(this._pool);
     return this;
