@@ -126,7 +126,10 @@ export class Batches {
     this: any,
     opts?: InBatchesOptions,
   ): BatchEnumerator<LoadedRelation<Relation<T>>>;
-  /** @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator */
+  /**
+   * @inventedArm loop — CONVERGEABLE batch-enumerator-should-not-carry-a-generator
+   * @inventedArm indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+   */
   inBatches<T extends Base>(
     this: any,
     {
@@ -143,13 +146,15 @@ export class Batches {
   ): BatchEnumerator<LoadedRelation<Relation<T>>> | Promise<null> {
     const self = this;
     const cursor = Array(cursorOption ?? this.primaryKey).map(String);
+    ensureValidOptionsForBatchingBang.call(this, cursor, start, finish, order);
 
     if (this.arel().orders.length > 0) {
       this.actOnIgnoredOrder(errorOnIgnore);
     }
 
     const run = async (block: (relation: any) => unknown): Promise<null> => {
-      await ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
+      await self.model.schemaCache().indexes(self.tableName);
+      ensureValidOptionsForBatchingBang.call(self, cursor, start, finish, order);
 
       let batchLimit = of;
       let remaining: number | null = null;
@@ -260,14 +265,18 @@ export class Batches {
   }
 }
 
-/** @internal */
-export async function ensureValidOptionsForBatchingBang(
+/**
+ * @internal
+ * @missingRailsCall indexes — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ * @inventedArm if — CONVERGEABLE in-batches-unique-index-check-skips-on-a-cold-index-cache
+ */
+export function ensureValidOptionsForBatchingBang(
   this: any,
   cursor: string[],
   start: unknown,
   finish: unknown,
   order: ":asc" | ":desc" | (":asc" | ":desc")[],
-): Promise<void> {
+): void {
   if (rtest(start) && Array(start).length !== cursor.length) {
     throw new ArgumentError(":start must contain one value per cursor column");
   }
@@ -277,19 +286,20 @@ export async function ensureValidOptionsForBatchingBang(
   }
 
   if (Array<string>(this.primaryKey).some((key) => !cursor.includes(key))) {
-    const indexes = (await this.model.schemaCache().indexes(this.tableName)) as {
-      unique: boolean;
-      where?: string | null;
-      columns: string[];
-    }[];
-    const uniqueIndex = indexes.find(
-      (index) =>
-        index.unique &&
-        !index.where &&
-        isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
-    );
-    if (!uniqueIndex) {
-      throw new ArgumentError(":cursor must include a primary key or other unique column(s)");
+    const indexes = this.model.schemaCache().getCachedIndexes(this.tableName) as
+      | { unique: boolean; where?: string | null; columns: string[] }[]
+      | undefined;
+    if (indexes !== undefined) {
+      const uniqueIndex = indexes.find(
+        (index) =>
+          index.unique &&
+          !index.where &&
+          isEmpty(Array(index.columns).filter((c) => !cursor.includes(c))),
+      );
+
+      if (!uniqueIndex) {
+        throw new ArgumentError(":cursor must include a primary key or other unique column(s)");
+      }
     }
   }
 

@@ -70,7 +70,7 @@ describe("BatchEnumerator (trails)", () => {
   });
 
   it("an invalid order raises the ArgumentError batches.rb:324 raises", async () => {
-    await expect(
+    await expect(async () =>
       Post.inBatches({ of: 1, order: ":invalid" as ":asc" }).eachRecord(() => {}),
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got :invalid",
@@ -86,7 +86,7 @@ describe("BatchEnumerator (trails)", () => {
   });
 
   it("an invalid order inside an array raises with the array inspected", async () => {
-    await expect(
+    await expect(async () =>
       Post.inBatches({
         of: 1,
         cursor: ["id"],
@@ -94,6 +94,15 @@ describe("BatchEnumerator (trails)", () => {
       }).eachRecord(() => {}),
     ).rejects.toThrow(
       ":order must be :asc or :desc or an array consisting of :asc or :desc, got [:asc, :sideways]",
+    );
+  });
+
+  it("a blockless inBatches with an invalid option raises at the call, before the ignored order", () => {
+    expect(() => Post.inBatches({ order: ":invalid" as ":asc" })).toThrow(
+      ":order must be :asc or :desc or an array consisting of :asc or :desc, got :invalid",
+    );
+    expect(() => Post.order("id").inBatches({ start: [1, 2], errorOnIgnore: true })).toThrow(
+      ":start must contain one value per cursor column",
     );
   });
 
