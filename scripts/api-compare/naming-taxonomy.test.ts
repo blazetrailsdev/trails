@@ -153,6 +153,16 @@ describe("classifyRow", () => {
     expect(classifyRow(["ref:a", "ref:inject"], ["ref:a", "ref:reduce"])).toBe("no-js-equivalent");
   });
 
+  // associations/association.rb:250 `strict_loading_violation!(owner: owner.class, …)`.
+  it("classifies a pair nested under the same kwarg key", () => {
+    expect(
+      classifyRow(
+        ["kwargs{owner=ref:class,reflection=ref:reflection}"],
+        ["kwargs{owner=ref:constructor,reflection=ref:reflection}"],
+      ),
+    ).toBe("js-reserved-word");
+  });
+
   // A row is only closeable when EVERY identifier it differs on is, so one
   // convergeable pair keeps the whole row out of any baseline.
   it("reports a mixed row by its convergeable pair, never as permanent", () => {

@@ -228,6 +228,24 @@ describe("compareCallArgs to_s and reserved-word locals", () => {
     expect(result.verdict).toBe("mismatch");
   });
 
+  // associations/association.rb:250 `strict_loading_violation!(owner: owner.class, …)`.
+  it("classes a kwargs value that differs only by its ref as naming", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:class,reflection=id:reflection}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:constructor,reflection=id:reflection}"]),
+    );
+    expect(result.verdict).toBe("mismatch");
+    expect(result.verdict === "mismatch" && result.class).toBe("naming");
+  });
+
+  it("keeps a kwargs pair with a changed key or literal as shape", () => {
+    const result = compareCallArgs(
+      site("strict_loading_violation!", ["kwargs{owner=id:class,mode=sym:all}"]),
+      site("strictLoadingViolationBang", ["kwargs{owner=id:constructor,mode=sym:none}"]),
+    );
+    expect(result.verdict === "mismatch" && result.class).toBe("shape");
+  });
+
   it("still reports a genuine rename of a non-reserved name", () => {
     const result = compareCallArgs(
       site("change_column_null", ["id:column_name"]),

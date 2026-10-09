@@ -379,7 +379,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     void this.klass;
   }
 
-  /** @missingRailsArgs strict_loading_violation! — CONVERGEABLE call-args-comparer-classes-kwarg-nested-class-ref-as-shape */
+  /** @missingRailsName class — PERMANENT */
   protected findTarget({ async = false }: { async?: boolean } = {}): Promise<Base | Base[] | null> {
     if (this.isViolatesStrictLoading()) {
       strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });

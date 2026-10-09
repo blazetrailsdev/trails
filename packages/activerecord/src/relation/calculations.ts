@@ -406,6 +406,7 @@ export async function calculate(
   }
 }
 
+/** @missingRailsName async — PERMANENT */
 export async function pluck(
   this: CalculationRelation,
   ...columnNames: Array<
