@@ -72,44 +72,47 @@ class Timestamp extends PGSimpleDecoder {
   /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
   decode(string: string): unknown {
     const m = TIMESTAMP.exec(string);
-    let year = m ? Number(m[1]) : 0;
-    if (!m || !(year > 0)) return string;
+    let year = Number(m?.[1]);
 
-    const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
-    if (m[12]) year = -year + 1;
-    const secValue = nsec
-      ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
-      : Number(m[6]);
+    if (year > 0 && m) {
+      const nsec = BigInt((m[7] ?? "").slice(0, 9).padEnd(9, "0"));
+      if (m[12]) year = -year + 1;
+      const secValue = nsec
+        ? new Rational(BigInt(m[6]) * 1_000_000_000n + nsec, 1_000_000_000n)
+        : Number(m[6]);
 
-    if (m[8]) {
-      let gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
-      if (m[8] === "-") gmtOffset = -gmtOffset;
-      return Time.new(
+      if (m[8]) {
+        let gmtOffset = Number(m[9]) * 3600 + Number(m[10] ?? 0) * 60 + Number(m[11] ?? 0);
+        if (m[8] === "-") gmtOffset = -gmtOffset;
+        return Time.new(
+          year,
+          Number(m[2]),
+          Number(m[3]),
+          Number(m[4]),
+          Number(m[5]),
+          secValue,
+          gmtOffset,
+        );
+      }
+      const res = Time.new(
         year,
         Number(m[2]),
         Number(m[3]),
         Number(m[4]),
         Number(m[5]),
         secValue,
-        gmtOffset,
+        this.flags & TIMESTAMP_DB_LOCAL ? null : 0,
       );
+      if (this.flags & TIMESTAMP_DB_LOCAL && this.flags & TIMESTAMP_APP_LOCAL) {
+        return res;
+      } else if (this.flags & TIMESTAMP_APP_LOCAL) {
+        return res.getlocal();
+      } else {
+        return res.utc();
+      }
     }
-    const res = Time.new(
-      year,
-      Number(m[2]),
-      Number(m[3]),
-      Number(m[4]),
-      Number(m[5]),
-      secValue,
-      this.flags & TIMESTAMP_DB_LOCAL ? null : 0,
-    );
-    if (this.flags & TIMESTAMP_DB_LOCAL && this.flags & TIMESTAMP_APP_LOCAL) {
-      return res;
-    } else if (this.flags & TIMESTAMP_APP_LOCAL) {
-      return res.getlocal();
-    } else {
-      return res.utc();
-    }
+
+    return string;
   }
 }
 
