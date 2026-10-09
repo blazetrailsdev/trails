@@ -623,7 +623,7 @@ export class PostgreSQLAdapter
       }
 
       await this.initializeTypeMap();
-      void this._statements.reset();
+      this._statements.reset();
     });
   }
 
@@ -661,7 +661,7 @@ export class PostgreSQLAdapter
       this._rawConnection?.socketIo()?.reopen(IO.NULL);
     } catch {}
     this._rawConnection = null;
-    void this._statements.reset();
+    this._statements.reset();
     this._closed = true;
     this._discardedAcquireGeneration = this._acquireGeneration++;
   }
@@ -1251,7 +1251,7 @@ export class PostgreSQLAdapter
       } catch (e) {
         throw excSetupMessage(await this.translateExceptionClass(e, sql, binds), e);
       }
-      await this._statements.set(sqlKey, { name: nextkey });
+      this._statements.set(sqlKey, { name: nextkey });
     }
     return this._statements.get(sqlKey)!.name;
   }
@@ -1698,7 +1698,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   private _discardRawConnection(): void {
     const conn = this._rawConnection;
     this._rawConnection = null;
-    void this._statements.reset();
+    this._statements.reset();
     this._closed = false;
     conn?.end().catch(() => {});
   }

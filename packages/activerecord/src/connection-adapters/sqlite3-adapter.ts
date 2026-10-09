@@ -1141,7 +1141,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
     if (!stmt) {
       stmt = await rawConnection.prepare(sql);
       this._maybeEnableReadBigInts(sql, stmt);
-      void this._statements.set(sql, stmt);
+      this._statements.set(sql, stmt);
     }
     return stmt;
   }
@@ -1242,7 +1242,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 }
 
 export class StatementPool extends GenericStatementPool<SqliteStatement> {
-  override reset(): void | Promise<void> {
+  override reset(): void {
     return this.clear();
   }
 

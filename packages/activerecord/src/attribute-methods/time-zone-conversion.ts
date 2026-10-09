@@ -10,6 +10,7 @@ import {
   ArgumentError,
   DelegateClass,
   rbEqual,
+  rbFSend,
   rbObjRespondTo,
   registerConstant,
   rtest,
@@ -71,7 +72,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
         if (e instanceof ArgumentError) return null;
         throw e;
       }
-    } else if (isInfinite(value)) {
+    } else if (rbObjRespondTo(value, "isInfinite") && rtest(rbFSend(value, "isInfinite"))) {
       return value;
     } else {
       return this.map(super.cast(value), (v) => this.cast(v));
@@ -87,22 +88,12 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
 
     if (actsLike.call(value, "time")) {
       return inTimeZone(value as DateOrTime);
-    } else if (isInfinite(value)) {
+    } else if (rbObjRespondTo(value, "isInfinite") && rtest(rbFSend(value, "isInfinite"))) {
       return value;
     } else {
       return this.map(value, (v) => this.convertTimeToTimeZone(v));
     }
   }
-}
-
-/** @internal */
-function isInfinite(value: unknown): boolean {
-  const fn = (value as { isInfinite?: unknown }).isInfinite;
-  if (typeof fn === "function") {
-    const result = (fn as () => unknown).call(value);
-    return result != null && result !== false;
-  }
-  return value === Infinity || value === -Infinity;
 }
 
 /** @internal */
