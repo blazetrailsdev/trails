@@ -21,6 +21,8 @@ import {
   SerializationFailure,
   ValueTooLong,
 } from "../../errors.js";
+import { PG } from "../../pg/pg.js";
+import type { PGConnection } from "../../pg/connection.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { captureSql } from "../../testing/sql-capture.js";
@@ -1315,6 +1317,42 @@ describeIfPg("PostgreSQLAdapter", () => {
         spy.mockRestore();
         await a.disconnectBang();
         await orphan.end().catch(() => {});
+      }
+    });
+
+    it("reconnect resets the raw connection in place onto a new backend", async () => {
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await a.connect();
+        const raw = a._rawConnectionForTest() as PGConnection;
+        const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
+        await raw.query("BEGIN");
+
+        await a.reconnect();
+
+        expect(a._rawConnectionForTest()).toBe(raw);
+        expect(raw.transactionStatus()).toBe(0);
+        expect((await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid).not.toBe(pid);
+      } finally {
+        await a.disconnectBang();
+      }
+    });
+
+    it("reconnect connects afresh when reset raises PG::ConnectionBad", async () => {
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      try {
+        await a.connect();
+        const raw = a._rawConnectionForTest() as PGConnection;
+        vi.spyOn(raw, "connect").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+        await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
+
+        vi.spyOn(raw, "connect").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+        await a.reconnect();
+
+        expect(a._rawConnectionForTest()).not.toBe(raw);
+        expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).rows[0].one).toBe(1);
+      } finally {
+        await a.disconnectBang();
       }
     });
   });

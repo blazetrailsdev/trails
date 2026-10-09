@@ -8,6 +8,7 @@ import {
   isModuleIncluded,
   registerConstant,
   sort,
+  synchronize,
 } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -111,11 +112,11 @@ export class SchemaReflection {
     return new SchemaCache();
   }
 
-  /** @inventedArm then — CONVERGEABLE schema-reflection-cache-rereads-the-stored-cache-at-settle */
-  private async cache(pool: Pool): Promise<SchemaCache> {
-    return (this._cache ||= await this.loadCache(pool).then(
-      (newCache) => this._cache || newCache || this.emptyCache(),
-    ))!;
+  private cache(pool: Pool): Promise<SchemaCache> {
+    return (synchronize<SchemaCache>).call(
+      this,
+      async () => (this._cache ||= (await this.loadCache(pool)) || this.emptyCache()),
+    );
   }
 
   /** @missingRailsName cachePath — PERMANENT */

@@ -1260,8 +1260,14 @@ export class PostgreSQLAdapter
 
   /** @internal */
   async reconnect(): Promise<void> {
-    this._discardRawConnection();
-    await this.connect();
+    try {
+      await this._rawConnection?.reset();
+    } catch (error) {
+      if (!(error instanceof PG.ConnectionBad)) throw error;
+      this._rawConnection = null;
+    }
+
+    if (!this._rawConnection) await this.connect();
   }
 
   /** @internal */
@@ -1647,14 +1653,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   /** @internal */
   override returningColumnValues(result: Result): unknown[] | undefined {
     return pgReturningColumnValues(result);
-  }
-
-  /** @internal */
-  private _discardRawConnection(): void {
-    const conn = this._rawConnection;
-    this._rawConnection = null;
-    this._statements.reset();
-    conn?.end().catch(() => {});
   }
 
   /** @internal */

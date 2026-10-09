@@ -4289,6 +4289,13 @@ describe("skeletonsOfOwner", () => {
       instance,
     ]);
   });
+
+  it("answers the one body a synthesized file module re-listed, for any owner", () => {
+    const relisted = [instance, instance];
+    const one = new Map([["", [instance]]]);
+    expect(skeletonsOfOwner(relisted, one, undefined, undefined)).toEqual([instance]);
+    expect(skeletonsOfOwner(relisted, one, "Deprecator", undefined)).toEqual([instance]);
+  });
 });
 
 describe("recordSkeletonBody", () => {
@@ -4326,13 +4333,12 @@ describe("recordSkeletonBody", () => {
     ).toEqual(expected);
   });
 
-  it("holds a body shared by two owners once, so the name still reads by name", () => {
+  it("holds a body shared by two owners once, so the pair compares one body", () => {
     const byOwner = record([
       ["inflector.ts:42", "Inflector", instance],
       ["inflector.ts:42", "", instance],
     ]);
-    const byName = [instance, instance];
-    expect(skeletonsOfOwner(byName, byOwner, "", undefined)).toBe(byName);
+    expect(skeletonsOfOwner([instance, instance], byOwner, "", undefined)).toEqual([instance]);
   });
 });
 

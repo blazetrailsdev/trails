@@ -496,3 +496,18 @@ describe("SchemaCacheMarshalDumpTest", () => {
     expect(index.columns).toEqual(["college_id"]);
   });
 });
+
+describe("SchemaReflectionColdCacheTest", () => {
+  it("two concurrent cold cache calls answer the same SchemaCache", async () => {
+    const reflection = new SchemaReflection(null) as unknown as {
+      cache(pool: unknown): Promise<SchemaCache>;
+      loadedCache: SchemaCache | null;
+    };
+    const pool = new FakePool({});
+
+    const [first, second] = await Promise.all([reflection.cache(pool), reflection.cache(pool)]);
+
+    expect(second).toBe(first);
+    expect(reflection.loadedCache).toBe(first);
+  });
+});

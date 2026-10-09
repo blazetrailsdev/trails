@@ -1,7 +1,13 @@
 import { ArgumentError } from "./hash-utils.js";
 import { Unicode } from "./multibyte/unicode.js";
 import { I18n } from "./i18n.js";
-import { rbObjClassname, regexpEscape } from "@blazetrails/ruby-compat";
+import { Encoding, rbObjClassname, rbObjEncoding, regexpEscape } from "@blazetrails/ruby-compat";
+
+export const ALLOWED_ENCODINGS_FOR_TRANSLITERATE: readonly Encoding[] = Object.freeze([
+  Encoding.UTF_8,
+  Encoding.US_ASCII,
+  Encoding.find("GB18030")!,
+]);
 
 /** @missingRailsName unicodeNormalize — PERMANENT */
 export function transliterate(
@@ -11,6 +17,8 @@ export function transliterate(
 ): string {
   if (typeof string !== "string")
     throw new ArgumentError(`Can only transliterate strings. Received ${rbObjClassname(string)}`);
+  if (!ALLOWED_ENCODINGS_FOR_TRANSLITERATE.includes(rbObjEncoding(string)))
+    throw new ArgumentError(`Cannot transliterate strings with ${rbObjEncoding(string)} encoding`);
   // eslint-disable-next-line no-control-regex -- Ruby's `ascii_only?` (transliterate.rb:69)
   if (/^[\x00-\x7f]*$/.test(string)) return string;
 

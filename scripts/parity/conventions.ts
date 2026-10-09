@@ -383,9 +383,12 @@ export function railsCommandFileToTs(rubyFile: string): string | undefined {
  * Ruby source paths are POSIX, the rest of api-compare keys files by
  * POSIX paths, and the default `path.join` would return backslashes
  * on Windows.
+ *
+ * `overrides: false` answers the file the path itself mirrors, past any
+ * `RUBY_FILE_TS_OVERRIDES` entry.
  */
-export function rubyFileToTs(rubyFile: string, pkg?: string): string {
-  const override = rubyFileTsOverride(rubyFile, pkg);
+export function rubyFileToTs(rubyFile: string, pkg?: string, overrides = true): string {
+  const override = overrides ? rubyFileTsOverride(rubyFile, pkg) : undefined;
   if (override !== undefined) return override;
   const command = railsCommandFileToTs(rubyFile);
   if (command !== undefined) return command;

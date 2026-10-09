@@ -2257,8 +2257,11 @@ export function skeletonsByOwner(
  * (`activemodel/lib/active_model/validations/with.rb:88`, `:144`) meets its own
  * port.
  *
- * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. A class
- * owner still reads by name, and so does a name whose owners share one body.
+ * `byOwner` is {@link skeletonsByOwner}'s, which holds each body once. Where
+ * that is ONE body it answers whatever the by-name list holds: the extractor's
+ * synthesized file module re-lists every top-level function, so the by-name
+ * list carries a lone `export function` twice. Otherwise a class owner still
+ * reads by name, and so does a name whose owners share one body.
  */
 export function skeletonsOfOwner(
   byName: string[][] | undefined,
@@ -2266,6 +2269,8 @@ export function skeletonsOfOwner(
   tsClass: string | undefined,
   classOwners: ReadonlySet<string> | undefined,
 ): string[][] | undefined {
+  const declared = [...(byOwner?.values() ?? [])].flat();
+  if (declared.length === 1) return declared;
   const bodies = [...(byOwner?.keys() ?? [])].filter((o) => classOwners?.has(o) !== true);
   if (tsClass === undefined || bodies.length < 2 || !bodies.includes(tsClass)) return byName;
   return byOwner?.get(tsClass);
@@ -5610,44 +5615,62 @@ export function main() {
         const rubySkeleton = ownsBody(rubyName)
           ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
           : rubySkeletonByName.get(rubyName);
+        // A file-level override sends every method of the `.rb` to one TS file.
+        // Where the file the path mirrors holds the name's one body, that body
+        // is the port: `String#camelize` (`core_ext/string/inflections.rb:101`)
+        // is `core-ext/string/inflections.ts`'s, not `Inflector.camelize`'s.
+        const mirrorFile = rubyFileToTs(rubyFile, pkg, false);
+        const mirrored =
+          mirrorFile === tsFile
+            ? []
+            : [
+                ...(skeletonsByOwner(
+                  tsSkeletonBodiesByFileName.get(mirrorFile)?.get(tsName),
+                )?.values() ?? []),
+              ].flat();
+        const skeletonFile = mirrored.length === 1 ? mirrorFile : tsFile;
         const tsSkeletonsByOwner = skeletonsByOwner(
-          tsSkeletonBodiesByFileName.get(tsFile)?.get(tsName),
+          tsSkeletonBodiesByFileName.get(skeletonFile)?.get(tsName),
         );
         const tsSkeletons = skeletonsOfOwner(
-          tsSkeletonByFileName.get(tsFile)?.get(tsName),
+          tsSkeletonByFileName.get(skeletonFile)?.get(tsName),
           tsSkeletonsByOwner,
           tsClass,
-          tsClassOwnersByFile.get(tsFile),
+          tsClassOwnersByFile.get(skeletonFile),
         );
         if (
           rubySkeleton !== undefined &&
           tsSkeletons?.length === 1 &&
           !skeletonIsAnotherOwners(
             tsClass !== undefined &&
-              tsCallsByFileNameOwner.get(tsFile)?.get(tsName)?.get(tsClass) !== undefined,
+              tsCallsByFileNameOwner.get(skeletonFile)?.get(tsName)?.get(tsClass) !== undefined,
             tsClass,
-            tsSkeletonOwnersByFileName.get(tsFile)?.get(tsName),
+            tsSkeletonOwnersByFileName.get(skeletonFile)?.get(tsName),
           )
         ) {
           const tsSkeletonOf = (name: string) => {
-            const sets = tsSkeletonByFileName.get(tsFile)?.get(name);
+            const sets = tsSkeletonByFileName.get(skeletonFile)?.get(name);
             if (sets?.length === 1) return sets[0];
-            const local = tsLocalSkeletonByFileName.get(tsFile)?.get(name);
+            const local = tsLocalSkeletonByFileName.get(skeletonFile)?.get(name);
             return local?.length === 1 ? local[0] : undefined;
           };
-          const localSets = tsLocalSkeletonByFileName.get(tsFile)?.get(tsName);
+          const localSets = tsLocalSkeletonByFileName.get(skeletonFile)?.get(tsName);
           const tsOwnNameDelegate = localSets?.length === 1 ? localSets[0] : undefined;
           const tsFolded = foldSkeletonTokens(tsSkeletons[0], "ts", rubySkeleton);
           const armTags = tagsForOwner(
-            tsInventedArmTagsByFileName.get(tsFile)?.get(tsName),
+            tsInventedArmTagsByFileName.get(skeletonFile)?.get(tsName),
             tsClass,
-            tsBodylessOwnersByFileName.get(tsFile)?.get(tsName),
+            tsBodylessOwnersByFileName.get(skeletonFile)?.get(tsName),
           );
-          seedComparedTagKey(armTagsUsed, armTags, callTagKey(tsFile, tsClass ?? "*", tsName));
+          seedComparedTagKey(
+            armTagsUsed,
+            armTags,
+            callTagKey(skeletonFile, tsClass ?? "*", tsName),
+          );
           callSkeletons.push({
             rubyFile,
             rubyName,
-            tsFile,
+            tsFile: skeletonFile,
             tsName,
             ruby: foldSkeletonTokens(rubySkeleton, "ruby", tsFolded),
             ts: tsFolded,
