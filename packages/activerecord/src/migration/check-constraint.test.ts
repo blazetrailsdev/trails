@@ -11,7 +11,6 @@ import { adapterSupports, describeIfSupports, itIfSupports } from "../support/su
 import { adapterType } from "../test-adapter.js";
 import { isMariaDb, serverVersion } from "../support/mysql-server-version.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { rbInspect } from "@blazetrails/ruby-compat";
 
 const supportsJsonSchemaValid = !isMariaDb && (serverVersion?.compare("8.0.17") ?? -1) >= 0;
@@ -314,7 +313,7 @@ describe("Migration", () => {
         validate: false,
       });
 
-      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+      const output = await dumpTableSchema(connection, "trades");
 
       expect(output).toMatch(
         /\s+await ctx\.addCheckConstraint\("trades", "quantity > 0", \{ name: "quantity_check", validate: false \}\);$/m,
@@ -328,7 +327,7 @@ describe("Migration", () => {
         validate: true,
       });
 
-      const output = await dumpTableSchema(connection as unknown as SchemaSource, "trades");
+      const output = await dumpTableSchema(connection, "trades");
 
       expect(output).toMatch(
         /\s+t\.checkConstraint\("quantity > 0", \{ name: "quantity_check" \}\);$/m,

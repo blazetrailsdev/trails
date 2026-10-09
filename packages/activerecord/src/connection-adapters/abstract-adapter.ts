@@ -2,6 +2,7 @@ import type { SqlTypeMetadata } from "./sql-type-metadata.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { LocalJumpError, rbRegSUnion, rbRegToS, rtest } from "@blazetrails/ruby-compat";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import type { SchemaDumper } from "./abstract/schema-dumper.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type * as Arel from "@blazetrails/arel";
 import { type Nodes, type ArelNode, Visitors, Collectors } from "@blazetrails/arel";
@@ -432,6 +433,8 @@ export interface AbstractAdapter
   tableComment(tableName: string): Promise<string | null>;
   indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
+  foreignKeyColumnFor(tableName: string, columnName?: string): string;
+  createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
   foreignKeyExists(
     fromTable: string,
     toTable?: string | ForeignKeyLookupOptions,

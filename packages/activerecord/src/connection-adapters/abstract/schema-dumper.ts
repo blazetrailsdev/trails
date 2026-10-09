@@ -1,6 +1,5 @@
 import { SchemaDumper as BaseSchemaDumper } from "../../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import type { Column } from "../column.js";
 import { compact, isPresent } from "@blazetrails/activesupport";
 import { rbInspect, rtest } from "@blazetrails/ruby-compat";
@@ -10,18 +9,18 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   static override create<T extends typeof BaseSchemaDumper>(
     this: T,
-    connection: SchemaSource | DatabaseAdapter,
+    connection: DatabaseAdapter,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
     return new (this as unknown as new (
-      connection: SchemaSource | DatabaseAdapter,
+      connection: DatabaseAdapter,
       options: Record<string, unknown>,
     ) => InstanceType<T>)(connection, options);
   }
 
   /** @internal */
   protected async columnSpec(column: Column): Promise<[string, Record<string, unknown>]> {
-    return [this.schemaTypeWithVirtual(column), await this.prepareColumnOptions(column)];
+    return [await this.schemaTypeWithVirtual(column), await this.prepareColumnOptions(column)];
   }
 
   /** @internal */
@@ -65,9 +64,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected schemaTypeWithVirtual(column: Column): string {
-    if (this.supportsVirtualColumns && column.isVirtual()) return ":virtual";
-    return this.schemaType(column);
+  protected async schemaTypeWithVirtual(column: Column): Promise<string> {
+    if ((await this.connection.supportsVirtualColumns()) && column.isVirtual()) {
+      return ":virtual";
+    } else {
+      return this.schemaType(column);
+    }
   }
 
   /** @internal */
@@ -81,7 +83,8 @@ export class SchemaDumper extends BaseSchemaDumper {
     const limit = this.isBigint(column) ? undefined : column.limit;
     if (
       rtest(limit) &&
-      limit !== this._adapter().nativeDatabaseTypes()[column.type as string].limit
+      limit !==
+        (this.connection.nativeDatabaseTypes()[column.type as string] as { limit?: unknown }).limit
     ) {
       return rbInspect(limit);
     }
@@ -108,7 +111,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaDefault(column: Column): unknown {
     if (!column.hasDefault) return undefined;
-    const type = this._adapter().lookupCastTypeFromColumn(column);
+    const type = this.connection.lookupCastTypeFromColumn(column);
     const default_ = type.deserialize(column.default);
     if (default_ == null) {
       return this.schemaExpression(column);
@@ -132,14 +135,5 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected isBigint(column: Column): boolean {
     return column.type === "bigint" || column.isBigint();
-  }
-
-  /** @internal */
-  protected validType(type: string | null | undefined): boolean {
-    const adapter = this._adapter();
-    if (adapter && typeof adapter.isValidType === "function") {
-      return adapter.isValidType(type);
-    }
-    return true;
   }
 }

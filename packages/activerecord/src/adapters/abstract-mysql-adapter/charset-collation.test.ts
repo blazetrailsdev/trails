@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -101,10 +100,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      const output = await dumpTableSchema(
-        adapter as unknown as SchemaSource,
-        "charset_collations",
-      );
+      const output = await dumpTableSchema(adapter, "charset_collations");
       expect(output).toMatch(
         /createTable\("charset_collations",\s+\{\s+id:\s+\{\s+type:\s+"string",\s+collation:\s+"utf8mb4_bin"\s+\}/,
       );

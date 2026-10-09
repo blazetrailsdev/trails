@@ -67,7 +67,7 @@ describeIfSqlite("SQLite3CollationTest", () => {
   });
 
   it("schema dump includes collation", async () => {
-    const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
+    const output = (await SchemaDumper.dump(Base.connectionPool(), new StringIO())).string();
     expect(output).toMatch(/t\.string\("string_nocase",[^)]*collation: "NOCASE"/);
     expect(output).toMatch(/t\.text\("text_rtrim",[^)]*collation: "RTRIM"/);
   });

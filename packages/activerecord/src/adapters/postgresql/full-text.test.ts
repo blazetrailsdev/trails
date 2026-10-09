@@ -1,18 +1,21 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 import type { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
     await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
     await adapter.execute(`CREATE TABLE tsvectors (id serial primary key, text_vector tsvector)`);
   });
   afterEach(async () => {
     await adapter.execute(`DROP TABLE IF EXISTS tsvectors`);
-    await adapter.disconnectBang();
   });
 
   describe("PostgresqlFullTextTest", () => {

@@ -9,7 +9,6 @@ import { Name } from "../../connection-adapters/postgresql/utils.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../../test-fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "../../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base, registerModel } from "../../index.js";
 import { Default } from "../../test-helpers/models/default.js";
@@ -900,7 +899,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("dumping schemas", async () => {
-      const output = await dumpAllTableSchema([/./], adapter as unknown as SchemaSource);
+      const output = await dumpAllTableSchema([/./]);
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);

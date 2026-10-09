@@ -3,10 +3,11 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
+import { AbstractAdapter } from "../abstract-adapter.js";
 import { TypeMetadata } from "./type-metadata.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 
-const emptySource: SchemaSource = {
+const emptySource: any = {
+  supportsVirtualColumns: async () => false,
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
@@ -134,7 +135,6 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
@@ -159,7 +159,6 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => true,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "status",
         null,
@@ -177,7 +176,7 @@ describe("PostgreSQL::SchemaDumper", () => {
 
     it("keeps the bit_varying type key for a virtual column's type option", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      dumper.supportsVirtualColumns = true;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
       const col = new Column(
         "flags",
         null,
@@ -198,7 +197,6 @@ describe("PostgreSQL::SchemaDumper", () => {
         supportsVirtualColumns: () => false,
       };
       const dumper = new (SchemaDumper as any)(mockAdapter);
-      dumper.supportsVirtualColumns = mockAdapter.supportsVirtualColumns();
       const col = new Column(
         "computed",
         null,
@@ -228,9 +226,9 @@ describe("PostgreSQL::SchemaDumper", () => {
   });
 
   describe("schemaTypeWithVirtual", () => {
-    it("returns virtual for generated (stored) PG columns", () => {
+    it("returns virtual for generated (stored) PG columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
-      dumper.supportsVirtualColumns = true;
+      dumper.connection = { ...emptySource, supportsVirtualColumns: async () => true };
       const col = new Column(
         "computed",
         null,
@@ -241,13 +239,13 @@ describe("PostgreSQL::SchemaDumper", () => {
           generated: "s",
         },
       );
-      expect(dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":virtual");
     });
 
-    it("returns schemaType for non-virtual columns", () => {
+    it("returns schemaType for non-virtual columns", async () => {
       const dumper = SchemaDumper.create(emptySource) as any;
       const col = makeColumn({ sqlType: "integer", type: "integer", serial: true });
-      expect(dumper.schemaTypeWithVirtual(col)).toBe(":serial");
+      expect(await dumper.schemaTypeWithVirtual(col)).toBe(":serial");
     });
   });
 
@@ -286,7 +284,9 @@ describe("PostgreSQL::SchemaDumper", () => {
         nativeDatabaseTypes: () => ({ bit_varying: { name: "bit varying" } }),
         tableOptions: async () => ({}),
       };
-      const dumper = new (SchemaDumper as any)(source);
+      const dumper = new (SchemaDumper as any)(
+        Object.assign(Object.create(AbstractAdapter.prototype), source),
+      );
       const io = new StringIO();
       await dumper.table("widgets", io);
       expect(io.string()).toContain('t.bitVarying("flags")');

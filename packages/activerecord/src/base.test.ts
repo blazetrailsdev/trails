@@ -64,6 +64,8 @@ import {
   RuntimeError,
   sort,
   rbModConstSet,
+  registerConstant,
+  unregisterConstant,
 } from "@blazetrails/ruby-compat";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./active-record.js";
 
@@ -1157,13 +1159,15 @@ describe("BasicsTest", async () => {
   class DeveloperSalary {
     constructor(public amount: number) {}
   }
+  registerConstant("BasicsTest::DeveloperSalary", DeveloperSalary);
+  afterAll(() => unregisterConstant("BasicsTest::DeveloperSalary", DeveloperSalary));
 
   it("dup with aggregate of same name as attribute", async () => {
     const developerWithAggregate = class extends Base {
       static {
         this.tableName = "developers";
         this.composedOf("salary", {
-          className: DeveloperSalary,
+          className: "BasicsTest::DeveloperSalary",
           mapping: [["salary", "amount"]],
         });
       }

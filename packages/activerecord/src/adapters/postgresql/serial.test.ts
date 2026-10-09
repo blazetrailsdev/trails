@@ -1,15 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
+import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
+import { Base } from "../../base.js";
+import { fixtures } from "../../test-fixtures.js";
 import type { Column } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfPg("PostgreSQLAdapter", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-  });
-  afterEach(async () => {
-    await adapter.disconnectBang();
+    adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
   });
 
   const columnNamed = async (table: string, name: string): Promise<Column> => {

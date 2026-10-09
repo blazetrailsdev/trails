@@ -1,22 +1,23 @@
 import { SchemaDumper as BaseSchemaDumper } from "../schema-dumper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
+import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { Base } from "../base.js";
 import { capture } from "@blazetrails/activesupport";
 
 export const FULL_DUMP_TIMEOUT_MS = 30_000;
 
 export async function dumpTableSchema(
-  pool: SchemaSource | DatabaseAdapter,
+  connection: DatabaseAdapter,
   ...tables: string[]
 ): Promise<string> {
+  const pool = connection.pool as ConnectionPool;
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
-  const enumerated = pool as { dataSources?: () => Promise<string[]> };
-  const dataSources = enumerated.dataSources
-    ? await enumerated.dataSources()
-    : await (pool as SchemaSource).tables();
-  BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
+  await pool.withConnection(async (connection) => {
+    BaseSchemaDumper.ignoreTables = (await connection.dataSources()).filter(
+      (name) => !tables.includes(name),
+    );
+  });
   try {
     const output = await capture("stdout", async () => {
       await SchemaDumper.dump(pool);
@@ -29,7 +30,7 @@ export async function dumpTableSchema(
 
 export async function dumpAllTableSchema(
   ignoreTables: (string | RegExp)[] = [],
-  pool: Parameters<typeof SchemaDumper.dump>[0] = Base.connectionPool(),
+  pool: ConnectionPool = Base.connectionPool(),
 ): Promise<string> {
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
   BaseSchemaDumper.ignoreTables = ignoreTables;
