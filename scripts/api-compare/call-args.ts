@@ -450,6 +450,7 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   if (rubyArgs.length !== tsArgs.length) return "shape";
   for (let i = 0; i < rubyArgs.length; i++) {
     if (argKeysEqual(rubyArgs[i], tsArgs[i])) continue;
+    if (kwargsDifferByRefOnly(rubyArgs[i], tsArgs[i])) continue;
     if (!rubyArgs[i].startsWith("ref:") || !tsArgs[i].startsWith("ref:")) return "shape";
   }
   // A list carrying the SAME refs in a different order is the reordering this
@@ -459,6 +460,28 @@ function classify(rubyArgs: string[], tsArgs: string[]): CallArgClass {
   // to catch. Only the gated class sees it, so it must not fall through to
   // `naming`.
   return isPermutation(rubyArgs, tsArgs) ? "shape" : "naming";
+}
+
+/** Two `kwargs{…}` descriptors with the same keys whose every differing value
+ *  is a `ref:` on both sides: `owner: owner.class` ported as
+ *  `owner: this.owner.constructor` (association.rb:250) is the rename its
+ *  positional twin would be, not a changed kwarg. */
+function kwargsDifferByRefOnly(rubyKey: string, tsKey: string): boolean {
+  if (!rubyKey.startsWith("kwargs{") || !tsKey.startsWith("kwargs{")) return false;
+  const ruby = kwargPairs(rubyKey);
+  const ts = kwargPairs(tsKey);
+  if (ruby.size !== ts.size) return false;
+  const rubyRefs: string[] = [];
+  const tsRefs: string[] = [];
+  for (const [key, rubyValue] of ruby) {
+    const tsValue = ts.get(key);
+    if (tsValue === undefined) return false;
+    if (argKeysEqual(rubyValue, tsValue)) continue;
+    if (!rubyValue.startsWith("ref:") || !tsValue.startsWith("ref:")) return false;
+    rubyRefs.push(rubyValue);
+    tsRefs.push(tsValue);
+  }
+  return !isPermutation(rubyRefs, tsRefs);
 }
 
 /** Whether the two lists hold the same argument keys in a different order.

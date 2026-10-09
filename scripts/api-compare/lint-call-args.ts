@@ -52,7 +52,7 @@ import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import { inScope, scopeMismatch, scopeOf } from "./scope.js";
 import { TAG as ARGS_TAG } from "./missing-rails-args-tags.js";
 import { TAG as NAME_TAG } from "./missing-rails-name-tags.js";
-import { NAMING_CLASSES, classifyPair, refName } from "./naming-taxonomy.js";
+import { NAMING_CLASSES, classifyPair, differingRefPairs } from "./naming-taxonomy.js";
 import {
   type CallArgArtifact,
   type CallArgExcludeEntry,
@@ -156,10 +156,7 @@ export function namingFindings(
     if (m.class !== "naming" || !enrolled.includes(m.package)) continue;
     const at = { package: m.package, tsFile: m.tsFile, tsName: m.tsName, call: m.call };
     let pairs = 0;
-    for (let i = 0; i < Math.max(m.rubyArgs.length, m.tsArgs.length); i++) {
-      const r = refName(m.rubyArgs[i] ?? "");
-      const t = refName(m.tsArgs[i] ?? "");
-      if (r === undefined || t === undefined || r === t) continue;
+    for (const [r, t] of differingRefPairs(m.rubyArgs, m.tsArgs)) {
       pairs++;
       if (!m.receipts?.includes(r)) {
         out.push({ ...at, identifier: r, problem: "unreceipted" });

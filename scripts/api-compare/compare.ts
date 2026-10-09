@@ -155,7 +155,7 @@ import {
   type CallArgSkipReason,
 } from "./call-args.js";
 import { callOf } from "./call-mismatch-baseline.js";
-import { refName } from "./naming-taxonomy.js";
+import { differingRefPairs } from "./naming-taxonomy.js";
 import {
   compareDefaults,
   compareLiteral,
@@ -5863,13 +5863,9 @@ export function main() {
           }
           const receipts =
             result.class === "naming" && nameTags
-              ? result.rubyArgs.flatMap((arg, i) => {
-                  const r = refName(arg);
-                  const t = refName(result.tsArgs[i] ?? "");
-                  return r !== undefined && t !== undefined && r !== t && nameTags.has(r)
-                    ? [r]
-                    : [];
-                })
+              ? differingRefPairs(result.rubyArgs, result.tsArgs).flatMap(([r]) =>
+                  nameTags.has(r) ? [r] : [],
+                )
               : [];
           for (const r of receipts) nameTagsUsed.get(tagKey)!.add(r);
           callArgMismatches.push({

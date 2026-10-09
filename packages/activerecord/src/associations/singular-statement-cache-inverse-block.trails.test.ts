@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 
 import { Face } from "../test-helpers/models/face.js";
 import { Human } from "../test-helpers/models/human.js";
-import { _loadSingularViaStatementCache, registerModel } from "../associations.js";
+import { registerModel } from "../associations.js";
 import { PartialQuery, Substitute } from "../statement-cache.js";
 import { fixtures } from "../test-fixtures.js";
 import type { Base } from "../base.js";
@@ -23,13 +23,9 @@ describe("Association#find_target statement-cache execute block", () => {
     const face = await Face.find(faces("trusting").id);
     face.strictLoadingBang(false, { mode: "n_plus_one_only" });
 
-    const reflection = (Face as unknown as typeof Base)._reflectOnAssociation("human");
-    const human = await _loadSingularViaStatementCache(
-      face,
-      "human",
-      reflection as never,
-      Human as unknown as typeof Base,
-    );
+    const human = await (
+      association(face, "human") as unknown as { loadTarget(): Promise<Base | null> }
+    ).loadTarget();
 
     expect(human).not.toBeNull();
     expect(association(human!, "face").target).toBe(face);

@@ -264,6 +264,50 @@ export function refName(arg: string): string | undefined {
   return arg.startsWith("ref:") ? arg.slice("ref:".length) : undefined;
 }
 
+/** Split a `kwargs{…}` body into its top-level `key=value` entries. */
+function kwargEntries(descriptor: string): Map<string, string> {
+  const entries = new Map<string, string>();
+  const body = descriptor.slice("kwargs{".length, -1);
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i <= body.length; i++) {
+    const c = body[i];
+    if (c === "{") depth++;
+    else if (c === "}") depth--;
+    else if (i === body.length || (c === "," && depth === 0)) {
+      const pair = body.slice(start, i);
+      const eq = pair.indexOf("=");
+      if (eq !== -1) entries.set(snakeToCamel(pair.slice(0, eq)), pair.slice(eq + 1));
+      start = i + 1;
+    }
+  }
+  return entries;
+}
+
+/**
+ * Every (ruby, ts) identifier pair two argument lists differ on: a `ref:`
+ * against a `ref:` at the same position, or under the same key of two
+ * `kwargs{…}` at the same position.
+ */
+export function differingRefPairs(rubyArgs: string[], tsArgs: string[]): [string, string][] {
+  const pairs: [string, string][] = [];
+  for (let i = 0; i < Math.max(rubyArgs.length, tsArgs.length); i++) {
+    const rubyArg = rubyArgs[i] ?? "";
+    const tsArg = tsArgs[i] ?? "";
+    if (rubyArg.startsWith("kwargs{") && tsArg.startsWith("kwargs{")) {
+      const ts = kwargEntries(tsArg);
+      for (const [key, rubyValue] of kwargEntries(rubyArg)) {
+        pairs.push(...differingRefPairs([rubyValue], [ts.get(key) ?? ""]));
+      }
+      continue;
+    }
+    const r = refName(rubyArg);
+    const t = refName(tsArg);
+    if (r !== undefined && t !== undefined && r !== t) pairs.push([r, t]);
+  }
+  return pairs;
+}
+
 /**
  * Is the Ruby name a `this`-typed function — the trails mixin idiom — under
  * either its own spelling or the ivar-underscore one the recorder may have
@@ -368,10 +412,7 @@ export function classifyRow(
   thisTypedFunctions?: ReadonlySet<string>,
 ): NamingClass {
   const seen: NamingClass[] = [];
-  for (let i = 0; i < Math.max(rubyArgs.length, tsArgs.length); i++) {
-    const r = refName(rubyArgs[i] ?? "");
-    const t = refName(tsArgs[i] ?? "");
-    if (r === undefined || t === undefined || r === t) continue;
+  for (const [r, t] of differingRefPairs(rubyArgs, tsArgs)) {
     seen.push(classifyPair(r, t, thisTypedFunctions));
   }
   if (seen.length === 0) return "burndown";

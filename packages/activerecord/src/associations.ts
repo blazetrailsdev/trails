@@ -5,7 +5,6 @@ import type { Relation } from "./relation.js";
 import { ActiveRecord, Associations as AssociationsNamespace } from "./namespaces.js";
 
 import { ArgumentError } from "@blazetrails/activemodel";
-import { StatementCache } from "./statement-cache.js";
 import { AssociationNotFoundError } from "./associations/errors.js";
 import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
@@ -307,71 +306,6 @@ export function _builtAssociationScope(
     reflection: reflection as never,
     klass: targetModel,
   }) as Relation<Base>;
-}
-
-export function _skipSingularStatementCache(
-  reflection: ReflectionLike,
-  targetModel: typeof Base,
-  options: AssociationOptions,
-): boolean {
-  if (reflection.scope) return true;
-  const refl = reflection as {
-    hasScope?(): boolean;
-    sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
-  };
-  if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
-  if (targetModel.isScopeAttributes()) return true;
-  if ((refl.sourceReflection?.activeRecord?.defaultScopes?.length ?? 0) > 0) return true;
-  return false;
-}
-
-export async function _loadSingularViaStatementCache(
-  owner: Base,
-  assocName: string,
-  reflection: ReflectionLike,
-  targetModel: typeof Base,
-  async = false,
-): Promise<Base | null> {
-  let instance: AssociationInstance | undefined;
-  const assocFn = (owner as { association?: (n: string) => unknown }).association;
-  if (typeof assocFn === "function") {
-    try {
-      instance = assocFn.call(owner, assocName) as typeof instance;
-    } catch (e) {
-      if (!(e instanceof AssociationNotFoundError)) throw e;
-    }
-  }
-  const targetScope = (instance as { targetScope?: () => unknown } | undefined)?.targetScope;
-  const baseScope = (): Relation<Base> =>
-    (typeof targetScope === "function"
-      ? (targetScope.call(instance) as Relation<Base>)
-      : undefined) ?? _scopeForAssociation(targetModel);
-  const sc = (await (
-    reflection as unknown as {
-      associationScopeCache(
-        klass: typeof Base,
-        owner: Base,
-        block: (params: { bind(): unknown }) => unknown,
-      ): unknown;
-    }
-  ).associationScopeCache(targetModel, owner, (params: { bind(): unknown }) => {
-    const as = AssociationScope.create(() => params.bind());
-    const built = as.scope({
-      owner,
-      reflection: reflection as never,
-      klass: targetModel,
-    }) as Relation<Base>;
-    return baseScope().merge(built) as never;
-  })) as StatementCache;
-  const chain = (reflection as unknown as { chain: never[] }).chain;
-  const binds = AssociationScope.getBindValues(owner, chain);
-  const records = await targetModel.withConnection((c) =>
-    sc.execute(binds, c, { async }, (record) => {
-      instance?.setInverseInstance(record);
-      instance?.setStrictLoading(record);
-    }),
-  );
-  return records[0] ?? null;
 }
 
 /** @internal */

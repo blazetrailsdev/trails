@@ -509,8 +509,8 @@ export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: s
 export function isAttributeMethod(
   this: { _attributes?: { isKey(name: string): boolean } },
   attrName: string,
-): boolean {
-  return this._attributes?.isKey(attrName) ?? false;
+): boolean | undefined {
+  return this._attributes?.isKey(attrName);
 }
 
 /** @internal */

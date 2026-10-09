@@ -178,7 +178,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     classAttribute.call(this, "strictStringsByDefault", { default: false });
   }
 
-  /** @missingRailsName config — PERMANENT */
+  /**
+   * @missingRailsName config — PERMANENT
+   * @missingRailsName toS — PERMANENT
+   */
   constructor(config: SQLite3Config) {
     const { database, ...options } = config;
     let filename = database ?? "";
