@@ -56,4 +56,19 @@ describe("registerModel array form", () => {
     registerModel("AuthorAlias", Author);
     expect(constantize("AuthorAlias")).toBe(Author);
   });
+
+  it("registers a direct child of Base in every form, as inherited does", () => {
+    class RegisterModelDirectChild extends Base {}
+    class RegisterModelNamedChild extends Base {}
+    registerModel(RegisterModelDirectChild);
+    registerModel("RegisterModelNamedChildAlias", RegisterModelNamedChild);
+
+    expect(Base.subclasses).toContain(RegisterModelDirectChild);
+    expect(Base.subclasses).toContain(RegisterModelNamedChild);
+  });
+
+  it("seats Base and registers nothing for it", () => {
+    expect(() => registerModel(Base)).not.toThrow();
+    expect(constantize("Base")).toBe(Base);
+  });
 });

@@ -133,7 +133,7 @@ export function registerModel(
     const qualified = rbModName(model)!;
     if (qualified !== model.name) registerConstant(qualified, model);
   }
-  if (model === ActiveRecord.Base) return;
+  if (model === frameworkBase(model)) return;
   DescendantsTracker.registerSubclass(rbClassSuperclass(model) as never, model as never);
 }
 
