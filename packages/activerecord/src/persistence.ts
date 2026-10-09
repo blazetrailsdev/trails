@@ -102,6 +102,28 @@ export async function createBang(
   return record;
 }
 
+export function build(
+  this: PersistenceHost,
+  attributes?: Record<string, unknown> | Record<string, unknown>[],
+  block?: (record: any) => void,
+): any {
+  if (Array.isArray(attributes)) {
+    return attributes.map((attr) => build.call(this, attr, block));
+  } else {
+    return new this(attributes, block);
+  }
+}
+
+export function instantiate(
+  this: PersistenceHost,
+  attributes: Record<string, unknown> | IndexedRow,
+  columnTypes: Record<string, unknown> = {},
+  block?: (record: any) => void,
+): any {
+  const klass = this.discriminateClassForRecord(attributes);
+  return instantiateInstanceOf(klass, attributes, columnTypes, block);
+}
+
 export class ClassMethods {
   static update<T extends typeof Base>(
     this: T,
@@ -212,28 +234,6 @@ export class ClassMethods {
       return object;
     }
   }
-}
-
-export function build(
-  this: PersistenceHost,
-  attributes?: Record<string, unknown> | Record<string, unknown>[],
-  block?: (record: any) => void,
-): any {
-  if (Array.isArray(attributes)) {
-    return attributes.map((attr) => build.call(this, attr, block));
-  } else {
-    return new this(attributes, block);
-  }
-}
-
-export function instantiate(
-  this: PersistenceHost,
-  attributes: Record<string, unknown> | IndexedRow,
-  columnTypes: Record<string, unknown> = {},
-  block?: (record: any) => void,
-): any {
-  const klass = this.discriminateClassForRecord(attributes);
-  return instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 
 export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {
