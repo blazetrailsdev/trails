@@ -193,10 +193,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   supportsComments(): boolean {
     return true;
   }
-  private _connectingPromise: Promise<mysql.Connection> | null = null;
-  private _connectGeneration = 0;
-  private _connectingPromiseGen = -1;
-  private _endingClient: Promise<void> | null = null;
   declare _statements: MysqlStatementPool | null;
 
   declare _affectedRowsBeforeWarnings: number | null;
@@ -257,11 +253,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      this._connectGeneration++;
-      this._statements = null;
-      this._endRawConnection();
+      await this._rawConnection?.end();
       this._rawConnection = null;
-      await this._endingClient;
     });
   }
 
@@ -294,9 +287,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   override async reconnect(): Promise<void> {
     return this.lock.synchronize(async () => {
-      this._connectGeneration++;
-      this._statements = null;
-      this._endRawConnection();
+      await this._rawConnection?.end();
       this._rawConnection = null;
       await this.connect();
     });
@@ -401,52 +392,29 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   private async _ensureClient(): Promise<mysql.Connection> {
     if (this._rawConnection) return this._rawConnection;
-    if (this._connectingPromise && this._connectingPromiseGen === this._connectGeneration) {
-      return this._connectingPromise;
-    }
     if (rtest(this._config._fakeConnection))
       throw new RuntimeError("Mysql2Adapter: fake connection has no client");
-    const gen = this._connectGeneration;
-    this._connectingPromiseGen = gen;
-    this._connectingPromise = Mysql2Adapter.newClient(
-      this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
-    ).then(
-      async (conn): Promise<mysql.Connection> => {
-        try {
-          await conn.query("SET time_zone = '+00:00'");
-        } catch (err) {
-          conn.end().catch(() => {});
-          throw err;
-        }
-        if (this._connectGeneration !== gen) {
-          if (this._connectingPromiseGen === gen) this._connectingPromise = null;
-          const discardErr = new ConnectionNotEstablished(
-            "Mysql2Adapter: connection was closed during connect",
-          );
-          return conn.end().then(
-            () => {
-              throw discardErr;
-            },
-            () => {
-              throw discardErr;
-            },
-          );
-        }
-        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
-        this._rawConnection = conn;
-        this._statements = null;
-        return conn;
-      },
-      (err) => {
-        if (this._connectingPromiseGen === gen) this._connectingPromise = null;
-        const translated = err instanceof Error ? err : new ConnectionNotEstablished(String(err));
-        if (translated instanceof ConnectionNotEstablished) {
-          translated.setPool(this.pool);
-        }
-        throw translated;
-      },
-    );
-    return this._connectingPromise;
+    let conn: mysql.Connection;
+    try {
+      conn = await Mysql2Adapter.newClient(
+        this._connectionParameters as Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
+      );
+    } catch (err) {
+      const translated = err instanceof Error ? err : new ConnectionNotEstablished(String(err));
+      if (translated instanceof ConnectionNotEstablished) {
+        translated.setPool(this.pool);
+      }
+      throw translated;
+    }
+    try {
+      await conn.query("SET time_zone = '+00:00'");
+    } catch (err) {
+      conn.end().catch(() => {});
+      throw err;
+    }
+    this._rawConnection = conn;
+    this._statements = null;
+    return conn;
   }
 
   /** @internal */
@@ -457,13 +425,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   /** @internal */
   affectedRows(rawResult: Mysql2RawResult): number {
     return mysql2AffectedRows.call(this as any, rawResult);
-  }
-
-  /** @internal */
-  private _endRawConnection(): void {
-    const ending = this._rawConnection?.end().catch(() => {});
-    if (!ending) return;
-    this._endingClient = this._endingClient ? this._endingClient.then(() => ending) : ending;
   }
 }
 

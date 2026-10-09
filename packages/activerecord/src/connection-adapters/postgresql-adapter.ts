@@ -1576,18 +1576,13 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         }
         throw error;
       }
-      const staleGeneration = acquireGen !== this._acquireGeneration;
-      if (this._pgClientOptions == null || this._rawConnection != null || staleGeneration) {
+      if (this._pgClientOptions == null || acquireGen !== this._acquireGeneration) {
         newClient.end().catch(() => {});
-        if (this._pgClientOptions == null || staleGeneration) {
-          throw new ConnectionNotEstablished("connection is closed");
-        }
-        client = this._rawConnection!;
-      } else {
-        newClient.on("error", () => {});
-        this._rawConnection = newClient as PGConnection;
-        client = newClient;
+        throw new ConnectionNotEstablished("connection is closed");
       }
+      newClient.on("error", () => {});
+      this._rawConnection = newClient as PGConnection;
+      client = newClient;
     }
     return client;
   }
