@@ -157,11 +157,9 @@ export async function performQuery(
       }
     } else {
       const stmt = rawConnection.prepare(sql);
-
       try {
         result = await stmt.execute(...typeCastedBinds);
         this._affectedRowsBeforeWarnings = stmt.affectedRows;
-
         if (result != null) {
           rbObjIvarSet(result, "@_ar_stmt_to_close", stmt);
         } else {
