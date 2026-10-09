@@ -12,7 +12,6 @@ import {
   rtest,
   union,
   zip,
-  Module,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -993,8 +992,6 @@ export function buildDefaultConstraint(this: {
   return defaultWhereClause.isEmpty() ? undefined : defaultWhereClause.ast;
 }
 
-export const Persistence = Object.assign(new Module(), {
+export const Persistence = {
   _updateRecord: instanceUpdateRecord,
-});
-
-Persistence.defineMethod("touch", touch);
+};

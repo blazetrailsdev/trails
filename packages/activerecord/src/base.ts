@@ -2249,7 +2249,7 @@ Object.assign(Base, {
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
 });
-include(Base, _Persistence.Persistence);
+include(Base, new Module((mod) => mod.defineMethod("touch", _Persistence.touch)));
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
