@@ -543,6 +543,31 @@ describe("ConnectionPool schema cache", () => {
     });
   });
 
+  it("a pool too small for a second connection times out validating the lazily loaded cache", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile, pool: 1, checkoutTimeout: 0.05 });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(warn.mock.calls[0][0]).toMatch(
+          /^Failed to validate the schema cache because of ActiveRecord::ConnectionTimeoutError/,
+        );
+        expect(pool.stat().connections).toBe(1);
+        expect(await pool.schemaCache.isCached("more_testings")).toBe(false);
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        vi.restoreAllMocks();
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
   it("rejects a stale schema cache when checkSchemaCacheDumpVersion is enabled", async () => {
     const prevLazy = lazilyLoadSchemaCache();
     setLazilyLoadSchemaCache(true);

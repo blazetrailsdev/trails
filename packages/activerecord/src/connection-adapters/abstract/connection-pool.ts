@@ -633,15 +633,15 @@ export class ConnectionPool implements ReapablePool {
     }
   }
 
-  private checkoutAndVerify(c: DatabaseAdapter): DatabaseAdapter {
+  private async checkoutAndVerify(c: DatabaseAdapter): Promise<DatabaseAdapter> {
     try {
       c._runCheckoutCallbacks(() => {
         c.cleanBang();
       });
       return c;
     } catch (err) {
-      this._trackCloseDrain(this.remove(c));
-      this._trackCloseDrain(c.disconnectBang());
+      await this.remove(c);
+      await c.disconnectBang();
       throw err;
     }
   }
@@ -692,8 +692,7 @@ export class ConnectionPool implements ReapablePool {
           this._connections.push(pinned);
         }
         result = fn(
-          (lease.connection =
-            pinned ?? this.checkoutAndVerify(this.acquireConnectionSync(this.checkoutTimeout))),
+          (lease.connection = pinned ?? this.acquireConnectionSync(this.checkoutTimeout)),
         );
       }
     } catch (error) {
@@ -723,7 +722,8 @@ export class ConnectionPool implements ReapablePool {
       this._nowConnecting += 1;
       try {
         const conn = this.checkoutNewConnection();
-        void this.adoptConnection(conn);
+        conn.pool = this;
+        this._connections!.push(conn);
         this._checkedOut.add(conn);
         conn.lease();
         return conn;
@@ -745,7 +745,17 @@ export class ConnectionPool implements ReapablePool {
       );
     }
     this._checkedOut.add(conn);
-    return conn;
+    try {
+      conn._runCheckoutCallbacks(() => {
+        conn.cleanBang();
+      });
+      conn._queryCache ||= this.queryCache;
+      return conn;
+    } catch (err) {
+      const c = conn;
+      this._trackCloseDrain(this.remove(c).then(() => c.disconnectBang()));
+      throw err;
+    }
   }
 
   /** @internal */
