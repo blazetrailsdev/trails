@@ -15,6 +15,9 @@ import {
   type ConflictBlock,
   eachPair,
   type Enumerator,
+  hashAset,
+  hashDelete,
+  keys as hashKeys,
   isEmpty,
   isModuleIncluded,
   rbBlockGivenP,
@@ -732,10 +735,10 @@ export class Parameters {
 
   /** @internal */
   _deepTransformKeysInObjectBang(object: unknown, block: (key: string) => string): unknown {
-    if (object instanceof Hash) {
-      for (const key of object.keys()) {
-        const value = object.delete(key);
-        object.set(block(key), this._deepTransformKeysInObjectBang(value, block));
+    if (object instanceof Hash || isPlainObject(object)) {
+      for (const key of hashKeys<string>(object)) {
+        const value = hashDelete(object, key);
+        hashAset(object, block(key), this._deepTransformKeysInObjectBang(value, block));
       }
       return object;
     } else if (object instanceof Parameters) {
@@ -958,11 +961,11 @@ export class Parameters {
   }
 
   private _deepTransformKeysInObject(object: unknown, block: (key: string) => string): unknown {
-    if (object instanceof Hash) {
+    if (object instanceof Hash || isPlainObject(object)) {
       const result = new (this.constructor as typeof Parameters)();
-      for (const [key, value] of object) {
+      eachPair(object as Hash<string, unknown>, (key, value) => {
         result.set(block(key), this._deepTransformKeysInObject(value, block));
-      }
+      });
       return result;
     } else if (object instanceof Parameters) {
       if (object.permitted) {
