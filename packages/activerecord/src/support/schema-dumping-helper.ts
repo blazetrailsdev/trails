@@ -11,10 +11,13 @@ export async function dumpTableSchema(
   connection: DatabaseAdapter,
   ...tables: string[]
 ): Promise<string> {
-  const pool = poolOf(connection);
+  const pool = connection.pool as ConnectionPool;
   const oldIgnoreTables = BaseSchemaDumper.ignoreTables;
-  const dataSources = await connection.dataSources();
-  BaseSchemaDumper.ignoreTables = dataSources.filter((name) => !tables.includes(name));
+  await pool.withConnection(async (connection) => {
+    BaseSchemaDumper.ignoreTables = (await connection.dataSources()).filter(
+      (name) => !tables.includes(name),
+    );
+  });
   try {
     const output = await capture("stdout", async () => {
       await SchemaDumper.dump(pool);
@@ -39,10 +42,4 @@ export async function dumpAllTableSchema(
   } finally {
     BaseSchemaDumper.ignoreTables = oldIgnoreTables;
   }
-}
-
-export function poolOf(connection: DatabaseAdapter): ConnectionPool {
-  return {
-    withConnection: (block: (connection: DatabaseAdapter) => unknown) => block(connection),
-  } as unknown as ConnectionPool;
 }

@@ -1,11 +1,10 @@
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
-  poolOf,
 } from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -64,13 +63,10 @@ describe("SchemaDumpingHelper", () => {
     const before = SchemaDumper.ignoreTables;
     const boom = new Error("boom");
     await createSdhTable("sdh_kept");
-    const failing = Object.assign(Object.create(adapter), {
-      columns: async () => {
-        throw boom;
-      },
-    });
+    const columns = vi.spyOn(adapter, "columns").mockRejectedValue(boom);
 
-    await expect(dumpTableSchema(failing, "sdh_kept")).rejects.toThrow(boom);
+    await expect(dumpTableSchema(adapter, "sdh_kept")).rejects.toThrow(boom);
+    columns.mockRestore();
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
 
@@ -78,7 +74,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_keep");
     await createSdhTable("sdh_skip");
 
-    const output = await dumpAllTableSchema(["sdh_skip"], poolOf(adapter));
+    const output = await dumpAllTableSchema(["sdh_skip"]);
 
     expect(output).toContain("sdh_keep");
     expect(output).not.toContain("sdh_skip");

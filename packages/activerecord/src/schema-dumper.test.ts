@@ -18,7 +18,6 @@ import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
-  poolOf,
 } from "./support/schema-dumping-helper.js";
 import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
@@ -66,7 +65,7 @@ describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   async function standardDump(ignoreTables: (string | RegExp)[] = []): Promise<string> {
-    return dumpAllTableSchema(ignoreTables, poolOf(await Base.leaseConnection()));
+    return dumpAllTableSchema(ignoreTables);
   }
   async function dumpCanonicalTable(...tables: string[]): Promise<string> {
     return dumpTableSchema(await Base.leaseConnection(), ...tables);
@@ -421,10 +420,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    const output = await dumpAllTableSchema(
-      [/^courses/],
-      poolOf(await ARUnit2Model.leaseConnection()),
-    );
+    const output = await dumpAllTableSchema([/^courses/], ARUnit2Model.connectionPool());
     expect(output).not.toMatch(/createTable\("courses"/);
     expect(output).toMatch(/createTable\("colleges"/);
     expect(output).not.toMatch(/createTable\("schema_migrations"/);
@@ -675,7 +671,7 @@ describe("SchemaDumperTest", () => {
     "foreign_keys",
     "foreign keys are dumped at the bottom to circumvent dependency issues",
     async () => {
-      const output = await dumpAllTableSchema([], poolOf(await Base.leaseConnection()));
+      const output = await dumpAllTableSchema([]);
       expect(output).toMatch(
         /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
       );
