@@ -4,6 +4,10 @@ import { StatementPool } from "./statement-pool.js";
 import { isSqliteRun } from "../support/sqlite-template.js";
 import { checkoutRawTestAdapter } from "../test-adapter.js";
 
+class EvictingPool extends StatementPool<string> {
+  protected dealloc(_stmt: string): void {}
+}
+
 describe("StatementPoolTest", () => {
   it("#delete doesn't call dealloc if the statement didn't exist", async () => {
     class TestPool extends StatementPool<object> {
@@ -14,10 +18,10 @@ describe("StatementPoolTest", () => {
     const pool = new TestPool();
     const stmt = {};
     const sql = "SELECT 1";
-    await pool.set(sql, stmt);
+    pool.set(sql, stmt);
     assertSame(stmt, pool.get(sql));
-    assertSame(stmt, await pool.delete(sql));
-    expect(await pool.delete(sql)).toBeUndefined();
+    assertSame(stmt, pool.delete(sql));
+    expect(pool.delete(sql)).toBeUndefined();
   });
 
   it("#delete calls dealloc when statement exists", async () => {
@@ -28,8 +32,8 @@ describe("StatementPoolTest", () => {
       }
     }
     const pool = new TestPool();
-    await pool.set("key", "prepared_stmt");
-    await pool.delete("key");
+    pool.set("key", "prepared_stmt");
+    pool.delete("key");
     expect(dealloced).toEqual(["prepared_stmt"]);
     expect(pool.length).toBe(0);
   });
@@ -42,9 +46,9 @@ describe("StatementPoolTest", () => {
       }
     }
     const pool = new TestPool();
-    await pool.set("a", "stmt_a");
-    await pool.set("b", "stmt_b");
-    await pool.clear();
+    pool.set("a", "stmt_a");
+    pool.set("b", "stmt_b");
+    pool.clear();
     expect(dealloced.sort()).toEqual(["stmt_a", "stmt_b"]);
     expect(pool.length).toBe(0);
   });
@@ -57,17 +61,17 @@ describe("StatementPoolTest", () => {
       }
     }
     const pool = new TestPool();
-    await pool.set("a", "stmt_a");
-    await pool.set("b", "stmt_b");
-    await pool.reset();
+    pool.set("a", "stmt_a");
+    pool.set("b", "stmt_b");
+    pool.reset();
     expect(dealloced).toHaveLength(0);
     expect(pool.length).toBe(0);
   });
 
   it("each iterates over all entries", async () => {
     const pool = new StatementPool<string>();
-    await pool.set("a", "1");
-    await pool.set("b", "2");
+    pool.set("a", "1");
+    pool.set("b", "2");
     const entries: [string, string][] = [];
     pool.each((key, stmt) => entries.push([key, stmt]));
     expect(entries).toEqual([
@@ -84,9 +88,9 @@ describe("StatementPoolTest", () => {
       }
     }
     const pool = new TestPool(2);
-    await pool.set("a", "1");
-    await pool.set("b", "2");
-    await pool.set("c", "3");
+    pool.set("a", "1");
+    pool.set("b", "2");
+    pool.set("c", "3");
     expect(pool.length).toBe(2);
     expect(pool.isKey("a")).toBe(false);
     expect(pool.isKey("b")).toBe(true);
@@ -95,22 +99,22 @@ describe("StatementPoolTest", () => {
   });
 
   it("evicts in insertion order regardless of reads", async () => {
-    const pool = new StatementPool<string>(2);
-    await pool.set("a", "1");
-    await pool.set("b", "2");
+    const pool = new EvictingPool(2);
+    pool.set("a", "1");
+    pool.set("b", "2");
     pool.get("a");
-    await pool.set("c", "3");
+    pool.set("c", "3");
     expect(pool.isKey("a")).toBe(false);
     expect(pool.isKey("b")).toBe(true);
     expect(pool.isKey("c")).toBe(true);
   });
 
   it("evicts before storing, so a full pool sheds its oldest entry on re-assign", async () => {
-    const pool = new StatementPool<string>(2);
-    await pool.set("a", "1");
-    await pool.set("b", "2");
-    await pool.set("a", "1b");
-    await pool.set("c", "3");
+    const pool = new EvictingPool(2);
+    pool.set("a", "1");
+    pool.set("b", "2");
+    pool.set("a", "1b");
+    pool.set("c", "3");
     expect(pool.isKey("a")).toBe(true);
     expect(pool.isKey("b")).toBe(false);
     expect(pool.isKey("c")).toBe(true);
@@ -118,7 +122,7 @@ describe("StatementPoolTest", () => {
 
   it("key? reports membership", async () => {
     const pool = new StatementPool<string>();
-    await pool.set("a", "1");
+    pool.set("a", "1");
     expect(pool.isKey("a")).toBe(true);
     expect(pool.isKey("b")).toBe(false);
   });
@@ -164,20 +168,19 @@ describe("SQLite3 StatementPool integration", () => {
     expect(pool.length).toBe(0);
   });
 
-  it("threads an asynchronous dealloc back to the eviction site", async () => {
-    const order: string[] = [];
+  it("clear empties the pool before it returns when dealloc is still pending", () => {
+    const dealloced: string[] = [];
     class TestPool extends StatementPool<string> {
-      private _chain: Promise<void> = Promise.resolve();
-      protected dealloc(stmt: string): Promise<void> {
-        this._chain = this._chain.then(() => Promise.resolve()).then(() => void order.push(stmt));
-        return this._chain;
+      protected async dealloc(stmt: string): Promise<void> {
+        dealloced.push(stmt);
+        await Promise.resolve();
       }
     }
-    const pool = new TestPool(1);
-    await pool.set("a", "stmt_a");
-    await pool.set("b", "stmt_b");
-    order.push("eviction-site-resumed");
-    await pool.clear();
-    expect(order).toEqual(["stmt_a", "eviction-site-resumed", "stmt_b"]);
+    const pool = new TestPool();
+    pool.set("a", "stmt_a");
+    pool.set("b", "stmt_b");
+    pool.clear();
+    expect(pool.length).toBe(0);
+    expect(dealloced).toEqual(["stmt_a", "stmt_b"]);
   });
 });

@@ -1,14 +1,21 @@
-import { Hash, last, Process } from "@blazetrails/ruby-compat";
+import {
+  eachValue,
+  Hash,
+  last,
+  NotImplementedError,
+  Process,
+  rtest,
+} from "@blazetrails/ruby-compat";
 
 export class StatementPool<T = unknown> {
   static readonly DEFAULT_STATEMENT_LIMIT = 1000;
 
-  private _cache: Hash<number, Map<string, T>>;
+  private _cache: Hash<number, Hash<string, T>>;
   private _statementLimit: number;
 
   constructor(statementLimit?: number) {
-    this._cache = new Hash<number, Map<string, T>>((h, pid) => {
-      const cache = new Map<string, T>();
+    this._cache = new Hash<number, Hash<string, T>>((h, pid) => {
+      const cache = new Hash<string, T>();
       h.set(pid, cache);
       return cache;
     });
@@ -33,45 +40,38 @@ export class StatementPool<T = unknown> {
     return this.cache.size;
   }
 
-  set(key: string, stmt: T): void | Promise<void> {
-    let deallocating: Promise<void> | undefined;
+  set(sql: string, stmt: T): void {
     while (this._statementLimit <= this.cache.size) {
-      const shifted = this.cache.entries().next().value!;
-      this.cache.delete(shifted[0]);
-      deallocating = deallocating
-        ? deallocating.then(() => this.dealloc(last(shifted) as T))
-        : (this.dealloc(last(shifted) as T) ?? undefined);
+      void this.dealloc(last(this.cache.shift()!) as T);
     }
-    this.cache.set(key, stmt);
-    return deallocating;
+    this.cache.set(sql, stmt);
   }
 
-  clear(): void | Promise<void> {
-    let deallocating: Promise<void> | undefined;
-    for (const stmt of this.cache.values()) {
-      deallocating = deallocating
-        ? deallocating.then(() => this.dealloc(stmt))
-        : (this.dealloc(stmt) ?? undefined);
-    }
-    this.cache.clear();
-    return deallocating;
-  }
-
-  reset(): void | Promise<void> {
+  clear(): void {
+    eachValue(this.cache, (stmt) => {
+      void this.dealloc(stmt);
+    });
     this.cache.clear();
   }
 
-  delete(key: string): T | undefined | Promise<T | undefined> {
-    if (!this.cache.has(key)) return undefined;
-    const stmt = this.cache.get(key) as T;
-    this.cache.delete(key);
-    const pending = this.dealloc(stmt);
-    return pending ? pending.then(() => stmt) : stmt;
+  reset(): void {
+    this.cache.clear();
   }
 
-  private get cache(): Map<string, T> {
+  delete(key: string): T | undefined {
+    const stmt = this.cache.delete(key) as T | undefined;
+    if (rtest(stmt)) {
+      void this.dealloc(stmt);
+    }
+    return stmt;
+  }
+
+  private get cache(): Hash<string, T> {
     return this._cache.get(Process.pid)!;
   }
 
-  protected dealloc(_stmt: T): void | Promise<void> {}
+  protected dealloc(_stmt: T): void | Promise<void> {
+    // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_adapters/statement_pool.rb:60
+    throw new NotImplementedError();
+  }
 }

@@ -62,6 +62,7 @@ export class File {
     })());
   }
 
+  /** @inventedArm if — PERMANENT */
   private rawRows(): [string, unknown][] {
     return (this.#rawRows ??= (() => {
       let data: unknown;

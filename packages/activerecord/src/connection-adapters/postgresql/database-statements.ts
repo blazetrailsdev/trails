@@ -323,7 +323,7 @@ export async function performQuery(
               { sql: sql as string, binds, cause: error },
             );
           } else {
-            await this._statements.delete(this.sqlKey(sql));
+            this._statements.delete(this.sqlKey(sql));
             continue;
           }
         }

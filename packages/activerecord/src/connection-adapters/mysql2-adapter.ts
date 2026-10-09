@@ -394,7 +394,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   _trackPrepared(conn: mysql.Connection, sql: string): void {
     const pool = this._getStmtPool();
     if (pool.get(sql)) return;
-    void pool.set(sql, {
+    pool.set(sql, {
       sql,
       close(): void {
         try {

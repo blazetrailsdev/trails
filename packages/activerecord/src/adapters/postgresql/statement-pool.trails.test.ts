@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.internalExecQuery("SELECT $1::text", "SQL", ["a"], { prepare: true });
         const pool = adapter._statements;
         expect(pool.length).toBe(2);
-        await pool.clear();
+        pool.clear();
         expect(pool.length).toBe(0);
       } finally {
         await adapter.rollbackDbTransaction();

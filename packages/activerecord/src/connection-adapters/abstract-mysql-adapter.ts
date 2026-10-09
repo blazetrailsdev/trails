@@ -1467,13 +1467,13 @@ WHERE fk.referenced_column_name IS NOT NULL
 
 export interface MysqlPreparedStatement {
   sql: string;
-  close(): void | Promise<void>;
+  close(): void;
 }
 
 export class StatementPool extends ConnectionStatementPool<MysqlPreparedStatement> {
   /** @internal */
-  protected override dealloc(stmt: MysqlPreparedStatement): void | Promise<void> {
-    return stmt.close();
+  protected override dealloc(stmt: MysqlPreparedStatement): void {
+    stmt.close();
   }
 }
 
