@@ -17,8 +17,8 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | Nodes.TableAlias | null = null;
   readonly tables: (Table | Nodes.TableAlias)[] | null = null;
-  private _readonly?: unknown;
-  private _strictLoading?: unknown;
+  declare private _readonly?: unknown;
+  declare private _strictLoading?: unknown;
 
   constructor(reflection: AbstractReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
@@ -112,7 +112,7 @@ export class JoinAssociation extends JoinPart {
   }
 
   isReadonly(): unknown {
-    if (this._readonly !== undefined) return this._readonly;
+    if (Object.hasOwn(this, "_readonly")) return this._readonly;
 
     const reflection = this.reflection as AbstractReflection & ConcreteReflection;
     return (this._readonly =
@@ -120,7 +120,7 @@ export class JoinAssociation extends JoinPart {
   }
 
   isStrictLoading(): unknown {
-    if (this._strictLoading !== undefined) return this._strictLoading;
+    if (Object.hasOwn(this, "_strictLoading")) return this._strictLoading;
 
     const reflection = this.reflection as AbstractReflection & ConcreteReflection;
     return (this._strictLoading =

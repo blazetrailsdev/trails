@@ -10,6 +10,7 @@ import {
   include,
   NotImplementedError,
   rbEqual,
+  rbFPublicSend,
   rbFSend,
 } from "@blazetrails/ruby-compat";
 import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
@@ -37,7 +38,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare saveThroughRecord: (record: Base) => Promise<boolean>;
   /** @internal */
-  declare throughRecordsFor: (record: Base) => Base[] | Promise<Base[]>;
+  declare throughRecordsFor: (record: Base) => Promise<Base[]>;
   /** @internal */
   declare deleteThroughRecords: (records: Base[]) => Promise<void>;
   /** @internal */
@@ -343,29 +344,21 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 }
 
 /** @internal */
-function throughRecordsFor(
-  this: HasManyThroughAssociation,
-  record: Base,
-): Base[] | Promise<Base[]> {
+async function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Promise<Base[]> {
   const attributes = this.constructJoinAttributes(record);
   const candidates = wrap((this.throughAssociation() as Association).target);
-  const sent = candidates.map((c) =>
-    Object.keys(attributes).map((key) => {
-      if ((c.constructor as any)._reflectOnAssociation?.(key)) {
-        return (c as any).association(key).reader as unknown;
+  const found: Base[] = [];
+  for (const c of candidates) {
+    let all = true;
+    for (const [key, value] of Object.entries(attributes)) {
+      if (!rbEqual(await rbFPublicSend(c, key), value)) {
+        all = false;
+        break;
       }
-      return typeof (c as any).readAttribute === "function"
-        ? (c as any).readAttribute(key)
-        : (c as any)[key];
-    }),
-  );
-  const findAll = (values: unknown[][]): Base[] =>
-    candidates.filter((_c, i) =>
-      Object.values(attributes).every((value, j) => rbEqual(values[i][j], value)),
-    );
-  return sent.some((values) => values.some(isThenable))
-    ? Promise.all(sent.map((values) => Promise.all(values))).then(findAll)
-    : findAll(sent);
+    }
+    if (all) found.push(c);
+  }
+  return found;
 }
 
 /** @internal */
