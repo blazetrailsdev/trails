@@ -91,61 +91,53 @@ describe("ParametersAccessorsTest", () => {
 
   it("each carries permitted status", () => {
     params.permitBang();
-    params.each((key, value) => {
+    params.each(([key, value]) => {
       if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
     });
   });
 
   it("each carries unpermitted status", () => {
-    params.each((key, value) => {
+    params.each(([key, value]) => {
       if (key === "person") assertNot((value as Parameters).permitted);
     });
   });
 
-  // BLOCKED: parameters-each-pair-drops-to-enum-arm-and-yields-two-args
-  it.skip("each returns key,value array for block with arity 1", () => {
+  it("each returns key,value array for block with arity 1", () => {
     params.each((arg) => {
       assertKindOf(Array, arg);
-      assertEqual("person", (arg as unknown as unknown[])[0]);
-      assertKindOf(Parameters, (arg as unknown as unknown[])[1]);
+      assertEqual("person", arg[0]);
+      assertKindOf(Parameters, arg[1]);
     });
   });
 
-  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
-  it.skip("each without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("each without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.each());
-    // @ts-expect-error -- the block-less arm is unported
     assertEqual(params, new Parameters(Object.fromEntries(params.each())));
   });
 
   it("each_pair carries permitted status", () => {
     params.permitBang();
-    params.eachPair((key, value) => {
+    params.eachPair(([key, value]) => {
       if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
     });
   });
 
   it("each_pair carries unpermitted status", () => {
-    params.eachPair((key, value) => {
+    params.eachPair(([key, value]) => {
       if (key === "person") assertNot((value as Parameters).permitted);
     });
   });
 
-  // BLOCKED: parameters-each-pair-drops-to-enum-arm-and-yields-two-args
-  it.skip("each_pair returns key,value array for block with arity 1", () => {
+  it("each_pair returns key,value array for block with arity 1", () => {
     params.eachPair((arg) => {
       assertKindOf(Array, arg);
-      assertEqual("person", (arg as unknown as unknown[])[0]);
-      assertKindOf(Parameters, (arg as unknown as unknown[])[1]);
+      assertEqual("person", arg[0]);
+      assertKindOf(Parameters, arg[1]);
     });
   });
 
-  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
-  it.skip("each_pair without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("each_pair without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.eachPair());
-    // @ts-expect-error -- the block-less arm is unported
     assertEqual(params, new Parameters(Object.fromEntries(params.eachPair())));
   });
 
@@ -162,11 +154,8 @@ describe("ParametersAccessorsTest", () => {
     });
   });
 
-  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
-  it.skip("each_value without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("each_value without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.eachValue());
-    // @ts-expect-error -- the block-less arm is unported
     assertEqual(params.values, [...params.eachValue()]);
   });
 
@@ -183,11 +172,8 @@ describe("ParametersAccessorsTest", () => {
     });
   });
 
-  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
-  it.skip("each_key without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("each_key without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.eachKey());
-    // @ts-expect-error -- the block-less arm is unported
     assertEqual(params.keys, [...params.eachKey()]);
   });
 
