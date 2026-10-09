@@ -16,7 +16,8 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { mergeBang } from "@blazetrails/ruby-compat";
+import { mergeBang, Module } from "@blazetrails/ruby-compat";
+import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
 
@@ -74,7 +75,7 @@ type CallbackOptions = {
   prepend?: boolean;
 };
 
-export const Transactions = {
+export const Transactions = Object.assign(new Module(), {
   [included](base: typeof Model): void {
     (base as typeof Model & Extended<typeof Callbacks.ClassMethods>).defineCallbacks(
       "commit",
@@ -83,7 +84,7 @@ export const Transactions = {
       { scope: ["kind", "name"] },
     );
   },
-};
+});
 
 export function beforeCommit<T extends typeof Base>(
   this: T,
@@ -180,9 +181,8 @@ export function setCallback<T extends typeof Model>(
   );
 }
 
-export async function beforeCommittedBang(record: Base): Promise<void> {
-  const ctor = record.constructor as typeof Base;
-  await record.runCallbacks("before_commit");
+export async function beforeCommittedBang(this: Base): Promise<void> {
+  await this.runCallbacks("before_commit");
 }
 
 export async function committedBang(
@@ -302,12 +302,11 @@ export async function saveBang<T>(this: Base, superFn: () => Promise<T>): Promis
   return withTransactionReturningStatus.call(this, superFn) as Promise<T>;
 }
 
-export function touch(
-  this: Base,
-  args: unknown[],
-  superFn: () => Promise<boolean>,
-): Promise<boolean> {
-  return withTransactionReturningStatus.call(this, superFn) as Promise<boolean>;
+export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
+  return withTransactionReturningStatus.call(
+    this,
+    () => Transactions.superMethod(this, "touch")!(...names) as Promise<boolean>,
+  ) as Promise<boolean>;
 }
 
 export async function withTransactionReturningStatus<T>(
@@ -466,3 +465,6 @@ function assertValidTransactionAction(actions: string[]): void {
     );
   }
 }
+
+Transactions.defineMethod("beforeCommittedBang", beforeCommittedBang);
+Transactions.defineMethod("touch", touch);

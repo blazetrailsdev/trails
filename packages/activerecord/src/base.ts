@@ -2249,6 +2249,7 @@ Object.assign(Base, {
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
 });
+include(Base, _Persistence.Persistence);
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
@@ -2430,19 +2431,6 @@ include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
-include(
-  Base,
-  new Module((mod) => {
-    mod.defineMethod("touch", function (this: Base, ...names: unknown[]): Promise<boolean> {
-      return _Transactions.touch.call(this, names, () =>
-        _Callbacks.touch.call(this, names, () => _Persistence.touch.call(this, ...(names as any))),
-      );
-    });
-    mod.defineMethod("beforeCommittedBang", function (this: Base): Promise<void> {
-      return _Transactions.beforeCommittedBang(this);
-    });
-  }),
-);
 include(Base, _TouchLater.TouchLater);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);

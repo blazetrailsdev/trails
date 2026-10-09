@@ -3,7 +3,8 @@ import type { CallbackConditions, CallbackObject } from "@blazetrails/activemode
 import { RecordNotDestroyed } from "./errors.js";
 import { include, included } from "@blazetrails/activesupport";
 import { ValidationsCallbacks } from "@blazetrails/activemodel";
-import { rtest } from "@blazetrails/ruby-compat";
+import { Module, rtest } from "@blazetrails/ruby-compat";
+import type { TouchArgs } from "./timestamp.js";
 import { _createRecord as counterCacheCreateRecord } from "./counter-cache.js";
 import { _createRecord as lockingCreateRecord } from "./locking/optimistic.js";
 import { _createRecord as encryptableRecordCreateRecord } from "./encryption/encryptable-record.js";
@@ -16,14 +17,14 @@ import {
 
 type ModelCtor = typeof Base;
 
-export const Callbacks = {
+export const Callbacks = Object.assign(new Module(), {
   [included](base: ModelCtor): void {
     include(base, ValidationsCallbacks);
 
     base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
-};
+});
 
 export declare class ClassMethods {
   afterInitialize: <T extends typeof Base>(
@@ -177,12 +178,11 @@ export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<
   }
 }
 
-export function touch(
-  this: any,
-  args: unknown[],
-  superFn: () => Promise<boolean>,
-): Promise<boolean> {
-  return this.runCallbacks("touch", superFn) as Promise<boolean>;
+export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
+  return this.runCallbacks(
+    "touch",
+    () => Callbacks.superMethod(this, "touch")!(...names) as Promise<boolean>,
+  ) as Promise<boolean>;
 }
 
 export function incrementBang<T>(
@@ -239,3 +239,5 @@ export async function _updateRecord(
     ),
   );
 }
+
+Callbacks.defineMethod("touch", touch);
