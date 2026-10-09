@@ -7,11 +7,12 @@ import { Duration, days, hours, minutes, months, seconds, weeks, years } from ".
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 import { Factory } from "@blazetrails/msgpack";
+import { extend } from "@blazetrails/ruby-compat/include";
 import { Serializer } from "./serializer.js";
 
 describe("MessagePackSerializerTrailsTest", () => {
   it("dumps Duration bytes identical to real Rails MessagePack", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const duration = years(1)
       .plus(months(2))
       .plus(weeks(3))
@@ -35,7 +36,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("dumps a Duration built from a Float scalar with a float64 value", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const negative = [
       204, 128, 199, 25, 10, 203, 192, 181, 24, 0, 0, 0, 0, 0, 151, 192, 192, 192, 192, 203, 191,
       248, 0, 0, 0, 0, 0, 0, 192, 192,
@@ -73,7 +74,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("loads a Duration with the parts and variability it was dumped with", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const roundtrip = (duration: Duration) =>
       serializer.load(serializer.dump(duration)) as Duration;
 
@@ -91,7 +92,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("dumps nanosecond temporal bytes identical to real Rails MessagePack", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const time = Time.at(946686896, 123456789, "nanosecond", { in: "-12:00" });
     expect([...serializer.dump(time)]).toEqual([
       204, 128, 199, 15, 7, 206, 56, 109, 75, 176, 206, 7, 91, 205, 21, 210, 255, 255, 87, 64,
@@ -142,7 +143,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("dumps BigDecimal bytes identical to real Rails MessagePack", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     expect([...serializer.dump(new BigDecimal("9876543210.0123456789"))]).toEqual([
       204,
       128,
@@ -161,7 +162,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("dumps Range, URI, IPAddr, Pathname and Regexp bytes identical to real Rails MessagePack", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const dump = (object: unknown) => [...serializer.dump(object)];
     expect(dump(new Range(1, 2))).toEqual([204, 128, 199, 3, 11, 1, 2, 194]);
     expect(dump(new Range(1, 2, true))).toEqual([204, 128, 199, 3, 11, 1, 2, 195]);
@@ -217,20 +218,20 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("dumps a Regexp without the flags MRI has no option for", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const loaded = serializer.load(serializer.dump(/^a/gimsuy)) as RegExp;
     expect([loaded.source, loaded.flags]).toEqual(["^a", "is"]);
   });
 
   it("loads the Regexp real Rails MessagePack dumps", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const dumped = Buffer.from([204, 128, 199, 12, 16, ...Buffer.from("(?i-mx:ab+c)")]);
     const loaded = serializer.load(dumped) as RegExp;
     expect([loaded.source, loaded.flags]).toEqual(["ab+c", "i"]);
   });
 
   it("freezes the factory once the pool is built", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     serializer.warmup();
     expect(Object.isFrozen(serializer.messagePackFactory)).toBe(true);
     expect(() =>
@@ -242,7 +243,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("message_pack_factory= drops the memoized pool", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     serializer.warmup();
     const factory = new Factory();
     serializer.messagePackFactory = factory;
@@ -252,7 +253,7 @@ describe("MessagePackSerializerTrailsTest", () => {
   });
 
   it("loads the Symbol real Rails MessagePack dumps", () => {
-    const serializer = new Serializer();
+    const serializer = extend({} as Serializer, Serializer);
     const dumped = Uint8Array.from([204, 128, 199, 11, 0, ...Buffer.from("some_symbol")]);
     expect(serializer.load(dumped)).toBe(":some_symbol");
   });

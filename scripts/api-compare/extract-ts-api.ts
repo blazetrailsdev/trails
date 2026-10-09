@@ -3496,6 +3496,9 @@ function unwrapAssertions(expr: ts.Expression): ts.Expression {
  *   chained on the construction is handed.
  * - `new Module((mod) => { mod.defineMethod("m", fn) })` — every `defineMethod`
  *   the block calls on its own parameter with a literal name.
+ * - `new Module((mod) => { delegate.call(mod, "m", { to: "target" }) })` — every
+ *   literal name `delegate` is handed with the block's own parameter as `self`
+ *   (Ruby's `delegate :m, to: :target` in a module body).
  * - `new Module((mod) => { mod[initialize] = function () {} })` — the module's
  *   `def initialize` (`Thor::Shell#initialize`, thor/shell.rb:44-48), recorded
  *   as `[initialize]`, the name a class's `static [initialize]` is recorded by.
@@ -3548,6 +3551,25 @@ export function harvestModuleInstanceMethods(
     }
     if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return;
     const receiver = node.expression.expression;
+    if (
+      ts.isIdentifier(receiver) &&
+      receiver.text === "delegate" &&
+      node.expression.name.text === "call"
+    ) {
+      const [self, ...names] = node.arguments;
+      if (!self || !ts.isIdentifier(self) || self.text !== mod.text) return;
+      for (const delegated of names) {
+        if (!ts.isStringLiteralLike(delegated)) continue;
+        out.push({
+          name: delegated.text,
+          visibility: "public",
+          params: [{ name: "args", kind: "rest" }],
+          line: node.getSourceFile().getLineAndCharacterOfPosition(node.getStart()).line + 1,
+          file,
+        });
+      }
+      return;
+    }
     if (!ts.isIdentifier(receiver) || receiver.text !== mod.text) return;
     if (node.expression.name.text !== "defineMethod") return;
     const [name, body] = node.arguments;
