@@ -18,6 +18,8 @@ import {
   rbInspect as inspect,
   rbModConstSet,
   rbModPublicInstanceMethod,
+  rbObjMethod,
+  rbObjRespondTo,
   NameError,
   type UnboundMethod,
 } from "@blazetrails/ruby-compat";
@@ -215,8 +217,6 @@ const RESTRICTED_CLASS_METHODS = new Set([
   "name",
   "superclass",
 ]);
-
-const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
 
 let _dangerousMethodsCache: Set<string> | null = null;
 
@@ -487,17 +487,21 @@ export function isMethodDefinedWithin(
   }
 }
 
-/** @inventedArm loop — CONVERGEABLE dangerous-class-method-compares-method-owners */
 export function isDangerousClassMethod(this: AttributeMethodsHost, methodName: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(methodName)) return true;
-  if (INTRINSIC_FUNCTION_PROPS.has(methodName)) return false;
 
-  let klass: any = ActiveRecord.Base;
-  while (klass && klass !== Function.prototype && klass !== Object.prototype) {
-    if (Object.prototype.hasOwnProperty.call(klass, methodName)) return true;
-    klass = Object.getPrototypeOf(klass);
+  if (rbObjRespondTo(ActiveRecord.Base, methodName, true)) {
+    if (rbObjRespondTo(Object, methodName, true)) {
+      return (
+        rbObjMethod(ActiveRecord.Base, methodName).owner() !==
+        rbObjMethod(Object, methodName).owner()
+      );
+    } else {
+      return true;
+    }
+  } else {
+    return false;
   }
-  return false;
 }
 
 export function isAttributeMethod(
