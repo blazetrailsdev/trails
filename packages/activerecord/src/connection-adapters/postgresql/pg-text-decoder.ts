@@ -65,7 +65,6 @@ const TIMESTAMP_APP_LOCAL = 0x2;
 const TIMESTAMP =
   /^(\d{1,7})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)(?:\.(\d+))?(?:([+-])(\d\d)(?::(\d\d))?(?::(\d\d))?)?( BC)?$/;
 
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
 class Timestamp extends PGSimpleDecoder {
   protected flags = 0;
 
@@ -119,7 +118,6 @@ class Timestamp extends PGSimpleDecoder {
 /** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
 class TimestampUtc extends Timestamp {}
 
-/** @noRailsEquivalent CONVERGEABLE pg-text-decoders-and-type-map-by-oid-score-against-the-pg-gem */
 class TimestampLocal extends Timestamp {
   protected override flags = TIMESTAMP_DB_LOCAL | TIMESTAMP_APP_LOCAL;
 }
