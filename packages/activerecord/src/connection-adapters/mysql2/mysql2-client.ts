@@ -4,6 +4,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { defaultTimezone } from "../../active-record.js";
 
 interface QueryOptions {
+  as?: "array";
   databaseTimezone?: "utc" | "local";
 }
 

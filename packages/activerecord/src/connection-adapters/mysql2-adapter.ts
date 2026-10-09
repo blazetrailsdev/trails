@@ -196,7 +196,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   private _connectingPromise: Promise<mysql.Connection> | null = null;
   private _connectGeneration = 0;
   private _connectingPromiseGen = -1;
-  private _discardedConnectGenerations = new Set<number>();
+  private _discardedConnectGeneration = -1;
   private _endingClient: Promise<void> | null = null;
   declare _statements: MysqlStatementPool | null;
 
@@ -269,7 +269,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override discardBang(): void {
     void this.lock.synchronize(() => {
       super.discardBang();
-      this._discardedConnectGenerations.add(this._connectGeneration++);
+      this._discardedConnectGeneration = this._connectGeneration;
+      this._connectGeneration++;
       this._statements = null;
       if (this._rawConnection) this._rawConnection.automaticClose = false;
       this._rawConnection = null;
@@ -307,6 +308,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override async configureConnection(): Promise<void> {
+    this._rawConnection!.queryOptions.as = "array";
     this._rawConnection!.queryOptions.databaseTimezone = defaultTimezone();
     await super.configureConnection();
     await this.loadEscapeState();
@@ -425,7 +427,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const discardErr = new ConnectionNotEstablished(
             "Mysql2Adapter: connection was closed during connect",
           );
-          if (this._discardedConnectGenerations.delete(gen)) {
+          if (this._discardedConnectGeneration === gen) {
             mysql2Client(conn).automaticClose = false;
             throw discardErr;
           }

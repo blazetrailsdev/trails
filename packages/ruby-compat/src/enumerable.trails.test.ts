@@ -121,6 +121,7 @@ describe("Enumerable", () => {
     expect(Enumerable.isNone.call(bag, String)).toBe(true);
     expect(Enumerable.isNone.call(bag, Klass)).toBe(false);
     expect(Enumerable.isNone.call(new Bag([null, false]))).toBe(true);
+    expect(() => Enumerable.isOne.call(bag, Klass, Klass)).toThrow(ArgumentError);
   });
 
   it("isAny? RTESTs the element, or the block's result", () => {

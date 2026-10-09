@@ -18,6 +18,7 @@ import {
   rbPlus,
 } from "./numeric.js";
 import { Rational } from "./rational.js";
+import { checkArity } from "./string/support.js";
 import { rbEqq, rbEqual } from "./rb-equal.js";
 
 /** @noRailsEquivalent PERMANENT */
@@ -140,6 +141,7 @@ function drop<T, E = unknown>(this: Each<T, E>, n: number): Enumerated<E, T[]> {
 }
 
 function enumfunc<T>(args: unknown[]): (i: T) => unknown {
+  checkArity(args.length, 0, 1);
   return args.length > 0 ? (i) => rbEqq(args[0], i) : (i) => i;
 }
 
