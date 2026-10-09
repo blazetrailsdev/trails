@@ -18,7 +18,7 @@ export interface RubyBody {
 
 /**
  * The `def` a tag cites, from whichever package's manifest defines the module.
- * Throws, naming `where` the tag sits, when the manifest holds no such `def`
+ * Throws, naming `where` the tag sits, when the manifest holds no such `def`,
  * the manifest did not record where that `def` was read from, or the tag's
  * citation is not exactly that `def`'s path and line span.
  */
