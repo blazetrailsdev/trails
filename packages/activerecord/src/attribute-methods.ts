@@ -272,10 +272,7 @@ export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   );
 }
 
-/**
- * @internal
- * @noRailsEquivalent PERMANENT
- */
+/** @internal */
 export function generatedAttributeMethods(this: AttributeMethodsHost): Module {
   if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
     initializeGeneratedModules.call(this);
