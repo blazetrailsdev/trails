@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SchemaCache, FakePool } from "./schema-cache.js";
+import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
@@ -186,6 +186,11 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
 
     await expect(SchemaCache._loadFrom(filename)).rejects.toThrow(/NoSuchSchemaCacheClass/);
     expect(await SchemaCache._loadFrom(path.join(tmpDir, "missing.yml"))).toBeNull();
+
+    const reflection = new SchemaReflection(filename);
+    const pool = new FakePool({ schemaVersion: async () => "1" });
+    await expect(reflection.columns(pool, "people")).rejects.toThrow(/NoSuchSchemaCacheClass/);
+    expect(reflection.loadedCache).toBeNull();
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 

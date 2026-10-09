@@ -145,9 +145,8 @@ export class HashConfig extends DatabaseConfig {
   private schemaFileType(format: string): string | null {
     switch (format) {
       case "ts":
-        return "schema.ts";
       case "js":
-        return "schema.js";
+        return `schema.${format}`;
       case "sql":
         return "structure.sql";
       default:

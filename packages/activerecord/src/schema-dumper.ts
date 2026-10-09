@@ -231,7 +231,7 @@ export abstract class SchemaDumper {
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
     stream: S = STDOUT as S,
     config: SchemaDumperConfig = baseClass(),
-    format: SchemaFormat = schemaFormat(),
+    format?: SchemaFormat,
   ): Promise<S> {
     const options = this.generateOptions(config);
     options.format = format;

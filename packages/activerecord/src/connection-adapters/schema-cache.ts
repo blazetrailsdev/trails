@@ -11,11 +11,14 @@ import {
 } from "@blazetrails/ruby-compat";
 import { atomicWrite } from "@blazetrails/activesupport";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
-import { Column } from "./column.js";
+import type { Column } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import type { IndexDefinition } from "./abstract/schema-definitions.js";
+import "./column.js";
+import "./sql-type-metadata.js";
+import "./abstract/schema-definitions.js";
 
 export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
@@ -614,7 +617,10 @@ export class SchemaCache {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE psych-to-ruby-revives-a-mapping-as-a-record-where-marshal-answers-a-map
+ */
 export function deepDeduplicate<T>(value: T): T {
   if (
     value instanceof Map ||
