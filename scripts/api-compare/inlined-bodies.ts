@@ -19,7 +19,8 @@ export interface RubyBody {
 /**
  * The `def` a tag cites, from whichever package's manifest defines the module.
  * Throws, naming `where` the tag sits, when the manifest holds no such `def`
- * or the tag's citation is not exactly that `def`'s path and line span.
+ * the manifest did not record where that `def` was read from, or the tag's
+ * citation is not exactly that `def`'s path and line span.
  */
 export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: string): MethodInfo {
   const name = `${tag.module}#${tag.hook}`;
@@ -27,6 +28,12 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
     const mod = pkg.modules[tag.module] as unknown as ClassInfo | undefined;
     const body = mod?.instanceMethods.find((m) => m.name === tag.hook);
     if (!body) continue;
+    if (body.vendorFile === undefined) {
+      throw new Error(
+        `${TAG} cannot be checked: ${where} — the manifest's \`${name}\` has no vendorFile: ` +
+          "its Ruby file was read from a path outside this checkout's vendor/.",
+      );
+    }
     const cited = `${tag.source}/${tag.version}/${tag.file}:${tag.firstLine}-${tag.lastLine}`;
     const actual = `${body.vendorFile}:${body.line}-${body.endLine}`;
     if (cited !== actual) {

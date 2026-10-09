@@ -195,6 +195,13 @@ describe("same-file module bodies join by convention", () => {
     );
   });
 
+  it("reds, apart from stale, on a def the manifest recorded no vendor path for", () => {
+    const bare = { packages: { m: { classes: {}, modules: { A: entity("a.rb", [], [api]) } } } };
+    expect(() => taggedBodies(bare as unknown as ApiManifest, [tag("A")], [], at)).toThrow(
+      /@inlinedFrom cannot be checked: .* has no vendorFile/,
+    );
+  });
+
   it("reds on a tag naming a same-file module", () => {
     expect(() => taggedBodies(ruby, [tag(sameFile[0])], sameFile, at)).toThrow(
       /@inlinedFrom is redundant/,
