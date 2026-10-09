@@ -513,9 +513,13 @@ export interface AbstractAdapter
       columnOptions?: Record<string, unknown>;
     },
   ): Promise<void>;
+  /**
+   * drift-ok: the mixin defaults `options`, and an interface cannot spell an
+   * optional parameter before the required block.
+   */
   changeTable(
     tableName: string,
-    options: { bulk?: boolean },
+    options: { bulk?: boolean } | undefined,
     block: (t: TableOf<this>) => void | Promise<void>,
     base?: unknown,
   ): Promise<void>;
