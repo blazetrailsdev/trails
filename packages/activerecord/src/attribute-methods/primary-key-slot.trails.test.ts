@@ -75,4 +75,23 @@ describe("per-instance @primary_key slot", () => {
     (Stale as unknown as { _primaryKey: string[] })._primaryKey = ["author_id", "id"];
     expect(Stale.compositePrimaryKey).toBe(false);
   });
+
+  it("a subclass that never assigns primary_key answers its parent's composite_primary_key?", () => {
+    class Parent extends Base {
+      static override tableName = "cpk_books";
+    }
+    Parent.primaryKey = ["author_id", "id"];
+    class Child extends Parent {}
+
+    expect(Child.primaryKey).toEqual(["author_id", "id"]);
+    expect(Child.compositePrimaryKey).toBe(true);
+
+    Child.resetPrimaryKey();
+    expect(Object.prototype.hasOwnProperty.call(Child, "_compositePrimaryKey")).toBe(true);
+    expect(Child.compositePrimaryKey).toBe(true);
+
+    Child.primaryKey = "id";
+    expect(Child.compositePrimaryKey).toBe(false);
+    expect(Parent.compositePrimaryKey).toBe(true);
+  });
 });

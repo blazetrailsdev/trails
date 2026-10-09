@@ -151,6 +151,22 @@ describe("PG::Error#result on every carrier path", () => {
     }
   });
 
+  it("a server error keeps its 08 SQLSTATE in result, and a bare 08 code is a ConnectionBad", async () => {
+    const server = Object.assign(new Error("terminating connection"), {
+      name: "error",
+      code: "08006",
+    });
+    const bare = Object.assign(new Error("socket"), { code: "08006" });
+    const client = pgConnection({ query: (error: unknown) => Promise.reject(error) });
+    const query = client.query as unknown as (error: Error) => Promise<unknown>;
+    await query(server).catch(() => {});
+    await query(bare).catch(() => {});
+    const { result } = server as unknown as { result: { errorField(code: number): string } };
+    expect(result.errorField(PG.PG_DIAG_SQLSTATE)).toBe("08006");
+    expect(server).not.toBeInstanceOf(PG.ConnectionBad);
+    expect(bare).toBeInstanceOf(PG.ConnectionBad);
+  });
+
   it("stamps the error prepare is handed", async () => {
     const client = pgConnection({
       query: (submittable: { handleError(error: unknown): void }) => {
