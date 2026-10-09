@@ -1,4 +1,5 @@
 import { Notifications, seconds, type Duration } from "@blazetrails/activesupport";
+import type { MiddlewareRequest } from "../database-selector.js";
 import { Time } from "@blazetrails/date";
 import { cmp, rbCmpint } from "@blazetrails/ruby-compat";
 import { Session } from "./resolver/session.js";
@@ -17,7 +18,7 @@ export class Resolver {
   readonly context: ResolverContext;
   private readonly options: { delay?: Duration | number | null } | null;
   readonly delay: Duration | number;
-  readonly instrumenter: typeof Notifications;
+  readonly instrumenter: typeof Notifications.instrumenter;
 
   constructor(context: ResolverContext, options: { delay?: Duration | number | null } | null = {}) {
     this.context = context;
@@ -26,7 +27,7 @@ export class Resolver {
       this.options != null && this.options.delay != null
         ? this.options.delay
         : SEND_TO_REPLICA_DELAY;
-    this.instrumenter = Notifications;
+    this.instrumenter = Notifications.instrumenter;
   }
 
   static call(
@@ -37,7 +38,11 @@ export class Resolver {
   }
 
   async read<T>(blk: () => T | Promise<T>): Promise<T> {
-    return this.isReadFromPrimary() ? this.readFromPrimary(blk) : this.readFromReplica(blk);
+    if (this.isReadFromPrimary()) {
+      return this.readFromPrimary(blk);
+    } else {
+      return this.readFromReplica(blk);
+    }
   }
 
   async write<T>(blk: () => T | Promise<T>): Promise<T> {
@@ -48,9 +53,8 @@ export class Resolver {
     this.context.save(response);
   }
 
-  isReadingRequest(request: { method: string }): boolean {
-    const m = request.method.toUpperCase();
-    return m === "GET" || m === "HEAD";
+  isReadingRequest(request: MiddlewareRequest): boolean {
+    return request.isGet() || request.isHead();
   }
 
   /** @internal */
@@ -70,25 +74,29 @@ export class Resolver {
 
   private async readFromPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: writingRole(), preventWrites: true }, () =>
-      this.instrumenter.instrument("database_selector.active_record.read_from_primary", {}, () =>
-        Promise.resolve(blk()),
+      this.instrumenter.instrument(
+        "database_selector.active_record.read_from_primary",
+        undefined,
+        blk,
       ),
     ) as Promise<T>;
   }
 
   private async readFromReplica<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: readingRole(), preventWrites: true }, () =>
-      this.instrumenter.instrument("database_selector.active_record.read_from_replica", {}, () =>
-        Promise.resolve(blk()),
+      this.instrumenter.instrument(
+        "database_selector.active_record.read_from_replica",
+        undefined,
+        blk,
       ),
-    );
+    ) as Promise<T>;
   }
 
   private async writeToPrimary<T>(blk: () => T | Promise<T>): Promise<T> {
     return Base.connectedTo({ role: writingRole(), preventWrites: false }, () =>
       this.instrumenter.instrument(
         "database_selector.active_record.wrote_to_primary",
-        {},
+        undefined,
         async () => {
           try {
             return await blk();

@@ -41,7 +41,6 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { deriveJoinTableName } from "./model-schema.js";
 
 import * as ReflectionModule from "./reflection.js";
-import { _setReflection } from "./reflection-slot.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -1697,7 +1696,8 @@ export function _reflectOnAssociation(
 ): AssociationReflection | ThroughReflection | null {
   const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
   return (
-    (rawReflections[association] as AssociationReflection | ThroughReflection | undefined) ?? null
+    (rawReflections[toS(association)] as AssociationReflection | ThroughReflection | undefined) ??
+    null
   );
 }
 
@@ -1809,4 +1809,4 @@ export const ClassMethods = {
   _reflectOnAssociation: _reflectOnAssociationClassMethod,
 };
 
-_setReflection(ReflectionModule);
+ActiveRecord.Reflection = ReflectionModule;

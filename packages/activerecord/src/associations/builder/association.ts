@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { assertValidKeys, kernelArray } from "@blazetrails/activesupport";
 import { ConfigurationError } from "../../errors.js";
-import { _Reflection } from "../../reflection-slot.js";
+import { ActiveRecord } from "../../namespaces.js";
 
 /** @internal */
 export interface AssociationInstanceHost {
@@ -101,7 +101,7 @@ export class Association {
     scope = this.buildScope(scope);
 
     const macro = this.macro();
-    return _Reflection!.create(macro as any, name, scope, options, model);
+    return ActiveRecord.Reflection.create(macro as any, name, scope, options, model);
   }
 
   static buildScope(scope: ((...args: any[]) => any) | null): ((...args: any[]) => any) | null {

@@ -2,10 +2,10 @@ import { fetch } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
 
-export interface ShardRequest {
+export type ShardRequest = InstanceType<NonNullable<typeof TopLevel.ActionDispatch>["Request"]> & {
   method: string;
   [key: string]: unknown;
-}
+};
 
 type ShardResolverFn = (request: ShardRequest) => string;
 

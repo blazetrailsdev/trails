@@ -59,6 +59,7 @@ import type { Optimistic } from "./locking/optimistic.js";
 import type { Pessimistic } from "./locking/pessimistic.js";
 import type { IrreversibleMigration, Migration } from "./migration.js";
 import type * as ModelSchema from "./model-schema.js";
+import type * as Reflection from "./reflection.js";
 import type { Relation } from "./relation.js";
 import type { Default } from "./scoping/default.js";
 import type * as Named from "./scoping/named.js";
@@ -92,6 +93,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
   "active_record/connection_handling": () => import("./connection-handling.js"),
   "active_record/fixtures": () => import("./fixtures.js"),
   "active_record/model_schema": () => import("./model-schema.js"),
+  "active_record/reflection": () => import("./reflection.js"),
   "active_record/scoping": () => import("./scoping.js"),
   "active_record/association_relation": () => import("./association-relation.js"),
   "active_record/disable_joins_association_relation": () =>
@@ -182,6 +184,7 @@ export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule
   Migration: typeof Migration;
   IrreversibleMigration: typeof IrreversibleMigration;
   ModelSchema: typeof ModelSchema;
+  Reflection: typeof Reflection;
   AssociationRelation: typeof AssociationRelationClass;
   Associations: typeof Associations;
   AttributeMethods: typeof AttributeMethods;
@@ -200,6 +203,7 @@ ActiveRecord.autoload("Encryption");
 ActiveRecord.autoload("Fixture", "active_record/fixtures");
 ActiveRecord.autoload("Migration");
 ActiveRecord.autoload("ModelSchema");
+ActiveRecord.autoload("Reflection");
 ActiveRecord.autoload("Scoping");
 ActiveRecord.eagerAutoload(() => {
   ActiveRecord.autoload("AssociationRelation");

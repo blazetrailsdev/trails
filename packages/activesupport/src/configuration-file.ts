@@ -1,13 +1,10 @@
-import { File } from "@blazetrails/ruby-compat";
+import { File, RuntimeError, StandardError } from "@blazetrails/ruby-compat";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 import { parse as tseParse } from "@blazetrails/tse-compiler";
 
-export class FormatError extends Error {
-  constructor(message: string, cause?: unknown) {
-    super(message, cause !== undefined ? { cause } : undefined);
-    this.name = "FormatError";
-  }
-}
+export class FormatError extends StandardError {}
+
+FormatError.prototype.name = "ActiveSupport::ConfigurationFile::FormatError";
 
 export class ConfigurationFile {
   private content: string;
@@ -33,12 +30,11 @@ export class ConfigurationFile {
       const parsed: unknown = yamlParse(source, options);
       return parsed != null && parsed !== false ? parsed : {};
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new FormatError(
+      if (!(error instanceof Error && error.name === "YAMLParseError")) throw error;
+      throw new RuntimeError(
         `YAML syntax error occurred while parsing ${this.contentPath}. ` +
           `Please note that YAML must be consistently indented using spaces. Tabs are not allowed. ` +
-          `Error: ${errorMessage}`,
-        error,
+          `Error: ${error.message}`,
       );
     }
   }

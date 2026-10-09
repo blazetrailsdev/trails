@@ -612,10 +612,9 @@ export interface CalculationMethods<G extends boolean = boolean> {
 function inQueryConnection<F extends (this: CalculationRelation, ...args: never[]) => Promise<any>>(
   fn: F,
 ): F {
-  const materialized = withDeferredDistinctPkPredicates(fn);
   return function (this: CalculationRelation, ...args: unknown[]) {
     const modelClass = (this as { _model?: unknown })._model as typeof Base;
-    return modelClass.withConnection(() => materialized.apply(this, args as never[]));
+    return modelClass.withConnection(() => fn.apply(this, args as never[]));
   } as unknown as F;
 }
 
@@ -642,7 +641,7 @@ export const Calculations = {
   asyncMaximum,
   sum: inQueryConnection(sum),
   asyncSum,
-  calculate: inQueryConnection(calculate),
+  calculate: inQueryConnection(withDeferredDistinctPkPredicates(calculate)),
   pluck: withDeferredDistinctPkPredicates(pluck),
   asyncPluck,
   pick,

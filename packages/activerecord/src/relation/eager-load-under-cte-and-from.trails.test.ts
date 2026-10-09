@@ -50,6 +50,10 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
       pluck: (relation) => relation.pluck("id"),
       ids: async (relation) => relation.ids(),
       exists: (relation) => relation.isExists(),
+      sum: (relation) => relation.sum("id"),
+      average: (relation) => relation.average("id"),
+      minimum: (relation) => relation.minimum("id"),
+      maximum: (relation) => relation.maximum("id"),
       first: (relation) => relation.first(),
     };
     for (const [name, query] of Object.entries(run)) {
@@ -61,6 +65,7 @@ describeIfSupports("common_table_expressions", "eager load under a CTE / FROM ov
       });
       await query(relation);
       Notifications.unsubscribe(subscriber);
+      expect(sqls.length, name).toBe(2);
       expect(sqls[0], name).toMatch(/^SELECT DISTINCT/i);
       expect(sqls.at(-1), name).toMatch(/IN \(\d+, \d+\)/);
       expect(sqls.at(-1), name).not.toMatch(/IN \(SELECT/i);

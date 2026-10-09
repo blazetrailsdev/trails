@@ -41,27 +41,27 @@ describe("WhereChainTest", () => {
     (await ((await Author.find(1)) as any).posts.toArray()).length;
 
   it("associated with association", async () => {
-    const relation = await Post.all().where().associated("author");
+    const relation = await Post.all().where().associated(":author");
     expect(relation).toContainEqual(posts("welcome"));
     expect(relation).toContainEqual(posts("sti_habtm"));
     expect(relation).not.toContainEqual(posts("authorless"));
   });
 
   it("associated with child association", async () => {
-    const relation = await Comment.all().where().associated("children");
+    const relation = await Comment.all().where().associated(":children");
     expect(relation).toContainEqual(comments("greetings"));
     expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with multiple associations", async () => {
-    const relation = await Post.all().where().associated("author", "comments");
+    const relation = await Post.all().where().associated(":author", ":comments");
     expect(relation).toContainEqual(posts("welcome"));
     expect(relation).not.toContainEqual(posts("sti_habtm"));
     expect(relation).not.toContainEqual(posts("authorless"));
   });
 
   it("associated with invalid association name", async () => {
-    const run = async () => Post.all().where().associated("cars");
+    const run = async () => Post.all().where().associated(":cars");
     const e = await run().then(
       () => undefined,
       (err: Error) => err,
@@ -78,7 +78,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.all()
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -88,7 +88,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.unscope(":where")
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -99,7 +99,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .unscope(":where")
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -111,7 +111,7 @@ describe("WhereChainTest", () => {
         .joins(":author")
         .unscope(":where")
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -122,7 +122,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .unscope(":where")
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .extending(Post.namedExtension)
         .count(),
@@ -133,7 +133,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.order({ created_at: "desc" })
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -144,7 +144,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .order({ created_at: "desc" })
         .where()
-        .associated("author")
+        .associated(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -153,7 +153,7 @@ describe("WhereChainTest", () => {
   it("associated with enum", async () => {
     const first = await Author.joins(":readingListing")
       .where()
-      .associated("readingListing")
+      .associated(":readingListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -162,7 +162,7 @@ describe("WhereChainTest", () => {
     const first = await Author.order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .associated("readingListing")
+      .associated(":readingListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -171,7 +171,7 @@ describe("WhereChainTest", () => {
     const first = await Author.unscope(":where")
       .joins(":readingListing")
       .where()
-      .associated("readingListing")
+      .associated(":readingListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -181,7 +181,7 @@ describe("WhereChainTest", () => {
       .order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .associated("readingListing")
+      .associated(":readingListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -190,26 +190,26 @@ describe("WhereChainTest", () => {
     const first = await Author.order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .associated("readingListing")
+      .associated(":readingListing")
       .extending(Author.namedExtension)
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
   it("associated with add joins before", async () => {
-    const relation = await Comment.joins(":children").where().associated("children");
+    const relation = await Comment.joins(":children").where().associated(":children");
     expect(relation).toContainEqual(comments("greetings"));
     expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with add left joins before", async () => {
-    const relation = await Comment.leftJoins(":children").where().associated("children");
+    const relation = await Comment.leftJoins(":children").where().associated(":children");
     expect(relation).toContainEqual(comments("greetings"));
     expect(relation).not.toContainEqual(comments("more_greetings"));
   });
 
   it("associated with add left outer joins before", async () => {
-    const relation = await Comment.leftOuterJoins(":children").where().associated("children");
+    const relation = await Comment.leftOuterJoins(":children").where().associated(":children");
     expect(relation).toContainEqual(comments("greetings"));
     expect(relation).not.toContainEqual(comments("more_greetings"));
   });
@@ -217,23 +217,23 @@ describe("WhereChainTest", () => {
   it("associated with composite primary key", async () => {
     const author = await CpkAuthor.create({ name: "Cpk" });
     await CpkBook.create({ id: [(author as any).id, 2] });
-    expect(await CpkAuthor.all().where().associated("books").isAny()).toBeTruthy();
+    expect(await CpkAuthor.all().where().associated(":books").isAny()).toBeTruthy();
   });
 
   it("missing with association", async () => {
     expect(blank(await (posts("authorless") as any).author)).toBeTruthy();
-    const relation = await Post.all().where().missing("author");
+    const relation = await Post.all().where().missing(":author");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 
   it("missing with child association", async () => {
-    const relation = await Comment.all().where().missing("children");
+    const relation = await Comment.all().where().missing(":children");
     expect(relation).toContainEqual(comments("more_greetings"));
     expect(relation).not.toContainEqual(comments("greetings"));
   });
 
   it("missing with invalid association name", async () => {
-    const run = async () => Post.all().where().missing("cars");
+    const run = async () => Post.all().where().missing(":cars");
     const e = await run().then(
       () => undefined,
       (err: Error) => err,
@@ -248,7 +248,7 @@ describe("WhereChainTest", () => {
 
   it("missing with multiple association", async () => {
     expect(await (posts("authorless") as any).comments.isEmpty()).toBeTruthy();
-    const relation = await Post.all().where().missing("author", "comments");
+    const relation = await Post.all().where().missing(":author", ":comments");
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 
@@ -256,7 +256,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.all()
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -267,7 +267,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .unscope(":where")
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -277,7 +277,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.unscope(":where")
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -287,7 +287,7 @@ describe("WhereChainTest", () => {
     expect(
       await Post.order({ created_at: "desc" })
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -298,7 +298,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .order({ created_at: "desc" })
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -310,7 +310,7 @@ describe("WhereChainTest", () => {
         .joins(":author")
         .unscope(":where")
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .count(),
     ).toBe(await davidPostsCount());
@@ -321,7 +321,7 @@ describe("WhereChainTest", () => {
       await Post.joins(":author")
         .unscope(":where")
         .where()
-        .missing("author")
+        .missing(":author")
         .merge(Author.where({ id: 1 }))
         .extending(Post.namedExtension)
         .count(),
@@ -329,7 +329,7 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with enum", async () => {
-    const first = await Author.joins(":readingListing").where().missing("unreadListing").first();
+    const first = await Author.joins(":readingListing").where().missing(":unreadListing").first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
@@ -337,7 +337,7 @@ describe("WhereChainTest", () => {
     const first = await Author.order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .missing("unreadListing")
+      .missing(":unreadListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -346,7 +346,7 @@ describe("WhereChainTest", () => {
     const first = await Author.unscope(":where")
       .joins(":readingListing")
       .where()
-      .missing("unreadListing")
+      .missing(":unreadListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -356,7 +356,7 @@ describe("WhereChainTest", () => {
       .order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .missing("unreadListing")
+      .missing(":unreadListing")
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
@@ -365,7 +365,7 @@ describe("WhereChainTest", () => {
     const first = await Author.order({ id: "desc" })
       .joins(":readingListing")
       .where()
-      .missing("unreadListing")
+      .missing(":unreadListing")
       .extending(Author.namedExtension)
       .first();
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
@@ -373,7 +373,7 @@ describe("WhereChainTest", () => {
 
   it("missing with composite primary key", async () => {
     await CpkBook.create({ id: [1, 2] });
-    expect(await CpkBook.all().where().missing("author").isAny()).toBeTruthy();
+    expect(await CpkBook.all().where().missing(":author").isAny()).toBeTruthy();
   });
 
   it("not inverts where clause", () => {
@@ -461,7 +461,7 @@ describe("WhereChainTest", () => {
   it("rewhere with nested condition", async () => {
     const relation = Post.all()
       .where()
-      .missing("comments")
+      .missing(":comments")
       .rewhere({ "comments.id": comments("does_it_hurt").id });
     const expected = Post.leftJoins(":comments").where({
       "comments.id": comments("does_it_hurt").id,

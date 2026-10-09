@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { DelegationError, Delegation } from "./delegation.js";
 
 describe("DelegationError", () => {
@@ -41,6 +41,31 @@ describe("Delegation.generate", () => {
     rbObjSingletonClass(record);
 
     expect(record.tableName()).toBe("records");
+  });
+
+  it("defines an accessor when the delegated class member is an accessor", () => {
+    class Record {
+      static get jobClass() {
+        return `${this.name}Job`;
+      }
+      declare jobClass: string;
+    }
+    class Child extends Record {}
+    Delegation.generate(Record.prototype, ["jobClass"], { to: "class" });
+
+    expect(Object.getOwnPropertyDescriptor(Record.prototype, "jobClass")!.get).toBeTypeOf(
+      "function",
+    );
+    expect(new Record().jobClass).toBe("RecordJob");
+    expect(new Child().jobClass).toBe("ChildJob");
+
+    class Detached {}
+    const detached = new Record();
+    Object.setPrototypeOf(
+      detached,
+      Object.create(Record.prototype, { constructor: { value: Detached } }),
+    );
+    expect(() => detached.jobClass).toThrow(NoMethodError);
   });
 
   it("delegates method to target", () => {
