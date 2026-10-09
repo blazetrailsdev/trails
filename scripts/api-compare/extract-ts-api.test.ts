@@ -1281,6 +1281,19 @@ describe("body call capture", () => {
             throw e;
           }
         }
+        catchAllElse() {
+          try {
+            this.commit();
+          } catch (e) {
+            if (e instanceof ConnectionFailed) {
+              this.invalidate();
+              throw e;
+            } else {
+              this.rollback();
+              throw e;
+            }
+          }
+        }
       }`,
     );
     const arms = (name: string) =>
@@ -1293,6 +1306,7 @@ describe("body call capture", () => {
     expect(arms("wrapped")).toEqual(["try", "rescue", "throw:ArgumentError"]);
     expect(arms("fallsThrough")).toEqual(["try", "rescue", "throw"]);
     expect(arms("catchAll")).toEqual(["try", "rescue", "throw"]);
+    expect(arms("catchAllElse")).toEqual(["try", "rescue", "throw", "rescue", "throw"]);
   });
 
   it("reads `rtest(x) ? x : y` as the `or` of Ruby's `x || y`, not as an arm", () => {

@@ -439,7 +439,7 @@ export function initWithAttributes<T extends CoreRecord>(
   this._attributes = attributes;
   this.initInternals();
 
-  block?.(this);
+  if (block) block(this);
 
   void this.runCallbacks("find", undefined, { strict: "sync" });
   void this.runCallbacks("initialize", undefined, { strict: "sync" });

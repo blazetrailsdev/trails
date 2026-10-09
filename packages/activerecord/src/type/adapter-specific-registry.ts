@@ -1,5 +1,5 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { max } from "@blazetrails/ruby-compat";
+import { max, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {
@@ -185,6 +185,9 @@ export class AdapterSpecificRegistry {
   ): void {
     if (block == null) {
       block = (_: unknown, ...args: unknown[]) => new klass!(...args);
+      if (rbObjRespondTo(block, "ruby2Keywords")) {
+        (block as unknown as { ruby2Keywords(): void }).ruby2Keywords();
+      }
     }
     this.registrations.push(new Registration(typeName, block, options));
   }

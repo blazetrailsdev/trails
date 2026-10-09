@@ -6193,6 +6193,11 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
       visitCatchArms(alternate, bound);
       return;
     }
+    // JS has no class every thrown value is an instance of, so a typed rescue
+    // followed by `rescue Exception`
+    // (activerecord/lib/active_record/connection_adapters/abstract/transaction.rb:639-646)
+    // can only spell the catch-all clause as the chain's trailing `else`.
+    if (!ts.isIfStatement(alternate)) tokens.push("rescue");
     visit(alternate);
   };
   // The body ITSELF, not just its children: an expression-bodied arrow

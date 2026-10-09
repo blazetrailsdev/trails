@@ -451,6 +451,11 @@ export function resetColumnInformation(this: SchemaHost): PromiseLike<void> | vo
       } | null
     )?.clearCacheBang?.();
   } catch {}
+  for (const klass of [this as unknown as typeof Base].concat(
+    (this as unknown as typeof Base).descendants,
+  )) {
+    klass.undefineAttributeMethods();
+  }
   clearAdapterDataSourceCache(this);
 
   this.reloadSchemaFromCache();

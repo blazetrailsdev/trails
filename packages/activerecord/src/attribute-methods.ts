@@ -594,26 +594,6 @@ interface AttributeNamesHost {
   _attributeNamesMemo?: { names: readonly string[] };
 }
 
-function classAttributeNames(this: AttributeNamesHost): string[] {
-  const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
-    ? this._attributeNamesMemo
-    : undefined;
-  if (memo) return memo.names as string[];
-  const exists = cachedTableExists.call(this as never);
-  if (this.abstractClass || exists === false) {
-    const frozen = Object.freeze([] as string[]);
-    this._attributeNamesMemo = { names: frozen };
-    return frozen as string[];
-  }
-  const names = hashKeys(this.attributeTypes());
-  if (exists !== undefined) {
-    const frozen = Object.freeze(names);
-    this._attributeNamesMemo = { names: frozen };
-    return frozen as string[];
-  }
-  return names;
-}
-
 /** @internal */
 function classHasAttribute(
   this: { attributeTypes(): Record<string, unknown> | Hash<string, unknown> },
@@ -632,7 +612,25 @@ export const ClassMethods = {
     );
   },
   /** @missingRailsCall table_exists? — PERMANENT */
-  attributeNames: classAttributeNames,
+  attributeNames(this: AttributeNamesHost): string[] {
+    const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
+      ? this._attributeNamesMemo
+      : undefined;
+    if (memo) return memo.names as string[];
+    const exists = cachedTableExists.call(this as never);
+    if (this.abstractClass || exists === false) {
+      const frozen = Object.freeze([] as string[]);
+      this._attributeNamesMemo = { names: frozen };
+      return frozen as string[];
+    }
+    const names = hashKeys(this.attributeTypes());
+    if (exists !== undefined) {
+      const frozen = Object.freeze(names);
+      this._attributeNamesMemo = { names: frozen };
+      return frozen as string[];
+    }
+    return names;
+  },
   _hasAttribute: classHasAttribute,
 };
 

@@ -8,6 +8,7 @@ import {
   type Included,
   rbHash,
   registerConstant,
+  strUminus,
 } from "@blazetrails/ruby-compat";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`column.rb:8`); the class/interface merge is how a mixin surfaces on the type side.
@@ -123,9 +124,12 @@ export class Column {
 
   /** @internal */
   deduplicated(): this {
-    if (this.sqlTypeMetadata) {
-      this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
-    }
+    this.name = strUminus(this.name);
+    if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
+    if (this.default != null) this.default = strUminus(this.default as string);
+    if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
+    if (this.collation != null) this.collation = strUminus(this.collation);
+    if (this.comment != null) this.comment = strUminus(this.comment);
     return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 
