@@ -22,14 +22,6 @@ export function validatesLengthOf(
   this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
 }
 
-export function validatesSizeOf(
-  this: {
-    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
-    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
-  },
-  ...attrNames: unknown[]
-): void {
-  this.validatesWith(LengthValidator, this._mergeAttributes(attrNames));
-}
+export const validatesSizeOf = validatesLengthOf;
 
 export const ClassMethods = { validatesLengthOf, validatesSizeOf };

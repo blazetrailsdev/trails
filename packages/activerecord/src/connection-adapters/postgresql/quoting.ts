@@ -9,8 +9,6 @@ import {
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
-import { Temporal } from "@blazetrails/date";
-import { defaultSqlTimezone } from "../abstract/sql-datetime.js";
 import { Data as ArrayData } from "./oid/array.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Data as XmlData } from "./oid/xml.js";
@@ -122,12 +120,13 @@ export function quoteSchemaName(schemaName: string): string {
   return quoteColumnName(schemaName);
 }
 
-export function quotedDate(value: TemporalDateLike): string {
-  if (yearOf(value) <= 0) {
-    const bceYear = format("%04d", -yearOf(value) + 1);
-    return `${abstractQuotedDate(value).replace(/^-?\d+/, bceYear)} BC`;
+export function quotedDate(this: { defaultTimezone: string }, value: TemporalDateLike): string {
+  if (year(value) <= 0) {
+    const bceYear = format("%04d", -year(value) + 1);
+    return abstractQuotedDate.call(this, value).replace(/^-?\d+/, bceYear) + " BC";
+  } else {
+    return abstractQuotedDate.call(this, value);
   }
-  return abstractQuotedDate(value);
 }
 
 export function quotedBinary(value: BinaryData): string {
@@ -282,9 +281,9 @@ function regtypeOid(this: RegtypeOidHost, sqlType: string | null): string | numb
   return this._regtypeOids?.get(name) ?? this._regtypeOids?.get(bare) ?? bare;
 }
 
-function yearOf(value: TemporalDateLike): number {
+function year(value: TemporalDateLike): number {
   if ("year" in value) return value.year;
-  const instant =
-    value instanceof Temporal.Instant ? value : Temporal.Instant.fromEpochMilliseconds(+value);
-  return instant.toZonedDateTimeISO(defaultSqlTimezone()).year;
+  // boundary: a JS `Date` a caller still holds is a local Ruby `Time`.
+  if (value instanceof Date) return value.getFullYear();
+  return value.toZonedDateTimeISO("UTC").year;
 }

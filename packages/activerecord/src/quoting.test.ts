@@ -9,7 +9,7 @@ import {
   quoteColumnName,
   quoteTableName as quoteTableNameFn,
   quoteTableNameForAssignment as quoteTableNameForAssignmentFn,
-  quotedDate,
+  quotedDate as quotedDateFn,
   quotedTime as quotedTimeFn,
   quotedTrue,
   unquotedTrue,
@@ -31,7 +31,8 @@ const quoteTableNameForAssignment = (table: string, attr: string): string =>
   quoteTableNameForAssignmentFn.call(HOST, table, attr);
 const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
-import { formatPlainTimeForSql } from "./connection-adapters/abstract/sql-datetime.js";
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(HOST, value);
 import { TypeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import { setDefaultTimezone } from "./active-record.js";
@@ -67,8 +68,8 @@ describe("QuotingTest", () => {
   });
 
   it("quoted time utc", () => {
-    const t = Temporal.PlainTime.from("15:30:45");
-    expect(formatPlainTimeForSql(t)).toBe("15:30:45");
+    const t = RubyTime.utc(2026, 4, 7, 15, 30, 45);
+    expect(quotedTime(t)).toBe("15:30:45");
   });
 
   it("quote nil", () => {
@@ -273,8 +274,8 @@ describe("QuoteBooleanTest", () => {
   });
 
   it("quoted time extracts time portion", () => {
-    const t = Temporal.PlainTime.from("08:15:30");
-    expect(formatPlainTimeForSql(t)).toBe("08:15:30");
+    const t = RubyTime.utc(2026, 4, 7, 8, 15, 30);
+    expect(quotedTime(t)).toBe("08:15:30");
   });
 
   it("quote returns frozen string", () => {

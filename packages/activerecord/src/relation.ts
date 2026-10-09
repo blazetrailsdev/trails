@@ -858,7 +858,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   async touchAll(...names: TouchAllArgs): Promise<number> {
     const { time } = extractOptionsBang(names as unknown[]) as TouchAllOptions;
 
-    return this.updateAll(this.model.touchAttributesWithTime(...(names as string[]), time));
+    return this.updateAll(await this.model.touchAttributesWithTime(...(names as string[]), time));
   }
 
   async findOrCreateBy(
@@ -1367,7 +1367,10 @@ export class Relation<T extends Base, G extends boolean = false> {
       if (touch !== true) names = touch as CounterCacheTouchOption;
       names = wrap(names) as Array<string | { time?: RubyTime }>;
       const options = extractOptionsBang(names) as TouchAllOptions;
-      const touchUpdates = this.model.touchAttributesWithTime(...(names as string[]), options.time);
+      const touchUpdates = await this.model.touchAttributesWithTime(
+        ...(names as string[]),
+        options.time,
+      );
       if (!isEmpty(touchUpdates)) mergeBang(updates, touchUpdates);
     }
 

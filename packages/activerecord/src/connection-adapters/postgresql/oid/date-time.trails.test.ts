@@ -6,8 +6,11 @@ import { describe, expect, it } from "vitest";
 import { DateTime } from "./date-time.js";
 import { Timestamp } from "./timestamp.js";
 import { TimestampWithTimeZone } from "./timestamp-with-time-zone.js";
-import { quotedDate, typeCast } from "../quoting.js";
+import { quotedDate as quotedDateFn, typeCast } from "../quoting.js";
 import type { QuotingDispatchHost } from "../../abstract/quoting.js";
+
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call({ defaultTimezone: "utc" }, value);
 
 describe("PostgreSQL::OID::DateTime", () => {
   const type = new DateTime();

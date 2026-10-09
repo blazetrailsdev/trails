@@ -101,7 +101,7 @@ export async function resetCounters(
     if (touch !== true) names = touch;
     names = wrap(names);
     const options = extractOptionsBang(names as unknown[]) as TouchAllOptions;
-    const touchUpdates = this.touchAttributesWithTime(...(names as string[]), options.time);
+    const touchUpdates = await this.touchAttributesWithTime(...(names as string[]), options.time);
     Object.assign(updates, touchUpdates);
   }
 

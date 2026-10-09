@@ -9,10 +9,13 @@ import {
   quote,
   quoteTableName,
   quotedBinary,
-  quotedDate,
+  quotedDate as quotedDateFn,
   quotedTime,
   typeCast,
 } from "./quoting.js";
+
+const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
+  quotedDateFn.call(quotingHost(), value);
 
 describe("quotedDate", () => {
   it("formats a Temporal.Instant as UTC datetime string", () => {
@@ -55,7 +58,7 @@ describe("quotedDate", () => {
   });
 
   it("throws for unrecognised types", () => {
-    expect(() => quotedDate("2026-04-26" as never)).toThrow("quotedDate: cannot format");
+    expect(() => quotedDate("2026-04-26" as never)).toThrow(TypeError);
   });
 });
 
