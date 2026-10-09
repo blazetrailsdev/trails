@@ -2432,6 +2432,7 @@ include(Base, LockingPessimistic.Pessimistic);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
 include(Base, _TouchLater.TouchLater);
+include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
@@ -2615,22 +2616,6 @@ for (const [name, fn] of [
         await this["_preloadBelongsToForDestroyCallbacks"]();
         return callbacksDestroy.call(this, () => _Persistence.destroy.call(this as any));
       });
-    },
-  ],
-  [
-    "touchLater",
-    function (this: Base, ...names: string[]): Promise<void> | undefined {
-      return _NoTouching.touchLater.call(this, names, () =>
-        _TouchLater.touchLater.call(this, ...names),
-      );
-    },
-  ],
-  [
-    "touch",
-    function (this: Base, ...args: unknown[]): Promise<boolean> | undefined {
-      return _NoTouching.touch.call(this, args, () =>
-        _TouchLater.touch.call(this, ...(args as any)),
-      );
     },
   ],
   [

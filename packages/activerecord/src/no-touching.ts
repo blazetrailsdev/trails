@@ -1,5 +1,8 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { Module } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
+
+export const NoTouching = new Module();
 
 /** @internal */
 function klasses(): Array<typeof Base> {
@@ -29,20 +32,16 @@ export function isNoTouching(this: Base): boolean {
   return isAppliedTo(this.constructor as typeof Base);
 }
 
-export function touchLater(
-  this: Base,
-  names: string[],
-  superFn: () => Promise<void>,
-): Promise<void> | undefined {
-  return isNoTouching.call(this) ? undefined : superFn();
+export function touchLater(this: Base, ...args: unknown[]): Promise<void> | undefined {
+  if (!isNoTouching.call(this)) {
+    return NoTouching.superMethod(this, "touchLater")!(...args) as Promise<void>;
+  }
 }
 
-export function touch(
-  this: Base,
-  args: unknown[],
-  superFn: () => Promise<boolean>,
-): Promise<boolean> | undefined {
-  return isNoTouching.call(this) ? undefined : superFn();
+export function touch(this: Base, ...args: unknown[]): Promise<boolean> | undefined {
+  if (!isNoTouching.call(this)) {
+    return NoTouching.superMethod(this, "touch")!(...args) as Promise<boolean>;
+  }
 }
 
 export function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
@@ -62,3 +61,6 @@ export function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): R | Pr
     throw error;
   }
 }
+
+NoTouching.defineMethod("touchLater", touchLater);
+NoTouching.defineMethod("touch", touch);
