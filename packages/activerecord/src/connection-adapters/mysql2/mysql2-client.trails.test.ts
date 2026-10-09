@@ -53,12 +53,11 @@ describe("mysql2Client", () => {
   });
 
   it("Mysql2.Error is an error the client raised, not any error with a code", async () => {
-    const raised = Object.assign(new Error("gone"), { code: "PROTOCOL_CONNECTION_LOST" });
-    const client = mysql2Client({ query: () => Promise.reject(raised) });
-    await expect(client.query("SELECT 1")).rejects.toBe(raised);
-    expect(raised instanceof Mysql2.Error).toBe(true);
-    expect(Object.assign(new Error("missing"), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(
-      false,
+    const raised = Object.assign(new Error("gone"), { code: "ER_X" });
+    await expect(mysql2Client({ query: () => Promise.reject(raised) }).query("")).rejects.toBe(
+      raised,
     );
+    expect(raised instanceof Mysql2.Error).toBe(true);
+    expect(Object.assign(new Error(), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(false);
   });
 });

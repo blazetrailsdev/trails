@@ -153,8 +153,6 @@ function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
   return new Statement(this, sql);
 }
 
-function abandonResultsBang(): void {}
-
 type Field = { type: string; string: () => string | null };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
 
@@ -259,7 +257,7 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
       affectedRows: 0,
       query,
       prepare,
-      abandonResultsBang,
+      abandonResultsBang() {},
       setServerOption,
     })) {
       Object.defineProperty(client, name, { configurable: true, writable: true, value });
