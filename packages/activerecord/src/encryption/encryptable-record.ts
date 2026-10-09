@@ -48,34 +48,6 @@ export class EncryptableRecord {
     });
   }
 
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
-   */
-  static requireOriginalColumnPresent(modelClass: any, name: string, colNames: string[]): void {
-    if (Encryption.config.supportUnencryptedData) return;
-    const originalName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-    if (colNames.length === 0 || colNames.includes(originalName)) return;
-    throw new Configuration(
-      `To use :ignore_case for '${name}' you must create an additional column named '${originalName}'`,
-    );
-  }
-
-  /**
-   * @internal
-   * @noRailsEquivalent CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
-   */
-  static requireOriginalColumnsAfterReflection(
-    modelClass: any,
-    reflectedColumnNames: string[],
-  ): void {
-    const preserved: Set<string> | undefined = modelClass._ignoreCasePreservedAttributes;
-    if (!preserved || preserved.size === 0) return;
-    for (const name of preserved) {
-      this.requireOriginalColumnPresent(modelClass, name, reflectedColumnNames);
-    }
-  }
-
   static loadSchemaBang(this: typeof EncryptableRecord, superFn: () => void): void {
     superFn();
 
@@ -284,18 +256,11 @@ export function encryptAttribute(this: any, name: string, options: SchemeOptions
   Encryption.encryptedAttributeWasDeclared(this, name);
 }
 
-/**
- * @internal
- * @inventedArm add — CONVERGEABLE encryption-preserve-original-column-check-waits-for-reflection
- */
+/** @internal */
 export function preserveOriginalEncrypted(this: any, name: string): void {
-  const modelClass = this;
   const originalAttributeName = `${ORIGINAL_ATTRIBUTE_PREFIX}${name}`;
-  modelClass._ignoreCasePreservedAttributes = new Set<string>(
-    modelClass._ignoreCasePreservedAttributes,
-  ).add(name);
 
-  const columnNames: string[] = this.columnNames?.() ?? [];
+  const columnNames: string[] = this.columnNames();
   if (
     !Encryption.config.supportUnencryptedData &&
     columnNames.length !== 0 &&
