@@ -258,6 +258,15 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "toAry")).toBe(false);
   });
 
+  it("answers a String for the method table rb_f_send dispatches it through", () => {
+    // vendor/ruby/v3.3.11/vm_method.c:2864 basic_obj_respond_to.
+    expect(basicObjRespondTo("abc", "upcase")).toBe(true);
+    expect(basicObjRespondTo("abc", "dup")).toBe(true);
+    expect(basicObjRespondTo("abc", "nope")).toBe(false);
+    expect(basicObjRespondTo(1, "upcase")).toBe(false);
+    expect(toS("abc")).toBe("abc");
+  });
+
   it("answers to_hash for a Hash with the receiver, which a plain object does not define", () => {
     // vendor/ruby/v3.3.11/hash.c:3497 rb_hash_to_hash.
     const hash = { a: 1 };

@@ -498,6 +498,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     return true;
   }
+  if (typeof obj === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) return true;
   if (temporalMethod(obj, mid) !== undefined) return true;
   if (enumerableMethod(obj, mid) !== undefined) return true;
   if (
@@ -945,7 +946,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
       return recv;
     }
   }
-  /* `rb_hash_to_hash` (`vendor/ruby/v3.3.11/hash.c:3497`) answers the receiver. */
   if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
   const enumerable = enumerableMethod(recv, mid);
   if (enumerable !== undefined) return enumerable(recv, ...args);
@@ -1369,6 +1369,7 @@ export function rbObjAsString(value: unknown): string;
 /** @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string` (`vendor/ruby/v3.3.11/string.c:1653`). */
 export function rbObjAsString(value: unknown): string | Uint8Array {
   if (value == null) return "";
+  if (typeof value === "string") return value;
   if (value instanceof Uint8Array) return value;
   if (Array.isArray(value)) return rbInspect(value);
   if (isPlainHash(value) || value instanceof Map) return rbInspect(value);

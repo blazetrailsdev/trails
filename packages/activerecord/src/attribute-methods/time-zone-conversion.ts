@@ -63,7 +63,7 @@ export class TimeZoneConverter extends DelegateClass(ValueType) {
     const subtype = this.__getobj__() as TimeValueSubtype;
     if (isPlainObject(value)) {
       return setTimeZoneWithoutConversion(super.cast(value));
-    } else if (typeof value === "string" || rbObjRespondTo(value, "inTimeZone")) {
+    } else if (rbObjRespondTo(value, "inTimeZone")) {
       try {
         const casted = super.cast(subtype.userInputInTimeZone(value));
         return rtest(casted) ? casted : super.cast(value);

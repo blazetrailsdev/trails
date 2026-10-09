@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { TimeZone, TimeWithZone, setZone } from "@blazetrails/activesupport";
 import { TimeZoneConverter } from "../attribute-methods/time-zone-conversion.js";
 import { RangeType } from "../connection-adapters/postgresql/oid/range.js";
@@ -69,7 +69,7 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
     setZone(TimeZone.find("America/New_York"));
     const converter = new TimeZoneConverter(new DateTime({ timezone: "local" }));
 
-    const casted = converter.cast(Temporal.PlainDateTime.from("2024-01-02T12:00:00"));
+    const casted = converter.cast("2024-01-02 12:00:00");
 
     expect(casted).toBeInstanceOf(TimeWithZone);
     expect((casted as TimeWithZone).hour).toBe(12);
@@ -84,8 +84,8 @@ describe("ActiveRecord::Type::DateTime timezone dispatch", () => {
 
     const casted = converter.cast(
       new Range(
-        Temporal.PlainDateTime.from("2024-01-02T12:00:00"),
-        Temporal.PlainDateTime.from("2024-01-03T12:00:00"),
+        new RubyTime(2024, 1, 2, 12, 0, 0, "-05:00"),
+        new RubyTime(2024, 1, 3, 12, 0, 0, "-05:00"),
         false,
       ),
     );
