@@ -372,12 +372,7 @@ function deleteThroughRecords(
   records: Base[],
 ): void | Promise<void> {
   const throughAssociation = this.throughAssociation() as Association;
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-    const throughRecords = this.throughRecordsFor(record);
-    if (isThenable(throughRecords)) {
-      return throughRecords.then(() => this.deleteThroughRecords(records.slice(i)));
-    }
+  const deleteThroughRecord = (record: Base, throughRecords: Base[]): void => {
     if ((this.throughReflection() as AssociationReflection).isCollection()) {
       for (const r of throughRecords) aryDelete(throughAssociation.target as Base[], r);
     } else {
@@ -387,6 +382,17 @@ function deleteThroughRecords(
     }
 
     this._throughRecords.delete(record);
+  };
+  for (let i = 0; i < records.length; i++) {
+    const record = records[i];
+    const throughRecords = this.throughRecordsFor(record);
+    if (isThenable(throughRecords)) {
+      return throughRecords.then((resolved) => {
+        deleteThroughRecord(record, resolved);
+        return this.deleteThroughRecords(records.slice(i + 1));
+      });
+    }
+    deleteThroughRecord(record, throughRecords);
   }
 }
 

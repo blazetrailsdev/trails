@@ -1533,7 +1533,7 @@ export class MigrationContext<
   }
 
   async migrationsStatus(this: MigrationContext): Promise<Array<[string, string, string]>> {
-    const dbList: Array<string | [string, string, string]> =
+    let dbList: Array<string | [string, string, string]> =
       await this.schemaMigration.normalizedVersions();
 
     const fileList = filterMap(this.migrationFiles(), (file): [string, string, string] => {
@@ -1550,9 +1550,7 @@ export class MigrationContext<
       return [status, version, humanize(name + scope)];
     });
 
-    dbList.forEach((version, index) => {
-      dbList[index] = ["up", version as string, "********** NO FILE **********"];
-    });
+    dbList = dbList.map((version) => ["up", version as string, "********** NO FILE **********"]);
 
     return ([...dbList, ...fileList] as Array<[string, string, string]>).sort(
       ([, a], [, b]) => Number(toI(a)) - Number(toI(b)),
