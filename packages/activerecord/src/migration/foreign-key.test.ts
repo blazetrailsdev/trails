@@ -23,7 +23,6 @@ import { assertQueriesMatch } from "../testing/query-assertions.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import { dumpTableSchema } from "../support/schema-dumping-helper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
 import type { CollectionProxy } from "../associations/collection-proxy.js";
@@ -598,7 +597,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           validate: false,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
 
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ validate: false \}\);$/m,
@@ -614,7 +613,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           validate: true,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
 
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
@@ -758,7 +757,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets");
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
     });
@@ -766,7 +765,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
     it("schema dumping with options", async () => {
       const conn = await ambientConnection();
       await withRocketTables(conn, async () => {
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "fk_test_has_fk");
+        const output = await dumpTableSchema(conn, "fk_test_has_fk");
         if (adapterType === "sqlite") {
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("fk_test_has_fk", "fk_test_has_pk", \{ column: "fk_id", primaryKey: "pk_id" \}\);$/m,
@@ -788,7 +787,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "ignored_fk_astronauts_rockets",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
 
         SchemaDumper.fkIgnorePattern = originalPattern;
@@ -804,7 +803,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           onUpdate: "cascade",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts",.+onUpdate: "cascade",.+onDelete: "nullify" \}\);$/m,
         );
@@ -832,7 +831,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       try {
         const migration = new CreateCitiesAndHousesMigration();
         await migration.migrate("up");
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "houses");
+        const output = await dumpTableSchema(conn, "houses");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("houses",.+onDelete: "cascade" \}\);$/m,
         );
@@ -953,7 +952,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           deferrable: "immediate",
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
         );
@@ -968,7 +967,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
           deferrable: false,
         });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
         expect(output).toMatch(/\s+await ctx\.addForeignKey\("astronauts", "rockets"\);$/m);
       });
     });
@@ -984,7 +983,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             deferrable: "deferred",
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema(conn, "astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "deferred" \}\);$/m,
           );
@@ -1003,7 +1002,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             deferrable: "immediate",
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema(conn, "astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ deferrable: "immediate" \}\);$/m,
           );
@@ -1021,7 +1020,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
             foreignKey: { toTable: "rockets", deferrable: "deferred" },
           });
 
-          const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+          const output = await dumpTableSchema(conn, "astronauts");
           expect(output).toMatch(
             /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: "røcket_id", deferrable: "deferred" \}\);$/m,
           );
@@ -1458,7 +1457,7 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withCompositeRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { primaryKey: ["tenant_id", "id"] });
 
-        const output = await dumpTableSchema(conn as unknown as SchemaSource, "astronauts");
+        const output = await dumpTableSchema(conn, "astronauts");
 
         expect(output).toMatch(
           /\s+await ctx\.addForeignKey\("astronauts", "rockets", \{ column: \["rocket_tenant_id","rocket_id"\], primaryKey: \["tenant_id","id"\] \}\);$/m,

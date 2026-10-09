@@ -876,10 +876,8 @@ export class CreatePosts extends Migration {
 
 describe("schema dump and load", () => {
   it("dumps schema from SQLite and loads it into a fresh database", async () => {
-    const { SchemaDumper } = await import("@blazetrails/activerecord");
     const { BetterSQLite3Adapter } =
       await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
-    const { AdapterSchemaSource } = await import("../schema-source.js");
 
     const sourceAdapter = new BetterSQLite3Adapter({ database: ":memory:" });
     const targetAdapter = new BetterSQLite3Adapter({ database: ":memory:" });
@@ -889,12 +887,11 @@ describe("schema dump and load", () => {
         t.integer("age");
       });
 
-      const source = new AdapterSchemaSource(sourceAdapter);
       const schemaFormatWas = schemaFormat();
       setSchemaFormat("js");
       let schema: string;
       try {
-        schema = (await SchemaDumper.dump(source, new StringIO())).string();
+        schema = (await sourceAdapter.createSchemaDumper({}).dump(new StringIO())).string();
       } finally {
         setSchemaFormat(schemaFormatWas);
       }
@@ -904,7 +901,10 @@ describe("schema dump and load", () => {
       const defineSchema = new Function(
         "ctx",
         schema
-          .replace(/^(?:\s*\/\/[^\n]*\n)*\s*\/\*\*[\s\S]*?\*\/\s*/, "")
+          .replace(
+            /^(?:\s*\/\/[^\n]*\n)*\s*export const defineParams[^\n]*\s*\/\*\*[\s\S]*?\*\/\s*/,
+            "",
+          )
           .replace(
             /export default async function defineSchema\(ctx(?:: any)?\) \{/,
             "return (async () => {",

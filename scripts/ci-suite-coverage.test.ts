@@ -243,7 +243,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  - trailties-tests runs `pnpm vitest run packages/trailties`.
  *    @blazetrails/activerecord is a runtime dependency
  *    (trailties/package.json) imported by src/database.ts,
- *    src/migration-loader.ts, src/schema-source.ts, src/commands/db.ts
+ *    src/migration-loader.ts, src/commands/db.ts
  *    and the generators — all of which have their own .test.ts. The AR
  *    clause in TRAILTIES_PKGS_RE is load-bearing.
  *

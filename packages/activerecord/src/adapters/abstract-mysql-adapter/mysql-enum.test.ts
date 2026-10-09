@@ -2,7 +2,6 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertNotPredicate } from "@blazetrails/activesupport";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../base.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -34,7 +33,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const schema = await dumpTableSchema(adapter as unknown as SchemaSource, "enum_tests");
+      const schema = await dumpTableSchema(adapter, "enum_tests");
       expect(schema).toMatch(
         /t\.column\("enum_column", "enum\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
       );

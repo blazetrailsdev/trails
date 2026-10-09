@@ -1,4 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
+import { poolOf } from "../../support/schema-dumping-helper.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -27,7 +28,7 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
   });
 
   it("schema dump", async () => {
-    const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
+    const output = (await SchemaDumper.dump(poolOf(adapter), new StringIO())).string();
 
     expect(output).not.toContain("searchables_docsize");
     expect(output).toContain(

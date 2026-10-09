@@ -1,14 +1,14 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
 
-const stubSource: SchemaSource & { nativeDatabaseTypes(): object } = {
+const stubSource: any = {
+  supportsVirtualColumns: async () => false,
   tables: async () => [],
   columns: async () => [],
   indexes: async () => [],
@@ -27,7 +27,8 @@ const stubConnection = (
     expression?: string;
     onQuery?: (sql: string) => void;
   } = {},
-): NonNullable<TestSchemaDumper["connection"]> => ({
+): any => ({
+  supportsVirtualColumns: async () => o.expression != null,
   tableOptions: async () => ({}),
   internalExecQuery: async (sql: string) => {
     o.onQuery?.(sql);
@@ -209,7 +210,6 @@ describe("MySQL::SchemaDumper", () => {
       const d = make();
       d.tableName = "t";
       d.setConnection(stubConnection({ expression: "CONCAT(a, b)" }));
-      (d as any).supportsVirtualColumns = true;
       const opts = await (d as any).prepareColumnOptions(
         col({
           name: "full_name",
@@ -282,12 +282,6 @@ describe("MySQL::SchemaDumper", () => {
         collation: "utf8mb4_bin",
       });
       expect((d as any)._tableCollationCache).toBeUndefined();
-    });
-
-    it("returns empty object when connection is absent", async () => {
-      const d = make();
-      d.setConnection(undefined);
-      expect(await (d as any).tableOptions("users")).toEqual({});
     });
   });
 });

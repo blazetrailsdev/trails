@@ -1,4 +1,5 @@
 import { it, expect, beforeEach, afterEach } from "vitest";
+import { poolOf } from "../../support/schema-dumping-helper.js";
 import { StringIO } from "@blazetrails/ruby-compat";
 import "../../index.js";
 import { describeIfSqlite } from "../../support/describe-if-sqlite.js";
@@ -67,7 +68,7 @@ describeIfSqlite("SQLite3CollationTest", () => {
   });
 
   it("schema dump includes collation", async () => {
-    const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
+    const output = (await SchemaDumper.dump(poolOf(adapter), new StringIO())).string();
     expect(output).toMatch(/t\.string\("string_nocase",[^)]*collation: "NOCASE"/);
     expect(output).toMatch(/t\.text\("text_rtrim",[^)]*collation: "RTRIM"/);
   });

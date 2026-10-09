@@ -1,7 +1,7 @@
 import { StringIO } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
-import { SchemaDumper, type SchemaSource } from "./schema-dumper.js";
+import { SchemaDumper } from "./schema-dumper.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -18,6 +18,7 @@ import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
+  poolOf,
 } from "./support/schema-dumping-helper.js";
 import { withPostgresqlDatetimeType } from "./support/with-postgresql-datetime-type.js";
 
@@ -64,14 +65,11 @@ class CreateCatMigration extends Current {
 describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
-  async function canonicalSource(): Promise<SchemaSource> {
-    return (await Base.leaseConnection()) as unknown as SchemaSource;
-  }
   async function standardDump(ignoreTables: (string | RegExp)[] = []): Promise<string> {
-    return dumpAllTableSchema(ignoreTables, await canonicalSource());
+    return dumpAllTableSchema(ignoreTables, poolOf(await Base.leaseConnection()));
   }
   async function dumpCanonicalTable(...tables: string[]): Promise<string> {
-    return dumpTableSchema(await canonicalSource(), ...tables);
+    return dumpTableSchema(await Base.leaseConnection(), ...tables);
   }
   async function dumpsIndexSortOrder(): Promise<boolean> {
     return (
@@ -423,7 +421,10 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    const output = await dumpAllTableSchema([/^courses/], await ARUnit2Model.leaseConnection());
+    const output = await dumpAllTableSchema(
+      [/^courses/],
+      poolOf(await ARUnit2Model.leaseConnection()),
+    );
     expect(output).not.toMatch(/createTable\("courses"/);
     expect(output).toMatch(/createTable\("colleges"/);
     expect(output).not.toMatch(/createTable\("schema_migrations"/);
@@ -674,7 +675,7 @@ describe("SchemaDumperTest", () => {
     "foreign_keys",
     "foreign keys are dumped at the bottom to circumvent dependency issues",
     async () => {
-      const output = await dumpAllTableSchema([], await Base.leaseConnection());
+      const output = await dumpAllTableSchema([], poolOf(await Base.leaseConnection()));
       expect(output).toMatch(
         /^\s+await ctx\.addForeignKey\("fk_test_has_fk"[^\n]+\n\s+await ctx\.addForeignKey\("lessons_students"/m,
       );

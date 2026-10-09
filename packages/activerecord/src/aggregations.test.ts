@@ -230,11 +230,9 @@ describe("AggregationsTest", () => {
 
 describe("OverridingAggregationsTest", () => {
   it("composed of aggregation redefinition reflections should differ and not inherited", () => {
-    class DifferentName {}
     class PersonBase extends Base {
       static {
         this.composedOf("composedOf", {
-          className: DifferentName,
           mapping: [["person_first_name", "firstName"]],
         });
       }
@@ -242,7 +240,7 @@ describe("OverridingAggregationsTest", () => {
     class DifferentPerson extends PersonBase {
       static {
         this.composedOf("composedOf", {
-          className: DifferentName,
+          className: "DifferentName",
           mapping: [["different_person_first_name", "firstName"]],
         });
       }
@@ -266,12 +264,9 @@ describe("lazy composed_of inclusion", () => {
   });
 
   it("mixes Aggregations onto a model that declares composed_of", () => {
-    class Money {
-      constructor(public amount: number) {}
-    }
     class Priced extends Base {
       static {
-        this.composedOf("balance", { className: Money, mapping: [["balance", "amount"]] });
+        this.composedOf("balance", { className: "Money", mapping: [["balance", "amount"]] });
       }
     }
     expect(Priced.prototype.reload).toBe(aggregationsReload);
@@ -280,17 +275,14 @@ describe("lazy composed_of inclusion", () => {
   });
 
   it("does not re-wrap a subclass whose superclass already declared composed_of", () => {
-    class Money {
-      constructor(public amount: number) {}
-    }
     class Priced extends Base {
       static {
-        this.composedOf("balance", { className: Money, mapping: [["balance", "amount"]] });
+        this.composedOf("balance", { className: "Money", mapping: [["balance", "amount"]] });
       }
     }
     class SubPriced extends Priced {
       static {
-        this.composedOf("credit", { className: Money, mapping: [["credit", "amount"]] });
+        this.composedOf("credit", { className: "Money", mapping: [["credit", "amount"]] });
       }
     }
     expect(own(SubPriced, "reload")).toBe(false);

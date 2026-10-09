@@ -101,7 +101,7 @@ export class Customer extends Base {
 
   static {
     this.composedOf("address", {
-      className: Address,
+      className: "Address",
       mapping: [
         ["address_street", "street"],
         ["address_city", "city"],
@@ -110,7 +110,7 @@ export class Customer extends Base {
       allowNil: true,
     });
     this.composedOf("addressHashMapping", {
-      className: Address,
+      className: "Address",
       mapping: [
         ["address_street", "street"],
         ["address_city", "city"],
@@ -119,17 +119,17 @@ export class Customer extends Base {
       allowNil: true,
     });
     this.composedOf("balance", {
-      className: Money,
+      className: "Money",
       mapping: [["balance", "amount"]],
       allowNil: false,
     });
     this.composedOf("gpsLocation", {
-      className: GpsLocation,
+      className: "GpsLocation",
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
     });
     this.composedOf("nonBlankGpsLocation", {
-      className: GpsLocation,
+      className: "GpsLocation",
       mapping: [["gps_location", "gpsLocation"]],
       allowNil: true,
       converter: (gps: unknown) => {
@@ -139,13 +139,13 @@ export class Customer extends Base {
       },
     });
     this.composedOf("fullname", {
-      className: Fullname,
+      className: "Fullname",
       mapping: [["name", "toS"]],
       constructorFn: (name: unknown) => Fullname.parse(name),
       converter: (v: unknown) => Fullname.parse(v),
     });
     this.composedOf("fullnameNoConverter", {
-      className: Fullname,
+      className: "Fullname",
       mapping: [["name", "toString"]],
     });
   }

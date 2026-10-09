@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test-helper.js";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
@@ -29,7 +28,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const schema = await dumpTableSchema(adapter as unknown as SchemaSource, "set_tests");
+      const schema = await dumpTableSchema(adapter, "set_tests");
       expect(schema).toMatch(
         /t\.column\("set_column", "set\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
       );

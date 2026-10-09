@@ -1,11 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
-import type { SchemaSource } from "../schema-dumper.js";
 import {
   dumpAllTableSchema,
   dumpTableSchema,
   FULL_DUMP_TIMEOUT_MS,
+  poolOf,
 } from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -33,7 +33,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_kept", "id INTEGER PRIMARY KEY, name varchar(255)");
     await createSdhTable("sdh_other");
 
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_kept");
+    const output = await dumpTableSchema(adapter, "sdh_kept");
 
     expect(output).toContain("sdh_kept");
     expect(output).not.toContain("sdh_other");
@@ -44,7 +44,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_b");
     await createSdhTable("sdh_c");
 
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_a", "sdh_c");
+    const output = await dumpTableSchema(adapter, "sdh_a", "sdh_c");
 
     expect(output).toContain("sdh_a");
     expect(output).toContain("sdh_c");
@@ -55,7 +55,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_kept");
     const before = SchemaDumper.ignoreTables;
 
-    await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_kept");
+    await dumpTableSchema(adapter, "sdh_kept");
 
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
@@ -63,13 +63,12 @@ describe("SchemaDumpingHelper", () => {
   it("restores SchemaDumper.ignoreTables even when the dump throws", async () => {
     const before = SchemaDumper.ignoreTables;
     const boom = new Error("boom");
-    const failing = {
-      tables: async () => ["sdh_kept"],
+    await createSdhTable("sdh_kept");
+    const failing = Object.assign(Object.create(adapter), {
       columns: async () => {
         throw boom;
       },
-      indexes: async () => [],
-    } as unknown as SchemaSource;
+    });
 
     await expect(dumpTableSchema(failing, "sdh_kept")).rejects.toThrow(boom);
     expect(SchemaDumper.ignoreTables).toBe(before);
@@ -79,7 +78,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_keep");
     await createSdhTable("sdh_skip");
 
-    const output = await dumpAllTableSchema(["sdh_skip"], adapter as unknown as SchemaSource);
+    const output = await dumpAllTableSchema(["sdh_skip"], poolOf(adapter));
 
     expect(output).toContain("sdh_keep");
     expect(output).not.toContain("sdh_skip");

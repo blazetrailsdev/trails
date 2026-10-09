@@ -14,7 +14,7 @@ import {
 } from "@blazetrails/activesupport";
 import { StatementInvalid } from "../../errors.js";
 import { fixtures } from "../../test-fixtures.js";
-import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
+import { dumpTableSchema, poolOf } from "../../support/schema-dumping-helper.js";
 
 class PostgresqlEnum extends Base {
   static {
@@ -305,7 +305,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             )
           `);
 
-          const output = (await SchemaDumper.dump(adapter, new StringIO())).string();
+          const output = (await SchemaDumper.dump(poolOf(adapter), new StringIO())).string();
 
           expect(output).toContain('await ctx.createEnum("public.mood", ["sad","ok","happy"]);');
           expect(output).toContain(

@@ -104,7 +104,6 @@ export {
 export * as RuntimeRegistry from "./runtime-registry.js";
 export { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 export { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-export type { SchemaSource, IndexInfo } from "./schema-dumper.js";
 export type { Column } from "./connection-adapters/column.js";
 export {
   ActiveRecordError,

@@ -4,7 +4,6 @@ import { describeIfMysqlAdapter, leaseMysqlAdapter, Mysql2Adapter } from "./test
 import { Base } from "../../base.js";
 import { RangeError as ActiveRecordRangeError } from "../../errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import type { SchemaSource } from "../../schema-dumper.js";
 import { deprecator } from "../../deprecator.js";
 import { fixtures } from "../../test-fixtures.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
@@ -84,7 +83,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes unsigned option", async () => {
-      const schema = await dumpTableSchema(adapter as unknown as SchemaSource, "unsigned_types");
+      const schema = await dumpTableSchema(adapter, "unsigned_types");
       expect(schema).toMatch(/t\.integer\("unsigned_integer", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.bigint\("unsigned_bigint", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.float\("unsigned_float", \{ unsigned: true \}\)/);
