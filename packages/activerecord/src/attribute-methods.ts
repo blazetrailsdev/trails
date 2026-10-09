@@ -76,7 +76,6 @@ export interface InstanceMethodHost {
   _readAttribute(name: string, block?: (name: string) => unknown): unknown;
 }
 
-/** @missingRailsCall private_method_defined? — PERMANENT */
 export function respondToMissing(
   this: AttributeRecord & InstanceMethodHost,
   name: string,
