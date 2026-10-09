@@ -164,7 +164,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await adapter.createTable("things", (t) => {
       t.string("name");
     });
-    await adapter.changeTable("things", undefined, async (t) => {
+    await adapter.changeTable("things", {}, async (t) => {
       await t.column("quantity", "integer");
     });
     expect((await adapter.columns("things")).map((c) => c.name)).toContain("quantity");

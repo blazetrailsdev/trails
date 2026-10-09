@@ -628,9 +628,12 @@ describe("MySQL::SchemaStatements#tableAliasLength", () => {
 
 describe("MysqlSchemaStatements#changeTable", () => {
   it("yields the MySQL Table subclass", async () => {
-    const ss = Object.setPrototypeOf({}, SchemaStatements.prototype) as SchemaStatements;
+    const ss = Object.setPrototypeOf(
+      { supportsBulkAlter: () => false },
+      SchemaStatements.prototype,
+    ) as SchemaStatements;
     let yielded: unknown;
-    await ss.changeTable("things", (t) => {
+    await ss.changeTable("things", {}, (t) => {
       yielded = t;
     });
     expect(yielded).toBeInstanceOf(MysqlTable);

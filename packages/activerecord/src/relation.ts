@@ -279,7 +279,7 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
       return (...args: any[]) =>
-        target._isRecordsSynchronous
+        target._isRecordsSynchronous && target.isLoaded
           ? enumerable([...(target.target ?? target._records)], args)
           : target.records().then((records: any[]) => enumerable([...records], args));
     }

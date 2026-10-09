@@ -112,13 +112,9 @@ export class CommandRecorder {
 
   async changeTable(
     tableName: string,
-    options: Record<string, unknown> | ((t: Table) => Promise<void> | void) = {},
+    options: Record<string, unknown> = {},
     block?: (t: Table) => Promise<void> | void,
   ): Promise<void> {
-    if (typeof options === "function") {
-      block = options;
-      options = {};
-    }
     const delegate = this.delegate as {
       supportsBulkAlter(): boolean;
       updateTableDefinition(tableName: string, base: unknown): Table;

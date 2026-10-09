@@ -58,7 +58,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("change table", async () => {
-      await adapter.changeTable("virtual_columns", async (t) => {
+      await adapter.changeTable("virtual_columns", {}, async (t) => {
         await t.virtual("lower_name", { type: "string", as: "LOWER(name)" });
       });
       void VirtualColumn.resetColumnInformation();

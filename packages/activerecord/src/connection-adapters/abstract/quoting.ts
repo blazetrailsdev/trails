@@ -98,17 +98,16 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   throw new TypeError(`can't quote ${rbObjClassname(value)}`);
 }
 
-/** @inventedArm if — CONVERGEABLE activerecord-converge-invented-arms-change-table-drop-table-and-float-type-cast */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof Chars || value instanceof BinaryData) return rbObjAsString(value);
   if (value === true) return this.unquotedTrue();
   if (value === false) return this.unquotedFalse();
   if (value instanceof BigDecimal) return value.toString("F");
-  if (value instanceof Number) return value.valueOf();
   if (
     value === null ||
     value === undefined ||
     typeof value === "number" ||
+    value instanceof Number ||
     typeof value === "bigint" ||
     typeof value === "string"
   ) {

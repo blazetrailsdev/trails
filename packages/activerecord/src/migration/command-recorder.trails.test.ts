@@ -179,7 +179,7 @@ describe("CommandRecorder", () => {
   describe("invert change table (non-bulk)", () => {
     it("accepts (tableName, fn) without explicit options", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.string("name");
       });
       expect(recorder.commands[0][0]).toBe("addColumn");
@@ -187,7 +187,7 @@ describe("CommandRecorder", () => {
 
     it("forwarders record no trailing options hash when the splat is empty", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.remove("name");
         await t.index("kind");
         await t.timestamps();
@@ -217,7 +217,7 @@ describe("CommandRecorder", () => {
 
     it("removeCheckConstraint records the expression alongside the options", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.removeCheckConstraint("qty > 0", { name: "chk" });
         await t.removeCheckConstraint("qty > 0");
         await t.removeCheckConstraint({ name: "chk" });
@@ -231,7 +231,7 @@ describe("CommandRecorder", () => {
 
     it("remove with multiple columns records a single removeColumns", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.remove("name", "kind", { type: "string" });
       });
       expect(recorder.commands).toEqual([
@@ -241,7 +241,7 @@ describe("CommandRecorder", () => {
 
     it("removeIndex with an options hash records a nil column, not the hash", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.removeIndex({ name: "index_fruits_on_kind" });
       });
       expect(recorder.commands).toEqual([
@@ -251,7 +251,7 @@ describe("CommandRecorder", () => {
 
     it("removeIndex with an explicit nil column keeps the second-argument options", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await t.removeIndex(undefined, { name: "index_fruits_on_kind" });
       });
       expect(recorder.commands).toEqual([
@@ -262,7 +262,7 @@ describe("CommandRecorder", () => {
     it("removeIndex with a column inverts back to addIndex", async () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
+        await recorder.changeTable("fruits", {}, async (t) => {
           await t.removeIndex("kind");
         });
       });
@@ -273,7 +273,7 @@ describe("CommandRecorder", () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await expect(
         recorder.revert(async () => {
-          await recorder.changeTable("fruits", async (t) => {
+          await recorder.changeTable("fruits", {}, async (t) => {
             await t.removeIndex({ name: "index_fruits_on_kind" });
           });
         }),
@@ -284,7 +284,7 @@ describe("CommandRecorder", () => {
       const recorder = new CommandRecorder(abstractDelegate);
       await expect(
         recorder.revert(async () => {
-          await recorder.changeTable("fruits", async (t) => {
+          await recorder.changeTable("fruits", {}, async (t) => {
             await t.remove("kind");
           });
         }),
@@ -297,7 +297,7 @@ describe("CommandRecorder", () => {
 
     it("records addColumn for t.serial and t.bigserial (up adds)", async () => {
       const recorder = new CommandRecorder(pgLike);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await columnMethods(t).serial("seq");
         await columnMethods(t).bigserial("big_seq");
       });
@@ -310,7 +310,7 @@ describe("CommandRecorder", () => {
     it("reverts t.serial / t.bigserial to removeColumn (down removes)", async () => {
       const recorder = new CommandRecorder(pgLike);
       await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
+        await recorder.changeTable("fruits", {}, async (t) => {
           await columnMethods(t).serial("seq");
           await columnMethods(t).bigserial("big_seq");
         });
@@ -323,7 +323,7 @@ describe("CommandRecorder", () => {
 
     it("never exposes primary_key as a generic column shorthand", async () => {
       const recorder = new CommandRecorder(pgDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         expect((t as unknown as Record<string, unknown>)["primary_key"]).toBeUndefined();
         await t.primaryKey("token", "uuid");
       });
@@ -334,7 +334,7 @@ describe("CommandRecorder", () => {
 
     it("records the snake_case type for PG bitVarying (multi-word shorthand)", async () => {
       const recorder = new CommandRecorder(pgDelegate);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await columnMethods(t).bitVarying("mask");
       });
       expect(recorder.commands).toEqual([
@@ -348,7 +348,7 @@ describe("CommandRecorder", () => {
 
     it("records addColumn for MySQL shorthands (up adds)", async () => {
       const recorder = new CommandRecorder(mysqlLike);
-      await recorder.changeTable("fruits", async (t) => {
+      await recorder.changeTable("fruits", {}, async (t) => {
         await columnMethods(t).unsignedInteger("qty");
         await columnMethods(t).mediumtext("notes");
         await columnMethods(t).longblob("payload");
@@ -363,7 +363,7 @@ describe("CommandRecorder", () => {
     it("reverts MySQL shorthands to removeColumn (down removes)", async () => {
       const recorder = new CommandRecorder(mysqlLike);
       await recorder.revert(async () => {
-        await recorder.changeTable("fruits", async (t) => {
+        await recorder.changeTable("fruits", {}, async (t) => {
           await columnMethods(t).unsignedInteger("qty");
           await columnMethods(t).mediumtext("notes");
         });

@@ -165,6 +165,7 @@ export interface SchemaStatements
       | "quote"
       | "schemaCache"
       | "selectRows"
+      | "supportsBulkAlter"
       | "supportsComments"
       | "supportsCommentsInCreate"
       | "supportsDatetimeWithPrecision"
@@ -285,22 +286,13 @@ export class SchemaStatements {
           ((t: TableDefinition) => void) | undefined,
         ]
   ): Promise<unknown> {
-    const rest = [...args] as unknown[];
-    while (
-      rest.length > 0 &&
-      (rest[rest.length - 1] === undefined || typeof rest[rest.length - 1] === "function")
-    ) {
-      rest.pop();
-    }
-    args = rest as typeof args;
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && last !== undefined && typeof last === "object";
-    const tableNames = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const options = (hasOptions ? last : {}) as { ifExists?: boolean; force?: boolean | "cascade" };
-    const ifExists = options.ifExists ? " IF EXISTS" : "";
+    const tableNames = args.filter((arg) => typeof arg === "string") as string[];
+    const options = (args.find(isPlainObject) ?? {}) as { ifExists?: boolean };
     for (const tableName of tableNames) {
       await this.schemaCache.clearDataSourceCacheBang(tableName);
-      await this.execute(`DROP TABLE${ifExists} ${this.quoteTableName(tableName)}`);
+      await this.execute(
+        `DROP TABLE${options.ifExists ? " IF EXISTS" : ""} ${this.quoteTableName(tableName)}`,
+      );
     }
     return tableNames;
   }
@@ -672,25 +664,16 @@ export class SchemaStatements {
 
   async changeTable(
     tableName: string,
-    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<this>) => void | Promise<void>,
+    options: { bulk?: boolean } = {},
+    block: (t: TableOf<this>) => void | Promise<void>,
     base: unknown = this,
   ): Promise<void> {
-    const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
-    const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
-
-    const supportsBulk =
-      typeof (this as any).supportsBulkAlter === "function" &&
-      (this as any).supportsBulkAlter() === true;
-
-    if (options.bulk && supportsBulk) {
+    if (this.supportsBulkAlter() && options.bulk) {
       const recorder = new CommandRecorder(this);
-      const bulkTable = this.updateTableDefinition(tableName, recorder as unknown) as TableOf<this>;
-      if (callback) await callback(bulkTable);
+      await block(this.updateTableDefinition(tableName, recorder) as TableOf<this>);
       await this.bulkChangeTable(tableName, recorder.commands);
     } else {
-      const table = this.updateTableDefinition(tableName, base) as TableOf<this>;
-      if (callback) await callback(table);
+      await block(this.updateTableDefinition(tableName, base) as TableOf<this>);
     }
   }
 

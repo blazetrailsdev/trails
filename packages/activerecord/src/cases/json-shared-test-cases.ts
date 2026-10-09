@@ -50,7 +50,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_change_table_supports_json", async () => {
-    await connection.changeTable("json_data_type", async (t: Table) => {
+    await connection.changeTable("json_data_type", {}, async (t: Table) => {
       await (t as unknown as Record<string, (name: string) => Promise<void>>)[columnType]("users");
     });
     await klass().resetColumnInformation();
