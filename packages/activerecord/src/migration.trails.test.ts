@@ -36,6 +36,31 @@ describe("MigrationTest", () => {
     expect(m.directions).toEqual(["up", "down"]);
   });
 
+  it("reversible runs a dir.up / dir.down block in line, before the statements after it", async () => {
+    class InLine extends Migration {
+      ran: string[] = [];
+      override write(): void {}
+      async change(): Promise<void> {
+        await this.reversible(async (dir) => {
+          this.ran.push("before");
+          await dir.up(async () => {
+            this.ran.push("up");
+          });
+          await dir.down(async () => {
+            this.ran.push("down");
+          });
+          this.ran.push("after");
+        });
+      }
+    }
+    const m = new InLine();
+    await m.migrate("up");
+    expect(m.ran).toEqual(["before", "up", "after"]);
+    m.ran = [];
+    await m.migrate("down");
+    expect(m.ran).toEqual(["before", "down", "after"]);
+  });
+
   it("migration.connection checks a connection out when none is leased, as migration_connection does", async () => {
     class M extends Migration {
       async up() {}

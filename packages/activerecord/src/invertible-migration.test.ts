@@ -67,8 +67,8 @@ class InvertibleByPartsMigration extends SilentMigration {
     });
     await this.reversible(async (dir) => {
       await this.test?.(Symbol.for("both"));
-      dir.up(async () => this.test?.(Symbol.for("up")));
-      dir.down(async () => this.test?.(Symbol.for("down")));
+      await dir.up(async () => this.test?.(Symbol.for("up")));
+      await dir.down(async () => this.test?.(Symbol.for("down")));
     });
     await this.revert(async () => {
       await this.createTable("horses", (t) => {
