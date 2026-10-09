@@ -274,3 +274,14 @@ re-entered the static method through a marker and ran twice.
 
 Decided by the repo owner on trails#8579 (2026-10-06); the
 `activerecord-port-trilogy-adapter` story is closed, not blocked.
+
+## An adapter file is loaded by an awaited step
+
+Ratified by the repo owner on 2026-10-08. Three alternatives were measured
+first. An async `resolve` makes `adapter_class` a promise under its synchronous
+readers (`quoted_table_name`, `quoted_primary_key`, `disallow_raw_sql!`).
+Importing every built-in adapter eagerly fails for an application that installs
+one driver, since `postgresql-adapter.ts` imports `pg` and `mysql2-adapter.ts`
+imports `mysql2/promise`. Moving each driver import into the adapter's
+`connect` would make the built-ins importable but leaves a third-party adapter
+registered by path unloadable, and drops `resolve`'s two `LoadError` arms.

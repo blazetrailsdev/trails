@@ -259,7 +259,7 @@ export class ConnectionHandler {
 
   /**
    * @internal
-   * @inventedArm load — CONVERGEABLE connection-adapters-load-is-an-awaited-require-split-from-resolve
+   * @inventedArm load — PERMANENT
    */
   private async resolvePoolConfig(
     config: DatabaseConfig | string | Record<string, unknown>,

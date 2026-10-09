@@ -443,3 +443,45 @@ SingularAssociation` reads `SingularAssociation` in TDZ when a builder is the
   imports `migration.ts` and `connection-handling.ts`, so a plain import back
   re-enters the `schema-statements.ts -> migration/command-recorder.ts ->
 migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
+
+## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
+
+Rails loads an adapter inside `ConnectionAdapters.resolve`: a synchronous
+`require path_to_adapter` under a `rescue LoadError`
+(`activerecord/lib/active_record/connection_adapters.rb:42-56`). `resolve` is
+reached synchronously through `DatabaseConfig#adapter_class`
+(`database_configurations/database_config.rb:17-19`) by `quoted_table_name`
+(`model_schema.rb:286`), `quoted_primary_key`
+(`attribute_methods/primary_key.rb:92`) and `disallow_raw_sql!`
+(`sanitization.rb:183`), so it cannot be a promise.
+
+ESM has no synchronous load of a module named by a path: `import()` is the
+only one, and it is async. The built-in adapter modules cannot be imported
+eagerly instead, because `postgresql-adapter.ts` imports `pg` and
+`mysql2-adapter.ts` imports `mysql2/promise`, optional peers an application
+installs one of.
+
+**The `require` is `ConnectionAdapters.load(adapterName)`, an awaited step that
+runs before `resolve`.** As a consequence:
+
+- `load` awaits the `import()` of the registered path, through
+  `ConnectionAdapters.loadPath` for a built-in. It holds a failure in the
+  module-private `loadErrors`, and `resolve` raises it as Rails' two
+  `LoadError` messages, at Rails' raise site.
+- `resolve` is otherwise `connection_adapters.rb:26-66`: same guards, same
+  order, same messages.
+- `ConnectionHandler#resolvePoolConfig` calls `load` before `validate!`
+  (`connection_adapters/abstract/connection_handler.rb:275-280`). It is the one
+  step every `establish_connection` already awaits, so `DatabaseConfig#validate!`
+  stays Rails' body. Code that builds a `PoolConfig` without a handler
+  (`support/template-global-setup.ts`) calls `load` itself.
+- An adapter registered by a third party is loaded the same way. Outside the
+  handler, the template setup and the per-worker test database setup
+  (`test-setup-worker-db.ts`), the only callers are tests that build a
+  `DatabaseConfig` by hand, and no other `require` is ported as an awaited step
+  on the strength of this section.
+
+This is a genuine language shortcoming, ratified here by the repo owner
+(2026-10-08). `load` carries `@noRailsEquivalent PERMANENT` and
+`resolvePoolConfig` carries `@inventedArm load — PERMANENT` against this
+section. There is no story to remove the step.
