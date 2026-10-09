@@ -655,7 +655,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   toAry(): T[] | null {
-    return isEachSynchronous(this) ? Array.from(this as Iterable<T>) : null;
+    return this._isRecordsSynchronous ? Array.from(this as Iterable<T>) : null;
   }
 
   async toArray(): Promise<T[]> {
