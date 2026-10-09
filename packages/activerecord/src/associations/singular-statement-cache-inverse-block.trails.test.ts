@@ -56,6 +56,7 @@ describe("Association#find_target statement-cache execute block", () => {
         association(face, "human") as unknown as { loadTarget(): Promise<Base | null> }
       ).loadTarget();
 
+      expect(checkout).toHaveBeenCalled();
       expect(overlapped).toBe(false);
       expect(association(face, "human").target).toBeInstanceOf(Human);
     } finally {
