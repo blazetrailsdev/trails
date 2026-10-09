@@ -22,7 +22,7 @@ export class Column {
   name: string;
   sqlTypeMetadata: SqlTypeMetadata | null;
   null: boolean;
-  default: unknown;
+  default: string | Uint8Array | null;
   defaultFunction: string | null;
   collation: string | null;
   comment: string | null;
@@ -49,7 +49,7 @@ export class Column {
 
   constructor(
     name: string,
-    defaultValue: unknown,
+    defaultValue: string | Uint8Array | null,
     sqlTypeMetadata: SqlTypeMetadata | null = null,
     null_: boolean = true,
     defaultFunction: string | null = null,
@@ -126,9 +126,7 @@ export class Column {
   deduplicated(): this {
     this.name = strUminus(this.name);
     if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
-    if (this.default != null && this.default !== false) {
-      this.default = strUminus(this.default as string);
-    }
+    if (this.default != null) this.default = strUminus(this.default);
     if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
     if (this.collation != null) this.collation = strUminus(this.collation);
     if (this.comment != null) this.comment = strUminus(this.comment);
@@ -139,7 +137,7 @@ export class Column {
     this.name = coder["name"] as string;
     this.sqlTypeMetadata = (coder["sql_type_metadata"] as SqlTypeMetadata | null) ?? null;
     this.null = coder["null"] as boolean;
-    this.default = coder["default"];
+    this.default = coder["default"] as string | Uint8Array | null;
     this.defaultFunction = (coder["default_function"] as string | null) ?? null;
     this.collation = (coder["collation"] as string | null) ?? null;
     this.comment = (coder["comment"] as string | null) ?? null;

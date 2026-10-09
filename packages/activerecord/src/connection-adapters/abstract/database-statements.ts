@@ -41,14 +41,8 @@ import { ActiveRecord } from "../../namespaces.js";
 
 import type { Quoting } from "./quoting.js";
 import type { ConnectionPool, NullPool } from "./connection-pool.js";
-import {
-  CURRENT_TRANSACTION_KEY,
-  NullTransaction,
-  Transaction,
-  TransactionManager,
-} from "./transaction.js";
-import { Transaction as UserTransaction } from "../../transaction.js";
-import { IsolatedExecutionState, isPlainObject, wrap } from "@blazetrails/activesupport";
+import { NullTransaction, Transaction, TransactionManager } from "./transaction.js";
+import { isPlainObject, wrap } from "@blazetrails/activesupport";
 import { Result } from "../../result.js";
 import {
   FutureResult,
@@ -397,49 +391,21 @@ export async function transaction<T>(
 ): Promise<T | undefined> {
   const { requiresNew, isolation, joinable = true } = options;
 
-  const fn = (userTx?: unknown): Promise<T> | T => {
-    let internalTx: Transaction;
-    if (userTx instanceof Transaction) {
-      internalTx = userTx;
-    } else if (
-      userTx &&
-      (userTx as { _internalTransaction?: unknown })._internalTransaction instanceof Transaction
-    ) {
-      internalTx = (userTx as { _internalTransaction: Transaction })._internalTransaction;
-    } else {
-      const tmCurrent = this.currentTransaction();
-      internalTx = tmCurrent instanceof Transaction ? tmCurrent : new Transaction(this as never);
-    }
-    const prevTx = IsolatedExecutionState.get<Transaction>(CURRENT_TRANSACTION_KEY);
-    IsolatedExecutionState.set(CURRENT_TRANSACTION_KEY, internalTx);
-    const restore = () => IsolatedExecutionState.set(CURRENT_TRANSACTION_KEY, prevTx);
-    let result: Promise<T> | T;
-    try {
-      const publicTx = userTx instanceof UserTransaction ? userTx : internalTx.userTransaction;
-      result = block(publicTx);
-    } catch (error) {
-      restore();
-      throw error;
-    }
-    if (result != null && typeof (result as PromiseLike<T>).then === "function") {
-      return Promise.resolve(result).finally(restore);
-    }
-    restore();
-    return result;
-  };
-
   try {
     if (!requiresNew && this.currentTransaction().joinable) {
       if (isolation) {
         throw new TransactionIsolationError("cannot set isolation when joining a transaction");
       }
-      return await fn(this.currentTransaction().userTransaction);
+      return await block(this.currentTransaction().userTransaction);
     } else {
-      return await this.withinNewTransaction({ isolation, joinable }, fn);
+      return await this.withinNewTransaction({ isolation, joinable }, block);
     }
   } catch (e) {
-    if (!(e instanceof Rollback)) throw e;
-    return undefined;
+    if (e instanceof Rollback) {
+      return undefined;
+    } else {
+      throw e;
+    }
   }
 }
 

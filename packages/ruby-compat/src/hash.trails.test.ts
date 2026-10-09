@@ -25,6 +25,7 @@ import {
   merge,
   mergeBang,
   reject,
+  size,
   slice,
   keys,
   transformValues,
@@ -1193,5 +1194,14 @@ describe("block (a marked `&block`)", () => {
     expect(() => rbHashSRuby2KeywordsHash(null as unknown as object)).toThrow(
       new TypeError("wrong argument type nil (expected Hash)"),
     );
+  });
+});
+
+describe("Hash#size", () => {
+  it("counts the pairs of a hash and the elements of an array", () => {
+    expect(size({ a: 1, b: 2 })).toBe(2);
+    expect(size(new Map([["a", 1]]))).toBe(1);
+    expect(size(["a", "b", "c"])).toBe(3);
+    expect(size({})).toBe(0);
   });
 });

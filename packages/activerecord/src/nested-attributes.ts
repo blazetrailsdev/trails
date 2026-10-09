@@ -11,7 +11,14 @@ import {
   kernelArray,
   singularize,
 } from "@blazetrails/activesupport";
-import { except, rbEqual, rbFSend, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  except,
+  rbEqual,
+  rbFSend,
+  rbObjMethod,
+  rbObjRespondTo,
+  size,
+} from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
 import { isCompositePrimaryKey } from "./attribute-methods/primary-key.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
@@ -185,12 +192,9 @@ export function checkRecordLimitBang(
       limit = limit();
     }
 
-    const size = Array.isArray(attributesCollection)
-      ? attributesCollection.length
-      : Object.keys(attributesCollection).length;
-    if (limit != null && size > limit) {
+    if (limit != null && size(attributesCollection) > limit) {
       throw new TooManyRecords(
-        `Maximum ${limit} records are allowed. Got ${size} records instead.`,
+        `Maximum ${limit} records are allowed. Got ${size(attributesCollection)} records instead.`,
       );
     }
   }

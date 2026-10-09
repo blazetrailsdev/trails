@@ -1,6 +1,7 @@
 import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
+import { Trails } from "../rails.js";
 import {
   env,
   setExitCode,
@@ -241,6 +242,10 @@ async function withRegisteredConfigurations<T>(
   const previousEnv = DatabaseTasks.env;
   DatabaseTasks.databaseConfiguration = new DatabaseConfigurations(configs);
   DatabaseTasks.env = envName;
+  if (!Trails.application) {
+    DatabaseTasks.root = getFs().cwd();
+    DatabaseTasks.dbDir = "db";
+  }
   try {
     return await fn();
   } finally {

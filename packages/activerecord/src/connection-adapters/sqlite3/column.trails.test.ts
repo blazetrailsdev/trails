@@ -3,7 +3,7 @@ import { Column } from "./column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 function makeColumn(options: {
-  defaultValue?: unknown;
+  defaultValue?: string | null;
   generatedType?: "stored" | "virtual" | null;
 }): Column {
   return new Column(

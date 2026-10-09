@@ -260,7 +260,7 @@ export class EnvironmentStorageError extends ActiveRecordError {
 }
 
 /** @internal */
-let migrationVerbose = true;
+let migrationVerbose: boolean | undefined = true;
 
 /** @internal */
 function writeMigrationMessage(text = ""): void {
@@ -306,19 +306,19 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   static delegate: Migration | null = null;
   private _version?: number;
 
-  static get verbose(): boolean {
+  static get verbose(): boolean | undefined {
     return migrationVerbose;
   }
 
-  static set verbose(value: boolean) {
+  static set verbose(value: boolean | undefined) {
     migrationVerbose = value;
   }
 
-  get verbose(): boolean {
+  get verbose(): boolean | undefined {
     return migrationVerbose;
   }
 
-  set verbose(value: boolean) {
+  set verbose(value: boolean | undefined) {
     migrationVerbose = value;
   }
   private static _disableDdlTransaction = false;

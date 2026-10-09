@@ -414,7 +414,7 @@ describe("parseTableOptions", () => {
   });
 });
 
-function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: unknown } = {}) {
+function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: string | null } = {}) {
   return new Column(
     "body",
     opts.default_ === undefined ? "hello" : opts.default_,

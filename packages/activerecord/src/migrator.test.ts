@@ -79,7 +79,7 @@ describe("MigratorTest", () => {
     return schemaMigration;
   }
 
-  let verboseWas: boolean;
+  let verboseWas: boolean | undefined;
 
   beforeEach(async () => {
     adapter = await Base.leaseConnection();

@@ -19,12 +19,12 @@ describe("FakeActiveRecordAdapter", () => {
   it("merge_column appends synthetic columns readable through columns", () => {
     const adapter = new FakeActiveRecordAdapter({});
     adapter.mergeColumn("fake_contacts", "name", "string");
-    adapter.mergeColumn("fake_contacts", "age", "integer", { null: false, default: 0 });
+    adapter.mergeColumn("fake_contacts", "age", "integer", { null: false, default: "0" });
 
     const columns = adapter.columns("fake_contacts");
     expect(columns.map((c) => c.name)).toEqual(["name", "age"]);
     expect(columns[1].null).toBe(false);
-    expect(columns[1].default).toBe(0);
+    expect(columns[1].default).toBe("0");
     expect(columns[0].sqlTypeMetadata?.sqlType).toBe("string");
     expect(columns[0].sqlTypeMetadata?.type).toBeUndefined();
     expect(columns[1].sqlTypeMetadata?.type).toBe("integer");

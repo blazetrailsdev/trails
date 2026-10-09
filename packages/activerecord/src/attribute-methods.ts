@@ -18,6 +18,8 @@ import {
   rbInspect as inspect,
   rbModConstSet,
   rbModPublicInstanceMethod,
+  rbObjIvarGet,
+  rbObjIvarSet,
   rbObjMethod,
   rbObjRespondTo,
   NameError,
@@ -595,7 +597,6 @@ export function pkAttribute(this: InstanceMethodHost, name: string): boolean {
 interface AttributeNamesHost {
   attributeTypes(): Record<string, unknown> | Hash<string, unknown>;
   abstractClass?: boolean;
-  _attributeNamesMemo?: { names: readonly string[] };
 }
 
 /** @internal */
@@ -615,25 +616,23 @@ export const ClassMethods = {
         this.columnNames().includes(String(attribute).replace(/=$/, "")))
     );
   },
-  /** @missingRailsCall table_exists? — PERMANENT */
+  /**
+   * @missingRailsCall table_exists? — PERMANENT
+   * @inventedArm if — PERMANENT
+   */
   attributeNames(this: AttributeNamesHost): string[] {
-    const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
-      ? this._attributeNamesMemo
-      : undefined;
-    if (memo) return memo.names as string[];
-    const exists = cachedTableExists.call(this as never);
-    if (this.abstractClass || exists === false) {
-      const frozen = Object.freeze([] as string[]);
-      this._attributeNamesMemo = { names: frozen };
-      return frozen as string[];
-    }
-    const names = hashKeys(this.attributeTypes());
-    if (exists !== undefined) {
-      const frozen = Object.freeze(names);
-      this._attributeNamesMemo = { names: frozen };
-      return frozen as string[];
-    }
-    return names;
+    return (rbObjIvarGet(this, "@attribute_names") ??
+      (!this.abstractClass && cachedTableExists.call(this as never) === undefined
+        ? hashKeys(this.attributeTypes())
+        : rbObjIvarSet(
+            this,
+            "@attribute_names",
+            Object.freeze(
+              !this.abstractClass && cachedTableExists.call(this as never)
+                ? hashKeys(this.attributeTypes())
+                : [],
+            ),
+          ))) as string[];
   },
   _hasAttribute: classHasAttribute,
 };

@@ -835,6 +835,20 @@ export function valuesAt(
 }
 
 /**
+ * Ruby `Hash#size` (`vendor/ruby/v3.3.11/hash.c:3002` `rb_hash_size`), and
+ * `Array#size` (`vendor/ruby/v3.3.11/array.c:2671` `rb_ary_length`): the number of
+ * pairs, or of elements.
+ * @noRailsEquivalent PERMANENT — Ruby core `Hash#size` (`vendor/ruby/v3.3.11/hash.c:3002`).
+ */
+export function size(
+  hash: Record<string, unknown> | Map<unknown, unknown> | readonly unknown[],
+): number {
+  if (hash instanceof Map) return hash.size;
+  if (Array.isArray(hash)) return hash.length;
+  return Object.keys(hash).length;
+}
+
+/**
  * Ruby `Hash#dup` (`vendor/ruby/v3.3.11/object.c:591` `rb_obj_dup`), which for a Hash
  * allocates through `rb_hash_dup` (`vendor/ruby/v3.3.11/hash.c:1584`): a NEW hash of
  * the receiver's class (`rb_obj_class(hash)`) with the same pairs in the same order, carrying the receiver's `default` /

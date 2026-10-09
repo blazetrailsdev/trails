@@ -24,11 +24,9 @@ describe("DbMigrateStatusTest", () => {
   let err: string[];
   let migrateStatusSpy: ReturnType<typeof vi.fn>;
   let withTemporaryPoolFn: ReturnType<typeof vi.fn>;
-  let priorDefaultEnv: string;
 
   beforeEach(() => {
     err = [];
-    priorDefaultEnv = DatabaseTasks.env;
     vi.spyOn(console, "error").mockImplementation((m) => void err.push(String(m)));
     migrateStatusSpy = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(DatabaseTasks, "migrateStatus").mockImplementation(migrateStatusSpy);
@@ -37,12 +35,12 @@ describe("DbMigrateStatusTest", () => {
       .mockImplementation(async (_config: unknown, fn: (p: never) => unknown) => fn({} as never));
     vi.spyOn(DatabaseTasks, "withTemporaryPool").mockImplementation(withTemporaryPoolFn);
     vi.spyOn(MigrationContext.prototype, "migrations", "get").mockReturnValue([]);
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    DatabaseTasks.env = priorDefaultEnv;
+    vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
@@ -61,7 +59,7 @@ describe("DbMigrateStatusTest", () => {
   });
 
   it("calls migrateStatus once per database config", async () => {
-    DatabaseTasks.env = "development";
+    vi.stubEnv("TRAILS_ENV", "development");
     const dir = await makeFakeProject();
     const code = await run(["db:migrate:status"], dir);
     expect(code).toBe(0);

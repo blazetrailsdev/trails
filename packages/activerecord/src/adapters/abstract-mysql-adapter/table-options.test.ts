@@ -121,7 +121,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
   describe("DefaultEngineOptionTest", () => {
     let loggerWas: unknown;
     let log: string[];
-    let verboseWas: boolean;
+    let verboseWas: boolean | undefined;
 
     beforeEach(() => {
       loggerWas = Base.logger;

@@ -23,7 +23,6 @@ describe("ArRunnerTest", () => {
     vi.restoreAllMocks();
     delete process.env["TRAILS_ENV"];
     DatabaseTasks.databaseConfiguration = null;
-    DatabaseTasks.env = null;
   });
 
   it("returns 1 when no script path is given", async () => {

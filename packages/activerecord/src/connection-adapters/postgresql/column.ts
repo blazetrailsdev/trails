@@ -19,7 +19,7 @@ export class Column extends BaseColumn {
 
   constructor(
     name: string,
-    defaultValue: unknown,
+    defaultValue: string | Uint8Array | null,
     sqlTypeMetadata: TypeMetadata | null = null,
     null_: boolean = true,
     defaultFunction: string | null = null,

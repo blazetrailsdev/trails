@@ -5,6 +5,7 @@ import {
   hasKey,
   hashAref,
   isEmpty,
+  rbDeclareIvar,
   rbModConstSet,
   rbModName,
 } from "@blazetrails/ruby-compat";
@@ -1927,6 +1928,8 @@ export class Base extends Model {
 }
 
 rbModConstSet(ActiveRecord, "Base", Base);
+rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
+rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {

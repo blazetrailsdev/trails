@@ -6,7 +6,7 @@ import { registerConstant } from "@blazetrails/ruby-compat";
 import { register } from "../connection-adapters.js";
 
 export interface MergeColumnOptions {
-  default?: unknown;
+  default?: string | null;
   null?: boolean;
 }
 
@@ -38,7 +38,7 @@ export class FakeActiveRecordAdapter extends AbstractAdapter {
     options: MergeColumnOptions = {},
   ): void {
     this.columns(tableName).push(
-      Column.new(name, options.default, this.fetchTypeMetadata(sqlType), options.null),
+      Column.new(name, options.default ?? null, this.fetchTypeMetadata(sqlType), options.null),
     );
   }
 

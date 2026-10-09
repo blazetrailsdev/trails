@@ -71,7 +71,6 @@ _Notifications.subscribe("sql.active_record", (event) => {
 });
 export {
   transaction,
-  currentTransaction,
   beforeCommittedBang,
   committedBang,
   rolledbackBang,
