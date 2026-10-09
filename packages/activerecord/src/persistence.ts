@@ -969,6 +969,15 @@ export async function createOrUpdate(
 }
 
 export const Persistence = new Module((mod) => {
+  mod.defineMethod("save", save);
+  mod.defineMethod("saveBang", saveBang);
+  mod.defineMethod("destroy", destroy);
+  mod.defineMethod("touch", touch);
+  mod.defineMethod("_queryConstraintsHash", _queryConstraintsHash);
+  mod.defineMethod("destroyRow", destroyRow);
+  mod.defineMethod("_touchRow", _touchRow);
+  mod.defineMethod("_updateRow", _updateRow);
+  mod.defineMethod("createOrUpdate", createOrUpdate);
   mod.defineMethod(
     "_updateRecord",
     /** @internal */
@@ -993,6 +1002,7 @@ export const Persistence = new Module((mod) => {
       return affectedRows;
     },
   );
+  mod.defineMethod("_createRecord", _createRecord);
 });
 
 /** @internal */

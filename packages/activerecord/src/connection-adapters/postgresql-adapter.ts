@@ -432,7 +432,7 @@ export class PostgreSQLAdapter
   private _closed = false;
   private _acquireGeneration = 0;
   private _acquiringGen = -1;
-  private _discardedAcquireGenerations = new Set<number>();
+  private _discardedAcquireGeneration = -1;
   private _acquiring: Promise<pg.Client> | null = null;
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
 
@@ -647,7 +647,7 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      if (this._acquiring) this._acquireGeneration++;
+      this._acquireGeneration++;
       try {
         await this._rawConnection?.end();
       } catch {}
@@ -663,8 +663,7 @@ export class PostgreSQLAdapter
     this._rawConnection = null;
     void this._statements.reset();
     this._closed = true;
-    if (this._acquiring) this._discardedAcquireGenerations.add(this._acquireGeneration);
-    this._acquireGeneration++;
+    this._discardedAcquireGeneration = this._acquireGeneration++;
   }
 
   nativeDatabaseTypes(): NativeDatabaseTypes {
@@ -1562,7 +1561,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
       const acquireGen = this._acquireGeneration;
       const acquiring = this._doAcquire(acquireGen).finally(() => {
-        this._discardedAcquireGenerations.delete(acquireGen);
         if (this._acquiring === acquiring) this._acquiring = null;
       });
       this._acquiring = acquiring;
@@ -1583,7 +1581,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         }
         throw error;
       }
-      const racedDiscard = this._discardedAcquireGenerations.has(acquireGen);
+      const racedDiscard = acquireGen <= this._discardedAcquireGeneration;
       const staleGeneration = acquireGen !== this._acquireGeneration;
       if (
         this._closed ||
@@ -1607,7 +1605,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   private _teardownRacedClient(client: pg.Client, acquireGen: number): void {
-    if (this._discardedAcquireGenerations.has(acquireGen)) {
+    if (acquireGen <= this._discardedAcquireGeneration) {
       try {
         pgConnection(client).socketIo()?.reopen(IO.NULL);
       } catch {}

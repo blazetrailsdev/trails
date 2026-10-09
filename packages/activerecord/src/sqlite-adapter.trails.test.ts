@@ -572,19 +572,19 @@ describe("SQLite adapter driver binding", () => {
       database: ":memory:",
       driver: asyncPragmaDriver,
     }).connectBang();
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
   it("encoding falls back to UTF-8 before a deferred async-only open completes", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncPragmaDriver });
     expect(await adapter.active()).toBe(false);
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
   });
 
   it("encoding returns the database encoding for a sync driver", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
@@ -604,7 +604,7 @@ describe("SQLite adapter driver binding", () => {
       }) as unknown as SqliteConnection;
     });
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: utf16Driver });
-    expect(await adapter.encoding).toBe("UTF-16le");
+    expect(await adapter.encoding()).toBe("UTF-16le");
     await adapter.disconnectBang();
   });
 

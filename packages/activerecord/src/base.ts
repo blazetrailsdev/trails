@@ -2043,6 +2043,7 @@ extend(Base, SignedId.ClassMethods);
 extend(Base, _Persistence.ClassMethods);
 extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
+include(Base, _Persistence.Persistence);
 include(Base, Inheritance.Inheritance);
 include(Base, _Integration);
 include(Base, SignedId.SignedId);
@@ -2140,7 +2141,6 @@ Object.assign(Base, {
   LengthValidator: _Validations.LengthValidator,
   NumericalityValidator: _Validations.NumericalityValidator,
 });
-include(Base, new Module((mod) => mod.defineMethod("touch", _Persistence.touch)));
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
