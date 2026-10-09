@@ -1,52 +1,79 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import {
+  assert,
+  assertEmpty,
+  assertEqual,
+  assertKindOf,
+  assertMatch,
+  assertNil,
+  assertNot,
+  assertNotEmpty,
+  assertNotPredicate,
+  assertPredicate,
+  assertSame,
+} from "@blazetrails/activesupport";
+import { Enumerator, rbInspect } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../metal/strong-parameters.js";
-import { assertEqual, assertMatch, assertNil } from "@blazetrails/activesupport";
-import { rbInspect } from "@blazetrails/ruby-compat";
 
 describe("ParametersAccessorsTest", () => {
   let params: Parameters;
   beforeEach(() => {
+    Parameters.permitAllParameters = false;
+
     params = new Parameters({
       person: {
         age: "32",
-        name: { first: "David", last: "Heinemeier Hansson" },
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
         addresses: [{ city: "Chicago", state: "Illinois" }],
       },
     });
   });
 
   it("each returns self", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    const result = params.each(() => {});
-    expect(result).toBe(params);
+    assertSame(
+      params,
+      params.each((_) => _),
+    );
   });
 
   it("each_pair returns self", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.eachPair(() => {});
-    expect(result).toBe(params);
+    assertSame(
+      params,
+      params.eachPair((_) => _),
+    );
   });
 
   it("each_value returns self", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.eachValue(() => {});
-    expect(result).toBe(params);
+    assertSame(
+      params,
+      params.eachValue((_) => _),
+    );
   });
 
   it("[] retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    expect(params.permitted).toBe(true);
-    expect(params.get("a")).toBe("1");
+    params.permitBang();
+    assertPredicate(params.get("person") as Parameters, (p) => p.permitted);
+    assertPredicate(
+      (params.get("person") as Parameters).get("name") as Parameters,
+      (p) => p.permitted,
+    );
   });
 
   it("[] retains unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.permitted).toBe(false);
+    assertNotPredicate(params.get("person") as Parameters, (p) => p.permitted);
+    assertNotPredicate(
+      (params.get("person") as Parameters).get("name") as Parameters,
+      (p) => p.permitted,
+    );
   });
 
   it("as_json returns the JSON representation of the parameters hash", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    expect(params.asJson()).toEqual({ a: "1", b: "2" });
+    assertNot(Object.hasOwn(params.asJson(), "parameters"));
+    assertNot(Object.hasOwn(params.asJson(), "permitted"));
+    assert(Object.hasOwn(params.asJson(), "person"));
   });
 
   it("to_s returns the string representation of the parameters hash", () => {
@@ -63,356 +90,430 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("each carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    const keys: string[] = [];
-    params.each((k) => keys.push(k));
-    expect(keys).toEqual(["a"]);
-    expect(params.permitted).toBe(true);
+    params.permitBang();
+    params.each((key, value) => {
+      if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
+    });
   });
 
   it("each carries unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    params.each(() => {});
-    expect(params.permitted).toBe(false);
+    params.each((key, value) => {
+      if (key === "person") assertNot((value as Parameters).permitted);
+    });
   });
 
-  it("each returns key,value array for block with arity 1", () => {
-    const params = new Parameters({ a: "1" });
-    const collected: [string, unknown][] = [];
-    params.each((k, v) => collected.push([k, v]));
-    expect(collected).toEqual([["a", "1"]]);
+  // BLOCKED: parameters-each-pair-drops-to-enum-arm-and-yields-two-args
+  it.skip("each returns key,value array for block with arity 1", () => {
+    params.each((arg) => {
+      assertKindOf(Array, arg);
+      assertEqual("person", (arg as unknown as unknown[])[0]);
+      assertKindOf(Parameters, (arg as unknown as unknown[])[1]);
+    });
   });
 
-  it("each without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.each(() => {});
-    expect(result).toBe(params);
+  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
+  it.skip("each without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.each());
+    // @ts-expect-error -- the block-less arm is unported
+    assertEqual(params, new Parameters(Object.fromEntries(params.each())));
   });
 
   it("each_pair carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    const keys: string[] = [];
-    params.eachPair((k) => keys.push(k));
-    expect(keys).toEqual(["a"]);
-    expect(params.permitted).toBe(true);
+    params.permitBang();
+    params.eachPair((key, value) => {
+      if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
+    });
   });
 
   it("each_pair carries unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    params.eachPair(() => {});
-    expect(params.permitted).toBe(false);
+    params.eachPair((key, value) => {
+      if (key === "person") assertNot((value as Parameters).permitted);
+    });
   });
 
-  it("each_pair returns key,value array for block with arity 1", () => {
-    const params = new Parameters({ a: "1" });
-    const collected: [string, unknown][] = [];
-    params.eachPair((k, v) => collected.push([k, v]));
-    expect(collected).toEqual([["a", "1"]]);
+  // BLOCKED: parameters-each-pair-drops-to-enum-arm-and-yields-two-args
+  it.skip("each_pair returns key,value array for block with arity 1", () => {
+    params.eachPair((arg) => {
+      assertKindOf(Array, arg);
+      assertEqual("person", (arg as unknown as unknown[])[0]);
+      assertKindOf(Parameters, (arg as unknown as unknown[])[1]);
+    });
   });
 
-  it("each_pair without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.eachPair(() => {});
-    expect(result).toBe(params);
+  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
+  it.skip("each_pair without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.eachPair());
+    // @ts-expect-error -- the block-less arm is unported
+    assertEqual(params, new Parameters(Object.fromEntries(params.eachPair())));
   });
 
   it("each_value carries permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    const values: unknown[] = [];
-    params.eachValue((v) => values.push(v));
-    expect(values).toEqual(["1"]);
+    params.permitBang();
+    params.eachValue((value) => {
+      assertPredicate(value as Parameters, (p) => p.permitted);
+    });
   });
 
   it("each_value carries unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    const values: unknown[] = [];
-    params.eachValue((v) => values.push(v));
-    expect(values).toEqual(["1"]);
-    expect(params.permitted).toBe(false);
+    params.eachValue((value) => {
+      assertNotPredicate(value as Parameters, (p) => p.permitted);
+    });
   });
 
-  it("each_value without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.eachValue(() => {});
-    expect(result).toBe(params);
+  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
+  it.skip("each_value without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.eachValue());
+    // @ts-expect-error -- the block-less arm is unported
+    assertEqual(params.values, [...params.eachValue()]);
   });
 
   it("each_key converts to hash for permitted", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    const keys: string[] = [];
-    params.eachKey((k) => keys.push(k));
-    expect(keys).toEqual(["a", "b"]);
+    params.permitBang();
+    params.eachKey((key) => {
+      if (key === "person") assertKindOf(String, key);
+    });
   });
 
   it("each_key converts to hash for unpermitted", () => {
-    const params = new Parameters({ a: "1" });
-    const keys: string[] = [];
-    params.eachKey((k) => keys.push(k));
-    expect(keys).toEqual(["a"]);
-    expect(params.permitted).toBe(false);
+    params.eachKey((key) => {
+      if (key === "person") assertKindOf(String, key);
+    });
   });
 
-  it("each_key without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.eachKey(() => {});
-    expect(result).toBe(params);
+  // BLOCKED: parameters-each-pair-has-no-enumerator-arm
+  it.skip("each_key without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.eachKey());
+    // @ts-expect-error -- the block-less arm is unported
+    assertEqual(params.keys, [...params.eachKey()]);
   });
 
   it("empty? returns true when params contains no key/value pairs", () => {
-    expect(new Parameters({}).isEmpty()).toBe(true);
+    const params = new Parameters();
+    assertEmpty(params);
   });
 
   it("empty? returns false when any params are present", () => {
-    expect(new Parameters({ a: "1" }).isEmpty()).toBe(false);
+    assertNotEmpty(params);
   });
 
   it("except retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    const result = params.except("b");
-    expect(result.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.except("person"), (p) => p.permitted);
+    assertPredicate((params.get("person") as Parameters).except("name"), (p) => p.permitted);
   });
 
   it("except retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    const result = params.except("b");
-    expect(result.permitted).toBe(false);
+    assertNotPredicate(params.except("person"), (p) => p.permitted);
+    assertNotPredicate((params.get("person") as Parameters).except("name"), (p) => p.permitted);
   });
 
   it("without retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    const result = params.without("b");
-    expect(result.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.without("person"), (p) => p.permitted);
+    assertPredicate((params.get("person") as Parameters).without("name"), (p) => p.permitted);
   });
 
   it("without retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    const result = params.without("b");
-    expect(result.permitted).toBe(false);
+    assertNotPredicate(params.without("person"), (p) => p.permitted);
+    assertNotPredicate((params.get("person") as Parameters).without("name"), (p) => p.permitted);
   });
 
   it("exclude? returns true if the given key is not present in the params", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.exclude("b")).toBe(true);
+    assert(params.exclude("address"));
   });
 
   it("exclude? returns false if the given key is present in the params", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.exclude("a")).toBe(false);
+    assertNot(params.exclude("person"));
   });
 
   it("fetch retains permitted status", () => {
     params.permitBang();
-    expect((params.fetch("person") as Parameters).permitted).toBe(true);
-    expect(((params.get("person") as Parameters).fetch("name") as Parameters).permitted).toBe(true);
+    assertPredicate(params.fetch("person") as Parameters, (p) => p.permitted);
+    assertPredicate(
+      (params.get("person") as Parameters).fetch("name") as Parameters,
+      (p) => p.permitted,
+    );
   });
 
   it("fetch retains unpermitted status", () => {
-    expect((params.fetch("person") as Parameters).permitted).toBe(false);
-    expect(((params.get("person") as Parameters).fetch("name") as Parameters).permitted).toBe(
-      false,
+    assertNotPredicate(params.fetch("person") as Parameters, (p) => p.permitted);
+    assertNotPredicate(
+      (params.get("person") as Parameters).fetch("name") as Parameters,
+      (p) => p.permitted,
     );
   });
 
   it("has_key? returns true if the given key is present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasKey("a")).toBe(true);
+    assert(params.hasKey("person"));
   });
 
   it("has_key? returns false if the given key is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasKey("b")).toBe(false);
+    assertNot(params.hasKey("address"));
   });
 
   it("has_value? returns true if the given value is present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasValue("1")).toBe(true);
+    const params = new Parameters({ city: "Chicago", state: "Illinois" });
+    assert(params.hasValue("Chicago"));
   });
 
   it("has_value? returns false if the given value is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasValue("2")).toBe(false);
+    const params = new Parameters({ city: "Chicago", state: "Illinois" });
+    assertNot(params.hasValue("New York"));
   });
 
   it("include? returns true if the given key is present in the params", () => {
-    expect(new Parameters({ a: "1" }).include("a")).toBe(true);
+    assert(params.include("person"));
   });
 
   it("include? returns false if the given key is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).include("b")).toBe(false);
+    assertNot(params.include("address"));
   });
 
   it("key? returns true if the given key is present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasKey("a")).toBe(true);
+    assert(params.isKey("person"));
   });
 
   it("key? returns false if the given key is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasKey("b")).toBe(false);
+    assertNot(params.isKey("address"));
   });
 
   it("member? returns true if the given key is present in the params", () => {
-    expect(new Parameters({ a: "1" }).member("a")).toBe(true);
+    assert(params.member("person"));
   });
 
   it("member? returns false if the given key is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).member("b")).toBe(false);
+    assertNot(params.member("address"));
   });
 
   it("keys returns an array of the keys of the params", () => {
-    expect(new Parameters({ a: "1", b: "2" }).keys).toEqual(["a", "b"]);
+    assertEqual(["person"], params.keys);
+    assertEqual(["age", "name", "addresses"], (params.get("person") as Parameters).keys);
   });
 
   it("reject retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    expect(params.reject(() => false).permitted).toBe(true);
+    assertNotPredicate(
+      params.reject((k) => k === "person"),
+      (p) => p.permitted,
+    );
   });
 
   it("reject retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    expect(params.reject(() => false).permitted).toBe(false);
+    params.permitBang();
+    assertPredicate(
+      params.reject((k) => k === "person"),
+      (p) => p.permitted,
+    );
   });
 
   it("select retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    expect(params.select(() => true).permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(
+      params.select((k) => k === "person"),
+      (p) => p.permitted,
+    );
   });
 
   it("select retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    expect(params.select(() => true).permitted).toBe(false);
+    assertNotPredicate(
+      params.select((k) => k === "person"),
+      (p) => p.permitted,
+    );
   });
 
   it("slice retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    expect(params.slice("a").permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.slice("person"), (p) => p.permitted);
   });
 
   it("slice retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    expect(params.slice("a").permitted).toBe(false);
+    assertNotPredicate(params.slice("person"), (p) => p.permitted);
   });
 
   it("transform_keys retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    expect(params.transformKeys((k) => k).permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(
+      params.transformKeys((k) => k),
+      (p) => p.permitted,
+    );
   });
 
   it("transform_keys retains unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.transformKeys((k) => k).permitted).toBe(false);
+    assertNotPredicate(
+      params.transformKeys((k) => k),
+      (p) => p.permitted,
+    );
   });
 
-  it("transform_keys without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.transformKeys((k) => k.toUpperCase());
-    expect(result.hasKey("A")).toBe(true);
+  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
+  it.skip("transform_keys without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.transformKeys());
+    assertKindOf(
+      Parameters,
+      // @ts-expect-error -- the block-less arm is unported
+      params.transformKeys().each((k) => k),
+    );
   });
 
-  it("transform_keys! without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    params.transformKeysBang((k) => k.toUpperCase());
-    expect(params.hasKey("A")).toBe(true);
+  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
+  it.skip("transform_keys! without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.transformKeysBang());
+    assertKindOf(
+      Parameters,
+      // @ts-expect-error -- the block-less arm is unported
+      params.transformKeysBang().each((k) => k),
+    );
   });
 
   it("deep_transform_keys retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    expect(params.deepTransformKeys((k) => k).permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(
+      params.deepTransformKeys((k) => k),
+      (p) => p.permitted,
+    );
   });
 
   it("deep_transform_keys retains unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.deepTransformKeys((k) => k).permitted).toBe(false);
+    assertNotPredicate(
+      params.deepTransformKeys((k) => k),
+      (p) => p.permitted,
+    );
   });
 
   it("transform_values retains permitted status", () => {
-    const params = new Parameters({ a: "1" }).permitBang();
-    expect(params.transformValues((v) => v).permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(
+      params.transformValues((v) => v),
+      (p) => p.permitted,
+    );
   });
 
   it("transform_values retains unpermitted status", () => {
-    const params = new Parameters({ a: "1" });
-    expect(params.transformValues((v) => v).permitted).toBe(false);
+    assertNotPredicate(
+      params.transformValues((v) => v),
+      (p) => p.permitted,
+    );
   });
 
   it("transform_values converts hashes to parameters", () => {
-    const params = new Parameters({ a: { nested: "value" } });
-    const result = params.transformValues((v) => v);
-    expect(result.get("a")).toBeInstanceOf(Parameters);
+    params.transformValues((value) => {
+      assertKindOf(Parameters, value);
+      return value;
+    });
   });
 
-  it("transform_values without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    const result = params.transformValues((v) => v);
-    expect(result.get("a")).toBe("1");
+  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
+  it.skip("transform_values without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.transformValues());
+    assertKindOf(
+      Parameters,
+      // @ts-expect-error -- the block-less arm is unported
+      params.transformValues().each((v) => v),
+    );
   });
 
   it("transform_values! converts hashes to parameters", () => {
-    const params = new Parameters({ a: { nested: "value" } });
-    params.transformValuesBang((v) => v);
-    expect(params.get("a")).toBeInstanceOf(Parameters);
+    params.transformValuesBang((value) => assertKindOf(Parameters, value));
   });
 
-  it("transform_values! without a block returns an enumerator", () => {
-    const params = new Parameters({ a: "1" });
-    params.transformValuesBang((v) => v);
-    expect(params.get("a")).toBe("1");
+  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
+  it.skip("transform_values! without a block returns an enumerator", () => {
+    // @ts-expect-error -- the block-less arm is unported
+    assertKindOf(Enumerator, params.transformValuesBang());
+    assertKindOf(
+      Parameters,
+      // @ts-expect-error -- the block-less arm is unported
+      params.transformValuesBang().each((v) => v),
+    );
   });
 
   it("value? returns true if the given value is present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasValue("1")).toBe(true);
+    const params = new Parameters({ city: "Chicago", state: "Illinois" });
+    assert(params.isValue("Chicago"));
   });
 
   it("value? returns false if the given value is not present in the params", () => {
-    expect(new Parameters({ a: "1" }).hasValue("2")).toBe(false);
+    const params = new Parameters({ city: "Chicago", state: "Illinois" });
+    assertNot(params.isValue("New York"));
   });
 
   it("values returns an array of the values of the params", () => {
-    expect(new Parameters({ a: "1", b: "2" }).values).toEqual(["1", "2"]);
+    const params = new Parameters({
+      city: "Chicago",
+      state: "Illinois",
+      person: new Parameters({ first_name: "David" }),
+    });
+    assertEqual(["Chicago", "Illinois", new Parameters({ first_name: "David" })], params.values);
   });
 
   it("values_at retains permitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" }).permitBang();
-    const result = params.valuesAt("a", "b");
-    expect(result).toEqual(["1", "2"]);
-    expect(params.permitted).toBe(true);
+    params.permitBang();
+    assertPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.permitted);
+    assertPredicate(
+      (params.get("person") as Parameters).valuesAt("name")[0] as Parameters,
+      (p) => p.permitted,
+    );
   });
 
   it("values_at retains unpermitted status", () => {
-    const params = new Parameters({ a: "1", b: "2" });
-    const result = params.valuesAt("a");
-    expect(result).toEqual(["1"]);
-    expect(params.permitted).toBe(false);
+    assertNotPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.permitted);
+    assertNotPredicate(
+      (params.get("person") as Parameters).valuesAt("name")[0] as Parameters,
+      (p) => p.permitted,
+    );
   });
 
   it("is equal to Parameters instance with same params", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ x: "1" });
-    expect(a.equals(b)).toBe(true);
+    const params1 = new Parameters({ a: 1, b: 2 });
+    const params2 = new Parameters({ a: 1, b: 2 });
+    assert(params1.equals(params2));
+    assert(params1.hash() === params2.hash());
   });
 
   it("is equal to Parameters instance with same permitted params", () => {
-    const a = new Parameters({ x: "1" }).permitBang();
-    const b = new Parameters({ x: "1" }).permitBang();
-    expect(a.equals(b)).toBe(true);
+    const params1 = new Parameters({ a: 1, b: 2 }).permit("a");
+    const params2 = new Parameters({ a: 1, b: 2 }).permit("a");
+    assert(params1.equals(params2));
+    assert(params1.hash() === params2.hash());
   });
 
   it("is equal to Parameters instance with same different source params, but same permitted params", () => {
-    const a = new Parameters({ x: "1", y: "2" }).permit("x");
-    const b = new Parameters({ x: "1", z: "3" }).permit("x");
-    expect(a.equals(b)).toBe(true);
+    const params1 = new Parameters({ a: 1, b: 2 }).permit("a");
+    const params2 = new Parameters({ a: 1, c: 3 }).permit("a");
+    assert(params1.equals(params2));
+    assert(params2.equals(params1));
+    assert(params1.hash() === params2.hash());
+    assert(params2.hash() === params1.hash());
   });
 
   it("is not equal to an unpermitted Parameters instance with same params", () => {
-    const a = new Parameters({ x: "1" }).permitBang();
-    const b = new Parameters({ x: "1" });
-    expect(a.equals(b)).toBe(false);
+    const params1 = new Parameters({ a: 1 }).permit("a");
+    const params2 = new Parameters({ a: 1 });
+    assert(!params1.equals(params2));
+    assert(!params2.equals(params1));
+    assert(params1.hash() !== params2.hash());
+    assert(params2.hash() !== params1.hash());
   });
 
   it("is not equal to Parameters instance with different permitted params", () => {
-    const a = new Parameters({ x: "1" }).permit("x");
-    const b = new Parameters({ y: "2" }).permit("y");
-    expect(a.equals(b)).toBe(false);
+    const params1 = new Parameters({ a: 1, b: 2 }).permit("a", "b");
+    const params2 = new Parameters({ a: 1, b: 2 }).permit("a");
+    assert(!params1.equals(params2));
+    assert(!params2.equals(params1));
+    assert(params1.hash() !== params2.hash());
+    assert(params2.hash() !== params1.hash());
   });
 
   it("equality with simple types works", () => {
-    const a = new Parameters({});
-    expect(a.equals(null as any)).toBe(false);
-    expect(a.equals(undefined as any)).toBe(false);
+    assert(!params.equals("Hello"));
+    assert(!params.equals(42));
+    assert(!params.equals(false));
   });
 
   it("inspect shows both class name, parameters and permitted flag", () => {
@@ -442,27 +543,40 @@ describe("ParametersAccessorsTest", () => {
   });
 
   it("#dig delegates the dig method to its values", () => {
-    const params = new Parameters({ a: { b: "1" } });
-    expect(params.dig("a", "b")).toBe("1");
+    assertEqual("David", params.dig("person", "name", "first"));
+    assertEqual("Chicago", params.dig("person", "addresses", 0, "city"));
   });
 
   it("#dig converts hashes to parameters", () => {
-    const params = new Parameters({ a: { b: { c: "deep" } } });
-    const result = params.dig("a");
-    expect(result).toBeInstanceOf(Parameters);
+    assertKindOf(Parameters, params.dig("person"));
+    assertKindOf(Parameters, params.dig("person", "addresses", 0));
+    assert((params.dig("person", "addresses") as unknown[]).every((v) => v instanceof Parameters));
   });
 
   it("mutating #dig return value mutates underlying parameters", () => {
-    const params = new Parameters({ a: { b: "1" } });
-    const nested = params.get("a") as Parameters;
-    nested.set("b", "2");
-    expect(params.dig("a", "b")).toBe("2");
+    (params.dig("person", "name") as Parameters).set("first", "Bill");
+    assertEqual("Bill", params.dig("person", "name", "first"));
+
+    (params.dig("person", "addresses") as unknown[])[0] = {
+      city: "Boston",
+      state: "Massachusetts",
+    };
+    assertEqual("Boston", params.dig("person", "addresses", 0, "city"));
   });
 
   it("#extract_value splits param by delimiter", () => {
-    const params = new Parameters({ id: "1_123", tags: "ruby,rails" });
-    expect(params.extractValue("id")).toEqual(["1", "123"]);
-    expect(params.extractValue("tags", ",")).toEqual(["ruby", "rails"]);
-    assertNil(params.extractValue("missing"));
+    const params = new Parameters({
+      id: "1_123",
+      tags: "ruby,rails,web",
+      blank_tags: ",ruby,,rails,",
+    });
+
+    assertEqual(["1", "123"], params.extractValue("id"));
+    assertEqual(["ruby", "rails", "web"], params.extractValue("tags", { delimiter: "," }));
+    assertEqual(
+      ["", "ruby", "", "rails", ""],
+      params.extractValue("blank_tags", { delimiter: "," }),
+    );
+    assertNil(params.extractValue("non_existent_key"));
   });
 });

@@ -3,17 +3,21 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { classify, camelize } from "@blazetrails/activesupport";
-import { virtualize } from "../src/type-virtualization/virtualize.js";
-import { tsApi } from "../src/type-virtualization/ts-api.js";
-import { walk, type ClassInfo, type AssociationCall } from "../src/type-virtualization/walker.js";
+import { virtualize } from "../../activerecord-cli/src/type-virtualization/virtualize.js";
+import { tsApi } from "../../activerecord-cli/src/type-virtualization/ts-api.js";
+import {
+  walk,
+  type ClassInfo,
+  type AssociationCall,
+} from "../../activerecord-cli/src/type-virtualization/walker.js";
 import {
   resolveAssociationTarget,
   resolveThroughTarget,
   isEmittableTargetName,
   stripQuotes,
   type ModelAssociationLookup,
-} from "../src/type-virtualization/resolve-target.js";
-import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
+} from "../../activerecord-cli/src/type-virtualization/resolve-target.js";
+import type { SchemaColumnValue } from "../../activerecord-cli/src/type-virtualization/synthesize.js";
 import type { TableSchema, WrappedTableSchema } from "../src/support/schema-types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));

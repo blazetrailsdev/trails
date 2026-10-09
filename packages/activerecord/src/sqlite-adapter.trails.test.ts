@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { SQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { NodeSQLiteAdapter } from "./connection-adapters/node-sqlite-adapter.js";
@@ -488,10 +488,11 @@ describe("SQLite adapter driver binding", () => {
     pool.checkin(conn as unknown as DatabaseAdapter);
 
     failCheckout = true;
-    await expect(pool.checkout()).rejects.toThrow(/checkout boom/);
+    const rejection = expect(pool.checkout()).rejects.toThrow(/checkout boom/);
     expect(isClosed()).toBe(false);
     release();
-    await vi.waitFor(() => expect(isClosed()).toBe(true));
+    await rejection;
+    expect(isClosed()).toBe(true);
   });
 
   it("sync-driver teardown seams stay synchronous (whenClosed no-ops)", async () => {
@@ -572,19 +573,19 @@ describe("SQLite adapter driver binding", () => {
       database: ":memory:",
       driver: asyncPragmaDriver,
     }).connectBang();
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
   it("encoding falls back to UTF-8 before a deferred async-only open completes", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: asyncPragmaDriver });
     expect(await adapter.active()).toBe(false);
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
   });
 
   it("encoding returns the database encoding for a sync driver", async () => {
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: betterSqlite3Driver });
-    expect(await adapter.encoding).toBe("UTF-8");
+    expect(await adapter.encoding()).toBe("UTF-8");
     await adapter.disconnectBang();
   });
 
@@ -604,7 +605,7 @@ describe("SQLite adapter driver binding", () => {
       }) as unknown as SqliteConnection;
     });
     const adapter = new SQLite3Adapter({ database: ":memory:", driver: utf16Driver });
-    expect(await adapter.encoding).toBe("UTF-16le");
+    expect(await adapter.encoding()).toBe("UTF-16le");
     await adapter.disconnectBang();
   });
 

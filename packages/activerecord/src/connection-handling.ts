@@ -22,10 +22,6 @@ import { deprecator } from "./deprecator.js";
 
 const PROHIBIT_SHARD_SWAPPING_KEY = Symbol.for("ar_prohibit_shard_swapping");
 
-function isBaseClass(klass: typeof Base): boolean {
-  return Object.prototype.hasOwnProperty.call(klass, "_isActiveRecordBase");
-}
-
 export async function connectsTo(
   this: typeof Base,
   options: {
@@ -33,7 +29,7 @@ export async function connectsTo(
     shards?: Record<string, Record<string, string | Record<string, unknown>>>;
   },
 ): Promise<ConnectionPool[]> {
-  if (!isBaseClass(this) && !this.abstractClass) {
+  if (!(this === ActiveRecord.Base || this.abstractClass)) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:82 cluster=connection-pool
     throw new NotImplementedError(
       "`connects_to` can only be called on ActiveRecord::Base or abstract classes",
@@ -79,7 +75,7 @@ export function connectedTo<T>(
   options: { role?: string; shard?: string; preventWrites?: boolean },
   fn: () => T,
 ): T {
-  if (!isBaseClass(this) && !this.abstractClass) {
+  if (!(this === ActiveRecord.Base || this.abstractClass)) {
     // @nie disposition=keep-as-strategy-hook rails=activerecord/lib/active_record/connection_handling.rb:138 cluster=connection-pool
     throw new NotImplementedError(
       "calling `connected_to` is only allowed on ActiveRecord::Base or abstract classes.",

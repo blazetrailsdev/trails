@@ -226,19 +226,19 @@ it("disconnect under exclusive acquisition checks out idle connections during th
   expect(pool.stat().connections).toBe(0);
 });
 
-it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", () => {
+it("tryToCheckoutNewConnection counts an in-flight connect in _nowConnecting and releases it when the connect raises", async () => {
   const pool = makePool(2) as any;
   const seen: number[] = [];
   pool.checkoutNewConnection = () => {
     seen.push(pool._nowConnecting);
     throw new ConnectionNotEstablished("boom");
   };
-  expect(() => pool.tryToCheckoutNewConnection()).toThrow("boom");
+  await expect(pool.tryToCheckoutNewConnection()).rejects.toThrow("boom");
   expect(seen).toEqual([1]);
   expect(pool._nowConnecting).toBe(0);
 
   pool._nowConnecting = 2;
-  expect(pool.tryToCheckoutNewConnection()).toBeNull();
+  expect(await pool.tryToCheckoutNewConnection()).toBeNull();
 });
 
 it("the exclusive sweep keeps waiting while a connect is in flight", async () => {
@@ -531,14 +531,38 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        await pool._lazyLoadPromise;
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("more_testings")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.poolConfig.schemaReflection.loadedCache!.isCached("more_testings")).toBe(
           true,
         );
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
+        await closePoolConnections(pool);
+      }
+    });
+  });
+
+  it("a pool too small for a second connection times out validating the lazily loaded cache", async () => {
+    const prevLazy = lazilyLoadSchemaCache();
+    setLazilyLoadSchemaCache(true);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    await withCacheDir(async (dir) => {
+      const cacheFile = join(dir, "schema_cache.json");
+      await writeCacheFixture(cacheFile, "more_testings", 0);
+      const pool = makeAmbientPool({ schemaCachePath: cacheFile, pool: 1, checkoutTimeout: 0.05 });
+      try {
+        await pool.leaseConnection();
+        pool.releaseConnection();
+        expect(warn.mock.calls[0][0]).toMatch(
+          /^Failed to validate the schema cache because of ActiveRecord::ConnectionTimeoutError/,
+        );
+        expect(pool.stat().connections).toBe(1);
+        expect(await pool.schemaCache.isCached("more_testings")).toBe(false);
+      } finally {
+        setLazilyLoadSchemaCache(prevLazy);
+        vi.restoreAllMocks();
         await closePoolConnections(pool);
       }
     });
@@ -556,8 +580,7 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).not.toBeNull();
-        await pool._lazyLoadPromise;
+        expect(pool.schemaReflection.loadedCache).not.toBeNull();
         expect(await pool.schemaCache.isCached("stale_thing")).toBe(false);
       } finally {
         setLazilyLoadSchemaCache(prevLazy);
@@ -577,74 +600,12 @@ describe("ConnectionPool schema cache", () => {
       try {
         await pool.leaseConnection();
         pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
+        expect(pool.schemaReflection.loadedCache).toBeNull();
         expect(await pool.schemaCache.isCached("widgets")).toBeNull();
       } finally {
         await closePoolConnections(pool);
       }
     });
-  });
-
-  it.skipIf(inMemoryDb())(
-    "eagerly warms the schema cache by introspection on first connection when enabled",
-    async () => {
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-        expect(pool.poolConfig.schemaReflection.loadedCache).not.toBeNull();
-        expect(
-          await pool.poolConfig.schemaReflection.loadedCache!.isColumnsHash(null, "posts"),
-        ).toBe(true);
-      } finally {
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it.skipIf(inMemoryDb())(
-    "lets eager warming win when both lazy and eager flags are on",
-    async () => {
-      const prevLazy = lazilyLoadSchemaCache();
-      const prevEager = SchemaReflection.eagerLoadSchemaCache;
-      setLazilyLoadSchemaCache(true);
-      SchemaReflection.eagerLoadSchemaCache = true;
-
-      const pool = makeAmbientPool({ schemaCachePath: "" });
-      try {
-        await pool.leaseConnection();
-        pool.releaseConnection();
-        expect(pool._lazyLoadPromise).toBeNull();
-        expect(pool._eagerWarmPromise).not.toBeNull();
-        await pool._eagerWarmPromise;
-        expect(await pool.schemaCache.isCached("posts")).toBe(true);
-      } finally {
-        setLazilyLoadSchemaCache(prevLazy);
-        SchemaReflection.eagerLoadSchemaCache = prevEager;
-        await closePoolConnections(pool);
-      }
-    },
-  );
-
-  it("does not eagerly warm when the flag is off (default)", async () => {
-    expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
-
-    const pool = makeAmbientPool({ schemaCachePath: "" });
-    try {
-      await pool.leaseConnection();
-      pool.releaseConnection();
-      expect(pool._eagerWarmPromise).toBeNull();
-      expect(await pool.schemaCache.isCached("posts")).toBeNull();
-    } finally {
-      await closePoolConnections(pool);
-    }
   });
 
   it.skipIf(inMemoryDb())(
@@ -757,15 +718,27 @@ describe("ConnectionPoolConfiguration query cache", () => {
         (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
       try {
+        let firstPinned!: () => void;
+        const first = new Promise<void>((resolve) => {
+          firstPinned = resolve;
+        });
+        let secondPinned!: () => void;
+        const second = new Promise<void>((resolve) => {
+          secondPinned = resolve;
+        });
         await Promise.all([
           new Thread(async () => {
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            firstPinned();
+            await second;
             await pool.unpinConnectionBang();
           }).value(),
           new Thread(async () => {
+            await first;
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
+            secondPinned();
             await pool.unpinConnectionBang();
           }).value(),
         ]);

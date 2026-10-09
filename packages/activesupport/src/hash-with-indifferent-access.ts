@@ -509,6 +509,9 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
    * anything else is `no_dig_method`'s TypeError (`object.c:3897-3900`).
    */
   dig(key: string, ...identifiers: (string | number)[]): unknown {
+    if (arguments.length === 0) {
+      throw new ArgumentError("wrong number of arguments (given 0, expected 1+)");
+    }
     let obj: unknown = this.get(key);
     for (let i = 0; i < identifiers.length; i++) {
       const identifier = identifiers[i];

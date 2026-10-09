@@ -1,5 +1,5 @@
 import * as ts from "typescript/unstable/ast";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
 
 export interface DumpColumnSchema {
   type: string;

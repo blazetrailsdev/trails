@@ -172,10 +172,10 @@ export function relationClassFor(this: FamilyCtor, model: typeof Base): FamilyCt
 export interface DelegationHost {
   readonly model: typeof Base;
   readonly isLoaded: boolean;
-  readonly isScheduled?: boolean;
+  readonly _isRecordsSynchronous: boolean;
+  readonly proxyAssociation?: { loadTarget(): unknown };
   readonly target?: Base[];
   _records?: Base[];
-  readonly _loadResult?: Promise<unknown>;
   records(): Promise<Base[]>;
 }
 
@@ -467,10 +467,9 @@ Object.defineProperty(Delegation.prototype.length, Symbol.toPrimitive, {
 });
 
 function withRecords<R>(host: DelegationHost, fn: (records: Base[]) => R): R | Promise<R> {
-  const loaded = (): boolean => host.isLoaded && !host.isScheduled && !host._loadResult;
-  const records = loaded() ? null : host.records();
-  if (records === null || loaded()) return fn([...(host.target ?? host._records ?? [])]);
-  return records.then((records) => fn([...records]));
+  if (!host._isRecordsSynchronous) return host.records().then((records) => fn([...records]));
+  if (!host.isLoaded) host.proxyAssociation!.loadTarget();
+  return fn([...(host.target ?? host._records ?? [])]);
 }
 
 function shuffleInPlace<T>(array: T[]): T[] {

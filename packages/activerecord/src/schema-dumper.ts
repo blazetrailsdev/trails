@@ -172,7 +172,7 @@ export abstract class SchemaDumper {
     this.connection = connection;
     this._source = isDatabaseAdapter(connection) ? new AdapterSchemaSource(connection) : connection;
     this._options = options;
-    this._format = (options.format as SchemaFormat | undefined) ?? schemaFormat();
+    this._format = schemaFormat();
     this._version = typeof options.version === "string" ? options.version : undefined;
     const subclassIgnore = (this.constructor as typeof SchemaDumper).ignoreTables ?? [];
     const base = baseClass();
@@ -231,10 +231,8 @@ export abstract class SchemaDumper {
     pool: ConnectionPoolLike | SchemaSource | DatabaseAdapter = baseClass().connectionPool(),
     stream: S = STDOUT as S,
     config: SchemaDumperConfig = baseClass(),
-    format?: SchemaFormat,
   ): Promise<S> {
     const options = this.generateOptions(config);
-    options.format = format;
     if (isDatabaseAdapter(pool)) {
       const source = new AdapterSchemaSource(pool);
       return (async () => {
@@ -255,7 +253,7 @@ export abstract class SchemaDumper {
     if (isConnectionPool(pool)) {
       return pool
         .withConnection(async (connection) => {
-          await this.dump(connection, stream, config, format);
+          await this.dump(connection, stream, config);
         })
         .then(() => stream);
     }

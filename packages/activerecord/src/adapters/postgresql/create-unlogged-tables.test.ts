@@ -51,7 +51,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("not changed in change table", async () => {
       await connection.createTable(TABLE_NAME, () => {});
       PostgreSQLAdapter.createUnloggedTables = true;
-      await connection.changeTable(TABLE_NAME, async (t) => {
+      await connection.changeTable(TABLE_NAME, {}, async (t) => {
         await t.column("name", "string");
       });
       const rows = (await connection.execute(LOGGED_QUERY)) as Array<Record<string, string>>;

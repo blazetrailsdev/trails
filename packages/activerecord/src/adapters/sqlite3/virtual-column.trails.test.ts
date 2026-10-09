@@ -25,7 +25,7 @@ describeIfSqlite("SQLite3VirtualColumnTest trails extras", () => {
   });
 
   it("alter-table rebuild preserves pre-existing generated columns", async () => {
-    await adapter.changeTable("virtual_columns", async (t) => {
+    await adapter.changeTable("virtual_columns", {}, async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
     });
 

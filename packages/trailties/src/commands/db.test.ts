@@ -890,7 +890,14 @@ describe("schema dump and load", () => {
       });
 
       const source = new AdapterSchemaSource(sourceAdapter);
-      const schema = (await SchemaDumper.dump(source, new StringIO(), undefined, "js")).string();
+      const schemaFormatWas = schemaFormat();
+      setSchemaFormat("js");
+      let schema: string;
+      try {
+        schema = (await SchemaDumper.dump(source, new StringIO())).string();
+      } finally {
+        setSchemaFormat(schemaFormatWas);
+      }
       expect(schema).toContain("users");
       expect(schema).toContain("createTable");
 

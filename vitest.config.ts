@@ -240,34 +240,6 @@ const alias = {
     __dirname,
     "packages/activerecord/src/adapters/mysql2-adapter.ts",
   ),
-  "@blazetrails/activerecord/type-virtualization/virtualize.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/virtualize.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/synthesize.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/synthesize.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/transitive-extends-walker.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/walker.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/walker.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/resolve-target.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/resolve-target.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/ts-api.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/ts-api.ts",
-  ),
-  "@blazetrails/activerecord/type-virtualization/auto-import.js": path.resolve(
-    __dirname,
-    "packages/activerecord/src/type-virtualization/auto-import.ts",
-  ),
   "@blazetrails/activerecord/fixtures": path.resolve(
     __dirname,
     "packages/activerecord/src/fixtures.ts",

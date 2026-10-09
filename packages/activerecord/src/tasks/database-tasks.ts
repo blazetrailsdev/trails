@@ -518,7 +518,6 @@ export class DatabaseTasks {
     return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
   }
 
-  /** @missingRailsArgs dump — PERMANENT */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
@@ -535,7 +534,7 @@ export class DatabaseTasks {
         const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
         const migrationConnectionPool = this.migrationConnectionPool();
         await File.open(filename, "w:utf-8", async (file) => {
-          await SchemaDumper.dump(migrationConnectionPool, file, undefined, format);
+          await SchemaDumper.dump(migrationConnectionPool, file);
         });
         break;
       }

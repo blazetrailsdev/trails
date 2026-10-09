@@ -439,7 +439,7 @@ describe("Migration", () => {
 
     it("add constraint from change table with options", async () => {
       const connection = await ambientConnection();
-      await connection.changeTable("trades", async (t) => {
+      await connection.changeTable("trades", {}, async (t) => {
         await t.checkConstraint("price > 0", { name: "price_check" });
       });
 
@@ -452,7 +452,7 @@ describe("Migration", () => {
       const connection = await ambientConnection();
       await connection.addCheckConstraint("trades", "price > 0", { name: "price_check" });
 
-      await connection.changeTable("trades", async (t) => {
+      await connection.changeTable("trades", {}, async (t) => {
         await t.removeCheckConstraint("price > 0", { name: "price_check" });
       });
 

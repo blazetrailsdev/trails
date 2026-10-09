@@ -421,7 +421,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   /** @internal */
-  protected isFindTarget(): boolean {
+  isFindTarget(): boolean {
     return (
       !this.isLoaded() && (!this.owner.isNewRecord() || this.foreignKeyPresent()) && !!this.klass
     );

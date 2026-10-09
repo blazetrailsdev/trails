@@ -6,7 +6,7 @@
     "rootDir": "src"
   },
   "include": ["src"],
-  "exclude": ["src/tsc-wrapper/__fixtures__"],
+  "exclude": ["src/tsc-wrapper/__fixtures__", "src/type-virtualization/fixtures"],
   "references": [
     { "path": "../activerecord" },
     { "path": "../activesupport" },

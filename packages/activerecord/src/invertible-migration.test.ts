@@ -33,7 +33,7 @@ class InvertibleMigration extends SilentMigration {
 
 class InvertibleChangeTableMigration extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.column("name", "string");
       await t.remove("remind_at", { type: "datetime" });
     });
@@ -102,7 +102,7 @@ class RemoveIndexMigration1 extends SilentMigration {
 
 class RemoveIndexMigration2 extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.removeIndex(["name", "color"]);
       if (await (t as any).indexExists?.(["color"])) {
         await t.removeIndex(["color"]);
@@ -231,7 +231,7 @@ class RevertNonNamedExpressionIndexMigration extends SilentMigration {
 
 class RevertCustomForeignKeyTable extends SilentMigration {
   async change(): Promise<void> {
-    await this.changeTable("horses", async (t) => {
+    await this.changeTable("horses", {}, async (t) => {
       await t.references("owner", { foreignKey: { toTable: "developers" } } as any);
     });
   }

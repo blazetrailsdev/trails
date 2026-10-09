@@ -154,11 +154,11 @@ export class ConnectionPoolConfiguration {
   declare _queryCacheVersion: { value: number };
   declare _pinnedConnection: unknown;
 
-  checkoutAndVerify(
+  async checkoutAndVerify(
     super_: (connection: QueryCacheHost) => unknown,
     connection: QueryCacheHost,
-  ): QueryCacheHost {
-    super_(connection);
+  ): Promise<QueryCacheHost> {
+    await super_(connection);
     connection._queryCache ||= this.queryCache;
     return connection;
   }

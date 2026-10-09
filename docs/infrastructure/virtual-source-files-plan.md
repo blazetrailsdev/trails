@@ -6,7 +6,7 @@ Last updated: 2026-05-22.
 
 Verified shipped: 1b.3 #553, 1b.4 #557, 1b.5 #561, 1b.6 #563, #596
 (schema-only declares), #919 (Temporal types from virtualizer); R.1 #532,
-R.2 #536, R.3 #543. `packages/activerecord/src/type-virtualization/` is
+R.2 #536, R.3 #543. `packages/activerecord-cli/src/type-virtualization/` is
 populated with `virtualize.ts`, `walker.ts`, `synthesize.ts`,
 `type-registry.ts`, `transitive-extends-walker.ts`, `resolve-target.ts`.
 
@@ -172,7 +172,7 @@ registry.
 ### The virtualize function
 
 ```ts
-// packages/activerecord/src/type-virtualization/virtualize.ts
+// packages/activerecord-cli/src/type-virtualization/virtualize.ts
 export interface VirtualizeResult {
   text: string;
   deltas: LineDelta[]; // injected-line offsets; consumed by diagnostic remapping
@@ -289,7 +289,7 @@ Rules:
 ### Shared internals
 
 Both shells share one module tree, all inside
-`packages/activerecord/src/type-virtualization/`:
+`packages/activerecord-cli/src/type-virtualization/`:
 
 1. **`virtualize.ts`** — pure text-transform.
 2. **`walker.ts`** — finds matching classes and extracts runtime calls.
@@ -346,21 +346,21 @@ independently testable and shippable:
 
 **Shared prerequisites — what we can reuse verbatim from Phase 1b:**
 
-- `packages/activerecord/src/type-virtualization/virtualize.ts` —
+- `packages/activerecord-cli/src/type-virtualization/virtualize.ts` —
   `virtualize(originalText, fileName, { baseNames, prependImports })`
   returns `{ text, deltas }`. Pure syntactic transform; no Program or
   checker. The plugin calls it exactly the same way the CLI does.
-- `packages/activerecord/src/type-virtualization/transitive-extends-walker.ts` —
+- `packages/activerecord-cli/src/type-virtualization/transitive-extends-walker.ts` —
   `collectBaseDescendants(program)` returns `{ baseNames, modelRegistry }`.
   Runs against the language service's `program` instead of a CLI-built
   one.
 - `packages/activerecord/src/tsc-wrapper/auto-import.ts` —
   `resolveAutoImports(text, fileName, modelRegistry, baseNames)`
   returns the `import type { ... }` lines to prepend. Same call site.
-- `packages/activerecord/src/type-virtualization/resolve-target.ts` —
+- `packages/activerecord-cli/src/type-virtualization/resolve-target.ts` —
   `resolveAssociationTarget(call)` already shared between the
   virtualizer and auto-import resolver.
-- `packages/activerecord/src/type-virtualization/virtualize.ts#remapLine`
+- `packages/activerecord-cli/src/type-virtualization/virtualize.ts#remapLine`
   - `packages/activerecord/src/tsc-wrapper/remap.ts#remapDiagnostics`
     (with the optional `originalSfCache`) — reused for mapping IDE
     positions back to user coordinates.
@@ -675,7 +675,7 @@ on every snapshot change.
   `Base` (or any known base name) before running the AST parse.
   Early-return the original snapshot if none match. Already used in
   the CLI host; hoist into a shared
-  `packages/activerecord/src/type-virtualization/fast-filter.ts`
+  `packages/activerecord-cli/src/type-virtualization/fast-filter.ts`
   module and reuse.
 - Walker memoization keyed on the set of root source files. Since
   `ts.Program.getSourceFiles()` returns the same `SourceFile` objects

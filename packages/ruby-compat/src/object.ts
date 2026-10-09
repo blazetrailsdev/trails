@@ -905,6 +905,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
+  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
+    return rbStrSend(recv, mid, ...args)[0];
+  }
   const obj = Object(recv) as Record<string, unknown>;
   const attr = mid.endsWith("=") ? mid.slice(0, -1) : undefined;
   const writer = writerSpelling(attr);
@@ -917,9 +920,6 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (setter) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
-  }
-  if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
-    return rbStrSend(recv, mid, ...args)[0];
   }
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));

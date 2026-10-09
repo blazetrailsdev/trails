@@ -107,8 +107,8 @@ path and the settled shape splits it the same way:
   `#primaryKeys` and `#dataSourceExists` are the async ports;
   `loadSchemaFromAdapter` (`model-schema.ts`) warms all three inside a
   `withConnection` scope and then enters the single `loadSchemaBang` body.
-  `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` and
-  `SchemaReflection.eagerLoadSchemaCache` warm a whole pool up front.
+  `SchemaReflection#loadAllBang` / `BoundSchemaReflection#loadAllBang` warm a
+  whole pool up front.
 - **A booted app warms before user code runs.** Rails loads schema lazily on
   first touch and its `active_record.define_attribute_methods` initializer
   (`activerecord/lib/active_record/railtie.rb:145-185`) is only an eager

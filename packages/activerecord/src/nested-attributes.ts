@@ -8,10 +8,12 @@ import {
   extractOptionsBang,
   included,
   isBlank,
+  kernelArray,
   singularize,
 } from "@blazetrails/activesupport";
-import { except, rbFSend, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { except, rbEqual, rbFSend, rbObjMethod, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
+import { isCompositePrimaryKey } from "./attribute-methods/primary-key.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {}
@@ -125,7 +127,10 @@ export function isRejectNewRecord(
   );
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE nested-attributes-maybe-promise-assignment-arms
+ */
 export function assignToOrMarkForDestruction(
   record: Base,
   attributes: Record<string, unknown>,
@@ -142,14 +147,12 @@ export function assignToOrMarkForDestruction(
 
 /** @internal */
 export function findRecordById(klass: typeof Base, records: Base[], id: unknown): Base | undefined {
-  if (Array.isArray((klass as any).primaryKey)) {
-    const needle = (Array.isArray(id) ? id : [id]).map(String);
-    return records.find((r) => {
-      const rid = Array.isArray(r.id) ? r.id : [r.id];
-      return rid.map(String).join(",") === needle.join(",");
-    });
+  if (isCompositePrimaryKey.call(klass)) {
+    id = kernelArray(id).map(String);
+    return records.find((record) => rbEqual(kernelArray(record.id).map(String), id));
+  } else {
+    return records.find((record) => String(record.id) === String(id));
   }
-  return records.find((r) => String(r.id) === String(id));
 }
 
 /** @internal */
@@ -193,23 +196,27 @@ export function checkRecordLimitBang(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm loop — PERMANENT
+ */
 export function generateAssociationWriter(
   this: typeof Base,
   associationName: string,
   type: "collection" | "one_to_one",
 ): void {
   const attrName = `${associationName}Attributes`;
-  const assign: (record: Base, name: string, value: any) => Promise<void> | void =
-    type === "collection"
-      ? assignNestedAttributesForCollectionAssociation
-      : assignNestedAttributesForOneToOneAssociation;
 
   this.generatedAssociationMethods().moduleEval((m) => {
     for (const methodName of [`set${camelize(attrName, true)}`, `${attrName}=`]) {
       Object.defineProperty(m, methodName, {
-        value(this: Base, value: any): Promise<void> | void {
-          return assign(this, associationName, value);
+        value(this: Base, attributes: unknown): Promise<void> | void {
+          return rbFSend(
+            this,
+            `assignNestedAttributesFor${camelize(type)}Association`,
+            associationName,
+            attributes,
+          ) as Promise<void> | void;
         },
         writable: true,
         configurable: true,
@@ -250,29 +257,36 @@ function nestedTypeName(value: unknown): string {
   return (value as { constructor?: { name?: string } }).constructor?.name ?? typeof value;
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE nested-attributes-maybe-promise-assignment-arms
+ */
 export function assignNestedAttributesForOneToOneAssociation(
-  record: Base,
+  this: Base,
   associationName: string,
   attributes: Record<string, unknown>,
 ): Promise<void> | void {
+  if (rbObjRespondTo(attributes, "permitted")) {
+    attributes = (attributes as unknown as { toH(): Record<string, unknown> }).toH();
+  }
+
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
     throw new ArgumentError(
       `Hash expected for \`${associationName}\` attributes, got ${nestedTypeName(attributes)}`,
     );
   }
 
-  const ctor = record.constructor as typeof Base;
+  const ctor = this.constructor as typeof Base;
   const options = ctor.nestedAttributesOptions[associationName] ?? {};
   const updateOnly = options.updateOnly ?? false;
   const hasId = hasNestedId(attributes);
 
-  const assoc = record.association(associationName) as unknown as OneToOneAssociation;
+  const assoc = this.association(associationName) as unknown as OneToOneAssociation;
   if ((hasId || updateOnly) && assoc.isLoaded() === false && "reader" in assoc) {
     const read = assoc.reader;
     if (read instanceof Promise) {
       return read.then(() =>
-        assignNestedAttributesForOneToOneAssociation(record, associationName, attributes),
+        assignNestedAttributesForOneToOneAssociation.call(this, associationName, attributes),
       );
     }
   }
@@ -283,7 +297,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     existingRecord &&
     (updateOnly || String(existingRecord.id) === String((attributes as any).id))
   ) {
-    if (!callRejectIf.call(record, associationName, attributes)) {
+    if (!callRejectIf.call(this, associationName, attributes)) {
       return assignToOrMarkForDestruction(
         existingRecord,
         attributes,
@@ -294,10 +308,10 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 
   if (hasId) {
-    raiseNestedAttributesRecordNotFoundBang(record, associationName, (attributes as any).id);
+    raiseNestedAttributesRecordNotFoundBang(this, associationName, (attributes as any).id);
   }
 
-  if (!isRejectNewRecord.call(record, associationName, attributes)) {
+  if (!isRejectNewRecord.call(this, associationName, attributes)) {
     const assignable = except(attributes, ...UNASSIGNABLE_KEYS);
     if (existingRecord && existingRecord.isNewRecord()) {
       const pending = existingRecord.setAttributes(assignable);
@@ -307,8 +321,8 @@ export function assignNestedAttributesForOneToOneAssociation(
       return assoc.initializeAttributes(existingRecord);
     } else {
       const method = `build${camelize(associationName, true)}`;
-      if (rbObjRespondTo(record, method)) {
-        const built = rbFSend(record, method, assignable);
+      if (rbObjRespondTo(this, method)) {
+        const built = rbFSend(this, method, assignable);
         if (built instanceof Promise) return built.then(() => {});
       } else {
         throw new ArgumentError(
@@ -322,11 +336,11 @@ export function assignNestedAttributesForOneToOneAssociation(
 
 /** @internal */
 export function assignNestedAttributesForCollectionAssociation(
-  record: Base,
+  this: Base,
   associationName: string,
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): Promise<void> | void {
-  const options = (record.constructor as typeof Base).nestedAttributesOptions[associationName];
+  const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
   if (rbObjRespondTo(attributesCollection, "permitted")) {
     attributesCollection = (attributesCollection as unknown as { toH(): never }).toH();
   }
@@ -337,7 +351,7 @@ export function assignNestedAttributesForCollectionAssociation(
     );
   }
 
-  checkRecordLimitBang.call(record, options.limit, attributesCollection);
+  checkRecordLimitBang.call(this, options.limit, attributesCollection);
 
   let attrs: Record<string, unknown>[];
   if (Array.isArray(attributesCollection)) {
@@ -351,7 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
     }
   }
 
-  const association = record.association(associationName) as CollectionAssociation;
+  const association = this.association(associationName) as CollectionAssociation;
 
   const assignRecords = (existingRecords: Base[]): Promise<void> | void => {
     const nestedTarget: (Base | null)[] = [];
@@ -362,7 +376,7 @@ export function assignNestedAttributesForCollectionAssociation(
       }
 
       if (!hasNestedId(a)) {
-        if (!isRejectNewRecord.call(record, associationName, a)) {
+        if (!isRejectNewRecord.call(this, associationName, a)) {
           nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
           nestedTarget.push(null);
@@ -370,7 +384,7 @@ export function assignNestedAttributesForCollectionAssociation(
       } else {
         let existingRecord = findRecordById(association.klass, existingRecords, (a as any).id);
         if (existingRecord) {
-          if (!callRejectIf.call(record, associationName, a)) {
+          if (!callRejectIf.call(this, associationName, a)) {
             const targetRecord = findRecordById(
               association.klass,
               association.target,
@@ -382,7 +396,7 @@ export function assignNestedAttributesForCollectionAssociation(
               (association as any).addToTarget(existingRecord, { skipCallbacks: true });
             }
 
-            const allowDestroy = isAllowDestroy.call(record, associationName);
+            const allowDestroy = isAllowDestroy.call(this, associationName);
             nestedTarget.push(existingRecord);
             pending = (
               pending
@@ -393,7 +407,7 @@ export function assignNestedAttributesForCollectionAssociation(
             nestedTarget.push(null);
           }
         } else {
-          raiseNestedAttributesRecordNotFoundBang(record, associationName, (a as any).id);
+          raiseNestedAttributesRecordNotFoundBang(this, associationName, (a as any).id);
         }
       }
     }

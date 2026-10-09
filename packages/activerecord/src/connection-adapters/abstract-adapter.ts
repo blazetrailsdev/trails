@@ -88,6 +88,7 @@ import {
   typeCast as abstractTypeCast,
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
+  ClassMethods as QuotingClassMethods,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
@@ -512,10 +513,14 @@ export interface AbstractAdapter
       columnOptions?: Record<string, unknown>;
     },
   ): Promise<void>;
+  /**
+   * drift-ok: the mixin defaults `options`, and an interface cannot spell an
+   * optional parameter before the required block.
+   */
   changeTable(
     tableName: string,
-    fnOrOptions?: ((t: TableOf<this>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<this>) => void | Promise<void>,
+    options: { bulk?: boolean } | undefined,
+    block: (t: TableOf<this>) => void | Promise<void>,
     base?: unknown,
   ): Promise<void>;
   /** @internal */
@@ -1447,8 +1452,8 @@ export class AbstractAdapter implements Quoting {
     await this.attemptConfigureConnection();
   }
 
-  throwAwayBang(): void | Promise<void> {
-    this.pool.remove(this);
+  async throwAwayBang(): Promise<void> {
+    await this.pool.remove(this);
     return this.disconnectBang();
   }
 
@@ -1971,7 +1976,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   static quoteColumnName(columnName: unknown): string {
-    return abstractQuoteColumnName(columnName);
+    return QuotingClassMethods.quoteColumnName(columnName);
   }
 
   private static readonly DEFAULT_READ_QUERY = [
@@ -1994,7 +1999,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   quoteColumnName(columnName: unknown): string {
-    return (this.constructor as typeof AbstractAdapter).quoteColumnName(columnName);
+    return abstractQuoteColumnName.call(this, columnName);
   }
 
   quoteTableNameForAssignment(table: string, attr: string): string {

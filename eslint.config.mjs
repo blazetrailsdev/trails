@@ -148,7 +148,7 @@ export default defineConfig(
       // parser's project service cannot resolve them when linted by path.
       "packages/website/vite.sw.config.ts",
       "packages/website/vitest.config.ts",
-      "packages/activerecord/src/type-virtualization/fixtures/**",
+      "packages/activerecord-cli/src/type-virtualization/fixtures/**",
       // `strip-asany`'s input sample is a file full of `as any` by
       // construction — linting it would be linting the codemod's test data.
       "scripts/__fixtures__/**",

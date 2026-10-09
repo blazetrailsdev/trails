@@ -139,7 +139,7 @@ describe("Migration", () => {
     it("timestamps have null constraints if not present in migration of change table", async () => {
       const migration = new (class extends Migration.get(4.2) {
         override async migrate(_x: unknown): Promise<void> {
-          await this.changeTable("testings", async (t) => {
+          await this.changeTable("testings", {}, async (t) => {
             await t.timestamps();
           });
         }
@@ -222,7 +222,7 @@ describe("Migration", () => {
     it("timestamps doesnt set precision on change table", async () => {
       const migration = new (class extends Migration.get(5.2) {
         override async migrate(_x: unknown): Promise<void> {
-          await this.changeTable("testings", async (t) => {
+          await this.changeTable("testings", {}, async (t) => {
             await t.timestamps({ default: RubyTime.now() });
           });
         }
@@ -315,7 +315,7 @@ describe("Migration", () => {
     it("change table allows if exists option on 7 0", async () => {
       const migration = new (class extends Migration.get(7.0) {
         override async migrate(_x: unknown): Promise<void> {
-          await this.changeTable("testings", async (t) => {
+          await this.changeTable("testings", {}, async (t) => {
             await t.remove("foo", { ifExists: true });
           });
         }
@@ -841,7 +841,7 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
         await this.createTable("legacy_primary_keys", { id: false }, (t) => {
           t.integer("dummy");
         });
-        await this.changeTable("legacy_primary_keys", async (t) => {
+        await this.changeTable("legacy_primary_keys", {}, async (t) => {
           await t.primaryKey("id");
         });
       }

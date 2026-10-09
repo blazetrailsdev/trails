@@ -1,5 +1,5 @@
 import { asJson, indexWith, isBlank } from "@blazetrails/activesupport";
-import { hashAset, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { hashAset, rbCheckArrayType, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
@@ -71,7 +71,8 @@ export function serializableHash(
             `includes / preload) — synchronous serialization cannot query the database.`,
         );
       }
-      const items = Array.isArray(records) ? records : Array.from(records);
+      const items = rbCheckArrayType(records);
+      if (items == null) throw new NoMethodError("undefined method 'map' for nil");
       hashAset(
         result,
         assocName,
@@ -251,9 +252,7 @@ async function preloadIncludes(
   for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
-      ? Array.isArray(records)
-        ? records
-        : Array.from(records)
+      ? (rbCheckArrayType(records) ?? [])
       : records != null && typeof records === "object"
         ? [records]
         : [];
@@ -355,11 +354,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
 
 /** @internal */
 function isSerializableCollection(value: unknown): value is Iterable<unknown> {
-  if (Array.isArray(value)) return true;
-  if (value == null || typeof value !== "object") return false;
-  if ((value as SerializationRecord)._attributes) return false;
-  if (typeof (value as { toArray?: unknown }).toArray === "function") return true;
-  return typeof (value as { [Symbol.iterator]?: unknown })[Symbol.iterator] === "function";
+  return rbObjRespondTo(value, "toAry");
 }
 
 function rubyArray(value: string | string[] | null | undefined): string[] {

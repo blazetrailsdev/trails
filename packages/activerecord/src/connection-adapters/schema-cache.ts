@@ -28,9 +28,6 @@ export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
 
-  /** @noRailsEquivalent PERMANENT */
-  static eagerLoadSchemaCache = false;
-
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
 
@@ -261,6 +258,14 @@ export class BoundSchemaReflection {
 
   async dumpTo(filename: string): Promise<SchemaCache> {
     return this._schemaReflection.dumpTo(this._pool, filename);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._schemaReflection.loadedCache?.getCachedIndexes(tableName);
   }
 
   /**
@@ -600,6 +605,14 @@ export class SchemaCache {
    */
   getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
     return this._primaryKeys.get(tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedIndexes(tableName: string): IndexDefinition[] | undefined {
+    return this._indexes.get(tableName);
   }
 
   /**

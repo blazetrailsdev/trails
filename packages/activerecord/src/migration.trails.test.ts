@@ -232,14 +232,18 @@ describe("MigrationTest", () => {
         seen.push([tableName, base]);
         return new AdapterTable(tableName, base as never);
       },
-      async changeTable(tableName: string, fn: (t: Table) => void | Promise<void>): Promise<void> {
+      async changeTable(
+        tableName: string,
+        _options: object,
+        fn: (t: Table) => void | Promise<void>,
+      ): Promise<void> {
         await fn(this.updateTableDefinition(tableName, this));
       },
     };
     (m as unknown as { _connectionOverride: unknown })._connectionOverride = connection;
 
     let yielded: unknown;
-    await m.changeTable("people", (t) => {
+    await m.changeTable("people", {}, (t) => {
       yielded = t;
     });
 
@@ -572,10 +576,10 @@ describe("Migration#removeColumns forwards to the connection", () => {
       await migration.createTable("testings", (t) => {
         yielded.push(t);
       });
-      await migration.changeTable("testings", (t) => {
+      await migration.changeTable("testings", {}, (t) => {
         yielded.push(t);
       });
-      await migration.changeTable("testings", undefined, (t) => {
+      await migration.changeTable("testings", {}, (t) => {
         yielded.push(t);
       });
       await migration.createTable("more_testings", undefined, (t) => {

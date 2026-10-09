@@ -235,6 +235,28 @@ describe("Serialization — trails-only coverage", () => {
     expect((result.comments as any[])[0].author).toBeUndefined();
   });
 
+  it("include naming a method that returns a Set raises NoMethodError", async () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: new Set([new Tag({ name: "rails" })]) });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+    await expect(p.serializableHash({ include: "tags" })).rejects.toThrow(NoMethodError);
+  });
+
+  it("include naming a to_ary that answers nil raises rather than serializing nothing", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toAry: () => null } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
+  it("include naming an object that answers toArray but not to_ary is sent serializable_hash", () => {
+    const p = new Post({ title: "Hello", body: "World", rating: 5 });
+    setAssociationAccessors(p, { tags: { toArray: () => Promise.resolve([]) } });
+
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
+  });
+
   it("awaited nested include preloads through an attributes-less PORO", async () => {
     const comment = { _attributes: new Map([["text", "Nice"]]) };
     const comments = {
@@ -243,8 +265,8 @@ describe("Serialization — trails-only coverage", () => {
         this.loaded = true;
         return Promise.resolve();
       },
-      [Symbol.iterator](): Iterator<unknown> {
-        return [comment][Symbol.iterator]();
+      toAry(): unknown[] {
+        return [comment];
       },
     };
     const author = { name: "Bob", comments };
