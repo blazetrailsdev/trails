@@ -1246,9 +1246,12 @@ export class StatementPool extends GenericStatementPool<SqliteStatement> {
     return this.clear();
   }
 
-  /** @internal */
-  protected override dealloc(stmt: SqliteStatement): void | Promise<void> {
-    if (!stmt.closed) return stmt.close();
+  /**
+   * @internal
+   * @inventedArm try — CONVERGEABLE sqlite3-statement-pool-dealloc-drops-an-async-close-rejection
+   */
+  protected override dealloc(stmt: SqliteStatement): void {
+    if (!stmt.closed) void Promise.resolve(stmt.close()).catch(() => {});
   }
 }
 
