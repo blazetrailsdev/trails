@@ -247,14 +247,14 @@ describe("Serialization — trails-only coverage", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
     setAssociationAccessors(p, { tags: { toAry: () => null } });
 
-    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(TypeError);
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
   });
 
-  it("include naming a loaded collection that cannot be read raises rather than serializing nothing", () => {
+  it("include naming an object that answers toArray but not to_ary is sent serializable_hash", () => {
     const p = new Post({ title: "Hello", body: "World", rating: 5 });
-    setAssociationAccessors(p, { tags: { loaded: true, toArray: () => Promise.resolve([]) } });
+    setAssociationAccessors(p, { tags: { toArray: () => Promise.resolve([]) } });
 
-    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(TypeError);
+    expect(() => p.serializableHash({ include: "tags" }).tags).toThrow(NoMethodError);
   });
 
   it("awaited nested include preloads through an attributes-less PORO", async () => {
@@ -265,11 +265,8 @@ describe("Serialization — trails-only coverage", () => {
         this.loaded = true;
         return Promise.resolve();
       },
-      toArray(): Promise<unknown[]> {
-        return Promise.resolve([comment]);
-      },
-      [Symbol.iterator](): Iterator<unknown> {
-        return [comment][Symbol.iterator]();
+      toAry(): unknown[] {
+        return [comment];
       },
     };
     const author = { name: "Bob", comments };

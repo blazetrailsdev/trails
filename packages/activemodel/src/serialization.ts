@@ -71,7 +71,8 @@ export function serializableHash(
             `includes / preload) — synchronous serialization cannot query the database.`,
         );
       }
-      const items = rbCheckArrayType(records) ?? [...records];
+      const items = rbCheckArrayType(records);
+      if (items == null) throw new NoMethodError("undefined method 'map' for nil");
       hashAset(
         result,
         assocName,
@@ -251,7 +252,7 @@ async function preloadIncludes(
   for (const [name, opts] of entries) {
     const records = await resolveIncludeAsync(record, name);
     const children = isSerializableCollection(records)
-      ? (rbCheckArrayType(records) ?? [...records])
+      ? (rbCheckArrayType(records) ?? [])
       : records != null && typeof records === "object"
         ? [records]
         : [];
@@ -353,7 +354,7 @@ function sendAssociation(record: SerializationRecord, name: string): unknown {
 
 /** @internal */
 function isSerializableCollection(value: unknown): value is Iterable<unknown> {
-  return rbObjRespondTo(value, "toAry") || rbObjRespondTo(value, "toArray");
+  return rbObjRespondTo(value, "toAry");
 }
 
 function rubyArray(value: string | string[] | null | undefined): string[] {
