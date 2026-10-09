@@ -1,5 +1,6 @@
 import type pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
+import { pgError } from "./exceptions.js";
 import { PG } from "./pg.js";
 
 export interface PGConnection extends pg.Client {
@@ -101,7 +102,7 @@ function prepare(this: pg.Client, stmtName: string, sql: string): Promise<void> 
         connection.sync();
         return null;
       },
-      handleError: reject,
+      handleError: (error: unknown) => reject(pgError(error)),
       handleReadyForQuery: () => {
         let prepared = PREPARED.get(this);
         if (!prepared) PREPARED.set(this, (prepared = new Map()));
@@ -151,6 +152,16 @@ async function execParams(
       types: types(this),
     }),
   );
+}
+
+function query(native: (...args: unknown[]) => unknown) {
+  return function (this: pg.Client, ...args: unknown[]): unknown {
+    const pending = native.apply(this, args) as { catch?: unknown } | null | undefined;
+    if (typeof pending?.catch !== "function") return pending;
+    return (pending as Promise<unknown>).catch((error: unknown) => {
+      throw pgError(error);
+    });
+  };
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
@@ -250,6 +261,10 @@ export const asyncCancel = cancel;
 export function pgConnection<T extends object>(client: T): T & PGConnection {
   if (!READY_FOR_QUERY.has(client)) {
     READY_FOR_QUERY.set(client, "I");
+    const native = (client as { query?: unknown }).query;
+    if (typeof native === "function") {
+      (client as { query?: unknown }).query = query(native as (...args: unknown[]) => unknown);
+    }
     const connection = (client as unknown as Client).connection;
     if (typeof connection?.on === "function") {
       connection.on("readyForQuery", (message: { status?: string }) => {

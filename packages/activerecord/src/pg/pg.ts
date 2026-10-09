@@ -1,9 +1,12 @@
+import { ConnectionBad, PG_DIAG_SQLSTATE } from "./exceptions.js";
 import { Result as PGResult } from "./result.js";
 import { Array as TextDecoderArray } from "./text-decoder/array.js";
 import { Array as TextEncoderArray } from "./text-encoder/array.js";
 
 export const PG = {
   Result: PGResult,
+  ConnectionBad,
+  PG_DIAG_SQLSTATE,
   TextEncoder: { Array: TextEncoderArray },
   TextDecoder: { Array: TextDecoderArray },
 };

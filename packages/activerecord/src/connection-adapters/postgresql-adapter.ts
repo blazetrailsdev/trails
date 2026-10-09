@@ -65,6 +65,7 @@ import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
 import { pgConnection, type PGConnection } from "../pg/connection.js";
+import { pgError } from "../pg/exceptions.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -241,6 +242,7 @@ export class PostgreSQLAdapter
       return client;
     } catch (error) {
       if (!(error instanceof Error)) throw error;
+      pgError(error);
       if (database === "postgres") {
         throw new ConnectionNotEstablished(error.message);
       } else if (database && error.message.includes(database)) {
@@ -1103,8 +1105,7 @@ export class PostgreSQLAdapter
       /no connection to the server/i.test(exception.message);
     if (
       !(exception instanceof pg.DatabaseError) &&
-      !PostgreSQLAdapter._isConnectionError(exception) &&
-      !PostgreSQLAdapter._isConnectionClosedBeforeSend(exception) &&
+      !(exception instanceof PG.ConnectionBad) &&
       !noConnection
     ) {
       return exception;
@@ -1114,11 +1115,8 @@ export class PostgreSQLAdapter
       case undefined:
         if (noConnection) {
           return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
-        } else if (
-          PostgreSQLAdapter._isConnectionError(exception) ||
-          PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)
-        ) {
-          if (!PostgreSQLAdapter._isConnectionClosedBeforeSend(exception)) {
+        } else if (exception instanceof PG.ConnectionBad) {
+          if (PG.ConnectionBad.isLibpq(exception)) {
             return new ConnectionFailed(exception, { connectionPool: this.pool });
           } else {
             return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
@@ -1617,28 +1615,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   /** @internal */
   affectedRows(result: PG.Result): number {
     return pgAffectedRows(result);
-  }
-
-  private static _isConnectionError(err: unknown): boolean {
-    const e = err as { code?: string; message?: string } | null | undefined;
-    if (!e) return false;
-    if (typeof e.code === "string" && e.code.startsWith("08")) return true;
-    const msg = typeof e.message === "string" ? e.message : "";
-    if (!msg) return false;
-    return (
-      msg.includes("Client has encountered a connection error") ||
-      msg.includes("invalid frontend message type") ||
-      msg.includes("Connection terminated") ||
-      msg.includes("client has already ended")
-    );
-  }
-
-  private static _isConnectionClosedBeforeSend(err: unknown): boolean {
-    const msg =
-      typeof (err as { message?: string })?.message === "string"
-        ? (err as { message: string }).message
-        : "";
-    return msg.includes("client has already ended") || /client was closed/i.test(msg);
   }
 
   /** @internal */
