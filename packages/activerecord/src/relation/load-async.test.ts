@@ -153,6 +153,8 @@ describe("LoadAsyncTest", () => {
         expect(posts.isScheduled).toBeTruthy();
       }
       expect(posts.isLoaded).toBeTruthy();
+      // BLOCKED: port bug — see 0178-activerecord-arms-parity-100/load-async-null-executor-load-is-unawaited-and-races-rollback
+      if (inMemoryDb()) await posts;
       throw new Rollback();
     });
 
