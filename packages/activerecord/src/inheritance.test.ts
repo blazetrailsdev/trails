@@ -22,7 +22,7 @@ import { classify, underscore } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import * as Type from "./type.js";
 import { fixtures } from "./test-fixtures.js";
-import { Inheritance, stiName, isBaseClass, baseClass, registerSubclass } from "./inheritance.js";
+import { Inheritance, stiName, isBaseClass, baseClass } from "./inheritance.js";
 import { registerModel } from "./associations.js";
 import {
   ActiveRecordError,
@@ -625,8 +625,8 @@ describe("InheritanceAttributeTest", () => {
   }
 
   registerModel([AttrTestCompany, AttrTestStartup, AttrTestEmpire]);
-  registerSubclass(AttrTestStartup);
-  registerSubclass(AttrTestEmpire);
+  registerModel(AttrTestStartup);
+  registerModel(AttrTestEmpire);
 
   it("inheritance new with subclass as default", () => {
     const startup = new AttrTestCompany();
@@ -683,8 +683,8 @@ describe("InheritanceAttributeMappingTest", () => {
   }
 
   registerModel([IamtCompany, IamtStartup, IamtEmpire]);
-  registerSubclass(IamtStartup);
-  registerSubclass(IamtEmpire);
+  registerModel(IamtStartup);
+  registerModel(IamtEmpire);
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
   class IamtSponsor extends Base {

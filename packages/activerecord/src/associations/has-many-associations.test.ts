@@ -8,7 +8,6 @@ import {
   Base,
   CollectionProxy,
   registerModel,
-  registerSubclass,
   RecordNotFound,
   RecordNotSaved,
   RecordNotDestroyed,
@@ -539,9 +538,9 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany.inheritanceColumn = "type";
     class StiFirm extends StiCompany {}
-    registerSubclass(StiFirm);
+    registerModel(StiFirm);
     class StiClient extends StiCompany {}
-    registerSubclass(StiClient);
+    registerModel(StiClient);
     class StiAccount extends Base {
       declare name: string | null;
 
@@ -592,7 +591,7 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany2.inheritanceColumn = "type";
     class StiClient2 extends StiCompany2 {}
-    registerSubclass(StiClient2);
+    registerModel(StiClient2);
     registerModel(StiCompany2);
     registerModel(StiClient2);
 
@@ -634,7 +633,7 @@ describe("HasManyAssociationsTest", () => {
     }
     StiCompany3.inheritanceColumn = "type";
     class StiClient3 extends StiCompany3 {}
-    registerSubclass(StiClient3);
+    registerModel(StiClient3);
     registerModel(StiCompany3);
     registerModel(StiClient3);
 

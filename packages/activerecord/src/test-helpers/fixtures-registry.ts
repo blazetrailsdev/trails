@@ -492,23 +492,23 @@ export const fixtureRegistry = {
     data: FixtureData.referenceFixtureData,
   },
   shardedBlogPosts: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlogPost),
+    model: () => import("./models/sharded/blog-post.js").then((m) => m.ShardedBlogPost),
     data: FixtureData.shardedBlogPostFixtureData,
   },
   shardedBlogPostsTags: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlogPostTag),
+    model: () => import("./models/sharded/blog-post-tag.js").then((m) => m.ShardedBlogPostTag),
     data: FixtureData.shardedBlogPostTagFixtureData,
   },
   shardedBlogs: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedBlog),
+    model: () => import("./models/sharded/blog.js").then((m) => m.ShardedBlog),
     data: FixtureData.shardedBlogFixtureData,
   },
   shardedComments: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedComment),
+    model: () => import("./models/sharded/comment.js").then((m) => m.ShardedComment),
     data: FixtureData.shardedCommentFixtureData,
   },
   shardedTags: {
-    model: () => import("./models/sharded.js").then((m) => m.ShardedTag),
+    model: () => import("./models/sharded/tag.js").then((m) => m.ShardedTag),
     data: FixtureData.shardedTagFixtureData,
   },
   ships: {

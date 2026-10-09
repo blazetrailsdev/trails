@@ -1,7 +1,7 @@
 import type { CollectionAssociation } from "./collection-association.js";
 import { kernelThrow } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { Base, registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel } from "../index.js";
 
 import { assertEmpty } from "@blazetrails/activesupport";
 import { fixtures } from "../test-fixtures.js";
@@ -480,8 +480,8 @@ describe("AssociationCallbacksTest", () => {
     registerModel(Client);
     registerModel(Account);
     Company.inheritanceColumn = "type";
-    registerSubclass(Firm);
-    registerSubclass(Client);
+    registerModel(Firm);
+    registerModel(Client);
   });
 
   it("has many callbacks for destroy on parent", async () => {

@@ -174,7 +174,7 @@ export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,
 ): ValueType {
-  if (this.typeMap == null) void this.verifyBang();
+  if (this.typeMap == null) this.verifyBang().catch(() => {});
   return this.typeMap.lookup(column.oid as number, column.fmod as number, column.sqlType as string);
 }
 

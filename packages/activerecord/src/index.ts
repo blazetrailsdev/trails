@@ -79,7 +79,7 @@ export {
   isTriggerTransactionalCallbacks,
 } from "./transactions.js";
 export type { EnumMacroOptions } from "./enum.js";
-export { registerSubclass, findStiClass } from "./inheritance.js";
+export { findStiClass } from "./inheritance.js";
 export { LockingType } from "./locking/optimistic.js";
 export {
   storedAttributes,

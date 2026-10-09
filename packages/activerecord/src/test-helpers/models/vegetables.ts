@@ -1,7 +1,7 @@
 import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Company } from "./company.js";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 export class Vegetable extends Base {
   declare custom_type: string;
@@ -44,7 +44,7 @@ export interface RedCabbage {
 }
 
 for (const klass of [Cucumber, Cabbage, GreenCabbage, KingCole, RedCabbage]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }
 
 export class YellingVegetable extends Vegetable {

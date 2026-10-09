@@ -1,25 +1,29 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
 
 export class ShardedBlogPostDestroyAsync extends Base {
   static _tableName = "sharded_blog_posts";
+  static {
+    registerConstant("Sharded::BlogPostDestroyAsync", this);
+  }
 
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    this.belongsTo("blog", { className: "ShardedBlog" });
+    this.belongsTo("blog", { className: "Sharded::Blog" });
     this.hasMany("comments", {
-      className: "ShardedCommentDestroyAsync",
+      className: "Sharded::CommentDestroyAsync",
       dependent: "destroy",
       foreignKey: ["blog_id", "blog_post_id"],
     });
     this.hasMany("blogPostTags", {
-      className: "ShardedBlogPostTag",
+      className: "Sharded::BlogPostTag",
       foreignKey: ["blog_id", "blog_post_id"],
     });
     this.hasMany("tags", {
       through: "blogPostTags",
-      className: "ShardedTag",
+      className: "Sharded::Tag",
       dependent: "destroy",
     });
   }

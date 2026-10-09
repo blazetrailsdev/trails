@@ -78,7 +78,9 @@ import { Section } from "../test-helpers/models/section.js";
 import { User } from "../test-helpers/models/user.js";
 import { Family } from "../test-helpers/models/family.js";
 import { FamilyTree } from "../test-helpers/models/family-tree.js";
-import { ShardedBlogPost, ShardedTag, ShardedBlogPostTag } from "../test-helpers/models/sharded.js";
+import { ShardedBlogPost } from "../test-helpers/models/sharded/blog-post.js";
+import { ShardedTag } from "../test-helpers/models/sharded/tag.js";
+import { ShardedBlogPostTag } from "../test-helpers/models/sharded/blog-post-tag.js";
 import {
   CpkTag,
   CpkOrder,

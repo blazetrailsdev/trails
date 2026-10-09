@@ -1,13 +1,27 @@
+import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../../base.js";
 import { queryConstraints } from "../../../persistence.js";
+import type { ShardedBlogPost } from "./blog-post.js";
+import type { ShardedTag } from "./tag.js";
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class ShardedBlogPostTag extends Base {
   static _tableName = "sharded_blog_posts_tags";
+  static {
+    registerConstant("Sharded::BlogPostTag", this);
+  }
 
   static {
     queryConstraints.call(this, "blog_id", "id");
 
-    this.belongsTo("blogPost", { className: "ShardedBlogPost" });
-    this.belongsTo("tag", { className: "ShardedTag" });
+    this.belongsTo("blogPost", { className: "Sharded::BlogPost" });
+    this.belongsTo("tag", { className: "Sharded::Tag" });
   }
+}
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface ShardedBlogPostTag {
+  get blogPost(): ShardedBlogPost | null | Promise<ShardedBlogPost | null>;
+  set blogPost(value: ShardedBlogPost | null);
+  get tag(): ShardedTag | null | Promise<ShardedTag | null>;
+  set tag(value: ShardedTag | null);
 }

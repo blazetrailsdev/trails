@@ -8,7 +8,7 @@ import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { TimeWithZone } from "@blazetrails/activesupport";
 import { Module, rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface Topic {
@@ -298,5 +298,5 @@ export class WebTopic extends Base {
 }
 
 for (const klass of [DefaultRejectedTopic, BlankTopic, TitlePrimaryKeyTopic]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

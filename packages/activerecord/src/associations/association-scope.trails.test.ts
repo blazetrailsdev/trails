@@ -1,6 +1,6 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect } from "vitest";
-import { Base, registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { loadSingularTarget } from "../test-helpers/load-singular-target.js";
 import { AssociationScope, ReflectionProxy } from "./association-scope.js";
@@ -339,7 +339,7 @@ describe("AssociationScope", () => {
     }
     class StiAsSubOwner extends StiAsOwner {}
     StiAsOwner.inheritanceColumn = "type";
-    registerSubclass(StiAsSubOwner);
+    registerModel(StiAsSubOwner);
     class StiAsComment extends Base {
       declare commentable_id: number | null;
       declare commentable_type: string | null;

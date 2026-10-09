@@ -1,6 +1,5 @@
 import { describe, it, expect } from "vitest";
 import { Base, SubclassNotFound, UnknownPrimaryKey, registerModel } from "./index.js";
-import { registerSubclass } from "./inheritance.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { include, initialize } from "@blazetrails/activesupport";
 import { fixtures } from "./test-fixtures.js";
@@ -126,7 +125,7 @@ describe("_applyScopeAttributes — a scope that sets type wins over the STI def
     ScopeStiVehicle.inheritanceColumn = "type";
     class ScopeStiCar extends ScopeStiVehicle {}
     registerModel(ScopeStiVehicle);
-    registerSubclass(ScopeStiCar);
+    registerModel(ScopeStiCar);
 
     const rel = ScopeStiVehicle.where({ type: "ScopeStiVehicle" });
     await rel.scoping(async () => {
@@ -341,7 +340,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     class Firm extends Company {
       static {
-        registerSubclass(this);
+        registerModel(this);
         this.ignoredColumns = ["rating"];
       }
     }
@@ -385,7 +384,7 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     }
     class Firm extends Company {
       static {
-        registerSubclass(this);
+        registerModel(this);
         this.ignoredColumns = ["rating"];
       }
     }

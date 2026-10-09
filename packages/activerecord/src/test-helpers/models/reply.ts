@@ -1,6 +1,6 @@
 import { rbModConstSet, registerConstant } from "@blazetrails/ruby-compat";
 import { Topic, Web, WebTopic } from "./topic.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Reply extends Topic {
@@ -129,5 +129,5 @@ export class WebReply extends WebTopic {
 }
 
 for (const klass of [Reply, SillyReply, UniqueReply, SillyUniqueReply, WrongReply, WebReply]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

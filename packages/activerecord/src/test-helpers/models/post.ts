@@ -26,7 +26,7 @@ import { Base } from "../../base.js";
 import type { ColumnLike } from "../../model-schema.js";
 import { ScopeRegistry } from "../../scoping.js";
 import { DelegateCache } from "../../relation/delegation.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
@@ -1117,5 +1117,5 @@ for (const klass of [
   ConditionalStiPost,
   SubConditionalStiPost,
 ]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

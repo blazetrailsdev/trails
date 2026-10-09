@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { Base, registerModel, registerSubclass } from "../index.js";
+import { Base, registerModel } from "../index.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-fixtures.js";
@@ -105,7 +105,6 @@ describe("Association scope cache — through singular loads", () => {
     Membership.inheritanceColumn = "type";
     registerModel(Membership);
     registerModel(CurrentMembership);
-    registerSubclass(CurrentMembership);
     await Member.loadSchema();
     await Club.loadSchema();
     await Membership.loadSchema();

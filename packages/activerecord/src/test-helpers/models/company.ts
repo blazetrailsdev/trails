@@ -15,7 +15,7 @@ import type { NewContract } from "./contract.js";
 import type { Project } from "./project.js";
 import type { SpecialContract } from "./contract.js";
 import type { SpecialDeveloper } from "./developer.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 import { Rollback } from "../../errors.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -764,5 +764,5 @@ for (const klass of [
   VerySpecialClient,
   NewlyContractedCompany,
 ]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

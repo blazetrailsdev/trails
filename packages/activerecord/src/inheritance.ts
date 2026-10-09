@@ -12,7 +12,7 @@ import {
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { hashAref, rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
-import { DescendantsTracker, demodulize } from "@blazetrails/activesupport";
+import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
 export interface Inheritance {
@@ -118,13 +118,6 @@ export function polymorphicName(modelClass: typeof Base): string {
   const name = rbModName(base)!;
   const klass = modelClass as typeof Base & { storeFullClassName?: boolean };
   return klass.storeFullClassName ? name : demodulize(name);
-}
-
-/** @noRailsEquivalent CONVERGEABLE register-model-wrapper-is-deleted-tests-seat-constants */
-export function registerSubclass(klass: typeof Base): void {
-  const parent = rbClassSuperclass(klass);
-  if (!parent) return;
-  DescendantsTracker.registerSubclass(parent as never, klass as never);
 }
 
 export function baseClass(this: typeof Base): typeof Base {

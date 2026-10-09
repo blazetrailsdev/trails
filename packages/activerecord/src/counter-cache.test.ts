@@ -1,6 +1,6 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, beforeEach } from "vitest";
-import { registerModel, registerSubclass } from "./index.js";
+import { registerModel } from "./index.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Bulb, CustomBulb, FunkyBulb, FailedBulb } from "./test-helpers/models/bulb.js";
 import { Person } from "./test-helpers/models/person.js";
@@ -80,7 +80,7 @@ export class SpecialReply extends Reply {
 }
 
 for (const klass of [SpecialTopic, SpecialReply]) {
-  registerSubclass(klass);
+  registerModel(klass);
   registerModel(klass);
 }
 

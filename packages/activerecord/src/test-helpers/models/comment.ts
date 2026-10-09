@@ -10,7 +10,7 @@ import type { Post } from "./post.js";
 import type { Rating } from "./rating.js";
 import type { SpecialPostWithDefaultScope } from "./post.js";
 import { Base } from "../../base.js";
-import { registerSubclass } from "../../inheritance.js";
+import { registerModel } from "../../associations.js";
 
 export class OopsError extends Error {}
 registerConstant("OopsError", OopsError);
@@ -249,5 +249,5 @@ for (const klass of [
   CommentWithDefaultScopeReferencesAssociation,
   CommentWithAfterCreateUpdate,
 ]) {
-  registerSubclass(klass);
+  registerModel(klass);
 }

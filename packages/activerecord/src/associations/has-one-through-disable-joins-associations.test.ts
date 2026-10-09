@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { Notifications } from "@blazetrails/activesupport";
-import { registerModel, registerSubclass } from "../index.js";
+import { registerModel } from "../index.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Organization } from "../test-helpers/models/organization.js";
 import { MemberDetail } from "../test-helpers/models/member-detail.js";
@@ -52,12 +52,12 @@ registerModel(Project);
 registerModel(Developer);
 registerModel(AuditLog);
 Company.inheritanceColumn = "type";
-registerSubclass(Firm);
-registerSubclass(DependentFirm);
-registerSubclass(ExclusivelyDependentFirm);
-registerSubclass(RestrictedWithExceptionFirm);
-registerSubclass(RestrictedWithErrorFirm);
-registerSubclass(Client);
+registerModel(Firm);
+registerModel(DependentFirm);
+registerModel(ExclusivelyDependentFirm);
+registerModel(RestrictedWithExceptionFirm);
+registerModel(RestrictedWithErrorFirm);
+registerModel(Client);
 
 async function captureSql(block: () => Promise<unknown>): Promise<string[]> {
   const observed: string[] = [];

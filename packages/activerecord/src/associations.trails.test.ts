@@ -5,7 +5,9 @@ import { assertQueriesCount } from "./testing/query-assertions.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
-import { ShardedBlogPost, ShardedBlogPostTag, ShardedTag } from "./test-helpers/models/sharded.js";
+import { ShardedBlogPost } from "./test-helpers/models/sharded/blog-post.js";
+import { ShardedBlogPostTag } from "./test-helpers/models/sharded/blog-post-tag.js";
+import { ShardedTag } from "./test-helpers/models/sharded/tag.js";
 
 describe("AssociationsTest", () => {
   registerModel([ShardedBlogPost, ShardedTag, ShardedBlogPostTag]);
