@@ -1,14 +1,11 @@
 import { TopLevel } from "@blazetrails/activesupport";
-import type { Hash } from "@blazetrails/ruby-compat";
 import { Resolver } from "./database-selector/resolver.js";
 import type { ResolverContext } from "./database-selector/resolver.js";
 import { Session } from "./database-selector/resolver/session.js";
 
-export interface MiddlewareRequest {
-  isGet(): boolean;
-  isHead(): boolean;
-  session: Pick<Hash<string, unknown>, "get" | "set">;
-}
+export type MiddlewareRequest = InstanceType<
+  NonNullable<typeof TopLevel.ActionDispatch>["Request"]
+>;
 
 type ResolverClass = {
   call(context: ResolverContext, options: Record<string, unknown>): Resolver;
@@ -38,7 +35,7 @@ export class DatabaseSelector {
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
-    const request = new TopLevel.ActionDispatch!.Request(env) as MiddlewareRequest;
+    const request = new TopLevel.ActionDispatch!.Request(env);
 
     return this.selectDatabase(request, () => this.app(env));
   }

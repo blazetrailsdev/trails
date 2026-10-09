@@ -163,7 +163,11 @@ export namespace Delegation {
           enumerable: false,
           get(this: Record<string, unknown>) {
             const _ = resolve(this);
-            return _ == null ? undefined : (_ as Record<string, unknown>)[method];
+            if (_ == null) return undefined;
+            if (!(method in Object(_))) {
+              throw new NoMethodError(`undefined method '${method}' for ${String(_)}`);
+            }
+            return (_ as Record<string, unknown>)[method];
           },
         });
         continue;

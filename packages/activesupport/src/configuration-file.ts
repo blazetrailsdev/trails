@@ -30,11 +30,11 @@ export class ConfigurationFile {
       const parsed: unknown = yamlParse(source, options);
       return parsed != null && parsed !== false ? parsed : {};
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (!(error instanceof Error && error.name === "YAMLParseError")) throw error;
       throw new RuntimeError(
         `YAML syntax error occurred while parsing ${this.contentPath}. ` +
           `Please note that YAML must be consistently indented using spaces. Tabs are not allowed. ` +
-          `Error: ${errorMessage}`,
+          `Error: ${error.message}`,
       );
     }
   }

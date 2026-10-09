@@ -73,7 +73,11 @@ export const TopLevel: {
     root(): string | null | undefined;
   };
   ActionDispatch?: {
-    Request: new (env: Record<string, unknown>) => unknown;
+    Request: new (env: Record<string, unknown>) => {
+      isGet(): boolean;
+      isHead(): boolean;
+      session: { get(key: string): unknown; set(key: string, value: unknown): unknown };
+    };
     Routing: {
       PolymorphicRoutes: {
         HelperMethodBuilder: { path(): PolymorphicBuilder; url(): PolymorphicBuilder };

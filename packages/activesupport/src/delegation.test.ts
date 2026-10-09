@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { rbObjSingletonClass } from "@blazetrails/ruby-compat";
+import { NoMethodError, rbObjSingletonClass } from "@blazetrails/ruby-compat";
 import { DelegationError, Delegation } from "./delegation.js";
 
 describe("DelegationError", () => {
@@ -58,6 +58,14 @@ describe("Delegation.generate", () => {
     );
     expect(new Record().jobClass).toBe("RecordJob");
     expect(new Child().jobClass).toBe("ChildJob");
+
+    class Detached {}
+    const detached = new Record();
+    Object.setPrototypeOf(
+      detached,
+      Object.create(Record.prototype, { constructor: { value: Detached } }),
+    );
+    expect(() => detached.jobClass).toThrow(NoMethodError);
   });
 
   it("delegates method to target", () => {
