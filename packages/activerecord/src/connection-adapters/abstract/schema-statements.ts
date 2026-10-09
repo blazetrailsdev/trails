@@ -664,7 +664,7 @@ export class SchemaStatements {
 
   async changeTable(
     tableName: string,
-    options: { bulk?: boolean } = {},
+    options: { bulk?: boolean },
     block: (t: TableOf<this>) => void | Promise<void>,
     base: unknown = this,
   ): Promise<void> {

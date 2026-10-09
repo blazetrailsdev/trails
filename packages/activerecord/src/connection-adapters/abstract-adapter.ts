@@ -515,7 +515,7 @@ export interface AbstractAdapter
   ): Promise<void>;
   changeTable(
     tableName: string,
-    options: { bulk?: boolean } | undefined,
+    options: { bulk?: boolean },
     block: (t: TableOf<this>) => void | Promise<void>,
     base?: unknown,
   ): Promise<void>;

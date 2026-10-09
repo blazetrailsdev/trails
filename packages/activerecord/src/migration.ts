@@ -761,10 +761,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async changeTable(
     tableName: string,
-    options: { bulk?: boolean } = {},
-    block?: (t: TableOf<A>) => void | Promise<void>,
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    await this.methodMissing("changeTable", tableName, options, block);
+    if (typeof options === "function") {
+      await this.methodMissing("changeTable", tableName, {}, options);
+    } else {
+      await this.methodMissing("changeTable", tableName, options ?? {}, fn);
+    }
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
@@ -1995,13 +1999,16 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
 
   override async changeTable(
     tableName: string,
-    options: { bulk?: boolean } = {},
-    block?: (t: TableOf<A>) => void | Promise<void>,
+    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+    fn?: (t: TableOf<A>) => void | Promise<void>,
   ): Promise<void> {
-    if (block !== undefined) {
-      await super.changeTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
-    } else {
+    const block = typeof options === "function" ? options : fn;
+    if (block === undefined) {
       await super.changeTable(tableName, options);
+    } else if (options === block) {
+      await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
+    } else {
+      await super.changeTable(tableName, options, (t) => block(this.compatibleTableDefinition(t)));
     }
   }
 
