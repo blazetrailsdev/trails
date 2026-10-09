@@ -111,9 +111,9 @@ export function exceedances(
   return violations;
 }
 
-/** Marks sitting ABOVE what a clean measurement would write. Not a failure —
- *  the gate only forbids growth — but reported so a converged PR narrows its
- *  mark instead of leaving slack for the next one to spend. */
+/** Marks sitting ABOVE what a clean measurement would write. A failure where
+ *  the gate reports it through {@link staleMarkFailure}: slack above the
+ *  measurement is a regression of that size the gate would wave through. */
 export function staleMarks(
   marks: ParamNameMarks,
   current: ParamNameMarks,
@@ -129,6 +129,23 @@ export function staleMarks(
     }
   }
   return stale;
+}
+
+/** The STALE half of an only-shrink mark, rendered for the console: every
+ *  dimension above its measurement, and the script that narrows it. `null`
+ *  when no mark is stale. */
+export function staleMarkFailure(
+  gate: string,
+  tightenScript: string,
+  stale: readonly MarkViolation[],
+): string | null {
+  if (stale.length === 0) return null;
+  return [
+    `\n${gate}: ${stale.length} STALE mark dimension(s) above the current measurement.`,
+    "Slack above the measurement lets a regression of that size pass. Narrow it:",
+    `  pnpm ${tightenScript}\n`,
+    ...stale.map((v) => `  - ${v.package}  ${v.dimension}: mark ${v.mark} → current ${v.current}`),
+  ].join("\n");
 }
 
 /** A package the gate covers but the measurement never reported — silently
