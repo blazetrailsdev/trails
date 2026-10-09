@@ -17,7 +17,7 @@ themselves reaches them through `records`
 synchronous. So a `Relation` is both the query and its result, and a predicate
 that needs a second query can run it in place.
 
-In trails the query is `await`ed, and that costs three shapes Rails has no
+In trails the query is `await`ed, and that costs four shapes Rails has no
 counterpart for:
 
 - **`applyThenable`** (`relation/thenable.ts`) **/ `stripThenable`**
@@ -51,6 +51,12 @@ counterpart for:
   exactly what `withConnectionSync` hands `toSql`. This ratifies the sync
   builders and `toSql`'s sync surface only; the synchronous _lease_ stays under
   the scope boundary of § "Schema reflection peeks at a warm cache".
+- **`Relation#[Symbol.asyncIterator]`** (`relation.ts`). Ruby iterates a
+  relation with `each` (`relation/delegation.rb:101-104`), which reads
+  `records`; `for await (const record of rel)` is that loop in JS. It awaits
+  `toArray()` and yields each record, the same evaluation as
+  `for (const record of await rel)`. Kept by the repo owner's ruling
+  (2026-10-08).
 
 This is a genuine language shortcoming — JS has no synchronous await — and it is
 ratified repo-wide here. Those names carry `@noRailsEquivalent PERMANENT`
