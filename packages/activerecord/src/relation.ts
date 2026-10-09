@@ -750,9 +750,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     joinedTables = joinedTables.map((name) => name.toLowerCase());
 
     return !isEmpty(
-      this.referencesValues
-        .map((ref) => toS(ref))
-        .filter((ref) => !joinedTables.includes(ref)),
+      this.referencesValues.map((ref) => toS(ref)).filter((ref) => !joinedTables.includes(ref)),
     );
   }
 
