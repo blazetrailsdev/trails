@@ -740,6 +740,33 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(c["Foo#lambda_arg"]).toEqual(["scope", "where"]);
   });
 
+  it("records the line an initialize / new def closes on, and no other def's", () => {
+    const ends = rubyField(
+      {
+        "foo.rb": `class Foo
+  def initialize(attributes = nil)
+    assign_attributes(attributes) if attributes
+
+    super()
+  end
+
+  def save
+    true
+  end
+
+  def self.new(*) = super
+end
+class Bar
+  def initialize; end
+end
+`,
+      },
+      "endLine",
+    );
+    expect(ends).toMatchObject({ "Foo#initialize": 6, "Bar#initialize": 15 });
+    expect(ends["Foo#save"]).toBeNull();
+  });
+
   it('records super(args) and bare super as a "super" call', () => {
     const c = rubyCalls({
       "foo.rb": `

@@ -258,6 +258,10 @@ def strip_sexp_positions(node)
   node.map { |child| strip_sexp_positions(child) }
 end
 
+# The hooks an `@inlinedFrom` tag may cite (RFC 0188). Their `def` span is
+# recorded so the tag's citation can be derived from the manifest.
+INLINED_HOOKS = %w[initialize new].freeze
+
 def body_digest(body)
   return nil if body.nil?
   Digest::SHA256.hexdigest(strip_sexp_positions(body).inspect)[0, 16]
@@ -883,6 +887,10 @@ class ApiExtractor
       line: @current_line,
     }
     record_body_facts(method_info, node[3], find_params(node), fqn)
+    if INLINED_HOOKS.include?(name)
+      end_line = def_end_line(node, method_info[:line])
+      method_info[:endLine] = end_line if end_line
+    end
     if name == "method_missing" && !@in_sclass
       reader = method_missing_send_receiver(node[3], find_params(node))
       (target[:methodMissingSends] ||= []) << reader if reader
@@ -4555,6 +4563,37 @@ class ApiExtractor
       return line if line
     end
     nil
+  end
+
+  # Latest source line under `node`, read off the same scanner events as
+  # `first_line`.
+  def last_line(node)
+    return nil unless node.is_a?(Array)
+
+    head = node[0]
+    if head.is_a?(Symbol) && head.to_s.start_with?("@")
+      tail = node.last
+      if tail.is_a?(Array) && tail.length == 2 &&
+         tail[0].is_a?(Integer) && tail[1].is_a?(Integer)
+        return tail[0]
+      end
+    end
+
+    node.filter_map { |child| last_line(child) }.max
+  end
+
+  # The line a `def`'s closing `end` sits on. Ripper records no position for
+  # the keyword, so it is the first line at or after the body's last token
+  # that is an `end` at the `def`'s own indentation. An endless `def`, and one
+  # closed on its own first line, end on their last token's line.
+  def def_end_line(node, line)
+    last = last_line(node)
+    return nil unless line && last && @source_lines
+    return last unless node.last.is_a?(Array) && node.last[0] == :bodystmt
+    return last if @source_lines[line - 1] =~ /\bend\s*(#.*)?$/
+
+    indent = @source_lines[line - 1][/^\s*/]
+    (last..@source_lines.length).find { |n| @source_lines[n - 1] =~ /^#{indent}end\b/ } || last
   end
 
   def new_class_info(name, fqn)

@@ -86,6 +86,7 @@ import type {
   ApiManifest,
   CallSite,
   ClassInfo,
+  InlinedFrom,
   MethodInfo,
   PackageInfo,
   ParamInfo,
@@ -183,6 +184,13 @@ import {
   skeletonIdiomLowering,
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
+import {
+  inlinedHookBody,
+  inlinedRubyBody,
+  inlinedRubyCallArgs,
+  inlinedSegments,
+  sameFileInitializeModules,
+} from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
 // `super` is captured by both extractors (extract-ruby-api.rb records
@@ -4624,6 +4632,8 @@ export function main() {
       string,
       Map<string, Map<string, Map<string, string>>>
     >();
+    // (file → owner → the `@inlinedFrom` tags on its constructor, in order).
+    const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
@@ -4803,6 +4813,11 @@ export function main() {
           undefined,
           scope,
         );
+      }
+      if (m.inlinedFrom !== undefined && m.name === "constructor" && scope === "package") {
+        const byOwner = tsInlinedFromByFileOwner.get(file) ?? new Map<string, InlinedFrom[]>();
+        byOwner.set(owner, m.inlinedFrom);
+        tsInlinedFromByFileOwner.set(file, byOwner);
       }
       // A relative path is not unique across packages — activemodel and
       // activerecord both port attribute_methods.rb to attribute-methods.ts —
@@ -5501,6 +5516,46 @@ export function main() {
         return { tsClass, ambiguous };
       };
 
+      // The Rails bodies a class's constructor answers to when module bodies
+      // are inlined into it (RFC 0188, inlined-bodies.ts): the class's own
+      // `initialize`, its same-file modules' and the ones its `@inlinedFrom`
+      // tags name. Empty for every other pair.
+      const inlinedSegmentsFor = (
+        rubyName: string,
+        tsName: string,
+        tsFile: string,
+        rubyModule: string,
+        level: OwnerSeat,
+      ): MethodInfo[] => {
+        if (rubyName !== "initialize" || tsName !== "constructor") return [];
+        const klass = rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined;
+        if (!klass) return [];
+        const initializeOf = (fqn: string) =>
+          (rubyPkg.modules[fqn] as unknown as ClassInfo | undefined)?.instanceMethods.find(
+            (m) => m.name === "initialize",
+          );
+        const sameFile = sameFileInitializeModules(
+          klass,
+          rubyModule,
+          rubyPkg.modules,
+          (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
+        );
+        const byOwner = tsInlinedFromByFileOwner.get(tsFile);
+        const tags =
+          byOwner === undefined
+            ? []
+            : (byOwner.get(
+                resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass ?? "",
+              ) ?? []);
+        return inlinedSegments(
+          klass.instanceMethods.find((m) => m.name === "initialize"),
+          sameFile.map(initializeOf),
+          tags
+            .filter((tag) => !sameFile.includes(tag.module))
+            .map((tag) => inlinedHookBody(ruby, tag)),
+        );
+      };
+
       // Advisory calls-parity check: for a name-matched pair, flag Ruby body
       // calls that (a) map by naming convention to a method we ported and
       // (b) are absent from the TS body's call-set. A coarse body-fidelity
@@ -5522,15 +5577,19 @@ export function main() {
         // The call set is computed only under `--calls`, the mode that
         // writes and gates the artifact (see the artifact write below).
         if (!callsGate) return;
-        const rubyOwned = ownsBody(rubyName)
-          ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : {
-              calls: rubyCallsByName.get(rubyName) ?? [],
-              weak: rubyWeakCallsByName.get(rubyName) ?? [],
-              receivers: rubyCallReceiversByName.get(rubyName) ?? {},
-              receiverNames: rubyCallReceiverNamesByName.get(rubyName) ?? {},
-              stringEvals: rubyStringEvalCallsByName.get(rubyName) ?? [],
-            };
+        const segments = inlinedSegmentsFor(rubyName, tsName, tsFile, rubyModule, level);
+        const rubyOwned =
+          segments.length > 0
+            ? inlinedRubyBody(segments)
+            : ownsBody(rubyName)
+              ? rubyCallsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : {
+                  calls: rubyCallsByName.get(rubyName) ?? [],
+                  weak: rubyWeakCallsByName.get(rubyName) ?? [],
+                  receivers: rubyCallReceiversByName.get(rubyName) ?? {},
+                  receiverNames: rubyCallReceiverNamesByName.get(rubyName) ?? {},
+                  stringEvals: rubyStringEvalCallsByName.get(rubyName) ?? [],
+                };
         // A body whose every Ruby call is weak still gets compared:
         // significantMissingCalls returns empty for an empty `rubyCalls`, so the
         // pair is counted and found clean rather than leaving the population.
@@ -5761,9 +5820,13 @@ export function main() {
         // only drop whole NAMES, but here a name that is weak at one site and a
         // genuine call at another would lose both sites to a name filter. See
         // {@link comparableRubySites} below for when a weak site is kept.
-        const rubyOwnSites = ownsBody(rubyName)
-          ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : rubyCallArgsByName.get(rubyName);
+        const segments = inlinedSegmentsFor(rubyName, tsName, tsFile, rubyModule, level);
+        const rubyOwnSites =
+          segments.length > 0
+            ? inlinedRubyCallArgs(segments)
+            : ownsBody(rubyName)
+              ? rubyCallArgsByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : rubyCallArgsByName.get(rubyName);
         // Also dropped: a receiver-less zero-arg read of an `attr_reader` name.
         // Ruby spells such a read exactly like a call, so `if foreign_key`
         // (schema_definitions.rb:241) arrives as a second, zero-arg

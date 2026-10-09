@@ -89,6 +89,7 @@ export const EXTRACTOR_OUTPUT_FIELDS = [
   "missingRailsArgs",
   "missingRailsNames",
   "inventedArms",
+  "inlinedFrom",
   "missingRailsCallReasons",
   "missingRailsArgsReasons",
   "recv",

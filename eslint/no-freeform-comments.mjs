@@ -105,7 +105,7 @@ const DIRECTIVE_RE =
  * them and they are English by construction.
  */
 const KEPT_TAG_NAMES =
-  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|inventedArm|empty|deprecated";
+  "internal|noRailsEquivalent|missingRailsCall|missingRailsArgs|missingRailsName|inventedArm|inlinedFrom|empty|deprecated";
 
 const KEPT_TAG_NAME_SET = new Set(KEPT_TAG_NAMES.split("|"));
 
@@ -272,8 +272,12 @@ function keptLines(comment) {
  * ruby_call NAMES which Rails call is unmade and is the tag's whole subject, so
  * it is data and stays. `@noRailsEquivalent` takes the permanence token
  * directly. Everything after the permanence claim is the English reason.
+ * `@inlinedFrom` is its Ruby name and source citation and nothing else.
  */
 function renderTag({ name, text }) {
+  if (name === "inlinedFrom") {
+    return [`@${name}`, ...text.trim().split(/\s+/u).slice(0, 2)].filter(Boolean).join(" ");
+  }
   const [subject, rest = ""] = text.split(/\s+—\s+/u, 2);
   const takesSubject =
     name === "missingRailsCall" ||

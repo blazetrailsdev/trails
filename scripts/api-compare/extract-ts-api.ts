@@ -44,6 +44,7 @@ import type {
   ParamInfo,
   LiteralValue,
   CallSite,
+  InlinedFrom,
 } from "@blazetrails/parity/types";
 import {
   ROOT_DIR,
@@ -90,6 +91,7 @@ import {
 } from "./missing-rails-args-tags.js";
 import { TAG as MISSING_RAILS_NAME_TAG, suppressedNamesIn } from "./missing-rails-name-tags.js";
 import { TAG as INVENTED_ARM_TAG, inventedArmsIn } from "./invented-arm-tags.js";
+import { TAG as INLINED_FROM_TAG, inlinedFromIn } from "./inlined-from-tags.js";
 
 const OPTION_READER_FUNCTIONS = new Set([
   "fetch",
@@ -213,6 +215,7 @@ const fileHasMissingRailsArgsTag = new WeakMap<ts.SourceFile, boolean>();
 /** Same role for `@missingRailsName`. */
 const fileHasMissingRailsNameTag = new WeakMap<ts.SourceFile, boolean>();
 const fileHasInventedArmTag = new WeakMap<ts.SourceFile, boolean>();
+const fileHasInlinedFromTag = new WeakMap<ts.SourceFile, boolean>();
 
 /**
  * Tags a deliberate JSDoc block may legitimately carry *after*
@@ -2628,6 +2631,16 @@ export function inventedArmTags(node: ts.Node): string[] | undefined {
 }
 
 /**
+ * The Ruby bodies a constructor's JSDoc names as inlined into it
+ * (`@inlinedFrom Module#initialize <citation>`, RFC 0188), in written order, or
+ * undefined. compare.ts joins them to the constructor's Rails call set.
+ */
+export function inlinedFromTags(node: ts.Node): InlinedFrom[] | undefined {
+  const tags = taggedCommentOf(node, INLINED_FROM_TAG, fileHasInlinedFromTag, inlinedFromIn);
+  return tags !== undefined && tags.length > 0 ? tags : undefined;
+}
+
+/**
  * The reasons behind {@link missingRailsCallTags}' suppressions, keyed by Ruby
  * call — the artifact half of the permanence report (RFC 0099): a receipt's
  * `PERMANENT` / `CONVERGEABLE` claim is only separable downstream if the reason
@@ -4194,6 +4207,7 @@ export function extractClass(
       const callArgs = extractCallArgs(member.body);
       const skeleton = extractSkeleton(member.body);
       const shapeTokens = extractShapeTokens(member.body);
+      const inlinedFrom = inlinedFromTags(member);
       instanceMethods.push({
         name: "constructor",
         visibility,
@@ -4202,6 +4216,7 @@ export function extractClass(
         file,
         ...(internal ? { internal: true } : {}),
         ...tagged,
+        ...(inlinedFrom !== undefined ? { inlinedFrom } : {}),
         ...(calls !== undefined ? { calls } : {}),
         ...(callSeq !== undefined ? { callSeq } : {}),
         ...(callArgs !== undefined ? { callArgs } : {}),
