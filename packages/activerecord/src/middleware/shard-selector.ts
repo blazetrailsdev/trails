@@ -2,7 +2,10 @@ import { fetch } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { TopLevel } from "@blazetrails/activesupport";
 
-export type ShardRequest = InstanceType<NonNullable<typeof TopLevel.ActionDispatch>["Request"]>;
+export type ShardRequest = InstanceType<NonNullable<typeof TopLevel.ActionDispatch>["Request"]> & {
+  method: string;
+  [key: string]: unknown;
+};
 
 type ShardResolverFn = (request: ShardRequest) => string;
 
@@ -23,7 +26,7 @@ export class ShardSelector {
   }
 
   async call(env: Record<string, unknown>): Promise<unknown> {
-    const request = new TopLevel.ActionDispatch!.Request(env);
+    const request = new TopLevel.ActionDispatch!.Request(env) as ShardRequest;
 
     const shard = this.selectedShard(request);
 
