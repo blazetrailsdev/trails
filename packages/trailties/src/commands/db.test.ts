@@ -890,7 +890,7 @@ describe("schema dump and load", () => {
       });
 
       const source = new AdapterSchemaSource(sourceAdapter);
-      const schema = (await SchemaDumper.dump(source, new StringIO(), { language: "js" })).string();
+      const schema = (await SchemaDumper.dump(source, new StringIO(), undefined, "js")).string();
       expect(schema).toContain("users");
       expect(schema).toContain("createTable");
 
@@ -1915,10 +1915,18 @@ fs.writeFileSync(${JSON.stringify(seedMarker)}, String(prev + 1));`,
         name: "users_on_email",
         columns: ["email"],
         unique: true,
+        where: null,
         orders: {},
         lengths: {},
         opclasses: {},
+        type: null,
+        using: null,
+        include: null,
+        nulls_not_distinct: null,
+        comment: null,
         valid: true,
+        algorithm: null,
+        if_not_exists: null,
       },
     ]);
   });

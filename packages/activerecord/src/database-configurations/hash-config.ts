@@ -2,7 +2,6 @@ import { fetch, File, hasKey, merge, rtest } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
-import { SchemaDumper } from "../connection-adapters/abstract/schema-dumper.js";
 import type { SchemaFormat } from "../tasks/database-tasks.js";
 
 export class HashConfig extends DatabaseConfig {
@@ -145,8 +144,9 @@ export class HashConfig extends DatabaseConfig {
 
   private schemaFileType(format: string): string | null {
     switch (format) {
-      case "ruby":
-        return `schema.${SchemaDumper.language}`;
+      case "ts":
+      case "js":
+        return `schema.${format}`;
       case "sql":
         return "structure.sql";
       default:

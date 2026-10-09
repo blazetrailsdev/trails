@@ -42,7 +42,7 @@ export class DatabaseNotSupported extends StandardError {}
 
 DatabaseNotSupported.prototype.name = "ActiveRecord::Tasks::DatabaseNotSupported";
 
-export type SchemaFormat = "ruby" | "sql";
+export type SchemaFormat = "ts" | "js" | "sql";
 
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
@@ -518,6 +518,7 @@ export class DatabaseTasks {
     return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
   }
 
+  /** @missingRailsArgs dump — PERMANENT */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
@@ -528,20 +529,25 @@ export class DatabaseTasks {
     if (filename == null) return;
 
     FileUtils.mkdirP(this.dbDir);
-    if (format === "ruby") {
-      const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
-      const migrationConnectionPool = this.migrationConnectionPool();
-      await File.open(filename, "w:utf-8", async (file) => {
-        await SchemaDumper.dump(migrationConnectionPool, file);
-      });
-    } else if (format === "sql") {
-      await this.structureDump(dbConfig, filename);
-      if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
-        await File.open(filename, "a", async (f) => {
-          f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
-          f.print("\n");
+    switch (format) {
+      case "ts":
+      case "js": {
+        const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
+        const migrationConnectionPool = this.migrationConnectionPool();
+        await File.open(filename, "w:utf-8", async (file) => {
+          await SchemaDumper.dump(migrationConnectionPool, file, undefined, format);
         });
+        break;
       }
+      case "sql":
+        await this.structureDump(dbConfig, filename);
+        if (await this.migrationConnectionPool().schemaMigration.tableExists()) {
+          await File.open(filename, "a", async (f) => {
+            f.puts(await (await this.migrationConnection()).dumpSchemaInformation!());
+            f.print("\n");
+          });
+        }
+        break;
     }
   }
 
@@ -559,7 +565,8 @@ export class DatabaseTasks {
       this.checkSchemaFile(file);
 
       switch (format) {
-        case "ruby": {
+        case "ts":
+        case "js": {
           const mod = (await import(
             getPath().pathToFileURL!(this._resolveSchemaPath(file)).href
           )) as {

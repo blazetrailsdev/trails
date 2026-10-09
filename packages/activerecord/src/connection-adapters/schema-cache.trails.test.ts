@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { SchemaCache, FakePool } from "./schema-cache.js";
+import { SchemaCache, SchemaReflection, FakePool } from "./schema-cache.js";
 import { IndexDefinition } from "./abstract/schema-definitions.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
@@ -141,6 +141,7 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     fs.writeFileSync(
       filename,
       [
+        "--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache",
         "columns:",
         "  people:",
         "    - !ruby/object:ActiveRecord::ConnectionAdapters::Column",
@@ -176,6 +177,21 @@ describe("SchemaCacheDeepDeduplicateTest", () => {
     expect(index).toBeInstanceOf(IndexDefinition);
     expect(index.name).toBe("index_people_on_id");
     expect(index.nullsNotDistinct).toBe(true);
+  });
+
+  it("_load_from raises on a cache file it cannot load", async () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-corrupt-"));
+    const filename = path.join(tmpDir, "schema_cache.yml");
+    fs.writeFileSync(filename, "--- !ruby/object:NoSuchSchemaCacheClass\ncolumns: {}\n");
+
+    await expect(SchemaCache._loadFrom(filename)).rejects.toThrow(/NoSuchSchemaCacheClass/);
+    expect(await SchemaCache._loadFrom(path.join(tmpDir, "missing.yml"))).toBeNull();
+
+    const reflection = new SchemaReflection(filename);
+    const pool = new FakePool({ schemaVersion: async () => "1" });
+    await expect(reflection.columns(pool, "people")).rejects.toThrow(/NoSuchSchemaCacheClass/);
+    expect(reflection.loadedCache).toBeNull();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it("deduplication leaves indexes as IndexDefinition instances", () => {

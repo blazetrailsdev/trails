@@ -558,7 +558,11 @@ describe("SchemaReflectionTest", () => {
       indexes: {},
       version: "1",
     };
-    fs.writeFileSync(cachePath, JSON.stringify(coder), "utf-8");
+    fs.writeFileSync(
+      cachePath,
+      `--- !ruby/object:ActiveRecord::ConnectionAdapters::SchemaCache\n${JSON.stringify(coder)}`,
+      "utf-8",
+    );
 
     const fakeConnection = {
       schemaVersion: async () => "2",

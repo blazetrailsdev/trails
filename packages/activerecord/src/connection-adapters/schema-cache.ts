@@ -9,79 +9,20 @@ import {
   registerConstant,
   sort,
 } from "@blazetrails/ruby-compat";
-import { atomicWrite, camelize, underscore } from "@blazetrails/activesupport";
-import {
-  parse as yamlParse,
-  stringify as yamlStringify,
-} from "@blazetrails/ruby-compat/psych-adapter";
-import type { CollectionTag, YAMLMap } from "@blazetrails/ruby-compat/psych-adapter";
-import { Column, NullColumn } from "./column.js";
+import { atomicWrite } from "@blazetrails/activesupport";
+import { YAML } from "@blazetrails/ruby-compat/yaml";
+import type { Column } from "./column.js";
 import { Deduplicable } from "./deduplicable.js";
-import type { ColumnCoder } from "./column.js";
-import { Column as MysqlColumn } from "./mysql/column.js";
-import { Column as PostgresqlColumn } from "./postgresql/column.js";
-import { Column as Sqlite3Column } from "./sqlite3/column.js";
-import { SqlTypeMetadata } from "./sql-type-metadata.js";
-import { TypeMetadata as MysqlTypeMetadata } from "./mysql/type-metadata.js";
-import { TypeMetadata as PostgresqlTypeMetadata } from "./postgresql/type-metadata.js";
 import { isSchemaCacheIgnoredTable } from "../active-record.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
-import { IndexDefinition } from "./abstract/schema-definitions.js";
+import type { IndexDefinition } from "./abstract/schema-definitions.js";
+import "./column.js";
+import "./sql-type-metadata.js";
+import "./abstract/schema-definitions.js";
 
 export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
 };
-
-type ToJSContext = Parameters<YAMLMap["toJSON"]>[1];
-
-const RUBY_OBJECT_CLASSES: Record<string, { prototype: object }> = {
-  "ActiveRecord::ConnectionAdapters::Column": Column,
-  "ActiveRecord::ConnectionAdapters::MySQL::Column": MysqlColumn,
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::Column": PostgresqlColumn,
-  "ActiveRecord::ConnectionAdapters::SQLite3::Column": Sqlite3Column,
-  "ActiveRecord::ConnectionAdapters::NullColumn": NullColumn,
-  "ActiveRecord::ConnectionAdapters::SqlTypeMetadata": SqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": MysqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": PostgresqlTypeMetadata,
-  "ActiveRecord::ConnectionAdapters::IndexDefinition": IndexDefinition,
-};
-
-const RUBY_OBJECT_TAGS: CollectionTag[] = Object.entries(RUBY_OBJECT_CLASSES).map(
-  ([name, klass]) => {
-    let RubyObject: (new () => YAMLMap) | undefined;
-    return {
-      tag: `!ruby/object:${name}`,
-      collection: "map",
-      default: false,
-      identify: (value) => value != null && Object.getPrototypeOf(value) === klass.prototype,
-      createNode: (schema, value, ctx) => {
-        const coder: ColumnCoder = {};
-        if (value instanceof Column) value.encodeWith(coder);
-        else for (const [ivar, v] of Object.entries(value as object)) coder[underscore(ivar)] = v;
-        return schema.tags.find((t) => t.tag === "tag:yaml.org,2002:map")!.createNode!(
-          schema,
-          coder,
-          ctx,
-        );
-      },
-      resolve: (map) => {
-        const nodeClass = (RubyObject ??= class extends (map.constructor as typeof YAMLMap) {
-          override toJSON(arg?: unknown, ctx?: ToJSContext): object {
-            const object = Object.create(klass.prototype) as object;
-            ctx?.onCreate?.(object);
-            const coder = super.toJSON(arg, ctx) as ColumnCoder;
-            if (object instanceof Column) object.initWith(coder);
-            else
-              for (const [ivar, v] of Object.entries(coder))
-                Object.assign(object, { [camelize(ivar, false)]: v });
-            return object;
-          }
-        });
-        return Object.assign(new nodeClass(), map);
-      },
-    };
-  },
-);
 
 export class SchemaReflection {
   static useSchemaCacheDump = true;
@@ -354,32 +295,16 @@ export class SchemaCache {
 
   /** @inventedArm forceEncoding — PERMANENT */
   static async _loadFrom(filename: string): Promise<SchemaCache | null> {
-    try {
-      if (!File.isFile(filename)) return null;
-      return await SchemaCache.read(filename, (file) => {
-        if (filename.includes(".dump")) {
-          return Marshal.load(file) as SchemaCache;
-        } else {
-          const parsed = yamlParse(forceEncoding(file, Encoding.UTF_8), {
-            customTags: RUBY_OBJECT_TAGS,
-            maxAliasCount: -1,
-          }) as Record<string, Record<string, unknown[]> | null>;
-          const cache = new SchemaCache();
-          cache.initWith({
-            ...parsed,
-            columns: new Map(Object.entries(parsed["columns"] ?? {}) as [string, Column[]][]),
-            primary_keys: new Map(Object.entries(parsed["primary_keys"] ?? {})),
-            data_sources: new Map(Object.entries(parsed["data_sources"] ?? {})),
-            indexes: new Map(
-              Object.entries(parsed["indexes"] ?? {}) as [string, IndexDefinition[]][],
-            ),
-          });
-          return cache;
-        }
-      });
-    } catch {
-      return null;
-    }
+    if (!File.isFile(filename)) return null;
+
+    return SchemaCache.read(filename, (file) => {
+      if (filename.includes(".dump")) {
+        return Marshal.load(file) as SchemaCache;
+      } else {
+        file = forceEncoding(file, Encoding.UTF_8);
+        return YAML.unsafeLoad(file) as SchemaCache;
+      }
+    });
   }
 
   /**
@@ -542,9 +467,7 @@ export class SchemaCache {
       if (filename.includes(".dump")) {
         f.write(Uint8Array.from(Marshal.dump(this), (byte) => byte.charCodeAt(0)));
       } else {
-        const coder: Record<string, unknown> = {};
-        this.encodeWith(coder);
-        f.write(yamlStringify(coder, { customTags: RUBY_OBJECT_TAGS }));
+        f.write(YAML.dump(this));
       }
     });
   }
@@ -694,11 +617,20 @@ export class SchemaCache {
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE psych-to-ruby-revives-a-mapping-as-a-record-where-marshal-answers-a-map
+ */
 export function deepDeduplicate<T>(value: T): T {
-  if (value instanceof Map) {
+  if (
+    value instanceof Map ||
+    (typeof value === "object" && value && !Object.getPrototypeOf(value))
+  ) {
     return new Map(
-      [...value].map(([k, v]) => [deepDeduplicate(k), deepDeduplicate(v)]),
+      [...(value instanceof Map ? value : Object.entries(value))].map(([k, v]) => [
+        deepDeduplicate(k),
+        deepDeduplicate(v),
+      ]),
     ) as unknown as T;
   }
   if (Array.isArray(value)) return value.map((i) => deepDeduplicate(i)) as unknown as T;

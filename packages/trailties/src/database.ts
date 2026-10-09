@@ -2,6 +2,7 @@ import { presence, reverseMerge, TopLevel, trailsRoot } from "@blazetrails/activ
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { env } from "@blazetrails/ruby-compat";
 import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import type { SchemaFormat } from "@blazetrails/activerecord";
 
 /** @noRailsEquivalent PERMANENT */
 export interface DatabaseConfig {
@@ -237,7 +238,7 @@ export async function loadAllDatabaseConfigs(
   return entries.map(([name, sub]) => ({ name, config: sub as DatabaseConfig }));
 }
 
-export type SchemaFormat = "ts" | "js" | "sql";
+export type { SchemaFormat };
 
 export async function resolveSchemaFormat(
   opts: { format?: string } = {},
