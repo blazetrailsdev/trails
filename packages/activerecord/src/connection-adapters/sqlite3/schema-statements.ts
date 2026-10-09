@@ -260,7 +260,7 @@ export function createSchemaDumper(
   this: DatabaseAdapter,
   options: Record<string, unknown>,
 ): AbstractSchemaDumper {
-  return SchemaDumper.create(this as Parameters<typeof SchemaDumper.create>[0], options);
+  return SchemaDumper.create(this, options);
 }
 
 export function schemaCreation(this: DatabaseAdapter): SchemaCreation {
