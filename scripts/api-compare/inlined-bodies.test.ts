@@ -23,7 +23,14 @@ function body(calls: string[], extra: Partial<MethodInfo> = {}): MethodInfo {
 }
 
 function entity(file: string, includes: string[], methods: MethodInfo[] = []): ClassInfo {
-  return { file, includes, extends: [], instanceMethods: methods, classMethods: [] } as ClassInfo;
+  return {
+    name: file,
+    file,
+    includes,
+    extends: [],
+    instanceMethods: methods,
+    classMethods: [],
+  } as ClassInfo;
 }
 
 const api = body(["assign_attributes", "super"]);
