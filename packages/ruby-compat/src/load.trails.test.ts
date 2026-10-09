@@ -8,15 +8,17 @@ import { registeredConstant, rbModRemoveConst } from "./variable.js";
 describe("rbFLoad", () => {
   it("evaluates the file on every call and seats its constant-named exports", async () => {
     const root = await mkdtemp(join(tmpdir(), "trails-rb-f-load-"));
-    const fname = join(root, "probe.mjs");
     try {
-      await writeFile(fname, `export const RbFLoadProbe = 1;\nexport const helper = 0;\n`);
-      expect(await rbFLoad(fname)).toBe(true);
+      await writeFile(
+        join(root, "probe.mjs"),
+        `export const RbFLoadProbe = 1;\nexport const helper = 0;\n`,
+      );
+      expect(await rbFLoad(join(root, "probe.mjs"))).toBe(true);
       expect(registeredConstant("RbFLoadProbe")).toBe(1);
       expect(registeredConstant("helper")).toBeUndefined();
 
-      await writeFile(fname, `export const RbFLoadProbe = 2;\n`);
-      await rbFLoad(fname);
+      await writeFile(join(root, "probe.mjs"), `export const RbFLoadProbe = 2;\n`);
+      await rbFLoad(join(root, "probe.mjs"));
       expect(registeredConstant("RbFLoadProbe")).toBe(2);
       expect(rbModRemoveConst(Object, "RbFLoadProbe")).toBe(2);
       expect(() => rbModRemoveConst(Object, "RbFLoadProbe")).toThrow(/not defined/);
