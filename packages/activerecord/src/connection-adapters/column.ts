@@ -126,7 +126,9 @@ export class Column {
   deduplicated(): this {
     this.name = strUminus(this.name);
     if (this.sqlTypeMetadata) this.sqlTypeMetadata = this.sqlTypeMetadata.deduplicate();
-    if (this.default != null) this.default = strUminus(this.default as string);
+    if (this.default != null && this.default !== false) {
+      this.default = strUminus(this.default as string);
+    }
     if (this.defaultFunction != null) this.defaultFunction = strUminus(this.defaultFunction);
     if (this.collation != null) this.collation = strUminus(this.collation);
     if (this.comment != null) this.comment = strUminus(this.comment);

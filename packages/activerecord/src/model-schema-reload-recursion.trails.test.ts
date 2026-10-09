@@ -139,11 +139,14 @@ describe("resetColumnInformation undefines attribute methods (model_schema.rb:52
       await klass.loadSchema();
       klass.defineAttributeMethods();
       expect(own<boolean>(klass, "_attributeMethodsGenerated")).toBe(true);
+      expect(klass.generatedAttributeMethods().instanceMethods()).toContain("guid");
     }
 
     await Shape.resetColumnInformation();
 
     expect(own<boolean>(Shape, "_attributeMethodsGenerated")).toBe(false);
     expect(own<boolean>(Ticket, "_attributeMethodsGenerated")).toBe(false);
+    expect(Shape.generatedAttributeMethods().instanceMethods()).not.toContain("guid");
+    expect(Ticket.generatedAttributeMethods().instanceMethods()).not.toContain("guid");
   });
 });
