@@ -5975,6 +5975,50 @@ function isOwnIvarRead(conditional: ts.ConditionalExpression): boolean {
   return receiver.getText() === owner.getText();
 }
 
+/**
+ * `if (!Object.hasOwn(klass, "_x")) klass._x = …` (or its
+ * `Object.prototype.hasOwnProperty.call` spelling): the seed Ruby's `inherited`
+ * hook gives a subclass's class-level ivar
+ * (`activerecord/lib/active_record/inheritance.rb:288-292`
+ * `subclass.instance_variable_set(:@_type_candidates_cache, Concurrent::Map.new)`),
+ * deferred to the first use because JS has no such hook (CLAUDE.md,
+ * "`inherited` is deferred to own-property memo guards"). The Ruby method the
+ * body mirrors holds no branch for it, so it is not an arm.
+ */
+function isOwnIvarInit(statement: ts.IfStatement): boolean {
+  if (statement.elseStatement !== undefined) return false;
+  let test = statement.expression;
+  if (!ts.isPrefixUnaryExpression(test) || test.operator !== ts.SyntaxKind.ExclamationToken) {
+    return false;
+  }
+  test = test.operand;
+  if (!ts.isCallExpression(test) || test.arguments.length !== 2) return false;
+  const callee = test.expression.getText();
+  if (callee !== "Object.hasOwn" && callee !== "Object.prototype.hasOwnProperty.call") return false;
+  const [owner, field] = test.arguments;
+  if (!ts.isStringLiteral(field)) return false;
+  let body: ts.Statement = statement.thenStatement;
+  if (ts.isBlock(body)) {
+    if (body.statements.length !== 1) return false;
+    body = body.statements[0];
+  }
+  if (!ts.isExpressionStatement(body)) return false;
+  const write = body.expression;
+  if (!ts.isBinaryExpression(write) || write.operatorToken.kind !== ts.SyntaxKind.EqualsToken) {
+    return false;
+  }
+  let target = write.left;
+  while (ts.isAsExpression(target) || ts.isParenthesizedExpression(target)) {
+    target = target.expression;
+  }
+  if (!ts.isPropertyAccessExpression(target) || target.name.text !== field.text) return false;
+  let receiver: ts.Expression = target.expression;
+  while (ts.isAsExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
+    receiver = receiver.expression;
+  }
+  return receiver.getText() === owner.getText();
+}
+
 function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const tokens: string[] = [];
@@ -6016,6 +6060,10 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
         if (raise !== undefined) {
           tokens.push("or");
           visit(raise);
+          return;
+        }
+        if (isOwnIvarInit(n as ts.IfStatement)) {
+          visit((n as ts.IfStatement).thenStatement);
           return;
         }
         if (isArgumentBindingGuard(n as ts.IfStatement)) return;

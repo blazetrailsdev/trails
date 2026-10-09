@@ -1426,6 +1426,38 @@ describe("body call capture", () => {
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if", "if"]);
   });
 
+  it("reads an own-property seed as the deferred inherited hook, not as an arm", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        static seeded(klass: typeof Foo) {
+          if (!Object.prototype.hasOwnProperty.call(klass, "_cache")) {
+            klass._cache = new Map();
+          }
+          return klass._cache.get(this.build());
+        }
+        static bare() {
+          if (!Object.hasOwn(this, "_cache")) this._cache = this.build();
+        }
+        static other(klass: typeof Foo) {
+          if (!Object.hasOwn(this, "_cache")) this._other = this.build();
+          if (!Object.hasOwn(this, "_cache")) klass._cache = this.build();
+          if (Object.hasOwn(this, "_cache")) this._cache = this.build();
+          if (!Object.hasOwn(this, "_cache")) this._cache = 1;
+          else this.build();
+          if (!Object.hasOwn(this, "_cache")) {
+            this._cache = 1;
+            this.build();
+          }
+        }
+      }`,
+    );
+    const skeleton = (name: string) => cls.classMethods.find((m) => m.name === name)!.skeleton;
+    expect(skeleton("seeded")!.filter((t) => t === "if")).toEqual([]);
+    expect(skeleton("seeded")).toContain("ref:build");
+    expect(skeleton("bare")).toEqual(["ref:build"]);
+    expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if", "if", "if", "if"]);
+  });
+
   it("emits or, not an arm, for a write guarded by the Ruby-falsiness of its own target", () => {
     const cls = extractFromSource(
       `class Foo {

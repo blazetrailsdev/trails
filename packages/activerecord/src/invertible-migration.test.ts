@@ -1,3 +1,4 @@
+import { block as rbBlock } from "@blazetrails/ruby-compat";
 import { describe, it, expect, afterEach } from "vitest";
 import { assertEmpty } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
@@ -50,12 +51,14 @@ class InvertibleTransactionMigration extends InvertibleMigration {
 
 class InvertibleRevertMigration extends SilentMigration {
   async change(): Promise<void> {
-    await this.revert(async () => {
-      await this.createTable("horses", (t) => {
-        t.column("content", "text");
-        t.column("remind_at", "datetime");
-      });
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
   }
 }
 
@@ -70,12 +73,14 @@ class InvertibleByPartsMigration extends SilentMigration {
       await dir.up(async () => this.test?.(Symbol.for("up")));
       await dir.down(async () => this.test?.(Symbol.for("down")));
     });
-    await this.revert(async () => {
-      await this.createTable("horses", (t) => {
-        t.column("content", "text");
-        t.column("remind_at", "datetime");
-      });
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await this.createTable("horses", (t) => {
+          t.column("content", "text");
+          t.column("remind_at", "datetime");
+        });
+      }),
+    );
   }
 }
 
@@ -201,9 +206,11 @@ class RevertWholeMigration extends SilentMigration {
 
 class NestedRevertWholeMigration extends RevertWholeMigration {
   async change(): Promise<void> {
-    await this.revert(async () => {
-      await super.change();
-    });
+    await this.revert(
+      rbBlock(async () => {
+        await super.change();
+      }),
+    );
   }
 }
 

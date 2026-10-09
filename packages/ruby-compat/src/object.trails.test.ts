@@ -258,6 +258,17 @@ describe("Object#respond_to?", () => {
     expect(basicObjRespondTo({}, "toAry")).toBe(false);
   });
 
+  it("answers to_hash for a Hash with the receiver, which a plain object does not define", () => {
+    // vendor/ruby/v3.3.11/hash.c:3497 rb_hash_to_hash.
+    const hash = { a: 1 };
+    const map = new Map([["a", 1]]);
+    expect(basicObjRespondTo(hash, "toHash")).toBe(true);
+    expect(basicObjRespondTo(map, "toHash")).toBe(true);
+    expect(basicObjRespondTo([], "toHash")).toBe(false);
+    expect(rbFSend(hash, "toHash")).toBe(hash);
+    expect(rbFSend(map, "toHash")).toBe(map);
+  });
+
   it("answers [] for an Array, a Hash and a String, whose JS values index without a method", () => {
     for (const obj of ["abc", [1], new Map(), {}]) {
       expect(basicObjRespondTo(obj, "get")).toBe(true);

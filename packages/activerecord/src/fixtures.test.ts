@@ -1335,7 +1335,7 @@ describe("HasManyThroughFixture", () => {
     return klass;
   }
 
-  function loadHasAndBelongsToMany(): Record<string, Record<string, unknown>[]> {
+  function loadHasAndBelongsToMany(): Map<string, Record<string, unknown>[]> {
     const parrot = makeModel("Parrot");
     parrot.hasAndBelongsToMany("treasures");
 
@@ -1361,7 +1361,9 @@ describe("HasManyThroughFixture", () => {
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();
-    expect(rows["parrots_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+    expect(rows.get("parrots_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
   });
 
   it("has many through with default table name on join table", () => {
@@ -1379,10 +1381,12 @@ describe("HasManyThroughFixture", () => {
 
     const fs = new FixtureSet(null, "parrots", parrot, parrots);
     const rows = fs.tableRows();
-    expect(rows["parrot_treasures"]).toEqual(loadHasAndBelongsToMany()["parrots_treasures"]);
+    expect(rows.get("parrot_treasures")).toEqual(
+      loadHasAndBelongsToMany().get("parrots_treasures"),
+    );
   });
 
   it("has and belongs to many order", () => {
-    expect(Object.keys(loadHasAndBelongsToMany())).toEqual(["parrots", "parrots_treasures"]);
+    expect([...loadHasAndBelongsToMany().keys()]).toEqual(["parrots", "parrots_treasures"]);
   });
 });

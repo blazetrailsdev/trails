@@ -15,6 +15,7 @@ import {
   ArgumentError,
   Dir,
   File as RubyFile,
+  type Hash,
   RuntimeError,
   StandardError,
   Zlib,
@@ -224,7 +225,7 @@ export class FixtureSet {
 
       for (const fixtureSet of set) {
         await fixtureSet.modelClass?.loadSchema();
-        for (const [table, rows] of Object.entries(fixtureSet.tableRows())) {
+        for (const [table, rows] of fixtureSet.tableRows()) {
           (tableRowsForConnection[table] ??= []).unshift(...rows);
         }
       }
@@ -314,7 +315,7 @@ export class FixtureSet {
     return Object.keys(this.fixtures).length;
   }
 
-  tableRows(): Record<string, Record<string, unknown>[]> {
+  tableRows(): Hash<string, Record<string, unknown>[]> {
     for (const label of this.ignoredFixtures ?? []) delete this.fixtures[label];
 
     return new TableRows(this.tableName, {

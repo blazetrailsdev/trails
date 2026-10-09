@@ -506,6 +506,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     return true;
   }
+  if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
   if (
     mid === "get" &&
     (typeof obj === "string" || Array.isArray(obj) || obj instanceof Map || isPlainHash(obj))
@@ -944,6 +945,8 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
       return recv;
     }
   }
+  /* `rb_hash_to_hash` (`vendor/ruby/v3.3.11/hash.c:3497`) answers the receiver. */
+  if (mid === "toHash" && (recv instanceof Map || isPlainHash(recv))) return recv;
   const enumerable = enumerableMethod(recv, mid);
   if (enumerable !== undefined) return enumerable(recv, ...args);
   if (Object.hasOwn(OBJECT_METHOD_TABLE, predicate)) {

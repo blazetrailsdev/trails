@@ -21,16 +21,13 @@ export class ConfigurationFile {
   /** @missingRailsCall load — PERMANENT */
   static parse(
     contentPath: string,
-    options: { context?: Record<string, unknown>; [option: string]: unknown } = {},
+    options: { context?: object; [option: string]: unknown } = {},
   ): unknown {
     return new ConfigurationFile(contentPath).parse(options);
   }
 
   /** @missingRailsCall load — PERMANENT */
-  parse({
-    context,
-    ...options
-  }: { context?: Record<string, unknown>; [option: string]: unknown } = {}): unknown {
+  parse({ context, ...options }: { context?: object; [option: string]: unknown } = {}): unknown {
     const source = this.content.includes("<%") ? this.render(context) : this.content;
     try {
       const parsed: unknown = yamlParse(source, options);
@@ -56,7 +53,7 @@ export class ConfigurationFile {
     return content;
   }
 
-  private render(context?: Record<string, unknown>): string {
+  private render(context?: object): string {
     const { nodes } = tseParse(this.content);
     let body = 'let __out = "";\n';
     for (const node of nodes) {
@@ -75,9 +72,10 @@ export class ConfigurationFile {
       }
     }
     body += `return __out;\n//# sourceURL=${this.contentPath}\n`;
-    const names = context ? Object.keys(context) : [];
-    const template = new Function(...names, body) as (...args: unknown[]) => string;
-    return context ? template(...names.map((n) => context[n])) : template();
+    const template = new Function("__binding", `with (__binding) {\n${body}}`) as (
+      binding: object,
+    ) => string;
+    return context ? template(context) : template({});
   }
 
   static FormatError = FormatError;
