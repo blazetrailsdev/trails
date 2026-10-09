@@ -5983,7 +5983,11 @@ function isOwnIvarRead(conditional: ts.ConditionalExpression): boolean {
  * `subclass.instance_variable_set(:@_type_candidates_cache, Concurrent::Map.new)`),
  * deferred to the first use because JS has no such hook (CLAUDE.md,
  * "`inherited` is deferred to own-property memo guards"). The Ruby method the
- * body mirrors holds no branch for it, so it is not an arm.
+ * body mirrors holds no branch for it, so it is not an arm. Only an ivar field
+ * (`_x`) seeded with a fresh object (`new …`, `[]`, `{}`) reads this way: an
+ * option default (`options[:id] = :integer unless options.key?(:id)`) and a
+ * computed memo (`@value = type_cast(…) unless defined?(@value)`) are Rails
+ * branches and stay arms.
  */
 function isOwnIvarInit(statement: ts.IfStatement): boolean {
   if (statement.elseStatement !== undefined) return false;
@@ -6012,6 +6016,14 @@ function isOwnIvarInit(statement: ts.IfStatement): boolean {
     target = target.expression;
   }
   if (!ts.isPropertyAccessExpression(target) || target.name.text !== field.text) return false;
+  if (!field.text.startsWith("_")) return false;
+  let seed = write.right;
+  while (ts.isAsExpression(seed) || ts.isParenthesizedExpression(seed)) seed = seed.expression;
+  const fresh =
+    ts.isNewExpression(seed) ||
+    (ts.isArrayLiteralExpression(seed) && seed.elements.length === 0) ||
+    (ts.isObjectLiteralExpression(seed) && seed.properties.length === 0);
+  if (!fresh) return false;
   let receiver: ts.Expression = target.expression;
   while (ts.isAsExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
     receiver = receiver.expression;

@@ -1436,16 +1436,20 @@ describe("body call capture", () => {
           return klass._cache.get(this.build());
         }
         static bare() {
+          if (!Object.hasOwn(this, "_cache")) this._cache = [];
+        }
+        static computed(options: { id?: string }) {
           if (!Object.hasOwn(this, "_cache")) this._cache = this.build();
+          if (!Object.hasOwn(options, "id")) options.id = {};
         }
         static other(klass: typeof Foo) {
-          if (!Object.hasOwn(this, "_cache")) this._other = this.build();
-          if (!Object.hasOwn(this, "_cache")) klass._cache = this.build();
-          if (Object.hasOwn(this, "_cache")) this._cache = this.build();
-          if (!Object.hasOwn(this, "_cache")) this._cache = 1;
+          if (!Object.hasOwn(this, "_cache")) this._other = [];
+          if (!Object.hasOwn(this, "_cache")) klass._cache = [];
+          if (Object.hasOwn(this, "_cache")) this._cache = [];
+          if (!Object.hasOwn(this, "_cache")) this._cache = [];
           else this.build();
           if (!Object.hasOwn(this, "_cache")) {
-            this._cache = 1;
+            this._cache = [];
             this.build();
           }
         }
@@ -1454,7 +1458,8 @@ describe("body call capture", () => {
     const skeleton = (name: string) => cls.classMethods.find((m) => m.name === name)!.skeleton;
     expect(skeleton("seeded")!.filter((t) => t === "if")).toEqual([]);
     expect(skeleton("seeded")).toContain("ref:build");
-    expect(skeleton("bare")).toEqual(["ref:build"]);
+    expect(skeleton("bare") ?? []).toEqual([]);
+    expect(skeleton("computed")!.filter((t) => t === "if")).toEqual(["if", "if"]);
     expect(skeleton("other")!.filter((t) => t === "if")).toEqual(["if", "if", "if", "if", "if"]);
   });
 

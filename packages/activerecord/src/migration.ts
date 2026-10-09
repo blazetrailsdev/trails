@@ -849,8 +849,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
       await this.run(...([...migrationClasses].reverse() as MigrationClass[]), { revert: true });
     }
     if (block !== undefined) {
-      if (isCommandRecorder(this.connection)) {
-        await this.connection.revert(block);
+      if (rbObjRespondTo(this.connection, "revert")) {
+        await (this.connection as unknown as CommandRecorder).revert(block);
       } else {
         const recorder = await this.commandRecorder();
         this._connectionOverride = recorder;
