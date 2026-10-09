@@ -31,7 +31,7 @@ interface Identifiable {
 }
 
 export function toParam(this: Identifiable): string | null {
-  if (this.id == null) return null;
+  if (this.id == null || this.id === false) return null;
   return kernelArray(this.id).join(this.constructor.paramDelimiter);
 }
 
