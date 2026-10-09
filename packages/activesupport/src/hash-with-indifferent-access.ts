@@ -119,11 +119,8 @@ export class HashWithIndifferentAccess<V = unknown> extends Hash<string, V> {
     return this;
   }
 
-  override delete(key: string): ReturnType<Hash<string, V>["delete"]> {
-    const convertedKey = this.convertKey(key);
-    const value = super.get(convertedKey);
-    super.delete(convertedKey);
-    return value;
+  override delete(key: string, block?: (key: string) => V): ReturnType<Hash<string, V>["delete"]> {
+    return super.delete(this.convertKey(key), block);
   }
 
   key(key: string): boolean {

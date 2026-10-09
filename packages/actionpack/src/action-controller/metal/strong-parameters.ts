@@ -14,6 +14,10 @@ import {
   block as blockOf,
   type ConflictBlock,
   eachPair,
+  type Enumerator,
+  hashAset,
+  hashDelete,
+  keys as hashKeys,
   isEmpty,
   isModuleIncluded,
   rbBlockGivenP,
@@ -27,6 +31,7 @@ import {
   rbObjClass,
   rbObjDup,
   rbObjRespondTo,
+  toEnum,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -39,6 +44,9 @@ import {
   ToJsonWithActiveSupportEncoder,
   asJson,
   deepDup,
+  deepTransformKeys,
+  deepTransformKeysBang,
+  filterMap,
   include,
   isBlank,
   toQuery,
@@ -149,7 +157,7 @@ export class Parameters {
   protected parameters: HashWithIndifferentAccess<unknown>;
   private _permitted: boolean;
   private loggingContext: Record<string, unknown>;
-  private _convertedArrays?: Set<string>;
+  private _convertedArrays?: Hash<unknown[], true>;
 
   static permitAllParameters = false;
   static actionOnUnpermittedParameters: OnUnpermitted = false;
@@ -193,7 +201,7 @@ export class Parameters {
   }
 
   permitBang(): this {
-    this.eachPair((_key, value) => {
+    this.eachPair(([_key, value]) => {
       const values = Array.isArray(value) ? value.flat() : [value];
       for (const v of values) {
         if (v instanceof Parameters) {
@@ -256,8 +264,7 @@ export class Parameters {
   }
 
   hasValue(value: unknown): boolean {
-    const converted = this._convertValueToParameters(value);
-    return aryIncludes(this.values, converted);
+    return aryIncludes([...this.eachValue()], this.convertValueToParameters(value));
   }
 
   declare isValue: Parameters["hasValue"];
@@ -279,9 +286,7 @@ export class Parameters {
   }
 
   get values(): unknown[] {
-    const values: unknown[] = [];
-    this.eachValue((value) => values.push(value));
-    return values;
+    return [...toEnum(this, "eachValue")];
   }
 
   isEmpty(): boolean {
@@ -367,12 +372,12 @@ export class Parameters {
 
   transformValues(fn: (value: unknown) => unknown): Parameters {
     return this._newWithInheritedPermitted(
-      this.parameters.transformValues((v) => fn(this._convertValueToParameters(v))),
+      this.parameters.transformValues((v) => fn(this.convertValueToParameters(v))),
     );
   }
 
   transformValuesBang(fn: (value: unknown) => unknown): this {
-    this.parameters.transformValuesBang((v) => fn(this._convertValueToParameters(v)));
+    this.parameters.transformValuesBang((v) => fn(this.convertValueToParameters(v)));
     return this;
   }
 
@@ -417,35 +422,46 @@ export class Parameters {
   }
 
   valuesAt(...keys: string[]): unknown[] {
-    return this._convertValueToParameters(this.parameters.valuesAt(...keys)) as unknown[];
+    return this.convertValueToParameters(this.parameters.valuesAt(...keys)) as unknown[];
   }
 
-  eachPair(fn: (key: string, value: unknown) => void): this {
-    for (const [key, value] of this.parameters) {
-      fn(key, this._convertHashesToParameters(key, value));
-    }
+  eachPair(): Enumerator<[string, unknown]>;
+  eachPair(block: (pair: [string, unknown]) => void): this;
+  eachPair(block?: (pair: [string, unknown]) => void): this | Enumerator<[string, unknown]> {
+    if (!block) return toEnum(this, "eachPair");
+    eachPair(this.parameters, (key, value) => {
+      block([key, this._convertHashesToParameters(key, value)]);
+    });
+
     return this;
   }
 
   declare each: Parameters["eachPair"];
 
-  eachValue(fn: (value: unknown) => void): this {
+  eachValue(): Enumerator<unknown>;
+  eachValue(block: (value: unknown) => void): this;
+  eachValue(block?: (value: unknown) => void): this | Enumerator<unknown> {
+    if (!block) return toEnum(this, "eachValue");
     eachPair(this.parameters, (key, value) => {
-      fn(this._convertHashesToParameters(key, value));
+      block(this._convertHashesToParameters(key, value));
     });
+
     return this;
   }
 
-  eachKey(fn: (key: string) => void): this {
-    for (const k of this.parameters.keys()) {
-      fn(k);
+  eachKey(): Enumerator<string>;
+  eachKey(block: (key: string) => void): this;
+  eachKey(block?: (key: string) => void): this | Enumerator<string> {
+    if (!block) return toEnum(this, "eachKey");
+    for (const key of this.parameters.keys()) {
+      block(key);
     }
     return this;
   }
 
   fetch(key: string, ...args: unknown[]): unknown {
     const blockGiven = rbBlockGivenP(args[args.length - 1]) ? (args.pop() as () => unknown) : null;
-    return this._convertValueToParameters(
+    return this.convertValueToParameters(
       this.parameters.fetch(key, () => {
         if (blockGiven) {
           return blockGiven();
@@ -467,14 +483,8 @@ export class Parameters {
     return this.parameters.dig(...(keys as [string, ...(string | number)[]]));
   }
 
-  delete(key: string, ...args: unknown[]): unknown {
-    if (this.parameters.has(key)) {
-      return this._convertValueToParameters(this.parameters.delete(key));
-    }
-    if (typeof args[0] === "function") {
-      return (args[0] as (key: string) => unknown)(key);
-    }
-    return args.length > 0 ? args[0] : undefined;
+  delete(key: string, block?: (key: string) => unknown): unknown {
+    return this.convertValueToParameters(this.parameters.delete(key, block));
   }
 
   toH(block?: (key: string, value: unknown) => [string, unknown]): Record<string, unknown> {
@@ -514,8 +524,8 @@ export class Parameters {
     return rbObjDup(this);
   }
 
-  get convertedArrays(): Set<string> {
-    this._convertedArrays ??= new Set<string>();
+  get convertedArrays(): Hash<unknown[], true> {
+    this._convertedArrays ??= new Hash<unknown[], true>();
     return this._convertedArrays;
   }
 
@@ -595,21 +605,6 @@ export class Parameters {
     return value == null ? null : (rbFSend(value, "split", delimiter, -1) as string[]);
   }
 
-  private _permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    if (this.hasKey(permittedKey) && isPermittedScalar(this.parameters.get(permittedKey))) {
-      params.parameters.set(permittedKey, this.parameters.get(permittedKey));
-    }
-    const re = /\(\d+[if]?\)$/;
-    this.eachKey((key) => {
-      const m = re.exec(key);
-      if (!m) return;
-      const preMatch = key.slice(0, m.index);
-      if (preMatch !== permittedKey) return;
-      if (isPermittedScalar(this.parameters.get(key)))
-        params.parameters.set(key, this.parameters.get(key));
-    });
-  }
-
   private _hashFilter(
     params: Parameters,
     filter: Record<string, unknown>,
@@ -618,7 +613,7 @@ export class Parameters {
       explicitArrays = false,
     }: { onUnpermitted?: OnUnpermitted; explicitArrays?: boolean } = {},
   ): void {
-    this.slice(...Object.keys(filter)).each((key, value) => {
+    this.slice(...Object.keys(filter)).each(([key, value]) => {
       if (value == null || value === false) return;
       if (!this.hasKey(key)) return;
       const result = this.permitValue(value, filter[key], { onUnpermitted, explicitArrays });
@@ -662,32 +657,11 @@ export class Parameters {
   }
 
   private _convertHashesToParameters(key: string, value: unknown): unknown {
-    const converted = this._convertValueToParameters(value);
+    const converted = this.convertValueToParameters(value);
     if (converted !== value) {
       this.parameters.set(key, converted);
     }
     return converted;
-  }
-
-  private _convertValueToParameters(value: unknown): unknown {
-    if (value instanceof Parameters) return value;
-    if (Array.isArray(value)) {
-      let mutated = false;
-      const result = value.slice();
-      for (let i = 0; i < result.length; i++) {
-        const original = result[i];
-        const converted = this._convertValueToParameters(original);
-        if (converted !== original) {
-          result[i] = converted;
-          mutated = true;
-        }
-      }
-      return mutated ? result : value;
-    }
-    if (value instanceof Hash || isPlainObject(value)) {
-      return this._newWithInheritedPermitted(value as Hash<string, unknown>);
-    }
-    return value;
   }
 
   /** @internal */
@@ -698,7 +672,7 @@ export class Parameters {
   /** @internal */
   eachNestedAttribute(fn: (value: unknown) => unknown): Parameters {
     const hash = new Parameters();
-    this.each((k, v) => {
+    this.each(([k, v]) => {
       if (Parameters.nestedAttribute(k, v)) hash.set(k, fn(v));
     });
     return hash;
@@ -716,7 +690,7 @@ export class Parameters {
 
     for (const filter of filters.flat()) {
       if (typeof filter === "string") {
-        this._permittedScalarFilter(params, filter);
+        this.permittedScalarFilter(params, filter);
       } else if (typeof filter === "object" && filter !== null) {
         this._hashFilter(params, filter, { onUnpermitted, explicitArrays });
       }
@@ -744,39 +718,41 @@ export class Parameters {
 
   /** @internal */
   convertValueToParameters(value: unknown): unknown {
-    return this._convertValueToParameters(value);
+    if (Array.isArray(value)) {
+      if (this.convertedArrays.has(value)) return value;
+      const converted = value.map((_) => this.convertValueToParameters(_));
+      this.convertedArrays.set(rbObjDup(converted), true);
+      return converted;
+    } else if (value instanceof Hash || isPlainObject(value)) {
+      return new (this.constructor as typeof Parameters)(
+        value as Hash<string, unknown>,
+        this.loggingContext,
+      );
+    } else {
+      return value;
+    }
   }
 
   /** @internal */
-  _deepTransformKeysInObjectBang(object: unknown, fn: (key: string) => string): unknown {
-    if (object instanceof Hash) {
-      for (const key of [...object.keys()]) {
-        const value = object.delete(key);
-        object.set(fn(key as string), this._deepTransformKeysInObjectBang(value, fn));
+  _deepTransformKeysInObjectBang(object: unknown, block: (key: string) => string): unknown {
+    if (object instanceof Hash || isPlainObject(object)) {
+      for (const key of hashKeys<string>(object)) {
+        const value = hashDelete(object, key);
+        hashAset(object, block(key), this._deepTransformKeysInObjectBang(value, block));
       }
       return object;
-    }
-    if (object instanceof Parameters) {
-      this._deepTransformKeysInObjectBang(object.parameters, fn);
+    } else if (object instanceof Parameters) {
+      if (object.permitted) {
+        return deepTransformKeysBang(object.toH(), block);
+      } else {
+        return deepTransformKeysBang(object.toUnsafeH(), block);
+      }
+    } else if (Array.isArray(object)) {
+      object.forEach((e, i) => (object[i] = this._deepTransformKeysInObjectBang(e, block)));
+      return object;
+    } else {
       return object;
     }
-    if (isPlainObject(object)) {
-      const target = object;
-      const keys = Object.keys(target);
-      for (const k of keys) {
-        const value = target[k];
-        delete target[k];
-        target[fn(k)] = this._deepTransformKeysInObjectBang(value, fn);
-      }
-      return target;
-    }
-    if (Array.isArray(object)) {
-      for (let i = 0; i < object.length; i++) {
-        object[i] = this._deepTransformKeysInObjectBang(object[i], fn);
-      }
-      return object;
-    }
-    return object;
   }
 
   /** @internal */
@@ -793,20 +769,15 @@ export class Parameters {
   }
 
   /** @internal */
-  eachArrayElement(object: unknown, filter: unknown, fn: (el: Parameters) => unknown): unknown {
+  eachArrayElement(object: unknown, filter: unknown, block: (el: Parameters) => unknown): unknown {
     if (Array.isArray(object)) {
-      const out: unknown[] = [];
-      for (const el of object) {
-        if (el instanceof Parameters) {
-          const r = fn(el);
-          if (r != null) out.push(r);
-        }
-      }
-      return out;
-    }
-    if (object instanceof Parameters) {
+      return filterMap(
+        object.filter((el): el is Parameters => el instanceof Parameters),
+        block,
+      );
+    } else if (object instanceof Parameters) {
       if (object.isNestedAttributes() && !this.isSpecifyNumericKeys(filter)) {
-        return object.eachNestedAttribute(fn as (v: unknown) => unknown);
+        return object.eachNestedAttribute(block as (v: unknown) => unknown);
       }
     }
     return undefined;
@@ -839,13 +810,24 @@ export class Parameters {
 
   /** @internal */
   unpermittedKeys(params: Parameters): string[] {
-    const allowed = new Set([...params.keys, ...this.alwaysPermittedParameters]);
-    return this.keys.filter((k) => !allowed.has(k));
+    return this.keys
+      .filter((key) => !params.keys.includes(key))
+      .filter((key) => !this.alwaysPermittedParameters.includes(key));
   }
 
   /** @internal */
   permittedScalarFilter(params: Parameters, permittedKey: string): void {
-    this._permittedScalarFilter(params, permittedKey);
+    if (this.hasKey(permittedKey) && isPermittedScalar(this.get(permittedKey))) {
+      params.set(permittedKey, this.get(permittedKey));
+    }
+
+    this.eachKey((key) => {
+      const match = /\(\d+[if]?\)$/.exec(key);
+      if (!match) return;
+      if (key.slice(0, match.index) !== permittedKey) return;
+
+      if (isPermittedScalar(this.get(key))) params.set(key, this.get(key));
+    });
   }
 
   /** @internal */
@@ -955,7 +937,7 @@ export class Parameters {
   /** @internal */
   permitAnyInParameters(params: Parameters): Parameters {
     const sanitized = new Parameters();
-    params.each((k, v) => {
+    params.each(([k, v]) => {
       if (isPermittedScalar(v)) {
         sanitized.set(k, v);
       } else if (Array.isArray(v)) {
@@ -978,30 +960,24 @@ export class Parameters {
     return sanitized;
   }
 
-  private _deepTransformKeysInObject(object: unknown, fn: (key: string) => string): unknown {
-    if (object instanceof Hash) {
-      const result = new Parameters();
-      for (const [key, value] of object) {
-        result.set(fn(key as string), this._deepTransformKeysInObject(value, fn));
+  private _deepTransformKeysInObject(object: unknown, block: (key: string) => string): unknown {
+    if (object instanceof Hash || isPlainObject(object)) {
+      const result = new (this.constructor as typeof Parameters)();
+      eachPair(object as Hash<string, unknown>, (key, value) => {
+        result.set(block(key), this._deepTransformKeysInObject(value, block));
+      });
+      return result;
+    } else if (object instanceof Parameters) {
+      if (object.permitted) {
+        return deepTransformKeys(object.toH(), block);
+      } else {
+        return deepTransformKeys(object.toUnsafeH(), block);
       }
-      return result;
+    } else if (Array.isArray(object)) {
+      return object.map((e) => this._deepTransformKeysInObject(e, block));
+    } else {
+      return object;
     }
-    if (object instanceof Parameters) {
-      const result = this._deepTransformKeysInObject(object.parameters, fn) as Parameters;
-      result._permitted = object._permitted;
-      return result;
-    }
-    if (isPlainObject(object)) {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(object)) {
-        result[fn(k)] = this._deepTransformKeysInObject(v, fn);
-      }
-      return result;
-    }
-    if (Array.isArray(object)) {
-      return object.map((e) => this._deepTransformKeysInObject(e, fn));
-    }
-    return object;
   }
 
   /** @internal */

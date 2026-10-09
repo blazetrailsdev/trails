@@ -154,3 +154,13 @@ describe("Parameters#dig", () => {
     expect(() => new Parameters({ a: "1" }).dig()).toThrow(ArgumentError);
   });
 });
+
+describe("Parameters#deep_transform_keys", () => {
+  it("transforms a hash pushed onto a stored array", () => {
+    const params = new Parameters({ list: [{ a: "1" }] });
+    (params.get("list") as unknown[]).push({ b: "2" });
+    expect(params.deepTransformKeys((key) => key.toUpperCase()).toUnsafeH()).toEqual({
+      LIST: [{ A: "1" }, { B: "2" }],
+    });
+  });
+});
