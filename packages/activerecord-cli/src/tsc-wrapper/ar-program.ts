@@ -7,8 +7,8 @@ import {
 import { createFileSystemLayer } from "typescript/unstable/fs";
 import { computeLineStarts } from "typescript/unstable/ast/scanner";
 import type { Diagnostic, DiagnosticCategory, Program } from "typescript/unstable/sync";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
-import { collectBaseDescendants } from "@blazetrails/activerecord/type-virtualization/transitive-extends-walker.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
+import { collectBaseDescendants } from "../type-virtualization/transitive-extends-walker.js";
 import { createArModelsPlugin, type ArModelsPluginOptions } from "./ar-models-plugin.js";
 
 export interface CreateArTrailsProgramOptions {

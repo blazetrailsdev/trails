@@ -234,7 +234,7 @@ it("removing releases latch", async () => {
   while (pool.numWaitingInQueue() !== 1) await new Promise((resolve) => setTimeout(resolve, 1));
 
   const connection = cs[0];
-  pool.remove(connection);
+  await pool.remove(connection);
   assertRespondTo(await t.value(), "execute");
   await connection.close();
 });
@@ -340,7 +340,7 @@ it("remove connection", async () => {
     expect(conn.isInUse()).toBeTruthy();
 
     const length = pool.connections.length;
-    pool.remove(conn);
+    await pool.remove(conn);
     expect(conn.isInUse()).toBeTruthy();
     expect(pool.connections.length).toBe(length - 1);
   } finally {

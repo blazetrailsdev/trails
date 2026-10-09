@@ -9,8 +9,8 @@ import {
 } from "typescript/unstable/sync";
 import * as path from "node:path";
 import * as fs from "node:fs";
-import { tsApi } from "@blazetrails/activerecord/type-virtualization/ts-api.js";
-import { virtualize } from "@blazetrails/activerecord/type-virtualization/virtualize.js";
+import { tsApi } from "../type-virtualization/ts-api.js";
+import { virtualize } from "../type-virtualization/virtualize.js";
 import {
   createArTrailsProgram,
   createArSolutionBuilder,
@@ -19,7 +19,7 @@ import {
   type ArTrailsProgram,
   sortAndDeduplicateDiagnostics,
 } from "./ar-program.js";
-import type { SchemaColumnValue } from "@blazetrails/activerecord/type-virtualization/synthesize.js";
+import type { SchemaColumnValue } from "../type-virtualization/synthesize.js";
 import { parseSchemaTs } from "./schema-ts-parser.js";
 import { buildViews, decodeLineMappings } from "@blazetrails/trails-tsc";
 import type { TseSourceMap } from "./ar-program.js";

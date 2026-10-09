@@ -28,9 +28,6 @@ export class SchemaReflection {
   static useSchemaCacheDump = true;
   static checkSchemaCacheDumpVersion = true;
 
-  /** @noRailsEquivalent PERMANENT */
-  static eagerLoadSchemaCache = false;
-
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
 

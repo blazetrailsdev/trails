@@ -178,11 +178,11 @@ function gateRegex(yml: string, name: string): RegExp {
  *
  *  AR_PKGS_RE
  *  AR workspace deps: arel/activemodel/activesupport/globalid/
- *  did-you-mean (per packages/activerecord/package.json). Also
- *  consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
- *  CLI + type-virtualization modules (see packages/activerecord/src/
- *  tsc-wrapper, schema-columns-dump.test.ts), so trails-tsc changes
- *  can fail AR vitest suites — include it in the gate.
+ *  did-you-mean (per packages/activerecord/package.json).
+ *  activerecord-cli consumes @blazetrails/trails-tsc at runtime via its
+ *  tsc-wrapper CLI + type-virtualization modules (see
+ *  packages/activerecord-cli/src/), so trails-tsc changes can fail the
+ *  suites the AR jobs run — include it in the gate.
  *  activerecord-cli E2E suites run in the three AR DB jobs (its tests
  *  exercise the CLI against real DBs), so cli source changes must also
  *  flip activerecord_affected.
@@ -212,7 +212,7 @@ function gateRegex(yml: string, name: string): RegExp {
  *  TRAILS_TSC_PKGS_RE
  *  trails_tsc_affected gates the virtualized DX type tests, the
  *  blocking trails-tsc-tests job, and trails-tsc-coverage.
- *  Workspace consumers of @blazetrails/trails-tsc today: activerecord
+ *  Workspace consumers of @blazetrails/trails-tsc today: activerecord-cli
  *  (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
  *  AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
  *

@@ -1,4 +1,3 @@
-/** @noRailsEquivalent CONVERGEABLE type-virtualization-leaves-the-activerecord-rails-matched-tree */
 import * as ts from "typescript/unstable/ast";
 import type { Project, Symbol } from "typescript/unstable/sync";
 import { tsApi } from "./ts-api.js";

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, onTestFinished } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, onTestFinished, vi } from "vitest";
 import { type LeasedTestAdapter, type TestDatabaseAdapter } from "../test-adapter.js";
 import { Base } from "../base.js";
 import { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
@@ -54,9 +54,9 @@ describe("withTransactionalFixtures", () => {
     onTestFinished(async () => {
       await Base.connectionHandler.removeConnectionPool("MidTestPool");
     });
-    await Promise.resolve();
-    await Promise.resolve();
-    expect((pool as unknown as { _pinnedConnection: unknown })._pinnedConnection).not.toBeNull();
+    await vi.waitFor(() =>
+      expect((pool as unknown as { _pinnedConnection: unknown })._pinnedConnection).not.toBeNull(),
+    );
   });
 
   it("nested user transaction becomes a savepoint and still rolls back at teardown", async () => {

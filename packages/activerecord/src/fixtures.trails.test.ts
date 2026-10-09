@@ -4,7 +4,11 @@ import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
 import { StandardError } from "@blazetrails/ruby-compat";
 import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
-import { insertFixturesSet } from "./connection-adapters/abstract/database-statements.js";
+import {
+  defaultInsertValue,
+  insertFixturesSet,
+} from "./connection-adapters/abstract/database-statements.js";
+import { Visitors } from "@blazetrails/arel";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import "./relation.js";
 
@@ -33,6 +37,11 @@ function makeAdapter(): DatabaseAdapter {
       columnsHash: async (table: string) => doubleColumnsHash(table, DOUBLE_ONLY_COLUMNS),
     },
     lookupCastTypeFromColumn: () => ({ serialize: (v: unknown) => v }),
+    supportsVirtualColumns: async () => false,
+    defaultInsertValue,
+    get visitor() {
+      return new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
+    },
     quoteString: (v: string) => v.replace(/'/g, "''"),
     disableReferentialIntegrity: async (fn: () => Promise<void>) => {
       await fn();
