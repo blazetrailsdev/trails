@@ -278,10 +278,12 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
-      return (...args: any[]) =>
-        target._isRecordsSynchronous && target.isLoaded
-          ? enumerable([...(target.target ?? target._records)], args)
-          : target.records().then((records: any[]) => enumerable([...records], args));
+      return (...args: any[]) => {
+        const records = target.each(() => {});
+        return records instanceof Promise
+          ? records.then((records: any[]) => enumerable([...records], args))
+          : enumerable([...records], args);
+      };
     }
     if (target.respondToMissing(prop, false)) {
       return (...args: any[]) => target.methodMissing(prop, ...args);
