@@ -290,6 +290,7 @@ describe.skipIf(inMemoryDb())("LoadAsyncNullExecutorTest", () => {
       posts = Post.where({ author_id: 1 }).loadAsync();
       expect(posts.isScheduled).toBeFalsy();
       expect(posts.isLoaded).toBeTruthy();
+      await posts;
       throw new Rollback();
     });
 
