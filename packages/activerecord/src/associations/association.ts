@@ -20,6 +20,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
+import { strictLoadingViolationBang } from "../core.js";
+import type { StatementCache } from "../statement-cache.js";
 
 export abstract class Association<Target extends Base | Base[] = Base | Base[]> {
   owner: Base;
@@ -112,7 +114,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     }
   }
 
-  /** @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies */
+  /** @inventedArm if — CONVERGEABLE singular-association-reader-and-reload-promise-or-value-arms */
   reload(force = false): this | null | Promise<this | null> {
     if (force && this.klass) this.klass.connectionPool().clearQueryCache();
     this.reset();
@@ -377,8 +379,37 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     void this.klass;
   }
 
-  protected async findTarget(_options: { async?: boolean } = {}): Promise<Base | Base[] | null> {
-    return null;
+  /** @missingRailsArgs strict_loading_violation! — CONVERGEABLE call-args-comparer-classes-kwarg-nested-class-ref-as-shape */
+  protected findTarget({ async = false }: { async?: boolean } = {}): Promise<Base | Base[] | null> {
+    if (this.isViolatesStrictLoading()) {
+      strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
+    }
+
+    const scope = this.scope();
+    if (this.isSkipStatementCache(scope)) {
+      if (async) {
+        return scope.loadAsync().then((records: Base[]) => records);
+      } else {
+        return scope.toArray();
+      }
+    }
+
+    const sc: Promise<StatementCache> = this.reflection.associationScopeCache(
+      this.klass,
+      this.owner,
+      (params: { bind(): unknown }) => {
+        const as = AssociationScope.create(() => params.bind());
+        return this.targetScope().mergeBang(as.scope(this as unknown as AssociationScopeable));
+      },
+    );
+
+    const binds = AssociationScope.getBindValues(this.owner, this.reflection.chain as never);
+    return this.klass.withConnection(async (c) =>
+      (await sc).execute(binds, c, { async }, (record) => {
+        this.setInverseInstance(record);
+        this.setStrictLoading(record);
+      }),
+    );
   }
 
   /** @internal */

@@ -1,10 +1,11 @@
 import { type Time as RubyTime } from "@blazetrails/date";
 import { MissingAttributeError } from "@blazetrails/activemodel";
-import { NoMethodError, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
+import { rbFSend, rbModDefineMethod, rbObjAsString } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   included,
   isPresent,
+  kernelArray,
   squish,
   parameterize,
   toFs,
@@ -26,14 +27,12 @@ interface Identifiable {
   readonly modelName: { cacheKey: string };
   readonly cacheTimestampFormat: "usec" | "number";
   readonly cacheVersioning: boolean;
-  constructor: { name: string; hasAttribute(name: string): boolean };
+  constructor: { name: string; paramDelimiter: string; hasAttribute(name: string): boolean };
 }
 
 export function toParam(this: Identifiable): string | null {
-  const pk = this.id;
-  if (pk == null) return null;
-  const paramDelimiter: string = (this.constructor as any).paramDelimiter ?? "_";
-  return Array.isArray(pk) ? pk.join(paramDelimiter) : String(pk);
+  if (this.id == null) return null;
+  return kernelArray(this.id).join(this.constructor.paramDelimiter);
 }
 
 export function cacheKey(this: Identifiable): string {
@@ -104,8 +103,8 @@ export const ClassMethods = {
       let result: string;
       let param: string;
       if (
-        (default_ = Object.getPrototypeOf(klass.prototype).toParam?.call(this) ?? null) != null &&
-        isPresent((result = String(publicSend(this, methodName) ?? ""))) &&
+        (default_ = Object.getPrototypeOf(klass.prototype).toParam.call(this)) != null &&
+        isPresent((result = rbObjAsString(rbFSend(this, methodName)))) &&
         isPresent(
           (param = truncate(parameterize(squish(result)), 20, { separator: /-/, omission: "" })),
         )
@@ -118,16 +117,6 @@ export const ClassMethods = {
     return undefined;
   },
 };
-
-function publicSend(obj: object, method: string): unknown {
-  if (!(method in obj)) {
-    throw new NoMethodError(
-      `undefined method '${method}' for an instance of ${obj.constructor.name}`,
-    );
-  }
-  const value = (obj as Record<string, unknown>)[method];
-  return value instanceof Function ? (value as () => unknown).call(obj) : value;
-}
 
 export function collectionCacheKey(
   this: { all(): any },

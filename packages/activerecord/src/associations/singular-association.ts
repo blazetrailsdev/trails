@@ -1,16 +1,7 @@
 import type { Base } from "../base.js";
-import {
-  _builtAssociationScope,
-  _ownerChainReflection,
-  _loadSingularViaStatementCache,
-  _scopeForAssociation,
-  _skipSingularStatementCache,
-} from "../associations.js";
 import { Association } from "./association.js";
-import { AssociationNotFoundError } from "./errors.js";
-import { exceptBang, kernelArray, underscore } from "@blazetrails/activesupport";
+import { exceptBang, kernelArray } from "@blazetrails/activesupport";
 import { NotImplementedError } from "@blazetrails/ruby-compat";
-import { strictLoadingViolationBang } from "../core.js";
 import { RecordInvalid } from "../validations.js";
 
 export class SingularAssociation extends Association<Base> {
@@ -65,7 +56,7 @@ export class SingularAssociation extends Association<Base> {
     return this.target;
   }
 
-  /** @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies */
+  /** @inventedArm if — CONVERGEABLE singular-association-reader-and-reload-promise-or-value-arms */
   get reader(): Base | null | Promise<Base | null> {
     this.ensureKlassExistsBang();
     if (!this.isLoaded() || this.isStaleTarget()) {
@@ -80,64 +71,18 @@ export class SingularAssociation extends Association<Base> {
     return exceptBang(super.scopeForCreate(), ...kernelArray(this.klass.primaryKey));
   }
 
-  /**
-   * @inventedArm if — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
-   * @inventedArm loop — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
-   * @inventedArm throw — CONVERGEABLE singular-association-find-target-and-reader-take-rails-bodies
-   */
   protected override findTarget({ async = false }: { async?: boolean } = {}): Promise<Base | null> {
-    if (!this.disableJoins && this.isViolatesStrictLoading()) {
-      strictLoadingViolationBang({ owner: this.owner.constructor, reflection: this.reflection });
+    if (this.disableJoins) {
+      if (async) {
+        return this.scope()
+          .loadAsync()
+          .then((records: Base[]) => records[0] ?? null);
+      } else {
+        return this.scope().first();
+      }
+    } else {
+      return (super.findTarget({ async }) as Promise<Base[]>).then((records) => records[0] ?? null);
     }
-    return (async (): Promise<Base | null> => {
-      const owner = this.owner;
-      const assocName = this.reflection.name;
-      const options = this.reflection.options;
-      const ctor = owner.constructor as typeof Base;
-      const reflection = ctor._reflectOnAssociation?.(assocName);
-      if (!reflection) throw new AssociationNotFoundError(owner, assocName);
-      const isBelongsTo = reflection.macro === "belongsTo";
-
-      if (this.disableJoins) return this.scope().first();
-
-      let targetModel: typeof Base;
-      if (isBelongsTo && options.polymorphic) {
-        const typeCol = options.foreignType ?? `${underscore(assocName)}_type`;
-        const typeName = owner._readAttribute(typeCol) as string | null;
-        if (!typeName) return null;
-        targetModel = ctor.polymorphicClassFor(typeName);
-      } else {
-        targetModel = this.klass;
-      }
-
-      const ownerSideReflection = _ownerChainReflection(reflection) ?? reflection;
-      const keyColsForCheck = Array.isArray(ownerSideReflection.joinForeignKey)
-        ? ownerSideReflection.joinForeignKey
-        : [ownerSideReflection.joinForeignKey];
-      for (const col of keyColsForCheck) {
-        const v = owner._readAttribute(col);
-        if (v === null || v === undefined) return null;
-      }
-
-      let result: Base | null;
-      if (!_skipSingularStatementCache(reflection, targetModel, options)) {
-        result = await _loadSingularViaStatementCache(
-          owner,
-          assocName,
-          reflection,
-          targetModel,
-          async,
-        );
-      } else {
-        const built = _builtAssociationScope(owner, assocName, reflection, targetModel);
-        const baseRelation = _scopeForAssociation(targetModel);
-        result = await baseRelation.merge(built).take();
-      }
-
-      if (result) this.setInverseInstance(result);
-
-      return result;
-    })();
   }
 
   /** @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */

@@ -8,8 +8,8 @@ import {
   extractOptionsBang,
   included,
   isBlank,
+  isPresent,
   kernelArray,
-  singularize,
 } from "@blazetrails/activesupport";
 import {
   except,
@@ -164,16 +164,15 @@ export function findRecordById(klass: typeof Base, records: Base[], id: unknown)
 
 /** @internal */
 export function raiseNestedAttributesRecordNotFoundBang(
-  record: Base,
+  this: Base,
   associationName: string,
   recordId: unknown,
 ): never {
-  const ctor = record.constructor as typeof Base;
-  const assocDef = (ctor as any)._reflectOnAssociation?.(associationName);
-  const modelName = assocDef?.options?.className ?? camelize(singularize(associationName));
+  const model = (this.constructor as typeof Base)._reflectOnAssociation(associationName)!.klass
+    .name;
   throw new RecordNotFound(
-    `Couldn't find ${modelName} with ID=${recordId} for ${ctor.name} with ID=${record.id}`,
-    modelName,
+    `Couldn't find ${model} with ID=${recordId} for ${this.constructor.name} with ID=${this.id}`,
+    model,
     "id",
     recordId,
   );
@@ -237,12 +236,6 @@ interface OneToOneAssociation {
   readonly reader?: Base | null | Promise<Base | null>;
 }
 
-/** @internal */
-function hasNestedId(attributes: Record<string, unknown>): boolean {
-  const id = (attributes as any).id;
-  return id !== undefined && id !== null && id !== "";
-}
-
 function nestedTypeName(value: unknown): string {
   if (value === null) return "NilClass";
   if (value === undefined) return "undefined";
@@ -280,13 +273,14 @@ export function assignNestedAttributesForOneToOneAssociation(
     );
   }
 
-  const ctor = this.constructor as typeof Base;
-  const options = ctor.nestedAttributesOptions[associationName] ?? {};
-  const updateOnly = options.updateOnly ?? false;
-  const hasId = hasNestedId(attributes);
+  const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
 
   const assoc = this.association(associationName) as unknown as OneToOneAssociation;
-  if ((hasId || updateOnly) && assoc.isLoaded() === false && "reader" in assoc) {
+  if (
+    (options.updateOnly || !isBlank(attributes["id"])) &&
+    assoc.isLoaded() === false &&
+    "reader" in assoc
+  ) {
     const read = assoc.reader;
     if (read instanceof Promise) {
       return read.then(() =>
@@ -297,28 +291,20 @@ export function assignNestedAttributesForOneToOneAssociation(
   const existingRecord = assoc.target ?? null;
 
   if (
-    (updateOnly || hasId) &&
+    (options.updateOnly || !isBlank(attributes["id"])) &&
     existingRecord &&
-    (updateOnly || String(existingRecord.id) === String((attributes as any).id))
+    (options.updateOnly || String(existingRecord.id) === String(attributes["id"]))
   ) {
     if (!callRejectIf.call(this, associationName, attributes)) {
-      return assignToOrMarkForDestruction(
-        existingRecord,
-        attributes,
-        options.allowDestroy ?? false,
-      );
+      return assignToOrMarkForDestruction(existingRecord, attributes, options.allowDestroy!);
     }
-    return;
-  }
+  } else if (isPresent(attributes["id"])) {
+    raiseNestedAttributesRecordNotFoundBang.call(this, associationName, attributes["id"]);
+  } else if (!isRejectNewRecord.call(this, associationName, attributes)) {
+    const assignableAttributes = except(attributes, ...UNASSIGNABLE_KEYS);
 
-  if (hasId) {
-    raiseNestedAttributesRecordNotFoundBang(this, associationName, (attributes as any).id);
-  }
-
-  if (!isRejectNewRecord.call(this, associationName, attributes)) {
-    const assignable = except(attributes, ...UNASSIGNABLE_KEYS);
     if (existingRecord && existingRecord.isNewRecord()) {
-      const pending = existingRecord.setAttributes(assignable);
+      const pending = existingRecord.setAttributes(assignableAttributes);
       if (pending) {
         return pending.then(() => assoc.initializeAttributes(existingRecord));
       }
@@ -326,7 +312,7 @@ export function assignNestedAttributesForOneToOneAssociation(
     } else {
       const method = `build${camelize(associationName, true)}`;
       if (rbObjRespondTo(this, method)) {
-        const built = rbFSend(this, method, assignable);
+        const built = rbFSend(this, method, assignableAttributes);
         if (built instanceof Promise) return built.then(() => {});
       } else {
         throw new ArgumentError(
@@ -379,7 +365,7 @@ export function assignNestedAttributesForCollectionAssociation(
         a = (a as unknown as { toH(): Record<string, unknown> }).toH();
       }
 
-      if (!hasNestedId(a)) {
+      if (isBlank(a["id"])) {
         if (!isRejectNewRecord.call(this, associationName, a)) {
           nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
@@ -411,7 +397,7 @@ export function assignNestedAttributesForCollectionAssociation(
             nestedTarget.push(null);
           }
         } else {
-          raiseNestedAttributesRecordNotFoundBang(this, associationName, (a as any).id);
+          raiseNestedAttributesRecordNotFoundBang.call(this, associationName, a["id"]);
         }
       }
     }
