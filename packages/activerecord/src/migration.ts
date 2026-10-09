@@ -1545,7 +1545,7 @@ export class MigrationContext<
       if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
         throw new InvalidMigrationTimestampError(version, name);
       }
-      version = SchemaMigration.normalizeMigrationNumber(version);
+      version = this.schemaMigration.normalizeMigrationNumber(version);
       const status = aryDelete(dbList, version) != null ? "up" : "down";
       return [status, version, humanize(name + scope)];
     });

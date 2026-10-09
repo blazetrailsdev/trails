@@ -102,13 +102,13 @@ export class SchemaMigration {
     );
   }
 
-  static normalizeMigrationNumber(number: string | number): string {
+  normalizeMigrationNumber(number: string | number): string {
     return format("%.3d", toI(number));
   }
 
   async normalizedVersions(): Promise<string[]> {
     const vers = await this.versions();
-    return vers.map((v) => SchemaMigration.normalizeMigrationNumber(v));
+    return vers.map((v) => this.normalizeMigrationNumber(v));
   }
 
   async integerVersions(): Promise<number[]> {

@@ -10,6 +10,7 @@ import {
   include,
   NotImplementedError,
   rbEqual,
+  rbFSend,
 } from "@blazetrails/ruby-compat";
 import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
@@ -38,7 +39,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare throughRecordsFor: (record: Base) => Base[] | Promise<Base[]>;
   /** @internal */
-  declare deleteThroughRecords: (records: Base[]) => void | Promise<void>;
+  declare deleteThroughRecords: (records: Base[]) => Promise<void>;
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
@@ -188,8 +189,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         return true;
       });
     }
-    const deleted = this.deleteThroughRecords(records);
-    return isThenable(deleted) ? deleted.then(() => true) : true;
+    return this.deleteThroughRecords(records).then(() => true);
   }
 
   /** @internal */
@@ -265,8 +265,9 @@ function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base
 
   const newRecord = (this.throughAssociation() as CollectionAssociation).build(attributes);
   if (this.reflection.options.sourceType) {
-    (newRecord as any).writeAttribute(
-      this.sourceReflection().foreignType!,
+    rbFSend(
+      newRecord,
+      `${this.sourceReflection().foreignType}=`,
       this.reflection.options.sourceType,
     );
   }
@@ -346,11 +347,10 @@ function throughRecordsFor(
   this: HasManyThroughAssociation,
   record: Base,
 ): Base[] | Promise<Base[]> {
-  const joinAttrs = this.constructJoinAttributes(record);
+  const attributes = this.constructJoinAttributes(record);
   const candidates = wrap((this.throughAssociation() as Association).target);
-  const attributes = Object.entries(joinAttrs);
   const sent = candidates.map((c) =>
-    attributes.map(([key]) => {
+    Object.keys(attributes).map((key) => {
       if ((c.constructor as any)._reflectOnAssociation?.(key)) {
         return (c as any).association(key).reader as unknown;
       }
@@ -360,19 +360,23 @@ function throughRecordsFor(
     }),
   );
   const findAll = (values: unknown[][]): Base[] =>
-    candidates.filter((_c, i) => attributes.every(([, value], j) => rbEqual(values[i][j], value)));
+    candidates.filter((_c, i) =>
+      Object.values(attributes).every((value, j) => rbEqual(values[i][j], value)),
+    );
   return sent.some((values) => values.some(isThenable))
     ? Promise.all(sent.map((values) => Promise.all(values))).then(findAll)
     : findAll(sent);
 }
 
 /** @internal */
-function deleteThroughRecords(
+async function deleteThroughRecords(
   this: HasManyThroughAssociation,
   records: Base[],
-): void | Promise<void> {
+): Promise<void> {
   const throughAssociation = this.throughAssociation() as Association;
-  const deleteThroughRecord = (record: Base, throughRecords: Base[]): void => {
+  for (const record of records) {
+    const throughRecords = await this.throughRecordsFor(record);
+
     if ((this.throughReflection() as AssociationReflection).isCollection()) {
       for (const r of throughRecords) aryDelete(throughAssociation.target as Base[], r);
     } else {
@@ -382,17 +386,6 @@ function deleteThroughRecords(
     }
 
     this._throughRecords.delete(record);
-  };
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-    const throughRecords = this.throughRecordsFor(record);
-    if (isThenable(throughRecords)) {
-      return throughRecords.then((resolved) => {
-        deleteThroughRecord(record, resolved);
-        return this.deleteThroughRecords(records.slice(i + 1));
-      });
-    }
-    deleteThroughRecord(record, throughRecords);
   }
 }
 
