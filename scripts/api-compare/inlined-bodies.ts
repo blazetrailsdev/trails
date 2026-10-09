@@ -19,7 +19,7 @@ export interface RubyBody {
 /**
  * The `def` a tag cites, from whichever package's manifest defines the module.
  * Throws, naming `where` the tag sits, when the manifest holds no such `def`
- * or the tag's citation is not that `def`'s file and line span.
+ * or the tag's citation is not exactly that `def`'s path and line span.
  */
 export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: string): MethodInfo {
   const name = `${tag.module}#${tag.hook}`;
@@ -27,16 +27,12 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
     const mod = pkg.modules[tag.module] as unknown as ClassInfo | undefined;
     const body = mod?.instanceMethods.find((m) => m.name === tag.hook);
     if (!body) continue;
-    const file = body.file ?? mod?.file;
-    const cited = `${tag.file}:${tag.firstLine}-${tag.lastLine}`;
-    if (
-      (file !== undefined && tag.file !== file && !tag.file.endsWith(`/${file}`)) ||
-      (body.line !== undefined && body.line !== tag.firstLine) ||
-      (body.endLine !== undefined && body.endLine !== tag.lastLine)
-    ) {
+    const cited = `${tag.source}/${tag.version}/${tag.file}:${tag.firstLine}-${tag.lastLine}`;
+    const actual = `${pkg.libDir}/${body.file ?? mod?.file}:${body.line}-${body.endLine}`;
+    if (cited !== actual) {
       throw new Error(
         `${TAG} citation is stale: ${where} — \`${name}\` is cited at ${cited}, and the ` +
-          `manifest has it at ${file}:${body.line}-${body.endLine}.`,
+          `manifest has it at ${actual}.`,
       );
     }
     return body;
@@ -101,6 +97,21 @@ export function taggedBodies(
     }
     return inlinedHookBody(ruby, tag, where);
   });
+}
+
+/**
+ * The tagged constructors the pairing pass never read, as `file Owner`. A tag
+ * is checked only when its constructor's chain is built, so one on a
+ * constructor the gate paired with no Rails `initialize` was checked by nothing.
+ */
+export function uncomparedInlinedTags(
+  byFileOwner: ReadonlyMap<string, ReadonlyMap<string, unknown>>,
+  compared: ReadonlySet<string>,
+): string[] {
+  return [...byFileOwner]
+    .flatMap(([file, byOwner]) => [...byOwner.keys()].map((owner) => `${file} ${owner}`))
+    .filter((key) => !compared.has(key))
+    .sort();
 }
 
 /**

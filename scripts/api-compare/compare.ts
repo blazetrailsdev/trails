@@ -190,6 +190,7 @@ import {
   inlinedSegments,
   sameFileInitializeModules,
   taggedBodies,
+  uncomparedInlinedTags,
 } from "./inlined-bodies.js";
 import { isStdlibMixinGap, stdlibMixinRows } from "./stdlib-mixin-surface.js";
 
@@ -4633,6 +4634,7 @@ export function main() {
       Map<string, Map<string, Map<string, string>>>
     >();
     const tsInlinedFromByFileOwner = new Map<string, Map<string, InlinedFrom[]>>();
+    const inlinedTagsCompared = new Set<string>();
     // (file → name → every class declaring it), `resolveTsOwner`'s population.
     const tsOwnersByFileName = new Map<string, Map<string, Set<string>>>();
     // (file → name → owner → the file the member is DECLARED in), recorded only
@@ -5540,6 +5542,7 @@ export function main() {
           byOwner === undefined
             ? undefined
             : resolveOwner(rubyName, tsName, tsFile, rubyModule, level).tsClass;
+        if (byOwner?.has(tsClass ?? "")) inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),
           sameFile.map(initializeOf).filter((m) => m !== undefined),
@@ -6632,6 +6635,13 @@ export function main() {
       }
     }
 
+    const uncomparedInlined = uncomparedInlinedTags(tsInlinedFromByFileOwner, inlinedTagsCompared);
+    if (callsGate && uncomparedInlined.length > 0) {
+      throw new Error(
+        `@inlinedFrom was never compared: ${uncomparedInlined.map((key) => `${pkg}/${key}#constructor`).join(", ")} — ` +
+          "the call gate paired no Rails `initialize` with this constructor, so its tags were not checked.",
+      );
+    }
     results.push({
       package: pkg,
       totalMethods,

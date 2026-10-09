@@ -13,6 +13,7 @@ import {
   inlinedSegments,
   sameFileInitializeModules,
   taggedBodies,
+  uncomparedInlinedTags,
 } from "./inlined-bodies.js";
 
 const site = (name: string, args: string[] = []): CallSite => ({ name, args, flags: [] });
@@ -141,6 +142,7 @@ describe("same-file module bodies join by convention", () => {
     packages: {
       i18n: { classes: {}, modules },
       activemodel: {
+        libDir: "rails/v8.0.2/activemodel/lib/active_model",
         classes: {},
         modules: {
           "ActiveModel::API": entity(
@@ -179,9 +181,11 @@ describe("same-file module bodies join by convention", () => {
     ["first line", tag("ActiveModel::API", 81)],
     ["last line", tag("ActiveModel::API", 80, 85)],
     ["file", tag("ActiveModel::API", 80, 84, "model.rb")],
+    ["directory", { ...tag("ActiveModel::API"), file: "foo/lib/active_model/api.rb" }],
+    ["version", { ...tag("ActiveModel::API"), version: "v7.2.0" }],
   ])("reds on a citation whose %s is not the def's", (_what, stale) => {
     expect(() => taggedBodies(ruby, [stale], [], at)).toThrow(
-      /@inlinedFrom citation is stale: .* the manifest has it at api\.rb:80-84/,
+      /@inlinedFrom citation is stale: .* at rails\/v8\.0\.2\/activemodel\/lib\/active_model\/api\.rb:80-84\./,
     );
   });
 
@@ -189,6 +193,21 @@ describe("same-file module bodies join by convention", () => {
     expect(() => taggedBodies(ruby, [tag(sameFile[0])], sameFile, at)).toThrow(
       /@inlinedFrom is redundant/,
     );
+  });
+
+  it("names a tagged constructor the pairing pass never read", () => {
+    const byFileOwner = new Map([
+      [
+        "model.ts",
+        new Map([
+          ["Model", []],
+          ["Other", []],
+        ]),
+      ],
+    ]);
+    expect(uncomparedInlinedTags(byFileOwner, new Set(["model.ts Model"]))).toEqual([
+      "model.ts Other",
+    ]);
   });
 
   it("runs a tagged ClassMethods#new ahead of every initialize, its super consumed", () => {

@@ -4862,6 +4862,7 @@ def run
     end
 
     manifest[:packages][pkg_name] = {
+      libDir: pkg_dir[%r{/vendor/(.+?)/?\z}, 1],
       classes: classes,
       modules: modules,
       fileConstants: extractor.file_constants,

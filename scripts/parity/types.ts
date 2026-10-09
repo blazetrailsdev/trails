@@ -514,6 +514,9 @@ export interface ClassInfo {
 }
 
 export interface PackageInfo {
+  /** Ruby-side only (RFC 0188): the directory every `file` in this package is
+   *  relative to, itself relative to `vendor/` (`rails/v8.0.2/activemodel/lib/active_model`). */
+  libDir?: string;
   classes: Record<string, ClassInfo>;
   modules: Record<string, ClassInfo>;
   fileFunctions?: Record<string, MethodInfo[]>;
