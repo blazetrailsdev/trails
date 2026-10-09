@@ -138,6 +138,12 @@ describe("quote dispatches through quoted_binary", () => {
     expect(received).toBe(data);
   });
 
+  it("raises for a bare byte view, which only Type::Binary::Data carries to quoted_binary", () => {
+    expect(() => quote.call(quotingHost(), new Uint8Array([0xde, 0xad]))).toThrow(
+      "can't quote String",
+    );
+  });
+
   it("falls back to the module quoted_binary helper without a host", () => {
     expect(quote.call(quotingHost(), new BinaryData("ab"))).toBe("'ab'");
   });
