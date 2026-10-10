@@ -10,7 +10,7 @@ import {
   include,
   Notifications,
 } from "@blazetrails/activesupport";
-import { ArgumentError, File, StringIO } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { Live } from "../metal/live.js";
@@ -58,7 +58,7 @@ class SendFileController extends Base {
   }
 
   fileFromBeforeAction() {
-    throw new Error("No file sent from before action.");
+    throw new RuntimeError("No file sent from before action.");
   }
 
   async testSendFileHeadersBang() {
