@@ -19,6 +19,8 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
   const cache = {
     isCached: () => true,
     getCachedColumnsHash: () => columns,
+    getCachedPrimaryKeys: () => undefined,
+    getCachedDataSourceExists: () => undefined,
     dataSourceExists: async () => true,
     columnsHash: async () => columns,
     primaryKeys: async () => null,

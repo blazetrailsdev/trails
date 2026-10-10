@@ -1,26 +1,55 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  include,
+  type Included,
+  rbEqual,
+  rbHash,
+  registerConstant,
+  strUminus,
+} from "@blazetrails/ruby-compat";
+import { Deduplicable } from "../deduplicable.js";
+import type { ClassMethods } from "../deduplicable.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
-export class TypeMetadata extends SqlTypeMetadata {
-  readonly extra: string | null;
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- Ruby `include Deduplicable` (`mysql/type_metadata.rb:9`); the class/interface merge is how a mixin surfaces on the type side.
+export interface TypeMetadata extends Included<typeof Deduplicable> {}
 
-  constructor(
-    typeMetadata: {
-      sqlType?: string | null;
-      type?: string;
-      limit?: number | null;
-      precision?: number | null;
-      scale?: number | null;
-    },
-    options: { extra?: string | null } = {},
-  ) {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface above.
+export class TypeMetadata extends DelegateClass(SqlTypeMetadata) {
+  declare static registry: typeof ClassMethods.registry;
+  declare static new: typeof ClassMethods.new;
+
+  extra: string | null;
+
+  constructor(typeMetadata: SqlTypeMetadata, options: { extra?: string | null } = {}) {
     super(typeMetadata);
     this.extra = options.extra ?? null;
   }
 
-  override equals(other: unknown): boolean {
-    return other instanceof TypeMetadata && super.equals(other) && this.extra === other.extra;
+  equals(other: unknown): boolean {
+    return (
+      other instanceof TypeMetadata &&
+      rbEqual(this.__getobj__(), other.__getobj__()) &&
+      this.extra === other.extra
+    );
+  }
+
+  eql(other: unknown): boolean {
+    return this.equals(other);
+  }
+
+  hash(): number {
+    return rbHash(TypeMetadata) ^ rbHash(this.__getobj__()) ^ rbHash(this.extra);
+  }
+
+  /** @internal */
+  deduplicated(): this {
+    this.__setobj__(this.__getobj__().deduplicate());
+    if (this.extra != null) this.extra = strUminus(this.extra);
+    return Deduplicable.instanceMethod("deduplicated")!.value.call(this);
   }
 }
+
+include(TypeMetadata, Deduplicable);
 
 registerConstant("ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata", TypeMetadata);

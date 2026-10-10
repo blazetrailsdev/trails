@@ -5,6 +5,7 @@ import * as path from "path";
 import { SchemaCache } from "../schema-cache.js";
 import { Column as MysqlColumn } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 async function dumpAndLoad(col: MysqlColumn): Promise<MysqlColumn> {
   const cache = new SchemaCache();
@@ -26,7 +27,7 @@ describe("MysqlColumn", () => {
       "id",
       null,
       new TypeMetadata(
-        { sqlType: "bigint(20) unsigned", type: "integer", limit: 8 },
+        new SqlTypeMetadata({ sqlType: "bigint(20) unsigned", type: "integer", limit: 8 }),
         { extra: "auto_increment" },
       ),
       false,
@@ -45,10 +46,28 @@ describe("MysqlColumn", () => {
   });
 });
 
+describe("MySQL::TypeMetadata#deduplicated", () => {
+  it("deduplicates the delegated SqlTypeMetadata and freezes itself", () => {
+    const a = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
+      extra: "auto_increment",
+    });
+    const b = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }), {
+      extra: "auto_increment",
+    });
+    const other = TypeMetadata.new(new SqlTypeMetadata({ sqlType: "int", type: "integer" }));
+
+    expect(a).toBe(b);
+    expect(other).not.toBe(a);
+    expect(other.__getobj__()).toBe(a.__getobj__());
+    expect(Object.isFrozen(a.__getobj__())).toBe(true);
+    expect(a.sqlType).toBe("int");
+  });
+});
+
 describe("MySQL::TypeMetadata JSON round-trip", () => {
   it("recovers its own class and ivars from the sql_type_metadata payload", async () => {
     const meta = new TypeMetadata(
-      { sqlType: "bigint(20)", type: "integer", limit: 8 },
+      new SqlTypeMetadata({ sqlType: "bigint(20)", type: "integer", limit: 8 }),
       { extra: "auto_increment" },
     );
     const back = (await dumpAndLoad(new MysqlColumn("id", null, meta))).sqlTypeMetadata!;
@@ -63,7 +82,9 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
     const col = new MysqlColumn(
       "id",
       null,
-      new TypeMetadata({ sqlType: "bigint(20)", type: "integer" }, { extra: "auto_increment" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "bigint(20)", type: "integer" }), {
+        extra: "auto_increment",
+      }),
     );
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.extra).toBe("auto_increment");
@@ -73,13 +94,15 @@ describe("MySQL::TypeMetadata JSON round-trip", () => {
   });
 
   it("is null when no extra was given, mirroring `extra: nil` / `allow_nil: true`", () => {
-    const meta = new TypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255 });
+    const meta = new TypeMetadata(
+      new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string", limit: 255 }),
+    );
     expect(meta.extra).toBeNull();
 
     const col = new MysqlColumn(
       "name",
       null,
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
     );
     expect(col.extra).toBeNull();
     expect(col.isAutoIncrement()).toBe(false);

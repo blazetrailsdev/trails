@@ -1,4 +1,5 @@
 import { Range } from "../../range.js";
+import { rbGetAllocFunc } from "../../include.js";
 import { rbObjIvarSet, rbObjRespondTo } from "../../object.js";
 import type { Alias, Node, ParsedNode, Scalar, YAMLMap, YAMLSeq } from "yaml";
 import { Psych } from "../../psych.js";
@@ -11,7 +12,11 @@ import { ScalarScanner } from "../scalar-scanner.js";
 type RubyClass = { prototype: object; allocate?: () => object };
 
 function allocate(klass: RubyClass): object {
-  return klass.allocate?.() ?? (Object.create(klass.prototype) as object);
+  return (
+    klass.allocate?.() ??
+    rbGetAllocFunc(klass)?.(klass as never) ??
+    (Object.create(klass.prototype) as object)
+  );
 }
 
 /**

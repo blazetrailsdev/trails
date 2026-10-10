@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { DelegateClass } from "./delegate.js";
-import { include, initialize, initializeIncludedModules } from "./include.js";
+import { include, initialize, initializeIncludedModules, rbGetAllocFunc } from "./include.js";
 
 describe("DelegateClass (trails)", () => {
+  it("allocates an instance that still forwards a delegate's data properties", () => {
+    class Point {
+      x = 1;
+    }
+    const klass = DelegateClass(Point);
+    const allocated = rbGetAllocFunc(klass)!(klass as never) as InstanceType<typeof klass>;
+    expect(Object.keys(allocated)).toEqual([]);
+    allocated.__setobj__(new Point());
+    expect(allocated.x).toBe(1);
+  });
+
   it("does not construct the delegated superclass", () => {
     let constructed = 0;
     class Required {

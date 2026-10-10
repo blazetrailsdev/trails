@@ -322,10 +322,9 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
       new MysqlColumn(
         "id",
         null,
-        new MysqlTypeMetadata(
-          { sqlType: "bigint(20)", type: "integer" },
-          { extra: "auto_increment" },
-        ),
+        new MysqlTypeMetadata(new SqlTypeMetadata({ sqlType: "bigint(20)", type: "integer" }), {
+          extra: "auto_increment",
+        }),
       ),
     ];
     const cache = new SchemaCache();
@@ -348,7 +347,11 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
   it("the dump carries the column class as a ruby/object tag, not a coder key", async () => {
     const cache = new SchemaCache();
     cache.setColumns("people", [
-      new MysqlColumn("id", null, new MysqlTypeMetadata({ sqlType: "int", type: "integer" })),
+      new MysqlColumn(
+        "id",
+        null,
+        new MysqlTypeMetadata(new SqlTypeMetadata({ sqlType: "int", type: "integer" })),
+      ),
     ]);
 
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "schema-cache-tag-test-"));
@@ -363,7 +366,9 @@ describe("SchemaCacheColumnClassRoundTripTest", () => {
   });
 
   it("an object shared across tables is dumped once and revived through its alias", async () => {
-    const metadata = new MysqlTypeMetadata({ sqlType: "int", type: "integer" });
+    const metadata = new MysqlTypeMetadata(
+      new SqlTypeMetadata({ sqlType: "int", type: "integer" }),
+    );
     const id = new MysqlColumn("id", null, metadata);
     const cache = new SchemaCache();
     cache.setColumns("people", [id, new MysqlColumn("parent_id", null, metadata)]);
@@ -406,10 +411,9 @@ describe("SchemaCacheMarshalDumpTest", () => {
           new MysqlColumn(
             "id",
             null,
-            new MysqlTypeMetadata(
-              { sqlType: "bigint(20)", type: "integer" },
-              { extra: "auto_increment" },
-            ),
+            new MysqlTypeMetadata(new SqlTypeMetadata({ sqlType: "bigint(20)", type: "integer" }), {
+              extra: "auto_increment",
+            }),
             true,
             null,
             { comment },

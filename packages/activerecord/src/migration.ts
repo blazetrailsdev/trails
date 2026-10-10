@@ -838,6 +838,19 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("views")) as string[];
   }
 
+  async transaction<T>(
+    ...args: Parameters<DatabaseAdapter["transaction"]>
+  ): Promise<T | undefined> {
+    return (await this.methodMissing("transaction", ...args)) as T | undefined;
+  }
+
+  async execute(sql: string, name?: string | null): Promise<unknown> {
+    if (name !== undefined) {
+      return await this.methodMissing("execute", sql, name);
+    }
+    return await this.methodMissing("execute", sql);
+  }
+
   get name(): string | null {
     return this._name;
   }

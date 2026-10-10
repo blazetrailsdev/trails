@@ -263,7 +263,7 @@ describe("BasicsTest", async () => {
 
     await Topic.resetColumnInformation();
 
-    vi.spyOn(Topic.connectionPool(), "schemaReflection", "get").mockImplementation(() => {
+    vi.spyOn(Topic.connectionPool(), "schemaCache", "get").mockImplementation(() => {
       throw new RuntimeError("Some Error");
     });
     await assertRaises([RuntimeError], {}, () => (Topic as any).columnsHash());
