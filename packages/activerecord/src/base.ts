@@ -2030,7 +2030,7 @@ export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializ
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;
-  updateColumns(attrs: Record<string, unknown>): Promise<boolean>;
+  updateColumns(attributes: Record<string, unknown> | Map<string, unknown>): Promise<boolean>;
   clone(): this;
   becomes<K extends typeof Base>(klass: K): InstanceType<K>;
   becomesBang<K extends typeof Base>(klass: K): InstanceType<K>;

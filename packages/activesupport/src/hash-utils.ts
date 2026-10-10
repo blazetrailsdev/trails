@@ -295,6 +295,10 @@ export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
+export function transformKeys<V>(
+  hash: AnyObject | Map<string, V>,
+  block: (key: string) => string,
+): Record<string, unknown> | Map<string, V>;
 export function transformKeys(
   hash: AnyObject | Map<unknown, unknown>,
   block: ((key: string) => string) | ((key: unknown) => unknown),
@@ -466,6 +470,9 @@ function buildQueryParts(value: unknown, key: string): string {
     return value.map((v) => buildQueryParts(v, prefix)).join("&");
   }
   if (isPlainObject(value) || value instanceof Map) return toQuery(value, key);
+  if (rbObjRespondTo(value, "toQuery")) {
+    return (value as { toQuery(key: string): string }).toQuery(key);
+  }
   return `${encodeQueryKey(key)}=${encodeQueryValue(toParam(value))}`;
 }
 
