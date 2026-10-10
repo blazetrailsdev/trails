@@ -4,11 +4,10 @@ import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
-  static override _railsClassName = "ActiveRecord::AssociationRelation";
 
   /** @internal */
   _association: CollectionProxy<T> | Association;
@@ -105,4 +104,4 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   }
 }
 
-ActiveRecord.AssociationRelation = AssociationRelation;
+rbModConstSet(ActiveRecord, "AssociationRelation", AssociationRelation);

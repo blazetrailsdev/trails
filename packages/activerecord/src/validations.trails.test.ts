@@ -1,3 +1,4 @@
+import { rbConstGet, rbModName } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Base } from "./index.js";
 import {
@@ -7,6 +8,7 @@ import {
   NumericalityValidator,
   PresenceValidator,
   UniquenessValidator,
+  Validations,
 } from "./validations.js";
 
 describe("ValidatesConstantLookupTest", () => {
@@ -19,7 +21,7 @@ describe("ValidatesConstantLookupTest", () => {
         NumericalityValidator,
         PresenceValidator,
         UniquenessValidator,
-      ].map((validatorClass) => (Base as unknown as Record<string, unknown>)[validatorClass.name]),
+      ].map((validatorClass) => rbConstGet(Base, validatorClass.name)),
     ).toEqual([
       AbsenceValidator,
       AssociatedValidator,
@@ -28,6 +30,12 @@ describe("ValidatesConstantLookupTest", () => {
       PresenceValidator,
       UniquenessValidator,
     ]);
+  });
+
+  it("seats the validators on ActiveRecord::Validations, not on Base", () => {
+    expect(Object.keys(Base).filter((key) => key.endsWith("Validator"))).toEqual([]);
+    expect(rbConstGet(Validations, "PresenceValidator")).toBe(PresenceValidator);
+    expect(rbModName(UniquenessValidator)).toBe("ActiveRecord::Validations::UniquenessValidator");
   });
 
   it("registers the ActiveRecord validator for a built-in key", () => {

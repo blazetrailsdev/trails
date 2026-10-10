@@ -17,6 +17,7 @@ import * as Reflection from "./reflection.js";
 import {
   Module,
   include,
+  included,
   rbClassInheritedP,
   rbClassSuperclass,
   rbModConstSet,
@@ -138,6 +139,10 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 }
 
 export class Associations {
+  static [included](base: object): void {
+    include(base as new () => object, SuperMethods);
+  }
+
   static belongsTo(
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
@@ -312,15 +317,20 @@ export function association(this: Base, name: string): AssociationInstance {
 }
 
 /** @internal */
-export function initInternals(this: Base, super_: () => void): void {
-  super_();
+export function initInternals(this: Base): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._associationCache = new Map();
 }
 
-export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  super_(other);
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("initializeDup", initializeDup);
+});
 
 /** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {

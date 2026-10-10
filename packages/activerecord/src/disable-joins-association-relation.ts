@@ -1,6 +1,6 @@
 import { Relation, type LoadedRelation } from "./relation.js";
 import { ActiveRecord } from "./namespaces.js";
-import { compact, groupBy, rbFSend, take, uniq } from "@blazetrails/ruby-compat";
+import { compact, groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrails/ruby-compat";
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
@@ -9,7 +9,6 @@ export type DjarIds = unknown[] | PromiseLike<unknown[]>;
 
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
-  static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
 
   readonly key: DjarKey;
   private readonly _ids: DjarIds;
@@ -58,4 +57,4 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
   }
 }
 
-ActiveRecord.DisableJoinsAssociationRelation = DisableJoinsAssociationRelation;
+rbModConstSet(ActiveRecord, "DisableJoinsAssociationRelation", DisableJoinsAssociationRelation);

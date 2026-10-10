@@ -1,5 +1,8 @@
 import {
+  included,
+  include,
   kernelThrow,
+  Module,
   rbEnsure,
   rbEqual,
   rbFSend,
@@ -59,6 +62,10 @@ export function reload<T extends Base>(
 }
 
 export const AutosaveAssociation = {
+  [included](base: object): void {
+    include(base as new () => object, SuperMethods);
+  },
+
   markForDestruction(this: AutosaveAssociationHost): void {
     this._markedForDestruction = true;
   },
@@ -271,10 +278,14 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
 }
 
 /** @internal */
-export function initInternals(this: AutosaveAssociationHost, super_: () => void): void {
-  super_();
+export function initInternals(this: AutosaveAssociationHost): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._alreadyCalled = null;
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initInternals", initInternals);
+});
 
 /** @internal */
 export function associatedRecordsToValidateOrSave(

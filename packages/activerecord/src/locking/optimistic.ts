@@ -1,4 +1,12 @@
-import { DelegateClass, type Hash, merge, rtest, union } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  type Hash,
+  include,
+  merge,
+  Module,
+  rtest,
+  union,
+} from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -46,6 +54,7 @@ export interface Optimistic {
 
 export const Optimistic = {
   [included](base: object): void {
+    include(base as new () => object, SuperMethods);
     classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
   },
   lockingEnabled,
@@ -231,14 +240,14 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
   this.clearAttributeChange(lockingColumn);
 }
 
-export function initializeDup(
-  this: InstanceLockingHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: InstanceLockingHost, other: unknown): void {
+  SuperMethods.superMethod(this, "initializeDup")!(other);
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initializeDup", initializeDup);
+});
 
 /** @internal */
 export function _queryConstraintsHash(

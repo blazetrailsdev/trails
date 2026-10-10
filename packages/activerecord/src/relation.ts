@@ -15,6 +15,8 @@ import {
   Enumerable,
   isEmpty,
   rbDefineAllocFunc,
+  rbModConstSet,
+  rbModName,
   rbObjClone,
   toS,
   type Each,
@@ -304,7 +306,6 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base, G extends boolean = false> {
   /** @internal */
-  static _railsClassName = "ActiveRecord::Relation";
 
   static create = _delegationCreate;
 
@@ -416,7 +417,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         record.inspect(),
       );
       if (entries.length === 11) entries[10] = "...";
-      return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
+      return `#<${rbModName(this.constructor)} [${entries.join(", ")}]>`;
     };
     if (Array.isArray(subject)) return inspectEntries(subject);
     return (
@@ -1768,7 +1769,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 }
 
-ActiveRecord.Relation = Relation;
+rbModConstSet(ActiveRecord, "Relation", Relation);
 
 /* eslint-disable @typescript-eslint/no-empty-object-type */
 export interface RelationScopes<T extends Base> {}

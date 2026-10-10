@@ -1,4 +1,4 @@
-import { RuntimeError, type Hash } from "@blazetrails/ruby-compat";
+import { include, Module, RuntimeError, type Hash } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   type HashWithIndifferentAccess,
@@ -84,6 +84,7 @@ export class Dirty {
 
     base.attributeMethodAffix({ prefix: "isWillSaveChangeTo", parameters: "**options" });
     base.attributeMethodSuffix("ChangeToBeSaved", "InDatabase", { parameters: false });
+    include(base as unknown as new () => object, SuperMethods);
   }
 
   get savedChanges(): Hash<string, [unknown, unknown]> {
@@ -143,8 +144,8 @@ export async function reload<T extends DirtyPrivateHost>(
 }
 
 /** @internal */
-export function initInternals(this: DirtyPrivateHost, super_: () => void): void {
-  super_();
+export function initInternals(this: DirtyPrivateHost): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   this._touchAttrNames = null;
@@ -236,5 +237,9 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
     return true;
   });
 }
+
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initInternals", initInternals);
+});
 
 AttributeMethods.Dirty = Dirty;

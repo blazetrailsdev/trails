@@ -1,5 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational, max } from "@blazetrails/ruby-compat";
+import { include, Module, Rational, max } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   currentTimeInstant,
@@ -120,17 +120,13 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 }
 
 /** @internal */
-export function initInternals(this: TimestampInstanceHost, super_: () => void): void {
-  super_();
+export function initInternals(this: TimestampInstanceHost): void {
+  SuperMethods.superMethod(this, "initInternals")!();
   this._touchRecord = null;
 }
 
-export function initializeDup(
-  this: TimestampInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: TimestampInstanceHost, other: unknown): void {
+  SuperMethods.superMethod(this, "initializeDup")!(other);
   clearTimestampAttributes.call(this);
 }
 
@@ -214,8 +210,14 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
+const SuperMethods = new Module((mod) => {
+  mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("initializeDup", initializeDup);
+});
+
 export const Timestamp = {
   [included](base: object): void {
+    include(base as new () => object, SuperMethods);
     classAttribute.call(base, "recordTimestamps", { default: true });
   },
   recordUpdateTimestamps,

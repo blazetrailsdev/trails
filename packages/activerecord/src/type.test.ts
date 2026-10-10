@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { register, lookup, registry, adapterNameFrom, AdapterSpecificRegistry } from "./type.js";
+import {
+  register,
+  lookup,
+  registry,
+  setRegistry,
+  adapterNameFrom,
+  AdapterSpecificRegistry,
+} from "./type.js";
 import { Base } from "./base.js";
 import { ValueType } from "@blazetrails/activemodel";
 
@@ -29,11 +36,11 @@ describe("TypeTest", () => {
 
   beforeEach(() => {
     oldRegistry = registry();
-    registry(new AdapterSpecificRegistry());
+    setRegistry(new AdapterSpecificRegistry());
   });
 
   afterEach(() => {
-    registry(oldRegistry);
+    setRegistry(oldRegistry);
   });
 
   it("registering a new type", () => {
