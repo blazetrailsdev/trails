@@ -95,6 +95,7 @@ export function isBlank(value: unknown): boolean {
   if (Array.isArray(value)) return value.length === 0;
   if (typeof value === "symbol") return Symbol.isBlank(value);
   if (typeof value === "string") return String.isBlank(value);
+  if (value instanceof Uint8Array) return String.isBlank(new TextDecoder().decode(value));
   if (typeof value === "number" || typeof value === "bigint") return false;
   // boundary: a JS `Date` is one of the `TimeValue`s this arm answers for.
   if (
