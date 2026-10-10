@@ -8,7 +8,6 @@ import {
   kernelArray,
   squish,
   parameterize,
-  toFs,
   truncate,
 } from "@blazetrails/activesupport";
 import { defaultTimezone } from "./active-record.js";
@@ -45,7 +44,7 @@ export function cacheKey(this: Identifiable): string {
       const timestamp = this.maxUpdatedColumnTimestamp();
 
       if (timestamp != null) {
-        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}-${toFs(timestamp.utc(), this.cacheTimestampFormat)}`;
+        return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}-${timestamp.utc().toFs(this.cacheTimestampFormat)}`;
       } else {
         return `${this.modelName.cacheKey}/${rbObjAsString(this.id)}`;
       }
@@ -61,7 +60,7 @@ export function cacheVersion(this: Identifiable): string | null {
     if (this.canUseFastCacheVersion(timestamp)) {
       return rawTimestampToCacheVersion(timestamp as string);
     } else if ((timestamp = this.readAttribute("updated_at")) != null) {
-      return toFs((timestamp as RubyTime).utc(), this.cacheTimestampFormat);
+      return (timestamp as RubyTime).utc().toFs(this.cacheTimestampFormat);
     }
   } else if (this.constructor.hasAttribute("updated_at")) {
     throw new MissingAttributeError(`missing attribute 'updated_at' for ${this.constructor.name}`);

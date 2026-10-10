@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { DateTime, Temporal } from "@blazetrails/date";
+import { DateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import * as DateTimeExt from "./date-time/calculations.js";
 
 import { hours } from "../duration.js";
@@ -39,8 +39,8 @@ describe("RangeTest", () => {
 
   it("to fs from times", () => {
     const dateRange = new Range(
-      new Date(Date.UTC(2005, 11, 10, 15, 30)),
-      new Date(Date.UTC(2005, 11, 10, 17, 30)),
+      RubyTime.utc(2005, 12, 10, 15, 30),
+      RubyTime.utc(2005, 12, 10, 17, 30),
     );
     expect(dateRange.toFs("db")).toBe("BETWEEN '2005-12-10 15:30:00' AND '2005-12-10 17:30:00'");
   });

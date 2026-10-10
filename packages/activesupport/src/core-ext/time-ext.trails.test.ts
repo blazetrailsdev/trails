@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { advance } from "../time-ext.js";
 import "./time/calculations.js";
-import { toFs } from "./time/conversions.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
+import "./time/conversions.js";
+import "./date/conversions.js";
 import { TimeWithZone } from "../time-with-zone.js";
 import { TimeZone } from "../values/time-zone.js";
 
@@ -54,11 +56,11 @@ describe("toFs dispatches on the receiver", () => {
       TimeZone.find("Eastern Time (US & Canada)")!,
     );
 
-    expect(toFs(twz, "db")).toBe("2000-01-01 00:00:00");
-    expect(toFs(twz, "db")).toBe(twz.toFs("db"));
+    expect(rbFSend(twz, "toFs", "db")).toBe("2000-01-01 00:00:00");
+    expect(rbFSend(twz, "toFs", "db")).toBe(twz.toFs("db"));
   });
 
   it("sends a Temporal.PlainDate to Date#to_fs", () => {
-    expect(toFs(Temporal.PlainDate.from("2005-02-21"), "inspect")).toBe("2005-02-21");
+    expect(rbFSend(Temporal.PlainDate.from("2005-02-21"), "toFs", "inspect")).toBe("2005-02-21");
   });
 });

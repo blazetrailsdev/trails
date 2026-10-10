@@ -1,8 +1,7 @@
-import { Temporal } from "@blazetrails/date";
-
 import { Range } from "@blazetrails/ruby-compat/range";
-import { toFs as timeToFs } from "../time/conversions.js";
-import { toFs as dateToFs } from "../date/conversions.js";
+import { rbFSend } from "@blazetrails/ruby-compat";
+import "../time/conversions.js";
+import "../date/conversions.js";
 
 declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
@@ -11,13 +10,10 @@ declare module "@blazetrails/ruby-compat/range" {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE range-formats-db-keeps-a-helper-because-a-number-has-no-to-fs-seat */
 function toFsDb(value: unknown): string {
-  if (value instanceof Temporal.PlainDate) return dateToFs(value, "db");
-  // boundary: `time-ext.ts`'s `toFs` — the ported `Time#to_fs` — takes a JS Date.
-  if (value instanceof Date) return timeToFs(value, "db");
-  // boundary: as above, an Instant is bridged to the Date `toFs` accepts.
-  if (value instanceof Temporal.Instant) return timeToFs(new Date(value.epochMilliseconds), "db");
-  return String(value);
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  return rbFSend(value, "toFs", "db") as string;
 }
 
 export const RANGE_FORMATS: Record<string, (start: unknown, stop: unknown) => string | undefined> =

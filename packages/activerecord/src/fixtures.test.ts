@@ -99,6 +99,7 @@ describe("PrimaryKeyErrorTest", () => {
       loadSchema: async () => {},
       columns: () => Object.values(doubleColumnsHash("authors")),
       typeForAttribute: () => ({ type: () => "integer" }),
+      definedEnums: {},
       _reflections: {
         ownedEssay: {
           name: "ownedEssay",

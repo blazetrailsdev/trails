@@ -4502,6 +4502,44 @@ describe("Ruby extractor Concern included-block class methods", () => {
   });
 });
 
+describe("Ruby extractor base.class_attribute in self.extended", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  it("credits a class_attribute sent to the base an extended hook receives", () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "extended-rb-"));
+    try {
+      fs.writeFileSync(
+        path.join(dir, "enum.rb"),
+        `
+          module ActiveRecord
+            module Enum
+              def self.extended(base)
+                base.class_attribute(:defined_enums, instance_writer: false, default: {})
+              end
+              def self.other(base)
+                base.class_attribute(:not_a_hook)
+              end
+            end
+          end
+        `,
+      );
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "enum.rb"), ${JSON.stringify(dir)})
+        puts JSON.generate(ex.modules["ActiveRecord::Enum"][:classMethods].map { |m| m[:name] })
+      `;
+      const out = JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+      expect(out).toContain("defined_enums");
+      expect(out).toContain("defined_enums?");
+      expect(out).not.toContain("not_a_hook");
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe(
   "Ruby extractor method_missing forwarding",
   { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },

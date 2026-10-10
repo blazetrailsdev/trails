@@ -46,10 +46,10 @@ describe("FieldOrderedValuesTest", () => {
     await Book.create({ status: "published" });
 
     const statuses = (Book as any).statuses;
-    const order = [statuses.written, statuses.published, statuses.proposed];
+    const order = [statuses.get("written"), statuses.get("published"), statuses.get("proposed")];
     const books = Book.inOrderOf("status", order);
 
-    expect((await books).map((book: any) => statuses[book.status])).toEqual(order);
+    expect((await books).map((book: any) => statuses.get(book.status))).toEqual(order);
   });
 
   it("in order of expression", async () => {

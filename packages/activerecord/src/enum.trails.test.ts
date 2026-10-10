@@ -88,6 +88,42 @@ describe("Enum name conflict detection", () => {
     }).not.toThrow();
   });
 
+  it("gives a subclass its own defined_enums holding the parent's mappings", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.enum("difficulty", { easy: 0, hard: 1 });
+      }
+    }
+
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).toEqual(["status", "difficulty"]);
+    expect(Child.definedEnums.status).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(Child.definedEnums.status).not.toBe(Parent.definedEnums.status);
+    expect(Child.definedEnums.status.fetch("written", null)).toBe(1);
+    expect(Child.definedEnums.status.get("proposed")).toBe(0);
+  });
+
+  it("keeps a subclass's enum out of its ancestors' defined_enums", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+    }
+    class Child extends Parent {}
+    class Grandchild extends Child {}
+    Parent.enum("status", { proposed: 0, written: 1 });
+    Grandchild.enum("difficulty", { easy: 0, hard: 1 });
+
+    expect(Object.keys(Base.definedEnums)).not.toContain("status");
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).not.toContain("difficulty");
+    expect(Object.keys(Grandchild.definedEnums)).toEqual(["status", "difficulty"]);
+  });
+
   it("does not treat a user class method on an ancestor as a plural-accessor conflict", () => {
     class Parent extends Base {
       static _tableName = "books";
@@ -425,10 +461,9 @@ describe("Enum acronym method name consistency", () => {
     const proto = AcroBook.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.isApiKey).toBe("function");
     expect(proto.isAPIKey).toBeUndefined();
-    const recorded = (AcroBook as unknown as { _enumMethodsModuleNames: Set<string> })
-      ._enumMethodsModuleNames;
-    expect(recorded.has("isApiKey")).toBe(true);
-    expect(recorded.has("isAPIKey")).toBe(false);
+    const recorded = (AcroBook as typeof Base)._enumMethodsModule();
+    expect(recorded.isMethodDefined("isApiKey")).toBe(true);
+    expect(recorded.isMethodDefined("isAPIKey")).toBe(false);
   });
 
   it("detects a conflict on the name it actually generates for an acronym label", () => {

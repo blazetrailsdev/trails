@@ -115,8 +115,8 @@ describe("EnumTest", () => {
   });
 
   it("find via where with values", async () => {
-    const published = (Book as any).statuses.published;
-    const written = (Book as any).statuses.written;
+    const published = (Book as any).statuses.get("published");
+    const written = (Book as any).statuses.get("written");
 
     expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
@@ -128,8 +128,8 @@ describe("EnumTest", () => {
 
   it("find via where with values.to_s", async () => {
     book = books("awdr");
-    const published = String((Book as any).statuses.published);
-    const written = String((Book as any).statuses.written);
+    const published = String((Book as any).statuses.get("published"));
+    const written = String((Book as any).statuses.get("written"));
 
     expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
@@ -137,7 +137,9 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
     expect((await Book.where().not({ status: published }).first())?.id).not.toBe(book.id);
     expect((await Book.where().not({ status: written }).first())?.id).toBe(book.id);
-    expect((await Book.where({ cover: (Book as any).covers.soft }).first())?.id).toBe(book.id);
+    expect((await Book.where({ cover: (Book as any).covers.get("soft") }).first())?.id).toBe(
+      book.id,
+    );
   });
 
   it("find via where with symbols", async () => {
@@ -196,10 +198,10 @@ describe("EnumTest", () => {
 
   it("build from where", () => {
     expect(
-      (Book.where({ status: (Book as any).statuses.written }).build() as any).isWritten(),
+      (Book.where({ status: (Book as any).statuses.get("written") }).build() as any).isWritten(),
     ).toBeTruthy();
     expect(
-      (Book.where({ status: (Book as any).statuses.written }).build() as any).isProposed(),
+      (Book.where({ status: (Book as any).statuses.get("written") }).build() as any).isProposed(),
     ).toBeFalsy();
     expect((Book.where({ status: ":written" }).build() as any).isWritten()).toBeTruthy();
     expect((Book.where({ status: ":written" }).build() as any).isProposed()).toBeFalsy();
@@ -432,9 +434,9 @@ describe("EnumTest", () => {
   });
 
   it("constant to access the mapping", () => {
-    expect((Book as any).statuses.proposed).toBe(0);
-    expect((Book as any).statuses.written).toBe(1);
-    expect((Book as any).statuses.published).toBe(2);
+    expect((Book as any).statuses.get("proposed")).toBe(0);
+    expect((Book as any).statuses.get("written")).toBe(1);
+    expect((Book as any).statuses.get("published")).toBe(2);
   });
 
   it("building new objects with enum scopes", () => {
@@ -665,15 +667,17 @@ describe("EnumTest", () => {
   });
 
   it("attempting to modify enum raises error", async () => {
-    let e = await assertRaises([TypeError], {}, () => {
-      (Book as any).statuses["bad_enum"] = 40;
+    let e = await assertRaises([RuntimeError], {}, () => {
+      (Book as any).statuses.set("bad_enum", 40);
     });
-    expect(e.message).toMatch(/Cannot add property bad_enum, object is not extensible/);
 
-    e = await assertRaises([TypeError], {}, () => {
-      delete (Book as any).statuses["published"];
+    expect(e.message).toMatch(/can't modify frozen/);
+
+    e = await assertRaises([RuntimeError], {}, () => {
+      (Book as any).statuses.delete("published");
     });
-    expect(e.message).toMatch(/Cannot delete property 'published'/);
+
+    expect(e.message).toMatch(/can't modify frozen/);
   });
 
   it("declare multiple enums with prefix: true", () => {
@@ -1003,7 +1007,7 @@ describe("EnumTest", () => {
         this.attribute("cover", "integer");
         this.attribute("difficulty", "integer");
         this.enum("cover", { hard: 0, soft: 1 }, { suffix: true });
-        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
+        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
       }
     }
     const instance = new K();
@@ -1081,8 +1085,8 @@ describe("EnumTest", () => {
       }
     }
     const computer = (Klass as any)["etc::Gmt+1"]().build();
-    expect(computer["isEtc/GMT+1"]()).toBeTruthy();
-    expect(computer["isEtc/GMT-1"]()).toBeFalsy();
+    expect(computer["isEtc::Gmt+1"]()).toBeTruthy();
+    expect(computer["isEtc::Gmt-1"]()).toBeFalsy();
   });
 
   it("deserialize enum value to original hash key", async () => {

@@ -1048,7 +1048,11 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
+  declare static definedEnums: Record<
+    string,
+    HashWithIndifferentAccess<number | string | boolean | null>
+  >;
+  declare static isDefinedEnums: boolean;
 
   declare static enum: typeof _EnumModule.enum;
 
@@ -2162,16 +2166,7 @@ include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
-extend(Base, {
-  enum: _EnumModule.enum,
-  _enum: _EnumModule._enum,
-  _enumMethodsModule: _EnumModule._enumMethodsModule,
-  detectEnumConflictBang: _EnumModule.detectEnumConflictBang,
-  raiseConflictError: _EnumModule.raiseConflictError,
-  assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
-  assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
-  detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
-});
+extend(Base, _EnumModule.Enum);
 extend(Base, DelegatedType);
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,

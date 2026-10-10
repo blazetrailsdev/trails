@@ -9,7 +9,7 @@ import {
   rbFSend,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { actsLike, TimeWithZone, toFs } from "@blazetrails/activesupport";
+import { actsLike, TimeWithZone } from "@blazetrails/activesupport";
 
 export interface TimezoneAware {
   readonly isUtc: boolean;
@@ -52,7 +52,7 @@ export function applySecondsPrecision<T>(this: { precision?: number }, value: T)
 }
 
 export function typeCastForSchema(value: unknown): unknown {
-  return JSON.stringify(toFs(value as Temporal.Instant, "db"));
+  return JSON.stringify(rbFSend(value, "toFs", "db"));
 }
 
 export function userInputInTimeZone(

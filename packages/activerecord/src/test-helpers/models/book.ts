@@ -171,7 +171,7 @@ export class Book extends Base {
     this.enum("author_visibility", ["visible", "invisible"], { prefix: true });
     this.enum("illustrator_visibility", ["visible", "invisible"], { prefix: true });
     this.enum("font_size", ["small", "medium", "large"], { prefix: "with", suffix: true });
-    this.enum("difficulty", ["easy", "medium", "hard"], { suffix: "toRead" });
+    this.enum("difficulty", ["easy", "medium", "hard"], { suffix: "to_read" });
     this.enum("cover", { hard: "hard", soft: "soft" });
     this.enum("boolean_status", { enabled: true, disabled: false });
   }
