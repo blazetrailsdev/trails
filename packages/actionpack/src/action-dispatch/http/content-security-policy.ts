@@ -92,6 +92,12 @@ export class ContentSecurityPolicy {
     if (init) init(this);
   }
 
+  initializeCopy(other: ContentSecurityPolicy): void {
+    this.directives = new Map(
+      Array.from(other.directives.entries()).map(([k, v]) => [k, v === true ? true : [...v]]),
+    );
+  }
+
   defaultSrc(...sources: CSPSourceOrClear[]): this {
     return this.setDirective("default-src", sources);
   }
@@ -317,14 +323,6 @@ export class ContentSecurityPolicy {
   /** @internal */
   private isNonceDirective(directive: string, nonceDirectives: readonly string[]): boolean {
     return nonceDirectives.includes(directive);
-  }
-
-  dup(): ContentSecurityPolicy {
-    const copy = new ContentSecurityPolicy();
-    for (const [k, v] of this.directives) {
-      copy.directives.set(k, v === true ? true : [...v]);
-    }
-    return copy;
   }
 
   getDirectives(): Map<DirectiveName, DirectiveValue> {
