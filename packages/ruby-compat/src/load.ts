@@ -1,4 +1,5 @@
 import { getPath } from "./fs-adapter.js";
+import { LoadError } from "./load-error.js";
 import { registerConstant } from "./variable.js";
 
 let loads = 0;
@@ -14,7 +15,9 @@ let loads = 0;
  * @noRailsEquivalent PERMANENT
  */
 export async function rbFLoad(fname: string): Promise<true> {
-  const path = getPath().pathToFileURL!(fname);
+  const { pathToFileURL } = getPath();
+  if (pathToFileURL === undefined) throw new LoadError(`cannot load such file -- ${fname}`);
+  const path = pathToFileURL(fname);
   path.search = `?${(loads += 1)}`;
   const exports = (await import(path.href)) as Record<string, unknown>;
   for (const [id, val] of Object.entries(exports)) {

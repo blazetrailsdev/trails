@@ -75,13 +75,13 @@ export function unregisterConstant(name: string, expected: unknown): void {
  * @noRailsEquivalent PERMANENT
  */
 export function rbModRemoveConst(mod: object, name: string): unknown {
-  const tbl = mod === Object ? _constants : new Map(Object.entries(mod));
-  if (!tbl.has(name)) {
+  const tbl = mod as Record<string, unknown>;
+  if (mod === Object ? !_constants.has(name) : !Object.prototype.hasOwnProperty.call(mod, name)) {
     throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
   }
-  const val = tbl.get(name);
+  const val = mod === Object ? _constants.get(name) : tbl[name];
   if (mod === Object) _constants.delete(name);
-  else delete (mod as Record<string, unknown>)[name];
+  else delete tbl[name];
   return val;
 }
 

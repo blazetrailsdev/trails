@@ -56,6 +56,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     try {
       return await Mysql2.Client.new(config);
     } catch (err) {
+      if (!(err instanceof Mysql2.Error)) throw err;
       switch ((err as { errno?: number }).errno) {
         case Mysql2Adapter.ER_BAD_DB_ERROR:
           throw NoDatabaseError.dbError((config as { database?: string }).database ?? "unknown");
@@ -321,7 +322,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       throw err;
     }
     this._rawConnection = conn;
-    this._statements.reset();
     return conn;
   }
 
