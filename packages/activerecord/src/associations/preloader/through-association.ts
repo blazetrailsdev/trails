@@ -3,13 +3,17 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
-import { first, isEmpty, rbObjRespondTo, union, uniq } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  first,
+  isEmpty,
+  rbObjRespondTo,
+  reduce,
+  union,
+  uniq,
+} from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
-
-function merge(acc: Map<Base, Base[]>, recordsByOwner: Map<Base, Base[]>): Map<Base, Base[]> {
-  return new Map([...acc, ...recordsByOwner]);
-}
 
 export class ThroughAssociation extends Association {
   private _sourcePreloaders: Association[] | undefined;
@@ -30,7 +34,7 @@ export class ThroughAssociation extends Association {
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
-    const result = new Map<Base, Base[]>();
+    const result = new Hash<Base, Base[]>();
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -136,7 +140,7 @@ export class ThroughAssociation extends Association {
     return (this._sourceRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.sourcePreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      return recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]>;
     })());
   }
 
@@ -145,7 +149,7 @@ export class ThroughAssociation extends Association {
     return (this._throughRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.throughPreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      return recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]>;
     })());
   }
 

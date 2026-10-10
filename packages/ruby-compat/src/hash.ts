@@ -1419,6 +1419,16 @@ export class Hash<K, V> extends Map<K, V> {
     return this;
   }
 
+  /**
+   * `Hash#merge` (`vendor/ruby/v3.3.11/hash.c:4144` `rb_hash_merge`):
+   * `rb_hash_update` over `rb_hash_dup(self)`.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/v3.3.11/hash.c:4144`).
+   */
+  merge(...argv: (object | undefined)[]): Hash<K, V> {
+    return update(dup(this) as Hash<never, V>, ...(argv as never[])) as Hash<K, V>;
+  }
+
   /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */
   private hashIteratingP(): boolean {
     return this.#iterLev > 0;
