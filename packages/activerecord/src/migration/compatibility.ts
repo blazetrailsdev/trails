@@ -1,10 +1,11 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
   except,
   include,
   prepend,
   rbInspect,
+  rtest,
   stringDelete,
   type ClassModule,
 } from "@blazetrails/ruby-compat";
@@ -66,7 +67,7 @@ export class V7_0 extends V7_1 {
     /** @internal */
     indexNameOptions(columnNames: string | string[]): Options {
       if (this.isExpressionColumnName(columnNames)) {
-        columnNames = (columnNames as string).match(/\w+/g)!.join("_");
+        columnNames = ((columnNames as string).match(/\w+/g) ?? []).join("_");
       }
 
       return { column: columnNames };
@@ -182,7 +183,7 @@ export class V7_0 extends V7_1 {
     options = { ...options, _skipValidateOptions: true };
     const connection = await this.connection;
     if (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") {
-      options.collation ??= "no_collation";
+      if (!rtest(options.collation)) options.collation = "no_collation";
     }
     await super.changeColumn(tableName, columnName, type, options);
   }
@@ -247,7 +248,7 @@ export class V6_1 extends V7_0 {
     options: ColumnOptions & { ifNotExists?: boolean } = {},
   ): Promise<void> {
     if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
 
     type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
@@ -261,7 +262,7 @@ export class V6_1 extends V7_0 {
     options: ColumnOptions = {},
   ): Promise<void> {
     if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
 
     type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, await this.connection);
@@ -281,12 +282,12 @@ export class V6_1 extends V7_0 {
     }
 
     change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return super_(name, type, options);
     }
 
     column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return super_(name, type, options);
     }
 
@@ -321,7 +322,7 @@ export class V6_0 extends V6_1 {
     }
 
     column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return super_(name, type, options);
     }
 
@@ -360,12 +361,12 @@ export class V6_0 extends V6_1 {
 export class V5_2 extends V6_0 {
   static override TableDefinition: ClassModule = class TableDefinition {
     timestamps(super_: Super, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return super_(options);
     }
 
     column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return super_(name, type, options);
     }
 
@@ -391,7 +392,10 @@ export class V5_2 extends V6_0 {
   };
 
   override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
-    options = { ...options, precision: options.precision ?? null } as ColumnOptions;
+    options = {
+      ...options,
+      precision: rtest(options.precision) ? options.precision : null,
+    } as ColumnOptions;
     await super.addTimestamps(tableName, options);
   }
 
@@ -418,8 +422,12 @@ export class V5_1 extends V5_2 {
   ): Promise<void> {
     const connection = await this.connection;
     if (connection.adapterName === "PostgreSQL") {
-      const { default: _d, null: _n, comment: _c, ...except } = options;
-      await super.changeColumn(tableName, columnName, type, except);
+      await super.changeColumn(
+        tableName,
+        columnName,
+        type,
+        except(options as Options, "default", "null", "comment"),
+      );
       if (Object.hasOwn(options, "default")) {
         await connection.changeColumnDefault(tableName, columnName, options.default);
       }
@@ -493,14 +501,9 @@ export class V5_0 extends V5_1 {
       }
     }
 
-    if (
-      !(
-        (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") &&
-        options.id === "bigint"
-      )
-    ) {
+    if (!(["Mysql2", "Trilogy"].includes(connection.adapterName) && options.id === "bigint")) {
       if (
-        (options.id === "integer" || options.id === "bigint") &&
+        (["integer", "bigint"] as unknown[]).includes(options.id) &&
         !Object.hasOwn(options, "default")
       ) {
         options.default = null;
@@ -524,7 +527,8 @@ export class V5_0 extends V5_1 {
       fn = options;
       options = undefined;
     }
-    const columnOptions = { type: "integer", ...options?.columnOptions };
+    const columnOptions = options?.columnOptions ?? {};
+    reverseMergeBang(columnOptions, { type: "integer" });
     await super.createJoinTable(table1, table2, { ...options, columnOptions }, fn);
   }
 
@@ -538,7 +542,7 @@ export class V5_0 extends V5_1 {
       type = "integer";
       options = { ...options, primaryKey: true };
     } else if (type === "datetime") {
-      options = { ...options, precision: options.precision ?? null };
+      options = { ...options, precision: rtest(options.precision) ? options.precision : null };
     }
     await super.addColumn(tableName, columnName, type, options);
   }
@@ -573,7 +577,7 @@ export class V4_2 extends V5_0 {
     references(super_: Super, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { ...options, index: options.index || false });
+      return super_(...args, { ...options, index: options.index ?? false });
     }
 
     belongsTo(super_: Super, ...args: unknown[]) {
@@ -594,7 +598,7 @@ export class V4_2 extends V5_0 {
     refName: string,
     options: Parameters<Current["addReference"]>[2] = {},
   ): Promise<void> {
-    options = { ...options, index: options.index || false };
+    options = { ...options, index: options.index ?? false };
     await super.addReference(tableName, refName, options);
   }
 
