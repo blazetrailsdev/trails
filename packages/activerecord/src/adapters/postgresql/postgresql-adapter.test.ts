@@ -24,6 +24,7 @@ import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Name } from "../../connection-adapters/postgresql/utils.js";
+import { connectionBad } from "../../pg/exceptions.js";
 
 const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
 
@@ -76,7 +77,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("reconnection error", async () => {
       const pgModule = (await import("pg")).default;
       const fakeClient = {
-        connect: () => Promise.reject(new Error("actual bad connection error")),
+        connect: () => Promise.reject(connectionBad(new Error("actual bad connection error"))),
         end: () => Promise.resolve(),
         on: () => fakeClient,
         query: () => Promise.reject(new Error("not connected")),
@@ -106,7 +107,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("bad connection to postgres database", async () => {
       const pgModule = (await import("pg")).default;
       const clientSpy = vi.spyOn(pgModule, "Client" as never).mockImplementation((() => ({
-        connect: () => Promise.reject(new Error('FATAL:  database "postgres" does not exist')),
+        connect: () =>
+          Promise.reject(connectionBad(new Error('FATAL:  database "postgres" does not exist'))),
         end: () => Promise.resolve(),
         on() {
           return this;

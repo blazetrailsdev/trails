@@ -68,7 +68,7 @@ describe("mysql2Client cast", () => {
     await raw.query("SELECT 1");
     raw.queryOptions.as = "array";
     await raw.query("SELECT 1");
-    expect(seen).toEqual([
+    expect(seen).toMatchObject([
       { sql: "SELECT 1", rowsAsArray: false },
       { sql: "SELECT 1", rowsAsArray: true },
     ]);

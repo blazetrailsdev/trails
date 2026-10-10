@@ -4,7 +4,7 @@ export const PG_DIAG_SOURCE_FUNCTION = 82;
 const ERRORS = new WeakSet<object>();
 
 export class Error {
-  static [Symbol.hasInstance](error: unknown): boolean {
+  static [Symbol.hasInstance](error: unknown): error is globalThis.Error {
     return typeof error === "object" && error !== null && ERRORS.has(error);
   }
 }

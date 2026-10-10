@@ -94,7 +94,7 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("new_client rescues a driver error and reads the database from conn_params", async () => {
     vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(
-      new Error('database "nope" does not exist'),
+      Object.assign(new Error('database "nope" does not exist'), { name: "error", code: "3D000" }),
     );
     await expect(PostgreSQLAdapter.newClient({ database: "nope" })).rejects.toBeInstanceOf(
       NoDatabaseError,
@@ -127,8 +127,8 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("a connection string that is not a URL leaves the conn_params keys unset", () => {
     const params = (config: string) =>
-      (new PostgreSQLAdapter(config) as unknown as { _pgClientOptions: pg.ClientConfig })
-        ._pgClientOptions;
+      (new PostgreSQLAdapter(config) as unknown as { _connectionParameters: pg.ClientConfig })
+        ._connectionParameters;
     expect(params("host=localhost dbname=blog").database).toBeUndefined();
     expect(params("postgres://bob@[::1]/blog").host).toBe("::1");
     expect(params("postgres://bob@db/blog?host=/var/run/pg&user=ann&dbname=shop")).toMatchObject({
