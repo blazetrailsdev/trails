@@ -89,6 +89,7 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
     definedEnums: {},
     columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
     typeForAttribute: () => ({ type: () => "integer" }),
+    definedEnums: {},
     findBy: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
@@ -150,6 +151,7 @@ describe("createFixtures", () => {
       definedEnums: {},
       columns: () => Object.values(doubleColumnsHash("orders", { orders: ["shop_id"] })),
       typeForAttribute: () => ({ type: () => "integer" }),
+      definedEnums: {},
       findBy: vi.fn(async () => ({ shop_id: 1, id: 1 })),
     } as any;
     await createFixtures(adapter, Model, { order1: { status: "paid" } });

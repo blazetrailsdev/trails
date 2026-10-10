@@ -246,7 +246,6 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
   const proto = base.prototype as Record<string, unknown>;
   for (const methodName of methodNames) {
     const original = proto[methodName];
-    if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
       if (this._queryCache?.dirties) {

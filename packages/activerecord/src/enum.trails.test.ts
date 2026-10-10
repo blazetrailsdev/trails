@@ -529,6 +529,20 @@ describe("Enum.extended and Enum#inherited carry defined_enums", () => {
     expect(Base.definedEnums).toEqual({});
   });
 
+  it("reads the parent's defined_enums from a subclass that has defined no enum", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    class Child extends Parent {}
+    Parent.enum("difficulty", { easy: 0, medium: 1 });
+
+    expect(Child.definedEnums).toBe(Parent.definedEnums);
+    expect(Object.keys(Child.definedEnums)).toEqual(["status", "difficulty"]);
+  });
+
   it("hands a subclass a deep copy of its parent's defined_enums at its first enum", () => {
     class Parent extends Base {
       static _tableName = "books";

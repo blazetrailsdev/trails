@@ -90,6 +90,7 @@ function makeModel(tableName: string, pk = "id") {
     definedEnums: {},
     columns: () => Object.values(doubleColumnsHash(tableName)),
     typeForAttribute: () => ({ type: () => "integer" }),
+    definedEnums: {},
     findBy: vi.fn(async (attrs: Record<string, unknown>) => {
       const val = attrs[pk];
       return rows.get(val) ?? null;
@@ -439,6 +440,7 @@ describe("developerFixtureData", () => {
           tableName: "computers",
           primaryKey: "id",
           typeForAttribute: () => ({ type: () => "integer" }),
+          definedEnums: {},
         },
         throughReflection: {
           foreignKey: () => "developer_id",
