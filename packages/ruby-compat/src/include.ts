@@ -480,7 +480,7 @@ export class Module<I extends object = Record<never, never>> {
     if (typeof instanceInitializer === "function") {
       trackInstanceInitializer(base.prototype, instanceInitializer);
     }
-    const proto = base.prototype as object;
+    const proto = prependOrigins.get(base.prototype as object) ?? (base.prototype as object);
     const link = Object.create(Object.getPrototypeOf(proto)) as object;
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
     let links = includerCarriers.get(this);
@@ -494,6 +494,22 @@ export class Module<I extends object = Record<never, never>> {
   /**
    * Mirrors: Ruby's Module#prepend_features — vendor/ruby/v3.3.11/eval.c:1175
    * `rb_mod_prepend_features`, the splice `prepend` runs before `prepended`.
+   * `rb_prepend_module` (vendor/ruby/v3.3.11/class.c:1430) moves the class's
+   * method table to an origin iclass (`ensure_origin`, class.c:1379) and
+   * splices the module between the class and that origin, so `superMethod`
+   * resumes at the class's own method. Here the origin holds the class's
+   * methods of the names the module defines; a later `include` is spliced
+   * beneath it, as `rb_include_module` splices at `RCLASS_ORIGIN`
+   * (class.c:1186). The origin is an iclass owned by the class, so
+   * `rbClassSuperclass` skips it and `methodOwner` answers the class for a
+   * method it holds.
+   *
+   * Two things MRI does have no JS counterpart. A method assigned to the
+   * class after the prepend lands on the class, above the module, where
+   * Ruby's `def` lands in the origin; and a moved method that calls
+   * `super.name()` resumes from the class, its home object, and so re-enters
+   * the module. A class whose own property of one of the module's names
+   * cannot be moved raises `TypeError`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -503,11 +519,34 @@ export class Module<I extends object = Record<never, never>> {
     if (typeof instanceInitializer === "function") {
       trackInstanceInitializer(base.prototype, instanceInitializer, prependedInstanceInitializers);
     }
+    const proto = base.prototype as object;
     const source = carrierOf(this);
-    for (const key of Object.getOwnPropertyNames(source)) {
-      const descriptor = Object.getOwnPropertyDescriptor(source, key);
-      if (descriptor) Object.defineProperty(base.prototype, key, descriptor);
+    let origin = prependOrigins.get(proto);
+    if (!origin) {
+      origin = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+      Object.defineProperty(origin, T_ICLASS, {
+        value: typeof proto === "function" ? proto : proto.constructor,
+      });
+      prependOrigins.set(proto, origin);
+      Object.setPrototypeOf(proto, origin);
     }
+    for (const key of Object.getOwnPropertyNames(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(proto, key);
+      if (descriptor === undefined) continue;
+      if (!descriptor.configurable) {
+        throw new TypeError(`prepend: cannot move ${key}, a non-configurable own property`);
+      }
+      Object.defineProperty(origin, key, descriptor);
+      delete (proto as Record<string, unknown>)[key];
+    }
+    const link = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+    Object.defineProperties(link, Object.getOwnPropertyDescriptors(source));
+    let links = includerCarriers.get(this);
+    if (!links) includerCarriers.set(this, (links = []));
+    links.push(link);
+    UNDEF_METHOD_TABLES.add(link);
+    Object.defineProperty(link, T_ICLASS, { value: this });
+    Object.setPrototypeOf(proto, link);
   }
 
   /**
@@ -691,6 +730,14 @@ const singletonCarriers = new WeakMap<
 const singletonReaper = new FinalizationRegistry<{ mod: Module; ref: WeakRef<object> }>(
   ({ mod, ref }) => singletonCarriers.get(mod)?.refs.delete(ref),
 );
+
+const prependOrigins = new WeakMap<object, object>();
+
+function iclassBeneath(obj: object, parent: object | null): object {
+  return typeof obj === "function" && typeof parent === "function" && parent !== Function.prototype
+    ? class extends (parent as new (...args: never[]) => object) {}
+    : (Object.create(parent) as object);
+}
 
 function isLinkOf(mod: Module, proto: object): boolean {
   return (

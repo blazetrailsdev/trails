@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, included, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, included, Module, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -148,25 +148,61 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   ): Promise<Result>;
 }
 
-export class ConnectionPoolConfiguration {
-  declare _threadQueryCaches: QueryCacheRegistry;
-  declare _queryCacheMaxSize: number | null;
-  declare _queryCacheVersion: { value: number };
-  declare _pinnedConnection: unknown;
+interface ConnectionPoolConfigurationHost {
+  _threadQueryCaches: QueryCacheRegistry;
+  _queryCacheMaxSize: number | null;
+  _queryCacheVersion: { value: number };
+  _pinnedConnection: unknown;
+  dbConfig: { queryCache?: unknown };
+  queryCache: Store;
+}
 
-  async checkoutAndVerify(
-    super_: (connection: QueryCacheHost) => unknown,
-    connection: QueryCacheHost,
-  ): Promise<QueryCacheHost> {
-    await super_(connection);
-    connection._queryCache ||= this.queryCache;
-    return connection;
-  }
+export interface ConnectionPoolConfiguration {
+  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  enableQueryCacheBang(): void;
+  disableQueryCacheBang(): void;
+  readonly queryCacheEnabled: boolean;
+  readonly dirtiesQueryCache: boolean;
+  clearQueryCache(): void;
+  readonly queryCache: Store;
+}
 
-  disableQueryCache<T>(
-    fn: () => T | Promise<T>,
-    options: { dirties?: boolean } = {},
-  ): T | Promise<T> {
+export const ConnectionPoolConfiguration: Module = new Module((mod) => {
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+    this: ConnectionPoolConfigurationHost,
+  ): void {
+    this._queryCacheVersion = { value: 0 };
+    this._threadQueryCaches = new QueryCacheRegistry();
+    const queryCache = this.dbConfig?.queryCache;
+    if (queryCache === 0 || queryCache === false) {
+      this._queryCacheMaxSize = null;
+    } else if (typeof queryCache === "number") {
+      this._queryCacheMaxSize = queryCache;
+    } else if (queryCache == null) {
+      this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
+    } else {
+      this._queryCacheMaxSize = null;
+    }
+  };
+
+  mod.defineMethod(
+    "checkoutAndVerify",
+    async function (
+      this: ConnectionPoolConfigurationHost,
+      connection: QueryCacheHost,
+    ): Promise<QueryCacheHost> {
+      await ConnectionPoolConfiguration.superMethod(this, "checkoutAndVerify")!(connection);
+      connection._queryCache ||= this.queryCache;
+      return connection;
+    },
+  );
+
+  mod.defineMethod("disableQueryCache", function <
+    T,
+  >(this: ConnectionPoolConfigurationHost, fn: () => T | Promise<T>, options: { dirties?: boolean } = {}):
+    | T
+    | Promise<T> {
     const { dirties = true } = options;
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
@@ -177,9 +213,11 @@ export class ConnectionPoolConfiguration {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  }
+  });
 
-  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
+  mod.defineMethod("enableQueryCache", function <
+    T,
+  >(this: ConnectionPoolConfigurationHost, fn: () => T | Promise<T>): T | Promise<T> {
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
     const oldDirties = cache.dirties;
@@ -189,58 +227,46 @@ export class ConnectionPoolConfiguration {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  }
+  });
 
-  enableQueryCacheBang(): void {
+  mod.defineMethod("enableQueryCacheBang", function (this: ConnectionPoolConfigurationHost): void {
     const qc = this.queryCache;
     qc.enabled = true;
     qc.dirties = true;
-  }
+  });
 
-  disableQueryCacheBang(): void {
+  mod.defineMethod("disableQueryCacheBang", function (this: ConnectionPoolConfigurationHost): void {
     const qc = this.queryCache;
     qc.enabled = false;
     qc.dirties = true;
-  }
+  });
 
-  get queryCacheEnabled(): boolean {
-    return this.queryCache.enabled;
-  }
+  mod.include({
+    get queryCacheEnabled(): boolean {
+      return (this as unknown as ConnectionPoolConfigurationHost).queryCache.enabled;
+    },
 
-  get dirtiesQueryCache(): boolean {
-    return this.queryCache.dirties;
-  }
+    get dirtiesQueryCache(): boolean {
+      return (this as unknown as ConnectionPoolConfigurationHost).queryCache.dirties;
+    },
+  });
 
-  clearQueryCache(): void {
+  mod.defineMethod("clearQueryCache", function (this: ConnectionPoolConfigurationHost): void {
     if (this._pinnedConnection) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();
-  }
+  });
 
-  get queryCache(): Store {
-    return this._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
-      return new Store(this._queryCacheVersion, this._queryCacheMaxSize);
-    });
-  }
-}
-
-(ConnectionPoolConfiguration as unknown as Record<symbol, unknown>)[initialize] = function (
-  this: ConnectionPoolConfiguration & { dbConfig: { queryCache?: unknown } },
-): void {
-  this._queryCacheVersion = { value: 0 };
-  this._threadQueryCaches = new QueryCacheRegistry();
-  const queryCache = this.dbConfig?.queryCache;
-  if (queryCache === 0 || queryCache === false) {
-    this._queryCacheMaxSize = null;
-  } else if (typeof queryCache === "number") {
-    this._queryCacheMaxSize = queryCache;
-  } else if (queryCache == null) {
-    this._queryCacheMaxSize = DEFAULT_MAX_SIZE;
-  } else {
-    this._queryCacheMaxSize = null;
-  }
-};
+  mod.include({
+    get queryCache(): Store {
+      const pool = this as unknown as ConnectionPoolConfigurationHost;
+      return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
+        return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
+      });
+    },
+  });
+});
 
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
   const proto = base.prototype as Record<string, unknown>;

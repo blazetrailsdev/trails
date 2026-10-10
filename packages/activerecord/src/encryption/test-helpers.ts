@@ -18,12 +18,13 @@ import { Encryption } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 
 import { Key } from "./key.js";
-import { prepend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { Fixture } from "../fixtures.js";
 import { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { Encryption, Errors };
 
-prepend(Fixture.prototype, EncryptedFixtures);
+prepend(Fixture, EncryptedFixtures);
 
 import {
   TEST_PRIMARY_KEY,

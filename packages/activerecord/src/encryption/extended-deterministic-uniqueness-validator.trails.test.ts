@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { EncryptedUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
@@ -47,12 +48,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       });
     };
 
-    await EncryptedUniquenessValidator.validateEach(
-      originalValidateEach,
-      record,
-      "email",
-      "user@example.com",
-    );
+    class Validator {
+      validateEach(record: any, attribute: string, value: unknown): Promise<void> | void {
+        originalValidateEach(record, attribute, value);
+      }
+    }
+    prepend(Validator, EncryptedUniquenessValidator);
+    await new Validator().validateEach(record, "email", "user@example.com");
 
     expect(calls[0].value).toBe("user@example.com");
     expect(calls[0].encryptionDisabled).toBe(false);
@@ -74,9 +76,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const record = { constructor: klass };
 
     const calls: unknown[] = [];
-    const originalValidateEach = (_r: any, _a: string, value: unknown) => calls.push(value);
-
-    await EncryptedUniquenessValidator.validateEach(originalValidateEach, record, "body", "hello");
+    class Validator {
+      validateEach(_r: any, _a: string, value: unknown): Promise<void> | void {
+        calls.push(value);
+      }
+    }
+    prepend(Validator, EncryptedUniquenessValidator);
+    await new Validator().validateEach(record, "body", "hello");
 
     expect(calls).toHaveLength(1);
   });
