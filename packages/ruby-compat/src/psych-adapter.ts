@@ -21,8 +21,7 @@ export const yaml: typeof import("yaml") = await import("yaml").catch(() => {
  * `require 'psych.so'`. Not `Psych.parse` (`:398`), which answers a node tree.
  * libyaml reads the source's bytes (`yaml_parser_set_input_string`,
  * `vendor/ruby/v3.3.11/ext/psych/psych_parser.c:271`), so a source held as its
- * bytes is decoded here, and a malformed one raises `SyntaxError`, JS's
- * `Psych::SyntaxError`, with libyaml's reader message.
+ * bytes is decoded here; malformed bytes raise `SyntaxError` (`Psych::SyntaxError`).
  *
  * @noRailsEquivalent PERMANENT
  */
