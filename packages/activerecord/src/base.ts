@@ -507,7 +507,7 @@ function _extractAssociationAttrs(
   rest: Record<string, unknown>;
   assocs: _PendingAssociationAttr[];
 } | null {
-  const defs = Object.values(ctor._reflections) as unknown as _AssociationDefLike[];
+  const defs = Object.values(ctor._reflections);
   if (defs.length === 0) return null;
   let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {

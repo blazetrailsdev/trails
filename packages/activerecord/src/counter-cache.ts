@@ -3,6 +3,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   classAttribute,
   extractOptionsBang,
+  filterMap,
   included,
   isPresent,
   kernelArray,
@@ -121,12 +122,11 @@ export function isCounterCacheColumn(this: typeof Base, name: string): boolean {
 export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
   superFn();
 
-  const associationNames: string[] = [];
-  for (const [name, reflection] of Object.entries(this._reflections)) {
-    if (!(reflection.isBelongsTo() && rtest(reflection.counterCacheColumn()))) continue;
+  const associationNames = filterMap(Object.entries(this._reflections), ([name, reflection]) => {
+    if (!(reflection.isBelongsTo() && rtest(reflection.counterCacheColumn()))) return;
 
-    associationNames.push(name);
-  }
+    return name;
+  });
 
   this.counterCachedAssociationNames = union(this.counterCachedAssociationNames, associationNames);
 }

@@ -1,5 +1,5 @@
 import { rbHash } from "@blazetrails/activesupport";
-import { rbEqual, stringValue } from "@blazetrails/ruby-compat";
+import { rbEqual, rbObjClass, stringValue } from "@blazetrails/ruby-compat";
 
 export class Name {
   static readonly SEPARATOR = ".";
@@ -26,10 +26,7 @@ export class Name {
   }
 
   equals(o: unknown): boolean {
-    return (
-      (o as Name | null)?.constructor === this.constructor &&
-      rbEqual((o as Name).parts(), this.parts())
-    );
+    return rbObjClass(o) === rbObjClass(this) && rbEqual((o as Name).parts(), this.parts());
   }
 
   eql(o: unknown): boolean {

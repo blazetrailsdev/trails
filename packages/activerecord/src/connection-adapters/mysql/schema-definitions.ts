@@ -75,6 +75,7 @@ export class TableDefinition extends AbstractTableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
+    options = { ...options };
     let match: RegExpExecArray | null;
     if (type === "virtual") {
       type = options.type as ColumnType;

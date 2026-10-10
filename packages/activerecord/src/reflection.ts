@@ -1668,7 +1668,7 @@ export function normalizedReflections(
   const cached = _normalizedReflectionsCache.get(modelClass);
   if (cached) return cached;
 
-  const rawReflections = modelClass._reflections as Record<string, RawReflection>;
+  const rawReflections: Record<string, RawReflection> = modelClass._reflections;
   const result: Record<string, AssociationReflection | ThroughReflection> = {};
   for (const [name, ref] of Object.entries(rawReflections)) {
     const parent = ref.parentReflection;
