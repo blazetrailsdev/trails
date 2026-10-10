@@ -234,6 +234,7 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
+  /** @inventedArm on — PERMANENT */
   static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
     const client = pgConnection(new pg.Client(connParams), connParams.stream);
     const { database, user, host } = client;
