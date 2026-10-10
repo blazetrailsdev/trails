@@ -1,8 +1,8 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { File, StringIO, type Tempfile } from "@blazetrails/ruby-compat";
 import { Date, DateTime, Time } from "@blazetrails/date";
 import { UploadedFile as RackTestUploadedFile } from "@blazetrails/rack-test";
-import { BigDecimal } from "@blazetrails/activesupport";
+import { BigDecimal, assertEqual, assertPredicate, assertRaises } from "@blazetrails/activesupport";
 import { UploadedFile } from "../../../action-dispatch/http/upload.js";
 import {
   ExpectedParameterMissing,
@@ -13,45 +13,66 @@ import {
 const thisFile = new URL(import.meta.url).pathname;
 
 describe("ParametersExpectTest", () => {
+  let params: Parameters;
+
+  beforeEach(() => {
+    params = new Parameters({
+      person: {
+        age: "32",
+        name: {
+          first: "David",
+          last: "Heinemeier Hansson",
+        },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+    });
+  });
+
   it("key to array: returns only permitted scalar keys", () => {
-    const inner = new Parameters({ name: "John", admin: true });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name"] });
-    expect(result.get("name")).toBe("John");
-    expect(result.hasKey("admin")).toBe(false);
+    const permitted = params.expect({ person: ["age", "name", "addresses"] });
+
+    assertEqual({ age: "32" }, permitted.toUnsafeH());
   });
 
   it("key to hash: returns permitted params", () => {
-    const address = new Parameters({ city: "NYC", secret: "x" });
-    const person = new Parameters({ name: "John", address });
-    const params = new Parameters({ person });
-    const result = params.expect({ person: ["name", { address: ["city"] }] });
-    expect(result.get("name")).toBe("John");
+    const permitted = params.expect({ person: { name: ["first", "last"] } }) as Parameters;
+
+    assertEqual({ name: { first: "David", last: "Heinemeier Hansson" } }, permitted.toH());
   });
 
   it("key to empty hash: permits all params", () => {
-    const prefs = new Parameters({ theme: "dark", locale: "en" });
-    const params = new Parameters({ prefs });
-    const result = params.expect({ prefs: {} });
-    expect(result).toBeInstanceOf(Parameters);
-    expect((result as Parameters).get("theme")).toBe("dark");
-    expect((result as Parameters).get("locale")).toBe("en");
+    const permitted = params.expect({ person: {} }) as Parameters;
+
+    assertEqual(
+      {
+        age: "32",
+        name: { first: "David", last: "Heinemeier Hansson" },
+        addresses: [{ city: "Chicago", state: "Illinois" }],
+      },
+      permitted.toH(),
+    );
+    assertPredicate(permitted, (p) => p.permitted);
   });
 
   it("keys to arrays: returns permitted params in hash key order", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
-    const params = new Parameters({ a, b });
-    const [ra, rb] = params.expect({ a: ["x"] }, { b: ["y"] }) as [Parameters, Parameters];
-    expect(ra.get("x")).toBe("1");
-    expect(rb.get("y")).toBe("2");
+    const [name, addresses] = (params.get("person") as Parameters).expect({
+      name: ["first", "last"],
+      addresses: [["city"]],
+    }) as [Parameters, Parameters[]];
+
+    assertEqual({ first: "David", last: "Heinemeier Hansson" }, name.toH());
+    assertEqual({ city: "Chicago" }, addresses[0].toH());
   });
 
-  it("key to array of keys: raises when params is an array", () => {
+  it("key to array of keys: raises when params is an array", async () => {
     const params = new Parameters({ name: "Martin", pies: [{ flavor: "pumpkin" }] });
 
-    expect(() => params.expect({ pies: ["flavor"] })).toThrow(ParameterMissing);
-    expect(() => params.expectBang({ pies: ["flavor"] })).toThrow(ExpectedParameterMissing);
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ pies: ["flavor"] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ pies: ["flavor"] });
+    });
   });
 
   it("key to explicit array: returns permitted array", () => {
@@ -61,91 +82,150 @@ describe("ParametersExpectTest", () => {
     });
     const pies = params.expect({ pies: [["flavor"]] }) as Parameters[];
 
-    expect(pies[0].toH()).toEqual({ flavor: "pumpkin" });
-    expect(pies[1].toH()).toEqual({ flavor: "chicken pot" });
+    assertEqual({ flavor: "pumpkin" }, pies[0].toH());
+    assertEqual({ flavor: "chicken pot" }, pies[1].toH());
   });
 
-  it("key to explicit array: returns array when params is a hash", () => {
+  it("key to explicit array: returns array when params is a hash", async () => {
     const params = new Parameters({ name: "Martin", pies: { flavor: "pumpkin" } });
 
-    expect(() => params.expect({ pies: [["flavor"]] })).toThrow(ParameterMissing);
-    expect(() => params.expectBang({ pies: [["flavor"]] })).toThrow(ExpectedParameterMissing);
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ pies: [["flavor"]] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ pies: [["flavor"]] });
+    });
   });
 
-  it("key to explicit array: returns empty array when params empty array", () => {
+  it("key to explicit array: returns empty array when params empty array", async () => {
     const params = new Parameters({ name: "Martin", pies: [] });
 
-    expect(() => params.expect({ pies: [["flavor"]] })).toThrow(ParameterMissing);
-    expect(() => params.expectBang({ pies: [["flavor"]] })).toThrow(ExpectedParameterMissing);
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ pies: [["flavor"]] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ pies: [["flavor"]] });
+    });
   });
 
   it("key to mixed array: returns permitted params", () => {
-    const inner = new Parameters({ name: "John", age: 22, admin: true });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name", "age"] });
-    expect(result.get("name")).toBe("John");
-    expect(result.get("age")).toBe(22);
-    expect(result.hasKey("admin")).toBe(false);
+    const permitted = params.expect({ person: ["age", { name: ["first", "last"] }] });
+
+    assertEqual(
+      { age: "32", name: { first: "David", last: "Heinemeier Hansson" } },
+      permitted.toH(),
+    );
   });
 
   it("chain of keys: returns permitted params", () => {
-    const deep = new Parameters({ city: "NYC" });
-    const inner = new Parameters({ address: deep });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: [{ address: ["city"] }] });
-    const address = result.get("address") as Parameters;
-    expect(address.get("city")).toBe("NYC");
+    const params = new Parameters({ person: { name: "David" } });
+    const name = (params.expect({ person: "name" }) as Parameters).expect("name");
+
+    assertEqual("David", name);
   });
 
   it("array of key: returns single permitted param", () => {
-    const inner = new Parameters({ name: "John" });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name"] });
-    expect(result).toBeInstanceOf(Parameters);
-    expect(result.get("name")).toBe("John");
+    const params = new Parameters({ a: 1, b: 2 });
+    const a = params.expect("a");
+
+    assertEqual(1, a);
   });
 
   it("array of keys: returns multiple permitted params", () => {
-    const a = new Parameters({ x: "1" });
-    const b = new Parameters({ y: "2" });
-    const params = new Parameters({ a, b });
-    const result = params.expect({ a: ["x"] }, { b: ["y"] }) as [Parameters, Parameters];
-    expect(result[0].get("x")).toBe("1");
-    expect(result[1].get("y")).toBe("2");
+    const params = new Parameters({ a: 1, b: 2 });
+    const [a, b] = params.expect("a", "b");
+
+    assertEqual(1, a);
+    assertEqual(2, b);
   });
 
-  it("key: raises ParameterMissing on nil, blank, non-scalar or non-permitted type", () => {
-    expect(() => new Parameters({ a: null }).expect("a")).toThrow(ParameterMissing);
-    expect(() => new Parameters({ a: "" }).expect("a")).toThrow(ParameterMissing);
+  it("key: raises ParameterMissing on nil, blank, non-scalar or non-permitted type", async () => {
+    const values = [null, "", {}, [], [1], { foo: "bar" }, new (class {})()];
+    for (const value of values) {
+      const params = new Parameters({ id: value });
+
+      await assertRaises([ParameterMissing], {}, () => {
+        params.expect("id");
+      });
+      await assertRaises([ExpectedParameterMissing], {}, () => {
+        params.expectBang({ pies: [["flavor"]] });
+      });
+    }
   });
 
-  it("key: raises ParameterMissing if not present in params", () => {
-    expect(() => new Parameters({}).expect("missing")).toThrow(ParameterMissing);
+  it("key: raises ParameterMissing if not present in params", async () => {
+    const params = new Parameters({ name: "Joe" });
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect("id");
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang("id");
+    });
   });
 
-  it("key to empty array: raises ParameterMissing on empty", () => {
-    const params = new Parameters({ tags: new Parameters({}) });
-    expect(() => params.expect({ tags: [] })).toThrow(ParameterMissing);
+  it("key to empty array: raises ParameterMissing on empty", async () => {
+    const params = new Parameters({ ids: [] });
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ ids: [] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ ids: [] });
+    });
   });
 
-  it("key to empty array: raises ParameterMissing on scalar", () => {
-    const params = new Parameters({ tags: "not_array" });
-    expect(() => params.expect({ tags: [] })).toThrow(ParameterMissing);
+  it("key to empty array: raises ParameterMissing on scalar", async () => {
+    const params = new Parameters({ person: 1 });
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ ids: [] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ ids: [] });
+    });
   });
 
-  it("key to non-scalar: raises ParameterMissing on scalar", () => {
-    const params = new Parameters({ name: "John" });
-    expect(() => params.expect({ name: ["first"] })).toThrow(ParameterMissing);
+  it("key to non-scalar: raises ParameterMissing on scalar", async () => {
+    const params = new Parameters({ foo: "bar" });
+
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ foo: [] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ foo: [] });
+    });
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ foo: ["bar"] });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ foo: ["bar"] });
+    });
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ foo: "bar" });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ foo: "bar" });
+    });
   });
 
-  it("key to empty hash: raises ParameterMissing on empty", () => {
-    const params = new Parameters({ prefs: new Parameters({}) });
-    expect(() => params.expect({ prefs: [{}] })).toThrow(ParameterMissing);
+  it("key to empty hash: raises ParameterMissing on empty", async () => {
+    const params = new Parameters({ person: {} });
+
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ person: {} });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ person: {} });
+    });
   });
 
-  it("key to empty hash: raises ParameterMissing on scalar", () => {
-    const params = new Parameters({ prefs: "not_hash" });
-    expect(() => params.expect({ prefs: {} })).toThrow(ParameterMissing);
+  it("key to empty hash: raises ParameterMissing on scalar", async () => {
+    const params = new Parameters({ person: 1 });
+
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect({ person: {} });
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang({ person: {} });
+    });
   });
 
   it("key: permitted scalar values", () => {
@@ -166,37 +246,55 @@ describe("ParametersExpectTest", () => {
     for (const value of values) {
       const params = new Parameters({ id: value });
 
-      expect(params.expect("id")).toBe(value);
+      assertEqual(value, params.expect("id"));
     }
   });
 
   it("key: unknown keys are filtered out", () => {
-    const inner = new Parameters({ name: "John", admin: true });
-    const params = new Parameters({ person: inner });
-    const result = params.expect({ person: ["name"] });
-    expect(result.hasKey("admin")).toBe(false);
+    const params = new Parameters({ id: "1234", injected: "injected" });
+
+    assertEqual("1234", params.expect("id"));
   });
 
-  it("array of keys: raises ParameterMissing when one is missing", () => {
-    const a = new Parameters({ x: "1" });
-    const params = new Parameters({ a });
-    expect(() => params.expect({ a: ["x"] }, { b: ["y"] })).toThrow(ParameterMissing);
+  it("array of keys: raises ParameterMissing when one is missing", async () => {
+    const params = new Parameters({ a: 1 });
+
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect(["a", "b"] as never);
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang(["a", "b"] as never);
+    });
   });
 
-  it("array of keys: raises ParameterMissing when one is non-scalar", () => {
-    const a = new Parameters({ x: "1" });
-    const params = new Parameters({ a, b: null });
-    expect(() => params.expect({ a: ["x"] }, { b: ["y"] })).toThrow(ParameterMissing);
+  it("array of keys: raises ParameterMissing when one is non-scalar", async () => {
+    const params = new Parameters({ a: 1, b: [] });
+
+    await assertRaises([ParameterMissing], {}, () => {
+      params.expect(["a", "b"] as never);
+    });
+    await assertRaises([ExpectedParameterMissing], {}, () => {
+      params.expectBang(["a", "b"] as never);
+    });
   });
 
   it("key to empty array: arrays of permitted scalars pass", () => {
-    const params = new Parameters({ tags: ["ruby", "rails"] });
-    const result = params.expect({ tags: [] });
-    expect(result).toEqual(["ruby", "rails"]);
+    for (const array of [["foo"], [1], ["foo", "bar"], [1, 2, 3]]) {
+      const params = new Parameters({ id: array });
+      const permitted = params.expect({ id: [] });
+      assertEqual(array, permitted);
+    }
   });
 
-  it("key to empty array: arrays of non-permitted scalar do not pass", () => {
-    const params = new Parameters({ tags: [{ bad: true }] });
-    expect(() => params.expect({ tags: [] })).toThrow(ParameterMissing);
+  it("key to empty array: arrays of non-permitted scalar do not pass", async () => {
+    for (const nonPermittedScalar of [[new (class {})()], [[]], [[1]], [{}], [{ id: "1" }]]) {
+      const params = new Parameters({ id: nonPermittedScalar });
+      await assertRaises([ParameterMissing], {}, () => {
+        params.expect({ id: [] });
+      });
+      await assertRaises([ExpectedParameterMissing], {}, () => {
+        params.expectBang({ id: [] });
+      });
+    }
   });
 });

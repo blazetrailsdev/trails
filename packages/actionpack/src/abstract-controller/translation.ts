@@ -1,12 +1,13 @@
-import { MissingTranslationData } from "@blazetrails/i18n";
 import {
   I18n,
   HtmlSafeTranslation,
   Module,
   htmlEscape,
   dasherize,
+  kernelArray,
   underscore,
 } from "@blazetrails/activesupport";
+import { flatten, rtest } from "@blazetrails/ruby-compat";
 
 export interface TranslationHost {
   actionName: string;
@@ -27,70 +28,25 @@ export function translate(
   key: string,
   options: TranslateOptions = {},
 ): unknown {
-  if (key == null) {
-    if (options.default !== undefined) return options.default;
-    return `Translation missing: ${I18n.locale()}.`;
-  }
-
-  const isHtmlKey = HtmlSafeTranslation.isHtmlSafeTranslationKey(key);
-  const i18nTranslate = (k: string, opts: Record<string, unknown>) =>
-    isHtmlKey
-      ? HtmlSafeTranslation.translate(k, opts)
-      : I18n.translate(k, opts as Parameters<typeof I18n.translate>[1]);
-
-  if (isHtmlKey && options.default !== undefined) {
-    const defs = Array.isArray(options.default) ? options.default : [options.default];
-    options = { ...options, default: defs.map((v) => htmlEscapeDefault(v)) };
-  }
-
-  if (key.startsWith(".")) {
+  options = { ...options };
+  if (key?.startsWith(".")) {
     const path = this.constructor.controllerPath().replace(/\//g, ".");
-    const scopedKey = `${path}.${dasherize(underscore(String(this.actionName)))}${key}`;
-    const fallbackKey = `${path}${key}`;
-
-    const passOptions = { ...options } as Record<string, unknown>;
-    delete passOptions.default;
-    delete passOptions.raise;
-
-    const direct = i18nTranslate(scopedKey, passOptions);
-    if (!isMissing(direct)) return direct;
-
-    const fallback = i18nTranslate(fallbackKey, passOptions);
-    if (!isMissing(fallback)) return fallback;
-
-    if (options.default !== undefined) {
-      const defs = Array.isArray(options.default) ? options.default : [options.default];
-      for (const d of defs as unknown[]) {
-        if (typeof d === "string" && d.startsWith(":")) {
-          const r = i18nTranslate(d.slice(1), passOptions);
-          if (!isMissing(r)) return r;
-        } else {
-          return d;
-        }
-      }
-    }
-
-    if ((options as { raise?: boolean }).raise) {
-      const locale = (passOptions as { locale?: string }).locale ?? (I18n.locale() as string);
-      throw new MissingTranslationData(locale, scopedKey);
-    }
-    return direct;
+    const defaults: unknown[] = [`:${path}${key}`];
+    if (rtest(options.default)) defaults.push(options.default);
+    options.default = flatten(defaults);
+    key = `${path}.${dasherize(underscore(String(this.actionName)))}${key}`;
   }
-  return i18nTranslate(key, options);
+
+  if (rtest(options.default) && HtmlSafeTranslation.isHtmlSafeTranslationKey(key)) {
+    options.default = kernelArray(options.default).map((value) =>
+      typeof value === "string" && !value.startsWith(":") ? htmlEscape(value) : value,
+    );
+  }
+
+  return HtmlSafeTranslation.translate(key, options);
 }
 
-function htmlEscapeDefault(value: unknown): unknown {
-  if (typeof value === "string") return htmlEscape(value);
-  return value;
-}
-
-function isMissing(value: unknown): boolean {
-  return typeof value === "string" && value.startsWith("Translation missing:");
-}
-
-export function t(this: TranslationHost, key: string, options: TranslateOptions = {}): unknown {
-  return translate.call(this, key, options);
-}
+export const t = translate;
 
 export interface LocalizeOptions {
   [key: string]: unknown;
@@ -104,9 +60,7 @@ export function localize(
   return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
 }
 
-export function l(this: TranslationHost, object: unknown, options: LocalizeOptions = {}): string {
-  return I18n.localize(object, options as Parameters<typeof I18n.localize>[1]) as string;
-}
+export const l = localize;
 
 export const Translation = new Module((mod) => {
   mod.defineMethod("translate", translate);

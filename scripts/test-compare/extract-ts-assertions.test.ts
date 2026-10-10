@@ -22,6 +22,20 @@ describe("TS extractor assertion-count collection", () => {
     expect(tsAssertionCounts(src)["two expects"]).toBe(2);
   });
 
+  it("counts a receiver-form x.expect(...) as the Ruby extractor does", () => {
+    const src = `
+      it("receiver expect", () => {
+        const name = params.expect({ person: "name" }).expect("name");
+        params.expectBang("id");
+        assertEqual("David", name);
+        expect(name).toBe("David");
+      });
+    `;
+    const info = extractTestsFromSource(src, "packages/actionpack/src/x.test.ts");
+    expect(info.testCases[0].assertionCount).toBe(4);
+    expect(info.testCases[0].assertionKinds).toEqual(["expect", "expect", "assertEqual", "toBe"]);
+  });
+
   it("counts a helper declared inside the test body once, not per call site", () => {
     const src = `
       it("inline lambda", () => {
