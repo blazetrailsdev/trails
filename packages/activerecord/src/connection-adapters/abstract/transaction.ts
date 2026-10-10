@@ -123,7 +123,7 @@ export class TransactionState {
 }
 
 export class InstrumentationNotStartedError extends ActiveRecordError {
-  constructor(message = "Called finish on a transaction that hasn't started") {
+  constructor(message?: string) {
     super(message);
     this.name =
       "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationNotStartedError";
@@ -131,7 +131,7 @@ export class InstrumentationNotStartedError extends ActiveRecordError {
 }
 
 export class InstrumentationAlreadyStartedError extends ActiveRecordError {
-  constructor(message = "Called start on an already started transaction") {
+  constructor(message?: string) {
     super(message);
     this.name =
       "ActiveRecord::ConnectionAdapters::TransactionInstrumenter::InstrumentationAlreadyStartedError";
@@ -142,43 +142,40 @@ export class TransactionInstrumenter {
   static readonly InstrumentationNotStartedError = InstrumentationNotStartedError;
   static readonly InstrumentationAlreadyStartedError = InstrumentationAlreadyStartedError;
 
-  private _started = false;
-  private _basePayload: Record<string, unknown>;
-  private _payload: Record<string, unknown> | null = null;
-  private _handle: NotificationHandle | null = null;
+  private handle: NotificationHandle | null = null;
+  private started = false;
+  private payload: Record<string, unknown> | null = null;
+  private basePayload: Record<string, unknown>;
 
   constructor(payload: Record<string, unknown> = {}) {
-    this._basePayload = payload;
+    this.basePayload = payload;
   }
 
   start(): void {
-    if (this._started) {
-      throw new InstrumentationAlreadyStartedError();
+    if (this.started) {
+      throw new InstrumentationAlreadyStartedError(
+        "Called start on an already started transaction",
+      );
     }
-    this._started = true;
+    this.started = true;
 
-    Notifications.instrument("start_transaction.active_record", this._basePayload);
+    Notifications.instrument("start_transaction.active_record", this.basePayload);
 
-    this._payload = { ...this._basePayload };
-    this._handle = Notifications.instrumenter.buildHandle(
-      "transaction.active_record",
-      this._payload,
-    );
-    this._handle.start();
+    this.payload = { ...this.basePayload };
+    this.handle = Notifications.instrumenter.buildHandle("transaction.active_record", this.payload);
+    this.handle.start();
   }
 
   finish(outcome: string): void {
-    if (!this._started) {
-      throw new InstrumentationNotStartedError();
+    if (!this.started) {
+      throw new InstrumentationNotStartedError(
+        "Called finish on a transaction that hasn't started",
+      );
     }
-    this._started = false;
+    this.started = false;
 
-    if (this._payload) {
-      this._payload.outcome = outcome;
-    }
-    if (this._handle) {
-      this._handle.finish();
-    }
+    this.payload!.outcome = outcome;
+    this.handle!.finish();
   }
 }
 

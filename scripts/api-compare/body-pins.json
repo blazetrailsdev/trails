@@ -20019,6 +20019,13 @@
   {
     "package": "activerecord",
     "rubyFile": "associations/association.rb",
+    "rubyName": "target",
+    "digest": "cc2902c3853d8dd9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/association.rb",
     "rubyName": "target=",
     "digest": "bdfb215789963070",
     "ref": "v8.0.2"
@@ -21197,6 +21204,13 @@
     "rubyFile": "associations/collection_proxy.rb",
     "rubyName": "take",
     "digest": "53f05fc608afb7ae",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "associations/collection_proxy.rb",
+    "rubyName": "target",
+    "digest": "c4c3d6d7fb5e2fee",
     "ref": "v8.0.2"
   },
   {
@@ -28370,6 +28384,13 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract/transaction.rb",
+    "rubyName": "finish",
+    "digest": "ef02d0407cc70f14",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/abstract/transaction.rb",
     "rubyName": "full_commit!",
     "digest": "33e411830895c389",
     "ref": "v8.0.2"
@@ -28582,6 +28603,13 @@
     "rubyFile": "connection_adapters/abstract/transaction.rb",
     "rubyName": "run_action_on_records",
     "digest": "efcd64e278d26195",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "connection_adapters/abstract/transaction.rb",
+    "rubyName": "start",
+    "digest": "2bee1a10bdda889c",
     "ref": "v8.0.2"
   },
   {
@@ -39262,8 +39290,22 @@
   {
     "package": "activerecord",
     "rubyFile": "explain_subscriber.rb",
+    "rubyName": "finish",
+    "digest": "05f40e9980df3a64",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "explain_subscriber.rb",
     "rubyName": "ignore_payload?",
     "digest": "44174ee8a17231e9",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "explain_subscriber.rb",
+    "rubyName": "start",
+    "digest": "c379738c3a38aa9c",
     "ref": "v8.0.2"
   },
   {
@@ -40824,6 +40866,13 @@
   {
     "package": "activerecord",
     "rubyFile": "migration.rb",
+    "rubyName": "finish",
+    "digest": "98822f1ddb543a66",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration.rb",
     "rubyName": "format_arguments",
     "digest": "66a0ab3fc0587b39",
     "ref": "v8.0.2"
@@ -41111,6 +41160,13 @@
   {
     "package": "activerecord",
     "rubyFile": "migration.rb",
+    "rubyName": "start",
+    "digest": "54fc4c9e898cee8d",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration.rb",
     "rubyName": "suppress_messages",
     "digest": "572e6b96f98125fe",
     "ref": "v8.0.2"
@@ -41120,6 +41176,13 @@
     "rubyFile": "migration.rb",
     "rubyName": "table_name_options",
     "digest": "86b8dad21d1d0f04",
+    "ref": "v8.0.2"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration.rb",
+    "rubyName": "target",
+    "digest": "8f36ef82b4937b9c",
     "ref": "v8.0.2"
   },
   {

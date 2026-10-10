@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, included, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -246,7 +246,6 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
   const proto = base.prototype as Record<string, unknown>;
   for (const methodName of methodNames) {
     const original = proto[methodName];
-    if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
       if (this._queryCache?.dirties) {
@@ -444,6 +443,28 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
 }
 
 export const QueryCache = {
+  [included](base: {
+    prototype: object;
+    setCallback(phase: "checkin", kind: "after", method: (this: never) => void): void;
+  }): void {
+    dirtiesQueryCache(
+      base,
+      "execQuery",
+      "execute",
+      "create",
+      "insert",
+      "update",
+      "delete",
+      "truncate",
+      "truncateTables",
+      "rollbackToSavepoint",
+      "rollbackDbTransaction",
+      "restartDbTransaction",
+      "execInsertAll",
+    );
+
+    base.setCallback("checkin", "after", unsetQueryCacheBang);
+  },
   [initialize](this: QueryCacheHost): void {
     this._queryCache = null;
   },

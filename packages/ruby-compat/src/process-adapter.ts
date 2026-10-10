@@ -354,9 +354,14 @@ export function chdir(dir: string): void {
   requireAdapter().chdir(dir);
 }
 
-/** @noRailsEquivalent PERMANENT */
-export function exit(code?: number): never {
-  return requireAdapter().exit(code);
+/**
+ * Mirrors: Ruby's Kernel#exit — vendor/ruby/v3.3.11/process.c:4467 `rb_f_exit`,
+ * whose status goes through `exit_status_code` (vendor/ruby/v3.3.11/process.c:4398).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function exit(code?: number | boolean): never {
+  return requireAdapter().exit(typeof code === "boolean" ? (code ? 0 : 1) : code);
 }
 
 /** @noRailsEquivalent PERMANENT */

@@ -619,13 +619,6 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "the ActiveRecord::Tasks infrastructure that has no JS equivalent.",
     names: ["any_schema_needs_update?", "db_configs_in_current_env", "load_schema!"],
   },
-  {
-    reason:
-      "Migrator internal index helpers — Rails stores @target_version / " +
-      "@direction as instance variables; our TS Migrator passes them as method " +
-      "parameters instead, so these zero-arg helpers can't be faithfully ported.",
-    names: ["target", "start", "finish"],
-  },
 ];
 
 export const SKIP = new Set<string>(SKIP_GROUPS.flatMap((g) => g.names));
