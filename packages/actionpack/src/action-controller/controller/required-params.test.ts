@@ -1,5 +1,14 @@
-import { beforeEach, describe, it, expect } from "vitest";
-import { assertMatch, assertRaise, toParam, toQuery } from "@blazetrails/activesupport";
+import { beforeEach, describe, it } from "vitest";
+import {
+  assert,
+  assertEqual,
+  assertKindOf,
+  assertMatch,
+  assertRaise,
+  assertRaises,
+  toParam,
+  toQuery,
+} from "@blazetrails/activesupport";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
 import { TestCase } from "../test-case.js";
@@ -62,51 +71,74 @@ describe("ActionControllerRequiredParamsTest", () => {
 
 describe("ParametersRequireTest", () => {
   it("required parameters should accept and return false value", () => {
-    const params = new Parameters({ person: false });
-    expect(params.require("person")).toBe(false);
+    assertEqual(false, new Parameters({ person: false }).require("person"));
   });
 
   it("required parameters must not be nil", () => {
-    const params = new Parameters({ person: null });
-    expect(() => params.require("person")).toThrow(ParameterMissing);
+    assertRaises([ParameterMissing], {}, () => {
+      new Parameters({ person: null }).require("person");
+    });
   });
 
   it("required parameters must not be empty", () => {
-    const params = new Parameters({ person: new Parameters({}) });
-    expect(() => params.require("person")).toThrow(ParameterMissing);
+    assertRaises([ParameterMissing], {}, () => {
+      new Parameters({ person: {} }).require("person");
+    });
   });
 
   it("require array when all required params are present", () => {
-    const params = new Parameters({ first: "John", last: "Doe" });
-    const result = params.require(["first", "last"]);
-    expect(result).toEqual(["John", "Doe"]);
+    const safeParams = (
+      new Parameters({
+        person: { first_name: "Gaurish", title: "Mjallo", city: "Barcelona" },
+      }).require("person") as Parameters
+    ).require(["first_name", "title"]);
+
+    assertKindOf(Array, safeParams);
+    assertEqual(["Gaurish", "Mjallo"], safeParams);
   });
 
   it("require array when a required param is missing", () => {
-    const params = new Parameters({ first: "John" });
-    expect(() => params.require(["first", "last"])).toThrow(ParameterMissing);
+    assertRaises([ParameterMissing], {}, () => {
+      (
+        new Parameters({ person: { first_name: "Gaurish", title: null } }).require(
+          "person",
+        ) as Parameters
+      ).require(["first_name", "title"]);
+    });
   });
 
   it("value params", () => {
-    const params = new Parameters({ foo: "bar" });
-    expect(params.get("foo")).toBe("bar");
+    const params = new Parameters({ foo: "bar", dog: "cinco" });
+    assertEqual(["bar", "cinco"], params.values);
+    assert(params.hasValue("cinco"));
+    assert(params.isValue("cinco"));
   });
 
   it("to_param works like in a Hash", () => {
-    const params = new Parameters({ nested: { key: "value" } }).permitBang();
-    expect(params.toParam()).toBe(toParam({ nested: { key: "value" } }));
+    let params: Parameters | { root: Parameters } = new Parameters({
+      nested: { key: "value" },
+    }).permitBang();
+    assertEqual(toParam({ nested: { key: "value" } }), params.toParam());
 
-    expect(() => new Parameters({ nested: { key: "value" } }).toParam()).toThrow(
-      UnfilteredParameters,
-    );
+    params = { root: new Parameters({ nested: { key: "value" } }).permitBang() };
+    assertEqual(toParam({ root: { nested: { key: "value" } } }), toParam(params));
+
+    assertRaise([UnfilteredParameters], {}, () => {
+      new Parameters({ nested: { key: "value" } }).toParam();
+    });
   });
 
   it("to_query works like in a Hash", () => {
-    const params = new Parameters({ nested: { key: "value" } }).permitBang();
-    expect(params.toQuery()).toBe(toQuery({ nested: { key: "value" } }));
+    let params: Parameters | { root: Parameters } = new Parameters({
+      nested: { key: "value" },
+    }).permitBang();
+    assertEqual(toQuery({ nested: { key: "value" } }), params.toQuery());
 
-    expect(() => new Parameters({ nested: { key: "value" } }).toQuery()).toThrow(
-      UnfilteredParameters,
-    );
+    params = { root: new Parameters({ nested: { key: "value" } }).permitBang() };
+    assertEqual(toQuery({ root: { nested: { key: "value" } } }), toQuery(params));
+
+    assertRaise([UnfilteredParameters], {}, () => {
+      new Parameters({ nested: { key: "value" } }).toQuery();
+    });
   });
 });
