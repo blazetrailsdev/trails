@@ -1,17 +1,16 @@
 import { serializableHash as amSerializableHash } from "@blazetrails/activemodel";
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
+import { kernelArray } from "@blazetrails/activesupport";
+import { union } from "@blazetrails/ruby-compat";
 
 export function serializableHash(this: Base, options?: SerializeOptions): Record<string, unknown> {
   const klass = this.constructor as typeof Base;
-  const inheritanceCol = klass.inheritanceColumn;
-  if (inheritanceCol && klass.hasAttribute(inheritanceCol)) {
+  if (klass._hasAttribute(klass.inheritanceColumn!)) {
     options = options ? { ...options } : {};
 
-    const raw = (options as { except?: unknown }).except;
-    const exceptArray =
-      raw == null ? [] : Array.isArray(raw) ? raw : [raw as string | number | symbol];
-    options.except = [...new Set([...exceptArray.map((v) => String(v)), inheritanceCol])];
+    options.except = kernelArray(options.except).map((v) => String(v));
+    options.except = union(options.except, kernelArray(klass.inheritanceColumn));
   }
 
   return amSerializableHash.call(this, options);

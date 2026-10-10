@@ -364,7 +364,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _offsets?: Map<number, T | null>;
+  protected _offsets?: Record<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
   _loadResult?: Promise<T[]>;

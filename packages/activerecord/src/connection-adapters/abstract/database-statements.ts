@@ -20,6 +20,7 @@ import {
 import { stringify as yamlStringify } from "@blazetrails/ruby-compat/psych-adapter";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
+  ArgumentError,
   aryReject,
   initialize,
   kernelInteger,
@@ -384,12 +385,24 @@ export async function truncateTables(
   });
 }
 
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm throw — PERMANENT
+ */
 export async function transaction<T>(
   this: DatabaseStatementsHost,
   block: (tx?: unknown) => Promise<T> | T,
   options: { requiresNew?: boolean; isolation?: string; joinable?: boolean } = {},
 ): Promise<T | undefined> {
-  const { requiresNew, isolation, joinable = true } = options;
+  const { requiresNew, isolation, joinable = true, ...unknown } = options;
+  if (Object.keys(unknown).length > 0) {
+    throw new ArgumentError(
+      `unknown keyword${Object.keys(unknown).length > 1 ? "s" : ""}: ` +
+        Object.keys(unknown)
+          .map((key) => `:${key}`)
+          .join(", "),
+    );
+  }
 
   try {
     if (!requiresNew && this.currentTransaction().joinable) {

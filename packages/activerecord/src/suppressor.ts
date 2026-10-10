@@ -15,9 +15,6 @@ export function registry(): Record<string, true | undefined> {
 
 export async function suppress<R>(modelClass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
   const name = modelClass.name;
-  if (!name) {
-    return await fn();
-  }
   const previousState = registry()[name];
   registry()[name] = true;
   try {

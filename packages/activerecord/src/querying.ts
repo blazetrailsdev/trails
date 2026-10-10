@@ -135,53 +135,41 @@ export async function findBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  {
+    preparable = null,
+    allowRetry = false,
+  }: { preparable?: boolean | null; allowRetry?: boolean } = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
-  const resolvedBlock = typeof opts === "function" ? opts : block;
   const result = await this.withConnection(
     (c) =>
       _queryBySql.call(this, c, sql, binds, {
-        preparable: resolvedOpts.preparable,
-        allowRetry: resolvedOpts.allowRetry,
+        preparable,
+        allowRetry,
       }) as Promise<Result>,
   );
-  return _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
-    this,
-    result,
-    resolvedBlock,
-  );
+  return _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block);
 }
 
 export async function asyncFindBySql<T extends typeof Base>(
   this: T,
   sql: string | [string, ...unknown[]],
   binds: unknown[] = [],
-  opts:
-    | { allowRetry?: boolean; preparable?: boolean | null }
-    | ((record: InstanceType<T>) => void)
-    | null = {},
+  {
+    preparable = null,
+    allowRetry = false,
+  }: { preparable?: boolean | null; allowRetry?: boolean } = {},
   block?: (record: InstanceType<T>) => void,
 ): Promise<InstanceType<T>[]> {
-  const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
-  const resolvedBlock = typeof opts === "function" ? opts : block;
   return this.withConnection(
     (c) =>
       _queryBySql.call(this, c, sql, binds, {
-        preparable: resolvedOpts.preparable,
-        allowRetry: resolvedOpts.allowRetry,
+        preparable,
+        allowRetry,
         async: true,
       }) as Promise<Result>,
   ).then((result) =>
-    _loadFromSql.call<T, [Result, typeof resolvedBlock], InstanceType<T>[]>(
-      this,
-      result,
-      resolvedBlock,
-    ),
+    _loadFromSql.call<T, [Result, typeof block], InstanceType<T>[]>(this, result, block),
   );
 }
 
@@ -189,9 +177,8 @@ export async function countBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number | bigint> {
-  const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   return this.withConnection(async (c) => {
-    return toI(await c.selectValue(sanitized, `${this.name} Count`));
+    return toI(await c.selectValue(this.sanitizeSql(sql)!, `${this.name} Count`));
   });
 }
 
