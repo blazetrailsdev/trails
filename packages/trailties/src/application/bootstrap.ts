@@ -1,4 +1,5 @@
 import { lookupStore } from "@blazetrails/activesupport/cache";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import {
   ActiveSupport,
   type Logger,
@@ -8,7 +9,7 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { LoadError, rbObjRespondTo, setVerbose, verbose } from "@blazetrails/ruby-compat";
+import { LoadError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
@@ -36,14 +37,10 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async function () {
-  const oldVerbose = verbose();
-  setVerbose(null);
   try {
-    await ActiveSupport.loadPath["active_support/message_pack"]();
+    await silenceWarnings(() => ActiveSupport.loadPath["active_support/message_pack"]());
   } catch (error) {
     if (!(error instanceof LoadError)) throw error;
-  } finally {
-    setVerbose(oldVerbose);
   }
   const cacheStore = this.config.cacheStore;
   const serializer = Array.isArray(cacheStore)
