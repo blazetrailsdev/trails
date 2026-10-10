@@ -128,10 +128,10 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("normalize version", () => {
-    expect(SchemaMigration.normalizeMigrationNumber("0000118")).toBe("118");
-    expect(SchemaMigration.normalizeMigrationNumber("2")).toBe("002");
-    expect(SchemaMigration.normalizeMigrationNumber("0017")).toBe("017");
-    expect(SchemaMigration.normalizeMigrationNumber("20131219224947")).toBe("20131219224947");
+    expect(schemaMigration.normalizeMigrationNumber("0000118")).toBe("118");
+    expect(schemaMigration.normalizeMigrationNumber("2")).toBe("002");
+    expect(schemaMigration.normalizeMigrationNumber("0017")).toBe("017");
+    expect(schemaMigration.normalizeMigrationNumber("20131219224947")).toBe("20131219224947");
   });
 
   it("schema load with multiple indexes for column of different names", async () => {

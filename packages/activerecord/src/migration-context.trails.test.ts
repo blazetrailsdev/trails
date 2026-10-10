@@ -192,9 +192,9 @@ describe("MigrationContext connected surface", () => {
     await context.schemaMigration.createVersion("1");
 
     expect(await context.migrationsStatus()).toEqual([
-      { status: "up", version: "001", name: "Valid people have last names" },
-      { status: "down", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
+      ["up", "001", "Valid people have last names"],
+      ["down", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
     ]);
   });
 

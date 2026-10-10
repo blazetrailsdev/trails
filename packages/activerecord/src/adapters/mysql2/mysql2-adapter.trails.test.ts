@@ -27,7 +27,7 @@ import { Base } from "../../base.js";
 describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   let adapter: Mysql2Adapter;
   beforeEach(() => {
-    adapter = new Mysql2Adapter({ _fakeConnection: true });
+    adapter = new Mysql2Adapter({});
   });
   afterEach(async () => {
     await adapter.disconnectBang().catch(() => {});

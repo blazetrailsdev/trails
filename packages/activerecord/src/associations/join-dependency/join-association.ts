@@ -1,7 +1,7 @@
 import type { Base } from "../../base.js";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
-import type { AbstractReflection } from "../../reflection.js";
+import type { AbstractReflection, ConcreteReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
 import { extractBang } from "@blazetrails/activesupport";
@@ -17,8 +17,8 @@ export class JoinAssociation extends JoinPart {
   readonly reflection: AbstractReflection;
   private _table: Table | Nodes.TableAlias | null = null;
   readonly tables: (Table | Nodes.TableAlias)[] | null = null;
-  private _readonly?: boolean;
-  private _strictLoading?: boolean;
+  declare private _readonly?: unknown;
+  declare private _strictLoading?: unknown;
 
   constructor(reflection: AbstractReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
@@ -111,29 +111,20 @@ export class JoinAssociation extends JoinPart {
     return joins;
   }
 
-  isReadonly(): boolean {
-    if (this._readonly !== undefined) return this._readonly;
-    this._readonly = !!this._scopeRelation()?.readonlyValue;
-    return this._readonly;
+  isReadonly(): unknown {
+    if (Object.hasOwn(this, "_readonly")) return this._readonly;
+
+    const reflection = this.reflection as AbstractReflection & ConcreteReflection;
+    return (this._readonly =
+      reflection.scope && reflection.scopeFor(this.baseKlass.unscoped()).readonlyValue);
   }
 
-  isStrictLoading(): boolean {
-    if (this._strictLoading !== undefined) return this._strictLoading;
-    this._strictLoading =
-      !!(this.reflection as any)?.strictLoading || !!this._scopeRelation()?.strictLoadingValue;
-    return this._strictLoading;
-  }
+  isStrictLoading(): unknown {
+    if (Object.hasOwn(this, "_strictLoading")) return this._strictLoading;
 
-  /** @internal */
-  private _scopeRelation(): any | null {
-    const refl = this.reflection as any;
-    if (!refl?.scope || typeof refl.scopeFor !== "function") return null;
-    try {
-      const unscoped = (this.baseKlass as any).unscoped?.();
-      return unscoped ? (refl.scopeFor(unscoped) ?? null) : null;
-    } catch {
-      return null;
-    }
+    const reflection = this.reflection as AbstractReflection & ConcreteReflection;
+    return (this._strictLoading =
+      reflection.scope && reflection.scopeFor(this.baseKlass.unscoped()).strictLoadingValue);
   }
 }
 

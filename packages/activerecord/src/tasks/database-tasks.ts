@@ -608,8 +608,8 @@ export class DatabaseTasks {
     puts(`\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n`);
     puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
     puts("-".repeat(50));
-    for (const row of rows) {
-      puts(`${center(row.status, 8)}  ${row.version.padEnd(14)}  ${row.name}`);
+    for (const [status, version, name] of rows) {
+      puts(`${center(status, 8)}  ${version.padEnd(14)}  ${name}`);
     }
     puts();
   }

@@ -16,6 +16,7 @@ import {
   extend,
   type Extended,
   wrap,
+  filterMap,
 } from "@blazetrails/activesupport";
 import {
   format,
@@ -31,6 +32,7 @@ import {
   rbBlockGivenP,
   rbStrSend,
   toI,
+  aryDelete,
 } from "@blazetrails/ruby-compat";
 import {
   Dir,
@@ -1530,12 +1532,11 @@ export class MigrationContext<
     return new Migrator("up", this.migrations, this.schemaMigration, this.internalMetadata);
   }
 
-  async migrationsStatus(
-    this: MigrationContext,
-  ): Promise<Array<{ status: "up" | "down"; version: string; name: string }>> {
-    const dbList = new Set(await this.schemaMigration.normalizedVersions());
+  async migrationsStatus(this: MigrationContext): Promise<Array<[string, string, string]>> {
+    let dbList: Array<string | [string, string, string]> =
+      await this.schemaMigration.normalizedVersions();
 
-    const fileList = this.migrationFiles().map((file) => {
+    const fileList = filterMap(this.migrationFiles(), (file): [string, string, string] => {
       const parsed = this.parseMigrationFilename(file);
       if (!parsed) throw new IllegalMigrationNameError(file);
       let version = parsed[0];
@@ -1544,18 +1545,16 @@ export class MigrationContext<
       if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
         throw new InvalidMigrationTimestampError(version, name);
       }
-      version = SchemaMigration.normalizeMigrationNumber(version);
-      const status = dbList.delete(version) ? ("up" as const) : ("down" as const);
-      return { status, version, name: humanize(name + scope) };
+      version = this.schemaMigration.normalizeMigrationNumber(version);
+      const status = aryDelete(dbList, version) != null ? "up" : "down";
+      return [status, version, humanize(name + scope)];
     });
 
-    const noFileList = [...dbList].map((version) => ({
-      status: "up" as const,
-      version,
-      name: "********** NO FILE **********",
-    }));
+    dbList = dbList.map((version) => ["up", version as string, "********** NO FILE **********"]);
 
-    return [...noFileList, ...fileList].sort((a, b) => toInteger(a.version) - toInteger(b.version));
+    return ([...dbList, ...fileList] as Array<[string, string, string]>).sort(
+      ([, a], [, b]) => Number(toI(a)) - Number(toI(b)),
+    );
   }
 
   get currentEnvironment(): string {

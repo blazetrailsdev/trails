@@ -233,10 +233,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
-      { status: "up", version: "010", name: "********** NO FILE **********" },
+      ["down", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
+      ["up", "010", "********** NO FILE **********"],
     ]);
   });
 
@@ -250,10 +250,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "230", name: "Add people hobby" },
-      { status: "up", version: "231", name: "Add people last name" },
-      { status: "up", version: "20210716122844", name: "Add people description" },
-      { status: "up", version: "20210716123013", name: "Add people number of legs" },
+      ["up", "230", "Add people hobby"],
+      ["up", "231", "Add people last name"],
+      ["up", "20210716122844", "Add people description"],
+      ["up", "20210716123013", "Add people number of legs"],
     ]);
   });
 
@@ -267,10 +267,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "230", name: "Add people hobby" },
-      { status: "up", version: "231", name: "Add people last name" },
-      { status: "down", version: "20210716122844", name: "Add people description" },
-      { status: "up", version: "20210716123013", name: "Add people number of legs" },
+      ["up", "230", "Add people hobby"],
+      ["up", "231", "Add people last name"],
+      ["down", "20210716122844", "Add people description"],
+      ["up", "20210716123013", "Add people number of legs"],
     ]);
   });
 
@@ -284,10 +284,10 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "down", version: "003", name: "Innocent jointable" },
-      { status: "up", version: "010", name: "********** NO FILE **********" },
+      ["down", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["down", "003", "Innocent jointable"],
+      ["up", "010", "********** NO FILE **********"],
     ]);
   });
 
@@ -301,9 +301,9 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "up", version: "001", name: "Valid people have last names" },
-      { status: "up", version: "002", name: "We need reminders" },
-      { status: "up", version: "003", name: "Innocent jointable" },
+      ["up", "001", "Valid people have last names"],
+      ["up", "002", "We need reminders"],
+      ["up", "003", "Innocent jointable"],
     ]);
   });
 
@@ -320,24 +320,12 @@ describe("MigratorTest", () => {
       internalMetadata,
     ).migrationsStatus();
     expect(status).toEqual([
-      { status: "down", version: "20090101010101", name: "People have hobbies" },
-      { status: "down", version: "20090101010202", name: "People have descriptions" },
-      {
-        status: "up",
-        version: "20100101010101",
-        name: "Valid with timestamps people have last names",
-      },
-      {
-        status: "down",
-        version: "20100201010101",
-        name: "Valid with timestamps we need reminders",
-      },
-      {
-        status: "down",
-        version: "20100301010101",
-        name: "Valid with timestamps innocent jointable",
-      },
-      { status: "up", version: "20160528010101", name: "********** NO FILE **********" },
+      ["down", "20090101010101", "People have hobbies"],
+      ["down", "20090101010202", "People have descriptions"],
+      ["up", "20100101010101", "Valid with timestamps people have last names"],
+      ["down", "20100201010101", "Valid with timestamps we need reminders"],
+      ["down", "20100301010101", "Valid with timestamps innocent jointable"],
+      ["up", "20160528010101", "********** NO FILE **********"],
     ]);
   });
 

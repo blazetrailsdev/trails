@@ -3,10 +3,20 @@ import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasManyAssociation } from "./has-many-association.js";
-import { aryCount, Hash, include, NotImplementedError, rbEqual } from "@blazetrails/ruby-compat";
-import { underscore, isBlank } from "@blazetrails/activesupport";
+import {
+  aryCount,
+  aryDelete,
+  Hash,
+  include,
+  NotImplementedError,
+  rbEqual,
+  rbFPublicSend,
+  rbFSend,
+} from "@blazetrails/ruby-compat";
+import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
 import { ThroughAssociation, sourceReflection } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
+import type { Association } from "./association.js";
 
 export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
@@ -20,7 +30,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   }
 
   /** @internal */
-  declare buildThroughRecord: (record: Base) => Base | null;
+  declare buildThroughRecord: (record: Base) => Base;
   /** @internal */
   declare throughScope: () => unknown;
   /** @internal */
@@ -28,9 +38,9 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   /** @internal */
   declare saveThroughRecord: (record: Base) => Promise<boolean>;
   /** @internal */
-  declare throughRecordsFor: (record: Base) => Base[] | Promise<Base[]>;
+  declare throughRecordsFor: (record: Base) => Promise<Base[]>;
   /** @internal */
-  declare deleteThroughRecords: (records: Base[]) => void | Promise<void>;
+  declare deleteThroughRecords: (records: Base[]) => Promise<void>;
   /** @internal */
   declare throughReflection: () => unknown;
   /** @internal */
@@ -142,7 +152,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       if (inverse) {
         if (inverse.isCollection()) {
           (record.association(inverse.name) as CollectionAssociation).addToTarget(
-            this.buildThroughRecord(record)!,
+            this.buildThroughRecord(record),
           );
         } else if (inverse.isHasOne()) {
           (
@@ -180,8 +190,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         return true;
       });
     }
-    const deleted = this.deleteThroughRecords(records);
-    return isThenable(deleted) ? deleted.then(() => true) : true;
+    return this.deleteThroughRecords(records).then(() => true);
   }
 
   /** @internal */
@@ -245,32 +254,23 @@ interface SourceCounterReflection {
 }
 
 /** @internal */
-function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base | null {
+function buildThroughRecord(this: HasManyThroughAssociation, record: Base): Base {
   const cache = this._throughRecords;
   const cached = cache.get(record);
   if (cached) return cached;
 
   this.ensureMutable();
 
-  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-  const sourceRefl = refl?.sourceReflection;
-  const proxy = throughProxy(this);
-  if (!proxy || typeof proxy.build !== "function" || !sourceRefl?.name) return null;
-
-  const existingTarget = proxy.loaded ? proxy.target : undefined;
-  if (existingTarget && !Array.isArray(existingTarget)) {
-    cache.set(record, existingTarget);
-    return existingTarget;
-  }
-
   const attributes = this.throughScopeAttributes();
-  if (sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo") {
-    attributes[sourceRefl.name] = record;
-  }
-  const newRecord = proxy.build(attributes);
-  if (this.reflection.options.sourceType && sourceRefl.foreignType) {
-    (newRecord as any).writeAttribute?.(sourceRefl.foreignType, this.reflection.options.sourceType);
+  attributes[this.sourceReflection().name] = record;
+
+  const newRecord = (this.throughAssociation() as CollectionAssociation).build(attributes);
+  if (this.reflection.options.sourceType) {
+    rbFSend(
+      newRecord,
+      `${this.sourceReflection().foreignType}=`,
+      this.reflection.options.sourceType,
+    );
   }
   cache.set(record, newRecord);
   return newRecord;
@@ -344,107 +344,46 @@ function updateThroughCounter(this: HasManyThroughAssociation, method: string): 
 }
 
 /** @internal */
-function throughRecordsFor(
-  this: HasManyThroughAssociation,
-  record: Base,
-): Base[] | Promise<Base[]> {
-  const throughName = this.reflection.options.through;
-  if (!throughName) return [];
-  const proxy = throughProxy(this);
-  if (!proxy) return [];
-
-  const joinAttrs = this.constructJoinAttributes(record);
-  const candidates: Base[] = Array.isArray(proxy.target)
-    ? proxy.target
-    : proxy.target
-      ? [proxy.target]
-      : [];
-  const attributes = Object.entries(joinAttrs);
-  const sent = candidates.map((c) =>
-    attributes.map(([key]) => {
-      if ((c.constructor as any)._reflectOnAssociation?.(key)) {
-        return (c as any).association(key).reader as unknown;
+async function throughRecordsFor(this: HasManyThroughAssociation, record: Base): Promise<Base[]> {
+  const attributes = this.constructJoinAttributes(record);
+  const candidates = wrap((this.throughAssociation() as Association).target);
+  const found: Base[] = [];
+  for (const c of candidates) {
+    let all = true;
+    for (const [key, value] of Object.entries(attributes)) {
+      if (!rbEqual(await rbFPublicSend(c, key), value)) {
+        all = false;
+        break;
       }
-      return typeof (c as any).readAttribute === "function"
-        ? (c as any).readAttribute(key)
-        : (c as any)[key];
-    }),
-  );
-  const findAll = (values: unknown[][]): Base[] =>
-    candidates.filter((_c, i) => attributes.every(([, value], j) => rbEqual(values[i][j], value)));
-  return sent.some((values) => values.some(isThenable))
-    ? Promise.all(sent.map((values) => Promise.all(values))).then(findAll)
-    : findAll(sent);
+    }
+    if (all) found.push(c);
+  }
+  return found;
 }
 
 /** @internal */
-function deleteThroughRecords(
+async function deleteThroughRecords(
   this: HasManyThroughAssociation,
   records: Base[],
-): void | Promise<void> {
-  const throughName = this.reflection.options.through;
-  if (!throughName) return;
-  const proxy = throughProxy(this);
-  const cache = this._throughRecords;
-  if (!proxy) return;
-  for (let i = 0; i < records.length; i++) {
-    const record = records[i];
-    const throughRecords = this.throughRecordsFor(record);
-    if (isThenable(throughRecords)) {
-      return throughRecords.then(() => this.deleteThroughRecords(records.slice(i)));
-    }
-    if (Array.isArray(proxy.target)) {
-      for (const r of throughRecords) {
-        for (let idx = proxy.target.length - 1; idx >= 0; idx--) {
-          if (rbEqual(proxy.target[idx], r)) proxy.target.splice(idx, 1);
-        }
+): Promise<void> {
+  const throughAssociation = this.throughAssociation() as Association;
+  for (const record of records) {
+    const throughRecords = await this.throughRecordsFor(record);
+
+    if ((this.throughReflection() as AssociationReflection).isCollection()) {
+      for (const r of throughRecords) aryDelete(throughAssociation.target as Base[], r);
+    } else {
+      if (throughRecords.some((r) => rbEqual(r, throughAssociation.target))) {
+        throughAssociation.target = null;
       }
-    } else if (throughRecords.some((r) => rbEqual(r, proxy.target))) {
-      (proxy as { target?: Base | null }).target = null;
     }
-    cache.delete(record);
+
+    this._throughRecords.delete(record);
   }
 }
 
 /** @internal */
 type Distribution = Hash<Base, number>;
-
-/** @internal */
-interface ThroughTargetStore {
-  build?: (attrs: Record<string, unknown>) => Base;
-  loaded?: boolean;
-  target?: Base[] | Base | null;
-}
-
-function throughProxy(assoc: HasManyThroughAssociation): ThroughTargetStore | null {
-  const tr = assoc.throughReflection() as {
-    name?: string;
-    isCollection?: () => boolean;
-    macro?: string;
-  } | null;
-  if (!tr?.name) return null;
-  const isCollection = tr.isCollection?.() ?? tr.macro === "hasMany";
-  if (isCollection) {
-    return (assoc.owner.association(tr.name) as CollectionAssociation)
-      .reader as unknown as ThroughTargetStore;
-  }
-  const oo = (assoc.owner as unknown as { association?: (n: string) => any }).association?.(
-    tr.name,
-  );
-  if (!oo) return null;
-  return {
-    build: typeof oo.build === "function" ? oo.build.bind(oo) : undefined,
-    get loaded() {
-      return oo.isLoaded?.() ?? false;
-    },
-    get target() {
-      return oo.target;
-    },
-    set target(v: Base[] | Base | null) {
-      oo._writeTargetStore(v);
-    },
-  };
-}
 
 /** @internal */
 function targetReflectionHasAssociatedRecord(

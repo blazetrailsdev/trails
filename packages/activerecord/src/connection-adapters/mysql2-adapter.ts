@@ -10,7 +10,7 @@ import {
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { Text as TextType } from "../type/text.js";
-import { rbModConstSet, rbObjRespondTo, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { rbModConstSet, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -301,8 +301,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   private async _ensureClient(): Promise<unknown> {
     if (this._rawConnection) return this._rawConnection;
-    if (rtest(this._config._fakeConnection))
-      throw new RuntimeError("Mysql2Adapter: fake connection has no client");
     let conn: Mysql2Client;
     try {
       conn = await Mysql2Adapter.newClient(

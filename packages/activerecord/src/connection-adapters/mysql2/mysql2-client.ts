@@ -331,7 +331,6 @@ async function newClient(
     encoding: _encoding,
     collation: _collation,
     variables: _vars,
-    _fakeConnection: _fake,
     connectionLimit: _connLimit,
     queueLimit: _queueLimit,
     waitForConnections: _waitFor,

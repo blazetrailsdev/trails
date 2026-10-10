@@ -63,7 +63,7 @@ describeIfMysqlAdapter("Mysql2AdapterTest", () => {
   });
 
   it("mysql2 default prepared statements", () => {
-    const fakeAdapter = new Mysql2Adapter({ _fakeConnection: true });
+    const fakeAdapter = new Mysql2Adapter({});
     expect(fakeAdapter.preparedStatements).toBe(false);
   });
 

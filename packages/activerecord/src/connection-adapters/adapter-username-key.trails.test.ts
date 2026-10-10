@@ -60,10 +60,7 @@ describe.each([
 
 describe("retained config", () => {
   it.each([
-    [
-      "Mysql2Adapter",
-      (c: Record<string, unknown>) => new Mysql2Adapter({ ...c, _fakeConnection: true } as never),
-    ],
+    ["Mysql2Adapter", (c: Record<string, unknown>) => new Mysql2Adapter({ ...c } as never)],
     ["PostgreSQLAdapter", (c: Record<string, unknown>) => new PostgreSQLAdapter(c as never)],
   ])("%s keeps username in the config the driver mapping read from", (_name, build) => {
     const adapter = build({ ...BASE, username: "rails" });
