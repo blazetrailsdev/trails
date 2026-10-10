@@ -718,6 +718,8 @@ describe("SCOPED_SKIP_GROUPS", () => {
     expect(isScopedSkip("then", "nodes/case.rb")).toBe(false);
     expect(isScopedSkip("then", "future_result.rb")).toBe(false);
     expect(rubyMethodToTs("to_ary")).toEqual(["toAry", "_toAry"]);
+    expect(isScopedSkip("to_ary", "core.rb")).toBe(true);
+    expect(isScopedSkip("to_ary", "result.rb")).toBe(false);
   });
 
   it("names every spelling of a port spread over several TS declarations", () => {

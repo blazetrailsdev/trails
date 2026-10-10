@@ -1562,8 +1562,6 @@ export class Base extends Model {
   declare isStrictLoadingNPlusOneOnly: typeof _Core.isStrictLoadingNPlusOneOnly;
   declare isFrozen: typeof _Core.isFrozen;
   declare freeze: () => this;
-  /** @internal */
-  declare toAry: typeof _Core.toAry;
 
   declare cacheKey: () => string;
   declare cacheKeyWithVersion: () => string;
@@ -2284,7 +2282,6 @@ include(Base, {
   isStrictLoadingNPlusOneOnly: _Core.isStrictLoadingNPlusOneOnly,
   isFrozen: _Core.isFrozen,
   freeze: _Core.freeze,
-  toAry: _Core.toAry,
   isNoTouching: _isNoTouching,
   toParam: _toParam,
   cacheKey: _cacheKey,

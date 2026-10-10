@@ -1156,6 +1156,22 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
+      "`ActiveRecord::Core#to_ary` (core.rb:822-832) is private and answers " +
+      "`nil`, defined only so `Array#flatten` does not reach a record's " +
+      "`method_missing`. A trails record has no `method_missing` to reach " +
+      '(CLAUDE.md § "Records are not Proxies"), and a private method is ' +
+      'visible to `rbObjRespondTo` (CLAUDE.md § "Method visibility is ' +
+      'compile-time only"), so a `toAry` member would make every record ' +
+      "answer `respond_to?(:to_ary)`, which Rails' record does not: " +
+      "`serializable_hash` (active_model/serialization.rb:141) and " +
+      "`fields_for_with_nested_attributes` (form_helper.rb:2713-2718) branch " +
+      "on it. Scoped to core.rb, and to base.rb, which includes `Core`, so " +
+      "every other `to_ary` stays scored.",
+    names: ["to_ary"],
+    rubyFiles: ["core.rb", "base.rb"],
+  },
+  {
+    reason:
       "`ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block " +
       "onto the relation's `@future_result`, else falls to `Kernel#then`. A " +
       "trails relation is evaluated by an async query, so `Relation.prototype` " +
