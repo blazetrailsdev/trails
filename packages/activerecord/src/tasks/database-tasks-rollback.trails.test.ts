@@ -54,7 +54,7 @@ describe("DatabaseTasksRollbackTest", () => {
     const primaryPath = await migrationsPath([2, "PrimaryOnly"]);
     const animalsPath = await migrationsPath([3, "AnimalsOnly"]);
 
-    const env = DatabaseTasks.env;
+    const env = DatabaseTasks.env.toString();
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [env]: {
         primary: {

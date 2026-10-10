@@ -33,7 +33,7 @@ export async function dbCreate(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   const configs: import("@blazetrails/activerecord").HashConfig[] = [];
   if (all) {
     await DatabaseTasks.eachLocalConfiguration((dbConfig) => configs.push(dbConfig));
@@ -60,7 +60,7 @@ export async function dbDrop(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   const configs: import("@blazetrails/activerecord").HashConfig[] = [];
   if (all) {
     await DatabaseTasks.eachLocalConfiguration((dbConfig) => configs.push(dbConfig));
@@ -112,7 +112,7 @@ export async function dbMigrate(cwd: string, args: string[]): Promise<number> {
   const previousVersion = getEnv("VERSION");
   if (version !== undefined) setEnv("VERSION", version);
   try {
-    await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env);
+    await withEnvironmentConnection(() => DatabaseTasks.migrateAll(), DatabaseTasks.env.toString());
     return 0;
   } catch (err) {
     console.error(`ar: db:migrate failed — ${String(err)}`);
@@ -135,7 +135,7 @@ export async function dbRollback(cwd: string, args: string[]): Promise<number> {
   try {
     await withEnvironmentConnection(
       () => DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step),
-      DatabaseTasks.env,
+      DatabaseTasks.env.toString(),
     );
     return 0;
   } catch (err) {
@@ -152,7 +152,7 @@ export async function dbSchemaLoad(cwd: string, _args: string[]): Promise<number
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   try {
     await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     await DatabaseTasks.loadSchemaCurrent(undefined, undefined, env);
@@ -171,7 +171,7 @@ export async function dbSchemaDump(cwd: string, _args: string[]): Promise<number
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -245,7 +245,7 @@ export async function dbSetup(cwd: string, _args: string[]): Promise<number> {
   await tryLoadModels(cwd);
   installSeedLoader(cwd);
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   const configs = DatabaseTasks.configsFor({ envName: env });
   if (configs.length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
@@ -288,7 +288,7 @@ export async function dbPrepare(cwd: string, _args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   if (DatabaseTasks.configsFor({ envName: env }).length === 0) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;
@@ -318,7 +318,7 @@ export async function dbVersion(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])
     : DatabaseTasks.configsFor({ envName: env });
@@ -359,7 +359,7 @@ export async function dbMigrateStatus(cwd: string, args: string[]): Promise<numb
   }
   await tryLoadModels(cwd);
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
 
   const configs = all
     ? (DatabaseTasks.databaseConfiguration?.configsFor() ?? [])

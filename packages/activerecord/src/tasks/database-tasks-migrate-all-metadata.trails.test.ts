@@ -25,7 +25,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
   async function setupConfigs(): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), "trails-migrate-all-meta-"));
     dirs.push(dir);
-    const env = DatabaseTasks.env;
+    const env = DatabaseTasks.env.toString();
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
       [env]: {
         primary: {
@@ -54,7 +54,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
 
   async function metadataTablesExist(): Promise<Array<boolean | null>> {
     const results: Array<boolean | null> = [];
-    for (const config of DatabaseTasks.configsFor({ envName: DatabaseTasks.env })) {
+    for (const config of DatabaseTasks.configsFor({ envName: DatabaseTasks.env.toString() })) {
       await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
         results.push(await adapter.tableExists("ar_internal_metadata"));
       });

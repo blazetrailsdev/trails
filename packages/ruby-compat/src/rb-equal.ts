@@ -50,6 +50,17 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  /* `rb_str_equal` / `rb_str_eql` (`vendor/ruby/v3.3.11/string.c:3742`, `:3773`) test
+     `RB_TYPE_P(str2, T_STRING)`, which a String subclass instance passes, and
+     then compare content. A JS `String` object is that subclass instance
+     (ActiveSupport::StringInquirer), and its content is its primitive. */
+  if (a instanceof String || b instanceof String) {
+    return equalOrEql(
+      a instanceof String ? a.valueOf() : a,
+      b instanceof String ? b.valueOf() : b,
+      eql,
+    );
+  }
   if (typeof a === "string" && b instanceof Uint8Array) {
     return a.length === b.length && b.every((byte, i) => byte < 0x80 && byte === a.charCodeAt(i));
   }

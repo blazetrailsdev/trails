@@ -27,7 +27,7 @@ describe.skipIf(skip)("Migration", () => {
       path.join(tmpDir, `${databaseName}-migrations`);
 
     const baseConfig = (): RawConfigurations => ({
-      [DatabaseTasks.env]: {
+      [DatabaseTasks.env.toString()]: {
         primary: {
           adapter: "sqlite3",
           database: databasePathFor("primary"),

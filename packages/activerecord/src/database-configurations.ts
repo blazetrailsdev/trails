@@ -4,11 +4,12 @@ import {
   groupBy,
   hasKey,
   isSymbol,
+  rbEqual,
   rbInspect,
   symbolToS,
   toS,
 } from "@blazetrails/ruby-compat";
-import { getEnv } from "@blazetrails/activesupport";
+import { type EnvironmentInquirer, getEnv } from "@blazetrails/activesupport";
 import { AdapterNotSpecified } from "./errors.js";
 import {
   DatabaseConfig,
@@ -71,20 +72,20 @@ export class DatabaseConfigurations {
   }
 
   configsFor(options: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name: string;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   configsFor(options?: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name?: undefined;
     configKey?: string;
     includeHidden?: boolean;
   }): HashConfig[];
   configsFor(
     options: {
-      envName?: string;
+      envName?: string | EnvironmentInquirer;
       name?: string;
       configKey?: string;
       includeHidden?: boolean;
@@ -172,8 +173,8 @@ export class DatabaseConfigurations {
   }
 
   /** @internal */
-  private envWithConfigs(env?: string): HashConfig[] {
-    if (env) return this._configurations.filter((c) => c.envName === env);
+  private envWithConfigs(env?: string | EnvironmentInquirer): HashConfig[] {
+    if (env) return this._configurations.filter((c) => rbEqual(c.envName, env));
     return this._configurations;
   }
 
