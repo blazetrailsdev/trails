@@ -476,7 +476,7 @@ export async function pick(
 
   return this.limit(1)
     .pluck(...columnNames)
-    .then((values) => values[0] ?? null);
+    .then((values) => first(values) ?? null);
 }
 
 export function asyncPick(

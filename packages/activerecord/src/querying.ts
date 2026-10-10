@@ -186,10 +186,9 @@ export function asyncCountBySql(
   this: typeof Base,
   sql: string | [string, ...unknown[]],
 ): Promise<number | bigint> {
-  const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   return this.withConnection((c) => {
     return c
-      .selectValue(sanitized, `${this.name} Count`, undefined, { async: true })
+      .selectValue(this.sanitizeSql(sql) as string, `${this.name} Count`, undefined, { async: true })
       .then((value) => toI(value));
   });
 }
