@@ -17,7 +17,6 @@ import * as Reflection from "./reflection.js";
 import {
   Module,
   include,
-  included,
   rbClassInheritedP,
   rbClassSuperclass,
   rbModConstSet,
@@ -139,11 +138,6 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 }
 
 export class Associations {
-  /** @noRailsEquivalent CONVERGEABLE activerecord-prepended-super-first-parameters-onto-super-method */
-  static [included](base: object): void {
-    include(base as new () => object, SuperMethods);
-  }
-
   static belongsTo(
     name: string,
     scope: ((...args: any[]) => any) | AssociationOptions | null = {},
@@ -319,19 +313,17 @@ export function association(this: Base, name: string): AssociationInstance {
 
 /** @internal */
 export function initInternals(this: Base): void {
-  SuperMethods.superMethod(this, "initInternals")!();
+  AssociationsNamespace.superMethod(this, "initInternals")!();
   this._associationCache = new Map();
 }
 
 export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  AssociationsNamespace.superMethod(this, "initializeDup")!(other);
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initInternals", initInternals);
-  mod.defineMethod("initializeDup", initializeDup);
-});
+AssociationsNamespace.defineMethod("initInternals", initInternals);
+AssociationsNamespace.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {
@@ -348,5 +340,3 @@ Object.defineProperty(AssociationsNamespace, "eagerLoadBang", {
   writable: true,
   configurable: true,
 });
-
-ActiveRecord.Associations = AssociationsNamespace;

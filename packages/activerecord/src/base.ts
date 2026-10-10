@@ -2301,7 +2301,7 @@ include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
-include(Base, _Associations);
+include(Base, ActiveRecord.Associations);
 include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
