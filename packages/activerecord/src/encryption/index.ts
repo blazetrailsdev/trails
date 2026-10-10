@@ -26,7 +26,6 @@ export { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 export { EncryptedFixtures } from "./encrypted-fixtures.js";
 export { EncryptableRecord } from "./encryptable-record.js";
 export { AutoFilteredParameters } from "./auto-filtered-parameters.js";
-export { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
 export {
   ExtendedDeterministicQueries,
   EncryptedQuery,
