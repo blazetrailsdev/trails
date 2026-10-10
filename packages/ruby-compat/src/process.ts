@@ -1,5 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
-import { isPlainHash } from "./object.js";
+import { isPlainHash, rbBuiltinClassName } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
 
@@ -10,9 +10,8 @@ interface SystemCallError extends Error {
 /**
  * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
  * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
- * Hash as the environment, laid over `ENV` with a `nil` value unsetting the
- * name. One remaining argument is a command line and `args` is `null`; more
- * are a program and its argv.
+ * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
+ * String is a command line (`args` is `null`); more are a program and its argv.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
  * (`vendor/ruby/v3.3.11/process.c:2767`).
@@ -36,6 +35,10 @@ export function rbExecargNew(
       if (value == null) delete env[name];
       else env[name] = value;
     }
+  }
+  for (const arg of rest) {
+    if (typeof arg === "string") continue;
+    throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(arg)} into String`);
   }
   const [prog, ...args] = rest as string[];
   return [prog, env, args.length === 0 ? null : args, opthash];

@@ -18,12 +18,10 @@
  * the package. A setter (`x=`) and `initialize` are left out. The TS half is
  * `returnsVoid` (`extract-ts-api.ts#signatureReturnsVoid`).
  *
- * A name is not an owner, so two rules keep a read off its homonyms. A
- * receiverless read in a file that defines a method of that name is that
- * file's definition's alone (`FixtureSet::File#raw_rows` calling its own
- * `validate`, `fixture_set/file.rb:55`, is no read of `Migrator#validate`).
- * And a read through an explicit receiver is no read of a method Rails
- * declares private, which no receiver can reach.
+ * Two rules keep a read off its homonyms. A receiverless read in a file that
+ * defines the name is that definition's alone (`fixture_set/file.rb:55` calling
+ * its own `validate` is no read of `Migrator#validate`), and a read through a
+ * receiver is no read of a method Rails declares private.
  *
  * The population is the skeleton artifact's pairs: every compared pair with a
  * body on both sides. A Ruby name defined twice in one file answers with its

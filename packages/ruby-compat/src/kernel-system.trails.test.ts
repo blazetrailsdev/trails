@@ -66,6 +66,7 @@ describe("Kernel#system", () => {
       await rbFSystem({ TRAILS_SYSTEM_PROBE: "1" }, "sh", "-c", 'test "$TRAILS_SYSTEM_PROBE" = 1'),
     ).toBe(true);
     expect(await rbFSystem("trails-no-such-program", "--version")).toBeNull();
+    await expect(rbFSystem("true", null as never)).rejects.toThrow("nil into String");
   });
 
   it("opens out: on the named file, truncated, for the child's stdout", async () => {

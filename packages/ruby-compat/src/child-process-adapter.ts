@@ -36,12 +36,11 @@ export interface WaitStatus {
 export interface ChildProcessAdapter {
   spawnSync(cmd: string, args: string[], options?: SpawnSyncOptions): SpawnSyncResult;
   /**
-   * Runs the child with the parent's stdio and resolves once it has been
-   * waited for. With no `args`, `command` is a command line run through
-   * `/bin/sh -c` (`proc_exec_sh`, `vendor/ruby/v3.3.11/process.c:1788`); with
-   * `args` it is the program, exec'd with that argv and no shell
-   * (`proc_exec_cmd`, `process.c:1741`). `options.out` is `out: filename`:
-   * stdout opened on that file, truncated (`check_exec_redirect`, `process.c:1985`).
+   * Runs the child with the parent's stdio and resolves once it is waited for.
+   * With no `args`, `command` is a command line for `/bin/sh -c` (`proc_exec_sh`,
+   * `vendor/ruby/v3.3.11/process.c:1788`); with `args` it is the program, exec'd
+   * with that argv and no shell (`proc_exec_cmd`, `process.c:1741`). `options.out`
+   * is `out: filename`: stdout opened on that file, truncated (`process.c:1985`).
    */
   system?(
     command: string,

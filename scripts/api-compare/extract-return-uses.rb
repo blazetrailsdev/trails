@@ -18,9 +18,8 @@
 # return value (`trilogy_adapter_test.rb:162`).
 #
 # Each read carries its file and whether it is receiverless (`:fcall` / `:vcall`
-# / `:command`), and each file lists the method names it defines, so
-# report-void-returns.ts#voidReturnRows can keep a read of one class's method
-# from counting against every same-named method in the package.
+# / `:command`), and each file lists the method names it defines, which
+# report-void-returns.ts#voidReturnRows attributes reads by.
 #
 # Usage: ruby extract-return-uses.rb '{"<pkg>": ["<dir>", …], …}'
 # Prints {"<pkg>": {"reads": {"<name>": [["<file>", <line>, <bare>], …]},
