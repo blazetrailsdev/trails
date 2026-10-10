@@ -1,3 +1,5 @@
+import { ArgumentError } from "./argument-error.js";
+
 /**
  * `ignore_keyword_hash_p` (`vendor/ruby/v3.3.11/vm_args.c:435`), the argument
  * list a `**keyword_hash` splat contributes to a call: nothing when the hash is
@@ -25,4 +27,42 @@ export function coreHashMergeKwd<H extends object, K extends object>(hash: H, kw
     if (value !== undefined) (hash as Record<string, unknown>)[key] = value;
   }
   return hash as H & K;
+}
+
+/**
+ * `rb_get_kwargs` (`vendor/ruby/v3.3.11/class.c:2413`) for a header with no
+ * `**rest`: every key of `keywordHash` that `table` does not declare raises
+ * `unknown_keyword_error` (`class.c:2373`), whose message is
+ * `rb_keyword_error_new`'s (`class.c:2346`). An `undefined`-valued key is an
+ * absent keyword. The `required` / `optional` counts, the `values` out-array
+ * and the found-keyword return value are not ported.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_get_kwargs` (`vendor/ruby/v3.3.11/class.c:2413`).
+ */
+export function rbGetKwargs(keywordHash: object, table: readonly string[]): void {
+  const keys = Object.entries(keywordHash)
+    .filter(([key, value]) => value !== undefined && !table.includes(key))
+    .map(([key]) => `:${key}`);
+  if (keys.length > 0) {
+    throw new ArgumentError(`unknown keyword${keys.length > 1 ? "s" : ""}: ${keys.join(", ")}`);
+  }
+}
+
+/**
+ * `rb_scan_args_set`'s option-hash capture
+ * (`vendor/ruby/v3.3.11/include/ruby/internal/scan_args.h:400-407`) for a
+ * `(*rest, **keywords)` header: a trailing Hash is popped off `argv` as the
+ * keywords (`rb_scan_args_keyword_p`, `scan_args.h:253`), and everything else
+ * is the splat.
+ *
+ * @noRailsEquivalent PERMANENT — Ruby core `rb_scan_args_set` (`vendor/ruby/v3.3.11/include/ruby/internal/scan_args.h:400`).
+ */
+export function rbScanArgs<K extends object = Record<string, unknown>>(
+  argv: readonly unknown[],
+): [unknown[], K] {
+  const last = argv[argv.length - 1];
+  if (last !== null && typeof last === "object" && last.constructor === Object) {
+    return [argv.slice(0, -1), { ...last } as K];
+  }
+  return [[...argv], {} as K];
 }

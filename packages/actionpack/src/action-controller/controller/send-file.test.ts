@@ -1,48 +1,23 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
-import * as fs from "fs";
-import * as path from "path";
-import * as os from "os";
+import { describe, it, beforeEach } from "vitest";
 import {
   assertEqual,
+  assertKindOf,
+  assertNil,
   assertNotNil,
   assertNothingRaised,
+  assertRaise,
+  assertRespondTo,
   include,
   Notifications,
 } from "@blazetrails/activesupport";
-import { File } from "@blazetrails/ruby-compat";
+import { ArgumentError, File, RuntimeError, StringIO } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
+import { Live } from "../metal/live.js";
 import { Testing } from "../metal/testing.js";
-import { TestCase } from "../test-case.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
-
-let tmpDir: string;
-let testFilePath: string;
-const testFileData = "Hello, world! This is test file data.\n";
-
-beforeAll(() => {
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "sendfile-"));
-  testFilePath = path.join(tmpDir, "send_file_test.txt");
-  fs.writeFileSync(testFilePath, testFileData);
-});
-
-afterAll(() => {
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-function makeRequest(opts: Record<string, unknown> = {}): Request {
-  return new Request({
-    REQUEST_METHOD: "GET",
-    PATH_INFO: "/",
-    HTTP_HOST: "localhost",
-    ...opts,
-  });
-}
-
-function makeResponse(): Response {
-  return new Response();
-}
+import { type LiveTestResponse, TestCase } from "../test-case.js";
+import { Mime } from "../../action-dispatch/http/mime-type.js";
+import type { TestResponse } from "../../action-dispatch/testing/test-response.js";
 
 const TestFileUtils = {
   fileName(): string {
@@ -67,7 +42,7 @@ class SendFileController extends Base {
     include(this, Testing);
     this.layout("layouts/standard");
 
-    this.beforeAction("file", { only: "file_from_before_action" });
+    this.beforeAction("file", { only: "fileFromBeforeAction" });
   }
 
   declare _options?: Record<string, unknown>;
@@ -83,7 +58,48 @@ class SendFileController extends Base {
   }
 
   fileFromBeforeAction() {
-    throw new Error("No file sent from before action.");
+    throw new RuntimeError("No file sent from before action.");
+  }
+
+  async testSendFileHeadersBang() {
+    const options = {
+      type: Mime.get("png"),
+      disposition: "disposition",
+      filename: "filename",
+    };
+
+    await this.sendData("foo", options);
+  }
+
+  async testSendFileHeadersWithDispositionAsASymbol() {
+    const options = {
+      type: Mime.get("png"),
+      disposition: "disposition",
+      filename: "filename",
+    };
+
+    await this.sendData("foo", options);
+  }
+
+  async testSendFileHeadersWithMimeLookupWithSymbol() {
+    const options = { type: ":png" };
+
+    await this.sendData("foo", options);
+  }
+
+  async testSendFileHeadersWithBadSymbol() {
+    const options = { type: ":this_type_is_not_registered" };
+    await this.sendData("foo", options);
+  }
+
+  async testSendFileHeadersWithNilContentType() {
+    const options = { type: null };
+    await this.sendData("foo", options);
+  }
+
+  async testSendFileHeadersGuessTypeFromExtension() {
+    const options = { filename: this.params.get("filename") as string };
+    await this.sendData("foo", options);
   }
 
   async data() {
@@ -91,10 +107,18 @@ class SendFileController extends Base {
   }
 }
 
+class SendFileWithActionControllerLive extends SendFileController {
+  static {
+    include(this, Live);
+  }
+}
+
 describe("SendFileTest", () => {
   class SendFileTest extends TestCase {
     declare controller: SendFileController;
     declare filePath: typeof TestFileUtils.filePath;
+    declare fileData: typeof TestFileUtils.fileData;
+    declare _data?: string;
 
     static {
       include(this, TestFileUtils);
@@ -114,189 +138,139 @@ describe("SendFileTest", () => {
   });
 
   it("file nostream", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath, { stream: false } as any);
-      }
-    }
-    const c = new C();
-    const response = makeResponse();
-    await c.dispatch("file", makeRequest(), response);
-    expect(response.body).toBe(testFileData);
+    tc.controller.options = { stream: false };
+    let response: LiveTestResponse | TestResponse | null = null;
+    await assertNothingRaised(async () => {
+      response = await tc.process("file");
+    });
+    assertNotNil(response);
+    const body = response!.body;
+    assertKindOf(String, body);
+    assertEqual(tc.fileData(), body);
   });
 
   it("file stream", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath);
-      }
-    }
-    const c = new C();
-    const response = makeResponse();
-    await c.dispatch("file", makeRequest(), response);
-    expect(response.body).toBe(testFileData);
+    let response: LiveTestResponse | TestResponse | null = null;
+    await assertNothingRaised(async () => {
+      response = await tc.process("file");
+    });
+    assertNotNil(response);
+    assertRespondTo(response!.stream, "each");
+    assertRespondTo(response!.stream, "toPath");
+
+    const output = new StringIO();
+    output.binmode();
+    for (const part of response!.bodyParts()) output.write(String(part));
+    assertEqual(tc.fileData(), output.string());
   });
 
   it("file url based filename", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath);
-      }
-    }
-    const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.headers.get("content-disposition")).toContain("attachment");
+    tc.controller.options = { urlBasedFilename: true };
+    let response: LiveTestResponse | TestResponse | null = null;
+    await assertNothingRaised(async () => {
+      response = await tc.process("file");
+    });
+    assertNotNil(response);
+    assertEqual("attachment", response!.headers.get("Content-Disposition"));
   });
 
   it("data", async () => {
-    const fileData = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x00, 0xff, 0xfe, 0x80, 0xc3, 0x28]);
-    class C extends Base {
-      async data() {
-        await this.sendData(fileData);
-      }
-    }
-    const c = new C();
-    await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.response.bodyParts()).toEqual([fileData]);
+    let response: LiveTestResponse | TestResponse | null = null;
+    await assertNothingRaised(async () => {
+      response = await tc.process("data");
+    });
+    assertNotNil(response);
+
+    assertKindOf(String, response!.body);
+    assertEqual(tc.fileData(), response!.body);
   });
 
   it("headers after send shouldnt include charset", async () => {
-    class C extends Base {
-      async data() {
-        await this.sendData(testFileData);
-      }
-    }
-    const c = new C();
-    await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/octet-stream");
-    expect(c.contentType).not.toContain("charset");
+    let response = await tc.process("data");
+    assertEqual("application/octet-stream", response.headers.get("Content-Type"));
+
+    response = await tc.process("file");
+    assertEqual("application/octet-stream", response.headers.get("Content-Type"));
   });
 
   it("send file headers bang", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", {
-          type: "image/png",
-          disposition: "disposition",
-          filename: "filename",
-        });
-      }
+    for (let i = 0; i < 5; i++) {
+      await tc.get("testSendFileHeadersBang");
+
+      assertEqual("image/png", tc.response.contentType);
+      assertEqual(
+        `disposition; filename="filename"; filename*=UTF-8''filename`,
+        tc.response.getHeader("Content-Disposition"),
+      );
+      assertEqual("binary", tc.response.getHeader("Content-Transfer-Encoding"));
     }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
-    expect(c.headers.get("content-disposition")).toContain("disposition");
-    expect(c.headers.get("content-disposition")).toContain("filename");
   });
 
   it("send file headers with disposition as a symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", {
-          type: "image/png",
-          disposition: "disposition",
-          filename: "filename",
-        });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.headers.get("content-disposition")).toContain("disposition");
-    expect(c.headers.get("content-disposition")).toContain("filename");
+    await tc.get("testSendFileHeadersWithDispositionAsASymbol");
+
+    assertEqual(
+      `disposition; filename="filename"; filename*=UTF-8''filename`,
+      tc.response.getHeader("Content-Disposition"),
+    );
   });
 
   it("send file headers with mime lookup with symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", { type: "image/png" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
+    await tc.get("testSendFileHeadersWithMimeLookupWithSymbol");
+    assertEqual("image/png", tc.response.contentType);
   });
 
   it("send file headers with bad symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", { type: "application/octet-stream" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/octet-stream");
+    const error = await assertRaise([ArgumentError], {}, async () => {
+      await tc.get("testSendFileHeadersWithBadSymbol");
+    });
+    assertEqual("Unknown MIME type this_type_is_not_registered", error.message);
   });
 
   it("send file headers with nil content type", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo");
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/octet-stream");
+    const error = await assertRaise([ArgumentError], {}, async () => {
+      await tc.get("testSendFileHeadersWithNilContentType");
+    });
+    assertEqual(":type option required", error.message);
   });
 
   it("send file headers guess type from extension", async () => {
-    const expectations: Record<string, string> = {
+    for (const [filename, expectedType] of Object.entries({
       "image.png": "image/png",
       "image.jpeg": "image/jpeg",
       "image.jpg": "image/jpeg",
+      "image.tif": "image/tiff",
       "image.gif": "image/gif",
+      "movie.mp4": "video/mp4",
       "file.zip": "application/zip",
       "file.unk": "application/octet-stream",
       zip: "application/octet-stream",
-    };
-
-    for (const [filename, expectedType] of Object.entries(expectations)) {
-      class C extends Base {
-        async action() {
-          await this.sendData("foo", { filename });
-        }
-      }
-      const c = new C();
-      await c.dispatch("action", makeRequest(), makeResponse());
-      expect(c.contentType).toBe(expectedType);
+    })) {
+      await tc.get("testSendFileHeadersGuessTypeFromExtension", { params: { filename } });
+      assertEqual(expectedType, tc.response.contentType);
     }
   });
 
   it("send file with default content disposition header", async () => {
-    class C extends Base {
-      async data() {
-        await this.sendData(testFileData, { filename: "test.dat" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.headers.get("content-disposition")).toContain("attachment");
+    await tc.process("data");
+    assertEqual("attachment", tc.controller.headers.get("Content-Disposition"));
   });
 
   it("send file without content disposition header", async () => {
-    class C extends Base {
-      async data() {
-        await this.sendData(testFileData, { disposition: null });
-      }
-    }
-    const c = new C();
-    await c.dispatch("data", makeRequest(), makeResponse());
-    expect(c.headers.get("content-disposition")).toBeUndefined();
+    tc.controller.options = { disposition: null };
+    await tc.process("data");
+    assertNil(tc.controller.headers.get("Content-Disposition"));
   });
 
   it("send file from before action", async () => {
-    class C extends Base {
-      async fileFromBeforeAction() {
-        throw new Error("No file sent from before action.");
-      }
-    }
-    C.beforeAction((controller) => {
-      (controller as Base).sendFile(testFilePath);
+    let response: LiveTestResponse | TestResponse | null = null;
+    await assertNothingRaised(async () => {
+      response = await tc.process("fileFromBeforeAction");
     });
+    assertNotNil(response);
 
-    const c = new C();
-    const response = makeResponse();
-    await c.dispatch("fileFromBeforeAction", makeRequest(), response);
-    expect(response.body).toBe(testFileData);
+    assertKindOf(String, response!.body);
+    assertEqual(tc.fileData(), response!.body);
   });
 
   it("send file instrumentation", async () => {
@@ -351,124 +325,31 @@ describe("SendFileTest", () => {
   }
 
   it("send file with action controller live", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath, { type: "application/x-ruby" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.status).toBe(200);
+    tc.controller = new SendFileWithActionControllerLive();
+    tc.controller.options = { contentType: "application/x-ruby" };
+
+    const response = await tc.process("file");
+    assertEqual(200, response.status);
   });
 
   it("send file charset with type options key", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath, { type: "text/calendar; charset=utf-8" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("text/calendar; charset=utf-8");
+    tc.controller = new SendFileWithActionControllerLive();
+    tc.controller.options = { type: "text/calendar; charset=utf-8" };
+    const response = await tc.process("file");
+    assertEqual("text/calendar; charset=utf-8", response.headers.get("Content-Type"));
   });
 
   it("send file charset with type options key without charset", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath, { type: "image/png" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
+    tc.controller = new SendFileWithActionControllerLive();
+    tc.controller.options = { type: "image/png" };
+    const response = await tc.process("file");
+    assertEqual("image/png", response.headers.get("Content-Type"));
   });
 
   it("send file charset with content type options key", async () => {
-    class C extends Base {
-      async file() {
-        this.sendFile(testFilePath, { type: "text/calendar" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("file", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("text/calendar");
-  });
-});
-
-describe("SendFileController", () => {
-  it("send file headers bang", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", {
-          type: "image/png",
-          disposition: "disposition",
-          filename: "filename",
-        });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
-    expect(c.headers.get("content-disposition")).toContain("disposition");
-    expect(c.headers.get("content-disposition")).toContain("filename");
-  });
-
-  it("send file headers with disposition as a symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", {
-          type: "image/png",
-          disposition: "disposition",
-          filename: "filename",
-        });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.headers.get("content-disposition")).toContain("disposition");
-  });
-
-  it("send file headers with mime lookup with symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", { type: "image/png" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
-  });
-
-  it("send file headers with bad symbol", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", { type: "application/octet-stream" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/octet-stream");
-  });
-
-  it("send file headers with nil content type", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo");
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("application/octet-stream");
-  });
-
-  it("send file headers guess type from extension", async () => {
-    class C extends Base {
-      async action() {
-        await this.sendData("foo", { filename: "image.png" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.contentType).toBe("image/png");
+    tc.controller = new SendFileWithActionControllerLive();
+    tc.controller.options = { contentType: "text/calendar" };
+    const response = await tc.process("file");
+    assertEqual("text/calendar", response.headers.get("Content-Type"));
   });
 });
