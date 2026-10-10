@@ -143,6 +143,7 @@ import { instrumentPayload, instrumentName } from "./caching.js";
 import {
   Caching,
   type cache,
+  type CachingClassMethods,
   type LookupStoreArgument,
   type viewCacheDependencies,
   type viewCacheDependency,
@@ -343,7 +344,7 @@ export interface Base
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   viewRuntime: number | null;
-  config(): Configuration & { performCaching?: boolean };
+  config(): Configuration & Pick<CachingClassMethods, "performCaching">;
   get cacheStore(): CacheStore | null;
   set cacheStore(store: LookupStoreArgument);
   get formats(): ReadonlyArray<string | symbol>;
