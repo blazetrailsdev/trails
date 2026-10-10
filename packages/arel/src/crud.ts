@@ -6,10 +6,15 @@ import { DeleteManager } from "./delete-manager.js";
 import type { SelectManager } from "./select-manager.js";
 import type { ArelNode } from "./arel.js";
 
-export type UpdateValues = [ArelNode, unknown][] | string | SqlLiteral | BoundSqlLiteral;
+export type UpdateValues =
+  | [ArelNode, unknown][]
+  | Map<ArelNode, unknown>
+  | string
+  | SqlLiteral
+  | BoundSqlLiteral;
 
 export interface Crud {
-  compileInsert(values: [ArelNode, unknown][]): InsertManager;
+  compileInsert(values: [ArelNode, unknown][] | Map<ArelNode, unknown>): InsertManager;
   createInsert(): InsertManager;
   compileUpdate(
     values: UpdateValues,
@@ -25,7 +30,10 @@ export interface Crud {
 }
 
 export const Crud: Crud = {
-  compileInsert(this: SelectManager, values: [ArelNode, unknown][]): InsertManager {
+  compileInsert(
+    this: SelectManager,
+    values: [ArelNode, unknown][] | Map<ArelNode, unknown>,
+  ): InsertManager {
     const im = this.createInsert();
     im.insert(values);
     return im;

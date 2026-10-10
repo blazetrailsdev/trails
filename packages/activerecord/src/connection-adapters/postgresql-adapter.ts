@@ -235,7 +235,7 @@ export class PostgreSQLAdapter
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
   static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
-    const client = pgConnection(new pg.Client(connParams), connParams.stream);
+    const client = pgConnection(new pg.Client(connParams), connParams);
     const { database, user, host } = client;
     try {
       await client.connect();

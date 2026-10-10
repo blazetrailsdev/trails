@@ -50,7 +50,8 @@ describe("deprecated raw-connection initialize overload", () => {
       const { result: adapter } = captureDeprecations(() => new PostgreSQLAdapter(raw as never));
       expect(adapter).toBeInstanceOf(PostgreSQLAdapter);
       expect(
-        (adapter as unknown as { _unconfiguredConnection: unknown })._unconfiguredConnection,
+        (adapter as unknown as { _unconfiguredConnection: { client: unknown } })
+          ._unconfiguredConnection.client,
       ).toBe(raw);
     });
 
