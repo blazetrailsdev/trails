@@ -377,7 +377,7 @@ export class V5_2 extends V6_0 {
   };
 
   static override CommandRecorder: ClassModule = class CommandRecorder {
-    invertTransaction(_super: unknown, args: unknown[], block?: unknown) {
+    invertTransaction(_super: unknown, args: unknown[], block?: (...args: unknown[]) => unknown) {
       return ["transaction", args, block];
     }
 
