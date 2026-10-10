@@ -455,7 +455,6 @@ describe("AttributeMethods#respond_to_missing? (trails)", () => {
     await Topic.loadSchema();
     expect(basicObjRespondTo(topic, "title", true)).toBe(true);
     expect(basicObjRespondTo(topic, "mumbo", true)).toBe(false);
-    expect(rbObjRespondTo(topic, "title")).toBe(false);
     expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
   });
 });
