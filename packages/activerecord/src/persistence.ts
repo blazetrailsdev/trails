@@ -13,6 +13,7 @@ import {
   rtest,
   union,
   zip,
+  eachPair,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 import type { CounterCacheCounters } from "./counter-cache.js";
@@ -318,7 +319,7 @@ export async function _insertRecord(
 
 export async function _updateRecord(
   this: PersistenceHost,
-  values: Hash<string, unknown>,
+  values: Map<string, unknown>,
   constraints: Record<string, unknown>,
 ): Promise<number> {
   const klass = this as unknown as typeof Base;
@@ -623,7 +624,7 @@ interface UpdateColumnsRecord {
   constructor: {
     attributeAliases: Record<string, string>;
     _updateRecord(
-      values: Hash<string, unknown>,
+      values: Map<string, unknown>,
       constraints: Record<string, unknown>,
     ): Promise<number>;
   };
@@ -639,7 +640,7 @@ export async function updateColumn<T extends UpdateColumnsRecord>(
 
 export async function updateColumns<T extends UpdateColumnsRecord>(
   this: T,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): Promise<boolean> {
   if (this.isNewRecord()) throw new ActiveRecordError("cannot update a new record");
   if (this.isDestroyed()) throw new ActiveRecordError("cannot update a destroyed record");
@@ -654,12 +655,13 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
 
   const updateConstraints = this._queryConstraintsHash();
   const h = new Hash<string, unknown>();
-  for (const [k, v] of Object.entries(attributes)) {
+  eachPair(attributes, (k, v) => {
     h.set(k, this._attributes.writeCastValue(k, v));
     this.clearAttributeChange(k);
-  }
+  });
+  attributes = h;
 
-  const affectedRows = await this.constructor._updateRecord(h, updateConstraints);
+  const affectedRows = await this.constructor._updateRecord(attributes, updateConstraints);
 
   return affectedRows === 1;
 }

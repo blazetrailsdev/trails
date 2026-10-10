@@ -295,6 +295,10 @@ export function transformKeys<T extends AnyObject>(
   hash: T,
   block: (key: string) => string,
 ): Record<string, unknown>;
+export function transformKeys<V>(
+  hash: AnyObject | Map<string, V>,
+  block: (key: string) => string,
+): Record<string, unknown> | Map<string, V>;
 export function transformKeys(
   hash: AnyObject | Map<unknown, unknown>,
   block: ((key: string) => string) | ((key: unknown) => unknown),
