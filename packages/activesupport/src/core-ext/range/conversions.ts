@@ -1,9 +1,7 @@
-import { Temporal } from "@blazetrails/date";
-
 import { Range } from "@blazetrails/ruby-compat/range";
 import { rbFSend } from "@blazetrails/ruby-compat";
 import "../time/conversions.js";
-import { toFs as dateToFs } from "../date/conversions.js";
+import "../date/conversions.js";
 
 declare module "@blazetrails/ruby-compat/range" {
   interface Range<T> {
@@ -13,11 +11,8 @@ declare module "@blazetrails/ruby-compat/range" {
 }
 
 function toFsDb(value: unknown): string {
-  if (value instanceof Temporal.PlainDate) return dateToFs(value, "db");
-  // boundary: a JS `Date` a caller still holds is the instant this bridges
-  if (value instanceof Date) value = Temporal.Instant.fromEpochMilliseconds(value.getTime());
-  if (value instanceof Temporal.Instant) return rbFSend(value, "toFs", "db") as string;
-  return String(value);
+  if (typeof value === "number" || typeof value === "bigint") return String(value);
+  return rbFSend(value, "toFs", "db") as string;
 }
 
 export const RANGE_FORMATS: Record<string, (start: unknown, stop: unknown) => string | undefined> =

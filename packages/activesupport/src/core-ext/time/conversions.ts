@@ -1,6 +1,5 @@
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
-import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -90,19 +89,3 @@ RubyTime.prototype.toFs = function (this: RubyTime, format?: string): string {
 };
 RubyTime.prototype.toFormattedS = RubyTime.prototype.toFs;
 RubyTime.prototype.rfc3339 = RubyTime.prototype.xmlschema;
-
-(TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).toFs = (
-  self: Temporal.Instant,
-  format?: string,
-): string => {
-  const utc = self.toZonedDateTimeISO("UTC");
-  return RubyTime.utc(
-    utc.year,
-    utc.month,
-    utc.day,
-    utc.hour,
-    utc.minute,
-    utc.second,
-    utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
-  ).toFs(format);
-};

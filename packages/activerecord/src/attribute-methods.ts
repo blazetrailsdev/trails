@@ -566,11 +566,7 @@ export function formatForInspect(
     let inspectedValue: string;
     if (typeof value === "string" && value.length > 50) {
       inspectedValue = inspect(`${value.slice(0, 50)}...`);
-    } else if (
-      value instanceof Temporal.PlainDate ||
-      value instanceof RubyTime ||
-      value instanceof Temporal.Instant
-    ) {
+    } else if (value instanceof Temporal.PlainDate || value instanceof RubyTime) {
       inspectedValue = `"${rbFSend(value, "toFs", "inspect")}"`;
     } else {
       inspectedValue = inspect(value);
