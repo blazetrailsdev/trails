@@ -1,15 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 function col(
   name: string,
   type: string,
   options: { defaultFunction?: string; generatedType?: "stored" | "virtual" } = {},
 ): Column {
-  return new Column(name, null, { sqlType: type, type }, true, options.defaultFunction ?? null, {
-    generatedType: options.generatedType ?? null,
-  });
+  return new Column(
+    name,
+    null,
+    new SqlTypeMetadata({ sqlType: type, type }),
+    true,
+    options.defaultFunction ?? null,
+    { generatedType: options.generatedType ?? null },
+  );
 }
 
 const dumper = SchemaDumper.create({

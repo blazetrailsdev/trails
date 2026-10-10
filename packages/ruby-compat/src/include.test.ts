@@ -1680,3 +1680,86 @@ describe("include — a module's own `included` shadows the one it was extended 
     expect(calls).toEqual(["appendFeatures", "own included", "appendFeatures", "own included"]);
   });
 });
+
+describe("Module#prependFeatures", () => {
+  it("splices the module above the class's own method, which superMethod resumes at", () => {
+    class Klass {
+      greet(name: string): string {
+        return `class ${name}`;
+      }
+      other(): string {
+        return "other";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object, name: string) {
+        return `module > ${mod.superMethod(this, "greet")!(name)}`;
+      });
+    });
+    prepend(Klass, mod);
+
+    expect(new Klass().greet("a")).toBe("module > class a");
+    expect(new Klass().other()).toBe("other");
+    expect(Object.prototype.hasOwnProperty.call(Klass.prototype, "greet")).toBe(false);
+  });
+
+  it("puts a later prepend above an earlier one, and a later include beneath the class", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const first: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `first > ${first.superMethod(this, "greet")!()}`;
+      });
+    });
+    const second: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `second > ${second.superMethod(this, "greet")!()}`;
+      });
+    });
+    const beneath: Module = new Module((m) => {
+      m.defineMethod("greet", () => "included");
+    });
+    prepend(Klass, first);
+    prepend(Klass, second);
+    include(Klass, beneath);
+
+    expect(new Klass().greet()).toBe("second > first > class");
+  });
+
+  it("answers no super method where neither the class nor an ancestor defines one", () => {
+    class Klass {}
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet");
+      });
+    });
+    prepend(Klass, mod);
+
+    expect((new Klass() as unknown as DynMethods).greet()).toBeUndefined();
+  });
+
+  it("keeps a subclass constructor chain when prepended onto a class's singleton", () => {
+    class Parent {
+      static build(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {
+      static build(): string {
+        return "child";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("build", function (this: object) {
+        return `module > ${mod.superMethod(this, "build")!()}`;
+      });
+    });
+    prepend({ prototype: Child } as never, mod);
+
+    expect(Child.build()).toBe("module > child");
+    expect(new Child()).toBeInstanceOf(Parent);
+  });
+});

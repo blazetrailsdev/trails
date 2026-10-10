@@ -13,6 +13,7 @@ import {
   Thread,
   ThreadPoolExecutor,
 } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { NoMethodError } from "@blazetrails/activemodel";
 import {
@@ -20,13 +21,7 @@ import {
   globalThreadPoolAsyncQueryExecutor,
   lazilyLoadSchemaCache,
 } from "../../active-record.js";
-import {
-  Executor,
-  include,
-  prepend,
-  initializeIncludedModules,
-  type Included,
-} from "@blazetrails/activesupport";
+import { Executor, initializeIncludedModules } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
 import type { HashConfig } from "../../database-configurations/hash-config.js";
@@ -780,15 +775,9 @@ export class ConnectionPool implements ReapablePool {
 
 rbDefineInspectCustom(ConnectionPool);
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface ConnectionPool
-  extends
-    Omit<Included<ConnectionPoolConfiguration>, "_pinnedConnection" | "checkoutAndVerify">,
-    Pick<ConnectionPoolConfiguration, "queryCache" | "queryCacheEnabled" | "dirtiesQueryCache"> {}
-include(ConnectionPool, ConnectionPoolConfiguration);
-prepend(ConnectionPool.prototype, {
-  checkoutAndVerify: ConnectionPoolConfiguration.prototype.checkoutAndVerify,
-});
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging, @typescript-eslint/no-empty-object-type -- see the class above.
+export interface ConnectionPool extends ConnectionPoolConfiguration {}
+prepend(ConnectionPool, ConnectionPoolConfiguration);
 ConnectionAdapters.ConnectionPool = ConnectionPool;
 
 // @internal

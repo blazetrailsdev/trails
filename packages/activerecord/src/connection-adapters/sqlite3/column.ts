@@ -1,6 +1,6 @@
 import { Column as BaseColumn } from "../column.js";
 import type { ColumnCoder } from "../column.js";
-import { SqlTypeMetadata } from "../sql-type-metadata.js";
+import type { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { rbHash, registerConstant } from "@blazetrails/ruby-compat";
 
 export class Column extends BaseColumn {
@@ -11,13 +11,7 @@ export class Column extends BaseColumn {
   constructor(
     name: string,
     defaultValue: string | Uint8Array | null,
-    sqlTypeMetadata: {
-      sqlType?: string | null;
-      type?: string;
-      precision?: number | null;
-      limit?: number | null;
-      scale?: number | null;
-    } = {},
+    sqlTypeMetadata: SqlTypeMetadata | null = null,
     null_: boolean = true,
     defaultFunction: string | null = null,
     options: {
@@ -27,14 +21,7 @@ export class Column extends BaseColumn {
       generatedType?: "stored" | "virtual" | null;
     } = {},
   ) {
-    const meta = new SqlTypeMetadata({
-      sqlType: sqlTypeMetadata.sqlType ?? undefined,
-      type: sqlTypeMetadata.type,
-      precision: sqlTypeMetadata.precision ?? undefined,
-      limit: sqlTypeMetadata.limit ?? undefined,
-      scale: sqlTypeMetadata.scale ?? undefined,
-    });
-    super(name, defaultValue, meta, null_, defaultFunction, { collation: options.collation });
+    super(name, defaultValue, sqlTypeMetadata, null_, defaultFunction, options);
     this._autoIncrement = options.autoIncrement ?? false;
     this.rowid = options.rowid ?? false;
     this._generatedType = options.generatedType ?? null;
