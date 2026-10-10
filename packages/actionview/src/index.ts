@@ -46,19 +46,12 @@ export {
   viewContextClass,
 } from "./rendering.js";
 
-export {
-  ClassMethods as ViewPathsClassMethods,
+export type {
   _prefixes,
   lookupContext,
   detailsForLookup,
   templateExists,
   isAnyTemplates,
-  prependViewPath as viewPathsPrependViewPath,
-  viewPaths as viewPathsViewPaths,
-  formats as viewPathsFormats,
-  setFormats as viewPathsSetFormats,
-  locale as viewPathsLocale,
-  setLocale as viewPathsSetLocale,
 } from "./view-paths.js";
 export { ViewPaths } from "./view-paths.js";
 export type { ViewPathsClass, ViewPathsInput } from "./view-paths.js";

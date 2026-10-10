@@ -1,6 +1,5 @@
 import {
   SafeBuffer,
-  extend,
   include,
   type Included,
   type Rescuable,
@@ -77,29 +76,21 @@ import type {
 } from "../abstract-controller/callbacks.js";
 import {
   Layouts,
-  LookupContext,
-  ViewPathsClassMethods,
+  type LookupContext,
+  type _prefixes,
+  type detailsForLookup,
+  type isAnyTemplates,
+  type templateExists,
   type _defaultLayout,
   type _impliedLayoutName,
   type _isConditionalLayout,
   type _isIncludeLayout,
   type _layoutForOption,
   type _normalizeLayout,
-  _prefixes,
   type _processRenderTemplateOptions,
   type _writeLayoutMethod,
   type isActionHasLayout,
   type layout,
-  detailsForLookup,
-  isAnyTemplates,
-  lookupContext,
-  templateExists,
-  viewPathsPrependViewPath,
-  viewPathsFormats,
-  viewPathsLocale,
-  viewPathsSetFormats,
-  viewPathsSetLocale,
-  viewPathsViewPaths,
 } from "@blazetrails/actionview";
 import {
   Base as ActionViewBase,
@@ -490,40 +481,18 @@ export class Base extends Metal {
   }
 
   /** @internal */
-  _prefixes = _prefixes;
-
+  declare _prefixes: typeof _prefixes;
   /** @internal */
-  _lookupContext?: LookupContext;
-
-  get lookupContext(): LookupContext {
-    return lookupContext.call(this as never);
-  }
-
-  detailsForLookup = detailsForLookup;
-
-  get viewPaths(): PathSet {
-    return viewPathsViewPaths.call(this as never);
-  }
-
-  get formats(): ReadonlyArray<string | symbol> {
-    return viewPathsFormats.call(this as never);
-  }
-  set formats(values: ReadonlyArray<string | symbol> | null) {
-    viewPathsSetFormats.call(this as never, values);
-  }
-
-  get locale(): string | null {
-    return viewPathsLocale.call(this as never);
-  }
-  set locale(value: string | null) {
-    viewPathsSetLocale.call(this as never, value);
-  }
-
-  templateExists = templateExists;
-
-  prependViewPath: (path: ViewPathsInput) => void = viewPathsPrependViewPath;
-
-  isAnyTemplates = isAnyTemplates;
+  declare _lookupContext?: LookupContext;
+  declare readonly lookupContext: LookupContext;
+  declare detailsForLookup: typeof detailsForLookup;
+  declare readonly viewPaths: PathSet;
+  declare formats: ReadonlyArray<string | symbol>;
+  declare locale: string | null;
+  declare templateExists: typeof templateExists;
+  declare appendViewPath: (path: ViewPathsInput) => void;
+  declare prependViewPath: (path: ViewPathsInput) => void;
+  declare isAnyTemplates: typeof isAnyTemplates;
 
   declare defaultRender: typeof defaultRender;
 
@@ -733,7 +702,6 @@ include(Base, Helpers);
 include(Base, UrlFor);
 include(Base, Redirecting);
 include(Base, Layouts);
-extend(Base, ViewPathsClassMethods);
 include(Base, Rendering);
 include(Base, Renderers.All);
 include(Base, ConditionalGet);
@@ -742,7 +710,7 @@ include(Base, EtagWithFlash);
 include(Base, Caching);
 include(Base, ImplicitRender);
 include(Base, StrongParametersModule);
-extend(Base, ParameterEncoding.ClassMethods);
+include(Base, ParameterEncoding);
 include(Base, Cookies);
 include(Base, Flash);
 include(Base, FormBuilder);
