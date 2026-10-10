@@ -139,6 +139,7 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
 }
 
 export class Associations {
+  /** @noRailsEquivalent CONVERGEABLE activerecord-prepended-super-first-parameters-onto-super-method */
   static [included](base: object): void {
     include(base as new () => object, SuperMethods);
   }
