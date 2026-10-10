@@ -52,6 +52,22 @@ import type {
   urlFrom,
   RedirectToOptions,
 } from "./metal/redirecting.js";
+import {
+  Callbacks,
+  type ActionCallbackHost,
+  type beforeAction,
+  type prependBeforeAction,
+  type skipBeforeAction,
+  type appendBeforeAction,
+  type afterAction,
+  type prependAfterAction,
+  type skipAfterAction,
+  type appendAfterAction,
+  type aroundAction,
+  type prependAroundAction,
+  type skipAroundAction,
+  type appendAroundAction,
+} from "../abstract-controller/callbacks.js";
 import { Rescue, type isShowDetailedExceptions } from "./metal/rescue.js";
 import { ImplicitRender, type defaultRender } from "./metal/implicit-render.js";
 import type {
@@ -361,6 +377,23 @@ export class Base extends Metal {
 
   declare readonly flash: FlashHash;
   declare static addFlashTypes: typeof addFlashTypes;
+
+  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
+  declare static setCallback: ActionCallbackHost["setCallback"];
+  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static raiseOnMissingCallbackActions: boolean;
+  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
+  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
+  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
+  declare static appendBeforeAction: OmitThisParameter<typeof appendBeforeAction>;
+  declare static afterAction: OmitThisParameter<typeof afterAction>;
+  declare static prependAfterAction: OmitThisParameter<typeof prependAfterAction>;
+  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
+  declare static appendAfterAction: OmitThisParameter<typeof appendAfterAction>;
+  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
+  declare static prependAroundAction: OmitThisParameter<typeof prependAroundAction>;
+  declare static skipAroundAction: OmitThisParameter<typeof skipAroundAction>;
+  declare static appendAroundAction: OmitThisParameter<typeof appendAroundAction>;
 
   declare static _viewPaths: {
     (): PathSet;
@@ -725,6 +758,7 @@ include(Base, HttpAuthentication.Digest.ControllerMethods);
 include(Base, HttpAuthentication.Token.ControllerMethods);
 include(Base, DefaultHeaders);
 include(Base, Logging);
+include(Base, Callbacks);
 include(Base, Rescue);
 include(Base, Instrumentation);
 include(Base, ParamsWrapper);

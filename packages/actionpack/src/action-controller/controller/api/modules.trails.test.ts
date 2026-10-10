@@ -2,6 +2,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { SharedTestRoutes } from "../../../test-helpers/abstract-unit.js";
 import { API } from "../../api.js";
+import { Base } from "../../base.js";
 import { TestCase } from "../../test-case.js";
 
 class ModulesApiController extends API {
@@ -67,4 +68,63 @@ describe("ActionController::API MODULES", () => {
     expect(controller._urlOptions).toBeNull();
     expect(controller.viewRuntime).toBeNull();
   });
+});
+
+describe("AbstractController::Callbacks#process_action", () => {
+  const calls: string[] = [];
+
+  class CallbacksApiController extends API {
+    static {
+      this.aroundAction(async (_controller, action) => {
+        calls.push("before");
+        await action();
+        calls.push("after");
+      });
+    }
+
+    index() {
+      calls.push("index");
+      this.head("ok");
+    }
+  }
+
+  class CallbacksBaseController extends Base {
+    static {
+      this.aroundAction(async (_controller, action) => {
+        calls.push("before");
+        await action();
+        calls.push("after");
+      });
+    }
+
+    index() {
+      calls.push("index");
+      this.head("ok");
+    }
+  }
+
+  for (const controllerClass of [CallbacksApiController, CallbacksBaseController]) {
+    it(`runs the callbacks once around send_action for ${controllerClass.name}`, async ({
+      task,
+    }) => {
+      class CallbacksTest extends TestCase {
+        static {
+          this.tests(controllerClass);
+        }
+
+        override setup(): void {
+          super.setup();
+          this.routes = SharedTestRoutes;
+        }
+      }
+      const tc = new CallbacksTest(task.name);
+      await tc.beforeSetup();
+      tc.setup();
+      calls.length = 0;
+
+      await tc.get("index");
+
+      expect(calls).toEqual(["before", "index", "after"]);
+    });
+  }
 });

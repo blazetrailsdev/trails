@@ -16,7 +16,7 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
     upToDate = true;
     originalConfigurations = Base.configurations();
     Base.configurations({
-      [DatabaseTasks.env]: {
+      [DatabaseTasks.env.toString()]: {
         primary: { adapter: "sqlite3", database: ":memory:" },
       },
     });

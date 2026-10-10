@@ -95,7 +95,8 @@ describe("add_flash_types readers", () => {
       addFlashTypes(...types: string[]): void;
       actionMethods(): string[];
     };
-    expect(Object.hasOwn(klass, "addFlashTypes")).toBe(true);
+    expect("addFlashTypes" in klass).toBe(true);
+    expect("addFlashTypes" in Metal).toBe(false);
     expect(klass.actionMethods()).toContain("show");
     expect(klass.actionMethods()).not.toContain("alert");
     klass.addFlashTypes("warning");

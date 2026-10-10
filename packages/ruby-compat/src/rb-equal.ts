@@ -50,6 +50,13 @@ export function rbEql(a: unknown, b: unknown): boolean {
 function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
   if (a === b) return true;
   if (a == null || b == null) return false;
+  if (a instanceof String || b instanceof String) {
+    return equalOrEql(
+      a instanceof String ? a.valueOf() : a,
+      b instanceof String ? b.valueOf() : b,
+      eql,
+    );
+  }
   if (typeof a === "string" && b instanceof Uint8Array) {
     return a.length === b.length && b.every((byte, i) => byte < 0x80 && byte === a.charCodeAt(i));
   }

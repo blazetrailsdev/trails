@@ -75,7 +75,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     "raises an error when called with protected environment",
     async () => {
       const protectedEnvironments = Base.protectedEnvironments;
-      const currentEnv = DatabaseTasks.env;
+      const currentEnv = DatabaseTasks.env.toString();
       const env = "arunit";
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
       const dbFile = path.join(tmp, "primary.sqlite3");
@@ -1167,7 +1167,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       },
     );
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { adapter: "sqlite3", database: dbFile },
+      [DatabaseTasks.env.toString()]: { adapter: "sqlite3", database: dbFile },
     });
     const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
     try {
@@ -1592,7 +1592,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
   it.skipIf(adapterType !== "sqlite")(
     "reuses the ambient pool for a relative sqlite path",
     async () => {
-      const config = new HashConfig(DatabaseTasks.env, "primary", {
+      const config = new HashConfig(DatabaseTasks.env.toString(), "primary", {
         adapter: "sqlite3",
         database: "db/relative.sqlite3",
         pool: 1,
@@ -1610,7 +1610,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
   );
 
   it.skipIf(adapterType !== "sqlite")("replaces the ambient pool when clobber", async () => {
-    const config = new HashConfig(DatabaseTasks.env, "primary", {
+    const config = new HashConfig(DatabaseTasks.env.toString(), "primary", {
       adapter: "sqlite3",
       database: "db/clobber.sqlite3",
       pool: 1,
@@ -1629,7 +1629,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
   });
 
   it.skipIf(adapterType !== "sqlite")("createAll restores the original pool", async () => {
-    const config = new HashConfig(DatabaseTasks.env, "primary", {
+    const config = new HashConfig(DatabaseTasks.env.toString(), "primary", {
       adapter: "sqlite3",
       database: "db/ambient.sqlite3",
       pool: 1,
@@ -1639,7 +1639,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
     const previousConfiguration = DatabaseTasks.databaseConfiguration;
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: { adapter: "sqlite3", database: "db/other.sqlite3" },
+      [DatabaseTasks.env.toString()]: { adapter: "sqlite3", database: "db/other.sqlite3" },
     });
     try {
       await DatabaseTasks.createAll();

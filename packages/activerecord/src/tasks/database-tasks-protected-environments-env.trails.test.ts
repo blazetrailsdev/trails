@@ -65,7 +65,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "compares the stored environment against the global default environment",
     async () => {
-      await stampedConfig(DatabaseTasks.env);
+      await stampedConfig(DatabaseTasks.env.toString());
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
   );
@@ -73,7 +73,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "reports the global default environment as current on a mismatch",
     async () => {
-      const current = DatabaseTasks.env;
+      const current = DatabaseTasks.env.toString();
       expect(current).not.toBe(env);
       await stampedConfig("otherenv");
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang(env).catch(
@@ -185,7 +185,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   });
 
   it.skipIf(skipUnlessFileSqlite)("passes when environments match", async () => {
-    const config = await seededConfig({ storedEnv: DatabaseTasks.env });
+    const config = await seededConfig({ storedEnv: DatabaseTasks.env.toString() });
     await expect(checkCurrentProtectedEnvironmentBang(config)).resolves.toBeUndefined();
   });
 
@@ -210,7 +210,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   );
 
   it.skipIf(skipUnlessFileSqlite)("passes for an unprotected stored environment", async () => {
-    const current = DatabaseTasks.env;
+    const current = DatabaseTasks.env.toString();
     const config = await seededConfig({ storedEnv: current });
     const protectedEnvironments = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
@@ -299,5 +299,30 @@ describe("PendingMigrationError message", () => {
     expect(new PendingMigrationError({ pendingMigrations }).message).toBe(
       `${command} TRAILS_ENV=production${tail}`,
     );
+  });
+});
+
+describe("DatabaseTasks.env", () => {
+  const trails = TopLevel.Trails;
+  const env = DatabaseTasks.env;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+    DatabaseTasks.env = env;
+  });
+
+  it("memoizes Trails.env itself and finds its configs through it", () => {
+    const inquirer = new EnvironmentInquirer("staging");
+    TopLevel.Trails = { env: inquirer } as unknown as typeof TopLevel.Trails;
+    DatabaseTasks.env = null;
+
+    expect(DatabaseTasks.env).toBe(inquirer);
+
+    const configurations = new DatabaseConfigurations({
+      staging: { adapter: "sqlite3", database: "db/staging.sqlite3" },
+      test: { adapter: "sqlite3", database: "db/test.sqlite3" },
+    });
+    const configs = configurations.configsFor({ envName: DatabaseTasks.env });
+    expect(configs.map((dbConfig) => dbConfig.envName)).toEqual(["staging"]);
   });
 });
