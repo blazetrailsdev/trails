@@ -3,6 +3,7 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { fixtures } from "./test-fixtures.js";
 import { Base } from "./base.js";
 import { captureSqlAndBinds } from "./test-helpers/test-case.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
 
 describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () => {
   fixtures({});
@@ -38,6 +39,15 @@ describe("primary_key on a key-less table after a reconnect (trails-only)", () =
 
     await KeylessEdge.establishConnection({ ...Base.connectionDbConfig().configurationHash });
     try {
+      if (inMemoryDb()) {
+        await KeylessEdge.withConnection((c) =>
+          c.createTable("edges", { force: true, id: false }, (t) => {
+            t.column("source_id", "integer", { null: false });
+            t.column("sink_id", "integer", { null: false });
+            t.index(["source_id", "sink_id"], { unique: true, name: "unique_edge_index" });
+          }),
+        );
+      }
       await KeylessEdge.loadSchema();
       expect(KeylessEdge.primaryKey).toBeNull();
 
