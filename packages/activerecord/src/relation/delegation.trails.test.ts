@@ -52,9 +52,9 @@ describe("generated relation methods — per-model prototype carrier", () => {
 
   it("reports the base Relation class name (per-model carrier stays anonymous)", () => {
     const carrier = relationClassFor.call(Relation, Post as never);
-    expect(carrier.name).toBe("Relation");
+    expect(carrier.name).toBe("ActiveRecord::Relation");
     expect((Post.limit(2) as unknown as { constructor: { name: string } }).constructor.name).toBe(
-      "Relation",
+      "ActiveRecord::Relation",
     );
   });
 
@@ -122,12 +122,14 @@ describe("generated relation methods — remaining delegate-class carriers", () 
 
   it("each carrier reports its base delegate class name (per-model subclass stays anonymous)", () => {
     expect(relationClassFor.call(AssociationRelation, Post as never).name).toBe(
-      "AssociationRelation",
+      "ActiveRecord::AssociationRelation",
     );
     expect(relationClassFor.call(DisableJoinsAssociationRelation, Post as never).name).toBe(
-      "DisableJoinsAssociationRelation",
+      "ActiveRecord::DisableJoinsAssociationRelation",
     );
-    expect(relationClassFor.call(CollectionProxy, Post as never).name).toBe("CollectionProxy");
+    expect(relationClassFor.call(CollectionProxy, Post as never).name).toBe(
+      "ActiveRecord::Associations::CollectionProxy",
+    );
   });
 
   it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
