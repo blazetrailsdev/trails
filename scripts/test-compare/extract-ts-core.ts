@@ -111,11 +111,6 @@ export function collectLibTests(content: string, file: string, namespace: string
   return tests;
 }
 
-/**
- * A receiver-form `x.expect(...)` call, the twin of the Ruby extractor's
- * `receiver_call_assertion?`, which records `mock.expect` (Minitest::Mock) and
- * so every other receiver-form `expect`, `Parameters#expect` included.
- */
 function isReceiverExpect(call: ts.CallExpression): boolean {
   return (
     ts.isPropertyAccessExpression(call.expression) &&
