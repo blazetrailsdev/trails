@@ -8,10 +8,13 @@ import { Notifications, type NotificationEvent } from "@blazetrails/activesuppor
 import * as Types from "@blazetrails/activemodel";
 import { Attribute } from "@blazetrails/activemodel";
 import {
+  QueryCache,
   Store,
   selectAll,
   type QueryCacheHost,
 } from "./connection-adapters/abstract/query-cache.js";
+import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
+import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { FutureResult, type FutureResultPool } from "./future-result.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
@@ -223,5 +226,39 @@ describe("select_all async arm on a cache miss (trails)", () => {
     const result = selectAll.call(host, () => future, "SELECT 1", null, [], { async: true });
 
     expect(result).toBe(future);
+  });
+});
+
+describe("QueryCache.included wires the including adapter class", () => {
+  it("wraps the dirtying methods on the class itself", () => {
+    const proto = AbstractAdapter.prototype as unknown as Record<string, unknown>;
+    const statements = DatabaseStatements as unknown as Record<string, unknown>;
+    for (const name of [
+      "execQuery",
+      "execute",
+      "create",
+      "insert",
+      "update",
+      "delete",
+      "truncate",
+      "truncateTables",
+      "rollbackToSavepoint",
+      "rollbackDbTransaction",
+      "restartDbTransaction",
+      "execInsertAll",
+    ]) {
+      expect(Object.hasOwn(proto, name), name).toBe(true);
+      expect(proto[name], name).toBeTypeOf("function");
+      expect(proto[name], name).not.toBe(statements[name]);
+    }
+  });
+
+  it("unsets the query cache after checkin", () => {
+    const callbacks = (
+      AbstractAdapter as unknown as {
+        _connectionCallbacks: { checkin: { kind: string; method: unknown }[] };
+      }
+    )._connectionCallbacks.checkin;
+    expect(callbacks[0]).toEqual({ kind: "after", method: QueryCache.unsetQueryCacheBang });
   });
 });

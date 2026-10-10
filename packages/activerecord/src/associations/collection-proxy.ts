@@ -115,7 +115,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   get target(): T[] {
-    return this._target;
+    return this._association.target as T[];
   }
 
   /** @internal */

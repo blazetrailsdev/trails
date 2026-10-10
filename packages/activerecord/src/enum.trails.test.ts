@@ -521,3 +521,34 @@ describe("EnumType reads its mapping at call time", () => {
     expect(() => type.assertValidValue(2)).toThrow(ArgumentError);
   });
 });
+
+describe("Enum.extended and Enum#inherited carry defined_enums", () => {
+  fixtures(["books"]);
+
+  it("gives Base an empty defined_enums", () => {
+    expect(Base.definedEnums).toEqual({});
+  });
+
+  it("hands a subclass a deep copy of its parent's defined_enums at its first enum", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.enum("difficulty", { easy: 0, medium: 1 });
+      }
+    }
+
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).toEqual(["status", "difficulty"]);
+    expect(Child.definedEnums.status).toEqual(Parent.definedEnums.status);
+    expect(Child.definedEnums.status).not.toBe(Parent.definedEnums.status);
+    expect(Base.definedEnums).toEqual({});
+    expect((new Child() as unknown as { definedEnums: object }).definedEnums).toBe(
+      Child.definedEnums,
+    );
+  });
+});

@@ -373,3 +373,14 @@ describe("Enumerable members answered over the loaded records", () => {
     expect(await rel.toSet()).toBeInstanceOf(Set);
   });
 });
+
+describe("DelegateCache#inherited is deferred to a subclass's first relation_delegate_class read", () => {
+  it("gives a subclass delegate classes of its own", () => {
+    class SubPost extends Post {}
+
+    const delegate = relationClassFor.call(Relation, SubPost as never);
+    expect(delegate).not.toBe(relationClassFor.call(Relation, Post as never));
+    expect(relationClassFor.call(Relation, SubPost as never)).toBe(delegate);
+    expect(Object.getPrototypeOf(delegate)).toBe(Relation);
+  });
+});

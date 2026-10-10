@@ -529,10 +529,10 @@ export const ClassMethods = {
         } else {
           config.shell!.error(e.message);
         }
-        if (this.isExitOnFailure()) exit(1);
+        if (this.isExitOnFailure()) exit(false);
         return null;
       } else if (e instanceof Errno.EPIPE) {
-        return exit(0);
+        return exit(true);
       }
       throw e;
     }

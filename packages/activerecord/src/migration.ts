@@ -1752,7 +1752,7 @@ export class Migrator {
   /** @internal */
   async runWithoutLock(): Promise<string | number | undefined> {
     await this._ensureSchemaTable();
-    const migration = this._migrations.find((m) => m.version === this._targetVersion);
+    const migration = this.migrations.find((m) => m.version === this._targetVersion);
     if (!migration) throw new UnknownMigrationVersionError(this._targetVersion ?? "");
     await this.recordEnvironment();
     return this.executeMigrationInTransaction(migration);
@@ -1839,23 +1839,19 @@ export class Migrator {
 
   /** @internal */
   private target(): MigrationProxy | undefined {
-    if (this._targetVersion === null) return undefined;
     return this.migrations.find((m) => m.version === this._targetVersion);
   }
 
   /** @internal */
   private finish(): number {
-    const migrations = this.migrations;
-    const target = this.target();
-    const index = target ? migrations.findIndex((m) => m.version === target.version) : -1;
-    return index === -1 ? migrations.length - 1 : index;
+    const index = this.migrations.indexOf(this.target()!);
+    return index === -1 ? this.migrations.length - 1 : index;
   }
 
   /** @internal */
   private async start(): Promise<number> {
     if (this.isUp()) return 0;
-    const current = await this.current();
-    const index = current ? this.migrations.findIndex((m) => m.version === current.version) : -1;
+    const index = this.migrations.indexOf((await this.current())!);
     return index === -1 ? 0 : index;
   }
 

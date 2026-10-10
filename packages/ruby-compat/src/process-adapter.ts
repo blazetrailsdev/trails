@@ -355,8 +355,9 @@ export function chdir(dir: string): void {
 }
 
 /** @noRailsEquivalent PERMANENT */
-export function exit(code?: number): never {
-  return requireAdapter().exit(code);
+export function exit(code?: number | boolean): never {
+  // `exit_status_code` (vendor/ruby/v3.3.11/process.c:4398-4418).
+  return requireAdapter().exit(typeof code === "boolean" ? (code ? 0 : 1) : code);
 }
 
 /** @noRailsEquivalent PERMANENT */
