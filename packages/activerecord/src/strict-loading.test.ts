@@ -131,9 +131,9 @@ describe("StrictLoadingTest", () => {
     const parts = await loadedShip.parts;
     expect(loadedShip.isStrictLoading()).toBeFalsy();
     expect(parts.every((p) => p.isStrictLoading())).toBeTruthy();
-    await expect((parts[0] as any).association("trinkets").loadTarget()).rejects.toThrow(
-      StrictLoadingViolationError,
-    );
+    await expect(async () =>
+      (parts[0] as any).association("trinkets").loadTarget(),
+    ).rejects.toThrow(StrictLoadingViolationError);
   });
 
   it("strict loading n plus one only mode does not eager load child associations", async () => {

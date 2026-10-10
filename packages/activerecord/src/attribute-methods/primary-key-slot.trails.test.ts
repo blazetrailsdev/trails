@@ -1,5 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
+import { includedModules } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
+import { AttributeMethods } from "../namespaces.js";
 import { adapterDouble, establishConnectionTo } from "../test-helpers/adapter-double.js";
 
 describe("per-instance @primary_key slot", () => {
@@ -93,5 +95,31 @@ describe("per-instance @primary_key slot", () => {
     Child.primaryKey = "id";
     expect(Child.compositePrimaryKey).toBe(false);
     expect(Parent.compositePrimaryKey).toBe(true);
+  });
+
+  it("primary_key= with an Array is the only thing that includes CompositePrimaryKey", () => {
+    class Scalar extends Base {
+      static override tableName = "toys";
+    }
+    Scalar.primaryKey = "toy_id";
+    class Parent extends Base {
+      static override tableName = "cpk_books";
+    }
+    Parent.primaryKey = ["author_id", "id"];
+    class Child extends Parent {}
+    Child.primaryKey = "id";
+
+    expect(includedModules(Base)).not.toContain(AttributeMethods.CompositePrimaryKey);
+    expect(includedModules(Scalar)).not.toContain(AttributeMethods.CompositePrimaryKey);
+    expect(includedModules(Parent)).toContain(AttributeMethods.CompositePrimaryKey);
+    expect(includedModules(Child)).toContain(AttributeMethods.CompositePrimaryKey);
+
+    const read = (name: string) => ({ author_id: 1, id: 2 })[name];
+    const parent = new Parent();
+    vi.spyOn(parent as never, "_readAttribute").mockImplementation(read as never);
+    expect(parent.id).toEqual([1, 2]);
+    const child = new Child();
+    vi.spyOn(child as never, "_readAttribute").mockImplementation(read as never);
+    expect(child.id).toBe(2);
   });
 });

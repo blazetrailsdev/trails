@@ -320,6 +320,8 @@ export function pgConnection<T extends object>(
       (client as { query?: unknown }).query = query(native as (...args: unknown[]) => unknown);
     }
     readyForQuery(client);
+    const on = (client as { on?: unknown }).on;
+    if (typeof on === "function") on.call(client, "error", () => {});
   }
   return Object.defineProperty(
     Object.assign(client, {

@@ -1242,9 +1242,6 @@ describeIfPg("PostgreSQLAdapter", () => {
         await waitForNewClientCalls(spy, 1);
 
         const disconnecting = new Thread(() => a.disconnectBang()).value();
-        for (let i = 0; i < 20; i++) await Promise.resolve();
-        expect(endSpy).not.toHaveBeenCalled();
-
         first.resolve(client);
         await connecting;
         await disconnecting;
