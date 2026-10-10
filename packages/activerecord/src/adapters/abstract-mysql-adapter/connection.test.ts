@@ -23,7 +23,7 @@ import {
   ConnectionNotEstablished,
 } from "../../errors.js";
 import mysql from "mysql2/promise";
-import type { Mysql2Result } from "../../connection-adapters/mysql2/mysql2-client.js";
+import type { Mysql2Result } from "../../mysql2/client.js";
 import { ConnectionUrlResolver } from "../../database-configurations/connection-url-resolver.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {

@@ -1,10 +1,10 @@
 import mysql from "mysql2/promise";
 import { rtest } from "@blazetrails/ruby-compat";
-import type { MysqlAdapterOptions } from "../pool-config.js";
+import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { quotedDate } from "../abstract/quoting.js";
-import { defaultTimezone } from "../../active-record.js";
+import { quotedDate } from "../connection-adapters/abstract/quoting.js";
+import { defaultTimezone } from "../active-record.js";
 
 interface QueryOptions {
   as?: "array";
@@ -91,6 +91,7 @@ export type Mysql2Client = Omit<mysql.Connection, "query" | "prepare"> & {
   readTimeout?: number | null;
   affectedRows: number;
   lastId?: number;
+  readonly warningCount: number;
   query(sql: string): Promise<Mysql2Result | null>;
   prepare(sql: string): Mysql2Statement;
   abandonResultsBang(): void;
@@ -119,6 +120,7 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
     );
   }
   client.affectedRows = result.affectedRows ?? 0;
+  WARNING_COUNT.set(client, result.warningStatus ?? 0);
   if (result.insertId !== undefined) client.lastId = result.insertId;
   return null;
 }
@@ -226,6 +228,18 @@ function bind(value: unknown): unknown {
 
 const QUERY_OPTIONS = new WeakSet<object>();
 
+const WARNING_COUNT = new WeakMap<object, number>();
+
+const warningCount: PropertyDescriptor = {
+  configurable: true,
+  get(this: object): number {
+    return WARNING_COUNT.get(this) ?? 0;
+  },
+};
+
+type EofPacket = { buffer: Buffer; offset: number; end: number; isEOF(): boolean };
+type PacketHandler = { handlePacket?: (packet?: EofPacket) => unknown };
+
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
 
 const automaticClose: PropertyDescriptor = {
@@ -245,7 +259,6 @@ const automaticClose: PropertyDescriptor = {
   },
 };
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
 export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   if (!QUERY_OPTIONS.has(client)) {
     QUERY_OPTIONS.add(client);
@@ -269,6 +282,17 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     })) {
       Object.defineProperty(client, name, { configurable: true, writable: true, value });
     }
+    const connection = (client as { connection?: PacketHandler }).connection;
+    const handlePacket = connection?.handlePacket;
+    if (typeof handlePacket === "function") {
+      connection!.handlePacket = function (packet) {
+        if (packet?.isEOF() && packet.end - packet.offset >= 5) {
+          WARNING_COUNT.set(client, packet.buffer.readUInt16LE(packet.offset + 1));
+        }
+        return handlePacket.call(this, packet);
+      };
+    }
+    Object.defineProperty(client, "warningCount", warningCount);
     const config = (client as { config?: { typeCast?: unknown } }).config;
     if (config) {
       const typeCast = config.typeCast;

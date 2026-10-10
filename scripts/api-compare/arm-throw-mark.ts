@@ -68,6 +68,7 @@ export const GATED_PACKAGES = [
   "did-you-mean",
   "globalid",
   "i18n",
+  "mysql2",
   "pg",
   "rack",
   "rack-session",

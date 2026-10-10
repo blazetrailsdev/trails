@@ -1,6 +1,6 @@
 import { it, expect, describe, vi } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { Mysql2, mysql2Client } from "./mysql2-client.js";
+import { Mysql2, mysql2Client } from "./client.js";
 
 describe("mysql2Client", () => {
   it("automatic_close = false unrefs and strips listeners, and never closes the socket", () => {

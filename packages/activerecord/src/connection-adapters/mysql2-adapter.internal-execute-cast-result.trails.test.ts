@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Result } from "../result.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
-import type { Mysql2Result } from "./mysql2/mysql2-client.js";
+import type { Mysql2Result } from "../mysql2/client.js";
 
 describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () => {
   afterEach(() => {

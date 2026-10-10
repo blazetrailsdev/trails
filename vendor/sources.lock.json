@@ -28,6 +28,10 @@
       "ref": "v1.8.0",
       "sha": "e4305b4b8a2506422bc78b6fab624907eb7e74a5"
     },
+    "mysql2": {
+      "ref": "0.5.6",
+      "sha": "43ea8af635f5e23f054294ef7759320d47f30e5f"
+    },
     "pg": {
       "ref": "v1.5.9",
       "sha": "afe2f208f7d5eacea1260ce1def10e1fb30b8241"

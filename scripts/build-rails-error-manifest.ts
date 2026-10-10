@@ -100,6 +100,7 @@ const BARE_RAISE_LIBS: Record<string, [source: string, lib: string, ns: string]>
   msgpack: ["msgpack", "lib", "msgpack/"],
   "rack-session": ["rack-session", "lib", "rack/session/"],
   "rack-test": ["rack-test", "lib", "rack/test/"],
+  mysql2: ["mysql2", "lib", "mysql2/"],
   pg: ["pg", "lib", "pg/"],
   sqlite3: ["sqlite3", "lib", "sqlite3/"],
   thor: ["thor", "lib", "thor/"],

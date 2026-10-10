@@ -31,12 +31,7 @@ import {
   performQuery as mysql2PerformQuery,
   selectAll as mysql2SelectAll,
 } from "./mysql2/database-statements.js";
-import {
-  Mysql2,
-  mysql2Client,
-  type Mysql2Client,
-  type Mysql2Result,
-} from "./mysql2/mysql2-client.js";
+import { Mysql2, mysql2Client, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
 import { defaultTimezone } from "../active-record.js";
 
 let mysql2TypeMap: TypeMap | null = null;

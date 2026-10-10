@@ -371,6 +371,7 @@ describe("vendor/sources.ts", () => {
         "globalid",
         "i18n",
         "msgpack",
+        "mysql2",
         "pg",
         "rack",
         "rack-session",

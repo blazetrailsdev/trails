@@ -288,6 +288,24 @@ export const SOURCES: readonly UpstreamSource[] = [
     ],
   },
   {
+    name: "mysql2",
+    origin: {
+      type: "git",
+      url: "https://github.com/brianmario/mysql2.git",
+      // vendor/rails/v8.0.2/Gemfile.lock:380 resolves mysql2 (0.5.6).
+      ref: "0.5.6",
+    },
+    packages: [
+      {
+        // The driver gem `Mysql2Adapter` calls into; its ports live in
+        // `packages/activerecord/src/mysql2/`.
+        name: "mysql2",
+        libPath: "lib/mysql2",
+        libEntryFile: "lib/mysql2.rb",
+      },
+    ],
+  },
+  {
     name: "pg",
     origin: {
       type: "git",
