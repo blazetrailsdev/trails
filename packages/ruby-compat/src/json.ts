@@ -73,9 +73,9 @@ export namespace JSON {
    * takes the source through `StringValue` and `convert_encoding`
    * (`vendor/ruby/v3.3.11/ext/json/parser/parser.rl:673-687,805`), which reads an
    * `ASCII-8BIT` source as UTF-8, so a source held as its bytes is decoded here.
-   * It also skips block and line comments (`ignore`, `parser.rl:105-108`).
    * A malformed source raises `SyntaxError`, JS's `JSON::ParserError`.
    *
+   * @inventedArm try — CONVERGEABLE json-parse-skips-comments-in-one-pass-and-takes-options
    * @noRailsEquivalent PERMANENT — Ruby stdlib `JSON.parse`
    * (`vendor/ruby/v3.3.11/ext/json/lib/json/common.rb:219`).
    */
