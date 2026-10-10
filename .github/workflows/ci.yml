@@ -473,6 +473,36 @@ jobs:
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
 
+      # Catches a run whose base moved under it and now conflicts — common here
+      # with agents landing PRs in parallel — plus a re-run of such a run. NOT a
+      # push to an already-conflicting branch: GitHub does not dispatch
+      # `pull_request` activity at all in that case, so there is no run to stop.
+      # Such a run's gates report on a merge with a base that no longer exists,
+      # so it is failed here and the cancel step below stops the expensive
+      # lanes. See the script's --help for why only `dirty` counts, why
+      # mergeability is read as of now, and why an unreadable answer passes.
+      #
+      # The self-test is a separate step from the check, unlike the sibling
+      # scanners above which run both in one. A failure here cancels the whole
+      # run, so the two have to be told apart: a red self-test is a bug in the
+      # script and says nothing about the PR, while a red check is a property
+      # of the PR. Folded together, the report step below can only name
+      # `merge-conflict` for either, and every PR would be cancelled with the
+      # reader unable to tell which happened.
+      - name: Merge conflicts (self-test)
+        id: merge-conflict-self-test
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: scripts/ci/check-merge-conflict.sh --self-test
+      - name: Merge conflicts
+        id: merge-conflict
+        # Skipped when the self-test went red: its verdict is worthless then,
+        # and `!cancelled()` alone would run it anyway.
+        if: >-
+          ${{ !cancelled() &&
+          steps.merge-conflict-self-test.outcome == 'success' &&
+          github.event_name == 'pull_request' }}
+        run: scripts/ci/check-merge-conflict.sh "$REPO" "$PR_NUMBER"
+
       # Prettier. Unconditional, exactly as the standalone job was: it runs on
       # push and PR (the events that carry a meaningful diff) and also on the
       # weekly `schedule` sweep / `workflow_dispatch`, where the `changes` job
