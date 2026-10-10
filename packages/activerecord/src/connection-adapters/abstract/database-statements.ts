@@ -385,6 +385,7 @@ export async function truncateTables(
   });
 }
 
+/** @inventedArm rbGetKwargs — PERMANENT */
 export async function transaction<T>(
   this: DatabaseStatementsHost,
   block: (tx?: unknown) => Promise<T> | T,

@@ -34,7 +34,8 @@ export function coreHashMergeKwd<H extends object, K extends object>(hash: H, kw
  * `**rest`: every key of `keywordHash` that `table` does not declare raises
  * `unknown_keyword_error` (`class.c:2373`), whose message is
  * `rb_keyword_error_new`'s (`class.c:2346`). An `undefined`-valued key is an
- * absent keyword.
+ * absent keyword. The `required` / `optional` counts, the `values` out-array
+ * and the found-keyword return value are not ported.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_get_kwargs` (`vendor/ruby/v3.3.11/class.c:2413`).
  */

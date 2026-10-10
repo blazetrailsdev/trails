@@ -9,6 +9,7 @@ export type ArelNode = Node | Attribute | SqlLiteral;
 
 export function sql(sqlString: string, options?: { retryable: boolean }): SqlLiteral;
 export function sql(sqlString: string, ...positionalBinds: unknown[]): SqlLiteral | BoundSqlLiteral;
+/** @inventedArm rbScanArgs — PERMANENT */
 export function sql(
   sqlString: string,
   ...positionalBinds: unknown[]
