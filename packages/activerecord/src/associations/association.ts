@@ -394,22 +394,20 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
       }
     }
 
-    const sc: Promise<StatementCache> = this.reflection.associationScopeCache(
-      this.klass,
-      this.owner,
-      (params: { bind(): unknown }) => {
+    return this.reflection
+      .associationScopeCache(this.klass, this.owner, (params: { bind(): unknown }) => {
         const as = AssociationScope.create(() => params.bind());
         return this.targetScope().mergeBang(as.scope(this as unknown as AssociationScopeable));
-      },
-    );
-
-    const binds = AssociationScope.getBindValues(this.owner, this.reflection.chain as never);
-    return this.klass.withConnection(async (c) =>
-      (await sc).execute(binds, c, { async }, (record) => {
-        this.setInverseInstance(record);
-        this.setStrictLoading(record);
-      }),
-    );
+      })
+      .then((sc: StatementCache) => {
+        const binds = AssociationScope.getBindValues(this.owner, this.reflection.chain as never);
+        return this.klass.withConnection((c) =>
+          sc.execute(binds, c, { async }, (record) => {
+            this.setInverseInstance(record);
+            this.setStrictLoading(record);
+          }),
+        );
+      });
   }
 
   /** @internal */

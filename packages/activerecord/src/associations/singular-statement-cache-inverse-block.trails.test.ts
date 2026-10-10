@@ -32,6 +32,38 @@ describe("Association#find_target statement-cache execute block", () => {
     expect(human!.strictLoadingMode()).toBe("n_plus_one_only");
   });
 
+  it("does not enter with_connection while association_scope_cache holds its own", async () => {
+    registerModel(Face);
+    registerModel(Human);
+    const face = await Face.find(faces("trusting").id);
+    const pool = (Human as unknown as typeof Base).connectionPool();
+    pool.releaseConnection();
+    const original = pool.checkout.bind(pool);
+    let pending = 0;
+    let overlapped = false;
+    const checkout = vi.spyOn(pool, "checkout").mockImplementation(async (...args) => {
+      if (pending > 0) overlapped = true;
+      pending += 1;
+      try {
+        return await original(...args);
+      } finally {
+        pending -= 1;
+      }
+    });
+
+    try {
+      await (
+        association(face, "human") as unknown as { loadTarget(): Promise<Base | null> }
+      ).loadTarget();
+
+      expect(checkout).toHaveBeenCalled();
+      expect(overlapped).toBe(false);
+      expect(association(face, "human").target).toBeInstanceOf(Human);
+    } finally {
+      checkout.mockRestore();
+    }
+  });
+
   it("passes async: through to StatementCache#execute", async () => {
     registerModel(Face);
     registerModel(Human);
