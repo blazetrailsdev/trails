@@ -232,6 +232,12 @@ clobbers what the class body already wrote.
   `core.trails.test.ts` covers a three-level hierarchy read leaf first.
 - **`Reflection`'s `@__reflections`** is a `WeakMap` keyed by the class
   (`reflection.ts`), which is per-class without a guard.
+- **`Enum.inherited`** (`enum.rb:289-292`) is a ninth, reached through
+  `extend Enum` rather than `Base`'s own chain. It gives a subclass a
+  `defined_enums.deep_dup`; `_enum` (`enum.ts`) makes that copy at the class's
+  first `enum`, while it still holds its superclass's hash. A subclass that
+  declares no enum reads its parent's hash, so it also sees an enum the parent
+  declares after it was defined, where Rails' snapshot would not.
 
 One thing Rails does at definition time has no counterpart: `Core`'s loop that
 re-initializes every ancestor's find-by cache up to the base class
