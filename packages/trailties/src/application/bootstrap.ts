@@ -1,4 +1,5 @@
 import { lookupStore } from "@blazetrails/activesupport/cache";
+import { silenceWarnings } from "@blazetrails/activesupport/core-ext/kernel/reporting";
 import {
   ActiveSupport,
   type Logger,
@@ -8,7 +9,7 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { LoadError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
@@ -35,12 +36,32 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
   if (level !== undefined) TopLevel.Trails!.logger.level = level;
 });
 
-Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
+Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async function () {
+  if (TopLevel.ActiveSupport!.MessagePack === undefined) {
+    try {
+      await silenceWarnings(() =>
+        TopLevel.ActiveSupport!.loadPath["active_support/message_pack"](),
+      );
+    } catch (error) {
+      if (!(error instanceof LoadError)) throw error;
+    }
+  }
   const cacheFormatVersion = this.config.activeSupport.cacheFormatVersion;
   delete this.config.activeSupport.cacheFormatVersion;
   if (cacheFormatVersion != null) ActiveSupport.setCacheFormatVersion(cacheFormatVersion);
 
   if (TopLevel.Trails!.cache == null) {
+    const cacheStore = this.config.cacheStore;
+    const serializer = Array.isArray(cacheStore)
+      ? (cacheStore.at(-1) as { serializer?: unknown } | null)?.serializer
+      : undefined;
+    if (
+      typeof serializer === "string" &&
+      serializer.includes("message_pack") &&
+      TopLevel.ActiveSupport!.MessagePack === undefined
+    ) {
+      await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
+    }
     TopLevel.Trails!.cache = lookupStore(this.config.cacheStore);
 
     if (rbObjRespondTo(TopLevel.Trails!.cache, "middleware")) {

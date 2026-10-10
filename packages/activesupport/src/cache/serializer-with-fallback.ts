@@ -140,7 +140,7 @@ const messagePackWithFallback: Serializer = {
     );
   },
 
-  /** @missingRailsCall require — CONVERGEABLE message-pack-load-awaited-at-boot-when-a-message-pack-serializer-is-configured */
+  /** @missingRailsCall require — PERMANENT */
   isAvailable(): boolean {
     return ActiveSupport.MessagePack !== undefined;
   },
@@ -181,7 +181,7 @@ export const SerializerWithFallback = {
 
   load: sharedLoad,
 
-  /** @missingRailsCall require — CONVERGEABLE message-pack-load-awaited-at-boot-when-a-message-pack-serializer-is-configured */
+  /** @missingRailsCall require — PERMANENT */
   get(format: string): Serializer & { load(dumped: unknown): unknown } {
     if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
       throw new LoadError("cannot load such file -- active_support/message_pack");
