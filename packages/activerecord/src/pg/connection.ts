@@ -69,6 +69,10 @@ export class Connection {
     return (pending as Promise<unknown>).catch(raise);
   }
 
+  connect(): Promise<unknown> {
+    return this.client.connect().catch(raise);
+  }
+
   status(): number {
     const { _ending, _ended } = this.client;
     return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;

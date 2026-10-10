@@ -65,7 +65,6 @@ import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
 import { pgConnection, type PGConnection } from "../pg/connection.js";
-import { pgError } from "../pg/exceptions.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -236,21 +235,23 @@ export class PostgreSQLAdapter
 
   static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
     const client = pgConnection(new pg.Client(connParams), connParams);
-    const { database, user, host } = client;
     try {
       await client.connect();
       return client;
     } catch (error) {
-      if (!(error instanceof Error)) throw error;
-      pgError(error);
-      if (database === "postgres") {
+      if (!(error instanceof PG.Error)) throw error;
+      if (connParams && connParams.database === "postgres") {
         throw new ConnectionNotEstablished(error.message);
-      } else if (database && error.message.includes(database)) {
-        throw NoDatabaseError.dbError(database);
-      } else if (user && error.message.includes(user)) {
-        throw DatabaseConnectionError.usernameError(user);
-      } else if (host && error.message.includes(host)) {
-        throw DatabaseConnectionError.hostnameError(host);
+      } else if (
+        connParams &&
+        rtest(connParams.database) &&
+        error.message.includes(connParams.database)
+      ) {
+        throw NoDatabaseError.dbError(connParams.database);
+      } else if (connParams && rtest(connParams.user) && error.message.includes(connParams.user)) {
+        throw DatabaseConnectionError.usernameError(connParams.user);
+      } else if (connParams && rtest(connParams.host) && error.message.includes(connParams.host)) {
+        throw DatabaseConnectionError.hostnameError(connParams.host);
       } else {
         throw new ConnectionNotEstablished(error.message);
       }
@@ -554,8 +555,22 @@ export class PostgreSQLAdapter
     }
     if (typeof config === "string") {
       this._minMessages = "warning";
+      let connParams: pg.ClientConfig = {};
+      try {
+        const url = new URL(config);
+        connParams = {
+          database:
+            url.searchParams.get("dbname") ??
+            (decodeURIComponent(url.pathname.slice(1)) || undefined),
+          user: url.searchParams.get("user") ?? (decodeURIComponent(url.username) || undefined),
+          host:
+            url.searchParams.get("host") ??
+            (decodeURIComponent(url.hostname).replace(/^\[|\]$/g, "") || undefined),
+        };
+      } catch {}
       this._connectionParameters = {
         connectionString: config,
+        ...connParams,
         types: {
           getTypeParser: (oid: number, format?: string) => pgTypeParser(oid, format),
         },
@@ -1206,11 +1221,13 @@ export class PostgreSQLAdapter
     }
   }
   /** @internal */
-  isCachedPlanFailure(pgerror: unknown): boolean {
+  isCachedPlanFailure(pgerror: {
+    result: { resultErrorField(fieldcode: number): string | null } | null;
+  }): boolean {
     try {
       return (
-        (pgerror as pg.DatabaseError).code === FEATURE_NOT_SUPPORTED &&
-        (pgerror as pg.DatabaseError).routine === "RevalidateCachedQuery"
+        pgerror.result!.resultErrorField(PG.PG_DIAG_SQLSTATE) === FEATURE_NOT_SUPPORTED &&
+        pgerror.result!.resultErrorField(PG.PG_DIAG_SOURCE_FUNCTION) === "RevalidateCachedQuery"
       );
     } catch {
       return false;

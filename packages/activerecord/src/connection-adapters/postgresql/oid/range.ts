@@ -1,11 +1,10 @@
 import { ValueType } from "@blazetrails/activemodel";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { TimeWithZone } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   Range,
   rbEqual,
   rbFSend,
+  rbInspect,
   rbObjRespondTo,
   registerConstant,
   stringSplit,
@@ -39,7 +38,7 @@ export class RangeType extends ValueType<Range<unknown>> {
   }
 
   override typeCastForSchema(value: unknown): string {
-    return inspect(value).replace(/Infinity/g, "::Float::INFINITY");
+    return rbInspect(value).replace(/Infinity/g, "::Float::INFINITY");
   }
 
   castValue(value: unknown): Range<unknown> | null {
@@ -139,18 +138,6 @@ export class RangeType extends ValueType<Range<unknown>> {
   private isInfinity(value: unknown): 1 | -1 | null | false {
     return rbObjRespondTo(value, "isInfinite") && (rbFSend(value, "isInfinite") as 1 | -1 | null);
   }
-}
-
-function inspect(value: unknown): string {
-  if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  if (value instanceof TimeWithZone) return value.inspect();
-  if (value instanceof RubyTime) return value.toS();
-  if (value instanceof Temporal.Instant) return value.toString();
-  if (value instanceof Temporal.PlainDateTime) return value.toString();
-  if (value instanceof Temporal.PlainDate) return value.toString();
-  if (value instanceof Temporal.PlainTime) return value.toString();
-  return String(value);
 }
 
 registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Range", RangeType);

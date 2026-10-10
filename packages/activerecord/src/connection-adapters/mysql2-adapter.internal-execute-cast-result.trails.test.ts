@@ -31,6 +31,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
     (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeConn;
     (adapter as unknown as { _verified: boolean })._verified = true;
+    adapter._rawConnection!.queryOptions.as = "array";
     return adapter;
   }
 

@@ -122,11 +122,10 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
 /**
  * Mirrors: ActiveRecord::AttributeMethods::PrimaryKey::ClassMethods#primary_key
  *
- * Honors an explicitly-configured primary key — read through the prototype
- * chain, so an STI subclass inherits the value its base set with `primary_key=`
- * (Rails copies base_class.primary_key into the subclass; the chain is the
- * equivalent here). When nothing is configured anywhere up the chain, mirror
- * Rails' get_primary_key: consult the schema cache so a key-less data source
+ * Rails' `inherited` (primary_key.rb:143-150) resets a subclass's
+ * `@primary_key`, so a configured key is answered only when it is an own
+ * property; any other class takes `reset_primary_key`, whose base-class arm
+ * consults the schema cache so a key-less data source
  * (e.g. a view) resolves to `null` rather than the "id" convention. The lookup
  * is query-free — it reads only what `loadSchema` already warmed — so a cold
  * cache falls back to "id". The `null` it can return matches Rails'
@@ -146,14 +145,17 @@ function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefi
  * @noRailsEquivalent CONVERGEABLE PrimaryKey::ClassMethods#primary_key (attribute_methods/primary_key.rb:80-81) as a this-typed function; a cold-cache read does not latch because table_exists? is async.
  */
 export function getPrimaryKeyAttr(this: PrimaryKeyHost): string | string[] | null {
-  const configured = this._primaryKey;
-  if (configured !== undefined) return configured;
+  if (Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    return this._primaryKey as string | string[] | null;
+  }
   if (isPrimaryKeyReflected(this)) {
     resetPrimaryKey.call(this);
     return this._primaryKey as string | string[] | null;
   }
-  const base = baseClass.call(this as unknown as typeof Base);
-  return getPrimaryKey.call(this, base.name);
+  if (isBaseClass(this as unknown as typeof Base)) {
+    return getPrimaryKey.call(this, baseClass.call(this as unknown as typeof Base).name);
+  }
+  return baseClass.call(this as unknown as typeof Base).primaryKey;
 }
 
 function isPrimaryKeyReflected(host: PrimaryKeyHost): boolean {
@@ -193,9 +195,15 @@ export function setPrimaryKeyAttr(this: PrimaryKeyHost, value: string | string[]
   this._attributesBuilder = undefined;
 }
 
-/** @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo */
+/**
+ * @inventedArm isPrimaryKeyReflected — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ * @inventedArm isArray — CONVERGEABLE latch-primary-key-resolution-into-reset-primary-key-memo
+ */
 export function isCompositePrimaryKey(this: PrimaryKeyHost): boolean {
-  if (this._primaryKey === undefined && isPrimaryKeyReflected(this)) resetPrimaryKey.call(this);
+  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    if (!isPrimaryKeyReflected(this)) return Array.isArray(getPrimaryKeyAttr.call(this));
+    resetPrimaryKey.call(this);
+  }
   return this._compositePrimaryKey;
 }
 

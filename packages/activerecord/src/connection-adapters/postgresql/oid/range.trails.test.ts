@@ -118,7 +118,7 @@ describe("PostgreSQL::OID::Range", () => {
 
     it("formats a value as a string via String()", () => {
       const type = new RangeType(passthroughSubtype, "int4range");
-      expect(typeof type.typeCastForSchema(new Range(1, 10))).toBe("string");
+      expect(type.typeCastForSchema(new Range(1, 10))).toBe("1..10");
     });
 
     it("formats a Temporal.Instant value via inspect()", () => {

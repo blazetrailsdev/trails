@@ -250,9 +250,7 @@ subclass is defined.
 
 The guard is the port of `inherited`, not a deviation to retire. Where the arms
 report flags a guarded read or a first-read seed in one of these readers, it
-carries `@inventedArm … — PERMANENT` against this section. `PrimaryKey`'s `_primaryKey`
-is still read through the prototype chain, which is debt, tracked by
-`primary-key-reset-is-read-through-the-prototype-chain`.
+carries `@inventedArm … — PERMANENT` against this section.
 
 ## A model is seated by `registerModel` (the `class` keyword's constant and its `inherited`)
 

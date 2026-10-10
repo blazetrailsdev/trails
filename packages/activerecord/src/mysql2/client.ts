@@ -107,9 +107,10 @@ function options(
   queryOptions: QueryOptions,
 ): Record<string, unknown> {
   const typeCast = typeCastFor(client, queryOptions);
+  const rowsAsArray = queryOptions.as === "array";
   return client.readTimeout != null
-    ? { sql, rowsAsArray: true, typeCast, timeout: client.readTimeout * 1000 }
-    : { sql, rowsAsArray: true, typeCast };
+    ? { sql, rowsAsArray, typeCast, timeout: client.readTimeout * 1000 }
+    : { sql, rowsAsArray, typeCast };
 }
 
 function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
@@ -255,7 +256,7 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
           ? "utc"
           : "local";
       const val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
-      return defaultTimezone() === "utc" ? val.getutc() : val.getlocal();
+      return queryOptions.databaseTimezone === "utc" ? val.getutc() : val.getlocal();
     }
     case "DATE":
     case "NEWDATE": {

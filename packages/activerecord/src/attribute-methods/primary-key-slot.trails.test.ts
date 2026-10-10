@@ -126,4 +126,28 @@ describe("per-instance @primary_key slot", () => {
     vi.spyOn(child as never, "_readAttribute").mockImplementation(read as never);
     expect(child.id).toBe(2);
   });
+
+  it("a concrete subclass of an abstract class derives its own key, not the abstract parent's", () => {
+    class AbstractKeyed extends Base {
+      static override abstractClass = true;
+    }
+    AbstractKeyed.primaryKey = "abstract_id";
+    class Concrete extends AbstractKeyed {
+      static override tableName = "toys";
+    }
+
+    expect(Concrete.primaryKey).toBe("id");
+  });
+
+  it("an STI leaf takes base_class.primary_key, not an intermediate class's key", () => {
+    class StiRoot extends Base {
+      static override tableName = "toys";
+    }
+    StiRoot.primaryKey = "toy_id";
+    class Middle extends StiRoot {}
+    Middle.primaryKey = "middle_id";
+    class Leaf extends Middle {}
+
+    expect(Leaf.primaryKey).toBe("toy_id");
+  });
 });
