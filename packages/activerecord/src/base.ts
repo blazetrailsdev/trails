@@ -168,7 +168,6 @@ import {
   type BenchmarkLogger,
   runLoadHooks,
   type PrependMethod,
-  type Included,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
@@ -1926,7 +1925,7 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
+export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   normalizeAttribute(name: string): void;
   /** @internal */
   normalizeChangedInPlaceAttributes(): void;
