@@ -555,10 +555,10 @@ export class PostgreSQLAdapter
     }
     if (typeof config === "string") {
       this._minMessages = "warning";
-      const url = URL.canParse(config) ? new URL(config) : null;
-      this._connectionParameters = {
-        connectionString: config,
-        ...(url && {
+      let connParams: pg.ClientConfig = {};
+      try {
+        const url = new URL(config);
+        connParams = {
           database:
             url.searchParams.get("dbname") ??
             (decodeURIComponent(url.pathname.slice(1)) || undefined),
@@ -566,7 +566,11 @@ export class PostgreSQLAdapter
           host:
             url.searchParams.get("host") ??
             (decodeURIComponent(url.hostname).replace(/^\[|\]$/g, "") || undefined),
-        }),
+        };
+      } catch {}
+      this._connectionParameters = {
+        connectionString: config,
+        ...connParams,
         types: {
           getTypeParser: (oid: number, format?: string) => pgTypeParser(oid, format),
         },

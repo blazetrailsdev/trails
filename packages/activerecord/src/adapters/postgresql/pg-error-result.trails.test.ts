@@ -130,6 +130,7 @@ describeIfPg("PG::Error#result (trails)", () => {
       (new PostgreSQLAdapter(config) as unknown as { _connectionParameters: pg.ClientConfig })
         ._connectionParameters;
     expect(params("host=localhost dbname=blog").database).toBeUndefined();
+    expect(params("postgres://u@h/db%zz").database).toBeUndefined();
     expect(params("postgres://bob@[::1]/blog").host).toBe("::1");
     expect(params("postgres://bob@db/blog?host=/var/run/pg&user=ann&dbname=shop")).toMatchObject({
       database: "shop",

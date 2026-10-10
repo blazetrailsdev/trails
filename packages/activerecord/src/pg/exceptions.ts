@@ -55,9 +55,7 @@ export function pgError(error: unknown): unknown {
     ERRORS.add(error);
   } else if (
     (typeof code === "string" && /^E([A-Z]+|AI_[A-Z]+)$/.test(code)) ||
-    message.includes("Query read timeout") ||
-    message.includes("timeout expired") ||
-    message.startsWith("SASL")
+    message.includes("Query read timeout")
   ) {
     ERRORS.add(error);
   }
