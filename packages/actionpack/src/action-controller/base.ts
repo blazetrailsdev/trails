@@ -1,6 +1,8 @@
 import {
   SafeBuffer,
   include,
+  type CacheStore,
+  type Configuration,
   type Included,
   type Rescuable,
   type Module,
@@ -141,6 +143,7 @@ import { instrumentPayload, instrumentName } from "./caching.js";
 import {
   Caching,
   type cache,
+  type LookupStoreArgument,
   type viewCacheDependencies,
   type viewCacheDependency,
 } from "../abstract-controller/caching.js";
@@ -340,6 +343,9 @@ export interface Base
   get params(): StrongParameters;
   set params(value: StrongParameters | Record<string, unknown>);
   viewRuntime: number | null;
+  config(): Configuration & { performCaching?: boolean };
+  get cacheStore(): CacheStore | null;
+  set cacheStore(store: LookupStoreArgument);
   helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;

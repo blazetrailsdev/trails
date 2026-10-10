@@ -8,7 +8,11 @@ import type { CacheOptions, CacheStore, Configuration } from "@blazetrails/activ
 
 export type ViewCacheDependency = (this: CachingHost) => unknown;
 
-type LookupStoreArgument = CacheStore | `:${string}` | readonly [`:${string}`, ...unknown[]] | null;
+export type LookupStoreArgument =
+  | CacheStore
+  | `:${string}`
+  | readonly [`:${string}`, ...unknown[]]
+  | null;
 
 export interface CachingClassMethods {
   get cacheStore(): CacheStore | null;

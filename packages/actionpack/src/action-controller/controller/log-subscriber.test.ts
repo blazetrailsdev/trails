@@ -160,9 +160,8 @@ class ACLogSubscriberTest extends TestCase {
     this.oldLogger = Base.logger;
 
     this.cachePath = Dir.mktmpdir(["tmp", "cache"]);
-    const controllerClass = LogSubscribersController as unknown as CachingClassMethods;
-    controllerClass.cacheStore = [":file_store", this.cachePath];
-    controllerClass.performCaching = true;
+    this.controller.cacheStore = [":file_store", this.cachePath];
+    this.controller.config().performCaching = true;
     LogSubscriber.attachTo("action_controller");
   }
 
