@@ -473,6 +473,49 @@ jobs:
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
 
+      # Merge conflicts. A PR whose branch no longer merges cleanly cannot
+      # produce a trustworthy run: GitHub maintains `refs/pull/N/merge` only
+      # while the merge succeeds, so on a conflict every `pull_request` job in
+      # this workflow checks out the LAST mergeable merge commit — a tree that
+      # describes neither the branch nor the base. Every gate downstream then
+      # passes or fails against that stale merge, and the 20+ minutes the DB
+      # matrix and the parity pipelines spend doing it buys nothing, because the
+      # run has to be re-fired after the rebase regardless. So fail here and let
+      # the cancel step at the end of this job stop the rest.
+      #
+      # `mergeable` is computed asynchronously: GitHub answers `null` and
+      # `mergeable_state: unknown` until a background merge job finishes, which
+      # on a branch pushed seconds ago it usually has not — the first read of a
+      # PR is also what *enqueues* that job. Hence the poll. An answer that
+      # never resolves is treated as mergeable: this gate exists to save runner
+      # minutes, not to become a new way for a green branch to go red on API
+      # timing. For the same reason the failure arm requires `dirty`
+      # specifically, the one `mergeable_state` that means textual conflict —
+      # `behind`, `blocked`, `draft` and `unstable` are all normal states for a
+      # PR in this repo and none of them invalidates the merge ref.
+      - name: Merge conflicts
+        id: merge-conflict
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5 6; do
+            # Retried for the same reason the attribution guards are: a 503
+            # here would read in the checks UI as "Preflight / merge conflict",
+            # i.e. as a conflict that does not exist.
+            answer=$(scripts/ci/gh-api-retry.sh "repos/$REPO/pulls/$PR_NUMBER" \
+              --jq '"\(.mergeable) \(.mergeable_state)"')
+            mergeable=${answer%% *}
+            state=${answer##* }
+            [ "$mergeable" = "null" ] || break
+            echo "Attempt $attempt: mergeability not computed yet (state=$state); waiting 5s."
+            sleep 5
+          done
+          if [ "$mergeable" = "false" ] && [ "$state" = "dirty" ]; then
+            echo "::error::This PR conflicts with its base branch. Every job in this run checked out a stale merge commit, so none of their results describe this branch. Rebase onto the base branch, resolve the conflicts and push — CI re-fires on the push."
+            exit 1
+          fi
+          echo "No merge conflict (mergeable=$mergeable, mergeable_state=$state)."
+
       # Prettier. Unconditional, exactly as the standalone job was: it runs on
       # push and PR (the events that carry a meaningful diff) and also on the
       # weekly `schedule` sweep / `workflow_dispatch`, where the `changes` job
