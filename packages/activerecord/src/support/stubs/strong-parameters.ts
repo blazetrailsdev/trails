@@ -59,7 +59,7 @@ export class ProtectedParams {
     return this.keys().length === 0;
   }
 
-  permitted(): boolean {
+  isPermitted(): boolean {
     return this.#permitted;
   }
 

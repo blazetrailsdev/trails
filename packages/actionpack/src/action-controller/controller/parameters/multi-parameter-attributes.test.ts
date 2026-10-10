@@ -20,7 +20,7 @@ describe("MultiParameterAttributesTest", () => {
 
     const permitted = params.permit({ book: ["shipped_at", "price"] });
 
-    expect(permitted.permitted).toBe(true);
+    expect(permitted.isPermitted()).toBe(true);
 
     const book = permitted.get("book") as Parameters;
     expect(book.get("shipped_at(1i)")).toBe("2012");

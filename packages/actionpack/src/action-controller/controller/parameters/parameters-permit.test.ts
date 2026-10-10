@@ -238,13 +238,13 @@ describe("ParametersPermitTest", () => {
   it("not permitted is sticky beyond merges", () => {
     const params = new Parameters({ a: "1" });
     const merged = params.merge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    expect(merged.isPermitted()).toBe(false);
   });
 
   it("permitted is sticky beyond merges", () => {
     const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.merge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    expect(merged.isPermitted()).toBe(true);
   });
 
   it("merge with parameters", () => {
@@ -258,13 +258,13 @@ describe("ParametersPermitTest", () => {
   it("not permitted is sticky beyond merge!", () => {
     const params = new Parameters({ a: "1" });
     params.mergeBang({ b: "2" });
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 
   it("permitted is sticky beyond merge!", () => {
     const params = new Parameters({ a: "1" }).permitBang();
     params.mergeBang({ b: "2" });
-    expect(params.permitted).toBe(true);
+    expect(params.isPermitted()).toBe(true);
   });
 
   it("merge! with parameters", () => {
@@ -278,25 +278,25 @@ describe("ParametersPermitTest", () => {
   it("not permitted is sticky beyond deep merges", () => {
     const params = new Parameters({ a: "1" });
     const merged = params.deepMerge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    expect(merged.isPermitted()).toBe(false);
   });
 
   it("permitted is sticky beyond deep merges", () => {
     const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.deepMerge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    expect(merged.isPermitted()).toBe(true);
   });
 
   it("not permitted is sticky beyond deep_merge!", () => {
     const params = new Parameters({ a: "1" });
     params.deepMergeBang({ b: "2" });
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 
   it("permitted is sticky beyond deep_merge!", () => {
     const params = new Parameters({ a: "1" }).permitBang();
     params.deepMergeBang({ b: "2" });
-    expect(params.permitted).toBe(true);
+    expect(params.isPermitted()).toBe(true);
   });
 
   it("deep_merge with other Hash", () => {
@@ -348,13 +348,13 @@ describe("ParametersPermitTest", () => {
   it("not permitted is sticky beyond reverse_merge", () => {
     const params = new Parameters({ a: "1" });
     const merged = params.reverseMerge({ b: "2" });
-    expect(merged.permitted).toBe(false);
+    expect(merged.isPermitted()).toBe(false);
   });
 
   it("permitted is sticky beyond reverse_merge", () => {
     const params = new Parameters({ a: "1" }).permitBang();
     const merged = params.reverseMerge({ b: "2" });
-    expect(merged.permitted).toBe(true);
+    expect(merged.isPermitted()).toBe(true);
   });
 
   it("#reverse_merge! with parameters", () => {
@@ -380,14 +380,14 @@ describe("ParametersPermitTest", () => {
     const inner = new Parameters({ city: "NYC" });
     const params = new Parameters({ address: inner });
     params.permitBang();
-    expect(params.permitted).toBe(true);
-    expect((params.get("address") as Parameters).permitted).toBe(true);
+    expect(params.isPermitted()).toBe(true);
+    expect((params.get("address") as Parameters).isPermitted()).toBe(true);
   });
 
   it("permitted takes a default value when Parameters.permit_all_parameters is set", () => {
     Parameters.permitAllParameters = true;
     const params = new Parameters({ name: "John" });
-    expect(params.permitted).toBe(true);
+    expect(params.isPermitted()).toBe(true);
   });
 
   it("permitting parameters as an array", () => {
@@ -481,7 +481,7 @@ describe("ParametersPermitTest", () => {
   });
 
   it("#permitted? is false by default", () => {
-    expect(new Parameters({}).permitted).toBe(false);
+    expect(new Parameters({}).isPermitted()).toBe(false);
   });
 
   it("only String and Symbol keys are allowed", () => {

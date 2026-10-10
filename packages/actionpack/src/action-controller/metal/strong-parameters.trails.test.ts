@@ -26,7 +26,7 @@ describe("Parameters#expect types", () => {
     const post = params.expect({ post: ["title", "body"] });
     expectTypeOf(post).toEqualTypeOf<Parameters>();
     expect(post).toBeInstanceOf(Parameters);
-    expect(post.permitted).toBe(true);
+    expect(post.isPermitted()).toBe(true);
     expectTypeOf(params.expectBang({ post: ["title"] })).toEqualTypeOf<Parameters>();
   });
 
@@ -116,19 +116,19 @@ describe("ActionController::Parameters", () => {
     };
 
     const legacy = allocate("!ruby/hash:ActionController::Parameters", { key: ":value" });
-    expect([legacy.get("key"), legacy.permitted]).toEqual([":value", false]);
+    expect([legacy.get("key"), legacy.isPermitted()]).toEqual([":value", false]);
 
     const withIvars = allocate("!ruby/hash-with-ivars:ActionController::Parameters", {
       elements: { key: ":value" },
       ivars: { ":@permitted": true },
     });
-    expect([withIvars.get("key"), withIvars.permitted]).toEqual([":value", true]);
+    expect([withIvars.get("key"), withIvars.isPermitted()]).toEqual([":value", true]);
 
     const object = allocate("!ruby/object:ActionController::Parameters", {
       parameters: withIndifferentAccess({ key: ":value" }),
       permitted: true,
     });
-    expect([object.get("key"), object.permitted]).toEqual([":value", true]);
+    expect([object.get("key"), object.isPermitted()]).toEqual([":value", true]);
 
     const coder = new Psych.Coder(null);
     object.encodeWith(coder);

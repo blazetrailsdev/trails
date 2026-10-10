@@ -10,6 +10,7 @@ import { controllerConstants } from "../http/request.js";
 import { Cookies } from "../middleware/cookies.js";
 import { CookieStore } from "../middleware/session/cookie-store.js";
 import { assertNil } from "@blazetrails/activesupport";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 
 function buildApp(routes: RouteSet): RackApp {
   const store = new CookieStore((e: RackEnv) => routes.call(e), { key: "_session" });
@@ -33,7 +34,7 @@ describe("ContentSecurityPolicyTest", () => {
   it("dup", () => {
     const policy = new ContentSecurityPolicy();
     policy.defaultSrc("'self'");
-    const copy = policy.dup();
+    const copy = rbObjDup(policy);
     copy.scriptSrc("'unsafe-inline'");
     expect(policy.build()).toBe("default-src 'self'");
     expect(copy.build()).toContain("script-src");
@@ -367,7 +368,7 @@ describe("ContentSecurityPolicyTest", () => {
   it("dup preserves bare-directive sentinel", () => {
     const policy = new ContentSecurityPolicy();
     policy.upgradeInsecureRequests();
-    const copy = policy.dup();
+    const copy = rbObjDup(policy);
     expect(copy.getDirectives().get("upgrade-insecure-requests")).toBe(true);
     expect(copy.build()).toBe("upgrade-insecure-requests");
   });

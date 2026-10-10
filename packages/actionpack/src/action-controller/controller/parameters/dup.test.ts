@@ -23,7 +23,7 @@ describe("ParametersDupTest", () => {
   it("a duplicate maintains the original's permitted status", () => {
     params.permitBang();
     const duppedParams = rbObjDup(params);
-    expect(duppedParams.permitted).toBe(true);
+    expect(duppedParams.isPermitted()).toBe(true);
   });
 
   it("a duplicate maintains the original's parameters", () => {
@@ -61,11 +61,11 @@ describe("ParametersDupTest", () => {
     const duppedParams = params.deepDup();
     duppedParams.permitBang();
 
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 
   it("deep_dup @permitted is being copied", () => {
     params.permitBang();
-    expect(params.deepDup().permitted).toBe(true);
+    expect(params.deepDup().isPermitted()).toBe(true);
   });
 });

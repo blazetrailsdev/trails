@@ -17,7 +17,7 @@ class ProtectedParams {
     this.parameters = attributes;
   }
 
-  permitted(): boolean {
+  isPermitted(): boolean {
     return this._permitted;
   }
 

@@ -7,13 +7,13 @@ import "../../test-helpers/abstract-unit.js";
 class PeopleController extends Base {
   async create(): Promise<void> {
     await this.render({
-      plain: (this.params.get("person") as Parameters).permitted ? "permitted" : "forbidden",
+      plain: (this.params.get("person") as Parameters).isPermitted() ? "permitted" : "forbidden",
     });
   }
 
   async createWithPermit(): Promise<void> {
     await this.render({
-      plain: (this.params.get("person") as Parameters).permit("name").permitted
+      plain: (this.params.get("person") as Parameters).permit("name").isPermitted()
         ? "permitted"
         : "forbidden",
     });

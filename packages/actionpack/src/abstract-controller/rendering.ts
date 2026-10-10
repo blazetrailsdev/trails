@@ -1,6 +1,6 @@
 import { ViewPaths } from "@blazetrails/actionview";
 import { Concern, extend, include } from "@blazetrails/activesupport";
-import { ArgumentError, Module } from "@blazetrails/ruby-compat";
+import { ArgumentError, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { AbstractControllerError } from "./error.js";
 
@@ -90,8 +90,8 @@ export function viewAssigns<T extends object>(this: T): Record<string, unknown> 
 }
 
 export function _normalizeArgs(action?: unknown, options: RenderOptions = {}): RenderOptions {
-  if (action != null && typeof (action as { permitted?: () => boolean }).permitted === "function") {
-    if ((action as { permitted: () => boolean }).permitted()) {
+  if (rbObjRespondTo(action, "isPermitted")) {
+    if ((action as { isPermitted(): boolean }).isPermitted()) {
       return action as RenderOptions;
     }
     throw new ArgumentError("render parameters are not permitted");

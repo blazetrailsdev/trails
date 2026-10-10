@@ -263,7 +263,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   associationName: string,
   attributes: Record<string, unknown>,
 ): Promise<void> | void {
-  if (rbObjRespondTo(attributes, "permitted")) {
+  if (rbObjRespondTo(attributes, "isPermitted")) {
     attributes = (attributes as unknown as { toH(): Record<string, unknown> }).toH();
   }
 
@@ -334,7 +334,7 @@ export function assignNestedAttributesForCollectionAssociation(
   attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
 ): Promise<void> | void {
   const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
-  if (rbObjRespondTo(attributesCollection, "permitted")) {
+  if (rbObjRespondTo(attributesCollection, "isPermitted")) {
     attributesCollection = (attributesCollection as unknown as { toH(): never }).toH();
   }
 
@@ -364,7 +364,7 @@ export function assignNestedAttributesForCollectionAssociation(
     const nestedTarget: (Base | null)[] = [];
     let pending: Promise<void> | undefined;
     for (let a of attrs) {
-      if (rbObjRespondTo(a, "permitted")) {
+      if (rbObjRespondTo(a, "isPermitted")) {
         a = (a as unknown as { toH(): Record<string, unknown> }).toH();
       }
 

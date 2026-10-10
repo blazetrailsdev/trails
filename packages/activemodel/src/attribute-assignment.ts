@@ -94,8 +94,8 @@ function isParamsLikeWrapper(attrs: object): boolean {
   if (typeof attrs !== "object" || attrs === null) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;
-  const wrapper = attrs as { permitted?: unknown; toH?: unknown };
-  return "permitted" in wrapper || typeof wrapper.toH === "function";
+  const wrapper = attrs as { isPermitted?: unknown; toH?: unknown };
+  return "isPermitted" in wrapper || typeof wrapper.toH === "function";
 }
 
 export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };

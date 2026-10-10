@@ -39,24 +39,27 @@ type LayoutsClass = {
   _impliedLayoutName(): string;
 };
 
-export const LayoutConditions = {
-  /** @internal */
-  _isConditionalLayout(this: Layouts): boolean | undefined {
-    if (!_isConditionalLayout.call(this)) return undefined;
+export const LayoutConditions: Module = new Module((mod) => {
+  mod.defineMethod(
+    "_isConditionalLayout",
+    /** @internal */
+    function _isConditionalLayout(this: Layouts): boolean | undefined {
+      if (!LayoutConditions.superMethod(this, "_isConditionalLayout")!()) return undefined;
 
-    const conditions = this._layoutConditions;
+      const conditions = this._layoutConditions;
 
-    let only: string[] | undefined;
-    let except: string[] | undefined;
-    if ((only = conditions["only"])) {
-      return only.includes(this.actionName);
-    } else if ((except = conditions["except"])) {
-      return !except.includes(this.actionName);
-    } else {
-      return true;
-    }
-  },
-};
+      let only: string[] | undefined;
+      let except: string[] | undefined;
+      if ((only = conditions["only"])) {
+        return only.includes(this.actionName);
+      } else if ((except = conditions["except"])) {
+        return !except.includes(this.actionName);
+      } else {
+        return true;
+      }
+    },
+  );
+});
 
 export function layout(
   this: LayoutsClass,

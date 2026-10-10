@@ -28,11 +28,11 @@ describe("ParametersMutatorsTest", () => {
 
   it("delete retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.delete("person") as Parameters, (p) => p.permitted);
+    assertPredicate(params.delete("person") as Parameters, (p) => p.isPermitted());
   });
 
   it("delete retains unpermitted status", () => {
-    assertNotPredicate(params.delete("person") as Parameters, (p) => p.permitted);
+    assertNotPredicate(params.delete("person") as Parameters, (p) => p.isPermitted());
   });
 
   it("delete returns the value when the key is present", () => {
@@ -66,38 +66,38 @@ describe("ParametersMutatorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.deleteIf((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("delete_if retains unpermitted status", () => {
     assertNotPredicate(
       params.deleteIf((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("extract! retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.extractBang("person"), (p) => p.permitted);
+    assertPredicate(params.extractBang("person"), (p) => p.isPermitted());
   });
 
   it("extract! retains unpermitted status", () => {
-    assertNotPredicate(params.extractBang("person"), (p) => p.permitted);
+    assertNotPredicate(params.extractBang("person"), (p) => p.isPermitted());
   });
 
   it("keep_if retains permitted status", () => {
     params.permitBang();
     assertPredicate(
       params.keepIf((k, _v) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("keep_if retains unpermitted status", () => {
     assertNotPredicate(
       params.keepIf((k, _v) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -105,14 +105,14 @@ describe("ParametersMutatorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.rejectBang((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("reject! retains unpermitted status", () => {
     assertNotPredicate(
       params.rejectBang((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -120,38 +120,38 @@ describe("ParametersMutatorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.selectBang((k) => k !== "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("select! retains unpermitted status", () => {
     assertNotPredicate(
       params.selectBang((k) => k !== "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("slice! retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.sliceBang("person"), (p) => p.permitted);
+    assertPredicate(params.sliceBang("person"), (p) => p.isPermitted());
   });
 
   it("slice! retains unpermitted status", () => {
-    assertNotPredicate(params.sliceBang("person"), (p) => p.permitted);
+    assertNotPredicate(params.sliceBang("person"), (p) => p.isPermitted());
   });
 
   it("transform_keys! retains permitted status", () => {
     params.permitBang();
     assertPredicate(
       params.transformKeysBang((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("transform_keys! retains unpermitted status", () => {
     assertNotPredicate(
       params.transformKeysBang((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -159,14 +159,14 @@ describe("ParametersMutatorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.transformValuesBang((v) => v),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("transform_values! retains unpermitted status", () => {
     assertNotPredicate(
       params.transformValuesBang((v) => v),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -174,7 +174,7 @@ describe("ParametersMutatorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.deepTransformKeysBang((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -212,17 +212,17 @@ describe("ParametersMutatorsTest", () => {
   it("deep_transform_keys! retains unpermitted status", () => {
     assertNotPredicate(
       params.deepTransformKeysBang((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("compact retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.compact(), (p) => p.permitted);
+    assertPredicate(params.compact(), (p) => p.isPermitted());
   });
 
   it("compact retains unpermitted status", () => {
-    assertNotPredicate(params.compact(), (p) => p.permitted);
+    assertNotPredicate(params.compact(), (p) => p.isPermitted());
   });
 
   it("compact! returns nil when no values are nil", () => {
@@ -232,30 +232,30 @@ describe("ParametersMutatorsTest", () => {
   it("compact! retains permitted status", () => {
     params.set("person", null);
     params.permitBang();
-    assertPredicate(params.compactBang()!, (p) => p.permitted);
+    assertPredicate(params.compactBang()!, (p) => p.isPermitted());
   });
 
   it("compact! retains unpermitted status", () => {
     params.set("person", null);
-    assertNotPredicate(params.compactBang()!, (p) => p.permitted);
+    assertNotPredicate(params.compactBang()!, (p) => p.isPermitted());
   });
 
   it("compact_blank retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.compactBlank(), (p) => p.permitted);
+    assertPredicate(params.compactBlank(), (p) => p.isPermitted());
   });
 
   it("compact_blank retains unpermitted status", () => {
-    assertNotPredicate(params.compactBlank(), (p) => p.permitted);
+    assertNotPredicate(params.compactBlank(), (p) => p.isPermitted());
   });
 
   it("compact_blank! retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.compactBlankBang(), (p) => p.permitted);
+    assertPredicate(params.compactBlankBang(), (p) => p.isPermitted());
   });
 
   it("compact_blank! retains unpermitted status", () => {
-    assertNotPredicate(params.compactBlankBang(), (p) => p.permitted);
+    assertNotPredicate(params.compactBlankBang(), (p) => p.isPermitted());
   });
 
   // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access

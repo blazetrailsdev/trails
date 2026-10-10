@@ -7,7 +7,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Module, rbEqq } from "@blazetrails/ruby-compat";
 import { AssertionResponse } from "../assertion-response.js";
-import { _computeRedirectToLocation } from "../../../action-controller/metal/redirecting.js";
+import { Redirecting, type RedirectingHost } from "../../../action-controller/metal/redirecting.js";
 
 export interface AssertionResponseHost {
   response: AssertionResponseLike;
@@ -76,14 +76,12 @@ export function normalizeArgumentToRedirection(
   this: AssertionResponseHost,
   fragment: unknown,
 ): unknown {
-  if (fragment instanceof RegExp) return fragment;
-  const handle = this.controller as
-    | { _computeRedirectToLocation?: (req: unknown, frag: unknown) => unknown }
-    | undefined;
-  if (handle?._computeRedirectToLocation) {
-    return handle._computeRedirectToLocation(this.request, fragment);
+  if (fragment instanceof RegExp) {
+    return fragment;
+  } else {
+    const handle = (this.controller as typeof Redirecting | undefined) || Redirecting;
+    return handle._computeRedirectToLocation(this.request as RedirectingHost["request"], fragment);
   }
-  return _computeRedirectToLocation(this.request!, fragment);
 }
 
 /** @internal */

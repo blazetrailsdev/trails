@@ -1,6 +1,7 @@
-import { Concern, Module, extend } from "@blazetrails/activesupport";
-import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
-import type { HelpersClass } from "../../abstract-controller/helpers.js";
+import { Concern, Module, extend, include } from "@blazetrails/activesupport";
+import { rbObjClone } from "@blazetrails/ruby-compat";
+import { Callbacks, type CallbackOptions } from "../../abstract-controller/callbacks.js";
+import { Helpers, type HelpersClass } from "../../abstract-controller/helpers.js";
 import { ContentSecurityPolicy as Policy } from "../../action-dispatch/http/content-security-policy.js";
 
 export type ContentSecurityPolicyBlock = (this: unknown, policy: Policy) => void;
@@ -82,8 +83,10 @@ export function contentSecurityPolicyReportOnly(
 }
 
 /** @internal */
-export function isContentSecurityPolicy(this: ContentSecurityPolicyInstanceHost): boolean {
-  return this.request.contentSecurityPolicy != null;
+export function isContentSecurityPolicy(
+  this: ContentSecurityPolicyInstanceHost,
+): Policy | null | undefined {
+  return this.request.contentSecurityPolicy;
 }
 
 /** @internal */
@@ -93,14 +96,17 @@ export function contentSecurityPolicyNonce(this: ContentSecurityPolicyInstanceHo
 
 /** @internal */
 export function currentContentSecurityPolicy(this: ContentSecurityPolicyInstanceHost): Policy {
-  const current = this.request.contentSecurityPolicy;
-  return current ? current.dup() : new Policy();
+  const policy = this.request.contentSecurityPolicy;
+  return (policy && rbObjClone(policy)) || new Policy();
 }
 
 export const ClassMethods = { contentSecurityPolicy, contentSecurityPolicyReportOnly };
 
 export const ContentSecurityPolicy = new Module((mod) => {
   extend(mod, Concern);
+
+  include(mod, Helpers);
+  include(mod, Callbacks);
 
   (
     mod as unknown as {

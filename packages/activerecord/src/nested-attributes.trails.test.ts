@@ -170,7 +170,7 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   it("converts a permitted? collection and its members with to_h", async () => {
     Pirate.acceptsNestedAttributesFor("parrots");
     const params = <T>(hash: T) =>
-      Object.assign(Object.create({ toH: () => hash }), { permitted: true });
+      Object.assign(Object.create({ toH: () => hash }), { isPermitted: () => true });
 
     const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     await (
@@ -183,7 +183,7 @@ describe("nested attributes save wrapper argument forwarding (trails-only)", () 
   it("converts a permitted? one-to-one hash with to_h", async () => {
     Pirate.acceptsNestedAttributesFor("ship");
     const params = <T>(hash: T) =>
-      Object.assign(Object.create({ toH: () => hash }), { permitted: true });
+      Object.assign(Object.create({ toH: () => hash }), { isPermitted: () => true });
 
     const pirate = await Pirate.createBang({ catchphrase: "Arr" });
     await (pirate as unknown as { setShipAttributes(v: unknown): Promise<void> }).setShipAttributes(
