@@ -188,7 +188,9 @@ export function asyncCountBySql(
 ): Promise<number | bigint> {
   return this.withConnection((c) => {
     return c
-      .selectValue(this.sanitizeSql(sql) as string, `${this.name} Count`, undefined, { async: true })
+      .selectValue(this.sanitizeSql(sql) as string, `${this.name} Count`, undefined, {
+        async: true,
+      })
       .then((value) => toI(value));
   });
 }
