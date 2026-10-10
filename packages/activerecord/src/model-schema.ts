@@ -592,7 +592,10 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * current pool (`:101-108`). That read is synchronous here and only peeks, so
  * a pool whose cache is cold answers the "id" convention. The warm above is
  * the awaited half of that read, and `resetPrimaryKey` under `primary_key`'s
- * own guard latches its answer while the cache is known warm. It retires with
+ * own guard latches its answer while the cache is known warm. The guard is
+ * spelled out because the reader (`getPrimaryKeyAttr`) latches only after its
+ * own peek of the cache succeeds and answers the convention unlatched when it
+ * does not, so reading it here would not guarantee the latch. It retires with
  * story `latch-primary-key-resolution-into-reset-primary-key-memo`.
  *
  * @internal
