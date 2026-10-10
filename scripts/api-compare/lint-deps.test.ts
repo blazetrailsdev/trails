@@ -13,6 +13,7 @@ import {
   methodUsesDepImport,
   moduleFunctionOwner,
   rubyRefSpellings,
+  visitMethodDeclarations,
 } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
@@ -812,5 +813,20 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       expect(tainted.has(sym)).toBe(true);
       expect(taintedRefs.get(sym)?.has("Attribute")).toBe(true);
     }
+  });
+});
+
+describe("visitMethodDeclarations", () => {
+  it("visits the methods of an object literal standing in for a Ruby `extend self` module", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install(registry: Factory): void {},
+        writeRecord(record: Base, packer: Packer): void {},
+      };
+      export const helper = () => 1;
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "writeRecord", "helper"]);
   });
 });

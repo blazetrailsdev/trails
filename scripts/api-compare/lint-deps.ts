@@ -366,7 +366,7 @@ function analyzeTsDepUsage(
   return result;
 }
 
-function visitMethodDeclarations(
+export function visitMethodDeclarations(
   sourceFile: ts.SourceFile,
   // anchor: the node whose leading trivia holds doc comments (e.g. VariableStatement, not its initializer)
   callback: (name: string, node: ts.Node, anchor: ts.Node) => void,
@@ -400,6 +400,9 @@ function visitMethodDeclarations(
               // anchor = VariableStatement so lint-deps-ignore above `const foo = ...` is found
               callback(decl.name.text, decl.initializer, node);
             }
+          } else if (ts.isObjectLiteralExpression(decl.initializer)) {
+            // `export const Extensions = { install() {} }` is a Ruby `module … extend self`.
+            visit(decl.initializer);
           }
         }
       }
