@@ -364,14 +364,10 @@ describe("SchemaDumperAdapterTest", () => {
       columns: async () => [column("id", "integer")],
       indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
+      tableOptions: async () => ({ comment: "user accounts" }),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    class CommentDumper extends TopLevelDumper {
-      protected override async tableOptions(_tableName: string): Promise<Record<string, unknown>> {
-        return { comment: "user accounts" };
-      }
-    }
-    const dumper = CommentDumper.create(connection(source));
+    const dumper = TopLevelDumper.create(connection(source));
     const lines = new StringIO();
     await (dumper as any).table("users", lines);
     expect(lines.string()).toContain(`comment: "user accounts"`);
@@ -385,14 +381,10 @@ describe("SchemaDumperAdapterTest", () => {
       columns: async () => [column("id", "integer")],
       indexes: async () => [],
       lookupCastTypeFromColumn: () => new ValueType(),
+      tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
       adapter: PRIMARY_KEY_ADAPTER,
     };
-    class MysqlDumper extends TopLevelDumper {
-      protected override async tableOptions(_t: string): Promise<Record<string, unknown>> {
-        return { charset: "utf8mb4", collation: "utf8mb4_bin" };
-      }
-    }
-    const dumper = MysqlDumper.create(connection(source));
+    const dumper = TopLevelDumper.create(connection(source));
     const lines = new StringIO();
     await (dumper as any).table("t", lines);
     const header = lines.string().split("\n")[0];

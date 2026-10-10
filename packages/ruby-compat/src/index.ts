@@ -115,6 +115,7 @@ export {
 } from "./hash.js";
 export type { Block, ConflictBlock } from "./hash.js";
 export type { DefaultProc } from "./hash.js";
+export { Set } from "./set.js";
 export { FileUtils } from "./file-utils.js";
 export {
   cryptoAdapterConfig,
@@ -304,7 +305,7 @@ export type {
   StdStream,
   WriteStream,
 } from "./process-adapter.js";
-export type { PrependMethod, PrependModule } from "./prepend.js";
+export type { ClassModule, PrependMethod, PrependModule } from "./prepend.js";
 export {
   Method,
   iseqLocationSetup,

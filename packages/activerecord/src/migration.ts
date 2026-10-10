@@ -1360,7 +1360,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 export declare namespace Migration {
   let CommandRecorder:
     | typeof import("./migration/command-recorder.js").CommandRecorder
-    | import("@blazetrails/ruby-compat").PrependModule;
+    | import("@blazetrails/ruby-compat").ClassModule;
   let Compatibility: typeof CompatibilityModule;
   let JoinTable: typeof JoinTableModule;
   let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;

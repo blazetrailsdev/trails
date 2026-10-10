@@ -277,19 +277,4 @@ describe("MySQL::SchemaDumper", () => {
       ).toBe(JSON.stringify("json_extract(`profile`,_utf8mb4'$.email')"));
     });
   });
-
-  describe("tableOptions", () => {
-    it("returns the adapter's options and writes no collation cache", async () => {
-      const d = make();
-      d.setConnection({
-        ...stubConnection(),
-        tableOptions: async () => ({ charset: "utf8mb4", collation: "utf8mb4_bin" }),
-      });
-      expect(await (d as any).tableOptions("users")).toEqual({
-        charset: "utf8mb4",
-        collation: "utf8mb4_bin",
-      });
-      expect((d as any)._tableCollationCache).toBeUndefined();
-    });
-  });
 });

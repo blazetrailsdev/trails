@@ -29945,13 +29945,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "table_options",
-    "digest": "71b865a56b13812a",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "throw_away!",
     "digest": "07db9357f996c67a",
     "ref": "v8.0.2"

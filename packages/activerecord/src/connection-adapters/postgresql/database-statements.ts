@@ -282,7 +282,9 @@ export interface PerformQueryHost extends HandleWarningsHost {
     binds: unknown[],
     rawConnection: PGConnection,
   ): Promise<string>;
-  isCachedPlanFailure(pgerror: unknown): boolean;
+  isCachedPlanFailure(pgerror: {
+    result: { resultErrorField(fieldcode: number): string | null } | null;
+  }): boolean;
   isInTransaction(): boolean;
   sqlKey(sql: string | null): string;
   _statements: StatementPool;
@@ -318,7 +320,7 @@ export async function performQuery(
         result = await rawConnection.execPrepared(stmtKey, typeCastedBinds);
         break;
       } catch (error) {
-        if (this.isCachedPlanFailure(error)) {
+        if (this.isCachedPlanFailure(error as Parameters<typeof this.isCachedPlanFailure>[0])) {
           if (this.isInTransaction()) {
             throw new PreparedStatementCacheExpired(
               (error as { message?: string })?.message ?? "cached plan expired",

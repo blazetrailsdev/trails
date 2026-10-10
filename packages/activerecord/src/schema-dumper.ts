@@ -268,7 +268,7 @@ export abstract class SchemaDumper {
         opts.push("id: false");
       }
 
-      const tableOptions = await this.tableOptions(table);
+      const tableOptions = await this.connection.tableOptions(table);
       if (isPresent(tableOptions)) {
         opts.push(this.formatOptions(tableOptions!));
       }
@@ -358,11 +358,6 @@ export abstract class SchemaDumper {
       }
     }
     return undefined;
-  }
-
-  /** @internal */
-  protected tableOptions(_tableName: string): Promise<Record<string, unknown> | null> {
-    return Promise.resolve({});
   }
 
   /** @internal */
