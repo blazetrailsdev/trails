@@ -410,15 +410,6 @@ interface InjectMemo<T> {
   op: unknown;
 }
 
-/**
- * `rb_funcallv_public(v, id, 1, &i)` as `inject` makes it. `+` goes through
- * {@link rbPlus}, the port of the `+` send, whose numeric arm is the Integer
- * loop `ary_inject_op` opens with (`vendor/ruby/v3.3.11/enum.c:835-862`).
- */
-function injectFuncall(v: unknown, op: string, i: unknown): unknown {
-  return symbolToS(op) === "+" ? rbPlus(v, i) : rbFPublicSend(v, op, i);
-}
-
 /** `inject_i` (`vendor/ruby/v3.3.11/enum.c:775`). */
 function injectI<T>(i: T, memo: InjectMemo<T>): void {
   if (memo.v1 === undef) {
@@ -434,7 +425,7 @@ function injectOpI<T>(i: T, memo: InjectMemo<T>): void {
   if (memo.v1 === undef) {
     memo.v1 = i;
   } else if (isSymbol(name)) {
-    memo.v1 = injectFuncall(memo.v1, name, i);
+    memo.v1 = rbFPublicSend(memo.v1, name, i);
   } else {
     memo.v1 = rbFSend(memo.v1, name, i);
   }
@@ -456,8 +447,17 @@ function aryInjectOp(ary: readonly unknown[], init: unknown, op: string): unknow
     i = 0;
   }
 
+  if (symbolToS(op) === "+") {
+    if (rbIntegerTypeP(v)) {
+      for (; i < ary.length; i++) {
+        const e = ary[i];
+        if (!rbIntegerTypeP(e)) break;
+        v = numericPlus(v, e);
+      }
+    }
+  }
   for (; i < ary.length; i++) {
-    v = injectFuncall(v, op, ary[i]);
+    v = rbFPublicSend(v, op, ary[i]);
   }
   return v;
 }

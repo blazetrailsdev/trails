@@ -106,8 +106,6 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Array#delete", { tsExport: "aryDelete", receiver: "array" }],
   ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
   ["Array#join", { tsExport: "aryJoin", receiver: "array" }],
-  // Array takes `reduce` from Enumerable (`vendor/ruby/v3.3.11/enum.c:5085`);
-  // `Array.prototype.reduce` is the homonym.
   ["Array#reduce", { tsExport: "reduce", receiver: "array" }],
   ["Array#sort", { tsExport: "sort", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],

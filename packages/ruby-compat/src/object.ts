@@ -2,6 +2,7 @@ import { aryIncludes } from "./array.js";
 import { hasKey } from "./hash.js";
 import { stringInspect } from "./string/inspect.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
+import { rbPlus } from "./numeric.js";
 import { STRING_METHOD_TABLE, rbStrSend } from "./string/method-table.js";
 import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 import { cmp, rbCmpint, rubyClass, type Comparable } from "./comparable.js";
@@ -882,6 +883,7 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const other = args[0];
     if (mid === "==") return rbEqual(recv, other);
     if (mid === "!=") return !rbEqual(recv, other);
+    if (mid === "+") return rbPlus(recv, other);
     const [spelling, relop] = RELOPS.get(mid) ?? [];
     if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
       return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);
