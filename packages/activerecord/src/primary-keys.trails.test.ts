@@ -28,6 +28,8 @@ describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () =
 });
 
 describe("primary_key on a key-less table after a reconnect (trails-only)", () => {
+  fixtures({}, { useTransactionalTests: false });
+
   it("answers nil and inserts with no RETURNING once the connection is re-established", async () => {
     class KeylessEdge extends Base {
       static override tableName = "edges";
