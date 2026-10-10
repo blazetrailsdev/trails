@@ -483,7 +483,6 @@ export class IndexDefinition {
 }
 
 export interface ColumnMethods {
-  primaryKey(name: string, type?: ColumnType, options?: ColumnOptions): unknown;
   string(...names: string[]): unknown;
   string(...args: [...names: string[], options: ColumnOptions]): unknown;
   text(...names: string[]): unknown;
@@ -754,6 +753,8 @@ export type TableOf<A> = A extends {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => this;
+
   readonly name: string;
   protected readonly columnsHash = new Map<string, ColumnDefinition | null>();
   readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
@@ -1038,6 +1039,8 @@ TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => Promise<void>;
+
   get name(): string {
     return this._tableName;
   }

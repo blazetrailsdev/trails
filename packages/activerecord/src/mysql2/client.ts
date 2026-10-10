@@ -74,7 +74,7 @@ class Statement implements Mysql2Statement {
     const result = storeResult(
       this.client,
       (await this.client
-        .execute(options(this.client, this.sql) as never, args as never)
+        .execute(options(this.client, this.sql, this.client.queryOptions) as never, args as never)
         .catch(driverError)) as Native,
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
@@ -82,7 +82,7 @@ class Statement implements Mysql2Statement {
   }
 
   close(): void {
-    this.client.unprepare(options(this.client, this.sql) as never);
+    this.client.unprepare(options(this.client, this.sql, this.client.queryOptions) as never);
   }
 }
 
@@ -101,10 +101,15 @@ export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"
   setServerOption(value: number): Promise<true>;
 }
 
-function options(client: Mysql2Client, sql: string): Record<string, unknown> {
+function options(
+  client: Mysql2Client,
+  sql: string,
+  queryOptions: QueryOptions,
+): Record<string, unknown> {
+  const typeCast = typeCastFor(client, queryOptions);
   return client.readTimeout != null
-    ? { sql, rowsAsArray: true, timeout: client.readTimeout * 1000 }
-    : { sql, rowsAsArray: true };
+    ? { sql, rowsAsArray: true, typeCast, timeout: client.readTimeout * 1000 }
+    : { sql, rowsAsArray: true, typeCast };
 }
 
 function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
@@ -191,8 +196,10 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
   }).catch(driverError);
 }
 
+let DEFAULT_QUERY_OPTIONS: QueryOptions | undefined;
+
 export function defaultQueryOptions(): QueryOptions {
-  return {
+  return (DEFAULT_QUERY_OPTIONS ||= {
     as: "hash",
     async: false,
     castBooleans: false,
@@ -211,7 +218,7 @@ export function defaultQueryOptions(): QueryOptions {
     cast: true,
     defaultFile: null,
     defaultGroup: null,
-  };
+  });
 }
 
 export function query(
@@ -276,6 +283,13 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
   }
 }
 
+const TYPE_CAST = new WeakMap<object, TypeCast>();
+
+function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {
+  const typeCast = TYPE_CAST.get(client);
+  return (field, next) => cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
+}
+
 type Execute = (sql: unknown, values?: unknown[]) => unknown;
 
 function bind(value: unknown): unknown {
@@ -326,15 +340,18 @@ const automaticClose: PropertyDescriptor = {
 export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   if (!QUERY_OPTIONS.has(client)) {
     QUERY_OPTIONS.add(client);
-    const queryOptions = defaultQueryOptions();
+    const queryOptions = { ...defaultQueryOptions() };
     const execute = (client as { execute?: unknown }).execute;
     if (typeof execute === "function") {
       (client as { execute?: Execute }).execute = (sql, values) =>
         (execute as Execute).call(client, sql, values?.map(bind));
     }
     const native = (client as { query?: (options: object) => Promise<Native> }).query;
-    const _query = async function (this: Mysql2Client, sql: string, _options: QueryOptions) {
-      return storeResult(this, await native!.call(this, options(this, sql)).catch(driverError));
+    const _query = async function (this: Mysql2Client, sql: string, opts: QueryOptions) {
+      return storeResult(
+        this,
+        await native!.call(this, options(this, sql, opts)).catch(driverError),
+      );
     };
     for (const [name, value] of Object.entries({
       queryOptions,
@@ -360,13 +377,11 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     Object.defineProperty(client, "warningCount", warningCount);
     const config = (client as { config?: { typeCast?: unknown } }).config;
     if (config) {
-      const typeCast = config.typeCast;
+      if (typeof config.typeCast === "function") {
+        TYPE_CAST.set(client, config.typeCast as TypeCast);
+      }
       config.typeCast = (field: Field, next: () => unknown) =>
-        cast(
-          queryOptions,
-          field,
-          typeof typeCast === "function" ? () => (typeCast as TypeCast)(field, next) : next,
-        );
+        typeCastFor(client, (client as unknown as Mysql2Client).queryOptions)(field, next);
     }
   }
   return Object.defineProperty(client, "automaticClose", automaticClose) as T & Mysql2Client;
@@ -436,6 +451,7 @@ export const Mysql2 = {
   },
   Client: {
     new: newClient,
+    defaultQueryOptions,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
     OPTION_MULTI_STATEMENTS_ON: 0,

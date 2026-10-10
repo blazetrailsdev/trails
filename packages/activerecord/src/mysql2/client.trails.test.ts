@@ -80,11 +80,22 @@ describe("Mysql2::Client#warning_count", () => {
     expect(client.warningCount).toBe(2);
   });
 
-  it("query merges its options over query_options", async () => {
-    const client = mysql2Client({ query: vi.fn(async () => [[], [{ name: "a" }]]) });
-    const _query = vi.spyOn(client, "_query");
-    await client.query("SELECT 1", { as: "array" });
-    expect(_query).toHaveBeenCalledWith("SELECT 1", { ...client.queryOptions, as: "array" });
-    expect(client.queryOptions.as).toBe("hash");
+  it("query merges its options over query_options, and _query casts with what it is handed", async () => {
+    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    await client.query("SELECT 1", { databaseTimezone: "utc" });
+    expect(client.queryOptions.databaseTimezone).toBe("local");
+    const { typeCast } = native.mock.calls[0][0] as {
+      typeCast(field: object, next: () => unknown): Time;
+    };
+    const time = typeCast({ type: "DATETIME", string: () => "2026-04-27 14:23:55" }, () => null);
+    expect(time.getutc().hour).toBe(14);
+  });
+
+  it("default_query_options is one shared Hash each client dups", () => {
+    expect(Mysql2.Client.defaultQueryOptions()).toBe(Mysql2.Client.defaultQueryOptions());
+    const { queryOptions } = mysql2Client({});
+    expect(queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
+    expect(queryOptions).not.toBe(Mysql2.Client.defaultQueryOptions());
   });
 });

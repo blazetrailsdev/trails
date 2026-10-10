@@ -188,10 +188,13 @@ describe("PG::Error#result on every carrier path", () => {
 
 describe("PG::Error", () => {
   it("is the class of an error the connection's query raised, and of no other", async () => {
-    const failure = new Error("boom");
+    const failure = Object.assign(new Error("boom"), { name: "error", code: "57014" });
     const client = pgConnection({ query: () => Promise.reject(failure) });
     await expect(client.query("SELECT 1")).rejects.toBe(failure);
     expect(failure).toBeInstanceOf(PG.Error);
+    const bug = new TypeError("values is not iterable");
+    await expect(pgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(bug);
+    expect(bug).not.toBeInstanceOf(PG.Error);
     expect(new TypeError("conn.status is not a function")).not.toBeInstanceOf(PG.Error);
   });
 
