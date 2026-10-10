@@ -1,6 +1,6 @@
 import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual, registerConstant } from "@blazetrails/ruby-compat";
+import { DelegateClass, rbEqual, rbObjInspect, registerConstant } from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import type { ColumnSerializer } from "../coders/column-serializer.js";
 
@@ -36,6 +36,10 @@ export class Serialized extends DelegateClass(ValueType) {
       return super.serialize(this.coder.dump(value));
     }
     return null;
+  }
+
+  inspect(): string {
+    return rbObjInspect(this);
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {

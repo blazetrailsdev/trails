@@ -13,6 +13,7 @@ import {
   methodUsesDepImport,
   moduleFunctionOwner,
   rubyRefSpellings,
+  visitMethodDeclarations,
 } from "./lint-deps.js";
 
 function makeSourceFile(source: string): ts.SourceFile {
@@ -812,5 +813,66 @@ describe("collectTaintedSymbols — transitive dep usage", () => {
       expect(tainted.has(sym)).toBe(true);
       expect(taintedRefs.get(sym)?.has("Attribute")).toBe(true);
     }
+  });
+});
+
+describe("visitMethodDeclarations", () => {
+  it("visits the methods of an object literal standing in for a Ruby `extend self` module", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install(registry: Factory): void {},
+        writeRecord(record: Base, packer: Packer): void {},
+      };
+      export const helper = () => 1;
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "writeRecord", "helper"]);
+  });
+
+  it("visits an object literal's function-valued properties and skips its data", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install: (registry: Factory): void => {},
+        readRecord: function (unpacker: Unpacker) {},
+        version: 1,
+        writeRecord: () => {
+          throw new NotImplementedError();
+        },
+      };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "readRecord"]);
+  });
+
+  it("does not visit a function-valued property of a literal that is not a const's initializer", () => {
+    const sf = makeSourceFile(`
+      registerFoo({ handler: () => {} });
+      class Host {
+        static table = { fn: () => {} };
+      }
+      export const Extensions = { nested: { deep: () => {} } };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual([]);
+  });
+
+  it("anchors an object literal's member on the member, so an opt-out is per member", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        // lint-deps-ignore: arel
+        install(registry: Factory): void {},
+        // lint-deps-ignore: arel
+        writeRecord: (record: Base): void => {},
+        readRecord(unpacker: Unpacker) {},
+      };
+    `);
+    const covered: Record<string, boolean> = {};
+    visitMethodDeclarations(sf, (name, node, anchor) => {
+      covered[name] = methodUsesDepImport(node, new Set(["Nodes"]), new Set(), "arel", sf, anchor);
+    });
+    expect(covered).toEqual({ install: true, writeRecord: true, readRecord: false });
   });
 });
