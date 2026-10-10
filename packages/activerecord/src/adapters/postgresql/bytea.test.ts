@@ -3,7 +3,7 @@ import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { fixtures } from "../../test-fixtures.js";
 import { Base } from "../../index.js";
-import { assert, assertNotPredicate } from "@blazetrails/activesupport";
+import { assert, assertEqual, assertNotPredicate } from "@blazetrails/activesupport";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { dumpTableSchema } from "../../support/schema-dumping-helper.js";
 
@@ -142,7 +142,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       obj.serialized = "hello world";
       await obj.saveBang();
       await obj.reload();
-      expect(obj.serialized).toBe("hello world");
+      assertEqual("hello world", obj.serialized);
     });
 
     it("schema dumping", async () => {

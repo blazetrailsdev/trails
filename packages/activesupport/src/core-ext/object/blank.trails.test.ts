@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { isBlank, presence } from "../../index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {
+  it("reads a String held as its bytes as String#blank? does", () => {
+    expect(isBlank(Uint8Array.of(0x20, 0x0a))).toBe(true);
+    expect(isBlank(Uint8Array.of(0x7b))).toBe(false);
+  });
+
   it("invokes a method-shaped isEmpty, as blank.rb:19 invokes empty?", () => {
     class Buffer {
       constructor(private readonly items: string[]) {}

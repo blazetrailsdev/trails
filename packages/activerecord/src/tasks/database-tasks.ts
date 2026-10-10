@@ -3,7 +3,6 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { Migration, ProtectedEnvironmentError } from "../migration.js";
-import { _setDatabaseTasks } from "./database-tasks-slot.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
 import {
@@ -31,6 +30,7 @@ import {
   File,
   FileUtils,
   getPath,
+  rbModConstSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
@@ -858,7 +858,7 @@ export class DatabaseTasks {
   }
 }
 
-_setDatabaseTasks(DatabaseTasks);
+rbModConstSet(ActiveRecord.Tasks, "DatabaseTasks", DatabaseTasks);
 
 export interface DatabaseTaskInstance {
   create?(): Promise<unknown>;

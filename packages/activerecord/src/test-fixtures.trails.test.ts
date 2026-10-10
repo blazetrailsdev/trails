@@ -26,6 +26,15 @@ describe("TestFixtures::ClassMethods", () => {
     klass = k as unknown as Host;
   });
 
+  it("setup_fixture_accessors keys a Symbol set name by its String", () => {
+    klass.setupFixtureAccessors([":posts", ":admin/users", "accounts"]);
+    expect(klass.fixtureSets).toEqual({
+      posts: "posts",
+      admin_users: "admin/users",
+      accounts: "accounts",
+    });
+  });
+
   it("set_fixture_class merges stringified class names", () => {
     const model = class {};
     klass.setFixtureClass({ some_fixture: model });

@@ -3,6 +3,8 @@ import {
   RuntimeError,
   getChildProcessAsync,
   rbEqq,
+  rbFSystem,
+  rbModConstSet,
   File,
   FileUtils,
 } from "@blazetrails/ruby-compat";
@@ -12,6 +14,7 @@ import type { SQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
+import { Tasks } from "../namespaces.js";
 import { NoDatabaseError, DatabaseAlreadyExists } from "../errors.js";
 
 export class SQLiteDatabaseTasks {
@@ -107,10 +110,8 @@ export class SQLiteDatabaseTasks {
   }
 
   private async runCmd(cmd: string, args: string[], out: string): Promise<void> {
-    const childProcess = await getChildProcessAsync();
-    if (childProcess.spawnSync(cmd, args, { encoding: "utf8", out }).status !== 0) {
+    if (!(await rbFSystem(cmd, ...args, { out })))
       throw new RuntimeError(this.runCmdError(cmd, args));
-    }
   }
 
   private runCmdError(cmd: string, args: string[]): string {
@@ -121,4 +122,5 @@ export class SQLiteDatabaseTasks {
   }
 }
 
+rbModConstSet(Tasks, "SQLiteDatabaseTasks", SQLiteDatabaseTasks);
 DatabaseTasks.registerTask(/sqlite/, SQLiteDatabaseTasks);

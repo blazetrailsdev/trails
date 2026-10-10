@@ -22,17 +22,11 @@ export class Serialized extends DelegateClass(ValueType) {
     return IndifferentHashAccessor;
   }
 
-  /** @inventedArm if — CONVERGEABLE serialized-deserialize-decodes-binary-subtype-bytes-in-line */
   deserialize(value: unknown): unknown {
     if (this.isDefaultValue(value)) {
       return value;
     } else {
-      const deserialized = super.deserialize(value);
-      return this.coder.load(
-        this.subtype!.type() === "binary" && deserialized instanceof Uint8Array
-          ? Buffer.from(deserialized).toString("utf8")
-          : deserialized,
-      );
+      return this.coder.load(super.deserialize(value));
     }
   }
 

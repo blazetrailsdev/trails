@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
+  type ChildProcessAdapter,
   getChildProcess,
   getChildProcessAsync,
   File,
@@ -317,7 +318,7 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
     created.push(filename);
 
     const childProcess = await getChildProcessAsync();
-    const spawnSync = vi.spyOn(childProcess, "spawnSync");
+    const system = vi.spyOn(childProcess as Required<ChildProcessAdapter>, "system");
 
     let message = "";
     DatabaseTasks.structureDumpFlags = ["--noop"];
@@ -328,10 +329,11 @@ describeIfSqlite("SqliteStructureDumpTest", () => {
       }),
     ).rejects.toThrow(Error);
 
-    expect(spawnSync).toHaveBeenCalledWith(
+    expect(system).toHaveBeenCalledWith(
       "sqlite3",
+      expect.anything(),
       ["--noop", database, ".schema --nosys"],
-      expect.objectContaining({ out: filename }),
+      { out: filename },
     );
     expect(message).toMatch("failed to execute:");
   });

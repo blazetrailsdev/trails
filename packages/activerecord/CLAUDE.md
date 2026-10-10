@@ -477,8 +477,8 @@ against this section, and there is no story to convert the fixtures to `.yml`.
 
 The activerecord inventory for root CLAUDE.md § "Call-time constant
 resolution". `activerecord/src/namespaces.ts` holds the `ActiveRecord`,
-`ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters` and
-`ActiveRecord::Encryption` namespace objects, extended with
+`ActiveRecord::Associations`, `ActiveRecord::ConnectionAdapters`,
+`ActiveRecord::Encryption` and `ActiveRecord::Tasks` namespace objects, extended with
 `ActiveSupport::Autoload` like arel's, mirroring `active_record.rb:43-112`,
 `associations.rb:15,29-41` and `encryption.rb:10-35`. Each constant is seated
 by the module that defines it:
@@ -510,6 +510,12 @@ by the module that defines it:
   `DefaultStrategy` (`:572-576`); command-recorder.ts reads
   `ActiveRecord.IrreversibleMigration` at call time, so it takes no edge back
   into migration.ts.
+- `Tasks` (`active_record.rb:173-180`): `DatabaseTasks` and the three
+  adapter task classes. `migration.ts` reads `ActiveRecord.Tasks.DatabaseTasks`
+  at call time (`migration.rb:151-183,696,750,1037-1041,1361-1365`), because
+  `database-tasks.ts` imports `migration.ts` and `connection-handling.ts`, and
+  a plain import back re-enters the `schema-statements.ts ->
+migration/command-recorder.ts -> migration.ts` cycle.
 - `ActiveRecord` registers itself with `constantize`, which walks each further
   segment through the constant seated on its namespace, as `Object.const_get`
   does (`inflector/methods.rb:289-291`).
@@ -539,14 +545,7 @@ exception only when that lane is shown to reach it. A seat on the
 it; `Base` holds none of them) needs no guard: the module is a plain import and
 holds the Rails default.
 
-The one remaining zero-import slot, and the cycle it breaks:
-
-- `activerecord/src/tasks/database-tasks-slot.ts` — `DatabaseTasks`, read by
-  `migration.ts` for `ActiveRecord::Tasks::DatabaseTasks`
-  (`migration.rb:151-183,696,750,1037-1041,1361-1365`). `database-tasks.ts`
-  imports `migration.ts` and `connection-handling.ts`, so a plain import back
-  re-enters the `schema-statements.ts -> migration/command-recorder.ts ->
-migration.ts` cycle `ActiveRecord.ConnectionHandling` breaks.
+No zero-import slot remains in activerecord.
 
 ## An adapter file is loaded by an awaited step (`ConnectionAdapters.resolve`'s `require`)
 

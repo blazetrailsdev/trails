@@ -1,18 +1,11 @@
-import {
-  getChildProcessAsync,
-  merge,
-  rbEqq,
-  RuntimeError,
-  stderr,
-  stdout,
-  type SpawnSyncResult,
-} from "@blazetrails/ruby-compat";
+import { merge, rbEqq, rbFSystem, rbModConstSet, RuntimeError } from "@blazetrails/ruby-compat";
 import { kernelArray } from "@blazetrails/activesupport";
 import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { HashConfig } from "../database-configurations/hash-config.js";
 import { Base } from "../base.js";
 import { DatabaseTasks } from "./database-tasks.js";
+import { Tasks } from "../namespaces.js";
 
 type ConfigHash = Record<string, unknown>;
 
@@ -132,15 +125,8 @@ export class MySQLDatabaseTasks {
     return (await Base.connectionPool().leaseConnection()) as Mysql2Adapter;
   }
 
-  /** @inventedArm write — CONVERGEABLE tasks-run-cmd-through-kernel-system-inherited-stdio */
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
-    const childProcess = await getChildProcessAsync();
-    const result: SpawnSyncResult = childProcess.spawnSync(cmd, args, {
-      encoding: "utf8",
-    });
-    stdout.write(result.stdout ?? "");
-    stderr.write(result.stderr ?? "");
-    if (result.status !== 0) throw new RuntimeError(runCmdError(cmd, args, action));
+    if (!(await rbFSystem(cmd, ...args))) throw new RuntimeError(runCmdError(cmd, args, action));
   }
 
   /** @internal */
@@ -167,5 +153,6 @@ export function runCmdError(cmd: string, _args: string[], _action: string): stri
   );
 }
 
+rbModConstSet(Tasks, "MySQLDatabaseTasks", MySQLDatabaseTasks);
 DatabaseTasks.registerTask(/mysql/, MySQLDatabaseTasks);
 DatabaseTasks.registerTask(/trilogy/, MySQLDatabaseTasks);

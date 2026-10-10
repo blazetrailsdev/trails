@@ -6,10 +6,12 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { MethodInfo } from "@blazetrails/parity/types";
 import type { SkeletonRow } from "./report-arms.js";
 import {
+  rubyPrivates,
   sampleRows,
   tsVoidReturns,
   voidReturnRows,
   type ApiManifest,
+  type PackageReturnUses,
   type ReturnUses,
 } from "./report-void-returns.js";
 
@@ -23,13 +25,19 @@ const PAIRS = [
   ["activemodel", "attribute.rb", "forgetting_assignment", "attribute.ts", "forgettingAssignment", true],
 ] as const;
 
+const uses = (reads: PackageReturnUses["reads"], defs: PackageReturnUses["defs"] = {}) => ({
+  lib: "lib",
+  reads,
+  defs,
+});
+
 const USES: ReturnUses = {
-  activerecord: {
-    establish_connection: { count: 1, site: "pending_migration_connection.rb:6" },
-    "connection_specification_name=": { count: 1, site: "x.rb:1" },
-  },
-  activesupport: { assert_not: { count: 1, site: "test_case_test.rb:21" } },
-  activemodel: { forgetting_assignment: { count: 1, site: "attribute.rb:9" } },
+  activerecord: uses({
+    establish_connection: [["lib/pending_migration_connection.rb", 6, false]],
+    "connection_specification_name=": [["lib/x.rb", 1, true]],
+  }),
+  activesupport: uses({ assert_not: [["test/test_case_test.rb", 21, true]] }),
+  activemodel: uses({ forgetting_assignment: [["lib/attribute.rb", 9, false]] }),
 };
 
 function manifest(): ApiManifest {
@@ -75,6 +83,48 @@ describe("voidReturnRows", () => {
   });
 });
 
+describe("voidReturnRows homonyms", () => {
+  const pair = (rubyFile: string, tsFile: string) =>
+    ({ package: "ar", rubyFile, rubyName: "validate", tsFile, tsName: "validate" }) as SkeletonRow;
+  const pairs = [pair("migration.rb", "migration.ts"), pair("fixture_set/file.rb", "file.ts")];
+  const voids = new Set(pairs.map((r) => `ar\u0000${r.tsFile}\u0000validate`));
+  const defs = { "lib/migration.rb": ["validate"], "lib/fixture_set/file.rb": ["validate"] };
+  const files = (reads: PackageReturnUses["reads"], privates?: Set<string>) =>
+    voidReturnRows(pairs, { ar: uses(reads, defs) }, voids, privates).map((r) => r.rubyFile);
+
+  it("attributes a receiverless read to the definition in its own file only", () => {
+    expect(files({ validate: [["lib/fixture_set/file.rb", 55, true]] })).toEqual([
+      "fixture_set/file.rb",
+    ]);
+    expect(files({ validate: [["lib/other.rb", 3, true]] })).toEqual([
+      "migration.rb",
+      "fixture_set/file.rb",
+    ]);
+  });
+
+  it("does not attribute a read through a receiver to a private method", () => {
+    const rubyApi = {
+      packages: {
+        ar: {
+          fileFunctions: {
+            "migration.rb": [
+              { name: "validate", visibility: "private", params: [], file: "migration.rb" },
+            ],
+          },
+        },
+      },
+    } as ApiManifest;
+    const privates = rubyPrivates(rubyApi);
+    expect(files({ validate: [["lib/other.rb", 3, false]] }, privates)).toEqual([
+      "fixture_set/file.rb",
+    ]);
+    expect(files({ validate: [["lib/other.rb", 3, true]] }, privates)).toEqual([
+      "migration.rb",
+      "fixture_set/file.rb",
+    ]);
+  });
+});
+
 describe("sampleRows", () => {
   it("draws the same rows whatever order they arrive in", () => {
     expect(sampleRows(rows, 1)).toEqual(sampleRows([...rows].reverse(), 1));
@@ -84,7 +134,8 @@ describe("sampleRows", () => {
 
 describe("extract-return-uses.rb", () => {
   let dir: string;
-  let uses: Record<string, { count: number; site: string }>;
+  let uses: Record<string, [file: string, line: number, bare: boolean][]>;
+  let defs: Record<string, string[]>;
 
   beforeAll(async () => {
     dir = await mkdtemp(path.join(tmpdir(), "return-uses-"));
@@ -100,13 +151,15 @@ describe("extract-return-uses.rb", () => {
         "records.each { |r| r }.size",
         "statement_only(1)",
         "local = 1; local.to_s",
+        "def validate(x) = x",
+        "def self.build(x) = x",
       ].join("\n"),
     );
     const script = path.join(import.meta.dirname, "extract-return-uses.rb");
     const stdout = execFileSync("ruby", [script, JSON.stringify({ pkg: [dir] })], {
       encoding: "utf-8",
     });
-    uses = JSON.parse(stdout).pkg;
+    ({ reads: uses, defs } = JSON.parse(stdout).pkg);
   });
 
   afterAll(async () => {
@@ -126,7 +179,13 @@ describe("extract-return-uses.rb", () => {
         "records",
       ].sort(),
     );
-    expect(uses.establish_connection.site).toMatch(/sample\.rb:1$/);
+    expect(uses.establish_connection[0][0]).toMatch(/sample\.rb$/);
+    expect(uses.establish_connection[0].slice(1)).toEqual([1, true]);
+    expect(uses.open[0].slice(1)).toEqual([5, false]);
+  });
+
+  it("lists the method names each file defines", () => {
+    expect(Object.values(defs)).toEqual([["validate", "build"]]);
   });
 
   it("skips assert_nil's argument, Ruby core names, statements and locals", () => {

@@ -17,8 +17,13 @@
 # nothing, and neither does `assert_nil m`'s argument, which asserts there is no
 # return value (`trilogy_adapter_test.rb:162`).
 #
+# Each read carries its file and whether it is receiverless (`:fcall` / `:vcall`
+# / `:command`), and each file lists the method names it defines, which
+# report-void-returns.ts#voidReturnRows attributes reads by.
+#
 # Usage: ruby extract-return-uses.rb '{"<pkg>": ["<dir>", …], …}'
-# Prints {"<pkg>": {"<name>": {"count": N, "site": "<file>:<line>"}}}.
+# Prints {"<pkg>": {"reads": {"<name>": [["<file>", <line>, <bare>], …]},
+#                   "defs": {"<file>": ["<name>", …]}}}.
 require "json"
 require "ripper"
 require "set"
@@ -35,6 +40,14 @@ def call_name(node)
   when *CALL_WRAPPERS then call_name(node[1])
   when :command, :fcall, :vcall then ident(node[1])
   when :call, :command_call then ident(node[3])
+  end
+end
+
+def bare_call?(node)
+  case node[0]
+  when *CALL_WRAPPERS then bare_call?(node[1])
+  when :command, :fcall, :vcall then true
+  else false
   end
 end
 
@@ -72,27 +85,31 @@ def value_reads(node)
   end
 end
 
-def walk(node, file, uses)
+def walk(node, file, reads, defs)
   return unless node.is_a?(Array)
+
+  defined = ident(node[1]) if node[0] == :def
+  defined = ident(node[3]) if node[0] == :defs
+  (defs[file] ||= []) << defined.first if defined
 
   value_reads(node).each do |expr|
     name, line = call_name(expr)
     next if name.nil? || CORE_NAMES.include?(name)
 
-    use = (uses[name] ||= { count: 0, site: "#{file}:#{line}" })
-    use[:count] += 1
+    (reads[name] ||= []) << [file, line, bare_call?(expr)]
   end
-  node.each { |child| walk(child, file, uses) }
+  node.each { |child| walk(child, file, reads, defs) }
 end
 
 roots = JSON.parse(ARGV.fetch(0))
 out = roots.to_h do |pkg, dirs|
-  uses = {}
+  reads = {}
+  defs = {}
   dirs.each do |dir|
     Dir.glob(File.join(dir, "**", "*.rb")).sort.each do |path|
-      walk(Ripper.sexp(File.read(path)), path.sub(%r{\A.*/vendor/[^/]+/[^/]+/}, ""), uses)
+      walk(Ripper.sexp(File.read(path)), path.sub(%r{\A.*/vendor/[^/]+/[^/]+/}, ""), reads, defs)
     end
   end
-  [pkg, uses]
+  [pkg, { reads: reads, defs: defs.transform_values(&:uniq) }]
 end
 puts JSON.generate(out)
