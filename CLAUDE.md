@@ -867,6 +867,15 @@ As a consequence:
   (`action_dispatch/routing/mapper.rb:198-204`) keeps a constraint named after a
   private `Request` method, filed as
   `mapper-build-conditions-keeps-request-private-method-constraints`.
+- `ActiveRecord::Core#to_ary` (`activerecord/lib/active_record/core.rb:822-832`)
+  is not ported. It is private and answers `nil`, there only to keep
+  `Array#flatten` off a record's `method_missing`, so a Rails record does not
+  `respond_to?(:to_ary)`. A `toAry` member would answer "defined", and
+  `serializable_hash` (`activemodel/lib/active_model/serialization.rb:141`) and
+  `fields_for_with_nested_attributes`
+  (`actionview/lib/action_view/helpers/form_helper.rb:2713-2718`) would read a
+  single record as a collection. Its scoped skip for `core.rb` / `base.rb` is
+  permanent, ruled by the repo owner on trails#8750.
 - `defineModule`'s section record (`ruby-compat/src/include.ts`), read by
   `publicInstanceMethods`, is such a mechanism and stays. It is read once at
   load, where a Rails body enumerates `public_instance_methods`

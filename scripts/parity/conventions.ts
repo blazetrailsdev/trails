@@ -1156,7 +1156,7 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`ActiveRecord::Core#to_ary` (core.rb:822-832) is private and answers " +
+      "PERMANENT — `ActiveRecord::Core#to_ary` (core.rb:822-832) is private and answers " +
       "`nil`, defined only so `Array#flatten` does not reach a record's " +
       "`method_missing`. A trails record has no `method_missing` to reach " +
       '(CLAUDE.md § "Records are not Proxies"), and a private method is ' +
