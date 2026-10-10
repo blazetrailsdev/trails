@@ -618,7 +618,9 @@ function checkDefinitionVisibility(
  * {@link rbFSend} dispatches to. A false `inherit` answers for `mod`'s
  * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
  * A `Module` instance keeps its method table on a private carrier and answers
- * through its own `isMethodDefined`.
+ * through its own `isMethodDefined`, for that table only whatever `inherit` is:
+ * a ruby-compat `Module` copies an included module's methods into its includer
+ * and records no ancestor to walk.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -627,7 +629,7 @@ export function rbModMethodDefined(
   mid: string,
   inherit = true,
 ): boolean {
-  if ("isMethodDefined" in mod) return mod.isMethodDefined(mid);
+  if (!("prototype" in mod)) return mod.isMethodDefined(mid);
   return checkDefinitionVisibility(mod, mid, inherit);
 }
 

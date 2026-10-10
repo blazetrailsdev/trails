@@ -202,7 +202,7 @@ export function rbStrScan(self: StringReceiver, ...argv: unknown[]): unknown {
 /**
  * `String#scan` (`vendor/ruby/v3.3.11/string.c:10131` `rb_str_scan`) over a
  * pattern that ends in a group calling itself,
- * `head(?<name>([^()]|\(\g<name>\))+)\)`, where `head` matches through the
+ * `head(?<name>(:?[^()]|\(\g<name>\))+)\)`, where `head` matches through the
  * opening parenthesis. `\g<name>` is Onigmo's subexpression call (`TK_CALL`,
  * `vendor/ruby/v3.3.11/regparse.c:3855`), which a JS `RegExp` cannot spell, so
  * the balanced group is matched here and answered as the last capture.
