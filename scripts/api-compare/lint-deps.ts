@@ -401,17 +401,23 @@ export function visitMethodDeclarations(
               callback(decl.name.text, decl.initializer, node);
             }
           } else if (ts.isObjectLiteralExpression(decl.initializer)) {
-            visit(decl.initializer);
+            for (const prop of decl.initializer.properties) {
+              if (
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
+              ) {
+                callback(prop.name.text, prop.initializer, prop);
+              } else if (!ts.isPropertyAssignment(prop)) {
+                visit(prop);
+              }
+            }
           }
         }
       }
       return;
     }
-    if (
-      (ts.isPropertyDeclaration(node) || ts.isPropertyAssignment(node)) &&
-      node.name &&
-      ts.isIdentifier(node.name)
-    ) {
+    if (ts.isPropertyDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
       if (
         node.initializer &&
         (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))

@@ -843,6 +843,19 @@ describe("visitMethodDeclarations", () => {
     expect(names).toEqual(["install", "readRecord"]);
   });
 
+  it("does not visit a function-valued property of a literal that is not a const's initializer", () => {
+    const sf = makeSourceFile(`
+      registerFoo({ handler: () => {} });
+      class Host {
+        static table = { fn: () => {} };
+      }
+      export const Extensions = { nested: { deep: () => {} } };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual([]);
+  });
+
   it("anchors an object literal's member on the member, so an opt-out is per member", () => {
     const sf = makeSourceFile(`
       export const Extensions = {
