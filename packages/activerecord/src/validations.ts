@@ -1,7 +1,8 @@
 import type { AttrNameArg } from "@blazetrails/activemodel";
 import { I18n, Model } from "@blazetrails/activemodel";
-import { rbModConstSet } from "@blazetrails/ruby-compat";
+import { Module, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveRecordError } from "./errors.js";
+import { ActiveRecord } from "./namespaces.js";
 
 export type ValidationContextArg = string | string[] | null;
 import { AbsenceValidator } from "./validations/absence.js";
@@ -42,8 +43,12 @@ export class RecordInvalid extends ActiveRecordError {
   }
 }
 
-export const Validations = { name: "ActiveRecord::Validations", validate, customValidationContext };
+export const Validations = new Module((mod) => {
+  mod.defineMethod("validate", validate);
+  mod.defineMethod("customValidationContext", customValidationContext);
+});
 
+rbModConstSet(ActiveRecord, "Validations", Validations);
 rbModConstSet(Validations, "AbsenceValidator", AbsenceValidator);
 rbModConstSet(Validations, "AssociatedValidator", AssociatedValidator);
 rbModConstSet(Validations, "LengthValidator", LengthValidator);

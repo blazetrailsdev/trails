@@ -1,6 +1,7 @@
 import { rbConstGet, rbModName } from "@blazetrails/ruby-compat";
 import { describe, expect, it } from "vitest";
 import { Base } from "./index.js";
+import { ActiveRecord } from "./namespaces.js";
 import {
   AbsenceValidator,
   AssociatedValidator,
@@ -34,6 +35,7 @@ describe("ValidatesConstantLookupTest", () => {
 
   it("seats the validators on ActiveRecord::Validations, not on Base", () => {
     expect(Object.keys(Base).filter((key) => key.endsWith("Validator"))).toEqual([]);
+    expect(rbConstGet(ActiveRecord, "Validations")).toBe(Validations);
     expect(rbConstGet(Validations, "PresenceValidator")).toBe(PresenceValidator);
     expect(rbModName(UniquenessValidator)).toBe("ActiveRecord::Validations::UniquenessValidator");
   });

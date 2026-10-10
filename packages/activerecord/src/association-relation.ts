@@ -8,8 +8,6 @@ import { rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
   /** @internal */
-
-  /** @internal */
   _association: CollectionProxy<T> | Association;
 
   constructor(klass: typeof Base, association: CollectionProxy<T> | Association) {

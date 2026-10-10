@@ -2229,7 +2229,6 @@ include(Base, {
   increment: _Persistence.increment,
   decrement: _Persistence.decrement,
   toggle: _Persistence.toggle,
-  incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
   destroyBang: _Persistence.destroyBang,

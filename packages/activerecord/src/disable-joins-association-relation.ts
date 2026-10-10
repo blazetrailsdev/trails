@@ -8,8 +8,6 @@ export type DjarKey = string | string[];
 export type DjarIds = unknown[] | PromiseLike<unknown[]>;
 
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T, boolean> {
-  /** @internal */
-
   readonly key: DjarKey;
   private readonly _ids: DjarIds;
 

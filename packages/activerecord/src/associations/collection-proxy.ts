@@ -69,8 +69,6 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean> {
-  /** @internal */
-
   private _association!: CollectionAssociation;
   private _assocName: string;
   private get _target(): T[] {

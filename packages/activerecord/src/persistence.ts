@@ -1008,6 +1008,7 @@ export const Persistence = new Module((mod) => {
   );
   mod.defineMethod("_createRecord", _createRecord);
   mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("incrementBang", incrementBang);
 });
 
 /** @internal */

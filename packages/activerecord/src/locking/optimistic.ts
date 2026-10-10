@@ -1,18 +1,10 @@
-import {
-  DelegateClass,
-  type Hash,
-  include,
-  merge,
-  Module,
-  rtest,
-  union,
-} from "@blazetrails/ruby-compat";
+import { DelegateClass, type Hash, merge, Module, rtest, union } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
 import { ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
-import { incrementBang as persistenceIncrementBang } from "../persistence.js";
+import type { incrementBang as persistenceIncrementBang } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
 import type { CounterCacheCounters } from "../counter-cache.js";
 import { Locking } from "../namespaces.js";
@@ -52,16 +44,11 @@ export interface Optimistic {
   readonly lockOptimistically: boolean;
 }
 
-export const Optimistic = {
+export const Optimistic = Object.assign(new Module(), {
   [included](base: object): void {
-    include(base as new () => object, SuperMethods);
     classAttribute.call(base, "lockOptimistically", { instanceWriter: false, default: true });
   },
-  lockingEnabled,
-  incrementBang,
-  _lockValueForDatabase,
-  _clearLockingColumn,
-};
+});
 
 interface LockingRecord {
   constructor: { lockingEnabled: boolean; lockingColumn: string };
@@ -87,10 +74,7 @@ export async function incrementBang(
   this: LockingRecord & { lockingEnabled(): boolean },
   ...args: Parameters<typeof persistenceIncrementBang>
 ): Promise<unknown> {
-  const result = await (persistenceIncrementBang as (...a: unknown[]) => Promise<unknown>).apply(
-    this,
-    args,
-  );
+  const result = await Optimistic.superMethod(this, "incrementBang")!(...args);
   if (this.lockingEnabled()) {
     const lockingColumn = this.constructor.lockingColumn;
     this.writeAttribute(lockingColumn, Number(this.readAttribute(lockingColumn)) + 1);
@@ -241,13 +225,15 @@ export function _clearLockingColumn(this: InstanceLockingHost): void {
 }
 
 export function initializeDup(this: InstanceLockingHost, other: unknown): void {
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  Optimistic.superMethod(this, "initializeDup")!(other);
   if (this.constructor.lockingEnabled) _clearLockingColumn.call(this);
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initializeDup", initializeDup);
-});
+Optimistic.defineMethod("lockingEnabled", lockingEnabled);
+Optimistic.defineMethod("incrementBang", incrementBang);
+Optimistic.defineMethod("_lockValueForDatabase", _lockValueForDatabase);
+Optimistic.defineMethod("_clearLockingColumn", _clearLockingColumn);
+Optimistic.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function _queryConstraintsHash(

@@ -13,7 +13,6 @@ import {
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   hashAref,
-  include,
   Module,
   rbClassSuperclass,
   rbModName,
@@ -27,15 +26,14 @@ export interface Inheritance {
   readonly storeFullStiClass: boolean;
 }
 
-export const Inheritance = {
+export const Inheritance = Object.assign(new Module(), {
   [included](base: object): void {
-    include(base as new () => object, SuperMethods);
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
 
     setBaseClass(base as typeof Base);
   },
-};
+});
 
 /**
  * @internal
@@ -228,13 +226,11 @@ export function initializeClone(
 }
 
 export function initializeDup(this: Base, other: unknown): void {
-  SuperMethods.superMethod(this, "initializeDup")!(other);
+  Inheritance.superMethod(this, "initializeDup")!(other);
   ensureProperType.call(this);
 }
 
-const SuperMethods = new Module((mod) => {
-  mod.defineMethod("initializeDup", initializeDup);
-});
+Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {

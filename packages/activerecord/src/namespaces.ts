@@ -44,6 +44,7 @@ import type { Encryptor } from "./encryption/encryptor.js";
 import type { EnvelopeEncryptionKeyProvider } from "./encryption/envelope-encryption-key-provider.js";
 import type * as Errors from "./encryption/errors.js";
 import type { ExtendedDeterministicQueries } from "./encryption/extended-deterministic-queries.js";
+import type { Validations } from "./validations.js";
 import type { ExtendedDeterministicUniquenessValidator } from "./encryption/extended-deterministic-uniqueness-validator.js";
 import type { Key } from "./encryption/key.js";
 import type { KeyGenerator } from "./encryption/key-generator.js";
@@ -186,6 +187,7 @@ const loadPath: Record<string, () => Promise<unknown>> = {
 };
 
 export const ActiveRecord = { name: "ActiveRecord", loadPath } as AutoloadModule & {
+  Validations: typeof Validations;
   Base: typeof Base;
   ConnectionHandling: typeof ConnectionHandling;
   Encryption: typeof Encryption;

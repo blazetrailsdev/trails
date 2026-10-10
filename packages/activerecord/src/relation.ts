@@ -305,8 +305,6 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base, G extends boolean = false> {
-  /** @internal */
-
   static create = _delegationCreate;
 
   static readonly MULTI_VALUE_METHODS = [
