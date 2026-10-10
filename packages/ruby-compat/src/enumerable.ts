@@ -9,6 +9,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { each } from "./array.js";
 import {
   numericPlus,
   rbBigNorm,
@@ -17,9 +18,11 @@ import {
   rbIntegerTypeP,
   rbPlus,
 } from "./numeric.js";
+import { rbFPublicSend, rbFSend } from "./object.js";
 import { Rational } from "./rational.js";
 import { checkArity } from "./string/support.js";
 import { rbEqq, rbEqual } from "./rb-equal.js";
+import { isSymbol, stringToSym, symbolToS } from "./symbol.js";
 
 /** @noRailsEquivalent PERMANENT */
 export interface Each<T, E = unknown> {
@@ -398,6 +401,128 @@ function sum<T, E = unknown>(this: Each<T, E>, ...args: unknown[]): unknown {
     },
     () => enumSumValue(memo),
   );
+}
+
+const undef = Symbol("Qundef");
+
+interface InjectMemo<T> {
+  v1: unknown;
+  block: ((memo: unknown, i: T) => unknown) | undefined;
+  op: unknown;
+}
+
+/** `inject_i` (`vendor/ruby/v3.3.11/enum.c:775`). */
+function injectI<T>(i: T, memo: InjectMemo<T>): void {
+  if (memo.v1 === undef) {
+    memo.v1 = i;
+  } else {
+    memo.v1 = memo.block!(memo.v1, i);
+  }
+}
+
+/** `inject_op_i` (`vendor/ruby/v3.3.11/enum.c:791`). */
+function injectOpI<T>(i: T, memo: InjectMemo<T>): void {
+  const name = memo.op;
+  if (memo.v1 === undef) {
+    memo.v1 = i;
+  } else if (isSymbol(name)) {
+    memo.v1 = rbFPublicSend(memo.v1, name, i);
+  } else {
+    memo.v1 = rbFSend(memo.v1, name, i);
+  }
+}
+
+/** `ary_inject_op` (`vendor/ruby/v3.3.11/enum.c:815`). */
+function aryInjectOp(ary: readonly unknown[], init: unknown, op: string): unknown {
+  let v: unknown;
+  let i: number;
+
+  if (ary.length === 0) return init === undef ? null : init;
+
+  if (init === undef) {
+    v = ary[0];
+    i = 1;
+    if (ary.length === 1) return v;
+  } else {
+    v = init;
+    i = 0;
+  }
+
+  if (symbolToS(op) === "+") {
+    if (rbIntegerTypeP(v)) {
+      for (; i < ary.length; i++) {
+        const e = ary[i];
+        if (!rbIntegerTypeP(e)) break;
+        v = numericPlus(v, e);
+      }
+    }
+  }
+  for (; i < ary.length; i++) {
+    v = rbFPublicSend(v, op, ary[i]);
+  }
+  return v;
+}
+
+/**
+ * Mirrors: Ruby's Enumerable#reduce — `vendor/ruby/v3.3.11/enum.c:1005` `enum_inject`,
+ * bound as `reduce` at `:5085`. The receiver is the first argument, an Array
+ * as readily as an `each` includer, and the block is the trailing function
+ * argument. `rb_check_id` turns a String naming a method into its Symbol,
+ * which every String here does; `rb_warning("given block not used")` prints
+ * only under `$VERBOSE`. An Array's `each` is `rb_ary_each`
+ * (`vendor/ruby/v3.3.11/array.c:2532`), which has no `each` member to call.
+ * Unported: the `rb_method_basic_definition_p` checks on `each` (`:1044`) and
+ * on `Integer#+` (`:836`), which ask whether a core method was redefined.
+ * @noRailsEquivalent PERMANENT
+ */
+export function reduce<T, E = unknown>(
+  obj: Each<T, E> | readonly T[],
+  ...argv: unknown[]
+): Enumerated<E, unknown> {
+  const block =
+    typeof argv[argv.length - 1] === "function"
+      ? (argv.pop() as (memo: unknown, i: T) => unknown)
+      : undefined;
+  let init: unknown;
+  let op: unknown;
+  let iter: (i: T, memo: InjectMemo<T>) => void = injectI;
+
+  if (block !== undefined) {
+    checkArity(argv.length, 0, 2);
+  } else {
+    checkArity(argv.length, 1, 2);
+  }
+  [init, op] = argv;
+
+  switch (argv.length) {
+    case 0:
+      init = undef;
+      break;
+    case 1:
+      if (block !== undefined) {
+        break;
+      }
+      op = typeof init === "string" ? stringToSym(init) : init;
+      init = undef;
+      iter = injectOpI;
+      break;
+    case 2:
+      if (typeof op === "string") op = stringToSym(op);
+      iter = injectOpI;
+      break;
+  }
+
+  if (iter === injectOpI && isSymbol(op) && Array.isArray(obj)) {
+    return aryInjectOp(obj, init, op) as Enumerated<E, unknown>;
+  }
+
+  const memo: InjectMemo<T> = { v1: init, block, op };
+  const result = () => (memo.v1 === undef ? null : memo.v1);
+  if (Array.isArray(obj)) {
+    each(obj as T[], (i) => iter(i, memo));
+    return result() as Enumerated<E, unknown>;
+  }
+  return rbBlockCall(obj as Each<T, E>, (i) => iter(i, memo), result);
 }
 
 /**

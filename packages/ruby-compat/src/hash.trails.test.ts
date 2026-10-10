@@ -1227,3 +1227,38 @@ describe("Hash#key and Hash#has_value?", () => {
     expect(hash.hasValue("0")).toBe(false);
   });
 });
+
+describe("Hash#merge (Hash receiver)", () => {
+  it("answers a new Hash and leaves the receiver alone", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+    const other = new Hash<string, number>();
+    other.set("a", 2).set("b", 3);
+
+    const merged = hash.merge(other, { c: 4 });
+
+    expect(merged).toBeInstanceOf(Hash);
+    expect([...merged]).toEqual([
+      ["a", 2],
+      ["b", 3],
+      ["c", 4],
+    ]);
+    expect([...hash]).toEqual([["a", 1]]);
+  });
+
+  it("yields a conflicting key to the block", () => {
+    const hash = new Hash<string, number>();
+    hash.set("a", 1);
+
+    const merged = hash.merge(
+      { a: 2 },
+      { b: 3 },
+      block((_key: string, oldValue: number, newValue: number) => oldValue + newValue),
+    );
+
+    expect([...merged]).toEqual([
+      ["a", 3],
+      ["b", 3],
+    ]);
+  });
+});

@@ -1075,3 +1075,25 @@ describe("rb_class_inherited_p, rb_class_of and rb_absint_size", () => {
     expect(rbAbsintSize(-(2n ** 64n))).toEqual([9, 7]);
   });
 });
+
+describe("Kernel#send of +", () => {
+  it("adds the core receivers vm_opt_plus knows", () => {
+    expect(rbFSend(1, "+", 2)).toBe(3);
+    expect(rbFPublicSend(1.5, ":+", 1)).toBe(2.5);
+    expect(rbFSend("a", "+", "b")).toBe("ab");
+    expect(rbFSend([1], "+", [2])).toEqual([1, 2]);
+  });
+
+  it("leaves any other receiver to its own dispatch", () => {
+    const sent: unknown[][] = [];
+    const recv = {
+      methodMissing(mid: string, ...args: unknown[]) {
+        sent.push([mid, ...args]);
+        return "missing";
+      },
+    };
+
+    expect(rbFSend(recv, "+", 1)).toBe("missing");
+    expect(sent).toEqual([["+", 1]]);
+  });
+});

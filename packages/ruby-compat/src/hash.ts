@@ -1419,6 +1419,17 @@ export class Hash<K, V> extends Map<K, V> {
     return this;
   }
 
+  /**
+   * `Hash#merge` (`vendor/ruby/v3.3.11/hash.c:4144` `rb_hash_merge`), the
+   * method a `:merge` send finds; the body is {@link merge}'s. The conflict
+   * block is the trailing argument, marked with {@link block}.
+   *
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/v3.3.11/hash.c:4144`).
+   */
+  merge(...argv: (object | undefined)[]): Hash<K, V> {
+    return merge(this as never, ...(argv as never[])) as unknown as Hash<K, V>;
+  }
+
   /** `hash_iterating_p` (`vendor/ruby/v3.3.11/hash.c:1339`). */
   private hashIteratingP(): boolean {
     return this.#iterLev > 0;
