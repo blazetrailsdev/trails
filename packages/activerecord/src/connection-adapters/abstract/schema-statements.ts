@@ -487,7 +487,7 @@ export class SchemaStatements {
         foreignKeyOptions = { toTable: referenceName, ...conditionalOptions };
       }
       foreignKeyOptions.column ??= `${refName}_id`;
-      await this.removeForeignKey(tableName, foreignKeyOptions);
+      await this.removeForeignKey(tableName, undefined, foreignKeyOptions);
     }
 
     await this.removeColumn(tableName, `${refName}_id`, undefined, conditionalOptions);
@@ -532,16 +532,11 @@ export class SchemaStatements {
 
   async removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable: string | null = null,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    if (typeof toTable === "object" && toTable !== null) {
-      options = { ...toTable, ...options };
-      toTable = undefined;
-    } else {
-      options = { ...options };
-    }
     if (!this.useForeignKeys()) return;
+    options = { ...options };
     if (
       hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
       !(await this.foreignKeyExists(fromTable, toTable))
@@ -549,7 +544,9 @@ export class SchemaStatements {
       return;
     }
 
-    const fkNameToDelete = (await this.foreignKeyForBang(fromTable, { toTable, ...options })).name;
+    const fkNameToDelete = (
+      await this.foreignKeyForBang(fromTable, coreHashMergeKwd({ toTable }, options))
+    ).name;
 
     const at = this.createAlterTable(fromTable);
     at.dropForeignKey(fkNameToDelete);
@@ -588,30 +585,21 @@ export class SchemaStatements {
 
   async removeCheckConstraint(
     tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
+    expression: string | null = null,
+    {
+      ifExists = false,
+      ...options
+    }: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
-    let expr: string | undefined;
-    let opts: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean };
-    if (typeof expression === "string") {
-      expr = expression;
-      opts = { ...options };
-    } else {
-      expr = undefined;
-      opts = { ...(expression ?? {}), ...options };
-    }
-    const { ifExists, ...lookupOptions } = opts;
+    if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
-    if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
+    const chkNameToDelete = (
+      await this.checkConstraintForBang(tableName, { expression, ...options })
+    ).name;
 
-    const chk = await this.checkConstraintForBang(tableName, {
-      expression: expr,
-      ...lookupOptions,
-    });
     const at = this.createAlterTable(tableName);
-    at.dropCheckConstraint(chk.name);
+    at.dropCheckConstraint(chkNameToDelete);
+
     await this.execute(await this.schemaCreation.accept(at));
   }
 
@@ -831,7 +819,7 @@ export class SchemaStatements {
 
   async foreignKeyExists(
     fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
+    toTable?: string | null | ForeignKeyLookupOptions,
     options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
   ): Promise<boolean> {
     if (typeof toTable === "object" && toTable !== null) {

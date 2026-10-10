@@ -39,7 +39,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "tsvectors");
+      const output = await dumpTableSchema("tsvectors");
       expect(output).toMatch(/t\.tsvector\("text_vector"\)/);
     });
 

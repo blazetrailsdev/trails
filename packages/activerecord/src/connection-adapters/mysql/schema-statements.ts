@@ -208,20 +208,16 @@ export class SchemaStatements extends BaseSchemaStatements {
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
     if (await this.foreignKeyExists(tableName, { column: columnName })) {
-      await this.removeForeignKey(tableName, { column: columnName });
+      await this.removeForeignKey(tableName, undefined, { column: columnName });
     }
     return super.removeColumn(tableName, columnName, type, options);
   }
 
   override async removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable: string | null = null,
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
-    if (typeof toTable === "object" && toTable !== null) {
-      options = toTable;
-      toTable = options.toTable;
-    }
     options = { ...options };
     if (options.onUpdate === "restrict") delete options.onUpdate;
     if (options.onDelete === "restrict") delete options.onDelete;

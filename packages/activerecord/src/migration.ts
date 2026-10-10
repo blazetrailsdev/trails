@@ -570,15 +570,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async removeForeignKey(
     fromTable: string,
-    toTableOrOptions?:
-      | string
-      | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
-    options?: { column?: string; name?: string; ifExists?: boolean },
+    toTable?: string | null,
+    options?: { column?: string; name?: string; toTable?: string; ifExists?: boolean },
   ): Promise<void> {
     if (options !== undefined) {
-      await this.methodMissing("removeForeignKey", fromTable, toTableOrOptions, options);
-    } else if (toTableOrOptions !== undefined) {
-      await this.methodMissing("removeForeignKey", fromTable, toTableOrOptions);
+      await this.methodMissing("removeForeignKey", fromTable, toTable, options);
+    } else if (toTable !== undefined) {
+      await this.methodMissing("removeForeignKey", fromTable, toTable);
     } else {
       await this.methodMissing("removeForeignKey", fromTable);
     }
@@ -601,13 +599,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    expression?: string | null,
     options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (options !== undefined) {
-      await this.methodMissing("removeCheckConstraint", tableName, expressionOrOptions, options);
-    } else if (expressionOrOptions !== undefined) {
-      await this.methodMissing("removeCheckConstraint", tableName, expressionOrOptions);
+      await this.methodMissing("removeCheckConstraint", tableName, expression, options);
+    } else if (expression !== undefined) {
+      await this.methodMissing("removeCheckConstraint", tableName, expression);
     } else {
       await this.methodMissing("removeCheckConstraint", tableName);
     }

@@ -293,7 +293,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: 6 });
       });
-      const output = await dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema("foos");
       expect(output).toMatch(/t\.datetime\("created_at",\s*\{\s*null:\s*false\s*\}\)/);
       expect(output).toMatch(/t\.datetime\("updated_at",\s*\{\s*null:\s*false\s*\}\)/);
     },
@@ -306,7 +306,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: null });
       });
-      const output = await dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema("foos");
       expect(output).toMatch(/t\.datetime\("created_at".*precision.*null/);
       expect(output).toMatch(/t\.datetime\("updated_at".*precision.*null/);
     },
@@ -319,7 +319,7 @@ describe("DateTimePrecisionTest", () => {
       await adapter.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: 0 });
       });
-      const output = await dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema("foos");
       expect(output).toMatch(
         /t\.datetime\("created_at",\s*\{\s*precision:\s*0,\s*null:\s*false\s*\}\)/,
       );

@@ -33,7 +33,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const schema = await dumpTableSchema(adapter, "enum_tests");
+      const schema = await dumpTableSchema("enum_tests");
       expect(schema).toMatch(
         /t\.column\("enum_column", "enum\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
       );

@@ -141,7 +141,7 @@ describe("CommentTest", () => {
         name: "idx_obvious",
         comment: "We need to see obvious comments",
       });
-      const output = await dumpTableSchema(adapter, "commenteds");
+      const output = await dumpTableSchema("commenteds");
       expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
       expect(output).toMatch(
         /t\.\w+\("name"[^)]*\{[^}]*comment:\s*"Comment should help clarify the column purpose"/,
@@ -167,7 +167,7 @@ describe("CommentTest", () => {
     "comments",
     "schema dump omits blank comments",
     async () => {
-      const output = await dumpTableSchema(adapter, "blank_comments");
+      const output = await dumpTableSchema("blank_comments");
       expect(output).toMatch(/createTable.*"blank_comments"/);
       expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
       expect(output).toMatch(/t\.\w+\("space_comment"\)\s*;/);
@@ -221,7 +221,7 @@ describe("CommentTest", () => {
     "comments",
     "schema dump with primary key comment",
     async () => {
-      const output = await dumpTableSchema(adapter, "pk_commenteds");
+      const output = await dumpTableSchema("pk_commenteds");
       expect(output).toMatch(
         /createTable.*"pk_commenteds".*id:\s*\{\s*comment:\s*"Primary key comment"\s*\}.*comment:\s*"Table comment"/,
       );

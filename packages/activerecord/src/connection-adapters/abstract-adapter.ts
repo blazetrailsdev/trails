@@ -447,7 +447,7 @@ export interface AbstractAdapter
   createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
   foreignKeyExists(
     fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
+    toTable?: string | null | ForeignKeyLookupOptions,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
@@ -460,7 +460,7 @@ export interface AbstractAdapter
   useForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable?: string | null,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
@@ -500,9 +500,7 @@ export interface AbstractAdapter
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    expression?: string | null,
     options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string | undefined): Promise<void>;

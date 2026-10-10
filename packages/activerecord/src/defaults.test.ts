@@ -200,7 +200,7 @@ describeIfPostgresqlAdapter("PostgresqlDefaultExpressionTest", () => {
   });
 
   it("schema dump includes default expression", async () => {
-    const output = await dumpTableSchema(adapter, "defaults");
+    const output = await dumpTableSchema("defaults");
     const version = await adapter.databaseVersion;
     // eslint-disable-next-line blazetrails/no-conditional-in-test -- mirrors defaults_test.rb:152
     if (typeof version === "number" && version >= 100000) {
@@ -241,7 +241,7 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   });
 
   itIfSupports("default_expression", "schema dump includes default expression", async () => {
-    const output = await dumpTableSchema(adapter, "defaults");
+    const output = await dumpTableSchema("defaults");
     expect(output).toMatch(
       /t\.binary\("uuid", \{ limit: 36, default: \(\) => "\(?uuid\(\)\)?" \}\)/i,
     );
@@ -251,7 +251,7 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
     "default_expression",
     "schema dump includes default expression with single quotes reflected correctly",
     async () => {
-      const output = await dumpTableSchema(adapter, "defaults");
+      const output = await dumpTableSchema("defaults");
       expect(output).toMatch(
         /t\.string\("char2_concatenated", \{ default: \(\) => "\(?concat\(`char2`,\s*(_utf8mb4)?'-'\)\)?" \}\)/i,
       );
@@ -259,49 +259,49 @@ describeIfMysqlAdapter("MysqlDefaultExpressionTest", () => {
   );
 
   it("schema dump datetime includes default expression", async () => {
-    const output = await dumpTableSchema(adapter, "datetime_defaults");
+    const output = await dumpTableSchema("datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("modified_datetime", \{ precision: null, default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
     );
   });
 
   it("schema dump datetime includes precise default expression", async () => {
-    const output = await dumpTableSchema(adapter, "datetime_defaults");
+    const output = await dumpTableSchema("datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("precise_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump datetime includes precise default expression with on update", async () => {
-    const output = await dumpTableSchema(adapter, "datetime_defaults");
+    const output = await dumpTableSchema("datetime_defaults");
     expect(output).toMatch(
       /t\.datetime\("updated_datetime",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes default expression", async () => {
-    const output = await dumpTableSchema(adapter, "timestamp_defaults");
+    const output = await dumpTableSchema("timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("modified_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP(\(\))?" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes precise default expression", async () => {
-    const output = await dumpTableSchema(adapter, "timestamp_defaults");
+    const output = await dumpTableSchema("timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("precise_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp includes precise default expression with on update", async () => {
-    const output = await dumpTableSchema(adapter, "timestamp_defaults");
+    const output = await dumpTableSchema("timestamp_defaults");
     expect(output).toMatch(
       /t\.timestamp\("updated_timestamp",.*default: \(\) => "CURRENT_TIMESTAMP\(6\) ON UPDATE CURRENT_TIMESTAMP\(6\)" \}\)/i,
     );
   });
 
   it("schema dump timestamp without default expression", async () => {
-    const output = await dumpTableSchema(adapter, "timestamp_defaults");
+    const output = await dumpTableSchema("timestamp_defaults");
     expect(output).toMatch(/t\.timestamp\("nullable_timestamp"\);/);
   });
 });
@@ -373,7 +373,7 @@ describeIfSqlite("Sqlite3DefaultExpressionTest", () => {
   });
 
   it("schema dump includes default expression", async () => {
-    const output = await dumpTableSchema(adapter, "defaults");
+    const output = await dumpTableSchema("defaults");
     expect(output).toMatch(/t\.date\("modified_date", \{ default: \(\) => "CURRENT_DATE" \}\)/);
     expect(output).toMatch(
       /t\.datetime\("modified_time", \{ default: \(\) => "CURRENT_TIMESTAMP" \}\)/,

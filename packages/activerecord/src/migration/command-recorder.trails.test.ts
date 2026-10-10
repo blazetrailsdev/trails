@@ -220,12 +220,12 @@ describe("CommandRecorder", () => {
       await recorder.changeTable("fruits", {}, async (t) => {
         await t.removeCheckConstraint("qty > 0", { name: "chk" });
         await t.removeCheckConstraint("qty > 0");
-        await t.removeCheckConstraint({ name: "chk" });
+        await t.removeCheckConstraint(undefined, { name: "chk" });
       });
       expect(recorder.commands).toEqual([
         ["removeCheckConstraint", ["fruits", "qty > 0", { name: "chk" }], undefined],
         ["removeCheckConstraint", ["fruits", "qty > 0"], undefined],
-        ["removeCheckConstraint", ["fruits", { name: "chk" }], undefined],
+        ["removeCheckConstraint", ["fruits", undefined, { name: "chk" }], undefined],
       ]);
     });
 

@@ -357,8 +357,8 @@ describe("Migration", () => {
 
     it("remove check constraint removes check constraint", async () => {
       await withChangeTable(async (t, expect) => {
-        expect("removeCheckConstraint", null, ["delete_me", { name: "price_check" }]);
-        await t.removeCheckConstraint({ name: "price_check" });
+        expect("removeCheckConstraint", null, ["delete_me", undefined, { name: "price_check" }]);
+        await t.removeCheckConstraint(undefined, { name: "price_check" });
       });
     });
 

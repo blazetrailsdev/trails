@@ -17,8 +17,7 @@ const skipNoTableOptions =
   mysqlVersion === "" ||
   new Version(mysqlVersion.replace(/-.*$/, "")).compare("5.7.22") >= 0;
 
-const dumpTable = (adapter: Mysql2Adapter, tableName: string) =>
-  dumpTableSchema(adapter, tableName);
+const dumpTable = (adapter: Mysql2Adapter, tableName: string) => dumpTableSchema(tableName);
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;

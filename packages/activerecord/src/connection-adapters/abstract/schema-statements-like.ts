@@ -75,8 +75,8 @@ export interface SchemaStatementsLike {
     options?: Record<string, unknown>,
   ): Promise<void>;
   removeForeignKey(
-    tableName: string,
-    toTableOrOptions?: string | Record<string, unknown>,
+    fromTable: string,
+    toTable?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   foreignKeyExists(
@@ -91,7 +91,7 @@ export interface SchemaStatementsLike {
   ): Promise<void>;
   removeCheckConstraint(
     tableName: string,
-    expressionOrOptions?: string | Record<string, unknown>,
+    expression?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   checkConstraintExists(tableName: string, ...args: object[]): Promise<boolean>;

@@ -129,7 +129,7 @@ describe("TimePrecisionTest", () => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
     });
-    const output = await dumpTableSchema(adapter, "foos");
+    const output = await dumpTableSchema("foos");
     expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
     expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
   });
@@ -142,7 +142,7 @@ describe("TimePrecisionTest", () => {
         t.time("start", { precision: 0 });
         t.time("finish", { precision: 0 });
       });
-      const output = await dumpTableSchema(adapter, "foos");
+      const output = await dumpTableSchema("foos");
       expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*0/);
       expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*0/);
     },
