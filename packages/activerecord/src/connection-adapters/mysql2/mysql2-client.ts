@@ -103,14 +103,9 @@ function options(client: Mysql2Client, sql: string): Record<string, unknown> {
     : { sql, rowsAsArray: true };
 }
 
-const PENDING = new WeakMap<object, unknown[]>();
-
 function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
   let result = rawResult as unknown[][] | mysql.ResultSetHeader;
   let fields = rawFields;
-  if (Array.isArray(rawFields) && rawFields.length > 1 && Array.isArray(rawResult)) {
-    PENDING.set(client, rawResult.slice(1));
-  }
   if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
     result = (rawResult as unknown[])[0] as unknown[][];
     fields = rawFields[0] as mysql.FieldPacket[];
@@ -159,10 +154,6 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
       },
     });
   }).catch(driverError);
-}
-
-function abandonResultsBang(this: Mysql2Client): void {
-  PENDING.delete(this);
 }
 
 function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
@@ -273,7 +264,7 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
       affectedRows: 0,
       query,
       prepare,
-      abandonResultsBang,
+      abandonResultsBang() {},
       setServerOption,
     })) {
       Object.defineProperty(client, name, { configurable: true, writable: true, value });
