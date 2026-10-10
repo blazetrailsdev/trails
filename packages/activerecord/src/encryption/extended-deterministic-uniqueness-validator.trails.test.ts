@@ -6,6 +6,20 @@ import { Encryption } from "../encryption.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { deterministicEncryptedAttributes } from "./encryptable-record.js";
+import { type Module } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
+
+function prependedOver(
+  mod: Module,
+  name: string,
+  original: (...args: any[]) => unknown,
+  props: object = {},
+): any {
+  class Host {}
+  Object.defineProperty(Host.prototype, name, { value: original, configurable: true });
+  prepend(Host, mod);
+  return Object.assign(new Host(), props);
+}
 
 const encryptorA: EncryptorLike = {
   encrypt: (v) => `A:${v}`,
@@ -47,12 +61,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       });
     };
 
-    await EncryptedUniquenessValidator.validateEach(
+    await prependedOver(
+      EncryptedUniquenessValidator,
+      "validateEach",
       originalValidateEach,
-      record,
-      "email",
-      "user@example.com",
-    );
+    ).validateEach(record, "email", "user@example.com");
 
     expect(calls[0].value).toBe("user@example.com");
     expect(calls[0].encryptionDisabled).toBe(false);
@@ -76,7 +89,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const calls: unknown[] = [];
     const originalValidateEach = (_r: any, _a: string, value: unknown) => calls.push(value);
 
-    await EncryptedUniquenessValidator.validateEach(originalValidateEach, record, "body", "hello");
+    await prependedOver(
+      EncryptedUniquenessValidator,
+      "validateEach",
+      originalValidateEach,
+    ).validateEach(record, "body", "hello");
 
     expect(calls).toHaveLength(1);
   });
