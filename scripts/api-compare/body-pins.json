@@ -28979,13 +28979,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "delete",
-    "digest": "454699662459e27e",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "disable_extension",
     "digest": "c379738c3a38aa9c",
     "ref": "v8.0.2"
@@ -29037,34 +29030,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "enable_extension",
     "digest": "c379738c3a38aa9c",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "exec_delete",
-    "digest": "bd9f9fb1b670af90",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "exec_insert",
-    "digest": "80d5fbb994153bd1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "exec_query",
-    "digest": "5075f509bd373145",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "exec_update",
-    "digest": "bd9f9fb1b670af90",
     "ref": "v8.0.2"
   },
   {
@@ -29317,13 +29282,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "preventing_writes?",
     "digest": "8a3f091c00dcb8f1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "query_cache_enabled",
-    "digest": "2d2f3627c6f09863",
     "ref": "v8.0.2"
   },
   {
@@ -29597,41 +29555,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "seconds_since_last_activity",
     "digest": "3b829ec8efaf0dac",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "select_all",
-    "digest": "2c1ee17c95dc1a58",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "select_one",
-    "digest": "882995b6ef3d137f",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "select_rows",
-    "digest": "d47c3e43ffa99049",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "select_value",
-    "digest": "570ff69ffc675ddc",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "select_values",
-    "digest": "df4adef7b851c581",
     "ref": "v8.0.2"
   },
   {
@@ -30001,13 +29924,6 @@
   {
     "package": "activerecord",
     "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "update",
-    "digest": "80ace7cc25bb1921",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "valid_primary_key_options",
     "digest": "14075b60b8d7fe64",
     "ref": "v8.0.2"
@@ -30080,13 +29996,6 @@
     "rubyFile": "connection_adapters/abstract_adapter.rb",
     "rubyName": "with_raw_connection",
     "digest": "81922c7d1b179cb5",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "connection_adapters/abstract_adapter.rb",
-    "rubyName": "write_query?",
-    "digest": "c31fcdbafab9160f",
     "ref": "v8.0.2"
   },
   {
