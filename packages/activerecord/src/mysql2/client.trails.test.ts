@@ -60,3 +60,31 @@ describe("mysql2Client", () => {
     expect(Object.assign(new Error(), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(false);
   });
 });
+
+describe("Mysql2::Client#warning_count", () => {
+  it("is the count the last EOF or OK packet carried", async () => {
+    const handlePacket = vi.fn();
+    const query = vi.fn(async () => [{ affectedRows: 1, warningStatus: 2 }, undefined]);
+    const client = mysql2Client({ connection: { handlePacket }, query });
+    expect(client.warningCount).toBe(0);
+
+    const eof = Buffer.from([0xfe, 3, 0, 2, 0]);
+    const packet = { buffer: eof, offset: 0, end: eof.length, isEOF: () => true };
+    (
+      client as unknown as { connection: { handlePacket(p: object): void } }
+    ).connection.handlePacket(packet);
+    expect(handlePacket).toHaveBeenCalledWith(packet);
+    expect(client.warningCount).toBe(3);
+
+    await client.query("UPDATE t SET a = 1");
+    expect(client.warningCount).toBe(2);
+  });
+
+  it("query merges its options over query_options", async () => {
+    const client = mysql2Client({ query: vi.fn(async () => [[], [{ name: "a" }]]) });
+    const _query = vi.spyOn(client, "_query");
+    await client.query("SELECT 1", { as: "array" });
+    expect(_query).toHaveBeenCalledWith("SELECT 1", { ...client.queryOptions, as: "array" });
+    expect(client.queryOptions.as).toBe("hash");
+  });
+});

@@ -194,6 +194,7 @@ describe("vendor/sources.ts", () => {
       "activejob",
       "rack-test",
       "msgpack",
+      "mysql2",
       "pg",
       "thor",
       "i18n",

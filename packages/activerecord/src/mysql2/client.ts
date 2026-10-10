@@ -7,8 +7,9 @@ import { quotedDate } from "../connection-adapters/abstract/quoting.js";
 import { defaultTimezone } from "../active-record.js";
 
 interface QueryOptions {
-  as?: "array";
+  as?: "hash" | "array";
   databaseTimezone?: "utc" | "local";
+  [key: string]: unknown;
 }
 
 type Native = [unknown, mysql.FieldPacket[] | undefined];
@@ -85,18 +86,20 @@ class Statement implements Mysql2Statement {
   }
 }
 
-export type Mysql2Client = Omit<mysql.Connection, "query" | "prepare"> & {
+export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"> {
   automaticClose: boolean;
   queryOptions: QueryOptions;
   readTimeout?: number | null;
   affectedRows: number;
   lastId?: number;
   readonly warningCount: number;
-  query(sql: string): Promise<Mysql2Result | null>;
+  query(sql: string, options?: QueryOptions): Promise<Mysql2Result | null>;
+  /** @internal */
+  _query(sql: string, options: QueryOptions): Promise<Mysql2Result | null>;
   prepare(sql: string): Mysql2Statement;
   abandonResultsBang(): void;
   setServerOption(value: number): Promise<true>;
-};
+}
 
 function options(client: Mysql2Client, sql: string): Record<string, unknown> {
   return client.readTimeout != null
@@ -124,6 +127,36 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
   if (result.insertId !== undefined) client.lastId = result.insertId;
   return null;
 }
+
+const CLIENT_FLAGS: Record<string, number> = {
+  LONG_PASSWORD: 0x00000001,
+  FOUND_ROWS: 0x00000002,
+  LONG_FLAG: 0x00000004,
+  CONNECT_WITH_DB: 0x00000008,
+  NO_SCHEMA: 0x00000010,
+  COMPRESS: 0x00000020,
+  ODBC: 0x00000040,
+  LOCAL_FILES: 0x00000080,
+  IGNORE_SPACE: 0x00000100,
+  PROTOCOL_41: 0x00000200,
+  INTERACTIVE: 0x00000400,
+  SSL: 0x00000800,
+  IGNORE_SIGPIPE: 0x00001000,
+  TRANSACTIONS: 0x00002000,
+  RESERVED: 0x00004000,
+  SECURE_CONNECTION: 0x00008000,
+  MULTI_STATEMENTS: 0x00010000,
+  MULTI_RESULTS: 0x00020000,
+  PS_MULTI_RESULTS: 0x00040000,
+  PLUGIN_AUTH: 0x00080000,
+  CONNECT_ATTRS: 0x00100000,
+  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
+  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
+  SESSION_TRACK: 0x00800000,
+  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
+  SSL_VERIFY_SERVER_CERT: 0x40000000,
+  REMEMBER_OPTIONS: 0x80000000,
+};
 
 const COM_SET_OPTION = 0x1b;
 
@@ -156,6 +189,37 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
       },
     });
   }).catch(driverError);
+}
+
+export function defaultQueryOptions(): QueryOptions {
+  return {
+    as: "hash",
+    async: false,
+    castBooleans: false,
+    symbolizeKeys: false,
+    databaseTimezone: "local",
+    applicationTimezone: null,
+    cacheRows: true,
+    connectFlags:
+      CLIENT_FLAGS.REMEMBER_OPTIONS |
+      CLIENT_FLAGS.LONG_PASSWORD |
+      CLIENT_FLAGS.LONG_FLAG |
+      CLIENT_FLAGS.TRANSACTIONS |
+      CLIENT_FLAGS.PROTOCOL_41 |
+      CLIENT_FLAGS.SECURE_CONNECTION |
+      CLIENT_FLAGS.CONNECT_ATTRS,
+    cast: true,
+    defaultFile: null,
+    defaultGroup: null,
+  };
+}
+
+export function query(
+  this: Mysql2Client,
+  sql: string,
+  options: QueryOptions = {},
+): Promise<Mysql2Result | null> {
+  return this._query(sql, { ...this.queryOptions, ...options });
 }
 
 function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
@@ -262,19 +326,20 @@ const automaticClose: PropertyDescriptor = {
 export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   if (!QUERY_OPTIONS.has(client)) {
     QUERY_OPTIONS.add(client);
-    const queryOptions: QueryOptions = {};
+    const queryOptions = defaultQueryOptions();
     const execute = (client as { execute?: unknown }).execute;
     if (typeof execute === "function") {
       (client as { execute?: Execute }).execute = (sql, values) =>
         (execute as Execute).call(client, sql, values?.map(bind));
     }
     const native = (client as { query?: (options: object) => Promise<Native> }).query;
-    const query = async function (this: Mysql2Client, sql: string) {
+    const _query = async function (this: Mysql2Client, sql: string, _options: QueryOptions) {
       return storeResult(this, await native!.call(this, options(this, sql)).catch(driverError));
     };
     for (const [name, value] of Object.entries({
       queryOptions,
       affectedRows: 0,
+      _query,
       query,
       prepare,
       abandonResultsBang() {},
@@ -310,36 +375,6 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
 function withoutDefaultIgnoreSpace(list: string[]): string[] {
   return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
-
-const CLIENT_FLAGS: Record<string, number> = {
-  LONG_PASSWORD: 0x00000001,
-  FOUND_ROWS: 0x00000002,
-  LONG_FLAG: 0x00000004,
-  CONNECT_WITH_DB: 0x00000008,
-  NO_SCHEMA: 0x00000010,
-  COMPRESS: 0x00000020,
-  ODBC: 0x00000040,
-  LOCAL_FILES: 0x00000080,
-  IGNORE_SPACE: 0x00000100,
-  PROTOCOL_41: 0x00000200,
-  INTERACTIVE: 0x00000400,
-  SSL: 0x00000800,
-  IGNORE_SIGPIPE: 0x00001000,
-  TRANSACTIONS: 0x00002000,
-  RESERVED: 0x00004000,
-  SECURE_CONNECTION: 0x00008000,
-  MULTI_STATEMENTS: 0x00010000,
-  MULTI_RESULTS: 0x00020000,
-  PS_MULTI_RESULTS: 0x00040000,
-  PLUGIN_AUTH: 0x00080000,
-  CONNECT_ATTRS: 0x00100000,
-  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
-  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
-  SESSION_TRACK: 0x00800000,
-  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
-  SSL_VERIFY_SERVER_CERT: 0x40000000,
-  REMEMBER_OPTIONS: 0x80000000,
-};
 
 async function newClient(
   config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,

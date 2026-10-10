@@ -1515,6 +1515,15 @@ export class AbstractAdapter implements Quoting {
     });
   }
 
+  /** @internal */
+  get _rawConnection(): unknown {
+    return this._connection;
+  }
+  /** @internal */
+  set _rawConnection(value: unknown) {
+    this._connection = value;
+  }
+
   defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {
     return attribute.eq(value);
   }
@@ -2088,15 +2097,6 @@ export class AbstractAdapter implements Quoting {
     if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
     const proto = Object.getPrototypeOf(arg) as object | null;
     return proto !== Object.prototype && proto !== null;
-  }
-
-  /** @internal */
-  get _rawConnection(): unknown {
-    return this._connection;
-  }
-  /** @internal */
-  set _rawConnection(value: unknown) {
-    this._connection = value;
   }
 
   /** @internal */
