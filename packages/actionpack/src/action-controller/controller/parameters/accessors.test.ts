@@ -55,18 +55,16 @@ describe("ParametersAccessorsTest", () => {
 
   it("[] retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.get("person") as Parameters, (p) => p.permitted);
-    assertPredicate(
-      (params.get("person") as Parameters).get("name") as Parameters,
-      (p) => p.permitted,
+    assertPredicate(params.get("person") as Parameters, (p) => p.isPermitted());
+    assertPredicate((params.get("person") as Parameters).get("name") as Parameters, (p) =>
+      p.isPermitted(),
     );
   });
 
   it("[] retains unpermitted status", () => {
-    assertNotPredicate(params.get("person") as Parameters, (p) => p.permitted);
-    assertNotPredicate(
-      (params.get("person") as Parameters).get("name") as Parameters,
-      (p) => p.permitted,
+    assertNotPredicate(params.get("person") as Parameters, (p) => p.isPermitted());
+    assertNotPredicate((params.get("person") as Parameters).get("name") as Parameters, (p) =>
+      p.isPermitted(),
     );
   });
 
@@ -92,13 +90,13 @@ describe("ParametersAccessorsTest", () => {
   it("each carries permitted status", () => {
     params.permitBang();
     params.each(([key, value]) => {
-      if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
+      if (key === "person") assertPredicate(value as Parameters, (p) => p.isPermitted());
     });
   });
 
   it("each carries unpermitted status", () => {
     params.each(([key, value]) => {
-      if (key === "person") assertNot((value as Parameters).permitted);
+      if (key === "person") assertNot((value as Parameters).isPermitted());
     });
   });
 
@@ -118,13 +116,13 @@ describe("ParametersAccessorsTest", () => {
   it("each_pair carries permitted status", () => {
     params.permitBang();
     params.eachPair(([key, value]) => {
-      if (key === "person") assertPredicate(value as Parameters, (p) => p.permitted);
+      if (key === "person") assertPredicate(value as Parameters, (p) => p.isPermitted());
     });
   });
 
   it("each_pair carries unpermitted status", () => {
     params.eachPair(([key, value]) => {
-      if (key === "person") assertNot((value as Parameters).permitted);
+      if (key === "person") assertNot((value as Parameters).isPermitted());
     });
   });
 
@@ -144,13 +142,13 @@ describe("ParametersAccessorsTest", () => {
   it("each_value carries permitted status", () => {
     params.permitBang();
     params.eachValue((value) => {
-      assertPredicate(value as Parameters, (p) => p.permitted);
+      assertPredicate(value as Parameters, (p) => p.isPermitted());
     });
   });
 
   it("each_value carries unpermitted status", () => {
     params.eachValue((value) => {
-      assertNotPredicate(value as Parameters, (p) => p.permitted);
+      assertNotPredicate(value as Parameters, (p) => p.isPermitted());
     });
   });
 
@@ -188,24 +186,26 @@ describe("ParametersAccessorsTest", () => {
 
   it("except retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.except("person"), (p) => p.permitted);
-    assertPredicate((params.get("person") as Parameters).except("name"), (p) => p.permitted);
+    assertPredicate(params.except("person"), (p) => p.isPermitted());
+    assertPredicate((params.get("person") as Parameters).except("name"), (p) => p.isPermitted());
   });
 
   it("except retains unpermitted status", () => {
-    assertNotPredicate(params.except("person"), (p) => p.permitted);
-    assertNotPredicate((params.get("person") as Parameters).except("name"), (p) => p.permitted);
+    assertNotPredicate(params.except("person"), (p) => p.isPermitted());
+    assertNotPredicate((params.get("person") as Parameters).except("name"), (p) => p.isPermitted());
   });
 
   it("without retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.without("person"), (p) => p.permitted);
-    assertPredicate((params.get("person") as Parameters).without("name"), (p) => p.permitted);
+    assertPredicate(params.without("person"), (p) => p.isPermitted());
+    assertPredicate((params.get("person") as Parameters).without("name"), (p) => p.isPermitted());
   });
 
   it("without retains unpermitted status", () => {
-    assertNotPredicate(params.without("person"), (p) => p.permitted);
-    assertNotPredicate((params.get("person") as Parameters).without("name"), (p) => p.permitted);
+    assertNotPredicate(params.without("person"), (p) => p.isPermitted());
+    assertNotPredicate((params.get("person") as Parameters).without("name"), (p) =>
+      p.isPermitted(),
+    );
   });
 
   it("exclude? returns true if the given key is not present in the params", () => {
@@ -218,18 +218,16 @@ describe("ParametersAccessorsTest", () => {
 
   it("fetch retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.fetch("person") as Parameters, (p) => p.permitted);
-    assertPredicate(
-      (params.get("person") as Parameters).fetch("name") as Parameters,
-      (p) => p.permitted,
+    assertPredicate(params.fetch("person") as Parameters, (p) => p.isPermitted());
+    assertPredicate((params.get("person") as Parameters).fetch("name") as Parameters, (p) =>
+      p.isPermitted(),
     );
   });
 
   it("fetch retains unpermitted status", () => {
-    assertNotPredicate(params.fetch("person") as Parameters, (p) => p.permitted);
-    assertNotPredicate(
-      (params.get("person") as Parameters).fetch("name") as Parameters,
-      (p) => p.permitted,
+    assertNotPredicate(params.fetch("person") as Parameters, (p) => p.isPermitted());
+    assertNotPredicate((params.get("person") as Parameters).fetch("name") as Parameters, (p) =>
+      p.isPermitted(),
     );
   });
 
@@ -283,7 +281,7 @@ describe("ParametersAccessorsTest", () => {
   it("reject retains permitted status", () => {
     assertNotPredicate(
       params.reject((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -291,7 +289,7 @@ describe("ParametersAccessorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.reject((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -299,38 +297,38 @@ describe("ParametersAccessorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.select((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("select retains unpermitted status", () => {
     assertNotPredicate(
       params.select((k) => k === "person"),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("slice retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.slice("person"), (p) => p.permitted);
+    assertPredicate(params.slice("person"), (p) => p.isPermitted());
   });
 
   it("slice retains unpermitted status", () => {
-    assertNotPredicate(params.slice("person"), (p) => p.permitted);
+    assertNotPredicate(params.slice("person"), (p) => p.isPermitted());
   });
 
   it("transform_keys retains permitted status", () => {
     params.permitBang();
     assertPredicate(
       params.transformKeys((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("transform_keys retains unpermitted status", () => {
     assertNotPredicate(
       params.transformKeys((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -360,14 +358,14 @@ describe("ParametersAccessorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.deepTransformKeys((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("deep_transform_keys retains unpermitted status", () => {
     assertNotPredicate(
       params.deepTransformKeys((k) => k),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -375,14 +373,14 @@ describe("ParametersAccessorsTest", () => {
     params.permitBang();
     assertPredicate(
       params.transformValues((v) => v),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
   it("transform_values retains unpermitted status", () => {
     assertNotPredicate(
       params.transformValues((v) => v),
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 
@@ -440,18 +438,17 @@ describe("ParametersAccessorsTest", () => {
 
   it("values_at retains permitted status", () => {
     params.permitBang();
-    assertPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.permitted);
-    assertPredicate(
-      (params.get("person") as Parameters).valuesAt("name")[0] as Parameters,
-      (p) => p.permitted,
+    assertPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.isPermitted());
+    assertPredicate((params.get("person") as Parameters).valuesAt("name")[0] as Parameters, (p) =>
+      p.isPermitted(),
     );
   });
 
   it("values_at retains unpermitted status", () => {
-    assertNotPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.permitted);
+    assertNotPredicate(params.valuesAt("person")[0] as Parameters, (p) => p.isPermitted());
     assertNotPredicate(
       (params.get("person") as Parameters).valuesAt("name")[0] as Parameters,
-      (p) => p.permitted,
+      (p) => p.isPermitted(),
     );
   });
 

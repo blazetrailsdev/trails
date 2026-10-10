@@ -51,7 +51,7 @@ describe("ParametersExpectTest", () => {
       },
       permitted.toH(),
     );
-    assertPredicate(permitted, (p) => p.permitted);
+    assertPredicate(permitted, (p) => p.isPermitted());
   });
 
   it("keys to arrays: returns permitted params in hash key order", () => {

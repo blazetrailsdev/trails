@@ -189,7 +189,7 @@ export class Parameters {
     );
   }
 
-  get permitted(): boolean {
+  isPermitted(): boolean {
     return this._permitted;
   }
 
@@ -536,9 +536,9 @@ export class Parameters {
   declare toParam: Parameters["toQuery"];
 
   equals(other: unknown): boolean {
-    if (rbObjRespondTo(other, "permitted")) {
+    if (rbObjRespondTo(other, "isPermitted")) {
       return (
-        this.permitted === (other as Parameters).permitted &&
+        this.isPermitted() === (other as Parameters).isPermitted() &&
         rbEqual(this.parameters, (other as Parameters).parameters)
       );
     } else {
@@ -549,7 +549,7 @@ export class Parameters {
   eql(other: unknown): boolean {
     return (
       rbObjClass(this) === rbObjClass(other) &&
-      this.permitted === (other as Parameters).permitted &&
+      this.isPermitted() === (other as Parameters).isPermitted() &&
       rbEql(this.parameters, (other as Parameters).parameters)
     );
   }
@@ -742,7 +742,7 @@ export class Parameters {
       }
       return object;
     } else if (object instanceof Parameters) {
-      if (object.permitted) {
+      if (object.isPermitted()) {
         return deepTransformKeysBang(object.toH(), block);
       } else {
         return deepTransformKeysBang(object.toUnsafeH(), block);
@@ -968,7 +968,7 @@ export class Parameters {
       });
       return result;
     } else if (object instanceof Parameters) {
-      if (object.permitted) {
+      if (object.isPermitted()) {
         return deepTransformKeys(object.toH(), block);
       } else {
         return deepTransformKeys(object.toUnsafeH(), block);

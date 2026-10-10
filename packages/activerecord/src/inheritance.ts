@@ -278,7 +278,7 @@ export function subclassFromAttributes(
   this: typeof Base,
   attrs: Record<string, unknown> | null | undefined,
 ): typeof Base | null {
-  if (rbObjRespondTo(attrs, "permitted")) {
+  if (rbObjRespondTo(attrs, "isPermitted")) {
     attrs = (attrs as unknown as { toH(): Record<string, unknown> }).toH();
   }
 

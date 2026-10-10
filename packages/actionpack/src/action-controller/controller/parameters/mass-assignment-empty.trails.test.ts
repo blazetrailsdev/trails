@@ -42,7 +42,7 @@ describe("MassAssignmentEmptyParametersTest", () => {
 describe("ParametersForbiddenAttributesTest", () => {
   it("forbidden attributes cannot be used for mass assignment", () => {
     const params = new Parameters({ name: "Bob" });
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
     expect(() => new Account(params as unknown as Record<string, unknown>)).toThrow(
       ForbiddenAttributesError,
     );
@@ -50,7 +50,7 @@ describe("ParametersForbiddenAttributesTest", () => {
 
   it("permitted attributes can be used for mass assignment", () => {
     const params = new Parameters({ name: "Bob" }).permitBang();
-    expect(params.permitted).toBe(true);
+    expect(params.isPermitted()).toBe(true);
     const record = new Account(params as unknown as Record<string, unknown>);
     expect(record._readAttribute("name")).toBe("Bob");
   });

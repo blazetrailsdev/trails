@@ -1,26 +1,23 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
-import type { Base } from "../base.js";
+import { Base } from "../base.js";
 import type { ToModel } from "../../action-dispatch/routing/polymorphic-routes.js";
 import type { redirectTo as flashRedirectTo } from "./flash.js";
-import {
-  _allowOtherHost,
-  _urlHostAllowed,
-  redirectBackOrTo,
-  type RedirectingHost,
-} from "./redirecting.js";
+import type { RedirectingHost } from "./redirecting.js";
 
 describe("Redirecting#redirect_back_or_to", () => {
   const redirects: string[] = [];
-  const host = {
+  class RedirectBackController extends Base {
+    override redirectTo(location: string): number {
+      return redirects.push(location);
+    }
+  }
+  const host = Object.assign(new RedirectBackController(), {
     request: { host: "example.com", referer: "http://evil.test/x" },
-    redirectTo: (location: string) => redirects.push(location),
-    _allowOtherHost,
-    _urlHostAllowed,
-  } as never;
+  });
 
   it("defaults allow_other_host only when the keyword is absent", () => {
-    redirectBackOrTo.call(host, "/fallback", { allowOtherHost: null } as never);
-    redirectBackOrTo.call(host, "/fallback");
+    host.redirectBackOrTo("/fallback", { allowOtherHost: null } as never);
+    host.redirectBackOrTo("/fallback");
     expect(redirects).toEqual(["/fallback", "http://evil.test/x"]);
   });
 });

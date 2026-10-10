@@ -30,7 +30,7 @@ describe("ProtectedParams", () => {
     });
 
     expect(params.keys()).toEqual(["keys", "permitted", "toH", "first_name"]);
-    expect(params.permitted()).toBe(false);
+    expect(params.isPermitted()).toBe(false);
     expect(params.isEmpty()).toBe(false);
     expect(params.toH()).toEqual({
       keys: ["shadow"],
@@ -46,9 +46,9 @@ describe("ProtectedParams", () => {
   it("permit! flips permitted? and returns self", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
 
-    expect(params.permitted()).toBe(false);
+    expect(params.isPermitted()).toBe(false);
     expect(params.permitBang()).toBe(params);
-    expect(params.permitted()).toBe(true);
+    expect(params.isPermitted()).toBe(true);
   });
 
   it("to_unsafe_h returns to_h regardless of permitted?", () => {
@@ -56,7 +56,7 @@ describe("ProtectedParams", () => {
 
     expect(params.toUnsafeH()).toEqual({ first_name: "Guille" });
     expect(params.toUnsafeH()).toEqual(params.toH());
-    expect(params.permitted()).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 
   it("each_pair yields every parameter and returns self", () => {
@@ -77,7 +77,7 @@ describe("ProtectedParams", () => {
     const duplicate = params.dup();
 
     expect(duplicate).not.toBe(params);
-    expect(duplicate.permitted()).toBe(true);
+    expect(duplicate.isPermitted()).toBe(true);
     expect(duplicate.toH()).toEqual({ first_name: "Guille" });
 
     duplicate["gender"] = "m";
@@ -88,6 +88,6 @@ describe("ProtectedParams", () => {
   it("dup of an unpermitted params object stays unpermitted", () => {
     const duplicate = new ProtectedParams({ first_name: "Guille" }).dup();
 
-    expect(duplicate.permitted()).toBe(false);
+    expect(duplicate.isPermitted()).toBe(false);
   });
 });

@@ -1,13 +1,7 @@
 import { extend } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach } from "vitest";
-import {
-  contentSecurityPolicy,
-  contentSecurityPolicyNonce,
-  contentSecurityPolicyReportOnly,
-  currentContentSecurityPolicy,
-  isContentSecurityPolicy,
-  type ContentSecurityPolicyBlock,
-} from "./content-security-policy.js";
+import { Base } from "../base.js";
+import type { ContentSecurityPolicyBlock } from "./content-security-policy.js";
 import { ContentSecurityPolicy as Policy } from "../../action-dispatch/http/content-security-policy.js";
 import type { CallbackOptions } from "../../abstract-controller/callbacks.js";
 
@@ -18,19 +12,18 @@ type Registration = {
 
 function makeHost() {
   const registered: Registration[] = [];
-  const host = {
-    beforeAction(
-      callback: (controller: unknown) => void | boolean | Promise<void | boolean>,
-      options?: CallbackOptions,
-    ) {
-      registered.push({ callback, options });
-    },
-  };
+  class host extends Base {
+    static override beforeAction(...args: unknown[]): void {
+      registered.push({ callback: args[0], options: args[1] } as Registration);
+    }
+  }
   return { host, registered };
 }
 
-function makeController(initial: Policy | null = null) {
-  return { request: { contentSecurityPolicy: initial }, currentContentSecurityPolicy };
+class CspController extends Base {}
+
+function makeController(request: Record<string, unknown>): any {
+  return Object.assign(new CspController(), { request });
 }
 
 describe("contentSecurityPolicy class DSL", () => {
@@ -43,13 +36,13 @@ describe("contentSecurityPolicy class DSL", () => {
 
   it("registers a before_action and yields a cloned current policy to the block", async () => {
     const existing = new Policy((p) => p.defaultSrc(":self"));
-    const controller = makeController(existing);
+    const controller = makeController({ contentSecurityPolicy: existing });
     let yielded: Policy | undefined;
     const block: ContentSecurityPolicyBlock = function (policy) {
       yielded = policy;
       policy.scriptSrc(":self");
     };
-    contentSecurityPolicy.call(host, true, { only: ["show"] }, block);
+    host.contentSecurityPolicy(true, { only: ["show"] }, block);
 
     expect(registered).toHaveLength(1);
     expect(registered[0].options).toEqual({ only: ["show"] });
@@ -61,8 +54,8 @@ describe("contentSecurityPolicy class DSL", () => {
   });
 
   it("starts from a fresh policy when the request has none", async () => {
-    const controller = makeController(null);
-    contentSecurityPolicy.call(host, true, {}, function (policy) {
+    const controller = makeController({ contentSecurityPolicy: null });
+    host.contentSecurityPolicy(true, {}, function (policy) {
       policy.defaultSrc(":self");
     });
     await registered[0].callback(controller);
@@ -70,16 +63,16 @@ describe("contentSecurityPolicy class DSL", () => {
   });
 
   it("nils the request CSP when disabled", async () => {
-    const controller = makeController(new Policy());
-    contentSecurityPolicy.call(host, false, { only: ["index"] });
+    const controller = makeController({ contentSecurityPolicy: new Policy() });
+    host.contentSecurityPolicy(false, { only: ["index"] });
     await registered[0].callback(controller);
     expect(controller.request.contentSecurityPolicy).toBeNull();
   });
 
   it("treats a first-positional options object as enabled=true and accepts a block in arg 2 (Rails kwargs shape)", async () => {
-    const controller = makeController(null);
+    const controller = makeController({ contentSecurityPolicy: null });
     let blockRan = false;
-    contentSecurityPolicy.call(host, { only: ["show"] }, function (policy) {
+    host.contentSecurityPolicy({ only: ["show"] }, function (policy) {
       blockRan = true;
       policy.defaultSrc(":self");
     });
@@ -90,8 +83,8 @@ describe("contentSecurityPolicy class DSL", () => {
   });
 
   it("accepts a block-only form (no enabled, no options)", async () => {
-    const controller = makeController(null);
-    contentSecurityPolicy.call(host, function (policy) {
+    const controller = makeController({ contentSecurityPolicy: null });
+    host.contentSecurityPolicy(function (policy) {
       policy.defaultSrc(":self");
     });
     await registered[0].callback(controller);
@@ -108,29 +101,23 @@ describe("contentSecurityPolicyReportOnly class DSL", () => {
   });
 
   it("registers a before_action that sets request.contentSecurityPolicyReportOnly", async () => {
-    const controller: { request: { contentSecurityPolicyReportOnly?: boolean | Policy | null } } = {
-      request: {},
-    };
-    contentSecurityPolicyReportOnly.call(host, true, { only: ["show"] });
+    const controller = makeController({});
+    host.contentSecurityPolicyReportOnly(true, { only: ["show"] });
     expect(registered[0].options).toEqual({ only: ["show"] });
     await registered[0].callback(controller);
     expect(controller.request.contentSecurityPolicyReportOnly).toBe(true);
   });
 
   it("clears the report-only header when passed false", async () => {
-    const controller: { request: { contentSecurityPolicyReportOnly?: boolean | Policy | null } } = {
-      request: { contentSecurityPolicyReportOnly: true },
-    };
-    contentSecurityPolicyReportOnly.call(host, false);
+    const controller = makeController({ contentSecurityPolicyReportOnly: true });
+    host.contentSecurityPolicyReportOnly(false);
     await registered[0].callback(controller);
     expect(controller.request.contentSecurityPolicyReportOnly).toBe(false);
   });
 
   it("treats a first-positional options object as reportOnly=true", async () => {
-    const controller: { request: { contentSecurityPolicyReportOnly?: boolean | Policy | null } } = {
-      request: {},
-    };
-    contentSecurityPolicyReportOnly.call(host, { except: ["index"] });
+    const controller = makeController({});
+    host.contentSecurityPolicyReportOnly({ except: ["index"] });
     expect(registered[0].options).toEqual({ except: ["index"] });
     await registered[0].callback(controller);
     expect(controller.request.contentSecurityPolicyReportOnly).toBe(true);
@@ -139,37 +126,34 @@ describe("contentSecurityPolicyReportOnly class DSL", () => {
 
 describe("private instance helpers", () => {
   it("isContentSecurityPolicy reflects request.contentSecurityPolicy presence", () => {
-    expect(isContentSecurityPolicy.call({ request: { contentSecurityPolicy: null } })).toBe(false);
-    expect(isContentSecurityPolicy.call({ request: { contentSecurityPolicy: new Policy() } })).toBe(
+    expect(makeController({ contentSecurityPolicy: null }).isContentSecurityPolicy()).toBe(false);
+    expect(makeController({ contentSecurityPolicy: new Policy() }).isContentSecurityPolicy()).toBe(
       true,
     );
   });
 
   it("contentSecurityPolicyNonce returns the request nonce or null", () => {
-    expect(contentSecurityPolicyNonce.call({ request: {} })).toBeNull();
-    expect(
-      contentSecurityPolicyNonce.call({ request: { contentSecurityPolicyNonce: "abc" } }),
-    ).toBe("abc");
+    expect(makeController({}).contentSecurityPolicyNonce()).toBeNull();
+    expect(makeController({ contentSecurityPolicyNonce: "abc" }).contentSecurityPolicyNonce()).toBe(
+      "abc",
+    );
   });
 
   it("currentContentSecurityPolicy dups the request policy", () => {
     const existing = new Policy((p) => p.defaultSrc(":self"));
-    const dup = currentContentSecurityPolicy.call({
-      request: { contentSecurityPolicy: existing },
-    });
+    const dup = makeController({ contentSecurityPolicy: existing }).currentContentSecurityPolicy();
     expect(dup).toBeInstanceOf(Policy);
     expect(dup).not.toBe(existing);
   });
 
   it("currentContentSecurityPolicy returns a fresh policy when none is set", () => {
-    const fresh = currentContentSecurityPolicy.call({ request: { contentSecurityPolicy: null } });
+    const fresh = makeController({ contentSecurityPolicy: null }).currentContentSecurityPolicy();
     expect(fresh).toBeInstanceOf(Policy);
   });
 });
 
 describe("helper_method registration on Base", () => {
   it("exposes isContentSecurityPolicy and contentSecurityPolicyNonce as view helpers", async () => {
-    const { Base } = await import("../base.js");
     const cls = Base as unknown as { _helperMethods?: string[] };
     expect(cls._helperMethods).toEqual(
       expect.arrayContaining(["isContentSecurityPolicy", "contentSecurityPolicyNonce"]),
@@ -177,7 +161,6 @@ describe("helper_method registration on Base", () => {
   });
 
   it("helper proxies forward to the controller instance", async () => {
-    const { Base } = await import("../base.js");
     const controller = {
       isContentSecurityPolicy: () => true,
       contentSecurityPolicyNonce: () => "abc123",

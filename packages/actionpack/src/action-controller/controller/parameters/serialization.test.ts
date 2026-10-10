@@ -31,7 +31,7 @@ describe("ParametersSerializationTest", () => {
     const roundtripped = YAML.unsafeLoad(payload) as Parameters;
 
     expect(roundtripped.equals(params)).toBe(true);
-    expect(roundtripped.permitted).toBe(false);
+    expect(roundtripped.isPermitted()).toBe(false);
   });
 
   it("YAML backwardscompatible with psych 2.0.8 format", () => {
@@ -41,7 +41,7 @@ key: :value
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 
   it("YAML backwardscompatible with psych 2.0.9+ format", () => {
@@ -54,6 +54,6 @@ ivars:
     const params = YAML.unsafeLoad(payload) as Parameters;
 
     expect(params.get("key")).toEqual(":value");
-    expect(params.permitted).toBe(false);
+    expect(params.isPermitted()).toBe(false);
   });
 });

@@ -46,7 +46,7 @@ describe("NestedParametersPermitTest", () => {
       book: ["title", { authors: ["name"] }, { details: "pages" }, "id"],
     });
 
-    assertPredicate(permitted, (p) => p.permitted);
+    assertPredicate(permitted, (p) => p.isPermitted());
     assertEqual("Romeo and Juliet", (permitted.get("book") as Parameters).get("title"));
     assertEqual(
       "William Shakespeare",

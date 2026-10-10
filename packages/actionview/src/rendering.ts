@@ -217,7 +217,10 @@ export function _normalizeArgs(
     const key = action.includes("/") ? "template" : "action";
     options[key] = action;
   } else {
-    if (rbObjRespondTo(action, "permitted") && (action as { permitted: boolean }).permitted) {
+    if (
+      rbObjRespondTo(action, "isPermitted") &&
+      (action as { isPermitted(): boolean }).isPermitted()
+    ) {
       options = action as Record<string, unknown>;
     } else if (rbObjRespondTo(action, "renderIn")) {
       options["renderable"] = action;
