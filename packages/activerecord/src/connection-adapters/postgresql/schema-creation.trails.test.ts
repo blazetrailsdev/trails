@@ -5,6 +5,7 @@ import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import {
   CreateIndexDefinition,
   IndexDefinition,
@@ -113,7 +114,7 @@ describe("PostgreSQL SchemaCreation", () => {
     const col = new Column(
       "x",
       null,
-      new TypeMetadata({ sqlType: "character varying", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "character varying", type: "string" })),
     );
     expect(
       await s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, null)),
@@ -124,7 +125,11 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition: uuid function default stays bare", async () => {
-    const col = new Column("id", null, new TypeMetadata({ sqlType: "uuid", type: "uuid" }));
+    const col = new Column(
+      "id",
+      null,
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "uuid", type: "uuid" })),
+    );
     const host = s();
     host.conn.quoteDefaultExpression = (v: unknown, c: unknown) =>
       quoteDefaultExpression.call(null as never, v, c as never);

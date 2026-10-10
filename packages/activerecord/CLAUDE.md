@@ -127,10 +127,11 @@ path and the settled shape splits it the same way:
   returns `false` and leaves the model unloaded, `cachedTableExists` returns
   `undefined`, and `getPrimaryKey` (`attribute-methods/primary-key.ts`) falls
   through to the `"id"` convention. The one exception is
-  `SchemaReflection#getCachedColumnsHash`, which seeds the cache when the
-  adapter's `columns` itself answers synchronously (a fake test adapter), into
-  the cache `cache(pool)` would seat unless a dump file is still to be loaded; a real adapter's promise is dropped with
-  its rejection handled, and the cold answer stands. An empty column set was
+  `SchemaReflection#getCachedColumnsHash`, which reads the columns when the
+  adapter's `columns` itself answers synchronously (a fake test adapter). It
+  seeds a loaded cache, and with none loaded it memoizes per table without
+  seating a cache, so `cache(pool)` still runs `load_cache`; a real adapter's
+  promise is dropped with its rejection handled, and the cold answer stands. An empty column set was
   rejected because it makes a cold model silently attribute-less; `undefined`
   keeps it unloaded so the async warm can still load it.
 
