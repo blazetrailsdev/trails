@@ -174,7 +174,7 @@ export class DatabaseConfigurations {
 
   /** @internal */
   private envWithConfigs(env?: string | EnvironmentInquirer): HashConfig[] {
-    if (env) return this._configurations.filter((c) => rbEqual(c.envName, env));
+    if (env != null) return this._configurations.filter((c) => rbEqual(c.envName, env));
     return this._configurations;
   }
 
