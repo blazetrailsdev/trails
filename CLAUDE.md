@@ -1306,8 +1306,9 @@ are permanent, and a Trilogy-only test arm is dropped.
 
 Ratified in [packages/activerecord/CLAUDE.md](packages/activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require).
 The one-line rule: ESM has no synchronous `require`, so
-`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`, and
-no other `require` is ported that way.
+`ConnectionAdapters.load` awaits the adapter's `import()` before `resolve`. The
+one other `require` ported that way is `active_support/message_pack`, awaited
+at boot ([packages/activesupport/CLAUDE.md](packages/activesupport/CLAUDE.md#active_supportmessage_pack-is-loaded-by-an-awaited-step-at-boot-serializerwithfallbacks-require)).
 
 ## `ActiveRecord::Promise` is the native promise (`promise.rb`, `Promise::Complete`)
 

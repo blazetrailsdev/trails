@@ -164,7 +164,7 @@ const messagePackWithFallback: Serializer = {
 };
 
 /**
- * @missingRailsCall require — CONVERGEABLE message-pack-load-awaited-at-boot-when-a-message-pack-serializer-is-configured
+ * @missingRailsCall require — PERMANENT
  * @internal
  */
 function isAvailable(): boolean {
@@ -190,7 +190,7 @@ export const SERIALIZERS: Record<Format, Serializer> = {
 export const SerializerWithFallback = {
   SERIALIZERS,
 
-  /** @missingRailsCall require — CONVERGEABLE message-pack-load-awaited-at-boot-when-a-message-pack-serializer-is-configured */
+  /** @missingRailsCall require — PERMANENT */
   get(format: string): Serializer {
     if (format.includes("message_pack") && ActiveSupport.MessagePack === undefined) {
       throw new LoadError("cannot load such file -- active_support/message_pack");

@@ -1,6 +1,7 @@
 import "./i18n.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
+  ActiveSupport,
   deprecator,
   type Deprecation,
   type Deprecators,
@@ -21,6 +22,7 @@ export interface ActiveSupportConfig {
   disallowedDeprecation?: DisallowedBehaviorSetting;
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
   executorAroundTestCase?: boolean | null;
+  messageSerializer?: string | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -77,6 +79,22 @@ export class Trailtie extends BaseTrailtie {
         Digest.hashDigestClass = klass;
       }
     });
+
+    this.initializer(
+      "active_support.require_message_pack",
+      { after: "finisher_hook" },
+      async (app) => {
+        const messageSerializer = (
+          (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
+        ).messageSerializer;
+        if (
+          messageSerializer?.includes("message_pack") &&
+          ActiveSupport.MessagePack === undefined
+        ) {
+          await ActiveSupport.loadPath["active_support/message_pack"]();
+        }
+      },
+    );
   }
 }
 

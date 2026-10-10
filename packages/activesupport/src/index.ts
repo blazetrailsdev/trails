@@ -39,7 +39,17 @@ import {
   setTestOrder,
 } from "./active-support.js";
 
+import { ActiveSupport as ActiveSupportNamespace } from "./namespaces.js";
+
 export const ActiveSupport = {
+  get loadPath(): (typeof ActiveSupportNamespace)["loadPath"] {
+    return ActiveSupportNamespace.loadPath;
+  },
+
+  get MessagePack(): (typeof ActiveSupportNamespace)["MessagePack"] {
+    return ActiveSupportNamespace.MessagePack;
+  },
+
   get errorReporter(): ErrorReporter {
     return currentErrorReporter;
   },

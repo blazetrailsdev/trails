@@ -8,7 +8,7 @@ import {
   TopLevel,
 } from "@blazetrails/activesupport";
 import { Runtime } from "@blazetrails/rack";
-import { rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { LoadError, rbObjRespondTo, setVerbose, verbose } from "@blazetrails/ruby-compat";
 import { Initializable } from "../initializable.js";
 
 export interface BootstrapConfig {
@@ -35,7 +35,28 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
   if (level !== undefined) TopLevel.Trails!.logger.level = level;
 });
 
-Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, function () {
+Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async function () {
+  const oldVerbose = verbose();
+  setVerbose(null);
+  try {
+    await ActiveSupport.loadPath["active_support/message_pack"]();
+  } catch (error) {
+    if (!(error instanceof LoadError)) throw error;
+  } finally {
+    setVerbose(oldVerbose);
+  }
+  const cacheStore = this.config.cacheStore;
+  const serializer = Array.isArray(cacheStore)
+    ? (cacheStore.at(-1) as { serializer?: unknown } | null)?.serializer
+    : undefined;
+  if (
+    typeof serializer === "string" &&
+    serializer.includes("message_pack") &&
+    ActiveSupport.MessagePack === undefined
+  ) {
+    await ActiveSupport.loadPath["active_support/message_pack"]();
+  }
+
   const cacheFormatVersion = this.config.activeSupport.cacheFormatVersion;
   delete this.config.activeSupport.cacheFormatVersion;
   if (cacheFormatVersion != null) ActiveSupport.setCacheFormatVersion(cacheFormatVersion);

@@ -64,3 +64,37 @@ shaped the same way.
   includes UrlFor as a live `Module` whose link is spliced into
   `RoutingUrlFor`'s ancestry, because `include()` flattens a plain-object module
   beneath the class's own methods.
+
+## `active_support/message_pack` is loaded by an awaited step at boot (`SerializerWithFallback`'s `require`)
+
+Rails loads `active_support/message_pack` in line, from two synchronous
+methods in each of `messages/serializer_with_fallback.rb` and
+`cache/serializer_with_fallback.rb`: `[]` requires it when a `message_pack`
+format is asked for (`:9-15`), and `available?` requires it under
+`silence_warnings` and a `rescue LoadError` (`:134-140`). Their callers are
+synchronous constructors and readers: `Cache::Store#initialize`
+(`cache.rb:304`), `Messages::Codec#initialize` (`messages/codec.rb:17`) and
+`SerializedCookieJars#serializer`
+(`actionpack/lib/action_dispatch/middleware/cookies.rb:582`).
+
+ESM has no synchronous load, and `message-pack.ts` cannot be imported eagerly
+because `@blazetrails/msgpack` is an optional peer. This is the shortcoming
+[packages/activerecord/CLAUDE.md](../activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require)
+records for an adapter file, and the answer is the same: **the `require` is
+`await ActiveSupport.loadPath["active_support/message_pack"]()`, run before the
+synchronous reader.** As a consequence:
+
+- `get` peeks `ActiveSupport.MessagePack` and raises `LoadError` while it is
+  unseated, and `isAvailable` answers whether it is seated. Their
+  `@missingRailsCall require` receipts are `PERMANENT`.
+- A booted application awaits the load in trailties. `initialize_cache` makes
+  `available?`'s silenced, rescued attempt for every application, so a
+  MessagePack payload is detected wherever the peer is installed, and makes
+  `[]`'s raising load when the cache store names the format.
+  `active_support.require_message_pack` and
+  `action_dispatch.require_message_pack` make the raising load after
+  `finisher_hook`, when `active_support.message_serializer` or
+  `action_dispatch.cookies_serializer` names it. With the peer absent the
+  raising load prints `message_pack.rb:3-10`'s warning and raises.
+- Code outside a booted application awaits the load itself, or imports
+  `@blazetrails/activesupport/message-pack`.
