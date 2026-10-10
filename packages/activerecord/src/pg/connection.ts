@@ -69,7 +69,7 @@ export class Connection {
     return (pending as Promise<unknown>).catch(raise);
   }
 
-  connect(): Promise<void> {
+  connect(): Promise<unknown> {
     return this.client.connect().catch(raise);
   }
 

@@ -15,7 +15,8 @@ describeIfPg("PostgreSQLAdapter adopts a raw connection it was handed (trails)",
       expect(await adapter.active()).toBe(true);
       await adapter.verifyBang();
       expect(await adapter.selectValue("SELECT 2")).toBe(2);
-      expect((adapter as unknown as { _rawConnection: unknown })._rawConnection).toBe(client);
+      const raw = (adapter as unknown as { _rawConnection: { client: unknown } })._rawConnection;
+      expect(raw.client).toBe(client);
     } finally {
       await adapter.disconnectBang();
     }
