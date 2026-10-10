@@ -1,5 +1,5 @@
 import { isPresent, wrap } from "@blazetrails/activesupport";
-import { first, Hash, rbEqual, rbHash, toS, zip } from "@blazetrails/ruby-compat";
+import { first, Hash, rbEqual, rbHash, Set, toS, zip } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import type { AssociationReflection, ThroughReflection } from "../../reflection.js";
 
@@ -266,7 +266,7 @@ export class Association {
   }
 
   private _uniqueOwners(owners: Base[]): Base[] {
-    const seen = new Set<Base>();
+    const seen = new globalThis.Set<Base>();
     return owners.filter((o) => {
       if (seen.has(o)) return false;
       seen.add(o);
@@ -373,9 +373,7 @@ export class LoaderRecords {
       }
     }
 
-    for (const key of this.alreadyLoadedRecordsByKey.keys()) {
-      this.keysToLoad.delete(key);
-    }
+    this.keysToLoad.subtract(this.alreadyLoadedRecordsByKey.keys());
   }
 
   /** @internal */

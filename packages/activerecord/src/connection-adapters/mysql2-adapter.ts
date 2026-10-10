@@ -97,6 +97,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   );
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
+    if (this._unconfiguredConnection != null) {
+      this._unconfiguredConnection = mysql2Client(this._unconfiguredConnection as object);
+    }
 
     this._affectedRowsBeforeWarnings = null;
     this._config.flags ||= 0;

@@ -1,4 +1,5 @@
 export const PG_DIAG_SQLSTATE = 67;
+export const PG_DIAG_SOURCE_FUNCTION = 82;
 
 const ERRORS = new WeakSet<object>();
 
@@ -26,10 +27,20 @@ export function pgError(error: unknown): unknown {
   if (!(error instanceof globalThis.Error) || "result" in error || !Object.isExtensible(error)) {
     return error;
   }
-  const { code, message } = error as globalThis.Error & { code?: unknown };
-  let result: { errorField(fieldcode: number): string | null } | null = null;
+  const { code, message, routine } = error as globalThis.Error & {
+    code?: unknown;
+    routine?: string;
+  };
+  type ErrorField = (fieldcode: number) => string | null;
+  let result: { errorField: ErrorField; resultErrorField: ErrorField } | null = null;
   if (error.name === "error" && typeof code === "string") {
-    result = { errorField: (fieldcode) => (fieldcode === PG_DIAG_SQLSTATE ? code : null) };
+    const errorField: ErrorField = (fieldcode) =>
+      fieldcode === PG_DIAG_SQLSTATE
+        ? code
+        : fieldcode === PG_DIAG_SOURCE_FUNCTION
+          ? (routine ?? null)
+          : null;
+    result = { errorField, resultErrorField: errorField };
     ERRORS.add(error);
   } else if (message.includes("client has already ended") || /client was closed/i.test(message)) {
     CONNECTION_BAD.set(error, false);
@@ -44,7 +55,9 @@ export function pgError(error: unknown): unknown {
     ERRORS.add(error);
   } else if (
     (typeof code === "string" && /^E([A-Z]+|AI_[A-Z]+)$/.test(code)) ||
-    message.includes("Query read timeout")
+    message.includes("Query read timeout") ||
+    message.includes("timeout expired") ||
+    message.startsWith("SASL")
   ) {
     ERRORS.add(error);
   }

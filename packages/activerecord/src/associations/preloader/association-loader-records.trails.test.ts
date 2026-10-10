@@ -6,11 +6,14 @@ import { LoaderRecords } from "./association.js";
 import type { Association } from "./association.js";
 import type { Base } from "../../base.js";
 import { Author } from "../../test-helpers/models/author.js";
+import { CpkBook, CpkOrder } from "../../test-helpers/models/cpk.js";
 
 registerModel(Author);
+registerModel(CpkOrder);
+registerModel(CpkBook);
 
 describe("Preloader::Association::LoaderRecords", () => {
-  const { authors } = fixtures(["authors", "posts"]);
+  const { authors, cpkOrders } = fixtures(["authors", "posts", "cpkOrders", "cpkBooks"]);
 
   const keyFor = (loader: Association, owner: Base): unknown =>
     [...loader.ownersByKey.entries()].find(([, owners]) => owners.includes(owner))![0];
@@ -53,5 +56,28 @@ describe("Preloader::Association::LoaderRecords", () => {
       expect(records).toContain(post);
     }
     expect(records.length).toBeGreaterThan(davidPosts.length);
+  });
+
+  it("keeps a composite key shared by two loaders out of keys_to_load when one owner is loaded", async () => {
+    const loadedOrder = cpkOrders("cpk_groceries_order_1");
+    const unloadedOrder = await CpkOrder.find(loadedOrder.id as unknown[]);
+    await loadedOrder.books;
+
+    const loaders = [];
+    for (const order of [unloadedOrder, loadedOrder]) {
+      const [loader] = await new Preloader({
+        records: [order],
+        associations: ["books"],
+        associateByDefault: false,
+      }).loaders();
+      loaders.push(loader);
+    }
+
+    const sharedKey = keyFor(loaders[0], unloadedOrder);
+    expect(keyFor(loaders[1], loadedOrder)).not.toBe(sharedKey);
+
+    const loaderRecords = new LoaderRecords(loaders, loaders[0].loaderQuery());
+
+    expect(loaderRecords.keysToLoad.size).toBe(0);
   });
 });

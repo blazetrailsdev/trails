@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { mysql2Client } from "./client.js";
+import { defaultTimezone, setDefaultTimezone } from "../active-record.js";
 
 type TypeCast = (field: unknown, next: () => unknown) => unknown;
 
@@ -40,6 +41,37 @@ describe("mysql2Client cast", () => {
     expect(instantOf(local.typeCast!)).toBe(
       naive.toZonedDateTime(Temporal.Now.timeZoneId()).toInstant().epochNanoseconds,
     );
+  });
+
+  it("answers a Time in the zone queryOptions.databaseTimezone names, whatever the global default", () => {
+    const local: { typeCast?: TypeCast } = {};
+    mysql2Client({ config: local }).queryOptions.databaseTimezone = "local";
+    const before = defaultTimezone();
+    try {
+      for (const zone of ["utc", "local"] as const) {
+        setDefaultTimezone(zone);
+        const utc = config.typeCast!(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime;
+        const loc = local.typeCast!(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime;
+        expect(utc.isUtc()).toBe(true);
+        expect(loc.isUtc()).toBe(false);
+      }
+    } finally {
+      setDefaultTimezone(before);
+    }
+  });
+
+  it("asks the driver for rows as arrays only when queryOptions.as is :array", async () => {
+    const seen: unknown[] = [];
+    const raw = mysql2Client({
+      query: async (options: object) => (seen.push(options), [[], [{ name: "x" }]]),
+    });
+    await raw.query("SELECT 1");
+    raw.queryOptions.as = "array";
+    await raw.query("SELECT 1");
+    expect(seen).toEqual([
+      { sql: "SELECT 1", rowsAsArray: false },
+      { sql: "SELECT 1", rowsAsArray: true },
+    ]);
   });
 
   describe("TIMESTAMP", () => {

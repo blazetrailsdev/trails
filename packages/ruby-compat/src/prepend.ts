@@ -44,11 +44,13 @@ export interface PrependModule {
   readonly [methodName: string]: PrependMethod;
 }
 
+export type ClassModule = abstract new (...args: never[]) => object;
+
 const NO_METHOD_ROOT = function (): void {};
 
-const prepended = new WeakMap<object, { mod: PrependModule; original: object }>();
+const prepended = new WeakMap<object, { mod: object; original: object }>();
 
-function isPrepended(method: unknown, mod: PrependModule): boolean {
+function isPrepended(method: unknown, mod: object): boolean {
   let link = typeof method === "function" ? prepended.get(method) : undefined;
   while (link && link.mod !== mod) link = prepended.get(link.original);
   return link !== undefined;
@@ -58,10 +60,16 @@ function isPrepended(method: unknown, mod: PrependModule): boolean {
  * Mirrors: Ruby's Module#prepend — vendor/ruby/v3.3.11/eval.c:1196 `rb_mod_prepend`,
  * backed by vendor/ruby/v3.3.11/class.c:1430 `rb_prepend_module`.
  *
+ * A module may be written as a class: its prototype's own methods are the
+ * module's method table, and a class it extends is a module it includes. An
+ * included method reaches the target as it is, nearest module first, and
+ * replaces the target's own method of that name, as in Ruby's ancestors. It
+ * takes no `super_`, so it cannot reach the method it replaced.
+ *
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function prepend<T extends object>(target: T, mod: PrependModule): void {
+export function prepend<T extends object>(target: T, module: PrependModule | ClassModule): void {
   if (!target || (typeof target !== "object" && typeof target !== "function")) {
     throw new TypeError("prepend: target must be an object or function");
   }
@@ -69,12 +77,15 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
   if (!Object.isExtensible(target)) {
     throw new TypeError("prepend: target is not extensible (frozen/sealed)");
   }
-  const names = Object.keys(mod);
+  const mod: PrependModule = typeof module === "function" ? module.prototype : module;
+  const names =
+    typeof module === "function"
+      ? Object.getOwnPropertyNames(mod).filter((name) => name !== "constructor")
+      : Object.keys(mod);
   for (const name of names) {
-    if (typeof mod[name] !== "function") {
-      throw new TypeError(
-        `prepend: module entry ${name} must be a function, got ${typeof mod[name]}`,
-      );
+    const entry = Object.getOwnPropertyDescriptor(mod, name)!.value;
+    if (typeof entry !== "function") {
+      throw new TypeError(`prepend: module entry ${name} must be a function, got ${typeof entry}`);
     }
     const own = Object.getOwnPropertyDescriptor(target, name);
     if (own && own.configurable === false) {
@@ -91,10 +102,24 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
     }
   }
 
+  if (typeof module === "function") {
+    const seen = new Set(names);
+    let included = mod;
+    while ((included = Object.getPrototypeOf(included)) && included !== Object.prototype) {
+      for (const name of Object.getOwnPropertyNames(included)) {
+        if (name === "constructor" || seen.has(name)) continue;
+        seen.add(name);
+        const entry = Object.getOwnPropertyDescriptor(included, name)!.value;
+        if (typeof entry !== "function") continue;
+        Object.defineProperty(target, name, { value: entry, writable: true, configurable: true });
+      }
+    }
+  }
+
   for (const name of names) {
     const descriptor = findPropertyDescriptor(target, name);
     const existing = (target as Record<string, unknown>)[name];
-    if (isPrepended(existing, mod)) continue;
+    if (isPrepended(existing, module)) continue;
     const original =
       typeof existing === "function"
         ? (existing as (...args: unknown[]) => unknown)
@@ -107,7 +132,7 @@ export function prepend<T extends object>(target: T, mod: PrependModule): void {
     const wrapped = function (this: unknown, ...args: unknown[]) {
       return wrapper.call(this, original.bind(this), ...args);
     };
-    prepended.set(wrapped, { mod, original });
+    prepended.set(wrapped, { mod: module, original });
     Object.defineProperty(target, name, {
       value: wrapped,
       writable: descriptor?.writable ?? true,

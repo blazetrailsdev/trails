@@ -194,9 +194,4 @@ export class SchemaDumper extends AbstractSchemaDumper {
     const m = /^numeric\(\d+,\s*(\d+)\)/.exec(sqlType);
     return m ? m[1] : undefined;
   }
-
-  /** @internal */
-  protected override async tableOptions(tableName: string): Promise<Record<string, unknown>> {
-    return this.connection.tableOptions(tableName);
-  }
 }

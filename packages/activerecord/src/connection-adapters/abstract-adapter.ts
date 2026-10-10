@@ -429,6 +429,7 @@ export interface AbstractAdapter
   dataSourceSql(name?: string | null, options?: { type?: string }): string;
   columns(tableName: string): Promise<Column[]>;
   primaryKey(tableName: string): Promise<string | string[] | null>;
+  tableOptions(tableName: string): Promise<Record<string, unknown> | null>;
   tableComment(tableName: string): Promise<string | null>;
   indexes(tableName: string): Promise<IndexDefinition[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;

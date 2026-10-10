@@ -127,13 +127,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override async tableOptions(
-    tableName: string,
-  ): Promise<Record<string, unknown> | null> {
-    return this.connection.tableOptions(tableName);
-  }
-
-  /** @internal */
   protected override schemaScale(column: MysqlColumn): string | undefined {
     if (column.type !== "decimal") return undefined;
     return super.schemaScale(column);

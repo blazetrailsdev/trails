@@ -1,8 +1,14 @@
 import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import pg from "pg";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { ConnectionFailed, ConnectionNotEstablished, StatementInvalid } from "../../errors.js";
+import {
+  ConnectionFailed,
+  ConnectionNotEstablished,
+  NoDatabaseError,
+  StatementInvalid,
+} from "../../errors.js";
 import type { PGConnection } from "../../pg/connection.js";
+import { pgError } from "../../pg/exceptions.js";
 import { PG } from "../../pg/pg.js";
 import { fixtures } from "../../test-fixtures.js";
 
@@ -84,5 +90,51 @@ describeIfPg("PG::Error#result (trails)", () => {
   it("an error raised anywhere else does not answer result", () => {
     expect("result" in new Error("Connection terminated")).toBe(false);
     expect(new Error("Connection terminated")).not.toBeInstanceOf(PG.ConnectionBad);
+  });
+
+  it("new_client rescues a driver error and reads the database from conn_params", async () => {
+    vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(
+      new Error('database "nope" does not exist'),
+    );
+    await expect(PostgreSQLAdapter.newClient({ database: "nope" })).rejects.toBeInstanceOf(
+      NoDatabaseError,
+    );
+  });
+
+  it("new_client lets an error the driver did not raise propagate unchanged", async () => {
+    const error = new TypeError("not a driver error");
+    vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(error);
+    expect(await PostgreSQLAdapter.newClient({ database: "nope" }).catch((e) => e)).toBe(error);
+    expect(error).not.toBeInstanceOf(PG.Error);
+  });
+
+  it("is_cached_plan_failure? reads SQLSTATE and source function through result", () => {
+    const error = Object.assign(new Error("cached plan must not change result type"), {
+      name: "error",
+      code: "0A000",
+      routine: "RevalidateCachedQuery",
+    });
+    expect(adapter.isCachedPlanFailure(error as never)).toBe(false);
+    expect(adapter.isCachedPlanFailure(pgError(error) as never)).toBe(true);
+    expect(adapter.isCachedPlanFailure(pgError(new Error("gone")) as never)).toBe(false);
+  });
+
+  it("an Error that merely carries a result is not a PG::Error", () => {
+    const error = Object.assign(new Error("not from the driver"), { result: null });
+    expect(error).not.toBeInstanceOf(PG.Error);
+    expect(pgError(new Error("Connection terminated unexpectedly"))).toBeInstanceOf(PG.Error);
+  });
+
+  it("a connection string that is not a URL leaves the conn_params keys unset", () => {
+    const params = (config: string) =>
+      (new PostgreSQLAdapter(config) as unknown as { _pgClientOptions: pg.ClientConfig })
+        ._pgClientOptions;
+    expect(params("host=localhost dbname=blog").database).toBeUndefined();
+    expect(params("postgres://bob@[::1]/blog").host).toBe("::1");
+    expect(params("postgres://bob@db/blog?host=/var/run/pg&user=ann&dbname=shop")).toMatchObject({
+      database: "shop",
+      user: "ann",
+      host: "/var/run/pg",
+    });
   });
 });
