@@ -315,7 +315,7 @@ const warningCount: PropertyDescriptor = {
   },
 };
 
-type EofPacket = { buffer: Buffer; offset: number; end: number; isEOF(): boolean };
+type EofPacket = { offset: number; end: number; isEOF(): boolean; eofWarningCount(): number };
 type PacketHandler = { handlePacket?: (packet?: EofPacket) => unknown };
 
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
@@ -369,7 +369,7 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     if (typeof handlePacket === "function") {
       connection!.handlePacket = function (packet) {
         if (packet?.isEOF() && packet.end - packet.offset >= 5) {
-          WARNING_COUNT.set(client, packet.buffer.readUInt16LE(packet.offset + 1));
+          WARNING_COUNT.set(client, packet.eofWarningCount());
         }
         return handlePacket.call(this, packet);
       };

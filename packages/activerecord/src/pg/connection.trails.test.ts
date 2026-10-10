@@ -192,9 +192,20 @@ describe("PG::Error", () => {
     const client = pgConnection({ query: () => Promise.reject(failure) });
     await expect(client.query("SELECT 1")).rejects.toBe(failure);
     expect(failure).toBeInstanceOf(PG.Error);
-    const bug = new TypeError("values is not iterable");
+    const bug = Object.assign(new TypeError("values is not iterable"), {
+      code: "ERR_INVALID_ARG_TYPE",
+    });
     await expect(pgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(bug);
     expect(bug).not.toBeInstanceOf(PG.Error);
+    for (const driver of [
+      Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+      new Error("Query read timeout"),
+    ]) {
+      await pgConnection({ query: () => Promise.reject(driver) })
+        .query("")
+        .catch(() => {});
+      expect(driver).toBeInstanceOf(PG.Error);
+    }
     expect(new TypeError("conn.status is not a function")).not.toBeInstanceOf(PG.Error);
   });
 

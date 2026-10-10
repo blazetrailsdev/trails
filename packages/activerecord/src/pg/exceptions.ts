@@ -42,7 +42,10 @@ export function pgError(error: unknown): unknown {
   ) {
     CONNECTION_BAD.set(error, true);
     ERRORS.add(error);
-  } else if (typeof code === "string") {
+  } else if (
+    (typeof code === "string" && /^E[A-Z]+$/.test(code)) ||
+    message.includes("Query read timeout")
+  ) {
     ERRORS.add(error);
   }
   return Object.defineProperty(error, "result", {

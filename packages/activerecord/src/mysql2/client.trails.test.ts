@@ -69,7 +69,12 @@ describe("Mysql2::Client#warning_count", () => {
     expect(client.warningCount).toBe(0);
 
     const eof = Buffer.from([0xfe, 3, 0, 2, 0]);
-    const packet = { buffer: eof, offset: 0, end: eof.length, isEOF: () => true };
+    const packet = {
+      offset: 0,
+      end: eof.length,
+      isEOF: () => true,
+      eofWarningCount: () => eof.readInt16LE(1),
+    };
     (
       client as unknown as { connection: { handlePacket(p: object): void } }
     ).connection.handlePacket(packet);
