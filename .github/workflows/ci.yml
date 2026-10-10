@@ -473,10 +473,14 @@ jobs:
           # package.json — failing with "Unable to locate executable pnpm".
           package-manager-cache: false
 
-      # A conflicting PR's run reports on a stale merge commit rather than on
-      # the branch, so it is failed here and the cancel step below stops the
-      # expensive lanes. See the script's --help for why only `dirty` counts
-      # and why an uncomputed answer is treated as mergeable.
+      # Catches a run whose base moved under it and now conflicts — common here
+      # with agents landing PRs in parallel — plus a re-run of such a run. NOT a
+      # push to an already-conflicting branch: GitHub does not dispatch
+      # `pull_request` activity at all in that case, so there is no run to stop.
+      # Such a run's gates report on a merge with a base that no longer exists,
+      # so it is failed here and the cancel step below stops the expensive
+      # lanes. See the script's --help for why only `dirty` counts, why
+      # mergeability is read as of now, and why an unreadable answer passes.
       - name: Merge conflicts
         id: merge-conflict
         if: ${{ !cancelled() && github.event_name == 'pull_request' }}

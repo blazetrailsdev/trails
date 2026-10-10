@@ -7,11 +7,22 @@ Usage:
   check-merge-conflict.sh <repo> <pr>   fail if that PR conflicts with its base
   check-merge-conflict.sh --self-test   run the classifier's own fixture cases
 
-GitHub maintains refs/pull/N/merge only while the branch merges cleanly, so
-once a PR conflicts every `pull_request` job checks out the LAST mergeable
-merge commit — a tree describing neither the branch nor the base. Results from
-such a run do not describe the PR, and the run has to be re-fired after the
-rebase regardless, so Preflight fails early and cancels the rest.
+What this does NOT catch: a push to an already-conflicting branch. GitHub does
+not dispatch `pull_request` activity at all when the PR has a merge conflict
+("Workflows will not run on pull_request activity if the pull request has a
+merge conflict"), so there is no run to stop on that path.
+
+What it does catch is the case this repo actually produces, with many agents
+landing PRs in parallel: a run that was dispatched while the branch still
+merged cleanly, whose base then moved under it and now conflicts. That run
+checked out a merge of the branch with a base that no longer exists, so its
+gates are reporting on a tree that is neither side, and it has to be re-fired
+after the rebase regardless. The other reachable path is a manual re-run of
+such a run.
+
+Mergeability is therefore read as of NOW, not as of the run's trigger: a re-run
+after the base moved is judged on the current state, which is the intended
+reading — the question is whether this run's result can still be trusted.
 
 Only mergeable_state "dirty" is a textual conflict. "behind", "blocked",
 "draft" and "unstable" are normal states for an open PR here and none of them
@@ -42,25 +53,37 @@ classify() {
   fi
 }
 
+# Prints "<mergeable> <state>" on success; returns non-zero, having printed
+# nothing usable, when the API cannot be read. A failure here must never red
+# this step: an unreadable API is not a conflict, and this check exists to save
+# runner minutes, not to invent a new way for a mergeable branch to go red.
+# GH_API_RETRY_SOFT keeps the retry script from leaving an `::error::`
+# annotation on a run this check then deliberately passes.
 fetch() {
   local repo="$1" pr="$2"
   if [ -n "${MERGE_CONFLICT_FETCH:-}" ]; then
     "$MERGE_CONFLICT_FETCH" "$repo" "$pr"
   else
-    # Retried for the same reason the attribution guards are: an unretried 5xx
-    # would read in the checks UI as a conflict that does not exist.
-    "$(dirname "$0")/gh-api-retry.sh" "repos/$repo/pulls/$pr" \
+    GH_API_RETRY_SOFT=1 "$(dirname "$0")/gh-api-retry.sh" "repos/$repo/pulls/$pr" \
       --jq '"\(.mergeable) \(.mergeable_state)"'
   fi
 }
 
 check() {
   local repo="$1" pr="$2" answer mergeable state verdict attempt
+  local status
   for ((attempt = 1; attempt <= MAX_ATTEMPTS; attempt++)); do
-    answer=$(fetch "$repo" "$pr")
-    mergeable=${answer%% *}
-    state=${answer##* }
-    verdict=$(classify "$mergeable" "$state")
+    status=0
+    answer=$(fetch "$repo" "$pr") || status=$?
+    if [ "$status" -ne 0 ]; then
+      mergeable=unreadable
+      state=unreadable
+      verdict=unresolved
+    else
+      mergeable=${answer%% *}
+      state=${answer##* }
+      verdict=$(classify "$mergeable" "$state")
+    fi
     [ "$verdict" = unresolved ] || break
     if [ "$attempt" -lt "$MAX_ATTEMPTS" ]; then
       echo "Attempt $attempt: mergeability not computed yet (mergeable=$mergeable, state=$state); waiting."
@@ -74,7 +97,7 @@ check() {
       return 1
       ;;
     unresolved)
-      echo "GitHub did not compute mergeability within $MAX_ATTEMPTS attempts (mergeable=$mergeable, state=$state); treating as mergeable."
+      echo "::warning::Could not establish mergeability within $MAX_ATTEMPTS attempts (mergeable=$mergeable, state=$state); treating this PR as mergeable and letting the run continue. An unreadable or uncomputed answer is not a conflict."
       ;;
     *)
       echo "No merge conflict (mergeable=$mergeable, mergeable_state=$state)."
@@ -84,6 +107,7 @@ check() {
 
 selfTestDir=""
 selfTestStatus=0
+selfTestTarget=""
 
 classifyCase() {
   local label="$1" expected="$2" mergeable="$3" state="$4" actual
@@ -94,9 +118,14 @@ classifyCase() {
   fi
 }
 
+# Runs the check as a CHILD PROCESS, not by calling check() in this shell. A
+# command substitution in a `||` list suppresses `set -e` inside it, so an
+# in-shell call cannot see an abort that CI would see — which is the whole
+# failure mode the fail-open guard in fetch()/check() exists to prevent.
 checkCase() {
   local label="$1" expected="$2" script="$3" status=0 out
-  out=$(MERGE_CONFLICT_FETCH="$script" MERGE_CONFLICT_SLEEP=0 check owner/repo 1 2>&1) || status=$?
+  out=$(MERGE_CONFLICT_FETCH="$script" MERGE_CONFLICT_SLEEP=0 \
+    "$selfTestTarget" owner/repo 1 2>&1) || status=$?
   if [ "$status" != "$expected" ]; then
     echo "self-test FAILED: $label exited $status, expected $expected" >&2
     printf '%s\n' "$out" >&2
@@ -104,23 +133,34 @@ checkCase() {
   fi
 }
 
+# Writes a fetcher that answers the given lines in order, one per call, so a
+# case can exercise the poll loop. The answer "unreadable" makes that call fail
+# the way gh-api-retry.sh does when the API cannot be read.
 fakeFetch() {
   local dir="$1" tag="$2"
   shift 2
   printf '%s\n' "$@" >"$dir/answers-$tag"
   local path="$dir/fetch-$tag.sh"
-  {
-    echo '#!/usr/bin/env bash'
-    echo "n=\$(cat '$dir/count-$tag' 2>/dev/null || echo 0)"
-    echo "n=\$((n + 1))"
-    echo "echo \$n >'$dir/count-$tag'"
-    echo "sed -n \"\${n}p\" '$dir/answers-$tag'"
-  } >"$path"
+  sed -e "s#@ANSWERS@#$dir/answers-$tag#" -e "s#@COUNT@#$dir/count-$tag#" \
+    >"$path" <<'FAKE'
+#!/usr/bin/env bash
+set -euo pipefail
+n=$(cat '@COUNT@' 2>/dev/null || echo 0)
+n=$((n + 1))
+echo "$n" >'@COUNT@'
+answer=$(sed -n "${n}p" '@ANSWERS@')
+if [ "$answer" = unreadable ]; then
+  echo 'gh: HTTP 503 (fixture)' >&2
+  exit 1
+fi
+printf '%s\n' "$answer"
+FAKE
   chmod +x "$path"
   printf '%s' "$path"
 }
 
 selfTest() {
+  selfTestTarget="$1"
   selfTestDir=$(mktemp -d)
   trap 'rm -rf "$selfTestDir"' EXIT
   local dir="$selfTestDir"
@@ -139,6 +179,12 @@ selfTest() {
     "$(fakeFetch "$dir" late 'null unknown' 'null unknown' 'false dirty')"
   checkCase 'a clean merge seen only after polling' 0 \
     "$(fakeFetch "$dir" slow 'null unknown' 'true clean')"
+  checkCase 'an API that cannot be read at all' 0 \
+    "$(fakeFetch "$dir" unreadable unreadable unreadable unreadable unreadable unreadable unreadable)"
+  checkCase 'an API failure that clears on a later poll' 0 \
+    "$(fakeFetch "$dir" recovers unreadable 'true clean')"
+  checkCase 'an API failure clearing to reveal a conflict' 1 \
+    "$(fakeFetch "$dir" revealed unreadable 'false dirty')"
   checkCase 'mergeability that never resolves' 0 \
     "$(fakeFetch "$dir" never 'null unknown' 'null unknown' 'null unknown' 'null unknown' 'null unknown' 'null unknown')"
 
@@ -148,7 +194,7 @@ selfTest() {
 
 case "${1:-}" in
   --self-test)
-    selfTest
+    selfTest "$0"
     exit
     ;;
   -h | --help)
