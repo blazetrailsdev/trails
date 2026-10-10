@@ -1,9 +1,11 @@
 import {
   extractOptionsBang,
-  included,
   mattrAccessor,
   Callbacks as ASCallbacks,
+  Concern,
+  extend,
   include,
+  Module,
   type Extended,
   type FilterListEntry,
   type Included,
@@ -171,20 +173,6 @@ function _toConditionFns(pred: CallbackOptions["if"]): CallbackCondition[] | und
   );
 }
 
-export const Callbacks = {
-  [included](base: typeof AbstractController): void {
-    include(base, ASCallbacks);
-    base.defineCallbacks("process_action", {
-      terminator: async (controller, resultLambda) => {
-        await resultLambda();
-        return (controller as AbstractController).performed;
-      },
-      skipAfterCallbacksIfTerminated: true,
-    });
-    mattrAccessor.call(base, "raiseOnMissingCallbackActions", { default: false });
-  },
-};
-
 /** @internal */
 export function _registerActionCallback(
   klass: ActionCallbackHost,
@@ -311,14 +299,54 @@ export const appendBeforeAction = beforeAction;
 export const appendAfterAction = afterAction;
 export const appendAroundAction = aroundAction;
 
+export const ClassMethods: Module = new Module((mod) => {
+  mod.defineMethod("_normalizeCallbackOptions", _normalizeCallbackOptions);
+  mod.defineMethod("_normalizeCallbackOption", _normalizeCallbackOption);
+  mod.defineMethod("_insertCallbacks", _insertCallbacks);
+  mod.defineMethod("beforeAction", beforeAction);
+  mod.defineMethod("prependBeforeAction", prependBeforeAction);
+  mod.defineMethod("skipBeforeAction", skipBeforeAction);
+  mod.defineMethod("appendBeforeAction", appendBeforeAction);
+  mod.defineMethod("afterAction", afterAction);
+  mod.defineMethod("prependAfterAction", prependAfterAction);
+  mod.defineMethod("skipAfterAction", skipAfterAction);
+  mod.defineMethod("appendAfterAction", appendAfterAction);
+  mod.defineMethod("aroundAction", aroundAction);
+  mod.defineMethod("prependAroundAction", prependAroundAction);
+  mod.defineMethod("skipAroundAction", skipAroundAction);
+  mod.defineMethod("appendAroundAction", appendAroundAction);
+});
+
 /** @internal */
 export async function processAction(
-  controller: AbstractController,
-  _action: string,
-  dispatch: () => Promise<void>,
+  this: AbstractController & Included<typeof ASCallbacks>,
+  ...args: unknown[]
 ): Promise<void> {
-  await (controller as AbstractController & Included<typeof ASCallbacks>).runCallbacks(
-    "process_action",
-    () => dispatch(),
+  await this.runCallbacks("process_action", () =>
+    Callbacks.superMethod(this, "processAction")!(...args),
   );
 }
+
+type CallbacksIncludingClass = typeof AbstractController & ActionCallbackHost;
+
+export const Callbacks = new Module((mod) => {
+  extend(mod, Concern);
+
+  include(mod, ASCallbacks);
+
+  (
+    mod as unknown as { included(base: null, block: (this: CallbacksIncludingClass) => void): void }
+  ).included(null, function (this: CallbacksIncludingClass) {
+    this.defineCallbacks("process_action", {
+      terminator: async (controller, resultLambda) => {
+        await resultLambda();
+        return (controller as AbstractController).performed;
+      },
+      skipAfterCallbacksIfTerminated: true,
+    });
+    mattrAccessor.call(this, "raiseOnMissingCallbackActions", { default: false });
+  });
+
+  mod.defineMethod("processAction", processAction);
+}) as Module & { ClassMethods: typeof ClassMethods };
+Callbacks.ClassMethods = ClassMethods;

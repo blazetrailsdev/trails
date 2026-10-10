@@ -7,10 +7,33 @@ import {
   _insertCallbacks,
   _normalizeCallbackOption,
   _normalizeCallbackOptions,
+  type ActionCallbackHost,
+  type aroundAction,
+  Callbacks,
   type CallbackOptions,
+  type prependBeforeAction,
+  type skipBeforeAction,
+  type skipAfterAction,
 } from "./callbacks.js";
+import { include } from "@blazetrails/activesupport";
 
-class Callback1 extends AbstractController {
+class ControllerWithCallbacks extends AbstractController {
+  declare static setCallback: ActionCallbackHost["setCallback"];
+  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static raiseOnMissingCallbackActions: boolean;
+  declare static _normalizeCallbackOptions: typeof _normalizeCallbackOptions;
+  declare static _normalizeCallbackOption: typeof _normalizeCallbackOption;
+  declare static _insertCallbacks: typeof _insertCallbacks;
+  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
+  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
+  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
+  declare static afterAction: OmitThisParameter<typeof afterAction>;
+  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
+  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
+}
+include(ControllerWithCallbacks, Callbacks);
+
+class Callback1 extends ControllerWithCallbacks {
   text?: string;
   first() {
     this.text = "Hello world";
@@ -29,7 +52,7 @@ describe("TestCallbacks1", () => {
   });
 });
 
-class Callback2 extends AbstractController {
+class Callback2 extends ControllerWithCallbacks {
   text?: string;
   _secondIvar?: string;
   _aroundzIvar?: string;
@@ -83,7 +106,7 @@ describe("TestCallbacks2", () => {
   });
 });
 
-class Callback3 extends AbstractController {
+class Callback3 extends ControllerWithCallbacks {
   text?: string;
   second?: string;
   async index() {
@@ -114,7 +137,7 @@ describe("TestCallbacks3", () => {
   });
 });
 
-class CallbacksWithConditions extends AbstractController {
+class CallbacksWithConditions extends ControllerWithCallbacks {
   list?: string[];
   authenticated?: string;
   _list() {
@@ -156,7 +179,7 @@ describe("TestCallbacksWithConditions", () => {
   });
 });
 
-class CallbacksWithReusedConditions extends AbstractController {
+class CallbacksWithReusedConditions extends ControllerWithCallbacks {
   list?: string[];
   authenticated?: string;
   _list() {
@@ -202,7 +225,7 @@ describe("TestCallbacksWithReusedConditions", () => {
   });
 });
 
-class CallbacksWithArrayConditions extends AbstractController {
+class CallbacksWithArrayConditions extends ControllerWithCallbacks {
   list?: string[];
   authenticated?: string;
   _list() {
@@ -268,7 +291,7 @@ describe("TestCallbacksWithChangedConditions", () => {
   });
 });
 
-class SetsResponseBody extends AbstractController {
+class SetsResponseBody extends ControllerWithCallbacks {
   async index() {
     this.responseBody = "Fail";
   }
@@ -286,7 +309,7 @@ describe("TestHalting", () => {
   });
 });
 
-class CallbacksWithArgs extends AbstractController {
+class CallbacksWithArgs extends ControllerWithCallbacks {
   text?: string;
   first() {
     this.text = "Hello world";
@@ -307,13 +330,13 @@ describe("TestCallbacksWithArgs", () => {
 
 describe("TestCallbacksWithMissingConditions", () => {
   afterEach(() => {
-    AbstractController.raiseOnMissingCallbackActions = false;
+    ControllerWithCallbacks.raiseOnMissingCallbackActions = false;
   });
 
   function makeController(
-    register: (k: typeof AbstractController) => void,
-  ): typeof AbstractController {
-    class C extends AbstractController {
+    register: (k: typeof ControllerWithCallbacks) => void,
+  ): typeof ControllerWithCallbacks {
+    class C extends ControllerWithCallbacks {
       async index() {}
       async show() {}
     }
@@ -322,7 +345,7 @@ describe("TestCallbacksWithMissingConditions", () => {
     return C;
   }
 
-  async function runAndCatch(C: typeof AbstractController): Promise<Error> {
+  async function runAndCatch(C: typeof ControllerWithCallbacks): Promise<Error> {
     const c = new C();
     try {
       await c.process("index");
@@ -384,7 +407,7 @@ describe("TestCallbacksWithMissingConditions", () => {
 
 describe("AbstractController::Base — trails-only", () => {
   it("action name is set", async () => {
-    class TestController extends AbstractController {
+    class TestController extends ControllerWithCallbacks {
       async index() {}
     }
     const c = new TestController();
@@ -393,19 +416,19 @@ describe("AbstractController::Base — trails-only", () => {
   });
 
   it("response body can be set", () => {
-    const c = new (class extends AbstractController {})();
+    const c = new (class extends ControllerWithCallbacks {})();
     c.responseBody = "hello";
     expect(c.responseBody).toBe("hello");
   });
 
   it("throws ActionNotFound for missing action", async () => {
-    class EmptyController extends AbstractController {}
+    class EmptyController extends ControllerWithCallbacks {}
     const c = new EmptyController();
     await expect(c.process("missing")).rejects.toThrow(ActionNotFound);
   });
 
   it("available actions lists instance methods", () => {
-    class MethodController extends AbstractController {
+    class MethodController extends ControllerWithCallbacks {
       async index() {}
       async show() {}
     }
@@ -416,7 +439,7 @@ describe("AbstractController::Base — trails-only", () => {
   });
 
   it("has action", () => {
-    class HasActionController extends AbstractController {
+    class HasActionController extends ControllerWithCallbacks {
       async index() {}
     }
     const c = new HasActionController();
@@ -425,14 +448,14 @@ describe("AbstractController::Base — trails-only", () => {
   });
 
   it("performed starts false", () => {
-    const c = new (class extends AbstractController {})();
+    const c = new (class extends ControllerWithCallbacks {})();
     expect(c.performed).toBe(false);
   });
 });
 
 describe("ActionFilter", () => {
   it("matches when the controller's actionName is in the configured set", () => {
-    class C extends AbstractController {}
+    class C extends ControllerWithCallbacks {}
     const c = new C();
     c.actionName = "index";
     const f = new ActionFilter([], "only", ["index", "show"]);
@@ -442,7 +465,7 @@ describe("ActionFilter", () => {
   });
 
   it("accepts a scalar action name", () => {
-    class C extends AbstractController {}
+    class C extends ControllerWithCallbacks {}
     const c = new C();
     c.actionName = "index";
     expect(new ActionFilter([], "only", "index").isMatch(c)).toBe(true);
@@ -517,18 +540,18 @@ describe("_insertCallbacks", () => {
 
 describe("AbstractController callback statics", () => {
   it("exposes _normalizeCallbackOptions, _normalizeCallbackOption, _insertCallbacks", () => {
-    expect(AbstractController._normalizeCallbackOptions).toBe(_normalizeCallbackOptions);
-    expect(AbstractController._normalizeCallbackOption).toBe(_normalizeCallbackOption);
-    expect(AbstractController._insertCallbacks).toBe(_insertCallbacks);
+    expect(ControllerWithCallbacks._normalizeCallbackOptions).toBe(_normalizeCallbackOptions);
+    expect(ControllerWithCallbacks._normalizeCallbackOption).toBe(_normalizeCallbackOption);
+    expect(ControllerWithCallbacks._insertCallbacks).toBe(_insertCallbacks);
   });
 
   it("installs the *_action macros from callbacks.ts", () => {
-    expect(AbstractController.beforeAction).toBe(beforeAction);
-    expect(AbstractController.afterAction).toBe(afterAction);
+    expect(ControllerWithCallbacks.beforeAction).toBe(beforeAction);
+    expect(ControllerWithCallbacks.afterAction).toBe(afterAction);
   });
 
   it("registers on the receiving subclass, not on a sibling or the base", async () => {
-    class Left extends AbstractController {
+    class Left extends ControllerWithCallbacks {
       seen: string[] = [];
       async index() {}
     }
