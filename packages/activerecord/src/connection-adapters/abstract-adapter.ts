@@ -447,8 +447,8 @@ export interface AbstractAdapter
   createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
   foreignKeyExists(
     fromTable: string,
-    toTable?: string | null | ForeignKeyLookupOptions,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    toTable?: string | null,
+    options?: ForeignKeyLookupOptions,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   /** @internal */

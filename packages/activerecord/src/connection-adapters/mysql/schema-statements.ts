@@ -207,7 +207,7 @@ export class SchemaStatements extends BaseSchemaStatements {
     type?: string,
     options: { ifExists?: boolean } = {},
   ): Promise<void> {
-    if (await this.foreignKeyExists(tableName, { column: columnName })) {
+    if (await this.foreignKeyExists(tableName, undefined, { column: columnName })) {
       await this.removeForeignKey(tableName, undefined, { column: columnName });
     }
     return super.removeColumn(tableName, columnName, type, options);

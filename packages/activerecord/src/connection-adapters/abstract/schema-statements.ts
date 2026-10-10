@@ -170,6 +170,7 @@ export interface SchemaStatements
       | "supportsCommentsInCreate"
       | "supportsDatetimeWithPrecision"
       | "supportsForeignKeys"
+      | "supportsCheckConstraints"
       | "supportsIndexSortOrder"
       | "supportsIndexesInCreate"
       | "tableAliasLength"
@@ -591,10 +592,12 @@ export class SchemaStatements {
       ...options
     }: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
   ): Promise<void> {
+    if (!(await this.supportsCheckConstraints())) return;
+
     if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
     const chkNameToDelete = (
-      await this.checkConstraintForBang(tableName, { expression, ...options })
+      await this.checkConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
     ).name;
 
     const at = this.createAlterTable(tableName);
@@ -819,14 +822,10 @@ export class SchemaStatements {
 
   async foreignKeyExists(
     fromTable: string,
-    toTable?: string | null | ForeignKeyLookupOptions,
-    options: Omit<ForeignKeyLookupOptions, "toTable"> = {},
+    toTable: string | null = null,
+    options: ForeignKeyLookupOptions = {},
   ): Promise<boolean> {
-    if (typeof toTable === "object" && toTable !== null) {
-      options = toTable;
-      toTable = undefined;
-    }
-    return isPresent(await this.foreignKeyFor(fromTable, { toTable, ...options }));
+    return isPresent(await this.foreignKeyFor(fromTable, coreHashMergeKwd({ toTable }, options)));
   }
 
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {

@@ -349,8 +349,12 @@ describeIfSupports("foreign_keys", "Migration", () => {
       await withRocketTables(conn, async () => {
         await conn.addForeignKey("astronauts", "rockets", { column: "rocket_id" });
 
-        expect(await conn.foreignKeyExists("astronauts", { column: "rocket_id" })).toBeTruthy();
-        expect(await conn.foreignKeyExists("astronauts", { column: "star_id" })).toBeFalsy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { column: "rocket_id" }),
+        ).toBeTruthy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { column: "star_id" }),
+        ).toBeFalsy();
       });
     });
 
@@ -362,9 +366,11 @@ describeIfSupports("foreign_keys", "Migration", () => {
           name: "fancy_named_fk",
         });
 
-        expect(await conn.foreignKeyExists("astronauts", { name: "fancy_named_fk" })).toBeTruthy();
         expect(
-          await conn.foreignKeyExists("astronauts", { name: "other_fancy_named_fk" }),
+          await conn.foreignKeyExists("astronauts", undefined, { name: "fancy_named_fk" }),
+        ).toBeTruthy();
+        expect(
+          await conn.foreignKeyExists("astronauts", undefined, { name: "other_fancy_named_fk" }),
         ).toBeFalsy();
       });
     });
@@ -375,12 +381,14 @@ describeIfSupports("foreign_keys", "Migration", () => {
         await conn.changeTable("astronauts", {}, async (t) => {
           await t.foreignKey("rockets", { column: "rocket_id", name: "fancy_named_fk" });
 
-          expect(await t.foreignKeyExists({ column: "rocket_id" })).toBeTruthy();
-          expect(await t.foreignKeyExists({ column: "star_id" })).toBeFalsy();
+          expect(await t.foreignKeyExists(undefined, { column: "rocket_id" })).toBeTruthy();
+          expect(await t.foreignKeyExists(undefined, { column: "star_id" })).toBeFalsy();
 
           if (unlessSqlite3Adapter) {
-            expect(await t.foreignKeyExists({ name: "fancy_named_fk" })).toBeTruthy();
-            expect(await t.foreignKeyExists({ name: "other_fancy_named_fk" })).toBeFalsy();
+            expect(await t.foreignKeyExists(undefined, { name: "fancy_named_fk" })).toBeTruthy();
+            expect(
+              await t.foreignKeyExists(undefined, { name: "other_fancy_named_fk" }),
+            ).toBeFalsy();
           }
         });
       });

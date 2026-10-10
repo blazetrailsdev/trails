@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import {
+  coreHashMergeKwd,
   except,
   hashDelete,
   rbInspect,
@@ -221,8 +222,9 @@ export async function removeCheckConstraint(
   if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
   let checkConstraints = await this.checkConstraints(tableName);
-  const chkNameToDelete = (await this.checkConstraintForBang(tableName, { expression, ...options }))
-    .name;
+  const chkNameToDelete = (
+    await this.checkConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
+  ).name;
   checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
   await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);
 }

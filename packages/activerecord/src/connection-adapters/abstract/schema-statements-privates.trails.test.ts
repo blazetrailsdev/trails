@@ -521,10 +521,10 @@ describe("SchemaStatements privates (PR 8)", () => {
 
     expect(await ss.foreignKeyExists("users", "orgs")).toBe(true);
     expect(await ss.foreignKeyExists("users", "teams")).toBe(false);
-    expect(await ss.foreignKeyExists("users", { column: "org_id" })).toBe(true);
-    expect(await ss.foreignKeyExists("users", { column: "other_id" })).toBe(false);
-    expect(await ss.foreignKeyExists("users", { name: "fk_rails_abc" })).toBe(true);
-    expect(await ss.foreignKeyExists("users", { name: "nope" })).toBe(false);
+    expect(await ss.foreignKeyExists("users", undefined, { column: "org_id" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", undefined, { column: "other_id" })).toBe(false);
+    expect(await ss.foreignKeyExists("users", undefined, { name: "fk_rails_abc" })).toBe(true);
+    expect(await ss.foreignKeyExists("users", undefined, { name: "nope" })).toBe(false);
     expect(await ss.foreignKeyExists("users")).toBe(true);
   });
 

@@ -620,13 +620,11 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async validateForeignKey(
     fromTable: string,
-    toTableOrOptions?: string | Omit<ForeignKeyLookupOptions, "toTable">,
+    toTable?: string | null,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void> {
-    const toTable = typeof toTableOrOptions === "string" ? toTableOrOptions : undefined;
-    const opts = typeof toTableOrOptions === "object" ? toTableOrOptions : options;
-    if (opts !== undefined) {
-      await this.methodMissing("validateForeignKey", fromTable, toTable, opts);
+    if (options !== undefined) {
+      await this.methodMissing("validateForeignKey", fromTable, toTable, options);
     } else if (toTable !== undefined) {
       await this.methodMissing("validateForeignKey", fromTable, toTable);
     } else {
@@ -1238,7 +1236,10 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         if (args.length > 0 && !["execute", "enableExtension", "disableExtension"].includes(name)) {
           const options = Migration.tableNameOptions();
           args[0] = Migration.properTableName(args[0] as string | { tableName?: unknown }, options);
-          if (name === "renameTable" || (name === "removeForeignKey" && !isPlainObject(args[1]))) {
+          if (
+            name === "renameTable" ||
+            (name === "removeForeignKey" && !isPlainObject(args[1] ?? args[2]))
+          ) {
             args[1] = Migration.properTableName(
               args[1] as string | { tableName?: unknown },
               options,

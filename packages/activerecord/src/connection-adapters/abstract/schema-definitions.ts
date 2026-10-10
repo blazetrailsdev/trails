@@ -1179,7 +1179,7 @@ export class Table {
   }
 
   async removeForeignKey(
-    ...args: Array<string | undefined | { column?: string; name?: string }>
+    ...args: [toTable?: string | null, options?: { column?: string; name?: string }]
   ): Promise<void> {
     const options = extractOptionsBang(args);
     this.raiseOnIfExistOptions(options);
@@ -1190,7 +1190,9 @@ export class Table {
     );
   }
 
-  async foreignKeyExists(...args: Array<string | Record<string, unknown>>): Promise<boolean> {
+  async foreignKeyExists(
+    ...args: [toTable?: string | null, options?: Record<string, unknown>]
+  ): Promise<boolean> {
     const options = extractOptionsBang(args);
     return this._schema.foreignKeyExists(
       this.name,
@@ -1209,7 +1211,7 @@ export class Table {
   }
 
   async removeCheckConstraint(
-    ...args: Array<string | undefined | { name?: string }>
+    ...args: [expression?: string | null, options?: { name?: string }]
   ): Promise<void> {
     const options = extractOptionsBang(args);
     return this._schema.removeCheckConstraint(

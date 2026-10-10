@@ -80,8 +80,8 @@ export interface SchemaStatementsLike {
     options?: Record<string, unknown>,
   ): Promise<void>;
   foreignKeyExists(
-    tableName: string,
-    toTableOrOptions?: string | Record<string, unknown>,
+    fromTable: string,
+    toTable?: string | null,
     options?: Record<string, unknown>,
   ): Promise<boolean>;
   addCheckConstraint(
