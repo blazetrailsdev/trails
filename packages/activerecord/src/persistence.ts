@@ -300,7 +300,7 @@ export async function _insertRecord(
   if (isEmpty(values)) {
     im.insert(connection.emptyInsertStatementValue(primaryKey));
   } else {
-    im.insert([...transformKeys(values, (name) => arelTable.get(name))]);
+    im.insert(transformKeys(values, (name) => arelTable.get(name)));
   }
 
   return connection.insert(
@@ -336,7 +336,7 @@ export async function _updateRecord(
   }
 
   const um = new UpdateManager(arelTable);
-  um.set([...transformKeys(values, (name) => arelTable.get(name))]);
+  um.set(transformKeys(values, (name) => arelTable.get(name)));
   um.wheres = wheres;
 
   return klass.withConnection((c) => c.update(um, `${klass.name} Update`));

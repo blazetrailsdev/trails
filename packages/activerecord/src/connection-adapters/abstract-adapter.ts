@@ -75,7 +75,6 @@ import {
   Store,
   checkVersion as checkVersionMixin,
   selectAll as querySelectAll,
-  dirtiesQueryCache,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -2166,9 +2165,6 @@ include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);
 include(AbstractAdapter, QueryCacheMixin);
 AbstractAdapter.setCallback("checkin", "after", function () {
-  (this as unknown as { unsetQueryCacheBang(): void }).unsetQueryCacheBang();
-});
-AbstractAdapter.setCallback("checkin", "after", function () {
   this.enableLazyTransactionsBang();
 });
 include(AbstractAdapter, SavepointsMixin);
@@ -2181,21 +2177,5 @@ include(AbstractAdapter, {
 });
 
 prepend(AbstractAdapter.prototype, { selectAll: querySelectAll as PrependMethod });
-
-dirtiesQueryCache(
-  AbstractAdapter,
-  "execQuery",
-  "execute",
-  "create",
-  "insert",
-  "update",
-  "delete",
-  "truncate",
-  "truncateTables",
-  "rollbackToSavepoint",
-  "rollbackDbTransaction",
-  "restartDbTransaction",
-  "execInsertAll",
-);
 
 rbModConstSet(ConnectionAdapters, "AbstractAdapter", AbstractAdapter);

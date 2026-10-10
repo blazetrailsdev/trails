@@ -195,6 +195,20 @@ describe("Migration", () => {
         await connection.columnExists("testings", "updated_at", null, { null: true }),
       ).toBeTruthy();
     });
+    it("legacy migrations not raise exception on reverting transaction", async () => {
+      const migration = new (class extends Migration.get(5.2) {
+        async change(): Promise<void> {
+          await this.transaction(async () => {
+            await this.execute("select 1");
+          });
+        }
+      })();
+
+      await assertNothingRaised(async () => {
+        await migration.migrate("down");
+      });
+    });
+
     it("timestamps doesnt set precision on create table", async () => {
       const migration = new (class extends Migration.get(5.2) {
         override async migrate(_x: unknown): Promise<void> {

@@ -2,7 +2,7 @@ import { include } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { HasOneAssociation } from "./has-one-association.js";
-import { ThroughAssociation, sourceReflection } from "./through-association.js";
+import { ThroughAssociation } from "./through-association.js";
 
 export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
@@ -19,6 +19,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
+  declare sourceReflection: () => unknown;
 
   /** @internal */
   protected override loadTargetForBuild(): Promise<unknown> {
@@ -43,10 +44,6 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /** @internal */
   protected override displacementNeedsAwait(): boolean {
     return false;
-  }
-
-  sourceReflection(): unknown {
-    return sourceReflection(this);
   }
 
   /** @inventedArm if — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */

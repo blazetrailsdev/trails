@@ -5,6 +5,7 @@ import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 const emptySource: any = {
   supportsVirtualColumns: async () => false,
@@ -28,10 +29,12 @@ function makeColumn(
   return new Column(
     options.name ?? "id",
     null,
-    new TypeMetadata({
-      sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
-      type: options.type ?? "integer",
-    }),
+    new TypeMetadata(
+      new SqlTypeMetadata({
+        sqlType: `${options.sqlType ?? options.type ?? "bigint"}${options.array ? "[]" : ""}`,
+        type: options.type ?? "integer",
+      }),
+    ),
     true,
     null,
     { serial: options.serial, generated: options.generated },
@@ -138,7 +141,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
         "(a + b)",
         {
@@ -162,7 +165,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "status",
         null,
-        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
         true,
         "('happy'::mood)",
         {
@@ -180,7 +183,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "flags",
         null,
-        new TypeMetadata({ sqlType: "bit varying", type: "bit_varying" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
         true,
         "(a)",
         { generated: "s" },
@@ -200,7 +203,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
         "(a + b)",
         {
@@ -216,7 +219,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "status",
         null,
-        new TypeMetadata({ sqlType: "mood", type: "enum" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "mood", type: "enum" })),
         true,
         null,
       );
@@ -232,7 +235,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "computed",
         null,
-        new TypeMetadata({ sqlType: "integer", type: "integer" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
         true,
         null,
         {
@@ -255,7 +258,7 @@ describe("PostgreSQL::SchemaDumper", () => {
       const col = new Column(
         "full_name",
         null,
-        new TypeMetadata({ sqlType: "text", type: "string" }),
+        new TypeMetadata(new SqlTypeMetadata({ sqlType: "text", type: "string" })),
         true,
         "concat(first_name, ' ', last_name)",
         {
@@ -276,7 +279,7 @@ describe("PostgreSQL::SchemaDumper", () => {
           new Column(
             "flags",
             null,
-            new TypeMetadata({ sqlType: "bit varying", type: "bit_varying" }),
+            new TypeMetadata(new SqlTypeMetadata({ sqlType: "bit varying", type: "bit_varying" })),
             true,
           ),
         ],

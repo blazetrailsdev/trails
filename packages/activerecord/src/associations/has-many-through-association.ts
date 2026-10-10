@@ -14,7 +14,7 @@ import {
   rbFSend,
 } from "@blazetrails/ruby-compat";
 import { underscore, isBlank, wrap } from "@blazetrails/activesupport";
-import { ThroughAssociation, sourceReflection } from "./through-association.js";
+import { ThroughAssociation } from "./through-association.js";
 import { isThenable, type CollectionAssociation } from "./collection-association.js";
 import type { Association } from "./association.js";
 
@@ -51,6 +51,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
   declare ensureMutable: () => void;
   /** @internal */
   declare ensureNotNested: () => void;
+  declare sourceReflection: () => AssociationReflection;
 
   protected override async findTarget({ async = false }: { async?: boolean } = {}): Promise<
     Base[]
@@ -91,10 +92,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       distribution.set(record, distribution.get(record)! + 1);
     }
     return distribution;
-  }
-
-  sourceReflection(): AssociationReflection {
-    return sourceReflection(this) as AssociationReflection;
   }
 
   /**

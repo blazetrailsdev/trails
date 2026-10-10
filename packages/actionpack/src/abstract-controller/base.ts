@@ -1,10 +1,4 @@
-import {
-  type Callbacks as ASCallbacks,
-  Configurable,
-  include,
-  underscore,
-  type Extended,
-} from "@blazetrails/activesupport";
+import { Configurable, include, underscore } from "@blazetrails/activesupport";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import { rbFSend, rbModName, rbObjId, sprintf } from "@blazetrails/ruby-compat";
 
@@ -29,25 +23,6 @@ function allPublicMethodNames(proto: object | null | undefined): string[] {
   return [...out];
 }
 
-import {
-  afterAction,
-  appendAfterAction,
-  appendAroundAction,
-  appendBeforeAction,
-  aroundAction,
-  beforeAction,
-  prependAfterAction,
-  prependAroundAction,
-  prependBeforeAction,
-  skipAfterAction,
-  skipAroundAction,
-  skipBeforeAction,
-  Callbacks,
-  _insertCallbacks,
-  _normalizeCallbackOption,
-  _normalizeCallbackOptions,
-  processAction as _runProcessActionCallbacks,
-} from "./callbacks.js";
 export type {
   ActionCallback,
   AroundCallback,
@@ -87,10 +62,6 @@ export class ActionNotFound extends Error {
 }
 
 export class AbstractController {
-  declare static defineCallbacks: Extended<typeof ASCallbacks.ClassMethods>["defineCallbacks"];
-  declare static setCallback: Extended<typeof ASCallbacks.ClassMethods>["setCallback"];
-  declare static skipCallback: Extended<typeof ASCallbacks.ClassMethods>["skipCallback"];
-
   _actionName: string = "";
 
   get actionName(): string {
@@ -99,8 +70,6 @@ export class AbstractController {
   set actionName(value: string) {
     this._actionName = value;
   }
-
-  declare static raiseOnMissingCallbackActions: boolean;
 
   protected _responseBody: string | Buffer | true | null = null;
 
@@ -231,30 +200,8 @@ export class AbstractController {
   }
 
   /** @internal */
-  static _normalizeCallbackOptions = _normalizeCallbackOptions;
-  /** @internal */
-  static _normalizeCallbackOption = _normalizeCallbackOption;
-  /** @internal */
-  static _insertCallbacks = _insertCallbacks;
-
-  static beforeAction = beforeAction;
-  static prependBeforeAction = prependBeforeAction;
-  static appendBeforeAction = appendBeforeAction;
-  static afterAction = afterAction;
-  static prependAfterAction = prependAfterAction;
-  static appendAfterAction = appendAfterAction;
-  static aroundAction = aroundAction;
-  static prependAroundAction = prependAroundAction;
-  static appendAroundAction = appendAroundAction;
-  static skipBeforeAction = skipBeforeAction;
-  static skipAfterAction = skipAfterAction;
-  static skipAroundAction = skipAroundAction;
-
-  /** @internal */
   async processAction(action: string, ...args: unknown[]): Promise<void> {
-    await _runProcessActionCallbacks(this, action, async () => {
-      await this.sendAction(action, ...args);
-    });
+    await this.sendAction(action, ...args);
   }
 
   /** @internal */
@@ -332,5 +279,3 @@ export class AbstractController {
 }
 
 include(AbstractController, Configurable);
-
-include(AbstractController, Callbacks);

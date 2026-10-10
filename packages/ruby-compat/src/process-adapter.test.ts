@@ -21,6 +21,7 @@ import {
   stdout,
   abort,
   exec,
+  exit,
   SystemExit,
   type ProcessAdapter,
   type WriteStream,
@@ -394,6 +395,23 @@ describe("processAdapter", () => {
       expect(error).toBeInstanceOf(Errno.ENOTTY);
       expect(error).toBeInstanceOf(SystemCallError);
       expect(error).toMatchObject({ message: "Inappropriate ioctl for device", errno: 25 });
+    });
+  });
+
+  describe("Kernel#exit", () => {
+    it("maps true to EXIT_SUCCESS and false to EXIT_FAILURE", () => {
+      const adapter = makeFakeAdapter();
+      const codes: (number | undefined)[] = [];
+      adapter.exit = (code) => {
+        codes.push(code);
+        throw new Error("fake exit");
+      };
+      registerProcessAdapter(adapter);
+      expect(() => exit(true)).toThrow("fake exit");
+      expect(() => exit(false)).toThrow("fake exit");
+      expect(() => exit(3)).toThrow("fake exit");
+      expect(() => exit()).toThrow("fake exit");
+      expect(codes).toEqual([0, 1, 3, undefined]);
     });
   });
 

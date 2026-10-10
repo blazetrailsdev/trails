@@ -15,7 +15,7 @@ import {
   transformValues,
   zip,
 } from "@blazetrails/ruby-compat";
-import { filterMap, kernelArray as Array, presence } from "@blazetrails/activesupport";
+import { delegate, filterMap, kernelArray as Array, presence } from "@blazetrails/activesupport";
 
 /** @internal */
 export interface ThroughAssociationHost {
@@ -43,12 +43,6 @@ export function transaction<R>(
 ): Promise<R | undefined> {
   const klass = (this.throughReflection() as { klass: { transaction(b: unknown): unknown } }).klass;
   return klass.transaction(block) as Promise<R | undefined>;
-}
-
-export function sourceReflection(assoc: { owner: Base; reflection: { name: string } }): unknown {
-  const ctor = assoc.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(assoc.reflection.name) ?? assoc.reflection;
-  return (refl as { sourceReflection?: unknown })?.sourceReflection ?? null;
 }
 
 /** @internal */
@@ -153,16 +147,9 @@ export function foreignKeyPresent(this: ThroughAssociationHost): boolean {
 
 /** @internal */
 export function ensureMutable(this: ThroughAssociationHost): void {
-  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-  const hasOne: boolean = refl?.isHasOne?.() ?? this.reflection.type === "hasOne";
-  const sourceRefl = refl?.sourceReflection as
-    | { isBelongsTo?: () => boolean; macro?: string }
-    | undefined;
-  const isBelongs = sourceRefl?.isBelongsTo?.() ?? sourceRefl?.macro === "belongsTo";
-  if (!isBelongs) {
+  if (!this.sourceReflection().isBelongsTo()) {
     const ownerName = (this.owner.constructor as { name: string }).name;
-    if (hasOne) {
+    if (this.reflection.isHasOne()) {
       throw new HasOneThroughCantAssociateThroughHasOneOrManyReflection(
         ownerName,
         this.reflection.name,
@@ -178,13 +165,8 @@ export function ensureMutable(this: ThroughAssociationHost): void {
 
 /** @internal */
 export function ensureNotNested(this: ThroughAssociationHost): void {
-  const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-  const refl = ctor._reflectOnAssociation?.(this.reflection.name) as {
-    isNested?: () => boolean;
-    isHasOne?: () => boolean;
-  } | null;
-  if (refl?.isNested?.()) {
-    if (refl.isHasOne?.() ?? this.reflection.type === "hasOne") {
+  if (this.reflection.isNested()) {
+    if (this.reflection.isHasOne()) {
       throw new HasOneThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
     } else {
       throw new HasManyThroughNestedAssociationsAreReadonly(this.owner, this.reflection);
@@ -214,7 +196,9 @@ export function buildRecord(
   return ThroughAssociation.superMethod(this, "buildRecord")!(attributes, block) as Base | null;
 }
 
-export const ThroughAssociation: Module = new Module((mod) =>
+export const ThroughAssociation: Module = new Module((mod) => {
+  delegate.call(mod, "sourceReflection", { to: "reflection" });
+
   mod.include({
     transaction,
     throughReflection,
@@ -226,5 +210,5 @@ export const ThroughAssociation: Module = new Module((mod) =>
     ensureMutable,
     ensureNotNested,
     buildRecord,
-  }),
-);
+  });
+});

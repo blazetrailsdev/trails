@@ -112,11 +112,11 @@ interface PrimaryKeyHost {
   _attributesBuilder?: unknown;
   name: string;
   tableName?: string | null;
-  connectionPool?(): { schemaReflection?: { loadedCache: CachedSchemaSource | null } };
+  connectionPool?(): { schemaCache?: CachedSchemaSource | null };
 }
 
 function cachedSchemaCacheFor(host: PrimaryKeyHost): CachedSchemaSource | undefined {
-  return host.connectionPool?.().schemaReflection?.loadedCache ?? undefined;
+  return host.connectionPool?.().schemaCache ?? undefined;
 }
 
 /**

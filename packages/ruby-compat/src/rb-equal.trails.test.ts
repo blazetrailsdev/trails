@@ -118,6 +118,33 @@ describe("rbEqual between a String and a String subclass", () => {
   });
 });
 
+describe("rbEqual over a String subclass instance", () => {
+  it("compares a String object with a primitive by content", () => {
+    class Inquirer extends String {
+      constructor(value: string) {
+        super(value);
+        return new Proxy(this, {
+          get(target, prop, receiver) {
+            if (Reflect.has(target, prop)) {
+              const value = Reflect.get(target, prop, receiver);
+              return typeof value === "function" ? value.bind(target) : value;
+            }
+            return () => {
+              throw new Error(`undefined method '${String(prop)}'`);
+            };
+          },
+        });
+      }
+    }
+    expect(rbEqual("test", new Inquirer("test"))).toBe(true);
+    expect(rbEqual(new Inquirer("test"), "test")).toBe(true);
+    expect(rbEqual(new Inquirer("test"), new Inquirer("test"))).toBe(true);
+    expect(rbEql("test", new Inquirer("test"))).toBe(true);
+    expect(rbEqual(new Inquirer("test"), "development")).toBe(false);
+    expect(rbEqual(new Inquirer("1"), 1)).toBe(false);
+  });
+});
+
 describe("rbEqq, the === send", () => {
   it("dispatches to Range, Regexp, Set, Module, Proc and Kernel#===", () => {
     expect(rbEqq(new Range(1, 5), 3)).toBe(true);

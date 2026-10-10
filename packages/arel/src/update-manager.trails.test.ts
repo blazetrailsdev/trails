@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, UpdateManager, Nodes } from "./index.js";
+import { Table, UpdateManager, Nodes, type ArelNode } from "./index.js";
 
 describe("UpdateManagerTest (trails)", () => {
   const users = new Table("users");
@@ -122,5 +122,10 @@ describe("UpdateManagerTest (trails)", () => {
       um.key = lit;
       expect(um.ast.key).toBe(lit);
     });
+  });
+  it("takes the Hash ActiveRecord passes", () => {
+    const um = new UpdateManager(users);
+    um.set(new Map<ArelNode, unknown>([[users.get("name"), "aaron"]]));
+    expect(um.toSql()).toBe(`UPDATE "users" SET "name" = 'aaron'`);
   });
 });

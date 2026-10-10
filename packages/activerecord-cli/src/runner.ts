@@ -37,7 +37,7 @@ export async function arRunner(cwd: string, args: string[]): Promise<number> {
     return 1;
   }
 
-  const env = DatabaseTasks.env;
+  const env = DatabaseTasks.env.toString();
   if (!environmentDbConfig(env)) {
     console.error(`ar: no database configuration found for environment "${env}"`);
     return 1;

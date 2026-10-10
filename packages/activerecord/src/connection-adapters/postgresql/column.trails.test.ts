@@ -5,6 +5,7 @@ import * as path from "path";
 import { SchemaCache } from "../schema-cache.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 
 async function dumpAndLoad(col: Column): Promise<Column> {
   const cache = new SchemaCache();
@@ -25,7 +26,10 @@ describe("PostgreSQL::Column JSON round-trip", () => {
     const col = new Column(
       "tags",
       null,
-      new TypeMetadata({ sqlType: "character varying[]", type: "string" }, { oid: 1015, fmod: -1 }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "character varying[]", type: "string" }), {
+        oid: 1015,
+        fmod: -1,
+      }),
       true,
       null,
       { serial: false, identity: "a", generated: "s" },
@@ -62,7 +66,7 @@ describe("PostgreSQL::Column JSON round-trip", () => {
 describe("PostgreSQL::TypeMetadata JSON round-trip", () => {
   it("recovers its own class and ivars from the sql_type_metadata payload", async () => {
     const meta = new TypeMetadata(
-      { sqlType: "numeric(10,2)", type: "decimal", precision: 10, scale: 2 },
+      new SqlTypeMetadata({ sqlType: "numeric(10,2)", type: "decimal", precision: 10, scale: 2 }),
       { oid: 1700, fmod: 655366 },
     );
     const back = (await dumpAndLoad(new Column("n", null, meta))).sqlTypeMetadata!;
@@ -78,7 +82,10 @@ describe("PostgreSQL::TypeMetadata JSON round-trip", () => {
     const col = new Column(
       "n",
       null,
-      new TypeMetadata({ sqlType: "int4", type: "integer" }, { oid: 23, fmod: -1 }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "int4", type: "integer" }), {
+        oid: 23,
+        fmod: -1,
+      }),
     );
     expect(col.sqlTypeMetadata).toBeInstanceOf(TypeMetadata);
     expect(col.oid).toBe(23);

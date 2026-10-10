@@ -398,20 +398,26 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   type Cache = {
     clearDataSourceCacheBang?: (connection: unknown, name: string) => void;
   };
-  let cache: Cache | null | undefined;
+  type Reflection = {
+    loadedCache: Cache | null;
+    clearCachedColumnsHash?: (tableName: string) => void;
+  };
+  let schemaReflection: Reflection | undefined;
   let table: string | undefined;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
     const pool = (
       host as unknown as {
-        connectionPool?: () => { poolConfig?: { schemaReflection: { loadedCache: Cache | null } } };
+        connectionPool?: () => { poolConfig?: { schemaReflection: Reflection } };
       }
     ).connectionPool?.();
-    cache = pool?.poolConfig?.schemaReflection.loadedCache;
+    schemaReflection = pool?.poolConfig?.schemaReflection;
   } catch {
     return;
   }
   if (!table) return;
+  schemaReflection?.clearCachedColumnsHash?.(table);
+  const cache = schemaReflection?.loadedCache;
   if (typeof cache?.clearDataSourceCacheBang === "function") {
     cache.clearDataSourceCacheBang(null, table);
   }
@@ -633,44 +639,13 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   } catch {
     return false;
   }
-  const cache = pool.schemaReflection.loadedCache;
-  if (cache && typeof cache.getCachedColumnsHash !== "function") return false;
+  const schemaCache = pool.schemaCache;
   const table = host.tableName;
   if (table == null) return false;
-  let hash: Record<string, unknown> | undefined = cache?.getCachedColumnsHash(table);
-  if (!hash) {
-    let adapter: SchemaHost["connection"] | undefined;
-    try {
-      adapter = reflectionAdapter(host);
-    } catch {
-      adapter = undefined;
-    }
-    if (adapter) hash = warmColumnsHashSync(adapter, cache, table);
-  }
-  if (!hash) return false;
-  applyColumnsHash(host, hash);
+  const columnsHash = schemaCache?.getCachedColumnsHash(table);
+  if (!columnsHash) return false;
+  applyColumnsHash(host, columnsHash);
   return true;
-}
-
-function warmColumnsHashSync(
-  adapter: NonNullable<SchemaHost["connection"]>,
-  cache: {
-    setColumns?: (table: string, cols: any[]) => void;
-    getCachedColumnsHash: (table: string) => Record<string, unknown> | undefined;
-  } | null,
-  table: string,
-): Record<string, unknown> | undefined {
-  if (typeof adapter.columns !== "function") return undefined;
-  if (cache && typeof cache.setColumns !== "function") return undefined;
-  const cols: unknown = adapter.columns(table);
-  if (cols != null && typeof (cols as any).then === "function") {
-    void (cols as Promise<unknown>).catch(() => {});
-    return undefined;
-  }
-  if (!Array.isArray(cols)) return undefined;
-  if (!cache) return Object.fromEntries(cols.map((col) => [col.name, col]));
-  cache.setColumns!(table, cols);
-  return cache.getCachedColumnsHash(table);
 }
 
 export function tableName(this: SchemaHost): string | null {
@@ -749,9 +724,7 @@ export function cachedTableExists(this: SchemaHost): boolean | undefined {
   } catch {
     return undefined;
   }
-  const cache = pool.schemaReflection.loadedCache;
-  if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
-  return cache.getCachedDataSourceExists(this.tableName as string);
+  return pool.schemaCache?.getCachedDataSourceExists(this.tableName as string);
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {

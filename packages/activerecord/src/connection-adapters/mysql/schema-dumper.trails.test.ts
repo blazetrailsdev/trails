@@ -3,6 +3,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { SchemaDumper } from "./schema-dumper.js";
 import { Column } from "./column.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import { Version } from "../abstract-adapter.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 import { resultFromRowHashes } from "../../test-helpers/result-from-row-hashes.js";
@@ -70,9 +71,16 @@ const col = (
     limit: o.limit ?? null,
     precision: o.precision ?? null,
   };
-  return new Column(o.name ?? "col", null, new TypeMetadata(meta, { extra }), true, null, {
-    collation: o.collation ?? null,
-  });
+  return new Column(
+    o.name ?? "col",
+    null,
+    new TypeMetadata(new SqlTypeMetadata(meta), { extra }),
+    true,
+    null,
+    {
+      collation: o.collation ?? null,
+    },
+  );
 };
 
 describe("MySQL::SchemaDumper", () => {

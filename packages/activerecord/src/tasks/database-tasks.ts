@@ -6,6 +6,7 @@ import { Migration, ProtectedEnvironmentError } from "../migration.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import type { BoundSchemaReflection } from "../connection-adapters/schema-cache.js";
 import {
+  type EnvironmentInquirer,
   getEnv,
   isBlank,
   isPresent,
@@ -28,6 +29,7 @@ import {
   abort,
   File,
   FileUtils,
+  rbEqual,
   rbFLoad,
   rbModConstSet,
   RuntimeError,
@@ -45,14 +47,13 @@ export type SchemaFormat = "ts" | "js" | "sql";
 export class DatabaseTasks {
   static readonly LOCAL_HOSTS: readonly string[] = ["127.0.0.1", "localhost"];
 
-  private static _env: string | null = null;
+  private static _env: string | EnvironmentInquirer | null = null;
 
-  /** @inventedArm toString — CONVERGEABLE database-tasks-env-memoizes-to-s-and-db-dir-expands-by-hand */
-  static get env(): string {
-    return (this._env ??= TopLevel.Trails!.env.toString());
+  static get env(): string | EnvironmentInquirer {
+    return (this._env ??= TopLevel.Trails!.env);
   }
 
-  static set env(value: string | null) {
+  static set env(value: string | EnvironmentInquirer | null) {
     this._env = value;
   }
 
@@ -178,7 +179,7 @@ export class DatabaseTasks {
   }
 
   static async createCurrent(
-    environment: string = DatabaseTasks.env,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
     name?: string,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, name, async (dbConfig) => {
@@ -210,7 +211,9 @@ export class DatabaseTasks {
     });
   }
 
-  static async dropCurrent(environment: string = DatabaseTasks.env): Promise<void> {
+  static async dropCurrent(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.drop(dbConfig);
     });
@@ -263,7 +266,9 @@ export class DatabaseTasks {
     await rbFSend(this.databaseAdapterFor(dbConfig), "purge");
   }
 
-  static async purgeCurrent(environment: string = DatabaseTasks.env): Promise<void> {
+  static async purgeCurrent(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.purge(dbConfig);
     });
@@ -276,7 +281,9 @@ export class DatabaseTasks {
     });
   }
 
-  static async truncateAll(environment: string = DatabaseTasks.env): Promise<void> {
+  static async truncateAll(
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
+  ): Promise<void> {
     for (const dbConfig of this.configsFor({ envName: environment })) {
       await this.truncateTables(dbConfig);
     }
@@ -290,7 +297,7 @@ export class DatabaseTasks {
   }
 
   static async charsetCurrent(
-    envName: string = DatabaseTasks.env,
+    envName: string | EnvironmentInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
@@ -305,7 +312,7 @@ export class DatabaseTasks {
   }
 
   static async collationCurrent(
-    envName: string = DatabaseTasks.env,
+    envName: string | EnvironmentInquirer = DatabaseTasks.env,
     dbName: string = DatabaseTasks.name,
   ): Promise<string | null> {
     const dbConfig = this.configsFor({ envName, name: dbName });
@@ -337,7 +344,7 @@ export class DatabaseTasks {
   }
 
   static async checkProtectedEnvironmentsBang(
-    environment: string = DatabaseTasks.env,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
   ): Promise<void> {
     if (getEnv("DISABLE_DATABASE_ENVIRONMENT_CHECK") !== undefined) return;
 
@@ -348,19 +355,23 @@ export class DatabaseTasks {
 
   /** @internal */
   static configsFor(options: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name: string;
     includeHidden?: boolean;
   }): HashConfig | undefined;
   /** @internal */
   static configsFor(options?: {
-    envName?: string;
+    envName?: string | EnvironmentInquirer;
     name?: undefined;
     includeHidden?: boolean;
   }): HashConfig[];
   /** @internal */
   static configsFor(
-    options: { envName?: string; name?: string; includeHidden?: boolean } = {},
+    options: {
+      envName?: string | EnvironmentInquirer;
+      name?: string;
+      includeHidden?: boolean;
+    } = {},
   ): HashConfig[] | HashConfig | undefined {
     return ActiveRecord.Base.configurations().configsFor(options as { name: string });
   }
@@ -372,7 +383,7 @@ export class DatabaseTasks {
 
   /** @internal */
   private static async eachCurrentConfiguration(
-    environment: string,
+    environment: string | EnvironmentInquirer,
     name?: string | null | ((dbConfig: HashConfig) => unknown),
     block?: (dbConfig: HashConfig) => unknown,
   ): Promise<void> {
@@ -556,7 +567,7 @@ export class DatabaseTasks {
   static async loadSchemaCurrent(
     format: SchemaFormat = schemaFormat(),
     file?: string,
-    environment: string = DatabaseTasks.env,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
   ): Promise<void> {
     await this.eachCurrentConfiguration(environment, async (dbConfig) => {
       await this.withTemporaryConnection(dbConfig, async () => {
@@ -655,7 +666,7 @@ export class DatabaseTasks {
   }
 
   static async dbConfigsWithVersions(
-    environment: string = DatabaseTasks.env,
+    environment: string | EnvironmentInquirer = DatabaseTasks.env,
   ): Promise<Map<number, HashConfig[]>> {
     const dbConfigsWithVersions = new Map<number, HashConfig[]>();
     await this.withTemporaryPoolForEach({ env: environment }, async (pool) => {
@@ -709,7 +720,7 @@ export class DatabaseTasks {
       env = DatabaseTasks.env,
       name,
       clobber = false,
-    }: { env?: string; name?: string; clobber?: boolean } = {},
+    }: { env?: string | EnvironmentInquirer; name?: string; clobber?: boolean } = {},
     block: (pool: ConnectionPool) => Promise<void>,
   ): Promise<void> {
     if (name != null) {
@@ -784,7 +795,10 @@ export class DatabaseTasks {
     }
   }
 
-  static raiseForMultiDb(environment: string | undefined, opts: { command: string }): void {
+  static raiseForMultiDb(
+    environment: string | EnvironmentInquirer | undefined,
+    opts: { command: string },
+  ): void {
     environment ??= DatabaseTasks.env;
     const dbConfigs = this.configsFor({ envName: environment });
 
@@ -866,12 +880,12 @@ export function isVerbose(): boolean {
 
 /** @internal */
 export async function eachCurrentEnvironment(
-  environment: string,
-  block: (env: string) => unknown,
-): Promise<string[]> {
+  environment: string | EnvironmentInquirer,
+  block: (env: string | EnvironmentInquirer) => unknown,
+): Promise<(string | EnvironmentInquirer)[]> {
   const environments = [environment];
   if (
-    environment === "development" &&
+    rbEqual(environment, "development") &&
     getEnv("SKIP_TEST_DATABASE") === undefined &&
     getEnv("DATABASE_URL") === undefined
   ) {

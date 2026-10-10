@@ -153,8 +153,6 @@ describe("LoadAsyncTest", () => {
         expect(posts.isScheduled).toBeTruthy();
       }
       expect(posts.isLoaded).toBeTruthy();
-      // BLOCKED: port bug — see 0178-activerecord-arms-parity-100/load-async-null-executor-load-is-unawaited-and-races-rollback
-      if (inMemoryDb()) await posts;
       throw new Rollback();
     });
 
@@ -292,8 +290,6 @@ describe.skipIf(inMemoryDb())("LoadAsyncNullExecutorTest", () => {
       posts = Post.where({ author_id: 1 }).loadAsync();
       expect(posts.isScheduled).toBeFalsy();
       expect(posts.isLoaded).toBeTruthy();
-      // BLOCKED: port bug — see 0178-activerecord-arms-parity-100/load-async-null-executor-load-is-unawaited-and-races-rollback
-      await posts;
       throw new Rollback();
     });
 

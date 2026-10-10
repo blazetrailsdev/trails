@@ -111,6 +111,14 @@ export function collectLibTests(content: string, file: string, namespace: string
   return tests;
 }
 
+function isReceiverExpect(call: ts.CallExpression): boolean {
+  return (
+    ts.isPropertyAccessExpression(call.expression) &&
+    call.expression.name.text === "expect" &&
+    expectChainMatcher(call) === null
+  );
+}
+
 function helperCalleeName(expression: ts.Expression, helpers: HelperMap): string | null {
   if (ts.isIdentifier(expression)) return expression.text;
   if (!ts.isPropertyAccessExpression(expression)) return null;
@@ -219,6 +227,8 @@ function countAssertions(
           visiting.delete(name);
         }
       }
+    } else if (ts.isCallExpression(n) && isReceiverExpect(n)) {
+      count++;
     }
     ts.forEachChild(n, walk);
   };
@@ -352,6 +362,9 @@ function collectAssertionKinds(
         const matcher = ts.isPropertyAccessExpression(n.expression) && expectChainMatcher(n);
         if (matcher) {
           kinds.push(matcher);
+          values.push(literalToken(n.arguments[0], sourceFile));
+        } else if (isReceiverExpect(n)) {
+          kinds.push("expect");
           values.push(literalToken(n.arguments[0], sourceFile));
         }
       } else {

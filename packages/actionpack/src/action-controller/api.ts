@@ -13,7 +13,22 @@ import { DataStreaming } from "./metal/data-streaming.js";
 import { Redirecting } from "./metal/redirecting.js";
 import { Renderers } from "./metal/renderers.js";
 import { DefaultHeaders } from "./metal/default-headers.js";
-import { Callbacks } from "../abstract-controller/callbacks.js";
+import {
+  Callbacks,
+  type ActionCallbackHost,
+  type beforeAction,
+  type prependBeforeAction,
+  type skipBeforeAction,
+  type appendBeforeAction,
+  type afterAction,
+  type prependAfterAction,
+  type skipAfterAction,
+  type appendAfterAction,
+  type aroundAction,
+  type prependAroundAction,
+  type skipAroundAction,
+  type appendAroundAction,
+} from "../abstract-controller/callbacks.js";
 import {
   Rendering as AbstractControllerRendering,
   type render,
@@ -78,6 +93,23 @@ export class API extends Metal {
   ];
 
   declare static raiseOnOpenRedirects: boolean;
+
+  declare static defineCallbacks: ActionCallbackHost["defineCallbacks"];
+  declare static setCallback: ActionCallbackHost["setCallback"];
+  declare static skipCallback: ActionCallbackHost["skipCallback"];
+  declare static raiseOnMissingCallbackActions: boolean;
+  declare static beforeAction: OmitThisParameter<typeof beforeAction>;
+  declare static prependBeforeAction: OmitThisParameter<typeof prependBeforeAction>;
+  declare static skipBeforeAction: OmitThisParameter<typeof skipBeforeAction>;
+  declare static appendBeforeAction: OmitThisParameter<typeof appendBeforeAction>;
+  declare static afterAction: OmitThisParameter<typeof afterAction>;
+  declare static prependAfterAction: OmitThisParameter<typeof prependAfterAction>;
+  declare static skipAfterAction: OmitThisParameter<typeof skipAfterAction>;
+  declare static appendAfterAction: OmitThisParameter<typeof appendAfterAction>;
+  declare static aroundAction: OmitThisParameter<typeof aroundAction>;
+  declare static prependAroundAction: OmitThisParameter<typeof prependAroundAction>;
+  declare static skipAroundAction: OmitThisParameter<typeof skipAroundAction>;
+  declare static appendAroundAction: OmitThisParameter<typeof appendAroundAction>;
 
   declare static rateLimit: OmitThisParameter<(typeof RateLimitingClassMethods)["rateLimit"]>;
 

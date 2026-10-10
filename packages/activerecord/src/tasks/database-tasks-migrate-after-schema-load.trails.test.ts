@@ -25,7 +25,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
 
   async function connectTo(database: string): Promise<void> {
     DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
-      [DatabaseTasks.env]: {
+      [DatabaseTasks.env.toString()]: {
         primary: {
           adapter: "sqlite3",
           database,
@@ -67,7 +67,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
 
     await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
-    const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env });
+    const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env.toString() });
     await DatabaseTasks.loadSchema(fresh, "js", schemaFile);
 
     const pending =

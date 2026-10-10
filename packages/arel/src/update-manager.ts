@@ -38,7 +38,7 @@ export class UpdateManager extends TreeManager<UpdateStatement> {
     ) {
       this.ast.values = [values];
     } else {
-      this.ast.values = values.map(
+      this.ast.values = [...values].map(
         ([column, value]) => new Assignment(new UnqualifiedColumn(column), value as NodeOrValue),
       );
     }

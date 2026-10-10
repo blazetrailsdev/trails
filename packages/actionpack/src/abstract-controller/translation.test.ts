@@ -243,6 +243,19 @@ describe("AbstractController::Translation — trails-only", () => {
     expect(translate.call(host, ".foo")).toBe("admin users show foo");
   });
 
+  it("looks a colon-led default up as a key on an html key instead of rendering it", () => {
+    I18n.backend().storeTranslations("en", { people: { "<b>": "<b>stored</b>" } });
+    const host = makeHost("people", "index");
+
+    const found = translate.call(host, ".missing_html", { default: [":people.<b>"] });
+    expect(String(found)).toBe("<b>stored</b>");
+    expect(isHtmlSafe(found)).toBe(true);
+
+    const missed = translate.call(host, ".missing_html", { default: [":<script>"] });
+    expect(String(missed)).not.toBe(":<script>");
+    expect(isHtmlSafe(missed)).toBe(false);
+  });
+
   it("scopes a lazy lookup by the kebab-case form of a camelCase action", () => {
     I18n.backend().storeTranslations("en", {
       abstract_controller: { testing: { translation: { "recent-posts": { title: "Recent" } } } },

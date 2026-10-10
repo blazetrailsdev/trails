@@ -274,9 +274,9 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
-      return target.isScheduled || target._loadResult
-        ? target.records().then((records: any[]) => records[Number(prop)])
-        : (target.target ?? target._records)[Number(prop)];
+      return target._isRecordsSynchronous
+        ? (target.target ?? target._records)[Number(prop)]
+        : target.records().then((records: any[]) => records[Number(prop)]);
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
@@ -482,13 +482,16 @@ export class Relation<T extends Base, G extends boolean = false> {
     return this.isLoaded && !this.isScheduled && !this._loadResult;
   }
 
+  /** @inventedArm synchronize — CONVERGEABLE load-async-null-executor-arm-floats-its-load-under-the-adapter-lock */
   loadAsync(): Relation<T, G> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!c.asyncEnabled()) {
         const token = this._loadToken;
-        void this.load().catch(() => {
-          if (token === this._loadToken) this._loaded = false;
-        });
+        void c.lock
+          .synchronize(() => this.load())
+          .catch(() => {
+            if (token === this._loadToken) this._loaded = false;
+          });
         this._loaded = true;
         return;
       }
