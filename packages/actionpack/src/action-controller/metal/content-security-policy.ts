@@ -82,8 +82,10 @@ export function contentSecurityPolicyReportOnly(
 }
 
 /** @internal */
-export function isContentSecurityPolicy(this: ContentSecurityPolicyInstanceHost): boolean {
-  return this.request.contentSecurityPolicy != null;
+export function isContentSecurityPolicy(
+  this: ContentSecurityPolicyInstanceHost,
+): Policy | null | undefined {
+  return this.request.contentSecurityPolicy;
 }
 
 /** @internal */

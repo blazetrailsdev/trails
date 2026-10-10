@@ -81,7 +81,7 @@ export const ClassMethods: Module = new Module((mod) => {
   mod.defineMethod("actionMethods", actionMethods);
 });
 
-/** @missingRailsCall delegate — CONVERGEABLE flash-reader-is-a-hand-written-getter-not-a-delegate-call */
+/** @missingRailsCall delegate — CONVERGEABLE base-included-modules-dispatch-privates-through-self */
 export const Flash = new Module((mod) => {
   extend(mod, Concern);
 

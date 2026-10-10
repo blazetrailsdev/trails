@@ -149,7 +149,7 @@ export function _computeRedirectToLocation(
   } else if (typeof options === "string") {
     location = request.protocol + request.hostWithPort() + options;
   } else if (typeof options === "function") {
-    location = this._computeRedirectToLocation(request, options.call(this));
+    location = this._computeRedirectToLocation(request, options.call(this, this));
   } else {
     location = this.urlFor(options);
   }

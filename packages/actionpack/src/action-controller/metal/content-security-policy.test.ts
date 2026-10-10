@@ -125,10 +125,11 @@ describe("contentSecurityPolicyReportOnly class DSL", () => {
 });
 
 describe("private instance helpers", () => {
-  it("isContentSecurityPolicy reflects request.contentSecurityPolicy presence", () => {
-    expect(makeController({ contentSecurityPolicy: null }).isContentSecurityPolicy()).toBe(false);
-    expect(makeController({ contentSecurityPolicy: new Policy() }).isContentSecurityPolicy()).toBe(
-      true,
+  it("isContentSecurityPolicy answers request.contentSecurityPolicy", () => {
+    const policy = new Policy();
+    expect(makeController({ contentSecurityPolicy: null }).isContentSecurityPolicy()).toBeNull();
+    expect(makeController({ contentSecurityPolicy: policy }).isContentSecurityPolicy()).toBe(
+      policy,
     );
   });
 
