@@ -167,3 +167,14 @@ describe("rbEqq, the === send", () => {
     expect(rbEqq(Point, new Point())).toBe(true);
   });
 });
+
+describe("rbEqual of a Hash and a non-Hash", () => {
+  it("answers false without reading the Hash's entries", () => {
+    const hash = {
+      get value(): never {
+        throw new Error("read");
+      },
+    };
+    expect(rbEqual(hash, new (class Other {})())).toBe(false);
+  });
+});

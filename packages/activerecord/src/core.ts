@@ -198,11 +198,7 @@ export class ClassMethods {
         | Hash<string, { type(): string | null | undefined } | null>;
     },
   ): string {
-    const name = rbModSingletonP(this)
-      ? rbModToS(this)
-      : this === ActiveRecord.Base
-        ? "ActiveRecord::Base"
-        : this.name;
+    const name = rbModToS(this);
     if (this === ActiveRecord.Base || rbModSingletonP(this)) {
       return name;
     } else if (this.abstractClass) {
@@ -815,6 +811,7 @@ export function initInternals(
 const SuperMethods = new Module((mod) => {
   mod.defineMethod("initialize", constructor);
   mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("initializeDup", initializeDup);
 });
 
 export function initializeDup(
@@ -826,18 +823,20 @@ export function initializeDup(
     _startTransactionState: unknown;
     runCallbacks: Included<typeof Callbacks>["runCallbacks"];
   },
-  super_: (other: unknown) => void,
   other: unknown,
 ): void {
   this._attributes = (
     this as unknown as { initAttributes(other: unknown): unknown }
   ).initAttributes(other);
-  super_(other);
+
   void this.runCallbacks("initialize", undefined, { strict: "sync" });
+
   this._newRecord = true;
   this._previouslyNewRecord = false;
   this._destroyed = false;
   this._startTransactionState = null;
+
+  SuperMethods.superMethod(this, "initializeDup")!(other);
 }
 
 interface CloneRecord {

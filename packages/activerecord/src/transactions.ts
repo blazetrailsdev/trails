@@ -349,8 +349,8 @@ export function _triggerDestroyCallback(this: Base): boolean | null {
 }
 
 /** @internal */
-export function initInternals(this: Base, super_: () => void): void {
-  super_();
+export function initInternals(this: Base): void {
+  Transactions.superMethod(this, "initInternals")!();
   const r = this as any;
   r._startTransactionState = null;
   r._committedAlreadyCalled = null;
@@ -446,3 +446,4 @@ function assertValidTransactionAction(actions: string[]): void {
 
 Transactions.defineMethod("beforeCommittedBang", beforeCommittedBang);
 Transactions.defineMethod("touch", touch);
+Transactions.defineMethod("initInternals", initInternals);

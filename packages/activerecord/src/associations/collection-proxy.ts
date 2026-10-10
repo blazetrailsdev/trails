@@ -1,4 +1,4 @@
-import { NoMethodError, extend } from "@blazetrails/ruby-compat";
+import { NoMethodError, extend, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -69,9 +69,6 @@ function sameRecordList(a: Base[], b: Base[]): boolean {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean> {
-  /** @internal */
-  static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
-
   private _association!: CollectionAssociation;
   private _assocName: string;
   private get _target(): T[] {
@@ -510,4 +507,4 @@ for (const name of delegateMethods) {
   });
 }
 
-Associations.CollectionProxy = CollectionProxy;
+rbModConstSet(Associations, "CollectionProxy", CollectionProxy);

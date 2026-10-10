@@ -1,5 +1,5 @@
 import { Time as RubyTime } from "@blazetrails/date";
-import { Rational, max } from "@blazetrails/ruby-compat";
+import { Module, Rational, max } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   currentTimeInstant,
@@ -120,17 +120,13 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 }
 
 /** @internal */
-export function initInternals(this: TimestampInstanceHost, super_: () => void): void {
-  super_();
+export function initInternals(this: TimestampInstanceHost): void {
+  Timestamp.superMethod(this, "initInternals")!();
   this._touchRecord = null;
 }
 
-export function initializeDup(
-  this: TimestampInstanceHost,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeDup(this: TimestampInstanceHost, other: unknown): void {
+  Timestamp.superMethod(this, "initializeDup")!(other);
   clearTimestampAttributes.call(this);
 }
 
@@ -214,24 +210,43 @@ export function clearTimestampAttributes(this: TimestampInstanceHost): void {
   }
 }
 
-export const Timestamp = {
+export const Timestamp = Object.assign(new Module(), {
   [included](base: object): void {
     classAttribute.call(base, "recordTimestamps", { default: true });
   },
-  recordUpdateTimestamps,
-  shouldRecordTimestamps,
-  timestampAttributesForCreateInModel(this: { constructor: TimestampHost }): readonly string[] {
+});
+
+Timestamp.defineMethod("recordUpdateTimestamps", recordUpdateTimestamps);
+Timestamp.defineMethod("shouldRecordTimestamps", shouldRecordTimestamps);
+Timestamp.defineMethod(
+  "timestampAttributesForCreateInModel",
+  function timestampAttributesForCreateInModel(this: {
+    constructor: TimestampHost;
+  }): readonly string[] {
     return this.constructor.timestampAttributesForCreateInModel();
   },
-  timestampAttributesForUpdateInModel(this: { constructor: TimestampHost }): readonly string[] {
+);
+Timestamp.defineMethod(
+  "timestampAttributesForUpdateInModel",
+  function timestampAttributesForUpdateInModel(this: {
+    constructor: TimestampHost;
+  }): readonly string[] {
     return this.constructor.timestampAttributesForUpdateInModel();
   },
-  allTimestampAttributesInModel(this: { constructor: TimestampHost }): readonly string[] {
+);
+Timestamp.defineMethod(
+  "allTimestampAttributesInModel",
+  function allTimestampAttributesInModel(this: { constructor: TimestampHost }): readonly string[] {
     return this.constructor.allTimestampAttributesInModel();
   },
-  currentTimeFromProperTimezone(this: { constructor: TimestampHost }): Promise<RubyTime> {
+);
+Timestamp.defineMethod(
+  "currentTimeFromProperTimezone",
+  function currentTimeFromProperTimezone(this: { constructor: TimestampHost }): Promise<RubyTime> {
     return this.constructor.currentTimeFromProperTimezone();
   },
-  maxUpdatedColumnTimestamp,
-  clearTimestampAttributes,
-};
+);
+Timestamp.defineMethod("maxUpdatedColumnTimestamp", maxUpdatedColumnTimestamp);
+Timestamp.defineMethod("clearTimestampAttributes", clearTimestampAttributes);
+Timestamp.defineMethod("initInternals", initInternals);
+Timestamp.defineMethod("initializeDup", initializeDup);

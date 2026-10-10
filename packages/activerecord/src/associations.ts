@@ -312,15 +312,18 @@ export function association(this: Base, name: string): AssociationInstance {
 }
 
 /** @internal */
-export function initInternals(this: Base, super_: () => void): void {
-  super_();
+export function initInternals(this: Base): void {
+  AssociationsNamespace.superMethod(this, "initInternals")!();
   this._associationCache = new Map();
 }
 
-export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
+export function initializeDup(this: Base, other: unknown): void {
   this._associationCache = new Map();
-  super_(other);
+  AssociationsNamespace.superMethod(this, "initializeDup")!(other);
 }
+
+AssociationsNamespace.defineMethod("initInternals", initInternals);
+AssociationsNamespace.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function associationInstanceGet(this: Base, name: string): unknown {
@@ -337,5 +340,3 @@ Object.defineProperty(AssociationsNamespace, "eagerLoadBang", {
   writable: true,
   configurable: true,
 });
-
-ActiveRecord.Associations = AssociationsNamespace;

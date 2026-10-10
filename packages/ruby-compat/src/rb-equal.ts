@@ -159,10 +159,11 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
      Hash has two JS seats — a plain object and a `Map` (ruby-compat's `Hash`,
      and `HashWithIndifferentAccess` under it) — and both stand for the same
      Ruby value, so the arm reads whichever the operand is. */
-  const entriesA = hashEntries(a);
-  if (entriesA !== null) {
-    const entriesB = hashEntries(b);
-    if (entriesB === null || entriesA.length !== entriesB.length) return false;
+  if (isHash(a)) {
+    if (!isHash(b)) return false;
+    const entriesA = hashEntries(a)!;
+    const entriesB = hashEntries(b)!;
+    if (entriesA.length !== entriesB.length) return false;
     /* `eql_i` (`vendor/ruby/v3.3.11/hash.c:3714`) finds hash2's entry with
        `hash_stlike_lookup` (`hash.c:3719`), by
        the Hash's own key semantics — `hash` then `eql?`, never `==` — not by
@@ -184,14 +185,20 @@ function equalOrEql(a: unknown, b: unknown, eql: boolean): boolean {
  */
 export function hashEntries(value: unknown): [unknown, unknown][] | null {
   if (value instanceof Map) return [...value.entries()];
-  if (
-    typeof value === "object" &&
-    value !== null &&
-    [Object.prototype, null].includes(Object.getPrototypeOf(value))
-  ) {
-    return Object.entries(value as Record<string, unknown>);
-  }
+  if (isHash(value)) return Object.entries(value as Record<string, unknown>);
   return null;
+}
+
+/* `RB_TYPE_P(hash2, T_HASH)` (`vendor/ruby/v3.3.11/hash.c:3751`), which
+   `hash_equal` asks of the other operand before it reads either table. Its
+   `to_hash` arm for a non-Hash operand (`hash.c:3752-3764`) is not ported. */
+function isHash(value: unknown): boolean {
+  return (
+    value instanceof Map ||
+    (typeof value === "object" &&
+      value !== null &&
+      [Object.prototype, null].includes(Object.getPrototypeOf(value)))
+  );
 }
 
 /**

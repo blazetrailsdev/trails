@@ -24170,13 +24170,6 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "autosaving_belongs_to_for?",
-    "digest": "4dcd8940d1749e62",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "before_committed!",
     "digest": "39ac84220a61b76a",
     "ref": "v8.0.2"
@@ -24221,13 +24214,6 @@
     "rubyFile": "base.rb",
     "rubyName": "cache_version",
     "digest": "f663bb872a0e2fb1",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "changed_for_autosave?",
-    "digest": "95177a5967fbb0f4",
     "ref": "v8.0.2"
   },
   {
@@ -24604,20 +24590,6 @@
   {
     "package": "activerecord",
     "rubyFile": "base.rb",
-    "rubyName": "mark_for_destruction",
-    "digest": "1f0e1b011e346a18",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "marked_for_destruction?",
-    "digest": "3659bcfe0c14e3e0",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
     "rubyName": "new_record?",
     "digest": "499792da5dbc8eee",
     "ref": "v8.0.2"
@@ -24907,13 +24879,6 @@
     "rubyFile": "base.rb",
     "rubyName": "valid?",
     "digest": "2ecc0c4769bdc97a",
-    "ref": "v8.0.2"
-  },
-  {
-    "package": "activerecord",
-    "rubyFile": "base.rb",
-    "rubyName": "validating_belongs_to_for?",
-    "digest": "ae27cd2694ba2b19",
     "ref": "v8.0.2"
   },
   {

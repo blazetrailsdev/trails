@@ -67,7 +67,6 @@ import {
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
   _registerAssociationBuilderExtension,
-  initInternals as _autosaveInitInternals,
 } from "./autosave-association.js";
 import { Association as AssociationBuilder } from "./associations/builder/association.js";
 import { idsName as _idsName } from "./associations/builder/collection-association.js";
@@ -169,7 +168,6 @@ import {
   type BenchmarkLogger,
   runLoadHooks,
   type PrependMethod,
-  type Included,
   type HashWithIndifferentAccess,
 } from "@blazetrails/activesupport";
 import {
@@ -331,7 +329,6 @@ import {
   afterCreateCommit as _afterCreateCommit,
   afterUpdateCommit as _afterUpdateCommit,
   afterDestroyCommit as _afterDestroyCommit,
-  initInternals as _transactionsInitInternals,
 } from "./transactions.js";
 
 import {
@@ -347,8 +344,6 @@ import {
   associationInstanceGet as _associationInstanceGet,
   association as _association,
   associationInstanceSet as _associationInstanceSet,
-  initInternals as _associationsInitInternals,
-  initializeDup as _associationsInitializeDup,
 } from "./associations.js";
 import * as _AttributeAssignment from "./attribute-assignment.js";
 import * as _NestedAttributes from "./nested-attributes.js";
@@ -1927,7 +1922,7 @@ rbDeclareIvar({ prototype: Base }, "@attribute_names", "_attributeNames");
 rbDeclareIvar({ prototype: Base }, "@generated_relation_methods", "_generatedRelationMethods");
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
-export interface Base extends Included<typeof AutosaveAssociation>, JSONSerializer, AMDirty {
+export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   normalizeAttribute(name: string): void;
   /** @internal */
   normalizeChangedInPlaceAttributes(): void;
@@ -2130,14 +2125,6 @@ extend(Base, _PresenceClassMethods);
 extend(Base, _AbsenceClassMethods);
 extend(Base, _LengthClassMethods);
 extend(Base, _NumericalityClassMethods);
-Object.assign(Base, {
-  AssociatedValidator: _Validations.AssociatedValidator,
-  UniquenessValidator: _Validations.UniquenessValidator,
-  PresenceValidator: _Validations.PresenceValidator,
-  AbsenceValidator: _Validations.AbsenceValidator,
-  LengthValidator: _Validations.LengthValidator,
-  NumericalityValidator: _Validations.NumericalityValidator,
-});
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
@@ -2238,7 +2225,6 @@ include(Base, {
   increment: _Persistence.increment,
   decrement: _Persistence.decrement,
   toggle: _Persistence.toggle,
-  incrementBang: _Persistence.incrementBang,
   decrementBang: _Persistence.decrementBang,
   toggleBang: _Persistence.toggleBang,
   destroyBang: _Persistence.destroyBang,
@@ -2311,26 +2297,13 @@ include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
 prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
+include(Base, ActiveRecord.Associations);
 include(Base, _TouchLater.TouchLater);
 include(Base, _NoTouching.NoTouching);
 include(Base, _AttributeAssignment.AttributeAssignment);
 include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
-prepend(Base.prototype, { initInternals: _Persistence.initInternals as PrependMethod });
-prepend(Base.prototype, {
-  initInternals: _AttributeMethodsDirty.initInternals as PrependMethod,
-});
-prepend(Base.prototype, { initInternals: Timestamp.initInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _associationsInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _autosaveInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _transactionsInitInternals as PrependMethod });
-prepend(Base.prototype, { initInternals: _TouchLater.initInternals as PrependMethod });
-prepend(Base.prototype, { initializeDup: _Core.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: Inheritance.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: LockingOptimistic.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: Timestamp.initializeDup as PrependMethod });
-prepend(Base.prototype, { initializeDup: _associationsInitializeDup as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
 prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod });
 {
@@ -2351,10 +2324,7 @@ prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod
 }
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
-include(Base, {
-  validate: _Validations.validate,
-  customValidationContext: _Validations.customValidationContext,
-});
+include(Base, _Validations.Validations);
 include(Base, {
   attributeNamesForSerialization: Serialization.attributeNamesForSerialization,
 });

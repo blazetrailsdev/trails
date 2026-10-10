@@ -96,8 +96,8 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
 }
 
 /** @internal */
-export function initInternals(this: any, super_: () => void): void {
-  super_();
+export function initInternals(this: any): void {
+  TouchLater.superMethod(this, "initInternals")!();
   this._deferTouchAttrs = null;
   this._touchTime = null;
 }
@@ -111,3 +111,4 @@ export function hasDeferTouchAttrs(record: any): boolean {
 TouchLater.defineMethod("beforeCommittedBang", beforeCommittedBang);
 TouchLater.defineMethod("touchLater", touchLater);
 TouchLater.defineMethod("touch", touch);
+TouchLater.defineMethod("initInternals", initInternals);

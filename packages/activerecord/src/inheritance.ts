@@ -11,7 +11,13 @@ import {
   safeConstantize,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashAref, rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  hashAref,
+  Module,
+  rbClassSuperclass,
+  rbModName,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -20,14 +26,14 @@ export interface Inheritance {
   readonly storeFullStiClass: boolean;
 }
 
-export const Inheritance = {
+export const Inheritance = Object.assign(new Module(), {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
 
     setBaseClass(base as typeof Base);
   },
-};
+});
 
 /**
  * @internal
@@ -219,10 +225,12 @@ export function initializeClone(
   setBaseClass(this);
 }
 
-export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-  super_(other);
+export function initializeDup(this: Base, other: unknown): void {
+  Inheritance.superMethod(this, "initializeDup")!(other);
   ensureProperType.call(this);
 }
+
+Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {
