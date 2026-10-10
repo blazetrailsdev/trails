@@ -132,12 +132,8 @@ interface DirtyPrivateHost {
   };
 }
 
-export async function reload<T extends DirtyPrivateHost>(
-  this: T,
-  super_: (...args: unknown[]) => Promise<T>,
-  ...args: unknown[]
-): Promise<T> {
-  const record = await super_(...args);
+export async function reload<T extends DirtyPrivateHost>(this: T, ...args: unknown[]): Promise<T> {
+  const record = (await Dirty.superMethod(this, "reload")!(...args)) as T;
   this._mutationsBeforeLastSave = null;
   this._mutationsFromDatabase = null;
   return record;
@@ -239,5 +235,6 @@ export function attributeNamesForPartialInserts(this: DirtyPrivateHost): string[
 }
 
 Dirty.defineMethod("initInternals", initInternals);
+Dirty.defineMethod("reload", reload);
 
 AttributeMethods.Dirty = Dirty;

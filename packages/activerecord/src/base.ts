@@ -275,7 +275,6 @@ import {
   isBlank as _isBlank,
 } from "./core.js";
 import * as _Core from "./core.js";
-import * as _AttributeMethodsDirty from "./attribute-methods/dirty.js";
 import { Dirty as _Dirty } from "./attribute-methods/dirty.js";
 import * as _DirtyModule from "./attribute-methods/dirty.js";
 import * as _Persistence from "./persistence.js";
@@ -2128,6 +2127,7 @@ extend(Base, _PresenceClassMethods);
 extend(Base, _AbsenceClassMethods);
 extend(Base, _LengthClassMethods);
 extend(Base, _NumericalityClassMethods);
+include(Base, LockingOptimistic.Optimistic);
 include(Base, _Callbacks.Callbacks);
 include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
@@ -2235,7 +2235,6 @@ include(Base, {
   updateBang: _Persistence.updateBang,
   delete: _Persistence.delete,
   _updateRow: _Persistence._updateRow,
-  reload: _Persistence.reload,
   slice: Access.prototype.slice,
   valuesAt: Access.prototype.valuesAt,
   updateAttribute: _Persistence.updateAttribute,
@@ -2296,9 +2295,7 @@ include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initA
 include(Base, AMDirty);
 include(Base, _Dirty);
 include(Base, _AttrSerialization);
-include(Base, LockingOptimistic.Optimistic);
 include(Base, LockingPessimistic.Pessimistic);
-prepend(Base.prototype, { incrementBang: _Callbacks.incrementBang as PrependMethod });
 include(Base, Timestamp.Timestamp);
 include(Base, ActiveRecord.Associations);
 include(Base, _TouchLater.TouchLater);
@@ -2308,7 +2305,6 @@ include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-prepend(Base.prototype, { reload: _AttributeMethodsDirty.reload as PrependMethod });
 {
   const inheritedReload = (Base.prototype as any).reload as (
     this: Base,

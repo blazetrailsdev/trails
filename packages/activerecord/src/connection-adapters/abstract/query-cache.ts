@@ -8,7 +8,7 @@ import {
 import { Result } from "../../result.js";
 import { FutureResult, Complete as FutureResultComplete } from "../../future-result.js";
 import { ActiveRecord, ConnectionAdapters } from "../../namespaces.js";
-import { Fiber, included, rbEnsure, Thread } from "@blazetrails/ruby-compat";
+import { Fiber, included, Module, rbEnsure, Thread } from "@blazetrails/ruby-compat";
 
 const LOCKED_QUERY = /\bFOR\s+(UPDATE|SHARE|NO\s+KEY\s+UPDATE|KEY\s+SHARE)\b/i;
 
@@ -148,22 +148,34 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   ): Promise<Result>;
 }
 
-export class ConnectionPoolConfiguration {
-  declare _threadQueryCaches: QueryCacheRegistry;
-  declare _queryCacheMaxSize: number | null;
-  declare _queryCacheVersion: { value: number };
-  declare _pinnedConnection: unknown;
+export interface ConnectionPoolConfiguration {
+  _threadQueryCaches: QueryCacheRegistry;
+  _queryCacheMaxSize: number | null;
+  _queryCacheVersion: { value: number };
+  _pinnedConnection: unknown;
+  checkoutAndVerify(connection: QueryCacheHost): Promise<QueryCacheHost>;
+  disableQueryCache<T>(fn: () => T | Promise<T>, options?: { dirties?: boolean }): T | Promise<T>;
+  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T>;
+  enableQueryCacheBang(): void;
+  disableQueryCacheBang(): void;
+  readonly queryCacheEnabled: boolean;
+  readonly dirtiesQueryCache: boolean;
+  clearQueryCache(): void;
+  readonly queryCache: Store;
+}
 
+export const ConnectionPoolConfiguration = new Module().include({
   async checkoutAndVerify(
-    super_: (connection: QueryCacheHost) => unknown,
+    this: ConnectionPoolConfiguration,
     connection: QueryCacheHost,
   ): Promise<QueryCacheHost> {
-    await super_(connection);
+    await ConnectionPoolConfiguration.superMethod(this, "checkoutAndVerify")!(connection);
     connection._queryCache ||= this.queryCache;
     return connection;
-  }
+  },
 
   disableQueryCache<T>(
+    this: ConnectionPoolConfiguration,
     fn: () => T | Promise<T>,
     options: { dirties?: boolean } = {},
   ): T | Promise<T> {
@@ -177,9 +189,9 @@ export class ConnectionPoolConfiguration {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  }
+  },
 
-  enableQueryCache<T>(fn: () => T | Promise<T>): T | Promise<T> {
+  enableQueryCache<T>(this: ConnectionPoolConfiguration, fn: () => T | Promise<T>): T | Promise<T> {
     const cache = this.queryCache;
     const oldEnabled = cache.enabled;
     const oldDirties = cache.dirties;
@@ -189,41 +201,42 @@ export class ConnectionPoolConfiguration {
       cache.enabled = oldEnabled;
       cache.dirties = oldDirties;
     });
-  }
+  },
 
-  enableQueryCacheBang(): void {
+  enableQueryCacheBang(this: ConnectionPoolConfiguration): void {
     const qc = this.queryCache;
     qc.enabled = true;
     qc.dirties = true;
-  }
+  },
 
-  disableQueryCacheBang(): void {
+  disableQueryCacheBang(this: ConnectionPoolConfiguration): void {
     const qc = this.queryCache;
     qc.enabled = false;
     qc.dirties = true;
-  }
+  },
 
   get queryCacheEnabled(): boolean {
-    return this.queryCache.enabled;
-  }
+    return (this as unknown as ConnectionPoolConfiguration).queryCache.enabled;
+  },
 
   get dirtiesQueryCache(): boolean {
-    return this.queryCache.dirties;
-  }
+    return (this as unknown as ConnectionPoolConfiguration).queryCache.dirties;
+  },
 
-  clearQueryCache(): void {
+  clearQueryCache(this: ConnectionPoolConfiguration): void {
     if (this._pinnedConnection) {
       this._queryCacheVersion.value++;
     }
     this.queryCache.clear();
-  }
+  },
 
   get queryCache(): Store {
-    return this._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
-      return new Store(this._queryCacheVersion, this._queryCacheMaxSize);
+    const pool = this as unknown as ConnectionPoolConfiguration;
+    return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {
+      return new Store(pool._queryCacheVersion, pool._queryCacheMaxSize);
     });
-  }
-}
+  },
+});
 
 (ConnectionPoolConfiguration as unknown as Record<symbol, unknown>)[initialize] = function (
   this: ConnectionPoolConfiguration & { dbConfig: { queryCache?: unknown } },
