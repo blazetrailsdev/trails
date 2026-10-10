@@ -5,11 +5,11 @@ class DisconnectAdapter extends AbstractAdapter {
   static override readonly ADAPTER_NAME = "DisconnectAdapter";
 
   attachRawConnection(): void {
-    this._connection = this;
+    this._rawConnection = this;
   }
 
   currentConnection(): unknown {
-    return this._connection;
+    return this._rawConnection;
   }
 }
 

@@ -75,7 +75,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_points");
+      const output = await dumpTableSchema("postgresql_points");
       expect(output).toMatch(/t\.point\("x"\);$/m);
       expect(output).toMatch(/t\.point\("y",\s+\{?\s*default: \[12\.2, 13\.3\] \}\);$/m);
       expect(output).toMatch(/t\.point\("z",\s+\{?\s*default: \[14\.4, 15\.5\] \}\);$/m);
@@ -160,7 +160,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("legacy schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_points");
+      const output = await dumpTableSchema("postgresql_points");
       expect(output).toMatch(/t\.point\("legacy_x"\);$/m);
       expect(output).toMatch(/t\.point\("legacy_y",\s+\{?\s*default: \[12\.2, 13\.3\] \}\);$/m);
       expect(output).toMatch(/t\.point\("legacy_z",\s+\{?\s*default: \[14\.4, 15\.5\] \}\);$/m);
@@ -641,7 +641,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_geometrics");
+      const output = await dumpTableSchema("postgresql_geometrics");
       expect(output).toMatch(/t\.lseg\("a_line_segment"\);$/m);
       expect(output).toMatch(/t\.box\("a_box"\);$/m);
       expect(output).toMatch(/t\.path\("a_path"\);$/m);
@@ -693,7 +693,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping for line type", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_lines");
+      const output = await dumpTableSchema("postgresql_lines");
       expect(output).toMatch(/t\.line\("a_line"\);$/m);
     });
   });

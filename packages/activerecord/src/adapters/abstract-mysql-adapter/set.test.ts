@@ -28,7 +28,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dumping", async () => {
-      const schema = await dumpTableSchema(adapter, "set_tests");
+      const schema = await dumpTableSchema("set_tests");
       expect(schema).toMatch(
         /t\.column\("set_column", "set\('text','blob','tiny','medium','long','unsigned','bigint'\)"\)/,
       );

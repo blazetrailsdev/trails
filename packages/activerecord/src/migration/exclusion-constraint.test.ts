@@ -230,13 +230,15 @@ describeIfSupports("exclusion_constraints", "Migration", () => {
       });
       expect((await connection.exclusionConstraints("invoices")).length).toBe(1);
 
-      await connection.removeExclusionConstraint("invoices", { name: "invoices_date_overlap" });
+      await connection.removeExclusionConstraint("invoices", undefined, {
+        name: "invoices_date_overlap",
+      });
       expect((await connection.exclusionConstraints("invoices")).length).toBe(0);
     });
 
     it("remove non existing exclusion constraint", async () => {
       await expect(
-        connection.removeExclusionConstraint("invoices", { name: "nonexistent" }),
+        connection.removeExclusionConstraint("invoices", undefined, { name: "nonexistent" }),
       ).rejects.toThrow(ArgumentError);
     });
   });

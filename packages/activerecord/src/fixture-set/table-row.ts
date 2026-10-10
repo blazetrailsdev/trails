@@ -181,9 +181,9 @@ export class TableRow {
   }
 
   private resolveStiReflections(): void {
-    const reflections = (this.reflectionClass as { _reflections?: Record<string, unknown> })
-      ._reflections;
-    for (const association of Object.values(reflections ?? {}) as FixtureReflection[]) {
+    for (const association of Object.values(
+      this.reflectionClass._reflections,
+    ) as unknown as FixtureReflection[]) {
       switch (association.macro) {
         case "belongsTo": {
           const fkName = association.joinForeignKey;

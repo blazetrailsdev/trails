@@ -92,7 +92,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "citexts");
+      const output = await dumpTableSchema("citexts");
       expect(output).toMatch(/t\.citext\("cival"\)/);
     });
   });

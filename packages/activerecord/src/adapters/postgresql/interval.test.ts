@@ -122,7 +122,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with default value", async () => {
-      const output = await dumpTableSchema(adapter, "interval_data_types");
+      const output = await dumpTableSchema("interval_data_types");
       expect(output).toMatch(
         /t\.interval\("default_term",\s*\{[^}]*default:\s*"P3Y"|t\.column\("default_term",\s*"interval"(?:\([^)]*\))?,\s*\{[^}]*default:\s*"P3Y"/,
       );

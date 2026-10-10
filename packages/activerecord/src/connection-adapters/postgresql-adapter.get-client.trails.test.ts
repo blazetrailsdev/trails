@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { pgConnection } from "../pg/connection.js";
 
 interface PrivatePgAdapter {
   _rawConnection: unknown;
@@ -65,7 +66,7 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
         },
       },
     };
-    adapter._rawConnection = fakeClient;
+    adapter._rawConnection = pgConnection(fakeClient);
 
     vi.spyOn(
       adapter as unknown as { configureConnection: () => Promise<void> },

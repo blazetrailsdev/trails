@@ -153,7 +153,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
     });
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "pg_arrays");
+      const output = await dumpTableSchema("pg_arrays");
       expect(output).toMatch(/t\.string\("tags",\s+\{ limit: 255,\s+array: true/);
       expect(output).toMatch(/t\.integer\("ratings",\s+\{ array: true/);
       expect(output).toMatch(
@@ -172,7 +172,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       `);
       await adapter.loadAdditionalTypes();
       try {
-        const output = await dumpTableSchema(adapter, "pg_array_defaults");
+        const output = await dumpTableSchema("pg_array_defaults");
         const line = (name: string) => output.split("\n").find((l) => l.includes(`"${name}"`))!;
         expect(line("ints")).toMatch(/default: \[4, 4, 2\]/);
         expect(line("flags")).toMatch(/default: \[true, false\]/);

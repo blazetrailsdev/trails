@@ -1,5 +1,5 @@
 import * as Arel from "@blazetrails/arel";
-import { ArgumentError, Attribute as ModelAttribute, FloatType } from "@blazetrails/activemodel";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { b, first, StandardError } from "@blazetrails/ruby-compat";
 import type { SqliteBinds, SqliteConnection, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
@@ -123,7 +123,6 @@ interface PerformQueryHost {
   _narrowSpilledBigInts(stmt: SqliteStatement, rows: unknown[][]): void;
   verifiedBang(): void;
   _lastAffectedRows: number;
-  _lastInsertRowid: number | bigint;
 }
 
 interface ExecuteBatchHost {
@@ -174,10 +173,7 @@ export async function internalBeginTransaction(
   }
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
- */
+/** @internal */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,
@@ -194,16 +190,6 @@ export async function performQuery(
     batch?: boolean;
   },
 ): Promise<Result> {
-  if (Array.isArray(typeCastedBinds)) {
-    typeCastedBinds = typeCastedBinds.map((value, i) => {
-      const bind = binds[i];
-      return typeof value === "bigint" &&
-        bind instanceof ModelAttribute &&
-        bind.type instanceof FloatType
-        ? bind.valueForDatabase
-        : value;
-    });
-  }
   let result: Result;
   if (batch) {
     await rawConnection.exec(sql);
@@ -239,7 +225,6 @@ export async function performQuery(
     }
   }
   this._lastAffectedRows = await rawConnection.changes();
-  this._lastInsertRowid = await rawConnection.lastInsertRowId();
   this.verifiedBang();
   if (notificationPayload) notificationPayload.row_count = result.length;
   return result;

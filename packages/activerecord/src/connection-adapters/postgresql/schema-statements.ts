@@ -1059,15 +1059,11 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async removeExclusionConstraint(
     tableName: string,
-    expression: string | Record<string, unknown> | null = null,
+    expression: string | null = null,
     options: Record<string, unknown> = {},
   ): Promise<void> {
-    if (typeof expression === "object" && expression !== null) {
-      options = expression;
-      expression = null;
-    }
     const exclNameToDelete = (
-      await this.exclusionConstraintForBang(tableName, { expression, ...options })
+      await this.exclusionConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
     ).name;
 
     await this.removeConstraint(tableName, exclNameToDelete);
@@ -1196,11 +1192,12 @@ export class SchemaStatements extends AbstractSchemaStatements {
 
   async validateForeignKey(
     fromTable: string,
-    toTable?: string,
+    toTable: string | null = null,
     options: ForeignKeyLookupOptions = {},
   ): Promise<void> {
-    const fkNameToValidate = (await this.foreignKeyForBang(fromTable, { ...options, toTable }))
-      .name;
+    const fkNameToValidate = (
+      await this.foreignKeyForBang(fromTable, coreHashMergeKwd({ toTable }, options))
+    ).name;
     await this.validateConstraint(fromTable, fkNameToValidate);
   }
 

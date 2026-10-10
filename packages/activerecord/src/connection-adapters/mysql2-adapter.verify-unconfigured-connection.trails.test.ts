@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { mysql2Client } from "../mysql2/client.js";
 
 class FakeConnection {
   connection = { _handshakePacket: { serverVersion: "8.0.28" } };
@@ -16,7 +17,7 @@ class FakeConnection {
 
 describe("Mysql2Adapter#verify! with a connection handed to the constructor", () => {
   it("seats the unconfigured connection with usable query_options", async () => {
-    const adapter = new Mysql2Adapter(new FakeConnection() as never, null, {}, {});
+    const adapter = new Mysql2Adapter(mysql2Client(new FakeConnection()), null, {}, {});
 
     await adapter.verifyBang();
 

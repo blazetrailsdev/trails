@@ -979,7 +979,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_description ON trains USING btree(name text_pattern_ops, description text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: "text_pattern_ops"/);
     });
@@ -988,7 +988,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_description ON trains USING btree(name, description text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: \{ description: "text_pattern_ops" \}/);
     });
@@ -1001,7 +1001,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name_and_position ON trains USING btree(name, position text_pattern_ops)`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/opclass: "gin_trgm_ops"/);
       expect(output).toMatch(/opclass: \{ position: "text_pattern_ops" \}/);
@@ -1023,14 +1023,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `CREATE INDEX trains_name_and_description ON trains USING btree(name NULLS FIRST, description)`,
       );
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
       expect(output).toMatch(/order: \{ name: "NULLS FIRST" \}/);
     });
     it("non default order with nulls is dumped", async () => {
       await adapter.execute(
         `CREATE INDEX trains_name_and_desc ON trains USING btree(name DESC NULLS LAST, description)`,
       );
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
       expect(output).toMatch(/order: \{ name: "DESC NULLS LAST" \}/);
     });
   });
@@ -1175,7 +1175,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("SchemaIndexIncludeColumnsTest", () => {
     it("schema dumps index included columns", async () => {
-      const indexDefinition = (await dumpTableSchema(adapter, "companies"))
+      const indexDefinition = (await dumpTableSchema("companies"))
         .split(/\n/)
         .filter((l) => /t\.index.*company_include_index/.test(l))[0]
         .trim();
@@ -1207,21 +1207,21 @@ describeIfPg("PostgreSQLAdapter", () => {
         `CREATE INDEX trains_name ON trains USING btree(name) NULLS NOT DISTINCT`,
       );
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(/nullsNotDistinct: true/);
     });
     itIfSupports("nulls_not_distinct", "nulls distinct is dumped", async () => {
       await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name) NULLS DISTINCT`);
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch(/nullsNotDistinct/);
     });
     it("nulls not set is dumped", async () => {
       await adapter.execute(`CREATE INDEX trains_name ON trains USING btree(name)`);
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch(/nullsNotDistinct/);
     });
@@ -1240,7 +1240,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("kind");
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1253,7 +1253,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.datetime("created_at", { null: false });
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1268,7 +1268,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       await adapter.createTable("trains", { options });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1286,7 +1286,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
       await adapter.createTable("trains", { options });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).toMatch(`options: "${options}"`);
     });
@@ -1296,7 +1296,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         t.string("name");
       });
 
-      const output = await dumpTableSchema(adapter, "trains");
+      const output = await dumpTableSchema("trains");
 
       expect(output).not.toMatch("options:");
     });

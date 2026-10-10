@@ -272,7 +272,7 @@ export function isPrimaryClass(this: typeof Base): boolean | undefined {
 }
 
 export function adapterClass(this: typeof Base): typeof DatabaseAdapter {
-  return this.connectionPool().dbConfig.adapterClass() as typeof DatabaseAdapter;
+  return this.connectionPool().dbConfig.adapterClass();
 }
 
 export async function removeConnection(this: typeof Base): Promise<HashConfig | undefined> {

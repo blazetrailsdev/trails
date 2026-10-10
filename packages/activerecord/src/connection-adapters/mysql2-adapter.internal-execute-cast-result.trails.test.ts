@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Result } from "../result.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { mysql2Client } from "../mysql2/client.js";
 import type { Mysql2Result } from "../mysql2/client.js";
 
 describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () => {
@@ -29,7 +30,7 @@ describe("Mysql2Adapter#internalExecute → castResult duplicate columns", () =>
   function makeAdapter(): Mysql2Adapter {
     const adapter = new Mysql2Adapter({ host: "localhost" } as never);
     const fakeConn = { query: driverQuery, end: () => Promise.resolve() };
-    (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeConn;
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = mysql2Client(fakeConn);
     (adapter as unknown as { _verified: boolean })._verified = true;
     adapter._rawConnection!.queryOptions.as = "array";
     return adapter;

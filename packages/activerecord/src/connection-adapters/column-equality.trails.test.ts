@@ -85,14 +85,22 @@ describe("ColumnEqualityTrails", () => {
 
   it("compares the SQLite3 autoIncrement flag", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new SQLite3Column("id", null, opts, false);
-    expect(plain.equals(new SQLite3Column("id", null, opts, false))).toBe(true);
-    expect(
-      plain.equals(new SQLite3Column("id", null, opts, false, null, { autoIncrement: true })),
-    ).toBe(false);
-    expect(plain.equals(new SQLite3Column("id", null, opts, false, null, { rowid: true }))).toBe(
+    const plain = new SQLite3Column("id", null, new SqlTypeMetadata(opts), false);
+    expect(plain.equals(new SQLite3Column("id", null, new SqlTypeMetadata(opts), false))).toBe(
       true,
     );
+    expect(
+      plain.equals(
+        new SQLite3Column("id", null, new SqlTypeMetadata(opts), false, null, {
+          autoIncrement: true,
+        }),
+      ),
+    ).toBe(false);
+    expect(
+      plain.equals(
+        new SQLite3Column("id", null, new SqlTypeMetadata(opts), false, null, { rowid: true }),
+      ),
+    ).toBe(true);
   });
 
   it("does not equal a sibling adapter's column", () => {
@@ -103,7 +111,7 @@ describe("ColumnEqualityTrails", () => {
       new PgTypeMetadata(new SqlTypeMetadata(opts)),
       false,
     );
-    const sqlite = new SQLite3Column("id", null, opts, false);
+    const sqlite = new SQLite3Column("id", null, new SqlTypeMetadata(opts), false);
     expect(pg.equals(sqlite)).toBe(false);
     expect(sqlite.equals(pg)).toBe(false);
   });
@@ -165,8 +173,10 @@ describe("ColumnDeduplicationTrails", () => {
 
   it("folds the SQLite3 rowid flag into the key, which its equality ignores", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new SQLite3Column("dedup_sqlite", null, opts, false);
-    const rowid = new SQLite3Column("dedup_sqlite", null, opts, false, null, { rowid: true });
+    const plain = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false);
+    const rowid = new SQLite3Column("dedup_sqlite", null, new SqlTypeMetadata(opts), false, null, {
+      rowid: true,
+    });
     expect(plain.equals(rowid)).toBe(true);
     expect(plain.deduplicate()).not.toBe(rowid.deduplicate());
   });

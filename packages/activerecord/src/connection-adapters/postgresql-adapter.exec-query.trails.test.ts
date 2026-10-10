@@ -27,7 +27,7 @@ async function makeAdapter(
   const adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
   await loadTypeMap(adapter);
   const fakeClient = { query: queryImpl, release: () => {} };
-  (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
+  (adapter as unknown as { _rawConnection: unknown })._rawConnection = pgConnection(fakeClient);
   adapter.verifiedBang();
   adapter.typeMap.aliasType(UUID_OID, "uuid");
   adapter.typeMap.aliasType(23, "int4");
@@ -163,7 +163,7 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
       },
       release: () => {},
     };
-    (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
+    (adapter as unknown as { _rawConnection: unknown })._rawConnection = pgConnection(fakeClient);
     adapter.verifiedBang();
   });
 

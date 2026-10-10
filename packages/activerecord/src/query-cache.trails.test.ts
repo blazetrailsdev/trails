@@ -269,12 +269,9 @@ describe("QueryCache.included wires the including adapter class", () => {
   it("unsets the query cache after checkin", () => {
     const callbacks = (
       AbstractAdapter as unknown as {
-        _connectionCallbacks: { checkin: { kind: string; method: unknown }[] };
+        _checkinCallbacks: { entries: { kind: string; filter: unknown }[] };
       }
-    )._connectionCallbacks.checkin;
-    expect(callbacks[0]).toEqual({
-      kind: "after",
-      method: QueryCache.instanceMethod("unsetQueryCacheBang")!.value,
-    });
+    )._checkinCallbacks.entries;
+    expect(callbacks[0]).toMatchObject({ kind: "after", filter: ":unsetQueryCacheBang" });
   });
 });

@@ -19,7 +19,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         t.integer("id", { null: false, autoIncrement: true });
         t.index(["id"]);
       });
-      const output = await dumpTableSchema(adapter, "auto_increments");
+      const output = await dumpTableSchema("auto_increments");
       expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
 
@@ -32,7 +32,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
           t.datetime("created_at", { null: false });
         },
       );
-      const output = await dumpTableSchema(adapter, "auto_increments");
+      const output = await dumpTableSchema("auto_increments");
       expect(output).toMatch(/t\.integer\("id", \{ null: false, autoIncrement: true \}\)/);
     });
 

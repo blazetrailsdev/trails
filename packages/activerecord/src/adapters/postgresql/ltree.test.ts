@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "ltrees");
+      const output = await dumpTableSchema("ltrees");
       expect(output).toMatch(/t\.ltree\("path"\)/);
     });
   });

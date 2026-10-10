@@ -451,11 +451,13 @@ describe("Migration#createTable id option type", () => {
         const migration = new RecordingMigration();
         await migration.methodMissing("renameTable", "widgets", "gadgets");
         await migration.methodMissing("removeForeignKey", "widgets", "gadgets");
-        await migration.methodMissing("removeForeignKey", "widgets", { column: "gadget_id" });
+        await migration.removeForeignKey("widgets", undefined, { column: "gadget_id" });
+        await migration.removeForeignKey("widgets", null, { column: "gadget_id" });
         expect(migration.calls).toEqual([
           ["renameTable", ["p_widgets_s", "p_gadgets_s"]],
           ["removeForeignKey", ["p_widgets_s", "p_gadgets_s"]],
-          ["removeForeignKey", ["p_widgets_s", { column: "gadget_id" }]],
+          ["removeForeignKey", ["p_widgets_s", undefined, { column: "gadget_id" }]],
+          ["removeForeignKey", ["p_widgets_s", null, { column: "gadget_id" }]],
         ]);
       });
     });

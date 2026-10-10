@@ -3,12 +3,13 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   classAttribute,
   extractOptionsBang,
+  filterMap,
   included,
   isPresent,
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbEqual, rbFSend, rtest, toSym } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFSend, rtest, toSym, union } from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
@@ -121,16 +122,13 @@ export function isCounterCacheColumn(this: typeof Base, name: string): boolean {
 export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
   superFn();
 
-  const associationNames: string[] = [];
-  for (const [name, reflection] of Object.entries(this._reflections)) {
-    if (!reflection.belongsTo?.() || !reflection.counterCacheColumn?.()) continue;
-    associationNames.push(name);
-  }
-  let names = this.counterCachedAssociationNames;
-  for (const name of associationNames) {
-    if (!names.includes(name)) names = [...names, name];
-  }
-  this.counterCachedAssociationNames = names;
+  const associationNames = filterMap(Object.entries(this._reflections), ([name, reflection]) => {
+    if (!(reflection.isBelongsTo() && rtest(reflection.counterCacheColumn()))) return;
+
+    return name;
+  });
+
+  this.counterCachedAssociationNames = union(this.counterCachedAssociationNames, associationNames);
 }
 
 export const ClassMethods = {

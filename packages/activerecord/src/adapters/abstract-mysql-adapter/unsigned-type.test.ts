@@ -83,7 +83,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes unsigned option", async () => {
-      const schema = await dumpTableSchema(adapter, "unsigned_types");
+      const schema = await dumpTableSchema("unsigned_types");
       expect(schema).toMatch(/t\.integer\("unsigned_integer", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.bigint\("unsigned_bigint", \{ unsigned: true \}\)/);
       expect(schema).toMatch(/t\.float\("unsigned_float", \{ unsigned: true \}\)/);

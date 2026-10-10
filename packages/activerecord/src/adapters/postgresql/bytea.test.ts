@@ -146,7 +146,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumping", async () => {
-      const output = await dumpTableSchema(connection, "bytea_data_type");
+      const output = await dumpTableSchema("bytea_data_type");
       expect(output).toMatch(/t\.binary\s*\("payload"\);$/m);
       expect(output).toMatch(/t\.binary\s*\("serialized"\);$/m);
     });

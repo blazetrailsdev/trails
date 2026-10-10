@@ -61,7 +61,7 @@ describe("DdlHelper#with_example_table", () => {
   it("defaults the definition to nil", async () => {
     const { connection, calls } = recordingConnection();
 
-    await withExampleTable(connection, "ex", () => {});
+    await withExampleTable(connection, "ex", undefined, () => {});
 
     expect(calls[0]).toBe("CREATE TABLE ex()");
   });

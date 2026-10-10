@@ -107,20 +107,20 @@ export class EncryptedQuery {
   }
 }
 
-export const RelationQueries = new Module().include({
-  where(this: any, ...args: unknown[]): unknown {
+export const RelationQueries: Module = new Module((mod) => {
+  mod.defineMethod("where", function (this: any, ...args: unknown[]): unknown {
     return RelationQueries.superMethod(this, "where")!(
       ...EncryptedQuery.processArguments(this, args, true),
     );
-  },
+  });
 
-  isExists(this: any, ...args: unknown[]): unknown {
+  mod.defineMethod("isExists", function (this: any, ...args: unknown[]): unknown {
     return RelationQueries.superMethod(this, "isExists")!(
       ...EncryptedQuery.processArguments(this, args, true),
     );
-  },
+  });
 
-  scopeForCreate(this: any): Record<string, unknown> {
+  mod.defineMethod("scopeForCreate", function (this: any): Record<string, unknown> {
     if (!any(this.model.deterministicEncryptedAttributes() ?? []))
       return RelationQueries.superMethod(this, "scopeForCreate")!() as Record<string, unknown>;
 
@@ -139,7 +139,7 @@ export const RelationQueries = new Module().include({
     }
 
     return scopeAttributes;
-  },
+  });
 });
 
 export const CoreQueries = new Module() as Module & { ClassMethods: Module };
@@ -167,14 +167,14 @@ export class AdditionalValue {
   }
 }
 
-export const ExtendedEncryptableType = new Module().include({
-  serialize(this: object, data: unknown): unknown {
+export const ExtendedEncryptableType: Module = new Module((mod) => {
+  mod.defineMethod("serialize", function (this: object, data: unknown): unknown {
     if (data instanceof AdditionalValue) {
       return data.value;
     } else {
       return ExtendedEncryptableType.superMethod(this, "serialize")!(data);
     }
-  },
+  });
 });
 
 Encryption.ExtendedDeterministicQueries = ExtendedDeterministicQueries;

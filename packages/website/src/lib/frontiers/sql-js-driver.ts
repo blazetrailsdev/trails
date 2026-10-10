@@ -12,7 +12,14 @@ import type {
 
 function bindParams(binds: SqliteBinds | undefined): BindParams {
   if (binds === undefined) return [];
-  const cast = (v: SqliteBindValue): SqlValue => (typeof v === "boolean" ? (v ? 1 : 0) : v);
+  const cast = (v: SqliteBindValue): SqlValue =>
+    typeof v === "boolean"
+      ? v
+        ? 1
+        : 0
+      : (v as unknown) instanceof Number
+        ? (v as unknown as { valueOf(): number }).valueOf()
+        : v;
   if (Array.isArray(binds)) return (binds as SqliteBindValue[]).map(cast);
   const out: Record<string, SqlValue> = {};
   for (const [k, v] of Object.entries(binds)) out[/^[$:@]/.test(k) ? k : `$${k}`] = cast(v);

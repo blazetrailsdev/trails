@@ -68,7 +68,7 @@ describe("SchemaDumperTest", () => {
     return dumpAllTableSchema(ignoreTables);
   }
   async function dumpCanonicalTable(...tables: string[]): Promise<string> {
-    return dumpTableSchema(await Base.leaseConnection(), ...tables);
+    return dumpTableSchema(...tables);
   }
   async function dumpsIndexSortOrder(): Promise<boolean> {
     return (
@@ -420,7 +420,7 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
-    const output = await dumpAllTableSchema([/^courses/], ARUnit2Model.connectionPool());
+    const output = await dumpAllTableSchema([/^courses/], { pool: ARUnit2Model.connectionPool() });
     expect(output).not.toMatch(/createTable\("courses"/);
     expect(output).toMatch(/createTable\("colleges"/);
     expect(output).not.toMatch(/createTable\("schema_migrations"/);
@@ -439,16 +439,13 @@ describe("SchemaDumperTest", () => {
       await (
         await Base.leaseConnection()
       ).addIndex("dump_string_key_objects", "key", { unique: true });
-      const output = await dumpTableSchema(await Base.leaseConnection(), "dump_string_key_objects");
+      const output = await dumpTableSchema("dump_string_key_objects");
       expect(output).toMatch(/createTable\("dump_string_key_objects",\s*\{[^}]*id:\s*false/);
     },
   );
 
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
-    const output = await dumpTableSchema(
-      await Base.leaseConnection(),
-      "test_exclusion_constraints",
-    );
+    const output = await dumpTableSchema("test_exclusion_constraints");
     const constraintDefinitions = output
       .split(/\n/)
       .filter((line) => /test_exclusion_constraints_.*_overlap/.test(line));
@@ -465,7 +462,7 @@ describe("SchemaDumperTest", () => {
     );
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
-    const output = await dumpTableSchema(await Base.leaseConnection(), "test_unique_constraints");
+    const output = await dumpTableSchema("test_unique_constraints");
     const constraintDefinitions = output
       .split(/\n/)
       .filter((line) => /t\.uniqueConstraint/.test(line));
@@ -488,7 +485,7 @@ describe("SchemaDumperTest", () => {
     "unique_constraints",
     "schema does not dump unique constraints as indexes",
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "test_unique_constraints");
+      const output = await dumpTableSchema("test_unique_constraints");
       const uniqueIndexDefinitions = output
         .split(/\n/)
         .filter((line) => /t\.index.*unique: true/.test(line));
@@ -500,7 +497,7 @@ describe("SchemaDumperTest", () => {
     "schema dump includes length for mysql binary fields",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "binary_fields");
+      const output = await dumpTableSchema("binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
       expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
     },
@@ -509,7 +506,7 @@ describe("SchemaDumperTest", () => {
     "schema dump includes length for mysql blob and text fields",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "binary_fields");
+      const output = await dumpTableSchema("binary_fields");
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
       expect(output).toMatch(/t\.binary\("normal_blob"\)/);
       expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
@@ -530,7 +527,7 @@ describe("SchemaDumperTest", () => {
     "schema does not include limit for emulated mysql boolean fields",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "booleans");
+      const output = await dumpTableSchema("booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
   );
@@ -538,7 +535,7 @@ describe("SchemaDumperTest", () => {
     "schema dumps index type",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "key_tests");
+      const output = await dumpTableSchema("key_tests");
       expect(output).toMatch(
         /t\.index\(\["awesome"\], \{ name: "index_key_tests_on_awesome", type: "fulltext" \}\);$/m,
       );
@@ -550,7 +547,7 @@ describe("SchemaDumperTest", () => {
     "schema dump includes bigint default",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "defaults");
+      const output = await dumpTableSchema("defaults");
       expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
     },
   );
@@ -559,7 +556,7 @@ describe("SchemaDumperTest", () => {
     "schema dump includes limit on array type",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "bigint_array");
+      const output = await dumpTableSchema("bigint_array");
       expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
     },
   );
@@ -567,7 +564,7 @@ describe("SchemaDumperTest", () => {
     "schema dump allows array of decimal defaults",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "bigint_array");
+      const output = await dumpTableSchema("bigint_array");
       expect(output).toMatch(
         /t\.decimal\("decimal_array_default",\s*\{[^}]*default:\s*\["1\.23", "3\.45"\][^}]*array:\s*true/,
       );
@@ -577,7 +574,7 @@ describe("SchemaDumperTest", () => {
     "schema dump interval type",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "postgresql_times");
+      const output = await dumpTableSchema("postgresql_times");
       expect(output).toMatch(/t\.interval\("time_interval"\)/);
       expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
     },
@@ -586,7 +583,7 @@ describe("SchemaDumperTest", () => {
     "schema dump oid type",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "postgresql_oids");
+      const output = await dumpTableSchema("postgresql_oids");
       expect(output).toMatch(/t\.oid\("obj_id"\)/);
     },
   );
@@ -601,12 +598,12 @@ describe("SchemaDumperTest", () => {
       });
       try {
         (adapter as any).extensions = async () => ["hstore"];
-        let output = await dumpTableSchema(adapter, "schema_dump_probe");
+        let output = await dumpTableSchema("schema_dump_probe");
         expect(output).toMatch("These are extensions that must be enabled");
         expect(output).toMatch(/enableExtension\("hstore"\)/);
 
         (adapter as any).extensions = async () => [];
-        output = await dumpTableSchema(adapter, "schema_dump_probe");
+        output = await dumpTableSchema("schema_dump_probe");
         expect(output).not.toMatch("These are extensions that must be enabled");
         expect(output).not.toMatch(/enableExtension/);
       } finally {
@@ -625,14 +622,14 @@ describe("SchemaDumperTest", () => {
       });
       try {
         (adapter as any).extensions = async () => ["hstore", "uuid-ossp", "xml2"];
-        let output = await dumpTableSchema(adapter, "schema_dump_probe");
+        let output = await dumpTableSchema("schema_dump_probe");
         let enabledExtensions = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map(
           (m) => m[1],
         );
         expect(enabledExtensions).toEqual(["hstore", "uuid-ossp", "xml2"]);
 
         (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
-        output = await dumpTableSchema(adapter, "schema_dump_probe");
+        output = await dumpTableSchema("schema_dump_probe");
         enabledExtensions = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
         expect(enabledExtensions).toEqual(["hstore", "uuid-ossp", "xml2"]);
       } finally {
@@ -644,7 +641,7 @@ describe("SchemaDumperTest", () => {
     "schema dump include limit for float4 field",
     { timeout: FULL_DUMP_TIMEOUT_MS },
     async () => {
-      const output = await dumpTableSchema(await Base.leaseConnection(), "numeric_data");
+      const output = await dumpTableSchema("numeric_data");
       expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
     },
   );
@@ -658,7 +655,7 @@ describe("SchemaDumperTest", () => {
         t.integer("x");
       });
       try {
-        const output = await dumpTableSchema(adapter, "schema_dump_probe");
+        const output = await dumpTableSchema("schema_dump_probe");
         const expectedDefinition = 'createEnum("enum_with_comma", ["value1","value,2","value3"])';
         expect(output).toContain(expectedDefinition);
       } finally {
@@ -679,7 +676,7 @@ describe("SchemaDumperTest", () => {
     FULL_DUMP_TIMEOUT_MS,
   );
   itIfSupports("foreign_keys", "do not dump foreign keys for ignored tables", async () => {
-    const output = await dumpTableSchema(await Base.leaseConnection(), "authors");
+    const output = await dumpTableSchema("authors");
     expect(
       [...output.matchAll(/^\s*await ctx\.addForeignKey\("([^"]+)".+$/gm)].map((m) => m[1]),
     ).toEqual(["authors"]);
@@ -715,11 +712,7 @@ describe("SchemaDumperTest", () => {
     const migration = new CreateCatMigration();
     await migration.migrate("up");
     try {
-      const output = await dumpTableSchema(
-        await Base.leaseConnection(),
-        "foo_cat_owners_bar",
-        "foo_cats_bar",
-      );
+      const output = await dumpTableSchema("foo_cat_owners_bar", "foo_cats_bar");
 
       expect(output).toMatch(/createTable\("cat_owners"/);
       expect(output).toMatch(/createTable\("cats"/);
@@ -749,11 +742,7 @@ describe("SchemaDumperTest", () => {
     const migration = new CreateCatMigration();
     await migration.migrate("up");
     try {
-      const output = await dumpTableSchema(
-        await Base.leaseConnection(),
-        "foo$cat_owners$bar",
-        "foo$cats$bar",
-      );
+      const output = await dumpTableSchema("foo$cat_owners$bar", "foo$cats$bar");
 
       expect(output).toMatch(/createTable\("cat_owners"/);
       expect(output).toMatch(/createTable\("cats"/);
@@ -828,7 +817,7 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
         expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
@@ -861,7 +850,7 @@ describe("SchemaDumperTest", () => {
         migration = new TimestampsMigration();
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
         expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
         expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
@@ -889,7 +878,7 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("this_should_remain_datetime"')).toBeTruthy();
         expect(output.includes('t.datetime("this_is_an_alias_of_datetime"')).toBeTruthy();
         expect(output.includes('t.datetime("this_is_also_an_alias_of_datetime"')).toBeTruthy();
@@ -919,7 +908,7 @@ describe("SchemaDumperTest", () => {
         migration = new TimestampsMigration();
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
         expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
         expect(output.includes('t.timestamp("this_should_also_stay_as_timestamp"')).toBeTruthy();
@@ -946,13 +935,13 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        let output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        let output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("default_format"')).toBeTruthy();
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
         expect(output.includes('t.timestamptz("with_time_zone"')).toBeTruthy();
 
         await withPostgresqlDatetimeType("timestamptz", async () => {
-          output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+          output = await dumpTableSchema("timestamps");
           expect(output.includes('t.timestamp("default_format"')).toBeTruthy();
           expect(output.includes('t.timestamp("without_time_zone"')).toBeTruthy();
           expect(output.includes('t.datetime("with_time_zone"')).toBeTruthy();
@@ -983,7 +972,7 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("default_format"')).toBeTruthy();
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
         expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
@@ -1015,7 +1004,7 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("default_format"')).toBeTruthy();
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
         expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
@@ -1046,7 +1035,7 @@ describe("SchemaDumperTest", () => {
       try {
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.datetime("default_format"')).toBeTruthy();
         expect(output.includes('t.datetime("without_time_zone"')).toBeTruthy();
         expect(output.includes('t.datetime("also_without_time_zone"')).toBeTruthy();
@@ -1075,7 +1064,7 @@ describe("SchemaDumperTest", () => {
         migration = new TimestampsMigration();
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
         expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
       }).finally(() => migration.migrate("down"));
@@ -1102,7 +1091,7 @@ describe("SchemaDumperTest", () => {
         migration = new TimestampsMigration();
         await migration.migrate("up");
 
-        const output = await dumpTableSchema(await Base.leaseConnection(), "timestamps");
+        const output = await dumpTableSchema("timestamps");
         expect(output.includes('t.timestamp("this_should_change_to_timestamp"')).toBeTruthy();
         expect(output.includes('t.timestamp("this_should_stay_as_timestamp"')).toBeTruthy();
       }).finally(() => migration.migrate("down"));
@@ -1127,7 +1116,7 @@ describe("SchemaDumperDefaultsTest", () => {
         t.time("time_with_default", { default: "07:17:04" });
         t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
       });
-      const output = await dumpTableSchema(connection, "dump_defaults");
+      const output = await dumpTableSchema("dump_defaults");
       expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
       expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
       expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
@@ -1143,7 +1132,7 @@ describe("SchemaDumperDefaultsTest", () => {
         default: () => (adapterType === "postgres" ? "gen_random_uuid()" : "uuid()"),
       });
     });
-    const output = await dumpTableSchema(connection, "dump_defaults");
+    const output = await dumpTableSchema("dump_defaults");
 
     expect(output).toMatch(/text.*"text_with_default".*default: "John' Doe"/);
 
@@ -1166,7 +1155,7 @@ describe("SchemaDumperDefaultsTest", () => {
         t.date("date_with_neg_inf_default", { default: -Infinity });
         t.date("date_with_pos_inf_default", { default: Infinity });
       });
-      const output = await dumpTableSchema(connection, "infinity_defaults");
+      const output = await dumpTableSchema("infinity_defaults");
       expect(output).toMatch(/t\.float\("float_with_inf_default",.*default: ::Float::INFINITY/);
       expect(output).toMatch(/t\.float\("float_with_nan_default",.*default: ::Float::NAN/);
       expect(output).toMatch(/t\.datetime\("beginning_of_time",.*default: -::Float::INFINITY/);

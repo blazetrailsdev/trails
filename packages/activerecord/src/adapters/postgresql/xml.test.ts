@@ -57,7 +57,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "xml_data_type");
+      const output = await dumpTableSchema("xml_data_type");
       expect(output).toMatch(/t\.xml\("payload"\)/);
     });
   });

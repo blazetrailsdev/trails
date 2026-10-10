@@ -13,6 +13,7 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { deprecate } from "@blazetrails/activesupport";
+import { rtest } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
@@ -74,21 +75,20 @@ export class TableDefinition extends AbstractTableDefinition {
     type: ColumnType,
     options: ColumnOptions = {},
   ): ColumnDefinition {
-    let resolvedType = type as string;
-    if (resolvedType === "primary_key") {
-      resolvedType = "integer";
-      (options as any).limit = (options as any).limit ?? 8;
-      (options as any).primaryKey = true;
-    } else if (resolvedType === "virtual") {
-      resolvedType = options.type as string;
-    } else {
-      const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
-      if (unsignedMatch) {
-        resolvedType = unsignedMatch[1];
-        (options as any).unsigned = true;
-      }
+    options = { ...options };
+    let match: RegExpExecArray | null;
+    if (type === "virtual") {
+      type = options.type as ColumnType;
+    } else if (type === "primary_key") {
+      type = "integer";
+      if (!rtest(options.limit)) options.limit = 8;
+      options.primaryKey = true;
+    } else if ((match = /^unsigned_(?<type>.+)$/.exec(type))) {
+      type = match.groups!.type as ColumnType;
+      options.unsigned = true;
     }
-    return super.newColumnDefinition(name, resolvedType as ColumnType, options);
+
+    return super.newColumnDefinition(name, type, options);
   }
 
   /** @internal */

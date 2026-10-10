@@ -61,7 +61,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
   });
 
   it("test_schema_dumping", async () => {
-    const output = await dumpTableSchema(connection, "json_data_type");
+    const output = await dumpTableSchema("json_data_type");
     expect(output).toMatch(new RegExp(`t\\.${columnType}\\(\\s*"settings"`));
   });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { EncryptedUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
@@ -6,20 +7,6 @@ import { Encryption } from "../encryption.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import type { EncryptorLike } from "./encryptor.js";
 import { deterministicEncryptedAttributes } from "./encryptable-record.js";
-import { type Module } from "@blazetrails/ruby-compat";
-import { prepend } from "@blazetrails/ruby-compat/include";
-
-function prependedOver(
-  mod: Module,
-  name: string,
-  original: (...args: any[]) => unknown,
-  props: object = {},
-): any {
-  class Host {}
-  Object.defineProperty(Host.prototype, name, { value: original, configurable: true });
-  prepend(Host, mod);
-  return Object.assign(new Host(), props);
-}
 
 const encryptorA: EncryptorLike = {
   encrypt: (v) => `A:${v}`,
@@ -61,11 +48,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       });
     };
 
-    await prependedOver(
-      EncryptedUniquenessValidator,
-      "validateEach",
-      originalValidateEach,
-    ).validateEach(record, "email", "user@example.com");
+    class Validator {
+      validateEach(record: any, attribute: string, value: unknown): Promise<void> | void {
+        originalValidateEach(record, attribute, value);
+      }
+    }
+    prepend(Validator, EncryptedUniquenessValidator);
+    await new Validator().validateEach(record, "email", "user@example.com");
 
     expect(calls[0].value).toBe("user@example.com");
     expect(calls[0].encryptionDisabled).toBe(false);
@@ -87,13 +76,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const record = { constructor: klass };
 
     const calls: unknown[] = [];
-    const originalValidateEach = (_r: any, _a: string, value: unknown) => calls.push(value);
-
-    await prependedOver(
-      EncryptedUniquenessValidator,
-      "validateEach",
-      originalValidateEach,
-    ).validateEach(record, "body", "hello");
+    class Validator {
+      validateEach(_r: any, _a: string, value: unknown): Promise<void> | void {
+        calls.push(value);
+      }
+    }
+    prepend(Validator, EncryptedUniquenessValidator);
+    await new Validator().validateEach(record, "body", "hello");
 
     expect(calls).toHaveLength(1);
   });

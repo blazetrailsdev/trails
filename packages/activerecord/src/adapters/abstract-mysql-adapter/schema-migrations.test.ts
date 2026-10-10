@@ -23,7 +23,10 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
         const idxNames = (await adapter.indexes("engines")).map((i: { name: string }) => i.name);
         expect(idxNames).toEqual(["idx_renamed"]);
       } finally {
-        await adapter.removeForeignKey("engines", { name: "fk_engines_cars", ifExists: true });
+        await adapter.removeForeignKey("engines", undefined, {
+          name: "fk_engines_cars",
+          ifExists: true,
+        });
         await adapter.removeIndex("engines", { name: "idx_renamed", ifExists: true });
         await adapter.removeIndex("engines", { name: "index_engines_on_car_id", ifExists: true });
       }

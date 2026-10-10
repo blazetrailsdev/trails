@@ -258,20 +258,14 @@ describe("SQLite3::Quoting", () => {
 
   describe("typeCast", () => {
     it("converts booleans to 1/0", () => {
-      expect(typeCast(true)).toBe(1n);
-      expect(typeCast(false)).toBe(0n);
+      expect(typeCast(true)).toBe(1);
+      expect(typeCast(false)).toBe(0);
     });
 
     it("passes through strings and floats", () => {
       expect(typeCast("hello")).toBe("hello");
       expect(typeCast(4.2)).toBe(4.2);
       expect(typeCast(Infinity)).toBe(Infinity);
-    });
-
-    it("converts integer-valued numbers to BigInt so they bind as SQLITE_INTEGER", () => {
-      expect(typeCast(42)).toBe(42n);
-      expect(typeCast(0)).toBe(0n);
-      expect(typeCast(-7)).toBe(-7n);
     });
 
     it("throws on unsupported types", () => {

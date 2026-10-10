@@ -4,7 +4,7 @@ import { AdapterNotFound } from "./errors.js";
 import { ActiveRecord, ConnectionAdapters } from "./namespaces.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
-type AdapterClass = new (...args: any[]) => DatabaseAdapter;
+type AdapterClass = typeof DatabaseAdapter;
 const adapters = new Map<string, [string, string]>();
 const loadErrors = new Map<string, unknown>();
 

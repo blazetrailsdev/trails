@@ -309,7 +309,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("range schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_ranges");
+      const output = await dumpTableSchema("postgresql_ranges");
       expect(output).toContain(
         '# Could not dump table "postgresql_ranges" because of following StandardError',
       );

@@ -929,48 +929,47 @@ describe("checkout/checkin callbacks", () => {
 
   it("setCallback registers a custom :checkout callback that runs on checkout", async () => {
     const calls: string[] = [];
-    AbstractAdapter.setCallback("checkout", "after", function () {
+    const callback = function (this: AbstractAdapter) {
       calls.push(this.adapterName);
-    });
+    };
+    AbstractAdapter.setCallback("checkout", "after", callback);
     const pool = makeAmbientPool({ pool: 1 });
     try {
       const conn = await pool.checkout();
       expect(calls).toEqual([conn.adapterName]);
     } finally {
       await closePoolConnections(pool);
-      (
-        AbstractAdapter as unknown as {
-          _connectionCallbacks: { checkout: unknown[] };
-        }
-      )._connectionCallbacks.checkout.pop();
+      checkoutCallbacks(AbstractAdapter).skipCallback("checkout", "after", callback);
     }
   });
 
   it("setCallback on a subclass clones the registry and does not leak onto AbstractAdapter", async () => {
     class SubAdapter extends AbstractAdapter {}
-    const before = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks.checkout.length;
+    const before = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks.entries.length;
 
     SubAdapter.setCallback("checkout", "after", function () {});
 
-    const sub = (SubAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks;
-    const base = (AbstractAdapter as unknown as { _connectionCallbacks: { checkout: unknown[] } })
-      ._connectionCallbacks;
+    const sub = checkoutCallbacks(SubAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
     expect(sub).not.toBe(base);
-    expect(sub.checkout.length).toBe(before + 1);
-    expect(base.checkout.length).toBe(before);
+    expect(sub.entries.length).toBe(before + 1);
+    expect(base.entries.length).toBe(before);
   });
 
   it("subclass without its own callback inherits AbstractAdapter's shared registry", async () => {
     class SharedAdapter extends AbstractAdapter {}
-    const sub = (SharedAdapter as unknown as { _connectionCallbacks: unknown })
-      ._connectionCallbacks;
-    const base = (AbstractAdapter as unknown as { _connectionCallbacks: unknown })
-      ._connectionCallbacks;
+    const sub = checkoutCallbacks(SharedAdapter)._checkoutCallbacks;
+    const base = checkoutCallbacks(AbstractAdapter)._checkoutCallbacks;
     expect(sub).toBe(base);
   });
 });
+
+function checkoutCallbacks(klass: typeof AbstractAdapter) {
+  return klass as unknown as {
+    _checkoutCallbacks: { entries: unknown[] };
+    skipCallback(name: string, ...filterList: unknown[]): void;
+  };
+}
 
 describe("NullPool member parity", () => {
   it("defines no role or shard, matching Rails' NullPool", () => {

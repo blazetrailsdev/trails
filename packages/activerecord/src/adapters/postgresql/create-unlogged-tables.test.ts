@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("not included in schema dump", async () => {
       PostgreSQLAdapter.createUnloggedTables = true;
       await connection.createTable(TABLE_NAME, () => {});
-      const output = await dumpTableSchema(connection, TABLE_NAME);
+      const output = await dumpTableSchema(TABLE_NAME);
       expect(output).not.toMatch(/unlogged/i);
     });
 

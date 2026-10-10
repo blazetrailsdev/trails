@@ -17,7 +17,7 @@ class LifecycleTestAdapter extends AbstractAdapter {
 
   simulateConnect(): void {
     this._connected = true;
-    this._connection = this;
+    this._rawConnection = this;
     this.verifiedBang();
   }
 
@@ -35,7 +35,7 @@ class LifecycleTestAdapter extends AbstractAdapter {
 
   override reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
     this._connected = true;
-    this._connection = this;
+    this._rawConnection = this;
     return super.reconnectBang(opts);
   }
 }
@@ -143,7 +143,7 @@ class ReconnectLifecycleAdapter extends AbstractAdapter {
     await super.disconnectBang();
   }
   attachRawConnection(): void {
-    this._connection = this;
+    this._rawConnection = this;
   }
 }
 
@@ -241,7 +241,7 @@ describe("AbstractAdapter reconnect/verify lifecycle", () => {
 
     await a.verifyBang();
 
-    expect((a as unknown as { _connection: AbstractAdapter | null })._connection).toBe(raw);
+    expect((a as unknown as { _rawConnection: AbstractAdapter | null })._rawConnection).toBe(raw);
     expect(
       (a as unknown as { _unconfiguredConnection: AbstractAdapter | null })._unconfiguredConnection,
     ).toBeNull();

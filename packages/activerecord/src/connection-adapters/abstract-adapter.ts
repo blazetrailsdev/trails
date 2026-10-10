@@ -88,6 +88,8 @@ import {
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
   ClassMethods as QuotingClassMethods,
+  columnNameMatcher as abstractColumnNameMatcher,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
@@ -104,7 +106,7 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import { include } from "@blazetrails/activesupport";
+import { Callbacks, include, type Extended, type Included } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -196,8 +198,11 @@ export class Version {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter
   extends
+    Included<typeof Callbacks>,
     Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
     Pick<QueryCacheHost, "_queryCache"> {
+  _runCheckoutCallbacks(block?: () => unknown): unknown;
+  _runCheckinCallbacks(block?: () => unknown): unknown;
   queryCache: Store | null;
   readonly queryCacheEnabled: boolean | undefined;
   cache<T>(fn: () => T | Promise<T>): T | Promise<T>;
@@ -436,8 +441,8 @@ export interface AbstractAdapter
   createSchemaDumper(options: Record<string, unknown>): SchemaDumper;
   foreignKeyExists(
     fromTable: string,
-    toTable?: string | ForeignKeyLookupOptions,
-    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+    toTable?: string | null,
+    options?: ForeignKeyLookupOptions,
   ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   /** @internal */
@@ -449,7 +454,7 @@ export interface AbstractAdapter
   useForeignKeys(): boolean;
   removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable?: string | null,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   addReference(tableName: string, refName: string, options?: AddReferenceOptions): Promise<void>;
@@ -489,10 +494,11 @@ export interface AbstractAdapter
   ): Promise<CheckConstraintDefinition>;
   removeCheckConstraint(
     tableName: string,
-    expression?:
-      | string
-      | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-    options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    expression?: string | null,
+    {
+      ifExists,
+      ...options
+    }?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   /** @internal */
@@ -756,14 +762,6 @@ export interface AbstractAdapter
 
   readonly schemaCreation?: SchemaCreation;
 }
-/** @internal */
-export type ConnectionCallbackPhase = "checkout" | "checkin";
-/** @internal */
-export type ConnectionCallbackKind = "before" | "after";
-interface ConnectionCallback {
-  kind: ConnectionCallbackKind;
-  method: (this: AbstractAdapter) => void;
-}
 
 function isPlainConfigHash(value: unknown): value is Record<string, unknown> {
   if (value == null || typeof value !== "object") return false;
@@ -793,6 +791,15 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly ADAPTER_NAME: string = "Abstract";
+
+  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+
+  static {
+    include(this, Callbacks);
+    this.defineCallbacks("checkout", "checkin");
+  }
+
   static readonly Version = Version;
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
@@ -802,7 +809,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   protected _visitor!: Visitors.ToSql;
-  protected _connection: unknown = null;
+  /** @internal */
+  _rawConnection: unknown = null;
   private _owner: Thread | Fiber | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
@@ -913,7 +921,7 @@ export class AbstractAdapter implements Quoting {
   ) {
     initializeIncludedModules(this);
 
-    this._connection = null;
+    this._rawConnection = null;
     this._unconfiguredConnection = null;
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
@@ -1110,7 +1118,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get secondsSinceLastActivity(): number | null {
-    if (!this._connection || !this._lastActivity) return null;
+    if (!this._rawConnection || !this._lastActivity) return null;
     return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
   }
 
@@ -1152,11 +1160,6 @@ export class AbstractAdapter implements Quoting {
   supportsDdlTransactions(): boolean {
     return false;
   }
-
-  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
-    checkout: [],
-    checkin: [],
-  };
 
   supportsBulkAlter(): boolean {
     return false;
@@ -1379,11 +1382,11 @@ export class AbstractAdapter implements Quoting {
   async checkAllForeignKeysValidBang(): Promise<void> {}
 
   isConnected(): boolean {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async active(): Promise<boolean> {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
@@ -1507,15 +1510,6 @@ export class AbstractAdapter implements Quoting {
       this._rawConnectionDirty = true;
       return conn as RawConnectionOf<Self>;
     });
-  }
-
-  /** @internal */
-  get _rawConnection(): unknown {
-    return this._connection;
-  }
-  /** @internal */
-  set _rawConnection(value: unknown) {
-    this._connection = value;
   }
 
   defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {
@@ -1682,7 +1676,8 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = options.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
+      if (this._rawConnection === null && this.isReconnectCanRestoreState())
+        await this.connectBang();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -1785,13 +1780,13 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   anyRawConnection(): unknown {
-    return this._connection ?? this.validRawConnection();
+    return this._rawConnection ?? this.validRawConnection();
   }
 
   /** @internal */
   validRawConnection(): unknown {
     return (
-      (this._verified && this._connection) ||
+      (this._verified && this._rawConnection) ||
       this.withRawConnection({ allowRetry: false, materializeTransactions: false }, (conn) => conn)
     );
   }
@@ -1981,6 +1976,14 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
+  static columnNameMatcher(): RegExp {
+    return abstractColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return abstractColumnNameWithOrderMatcher();
+  }
+
   static quoteColumnName(columnName: unknown): string {
     return QuotingClassMethods.quoteColumnName(columnName);
   }
@@ -2052,40 +2055,6 @@ export class AbstractAdapter implements Quoting {
     return abstractSanitizeAsSqlComment(value);
   }
 
-  static setCallback(
-    phase: ConnectionCallbackPhase,
-    kind: ConnectionCallbackKind,
-    method: (this: AbstractAdapter) => void,
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
-      const inherited = this._connectionCallbacks;
-      this._connectionCallbacks = {
-        checkout: [...inherited.checkout],
-        checkin: [...inherited.checkin],
-      };
-    }
-    this._connectionCallbacks[phase].push({ kind, method });
-  }
-
-  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
-    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
-    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
-    block();
-    for (let i = callbacks.length - 1; i >= 0; i--) {
-      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
-    }
-  }
-
-  /** @internal */
-  _runCheckoutCallbacks(block: () => void): void {
-    this._runCallbacks("checkout", block);
-  }
-
-  /** @internal */
-  _runCheckinCallbacks(block: () => void): void {
-    this._runCallbacks("checkin", block);
-  }
-
   inspect(): string {
     const q = (v: string): string => JSON.stringify(String(v));
     const dbConfig = this.pool.dbConfig;
@@ -2140,7 +2109,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   protected async rawConnectionForBlock(): Promise<unknown> {
-    return this._connection;
+    return this._rawConnection;
   }
 
   /** @internal */
@@ -2164,9 +2133,7 @@ include(AbstractAdapter, DatabaseStatements);
 include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);
 include(AbstractAdapter, QueryCacheMixin);
-AbstractAdapter.setCallback("checkin", "after", function () {
-  this.enableLazyTransactionsBang();
-});
+AbstractAdapter.setCallback("checkin", "after", ":enableLazyTransactionsBang");
 include(AbstractAdapter, SavepointsMixin);
 include(AbstractAdapter, {
   maxIdentifierLength,

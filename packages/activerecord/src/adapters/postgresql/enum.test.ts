@@ -156,7 +156,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.execute(
         `ALTER TABLE "postgresql_enums" ADD COLUMN "good_mood" mood DEFAULT 'happy' NOT NULL`,
       );
-      const output = await dumpTableSchema(adapter, "postgresql_enums");
+      const output = await dumpTableSchema("postgresql_enums");
       expect(output).toContain(
         "// Note that some types may not work with other database engines. Be careful if changing database.",
       );
@@ -169,14 +169,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("schema dump renamed enum", async () => {
       await adapter.renameEnum("mood", "feeling");
-      const output = await dumpTableSchema(adapter, "postgresql_enums");
+      const output = await dumpTableSchema("postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
       expect(output).toContain('t.enum("current_mood", { enumType: "feeling" })');
     });
 
     it("schema dump renamed enum with to option", async () => {
       await adapter.renameEnum("mood", { to: "feeling" });
-      const output = await dumpTableSchema(adapter, "postgresql_enums");
+      const output = await dumpTableSchema("postgresql_enums");
       expect(output).toContain('await ctx.createEnum("feeling", ["sad","ok","happy"]);');
       expect(output).toContain('t.enum("current_mood", { enumType: "feeling" })');
     });
@@ -191,7 +191,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.addEnumValue("mood", "curious", { ifNotExists: true });
       });
 
-      const output = await dumpTableSchema(adapter, "postgresql_enums");
+      const output = await dumpTableSchema("postgresql_enums");
       expect(output).toContain(
         'await ctx.createEnum("mood", ["sad","angry","ok","nervous","happy","glad","curious"]);',
       );
@@ -199,7 +199,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it.skipIf(pgServerVersion < 100000)("schema dump renamed enum value", async () => {
       await adapter.renameEnumValue("mood", { from: "ok", to: "okay" });
-      const output = await dumpTableSchema(adapter, "postgresql_enums");
+      const output = await dumpTableSchema("postgresql_enums");
       expect(output).toContain('await ctx.createEnum("mood", ["sad","okay","happy"]);');
     });
 

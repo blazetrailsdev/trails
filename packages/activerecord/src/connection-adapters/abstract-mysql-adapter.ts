@@ -1005,7 +1005,7 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async handleWarnings(sql: string): Promise<void> {
-    const rawConnection = this._connection as WarningsConnection;
+    const rawConnection = this._rawConnection as WarningsConnection;
     if (dbWarningsAction() == null || rawConnection.warningCount === 0) return;
 
     const warningCount = rawConnection.warningCount;
@@ -1500,7 +1500,7 @@ export interface AbstractMysqlAdapter {
 
   removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable?: string | null,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>>;

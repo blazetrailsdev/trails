@@ -119,7 +119,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       assertPredicate(column, (c: PgColumn) => c.isArray());
       expect(column.default).toBe("{}");
 
-      const schema = await dumpTableSchema(adapter, "uuid_data_type");
+      const schema = await dumpTableSchema("uuid_data_type");
       expect(schema).toMatch(/t\.uuid\("thingy", \{ default: \[\], array: true \}\);?$/m);
     });
 
@@ -224,7 +224,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(adapter, "uuid_data_type");
+      const output = await dumpTableSchema("uuid_data_type");
       expect(output).toMatch(/t\.uuid\("guid"/);
     });
 
@@ -317,7 +317,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      const schema = await dumpTableSchema("pg_uuids");
       expect(schema).toMatch(
         /\bcreateTable\("pg_uuids", \{ id: "uuid", default: \(\) => "uuid_generate_v1\(\)"/,
       );
@@ -325,7 +325,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key with custom default", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids_2");
+      const schema = await dumpTableSchema("pg_uuids_2");
       expect(schema).toMatch(
         /\bcreateTable\("pg_uuids_2", \{ id: "uuid", default: \(\) => "my_uuid_generator\(\)"/,
       );
@@ -335,7 +335,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key default", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids_3");
+      const schema = await dumpTableSchema("pg_uuids_3");
       // eslint-disable-next-line blazetrails/no-conditional-in-test -- uuid_test.rb:289 branches on supports_pgcrypto_uuid? and parity:test counts both arms
       if (supportsPgcryptoUuid) {
         expect(schema).toMatch(
@@ -371,7 +371,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           pool.internalMetadata,
         ).migrate();
 
-        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        const schema = await dumpTableSchema("pg_uuids_4");
         expect(schema).toMatch(
           /\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: \(\) => "uuid_generate_v4\(\)"/,
         );
@@ -406,7 +406,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dumper for uuid primary key with default override via nil", async () => {
-      const schema = await dumpTableSchema(adapter, "pg_uuids");
+      const schema = await dumpTableSchema("pg_uuids");
       expect(schema).toMatch(/\bcreateTable\("pg_uuids", \{ id: "uuid", default: null/);
     });
 
@@ -433,7 +433,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           pool.internalMetadata,
         ).migrate();
 
-        const schema = await dumpTableSchema(adapter, "pg_uuids_4");
+        const schema = await dumpTableSchema("pg_uuids_4");
         expect(schema).toMatch(/\bcreateTable\("pg_uuids_4", \{ id: "uuid", default: null/);
       } finally {
         await dropTable("pg_uuids_4");

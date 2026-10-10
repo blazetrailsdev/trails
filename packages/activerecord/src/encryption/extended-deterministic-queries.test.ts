@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { Module } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { fixtures } from "../test-fixtures.js";
 import {
   AdditionalValue,
@@ -15,20 +17,6 @@ import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 import { deterministicEncryptedAttributes } from "./encryptable-record.js";
-import { type Module } from "@blazetrails/ruby-compat";
-import { prepend } from "@blazetrails/ruby-compat/include";
-
-function prependedOver(
-  mod: Module,
-  name: string,
-  original: (...args: any[]) => unknown,
-  props: object = {},
-): any {
-  class Host {}
-  Object.defineProperty(Host.prototype, name, { value: original, configurable: true });
-  prepend(Host, mod);
-  return Object.assign(new Host(), props);
-}
 
 fixtures([], { useTransactionalTests: false });
 
@@ -301,19 +289,24 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::EncryptedQuery
   });
 });
 
+function prepended(mod: Module, methods: Record<string, unknown>): any {
+  class Host {}
+  Object.assign(Host.prototype, methods);
+  prepend(Host, mod);
+  return new Host();
+}
+
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::ExtendedEncryptableType", () => {
   it("passes AdditionalValue through without re-serializing", () => {
     const type = makeType();
     const av = new AdditionalValue("hello", type);
     const serialize = (v: unknown) => `serialized(${v})`;
-    expect(prependedOver(ExtendedEncryptableType, "serialize", serialize).serialize(av)).toBe(
-      av.value,
-    );
+    expect(prepended(ExtendedEncryptableType, { serialize }).serialize(av)).toBe(av.value);
   });
 
   it("delegates to originalSerialize for non-AdditionalValue", () => {
     const serialize = (v: unknown) => `serialized(${v})`;
-    expect(prependedOver(ExtendedEncryptableType, "serialize", serialize).serialize("hello")).toBe(
+    expect(prepended(ExtendedEncryptableType, { serialize }).serialize("hello")).toBe(
       "serialized(hello)",
     );
   });
@@ -336,12 +329,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       whereValuesHash: () => ({ email: [avCurrent, avPrev] }),
     };
 
-    const result = prependedOver(
-      RelationQueries,
-      "scopeForCreate",
-      () => ({}),
-      relation,
-    ).scopeForCreate();
+    const result = prepended(RelationQueries, {
+      ...relation,
+      scopeForCreate: () => ({}),
+    }).scopeForCreate();
     expect(result.email).toBe(avCurrent);
   });
 
@@ -354,12 +345,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     };
     const relation = { model, whereValuesHash: () => ({}) };
 
-    const result = prependedOver(
-      RelationQueries,
-      "scopeForCreate",
-      () => ({ email: "plain@example.com" }),
-      relation,
-    ).scopeForCreate();
+    const result = prepended(RelationQueries, {
+      ...relation,
+      scopeForCreate: () => ({ email: "plain@example.com" }),
+    }).scopeForCreate();
     expect(result.email).toBe("plain@example.com");
   });
 
@@ -373,12 +362,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     };
     const relation = { model, whereValuesHash: () => ({ body: [av] }) };
 
-    const result = prependedOver(
-      RelationQueries,
-      "scopeForCreate",
-      () => ({}),
-      relation,
-    ).scopeForCreate();
+    const result = prepended(RelationQueries, {
+      ...relation,
+      scopeForCreate: () => ({}),
+    }).scopeForCreate();
     expect(result.body).toBeUndefined();
   });
 
@@ -393,12 +380,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       model,
       whereValuesHash: () => ({ email: "plain@example.com" }),
     };
-    const result = prependedOver(
-      RelationQueries,
-      "scopeForCreate",
-      () => ({}),
-      relation,
-    ).scopeForCreate();
+    const result = prepended(RelationQueries, {
+      ...relation,
+      scopeForCreate: () => ({}),
+    }).scopeForCreate();
     expect(result.email).toBeUndefined();
   });
 
@@ -438,9 +423,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
     expect((hash.email as unknown[])[0]).toBeInstanceOf(AdditionalValue);
     expect((hash.email as AdditionalValue[])[0].value).toBe(avCurrent.value);
 
-    const scope = prependedOver(RelationQueries, "scopeForCreate", () => ({}), {
+    const scope = prepended(RelationQueries, {
       model: rel.model,
       whereValuesHash: () => rel.whereValuesHash(),
+      scopeForCreate: () => ({}),
     }).scopeForCreate();
     expect(scope.email).toBeInstanceOf(AdditionalValue);
     expect((scope.email as AdditionalValue).value).toBe(avCurrent.value);

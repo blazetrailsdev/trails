@@ -221,7 +221,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
       new NotImplementedError("foreign_keys is not implemented"),
     );
     await expect(
-      stub.removeForeignKey("products", { name: "fk_products_user_id" }),
+      stub.removeForeignKey("products", undefined, { name: "fk_products_user_id" }),
     ).rejects.toThrow(new NotImplementedError("foreign_keys is not implemented"));
   });
 
@@ -293,7 +293,11 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     }
     const stub = new FkStub({});
     await expect(
-      stub.removeForeignKey("products", { name: "wrong_name", toTable: "other", ifExists: true }),
+      stub.removeForeignKey("products", undefined, {
+        name: "wrong_name",
+        toTable: "other",
+        ifExists: true,
+      }),
     ).rejects.toThrow(/no foreign key/i);
   });
 
@@ -322,7 +326,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     const stub = new NoFkAdapter({});
     expect((stub as any).useForeignKeys()).toBe(false);
     await expect(
-      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+      stub.removeForeignKey("articles", undefined, { name: "fk_whatever" }),
     ).resolves.toBeUndefined();
     expect(executed).toBe(false);
   });
@@ -348,7 +352,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect((stub as any).useForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     await expect(
-      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+      stub.removeForeignKey("articles", undefined, { name: "fk_whatever" }),
     ).resolves.toBeUndefined();
     expect(executed).toBe(false);
   });

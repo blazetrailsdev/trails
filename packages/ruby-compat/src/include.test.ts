@@ -28,6 +28,7 @@ import {
   initialize,
   initializeIncludedModules,
   isModuleIncluded,
+  methodOwner,
   rbModAncestors,
   defineModule,
   moduleVisibility,
@@ -1681,63 +1682,129 @@ describe("include — a module's own `included` shadows the one it was extended 
   });
 });
 
-describe("Module#prependFeatures keeps the class's method beneath the module", () => {
-  it("super from a prepended method reaches the class's own method", () => {
-    class Greeter {
+describe("Module#prependFeatures", () => {
+  it("splices the module above the class's own method, which superMethod resumes at", () => {
+    class Klass {
       greet(name: string): string {
-        return `hello ${name}`;
+        return `class ${name}`;
+      }
+      other(): string {
+        return "other";
       }
     }
-    const Loud = new Module((mod) => {
-      mod.defineMethod("greet", function (this: Greeter, name: string): string {
-        return `${String(Loud.superMethod(this, "greet")!(name))}!`;
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object, name: string) {
+        return `module > ${mod.superMethod(this, "greet")!(name)}`;
       });
     });
-    Loud.prependFeatures(Greeter);
+    prepend(Klass, mod);
 
-    expect(new Greeter().greet("a")).toBe("hello a!");
-    expect(Object.hasOwn(Greeter.prototype, "greet")).toBe(true);
+    expect(new Klass().greet("a")).toBe("module > class a");
+    expect(new Klass().other()).toBe("other");
+    expect(Object.prototype.hasOwnProperty.call(Klass.prototype, "greet")).toBe(false);
   });
 
-  it("a later prepend runs first and each super resumes beneath its own module", () => {
-    class Greeter {
+  it("puts a later prepend above an earlier one, and a later include beneath the class", () => {
+    class Klass {
       greet(): string {
         return "class";
       }
     }
-    const First = new Module((mod) => {
-      mod.defineMethod("greet", function (this: Greeter): string {
-        return `first(${String(First.superMethod(this, "greet")!())})`;
+    const first: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `first > ${first.superMethod(this, "greet")!()}`;
       });
     });
-    const Second = new Module((mod) => {
-      mod.defineMethod("greet", function (this: Greeter): string {
-        return `second(${String(Second.superMethod(this, "greet")!())})`;
+    const second: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return `second > ${second.superMethod(this, "greet")!()}`;
       });
     });
-    First.prependFeatures(Greeter);
-    Second.prependFeatures(Greeter);
+    const beneath: Module = new Module((m) => {
+      m.defineMethod("greet", () => "included");
+    });
+    prepend(Klass, first);
+    prepend(Klass, second);
+    include(Klass, beneath);
 
-    expect(new Greeter().greet()).toBe("second(first(class))");
+    expect(new Klass().greet()).toBe("second > first > class");
   });
 
-  it("a module included after the prepend sits beneath the class's own method", () => {
-    class Greeter {
+  it("answers no super method where neither the class nor an ancestor defines one", () => {
+    class Klass {}
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet");
+      });
+    });
+    prepend(Klass, mod);
+
+    expect((new Klass() as unknown as DynMethods).greet()).toBeUndefined();
+  });
+
+  it("keeps a subclass constructor chain when prepended onto a class's singleton", () => {
+    class Parent {
+      static build(): string {
+        return "parent";
+      }
+    }
+    class Child extends Parent {
+      static build(): string {
+        return "child";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("build", function (this: object) {
+        return `module > ${mod.superMethod(this, "build")!()}`;
+      });
+    });
+    prepend({ prototype: Child } as never, mod);
+
+    expect(Child.build()).toBe("module > child");
+    expect(new Child()).toBeInstanceOf(Parent);
+    expect(rbClassSuperclass(Child)).toBe(Parent);
+    expect(methodOwner(Child, "build")).toBe(mod);
+  });
+
+  it("answers the class as the owner of a method moved to its origin", () => {
+    class Parent {}
+    class Klass extends Parent {
       greet(): string {
         return "class";
       }
     }
-    const Wrapper = new Module((mod) => {
-      mod.defineMethod("greet", function (this: Greeter): string {
-        return `prepended(${String(Wrapper.superMethod(this, "greet")!())})`;
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet")!();
       });
     });
-    const Fallback = new Module((mod) => {
-      mod.defineMethod("greet", () => "included");
-    });
-    Wrapper.prependFeatures(Greeter);
-    include(Greeter, Fallback);
+    prepend(Klass, mod);
 
-    expect(new Greeter().greet()).toBe("prepended(class)");
+    const origin = Object.getPrototypeOf(Object.getPrototypeOf(Klass.prototype)) as object;
+    expect(methodOwner(Klass.prototype, "greet")).toBe(mod);
+    expect(methodOwner(origin, "greet")).toBe(Klass);
+    expect(rbClassSuperclass(Klass)).toBe(Parent);
+    expect(Object.getPrototypeOf(origin)).toBe(Parent.prototype);
+  });
+
+  it("raises where the class's own property of a module name cannot be moved", () => {
+    class Klass {}
+    Object.defineProperty(Klass.prototype, "greet", { value: () => "class" });
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+
+    expect(() => prepend(Klass, mod)).toThrow("prepend: cannot move greet");
+  });
+
+  it("leaves a method assigned to the class after the prepend above the module", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+    prepend(Klass, mod);
+    (Klass.prototype as unknown as DynMethods).greet = () => "reopened";
+
+    expect(new Klass().greet()).toBe("reopened");
   });
 });

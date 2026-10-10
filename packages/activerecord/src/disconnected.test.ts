@@ -21,7 +21,7 @@ describe.skipIf(inMemoryDb())("TestDisconnectedAdapter", () => {
     if (adapterType === "sqlite") {
       return sqlite._rawConnection?.isOpen() ? sqlite._rawConnection : null;
     }
-    return (conn as unknown as { _connection: unknown })._connection;
+    return (conn as unknown as { _rawConnection: unknown })._rawConnection;
   }
 
   it("reconnects to execute statements when disconnected", async () => {

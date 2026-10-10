@@ -32,7 +32,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_kept", "id INTEGER PRIMARY KEY, name varchar(255)");
     await createSdhTable("sdh_other");
 
-    const output = await dumpTableSchema(adapter, "sdh_kept");
+    const output = await dumpTableSchema("sdh_kept");
 
     expect(output).toContain("sdh_kept");
     expect(output).not.toContain("sdh_other");
@@ -43,7 +43,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_b");
     await createSdhTable("sdh_c");
 
-    const output = await dumpTableSchema(adapter, "sdh_a", "sdh_c");
+    const output = await dumpTableSchema("sdh_a", "sdh_c");
 
     expect(output).toContain("sdh_a");
     expect(output).toContain("sdh_c");
@@ -54,7 +54,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_kept");
     const before = SchemaDumper.ignoreTables;
 
-    await dumpTableSchema(adapter, "sdh_kept");
+    await dumpTableSchema("sdh_kept");
 
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
@@ -65,7 +65,7 @@ describe("SchemaDumpingHelper", () => {
     await createSdhTable("sdh_kept");
     const columns = vi.spyOn(adapter, "columns").mockRejectedValue(boom);
 
-    await expect(dumpTableSchema(adapter, "sdh_kept")).rejects.toThrow(boom);
+    await expect(dumpTableSchema("sdh_kept")).rejects.toThrow(boom);
     columns.mockRestore();
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
