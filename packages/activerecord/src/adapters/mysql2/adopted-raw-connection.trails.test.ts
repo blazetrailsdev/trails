@@ -6,12 +6,13 @@ import {
   MYSQL_TEST_URL,
 } from "../abstract-mysql-adapter/test-helper.js";
 import { deprecator } from "../../deprecator.js";
+import { mysql2Client } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter adopts a raw connection it was handed (trails)", () => {
   it("runs a statement on the client the caller built", async () => {
     const client = await mysql.createConnection(MYSQL_TEST_URL);
     const warn = vi.spyOn(deprecator(), "warn").mockImplementation(() => undefined);
-    const adapter = new Mysql2Adapter(client as never);
+    const adapter = new Mysql2Adapter(mysql2Client(client));
     warn.mockRestore();
     try {
       expect(Number(await adapter.selectValue("SELECT 1"))).toBe(1);

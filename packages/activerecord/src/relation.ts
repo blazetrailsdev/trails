@@ -1599,9 +1599,7 @@ export class Relation<T extends Base, G extends boolean = false> {
 
       await this.withConnection(async (c) => {
         const column = c.visitor.compile(this.table.get(timestampColumn));
-        const selectValues = `COUNT(*) AS ${(
-          this.model.adapterClass() as unknown as { quoteColumnName(name: string): string }
-        ).quoteColumnName("size")}, MAX(%s) AS timestamp`;
+        const selectValues = `COUNT(*) AS ${this.model.adapterClass().quoteColumnName("size")}, MAX(%s) AS timestamp`;
 
         let arel: unknown;
         if (collection.hasLimitOrOffset) {

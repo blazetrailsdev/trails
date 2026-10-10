@@ -76,6 +76,12 @@ describe("SqliteDriver — better-sqlite3 round-trip", () => {
     expect(await select.get(["sprocket"])).toMatchObject({ name: 42 });
   });
 
+  it("bindParams binds an integer-valued number as SQLITE_INTEGER and a boxed Float as REAL", async () => {
+    const select = await driver.prepare("SELECT typeof(?), typeof(?), typeof(?)");
+    select.bindParams([42, new Number(42) as number, 4.2]);
+    expect(await select.toA()).toEqual([["integer", "real", "real"]]);
+  });
+
   it("returns all rows", async () => {
     const select = await driver.prepare("SELECT id, name, qty FROM widgets ORDER BY id");
     const rows = (await select.all()) as Record<string, unknown>[];

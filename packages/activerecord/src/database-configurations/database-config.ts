@@ -1,5 +1,6 @@
 import { NotImplementedError } from "../errors.js";
 import { ActiveRecord, ConnectionAdapters } from "../namespaces.js";
+import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 export interface DatabaseConfigOptions {
   adapter?: string;
   database?: string;
@@ -31,7 +32,7 @@ export interface DatabaseConfigOptions {
 export class DatabaseConfig {
   readonly envName: string;
   readonly name: string;
-  #adapterClass: (new (...args: any[]) => unknown) | null;
+  #adapterClass: typeof AbstractAdapter | null;
 
   constructor(envName: string, name: string) {
     this.envName = envName;
@@ -39,7 +40,7 @@ export class DatabaseConfig {
     this.#adapterClass = null;
   }
 
-  adapterClass(): new (...args: any[]) => unknown {
+  adapterClass(): typeof AbstractAdapter {
     return (this.#adapterClass ||= ConnectionAdapters.resolve(this.adapter));
   }
 

@@ -109,7 +109,7 @@ describe("AbstractAdapter connection lifecycle privates", () => {
 describe("AbstractAdapter#databaseExists", () => {
   it("proves the database by connecting, not by a cached handle", async () => {
     const a = new AbstractAdapter({});
-    expect((a as any)._connection).toBe(null);
+    expect((a as any)._rawConnection).toBe(null);
     expect(await a.databaseExists()).toBe(true);
   });
 
@@ -118,7 +118,7 @@ describe("AbstractAdapter#databaseExists", () => {
     a.connectBang = async () => {
       throw new NoDatabaseError("no such database");
     };
-    (a as any)._connection = {};
+    (a as any)._rawConnection = {};
     expect(await a.databaseExists()).toBe(false);
   });
 
@@ -186,7 +186,7 @@ describe("AbstractAdapter connection lifecycle critical sections", () => {
       "configure:enter",
       "configure:exit",
     ]);
-    expect((a as any)._connection).toEqual({ handle: 1 });
+    expect((a as any)._rawConnection).toEqual({ handle: 1 });
   });
 });
 

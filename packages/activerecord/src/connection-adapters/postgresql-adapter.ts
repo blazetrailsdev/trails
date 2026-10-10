@@ -65,7 +65,7 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { pgConnection, type PGConnection } from "../pg/connection.js";
+import { type PGConnection } from "../pg/connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -497,7 +497,7 @@ export class PostgreSQLAdapter
   constructor(config: (pg.PoolConfig & PostgreSQLAdapterOptions) | DatabaseConfigOptions);
   /** @deprecated */
   constructor(
-    rawConnection: pg.Client,
+    rawConnection: PGConnection,
     deprecatedLogger?: unknown,
     deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
@@ -527,7 +527,7 @@ export class PostgreSQLAdapter
   }
 
   override isConnected(): boolean {
-    return this._connection !== null && !this._rawConnectionFinished();
+    return this._rawConnection !== null && !this._rawConnectionFinished();
   }
 
   override async active(): Promise<boolean> {
@@ -1435,13 +1435,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  get _rawConnection(): PGConnection | null {
-    return this._connection as PGConnection | null;
-  }
-  /** @internal */
-  set _rawConnection(value: PGConnection | null) {
-    this._connection = value && pgConnection(value);
-  }
+  declare _rawConnection: PGConnection | null;
 
   private _captureRegtypeOids(records: PgTypeRow[]): void {
     for (const row of records) {

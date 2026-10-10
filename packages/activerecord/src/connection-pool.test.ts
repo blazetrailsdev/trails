@@ -79,7 +79,7 @@ function makePool(size: number = 5): ConnectionPool {
 class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAdapter {
   constructor() {
     super({});
-    this._connection = this;
+    this._rawConnection = this;
   }
   activeFlag = true;
   override async active(): Promise<boolean> {

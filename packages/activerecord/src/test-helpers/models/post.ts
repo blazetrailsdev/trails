@@ -27,6 +27,7 @@ import type { ColumnLike } from "../../model-schema.js";
 import { ScopeRegistry } from "../../scoping.js";
 import { DelegateCache } from "../../relation/delegation.js";
 import { registerModel } from "../../associations.js";
+import type { AbstractAdapter } from "../../connection-adapters/abstract-adapter.js";
 import type { Comment } from "./comment.js";
 import type { Tagging } from "./tagging.js";
 
@@ -994,7 +995,7 @@ export class FakeKlass {
     return ScopeRegistry.instance();
   }
 
-  static adapterClass(): unknown {
+  static adapterClass(): typeof AbstractAdapter {
     return Post.adapterClass();
   }
 

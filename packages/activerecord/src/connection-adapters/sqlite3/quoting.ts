@@ -19,7 +19,7 @@ import {
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
-import { isFinite, toS } from "@blazetrails/ruby-compat";
+import { isFinite, Rational, toF, toS } from "@blazetrails/ruby-compat";
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || value instanceof BigDecimal) {
@@ -81,13 +81,12 @@ export function quoteDefaultExpression(
   return abstractQuoteDefaultExpression.call(this, value, column);
 }
 
-/** @inventedArm if — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
-  if (typeof value === "number") return Number.isInteger(value) ? BigInt(value) : value;
-  if (value instanceof BigDecimal) return Number(value.toString("F"));
-  return abstractTypeCast.call(this, value);
+  if (value instanceof BigDecimal || value instanceof Rational) {
+    return toF(value);
+  } else {
+    return abstractTypeCast.call(this, value);
+  }
 }
 
 export function columnNameMatcher(): RegExp {

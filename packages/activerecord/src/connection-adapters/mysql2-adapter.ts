@@ -31,7 +31,7 @@ import {
   performQuery as mysql2PerformQuery,
   selectAll as mysql2SelectAll,
 } from "./mysql2/database-statements.js";
-import { Mysql2, mysql2Client, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
+import { Mysql2, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
 import { defaultTimezone } from "../active-record.js";
 
 let mysql2TypeMap: TypeMap | null = null;
@@ -90,7 +90,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   );
   /** @deprecated */
   constructor(
-    rawConnection: mysql.Connection,
+    rawConnection: Mysql2Client,
     deprecatedLogger?: unknown,
     deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
@@ -281,13 +281,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  get _rawConnection(): Mysql2Client | null {
-    return this._connection as Mysql2Client | null;
-  }
-  /** @internal */
-  set _rawConnection(value: mysql.Connection | Mysql2Client | null) {
-    this._connection = value && mysql2Client(value);
-  }
+  declare _rawConnection: Mysql2Client | null;
 
   /** @internal */
   _clientForTest(): Mysql2Client | null {
