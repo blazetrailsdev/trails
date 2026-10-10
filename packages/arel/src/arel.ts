@@ -1,3 +1,4 @@
+import { rbScanArgs } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import { Node } from "./nodes/node.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
@@ -8,23 +9,15 @@ export type ArelNode = Node | Attribute | SqlLiteral;
 
 export function sql(sqlString: string, options?: { retryable: boolean }): SqlLiteral;
 export function sql(sqlString: string, ...positionalBinds: unknown[]): SqlLiteral | BoundSqlLiteral;
-/** @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer */
 export function sql(
   sqlString: string,
   ...positionalBinds: unknown[]
 ): SqlLiteral | BoundSqlLiteral {
-  let retryable = false;
-  let namedBinds: Record<string, unknown> = {};
-  const last = positionalBinds[positionalBinds.length - 1];
-  if (last !== null && typeof last === "object" && last.constructor === Object) {
-    positionalBinds.pop();
-    const { retryable: retryableBind, ...rest } = last as {
-      retryable?: boolean;
-      [key: string]: unknown;
-    };
-    retryable = retryableBind ?? false;
-    namedBinds = rest;
-  }
+  let retryable: boolean, namedBinds: Record<string, unknown>;
+  [positionalBinds, { retryable = false, ...namedBinds }] = rbScanArgs<{
+    retryable?: boolean;
+    [key: string]: unknown;
+  }>(positionalBinds);
   if (positionalBinds.length === 0 && Object.keys(namedBinds).length === 0) {
     return new SqlLiteral(sqlString, { retryable });
   } else {
