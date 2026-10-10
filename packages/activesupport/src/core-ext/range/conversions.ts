@@ -10,6 +10,7 @@ declare module "@blazetrails/ruby-compat/range" {
   }
 }
 
+/** @noRailsEquivalent CONVERGEABLE range-formats-db-keeps-a-helper-because-a-number-has-no-to-fs-seat */
 function toFsDb(value: unknown): string {
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   return rbFSend(value, "toFs", "db") as string;
