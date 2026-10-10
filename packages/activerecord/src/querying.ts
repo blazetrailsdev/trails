@@ -236,7 +236,9 @@ export function _loadFromSql<T extends typeof Base>(
     if (resultSet.includesColumn(this.inheritanceColumn)) {
       return resultSet.indexedRows.map((record) => this.instantiate(record, columnTypes, block));
     } else {
-      return resultSet.indexedRows.map((record) => this._instantiate(record, block, columnTypes));
+      return resultSet.indexedRows.map((record) =>
+        this.instantiateInstanceOf(this, record, columnTypes, block),
+      );
     }
   });
 }

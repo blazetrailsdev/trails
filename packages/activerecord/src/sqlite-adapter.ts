@@ -39,6 +39,7 @@ export interface SqliteConnection {
     bindVars: SqliteBinds | undefined,
     block: ((row: unknown) => void) | undefined,
   ): readonly unknown[] | null | Promise<readonly unknown[] | null>;
+  rollback(): true | Promise<true>;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown | Promise<unknown>;
   pragma(source: string, opts?: { simple?: boolean }): unknown | Promise<unknown>;
   changes(): number | Promise<number>;
@@ -72,6 +73,7 @@ export interface SyncSqliteConnection {
     bindVars: SqliteBinds | undefined,
     block: ((row: unknown) => void) | undefined,
   ): readonly unknown[] | null;
+  rollback(): true;
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown;
   pragma(source: string, opts?: { simple?: boolean }): unknown;
   changes(): number;

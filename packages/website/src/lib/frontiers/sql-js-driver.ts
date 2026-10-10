@@ -114,6 +114,11 @@ class SqlJsConnection implements SyncSqliteConnection {
     this.raw.exec(sql);
   }
 
+  rollback(): true {
+    this.execute("rollback transaction");
+    return true;
+  }
+
   execute(sql: string, bindVars?: SqliteBinds): readonly unknown[];
   execute(
     sql: string,

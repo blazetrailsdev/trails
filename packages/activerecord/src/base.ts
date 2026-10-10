@@ -1323,6 +1323,9 @@ export class Base extends Model {
     return _Persistence.instantiate.call(this, attributes, columnTypes, block);
   }
 
+  /** @internal */
+  static instantiateInstanceOf = _Persistence.instantiateInstanceOf;
+
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
   declare static countBySql: typeof Querying.countBySql;
@@ -1457,24 +1460,6 @@ export class Base extends Model {
     } finally {
       _Core._allocation.klass = previous;
     }
-  }
-
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown> | IndexedRow,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = this.discriminateClassForRecord(row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
   _newRecord = true;

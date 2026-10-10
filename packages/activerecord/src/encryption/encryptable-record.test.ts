@@ -563,7 +563,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
     const rawValues = book._attributes.valuesForDatabase();
 
-    const loadedBook = Book._instantiate(rawValues);
+    const loadedBook = Book.instantiate(rawValues);
 
     expect(loadedBook.name).toBe("Dune");
   });

@@ -80,7 +80,7 @@ describe("namespaced STI hydration goes through the single instantiate path", ()
   fixtures([]);
 
   it("terminates on the namespaced subclass instead of re-dispatching", () => {
-    const record = ClothingItemSized._instantiate({
+    const record = ClothingItemSized.instantiate({
       id: "5",
       clothing_type: "pants",
       color: "blue",

@@ -39,11 +39,6 @@ import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
-  _instantiate(
-    row: Record<string, unknown> | IndexedRow,
-    block?: (record: any) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): any;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
@@ -53,6 +48,13 @@ interface PersistenceHost {
   ensureSchemaLoaded(): Promise<void>;
   /** @internal */
   discriminateClassForRecord(record: Record<string, unknown> | IndexedRow): typeof Base;
+  /** @internal */
+  instantiateInstanceOf(
+    klass: typeof Base,
+    attributes: Record<string, unknown> | IndexedRow,
+    columnTypes?: Record<string, unknown>,
+    block?: (r: any) => void,
+  ): any;
 }
 
 export async function create(
@@ -122,7 +124,7 @@ export function instantiate(
   block?: (record: any) => void,
 ): any {
   const klass = this.discriminateClassForRecord(attributes);
-  return instantiateInstanceOf(klass, attributes, columnTypes, block);
+  return this.instantiateInstanceOf(klass, attributes, columnTypes, block);
 }
 
 export class ClassMethods {
@@ -1089,6 +1091,7 @@ export function _raiseRecordNotTouchedError(): never {
  * @inventedArm defineAttributeMethod — PERMANENT
  */
 export function instantiateInstanceOf(
+  this: PersistenceHost,
   klass: typeof Base,
   attributes: Record<string, unknown> | IndexedRow,
   columnTypes: Record<string, unknown> = {},
