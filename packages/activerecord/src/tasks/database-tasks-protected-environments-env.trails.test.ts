@@ -301,3 +301,28 @@ describe("PendingMigrationError message", () => {
     );
   });
 });
+
+describe("DatabaseTasks.env", () => {
+  const trails = TopLevel.Trails;
+  const env = DatabaseTasks.env;
+
+  afterEach(() => {
+    TopLevel.Trails = trails;
+    DatabaseTasks.env = env;
+  });
+
+  it("memoizes Trails.env itself and finds its configs through it", () => {
+    const inquirer = new EnvironmentInquirer("staging");
+    TopLevel.Trails = { env: inquirer } as unknown as typeof TopLevel.Trails;
+    DatabaseTasks.env = null;
+
+    expect(DatabaseTasks.env).toBe(inquirer);
+
+    const configurations = new DatabaseConfigurations({
+      staging: { adapter: "sqlite3", database: "db/staging.sqlite3" },
+      test: { adapter: "sqlite3", database: "db/test.sqlite3" },
+    });
+    const configs = configurations.configsFor({ envName: DatabaseTasks.env });
+    expect(configs.map((dbConfig) => dbConfig.envName)).toEqual(["staging"]);
+  });
+});
