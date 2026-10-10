@@ -32,9 +32,7 @@ describe("ambiguous-parent mark", () => {
     expect(failure).toContain("ambiguous-parent gate: 1 STALE mark dimension(s)");
     expect(failure).toContain("pnpm parity:api:parents:tighten");
     expect(failure).toContain("rack  total: mark 5 → current 1");
-    expect(
-      staleMarkFailure("ambiguous-parent gate", "t", staleMarks({ rack: 1 }, { rack: 1 })),
-    ).toBeNull();
+    expect(staleMarks({ rack: 1 }, { rack: 1 })).toEqual([]);
   });
 
   it("tightens DOWN only, and drops a package that converged to zero", () => {
