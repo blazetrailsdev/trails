@@ -5,6 +5,7 @@ import type { Base } from "./base.js";
 
 export { hasSecurePassword };
 
+/** @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass */
 export async function authenticateBy(
   this: typeof Base,
   attributes: Record<string, unknown> | { toH(): Record<string, unknown> },

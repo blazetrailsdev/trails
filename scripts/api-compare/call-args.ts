@@ -31,12 +31,12 @@ import {
 // Leading underscore included: Rails spells plenty of private method names
 // `_ensure_no_duplicate_errors`, and those are names the port renames by
 // convention exactly as any other identifier-shaped value is.
-const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
+export const IDENTIFIER_STRING = /^_?[a-z][A-Za-z0-9_]*$/;
 
 /** Ruby conversions the extractor records as the CALL with the receiver
  *  dropped, leaving no rename signal on the Ruby side at all — see
  *  {@link refKeysEqual}. */
-const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
+export const RECEIVER_DROPPING_CONVERSIONS = new Set(["toS", "toSym"]);
 
 /** Descriptors that carry no comparable value (RFC 0095 §1). Their presence
  *  anywhere in an argument list — INCLUDING nested inside a `kwargs{}` — makes

@@ -209,7 +209,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
       this._config.strict = SQLite3Adapter.strictStringsByDefault;
     }
     this._connectionParameters = merge(this._config as SQLite3Config, {
-      database: rbObjAsString(this._config.database),
+      database: (this._config.database as string).toString(),
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
     });

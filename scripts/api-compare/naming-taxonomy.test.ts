@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyPair,
+  differingRefPairs,
   classifyRow,
   refName,
   JS_RESERVED_WORDS,
@@ -193,5 +194,17 @@ describe("the taxonomy itself", () => {
     expect(refName("ref:foo")).toBe("foo");
     expect(refName("const:Foo")).toBeUndefined();
     expect(JS_RESERVED_WORDS.has("default")).toBe(true);
+  });
+});
+
+describe("differingRefPairs receiver-dropping conversions", () => {
+  // sqlite3_adapter.rb:128-129 `@config.merge(database: @config[:database].to_s, …)`.
+  it("does not file a nested to_s against the port's toString as a rename", () => {
+    expect(
+      differingRefPairs(
+        ["ref:config", "kwargs{database=ref:toS,resultsAsHash=bool:true}"],
+        ["ref:_config", "kwargs{database=ref:toString,resultsAsHash=bool:true}"],
+      ),
+    ).toEqual([["config", "_config"]]);
   });
 });

@@ -122,6 +122,11 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
+/**
+ * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ * @inventedArm loop — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ */
 export function find(this: FinderRelation, block: (record: any) => unknown): Promise<any>;
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
@@ -217,7 +222,11 @@ export async function takeBang(this: FinderRelation): Promise<any> {
   return (await take.call(this)) || raiseRecordNotFoundExceptionBang.call(this);
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ */
 export async function findNthWithLimit(
   this: FinderRelation,
   index: number,
@@ -379,11 +388,9 @@ export function raiseRecordNotFoundExceptionBang(
   key ??= this.model.primaryKey;
 
   if (ids === undefined || ids === null) {
-    throw new RecordNotFound(
-      `Couldn't find ${name}${conditions ? ` with${conditions}` : ""}`,
-      name,
-      key,
-    );
+    let error = `Couldn't find ${name}`;
+    if (conditions) error += ` with${conditions}`;
+    throw new RecordNotFound(error, name, key);
   }
 
   if (wrap(ids).length === 1) {
@@ -533,7 +540,10 @@ export function usingLimitableReflections(
   return reflections.every((r) => !r.isCollection());
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
+ */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
@@ -630,6 +640,7 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
 /**
  * @internal
  * @missingRailsName size — PERMANENT
+ * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
  */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   ids =

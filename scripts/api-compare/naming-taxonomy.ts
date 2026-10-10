@@ -17,6 +17,7 @@
  */
 import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/conventions";
 import { RUBY_COMPAT_EXPORTS } from "../parity/ruby-compat.js";
+import { IDENTIFIER_STRING, RECEIVER_DROPPING_CONVERSIONS } from "./call-args.js";
 
 export type NamingClass =
   | "js-reserved-word"
@@ -288,6 +289,11 @@ function kwargEntries(descriptor: string): Map<string, string> {
  * Every (ruby, ts) identifier pair two argument lists differ on: a `ref:`
  * against a `ref:` at the same position, or under the same key of two
  * `kwargs{…}` at the same position.
+ *
+ * A `to_s` / `to_sym` against any identifier is not one: call-args.ts'
+ * `refKeysEqual` already holds the two equal, so the pair only reaches here
+ * riding a row some OTHER argument opened (sqlite3_adapter.rb:128-129,
+ * `@config.merge(database: @config[:database].to_s, …)`).
  */
 export function differingRefPairs(rubyArgs: string[], tsArgs: string[]): [string, string][] {
   const pairs: [string, string][] = [];
@@ -303,7 +309,9 @@ export function differingRefPairs(rubyArgs: string[], tsArgs: string[]): [string
     }
     const r = refName(rubyArg);
     const t = refName(tsArg);
-    if (r !== undefined && t !== undefined && r !== t) pairs.push([r, t]);
+    if (r === undefined || t === undefined || r === t) continue;
+    if (RECEIVER_DROPPING_CONVERSIONS.has(r) && IDENTIFIER_STRING.test(t)) continue;
+    pairs.push([r, t]);
   }
   return pairs;
 }
