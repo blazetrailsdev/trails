@@ -1,5 +1,6 @@
 import {
   Enumerable,
+  groupBy as enumGroupBy,
   Hash,
   hashAref,
   numericPlus,
@@ -212,12 +213,12 @@ export function inOrderOf<T>(
 ): T[] {
   const filter = options.filter !== false;
   if (filter) {
-    return valuesAt(groupBy(collection, key), ...series)
+    return valuesAt(enumGroupBy(collection, key), ...series)
       .flat(1)
       .filter((v): v is T => v != null);
   } else {
     const position = (v: T): number => {
-      const index = series.indexOf(key(v));
+      const index = series.findIndex((s) => rbEqual(s, key(v)));
       return index === -1 ? series.length : index;
     };
     return [...collection].sort((a, b) => position(a) - position(b)).filter((v) => v != null);

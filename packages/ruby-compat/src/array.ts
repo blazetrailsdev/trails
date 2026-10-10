@@ -6,7 +6,8 @@ import { Hash, rbBlockGivenP } from "./hash.js";
 import { IndexError } from "./index-error.js";
 import { warn } from "./kernel-warn.js";
 import { rbBigNorm } from "./numeric.js";
-import { conversionMismatch, rbBuiltinClassName, toS } from "./object.js";
+import { NoMethodError } from "./no-method-error.js";
+import { conversionMismatch, rbBuiltinClassName, rbObjClassname, toS } from "./object.js";
 import { Range } from "./range.js";
 import { checkArity, num2long } from "./string/support.js";
 import { TypeError } from "./type-error.js";
@@ -595,12 +596,21 @@ export function aryPop<T>(ary: T[], n: number): T[] {
  * Ruby `Array#first` with no argument (`vendor/ruby/v3.3.11/array.c:1901` `ary_first`):
  * the first element, or `nil` for an empty array. Any other enumerable is
  * `Enumerable#first` (`vendor/ruby/v3.3.11/enum.c:1284` `enum_first`), whose
- * `first_i` (`enum.c:1245`) breaks out of `each` at the first element.
+ * `first_i` (`enum.c:1245`) breaks out of `each` at the first element. A
+ * receiver that is neither raises `NoMethodError` (`rb_method_missing`,
+ * `vendor/ruby/v3.3.11/vm_eval.c:869`).
  *
  * @noRailsEquivalent PERMANENT
  */
 export function first<T>(ary: Iterable<T>): T | undefined {
   if (Array.isArray(ary)) return ary[0];
+  if (typeof (ary as Partial<Iterable<T>> | null)?.[Symbol.iterator] !== "function") {
+    throw new NoMethodError(
+      ary == null
+        ? "undefined method 'first' for nil"
+        : `undefined method 'first' for an instance of ${rbObjClassname(ary)}`,
+    );
+  }
   for (const i of ary) {
     return i;
   }
@@ -726,8 +736,23 @@ export function groupBy<T, K>(ary: readonly T[], block: (item: T) => K): Hash<K,
  *
  * @noRailsEquivalent PERMANENT
  */
-export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, V> {
-  const hash = new Hash<K, V>();
+export function toH<K = unknown, V = unknown>(ary: readonly unknown[]): Hash<K, V>;
+/**
+ * The `to_h` send for any other receiver: its own `toH`, and a plain object,
+ * which is a Hash, answers itself (`vendor/ruby/v3.3.11/hash.c:3018` `rb_hash_to_h`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function toH<T extends object>(obj: T | { toH(): T }): T;
+/** @noRailsEquivalent PERMANENT — Ruby core `rb_ary_to_h` (`vendor/ruby/v3.3.11/array.c:2988`). */
+export function toH(ary: object): unknown {
+  if (!Array.isArray(ary)) {
+    if (typeof (ary as { toH?: unknown }).toH === "function") {
+      return (ary as { toH(): unknown }).toH();
+    }
+    return ary;
+  }
+  const hash = new Hash<unknown, unknown>();
   for (let i = 0; i < ary.length; i++) {
     const keyValuePair = ary[i];
     if (!Array.isArray(keyValuePair)) {

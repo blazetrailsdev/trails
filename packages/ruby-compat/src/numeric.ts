@@ -204,6 +204,23 @@ export function isNan(obj: unknown): boolean {
 }
 
 /**
+ * Ruby's `obj.finite?` send: `Float#finite?` (`vendor/ruby/v3.3.11/numeric.c:2022`
+ * `rb_flo_is_finite_p`) over the `number` seat, `Numeric#finite?`
+ * (`vendor/ruby/v3.3.11/numeric.rb:38`) for an Integer, else the receiver's own `isFinite`
+ * (`BigDecimal#finite?`, `vendor/ruby/v3.3.11/ext/bigdecimal/bigdecimal.c:1229`).
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function isFinite(obj: unknown): boolean {
+  if (typeof obj === "number" || obj instanceof Number) return Number.isFinite(obj.valueOf());
+  if (typeof obj === "bigint") return true;
+  if (typeof (obj as { isFinite?: unknown } | null)?.isFinite === "function") {
+    return (obj as { isFinite(): boolean }).isFinite();
+  }
+  throw new NoMethodError(`undefined method 'finite?' for an instance of ${rbObjClassname(obj)}`);
+}
+
+/**
  * `RB_FLOAT_TYPE_P` (`vendor/ruby/v3.3.11/include/ruby/internal/value_type.h:263`)
  * over the Float seats `rbObjClassname` reads: a fractional `number`, or a boxed one.
  * @noRailsEquivalent PERMANENT
@@ -311,6 +328,8 @@ export function numericMinus(x: unknown, y: unknown): unknown {
     if (rbFloatTypeP(y)) return rbDbl2num(Number(x) - y.valueOf());
     if (y instanceof Rational)
       return new Rational(x, 1).add(new Rational(-y.numerator, y.denominator));
+  } else {
+    throw new NoMethodError(`undefined method '-' for an instance of ${rbObjClassname(x)}`);
   }
   throw new TypeError(`${rbBuiltinClassName(y)} can't be coerced into ${rbObjClassname(x)}`);
 }

@@ -587,6 +587,17 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
  * pool to scope against and skips it, as does a pool-less model, whose
  * `connection_pool` throws where Ruby's always answers.
  *
+ * Rails latches `@primary_key` at the first `primary_key` read
+ * (attribute_methods/primary_key.rb:80-81), where `get_primary_key` asks the
+ * current pool (`:101-108`). That read is synchronous here and only peeks, so
+ * a pool whose cache is cold answers the "id" convention. The warm above is
+ * the awaited half of that read, and `resetPrimaryKey` under `primary_key`'s
+ * own guard latches its answer while the cache is known warm. The guard is
+ * spelled out because the reader (`getPrimaryKeyAttr`) latches only after its
+ * own peek of the cache succeeds and answers the convention unlatched when it
+ * does not, so reading it here would not guarantee the latch. It retires with
+ * story `latch-primary-key-resolution-into-reset-primary-key-memo`.
+ *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
@@ -629,6 +640,9 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
+  if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
+    (this as unknown as typeof Base).resetPrimaryKey();
+  }
   this.loadSchemaBang();
 }
 

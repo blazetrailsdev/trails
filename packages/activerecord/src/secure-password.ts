@@ -1,22 +1,16 @@
 import { camelize } from "@blazetrails/activesupport";
 import { ArgumentError, hasSecurePassword } from "@blazetrails/activemodel";
-import { partition } from "@blazetrails/ruby-compat";
+import { partition, toH } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
 export { hasSecurePassword };
 
-/** @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass */
 export async function authenticateBy(
   this: typeof Base,
   attributes: Record<string, unknown> | { toH(): Record<string, unknown> },
 ): Promise<Base | null> {
-  const attrs =
-    typeof (attributes as { toH?: unknown }).toH === "function"
-      ? (attributes as { toH(): Record<string, unknown> }).toH()
-      : (attributes as Record<string, unknown>);
-
   const [passwords, identifiers] = partition(
-    Object.entries(attrs),
+    Object.entries(toH(attributes)),
     ([name]) => !this.hasAttribute(name) && this.hasAttribute(`${name}_digest`),
   ).map((pairs) => Object.fromEntries(pairs));
 

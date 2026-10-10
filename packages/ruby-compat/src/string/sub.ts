@@ -200,6 +200,46 @@ export function rbStrScan(self: StringReceiver, ...argv: unknown[]): unknown {
 }
 
 /**
+ * `String#scan` (`vendor/ruby/v3.3.11/string.c:10131` `rb_str_scan`) over a
+ * pattern that ends in a group calling itself,
+ * `head(?<name>(:?[^()]|\(\g<name>\))+)\)`, where `head` matches through the
+ * opening parenthesis. `\g<name>` is Onigmo's subexpression call (`TK_CALL`,
+ * `vendor/ruby/v3.3.11/regparse.c:3855`), which a JS `RegExp` cannot spell, so
+ * the balanced group is matched here and answered as the last capture.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbStrScanSubexpCall(str: string, head: RegExp): string[][] {
+  const pat = new RegExp(head.source, head.flags.replace(/[gy]/g, "") + "g");
+  const results: string[][] = [];
+  for (let md = pat.exec(str); md !== null; md = pat.exec(str)) {
+    const beg = md.index + md[0].length;
+    const end = subexpCall(str, beg);
+    if (end > beg && str[end] === ")") {
+      results.push([...md.slice(1), str.slice(beg, end)]);
+      pat.lastIndex = end + 1;
+    } else {
+      pat.lastIndex = md.index + 1;
+    }
+  }
+  return results;
+}
+
+function subexpCall(str: string, beg: number): number {
+  let p = beg;
+  while (p < str.length && str[p] !== ")") {
+    if (str[p] === "(") {
+      const end = subexpCall(str, p + 1);
+      if (end === p + 1 || str[end] !== ")") break;
+      p = end + 1;
+    } else {
+      p++;
+    }
+  }
+  return p;
+}
+
+/**
  * `String#match` (`vendor/ruby/v3.3.11/string.c:4577` `rb_str_match_m`, over
  * `rb_reg_match_m`): a `MatchData` from character offset `pos`, handed to the
  * block when one is given.

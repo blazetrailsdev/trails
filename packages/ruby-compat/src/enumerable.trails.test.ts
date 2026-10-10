@@ -297,3 +297,37 @@ describe("Enumerable#reduce", () => {
     expect(() => reduce([1, 2], 3)).toThrow(RbTypeError);
   });
 });
+
+describe("Enumerable#find", () => {
+  const find = (bag: object, ...argv: unknown[]) => Enumerable.find.call(bag as Bag, ...argv);
+
+  it("breaks out of each at the first element the block accepts", () => {
+    const bag = new Bag([1, 2, 3, 4]);
+    expect(find(bag, (i: number) => i > 1)).toBe(2);
+    expect(bag.yielded).toBe(2);
+  });
+
+  it("calls if_none when no element is found, and answers nil without one", () => {
+    expect(find(new Bag([1]), (i: number) => i > 1)).toBeNull();
+    expect(
+      find(
+        new Bag([1]),
+        () => "none",
+        (i: number) => i > 1,
+      ),
+    ).toBe("none");
+    expect(() => find(new Bag([1]), 3, () => false)).toThrow(
+      "undefined method 'call' for an instance of Integer",
+    );
+  });
+
+  it("checks its arity before it iterates", () => {
+    expect(() => find(new Bag([1]), 1, 2, () => true)).toThrow(
+      new ArgumentError("wrong number of arguments (given 2, expected 0..1)"),
+    );
+  });
+
+  it("answers a promise where each does", async () => {
+    await expect(find(new LazyBag([1, 2, 3]), (i: number) => i > 1)).resolves.toBe(2);
+  });
+});

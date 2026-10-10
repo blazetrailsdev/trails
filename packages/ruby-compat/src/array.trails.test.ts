@@ -734,3 +734,17 @@ describe("aryJoin", () => {
     expect(() => aryJoin(ary)).toThrow("recursive array join");
   });
 });
+
+describe("the first and to_h sends on a receiver that is not an Array", () => {
+  it("first raises NoMethodError for a receiver with no each", () => {
+    expect(() => first(1 as never)).toThrow("undefined method 'first' for an instance of Integer");
+    expect(() => first(null as never)).toThrow("undefined method 'first' for nil");
+    expect(first(new Set([7, 8]))).toBe(7);
+  });
+
+  it("to_h answers the receiver's own toH, and a plain object itself", () => {
+    const hash = { a: 1 };
+    expect(toH(hash)).toBe(hash);
+    expect(toH({ toH: () => hash })).toBe(hash);
+  });
+});

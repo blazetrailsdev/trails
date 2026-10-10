@@ -741,17 +741,6 @@ export class Base extends Model {
       state._schemaLoadPromise = undefined;
       throw e;
     }
-    if (ModelSchema.isSchemaLoaded.call(this as never) && this._primaryKey === undefined) {
-      const base = this.baseClass;
-      const table = base.tableName as string;
-      if (
-        base.primaryKeyPrefixType == null &&
-        base.connectionPool().schemaReflection.loadedCache?.getCachedPrimaryKeys?.(table) ===
-          undefined
-      ) {
-        await base.schemaCache().primaryKeys(table);
-      }
-    }
   }
 
   /**

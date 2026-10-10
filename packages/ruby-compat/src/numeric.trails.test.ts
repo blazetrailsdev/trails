@@ -9,6 +9,7 @@ import {
   anybits,
   fixDiv,
   fixMod,
+  isFinite,
   isNan,
   numericMinus,
   numericUminus,
@@ -192,6 +193,23 @@ describe("#nan?", () => {
     expect(isNan(new Number(1))).toBe(false);
     expect(isNan({ isNan: () => true })).toBe(true);
     expect(() => isNan(null)).toThrow("undefined method 'nan?' for an instance of NilClass");
+  });
+});
+
+describe("#finite?", () => {
+  it("dispatches on the receiver the way a Ruby send does", () => {
+    expect(isFinite(1.5)).toBe(true);
+    expect(isFinite(Infinity)).toBe(false);
+    expect(isFinite(NaN)).toBe(false);
+    expect(isFinite(3n)).toBe(true);
+    expect(isFinite({ isFinite: () => false })).toBe(false);
+    expect(() => isFinite("1")).toThrow("undefined method 'finite?' for an instance of String");
+  });
+});
+
+describe("#-", () => {
+  it("raises NoMethodError for a receiver that is not Numeric", () => {
+    expect(() => numericMinus("asdf", 1)).toThrow("undefined method '-' for an instance of String");
   });
 });
 

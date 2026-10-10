@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  find,
   findOne,
   findWithIds,
   findSome,
@@ -32,6 +33,22 @@ describe("findWithIds — composite primary key", () => {
       [1, 2],
       [1n, 3],
     ]);
+  });
+});
+
+describe("find — with a block", () => {
+  const rel: any = { each: (fn: (i: number) => void) => Promise.resolve([1, 2, 3].forEach(fn)) };
+
+  it("is Enumerable#find over each", async () => {
+    await expect(find.call(rel, (i: number) => i > 1)).resolves.toBe(2);
+    await expect(find.call(rel, (i: number) => i > 3)).resolves.toBeNull();
+    await expect(
+      find.call(
+        rel,
+        () => "none",
+        (i: number) => i > 3,
+      ),
+    ).resolves.toBe("none");
   });
 });
 
