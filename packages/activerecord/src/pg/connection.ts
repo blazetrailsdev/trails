@@ -93,11 +93,11 @@ export class Connection {
     listen(this, conn);
     this.prepared.clear();
     this.readyForQuery = "I";
-    this.client = conn;
     await client
       .end()
       .then(() => conn.connect())
       .catch((error: unknown) => Promise.reject(connectionBad(error)));
+    this.client = conn;
   }
 
   transactionStatus(): number {
