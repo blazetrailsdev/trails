@@ -268,8 +268,7 @@ export function _enum(
     const pairs: [string, EnumValue][] = !Array.isArray(values)
       ? Object.entries(values)
       : values.map((label, value) => [label, value]);
-    // eslint-disable-next-line prefer-const
-    for (let [label, value] of pairs) {
+    pairs.forEach(([label, value]) => {
       enumValues.set(label, value);
       label = toS(label);
 
@@ -296,7 +295,7 @@ export function _enum(
           instanceMethods,
         );
       }
-    }
+    });
   });
   if (scopes) this.detectNegativeEnumConditionsBang(valueMethodNames);
 
