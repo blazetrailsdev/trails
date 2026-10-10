@@ -41782,6 +41782,278 @@
   },
   {
     "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "add_column",
+    "digest": "1f8f45959c0c57ee",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "add_foreign_key",
+    "digest": "82267b4de335ae86",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "add_index",
+    "digest": "81cbc966484fa023",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "add_reference",
+    "digest": "1f8f45959c0c57ee",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "add_timestamps",
+    "digest": "6661fa2e9104139c",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "change",
+    "digest": "1f8f45959c0c57ee",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "change_column",
+    "digest": "598bf37ffc05c5e7",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "change_column_null",
+    "digest": "14ad53c3b742b985",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "column",
+    "digest": "1f8f45959c0c57ee",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "command_recorder",
+    "digest": "78c193116209ffbf",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "compatible_table_definition",
+    "digest": "12691c2e2163667a",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "compatible_timestamp_type",
+    "digest": "0fa8ab6dc073284e",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "create_join_table",
+    "digest": "5dd40bc8cbe26593",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "create_table",
+    "digest": "7649a56af7f5b3db",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "disable_extension",
+    "digest": "0ff1591159ee08b3",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "expression_column_name?",
+    "digest": "93a46effe353faf7",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "find",
+    "digest": "a2c6c88b84c11b8f",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "index",
+    "digest": "da2f3a8f35c8de66",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "index_exists?",
+    "digest": "5467e8ba111177fc",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "index_name_for_remove",
+    "digest": "616505cd7bf91710",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "index_name_options",
+    "digest": "e9832ec939d69a5d",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "index_options",
+    "digest": "236c4f6f206d1fef",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "invert_change_column_comment",
+    "digest": "33e6eae1472ee5eb",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "invert_change_table_comment",
+    "digest": "92ebc762a315015e",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "invert_transaction",
+    "digest": "4285b402c5eaf818",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "legacy_index_name",
+    "digest": "b73a7912f4092a17",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "new_column_definition",
+    "digest": "2334e1d9a54326d3",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "primary_key",
+    "digest": "c441180e55451543",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "raise_on_duplicate_column",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "raise_on_if_exist_options",
+    "digest": "c379738c3a38aa9c",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "references",
+    "digest": "1f8f45959c0c57ee",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "remove_index",
+    "digest": "ee830f58a042e585",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "rename_table",
+    "digest": "beade2454bf4f2a6",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
+    "rubyFile": "migration/compatibility.rb",
+    "rubyName": "timestamps",
+    "digest": "6661fa2e9104139c",
+    "ref": "v8.0.2",
+    "reason": "activerecord-verify-and-pin-migration-compatibility"
+  },
+  {
+    "package": "activerecord",
     "rubyFile": "migration/default_strategy.rb",
     "rubyName": "connection",
     "digest": "b909823245f234b0",

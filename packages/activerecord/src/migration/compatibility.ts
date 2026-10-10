@@ -1,5 +1,5 @@
 import { ArgumentError } from "@blazetrails/activemodel";
-import { isPresent } from "@blazetrails/activesupport";
+import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
   except,
   include,
@@ -66,7 +66,7 @@ export class V7_0 extends V7_1 {
     /** @internal */
     indexNameOptions(columnNames: string | string[]): Options {
       if (this.isExpressionColumnName(columnNames)) {
-        columnNames = (columnNames as string).match(/\w+/g)!.join("_");
+        columnNames = ((columnNames as string).match(/\w+/g) ?? []).join("_");
       }
 
       return { column: columnNames };
@@ -418,8 +418,12 @@ export class V5_1 extends V5_2 {
   ): Promise<void> {
     const connection = await this.connection;
     if (connection.adapterName === "PostgreSQL") {
-      const { default: _d, null: _n, comment: _c, ...except } = options;
-      await super.changeColumn(tableName, columnName, type, except);
+      await super.changeColumn(
+        tableName,
+        columnName,
+        type,
+        except(options as Options, "default", "null", "comment"),
+      );
       if (Object.hasOwn(options, "default")) {
         await connection.changeColumnDefault(tableName, columnName, options.default);
       }
@@ -493,14 +497,9 @@ export class V5_0 extends V5_1 {
       }
     }
 
-    if (
-      !(
-        (connection.adapterName === "Mysql2" || connection.adapterName === "Trilogy") &&
-        options.id === "bigint"
-      )
-    ) {
+    if (!(["Mysql2", "Trilogy"].includes(connection.adapterName) && options.id === "bigint")) {
       if (
-        (options.id === "integer" || options.id === "bigint") &&
+        (["integer", "bigint"] as unknown[]).includes(options.id) &&
         !Object.hasOwn(options, "default")
       ) {
         options.default = null;
@@ -524,7 +523,8 @@ export class V5_0 extends V5_1 {
       fn = options;
       options = undefined;
     }
-    const columnOptions = { type: "integer", ...options?.columnOptions };
+    const columnOptions = options?.columnOptions ?? {};
+    reverseMergeBang(columnOptions, { type: "integer" });
     await super.createJoinTable(table1, table2, { ...options, columnOptions }, fn);
   }
 
@@ -573,7 +573,7 @@ export class V4_2 extends V5_0 {
     references(super_: Super, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { ...options, index: options.index || false });
+      return super_(...args, { ...options, index: options.index ?? false });
     }
 
     belongsTo(super_: Super, ...args: unknown[]) {
@@ -594,7 +594,7 @@ export class V4_2 extends V5_0 {
     refName: string,
     options: Parameters<Current["addReference"]>[2] = {},
   ): Promise<void> {
-    options = { ...options, index: options.index || false };
+    options = { ...options, index: options.index ?? false };
     await super.addReference(tableName, refName, options);
   }
 
