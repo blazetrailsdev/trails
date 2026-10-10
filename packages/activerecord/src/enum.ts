@@ -2,10 +2,13 @@ import type { Base } from "./base.js";
 import {
   HashWithIndifferentAccess,
   camelize,
+  deepDup,
   underscore,
   isBlank,
+  isPlainObject,
   pluralize,
   presence,
+  upcaseFirst,
 } from "@blazetrails/activesupport";
 import { ArgumentError, RuntimeError, ValueType, defaultValue } from "@blazetrails/activemodel";
 import {
@@ -17,7 +20,6 @@ import {
   toS,
 } from "@blazetrails/ruby-compat";
 import {
-  dangerousAttributeMethods,
   isDangerousAttributeMethod,
   isDangerousClassMethod,
   isMethodDefinedWithin,
@@ -110,13 +112,15 @@ export class EnumType extends ValueType<string> {
 function enumMethodNamesFor(valueMethodName: string): {
   predicateName: string;
   bangName: string;
+  scopeName: string;
   notScopeName: string;
 } {
-  const capitalized = `${valueMethodName.charAt(0).toUpperCase()}${valueMethodName.slice(1)}`;
+  const scopeName = camelize(valueMethodName, false);
   return {
-    predicateName: `is${capitalized}`,
-    bangName: `${valueMethodName}Bang`,
-    notScopeName: `not${capitalized}`,
+    predicateName: `is${upcaseFirst(scopeName)}`,
+    bangName: `${scopeName}Bang`,
+    scopeName,
+    notScopeName: `not${upcaseFirst(scopeName)}`,
   };
 }
 
@@ -142,20 +146,28 @@ export class EnumMethods extends Module {
     instanceMethods: boolean,
   ): void {
     const klass = this.klass;
-    const { predicateName, bangName, notScopeName: notName } = enumMethodNamesFor(valueMethodName);
+    const { predicateName, bangName, scopeName, notScopeName } =
+      enumMethodNamesFor(valueMethodName);
     if (instanceMethods) {
+      klass.detectEnumConflictBang(name, predicateName);
       this.defineMethod(predicateName, function (this: EnumInstanceHost) {
         return (this as unknown as Record<string, unknown>)[`${name}ForDatabase`] === value;
       });
+
+      klass.detectEnumConflictBang(name, bangName);
       this.defineMethod(bangName, function (this: EnumInstanceHost) {
         return this.updateBang({ [name]: value });
       });
     }
+
     if (scopes) {
-      klass.scope(valueMethodName, function (this: any) {
+      klass.detectEnumConflictBang(name, scopeName, true);
+      klass.scope(scopeName, function (this: any) {
         return this.where({ [name]: value });
       });
-      klass.scope(notName, function (this: any) {
+
+      klass.detectEnumConflictBang(name, notScopeName, true);
+      klass.scope(notScopeName, function (this: any) {
         return this.where().not({ [name]: value });
       });
     }
@@ -163,8 +175,8 @@ export class EnumMethods extends Module {
 }
 
 export interface EnumMacroOptions {
-  prefix?: boolean | string;
-  suffix?: boolean | string;
+  prefix?: boolean | string | null;
+  suffix?: boolean | string | null;
   scopes?: boolean;
   instanceMethods?: boolean;
   validate?: boolean | Record<string, unknown>;
@@ -185,53 +197,44 @@ function enumMethod(
 
 export { enumMethod as enum };
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — PERMANENT
+ */
 export function _enum(
   this: typeof import("./base.js").Base,
   name: string,
-  values: string[] | Record<string, string | number | boolean | null>,
-  options?: EnumMacroOptions,
+  values: string[] | Record<string, EnumValue>,
+  {
+    prefix = null,
+    suffix = null,
+    scopes = true,
+    instanceMethods = true,
+    validate = false,
+    ...options
+  }: EnumMacroOptions = {},
 ): void {
   assertValidEnumDefinitionValues(values);
-  assertValidEnumOptions(options ?? {});
+  assertValidEnumOptions(options);
 
-  const mapping = Array.isArray(values)
-    ? Object.fromEntries(values.map((v, i) => [v, i]))
-    : (values as Record<string, EnumValue>);
+  const enumValues = new HashWithIndifferentAccess<EnumValue>();
+  name = toS(name);
 
-  if (!Object.prototype.hasOwnProperty.call(this, "_enums")) {
-    this._enums = new Map(this._enums);
+  this.detectEnumConflictBang(name, pluralize(name), true);
+  rbModDefineMethod({ prototype: this }, pluralize(name), {
+    get() {
+      return enumValues;
+    },
+  });
+  if (!Object.prototype.hasOwnProperty.call(this, "__class_attr_definedEnums")) {
+    this.definedEnums = deepDup(this.definedEnums);
   }
+  this.definedEnums[name] = enumValues;
 
-  detectEnumConflictBang.call(this, name, pluralize(name), true);
+  this.detectEnumConflictBang(name, name);
+  this.detectEnumConflictBang(name, `${name}=`);
 
-  this._enums.set(name, mapping);
-
-  detectEnumConflictBang.call(this, name, name);
-  detectEnumConflictBang.call(this, name, `${name}=`);
-
-  const prefixStr = underscore(
-    options?.prefix === true ? name : typeof options?.prefix === "string" ? options.prefix : "",
-  );
-  const suffixStr = underscore(
-    options?.suffix === true ? name : typeof options?.suffix === "string" ? options.suffix : "",
-  );
-
-  const methodName = (n: string) => {
-    if (prefixStr && suffixStr) return `${prefixStr}_${n}_${suffixStr}`;
-    if (prefixStr) return `${prefixStr}_${n}`;
-    if (suffixStr) return `${n}_${suffixStr}`;
-    return n;
-  };
-  const toCamel = (s: string) => camelize(s, false);
-
-  const validate = options?.validate ?? false;
-
-  if (options && "default" in options) {
-    this.attribute(name, { default: options.default });
-  } else {
-    this.attribute(name);
-  }
+  this.attribute(name, options);
 
   this.decorateAttributes([name], (_name: string, subtype: ValueType | null) => {
     if (subtype === defaultValue() && !isReplayingOverColdSchema()) {
@@ -241,150 +244,68 @@ export function _enum(
           " via `attribute`.",
       );
     }
+
     if (subtype instanceof EnumType) subtype = subtype.subtype;
-    return new EnumType(
-      name,
-      new HashWithIndifferentAccess<EnumValue>(mapping),
-      subtype!,
-      !validate,
-    );
+    return new EnumType(name, enumValues, subtype!, !validate);
   });
 
-  Object.defineProperty(this.prototype, name, {
-    get(this: Base) {
-      return (this as unknown as EnumInstanceHost).readAttribute(name);
-    },
-    set(this: Base, value: unknown) {
-      (this as unknown as EnumInstanceHost).writeAttribute(name, value);
-    },
-    configurable: true,
-  });
-
-  const scopes = options?.scopes !== false;
-  const instanceMethods = options?.instanceMethods !== false;
-
-  const dangerousMethods = dangerousAttributeMethods();
-  const enumMethodsHost = this as unknown as { _enumMethodsModuleNames?: Set<string> };
-  if (!Object.prototype.hasOwnProperty.call(this, "_enumMethodsModuleNames")) {
-    enumMethodsHost._enumMethodsModuleNames = new Set<string>();
-  }
-  const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
-  const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
-  const methodsModule = this._enumMethodsModule();
-  for (const [n, value] of Object.entries(mapping)) {
-    const valueMethodName = toCamel(methodName(n));
-    const { predicateName, bangName, notScopeName } = enumMethodNamesFor(valueMethodName);
-    const methodFriendlyLabel = n.replace(/[^\w\x80-\uffff]+/g, "_");
-    const valueMethodAlias = toCamel(methodName(methodFriendlyLabel));
+  this._enumMethodsModule().moduleEval(() => {
+    prefix =
+      prefix != null && prefix !== false
+        ? prefix === true
+          ? `${underscore(name)}_`
+          : `${underscore(prefix)}_`
+        : null;
 
-    valueMethodNames.push(methodName(n));
-    const aliasIsNew =
-      methodName(methodFriendlyLabel) !== methodName(n) &&
-      !valueMethodNames.includes(methodName(methodFriendlyLabel));
-    if (aliasIsNew) {
-      valueMethodNames.push(methodName(methodFriendlyLabel));
-    }
+    suffix =
+      suffix != null && suffix !== false
+        ? suffix === true
+          ? `_${underscore(name)}`
+          : `_${underscore(suffix)}`
+        : null;
 
-    if (instanceMethods) {
-      if (definedNames.has(predicateName))
-        raiseConflictError.call(this, name, predicateName, { source: "another enum" });
-      if (definedNames.has(bangName))
-        raiseConflictError.call(this, name, bangName, { source: "another enum" });
-      definedNames.add(predicateName);
-      definedNames.add(bangName);
-      if (dangerousMethods.has(predicateName)) raiseConflictError.call(this, name, predicateName);
-      if (enumMethodNames.has(predicateName))
-        raiseConflictError.call(this, name, predicateName, { source: "another enum" });
-      if (dangerousMethods.has(bangName)) raiseConflictError.call(this, name, bangName);
-      if (enumMethodNames.has(bangName))
-        raiseConflictError.call(this, name, bangName, { source: "another enum" });
-    }
-    if (scopes) {
-      if (definedNames.has(valueMethodName))
-        raiseConflictError.call(this, name, valueMethodName, { type: "class" });
-      definedNames.add(valueMethodName);
-      detectEnumConflictBang.call(this, name, valueMethodName, true);
-      detectEnumConflictBang.call(this, name, notScopeName, true);
-    }
-    if (aliasIsNew) {
-      const {
-        predicateName: fp,
-        bangName: friendlyBang,
-        notScopeName: notFriendlyName,
-      } = enumMethodNamesFor(valueMethodAlias);
-      if (instanceMethods) {
-        if (definedNames.has(fp))
-          raiseConflictError.call(this, name, fp, { source: "another enum" });
-        if (definedNames.has(friendlyBang))
-          raiseConflictError.call(this, name, friendlyBang, { source: "another enum" });
-        definedNames.add(fp);
-        definedNames.add(friendlyBang);
-        if (dangerousMethods.has(fp)) raiseConflictError.call(this, name, fp);
-        if (enumMethodNames.has(fp))
-          raiseConflictError.call(this, name, fp, { source: "another enum" });
-        if (dangerousMethods.has(friendlyBang)) raiseConflictError.call(this, name, friendlyBang);
-        if (enumMethodNames.has(friendlyBang))
-          raiseConflictError.call(this, name, friendlyBang, { source: "another enum" });
-      }
-      if (scopes) {
-        detectEnumConflictBang.call(this, name, valueMethodAlias, true);
-        detectEnumConflictBang.call(this, name, notFriendlyName, true);
+    const pairs: [string, EnumValue][] = !Array.isArray(values)
+      ? Object.entries(values)
+      : values.map((label, value) => [label, value]);
+    // eslint-disable-next-line prefer-const
+    for (let [label, value] of pairs) {
+      enumValues.set(label, value);
+      label = toS(label);
+
+      const valueMethodName = `${prefix ?? ""}${label}${suffix ?? ""}`;
+      valueMethodNames.push(valueMethodName);
+      this._enumMethodsModule().defineEnumMethods(
+        name,
+        valueMethodName,
+        value,
+        scopes,
+        instanceMethods,
+      );
+
+      const methodFriendlyLabel = label.replace(/[^\w\x80-￿]+/g, "_");
+      const valueMethodAlias = `${prefix ?? ""}${methodFriendlyLabel}${suffix ?? ""}`;
+
+      if (valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias)) {
+        valueMethodNames.push(valueMethodAlias);
+        this._enumMethodsModule().defineEnumMethods(
+          name,
+          valueMethodAlias,
+          value,
+          scopes,
+          instanceMethods,
+        );
       }
     }
-
-    methodsModule.defineEnumMethods(name, valueMethodName, value, scopes, instanceMethods);
-    if (aliasIsNew) {
-      methodsModule.defineEnumMethods(name, valueMethodAlias, value, scopes, instanceMethods);
-    }
-
-    const originalName = methodName(n);
-    if (instanceMethods && /[^\w\x80-\uffff]/.test(originalName)) {
-      methodsModule.moduleEval((table) => {
-        Object.defineProperty(table, `is${originalName}`, {
-          value: function (this: Base) {
-            return this.readAttribute(name) === n;
-          },
-          writable: true,
-          configurable: true,
-        });
-        Object.defineProperty(table, `${originalName}Bang`, {
-          value: function (this: EnumInstanceHost) {
-            return this.updateBang({ [name]: value });
-          },
-          writable: true,
-          configurable: true,
-        });
-      });
-    }
-
-    if (instanceMethods) {
-      const names = enumMethodNamesFor(valueMethodName);
-      enumMethodNames.add(names.predicateName);
-      enumMethodNames.add(names.bangName);
-      if (aliasIsNew) {
-        const valueMethodAliasNames = enumMethodNamesFor(valueMethodAlias);
-        enumMethodNames.add(valueMethodAliasNames.predicateName);
-        enumMethodNames.add(valueMethodAliasNames.bangName);
-      }
-    }
-  }
-
-  if (scopes) {
-    detectNegativeEnumConditionsBang.call(this, valueMethodNames);
-  }
+  });
+  if (scopes) this.detectNegativeEnumConditionsBang(valueMethodNames);
 
   if (validate) {
-    const validateOptions = typeof validate === "object" ? validate : {};
-    this.validatesInclusionOf(name, { in: Object.keys(mapping), ...validateOptions });
+    if (!isPlainObject(validate)) validate = {};
+    this.validatesInclusionOf(name, { in: enumValues.keys(), ...(validate as object) });
   }
 
-  const frozenMapping = Object.freeze({ ...mapping });
-  rbModDefineMethod({ prototype: this }, pluralize(name), {
-    get() {
-      return frozenMapping;
-    },
-  });
+  enumValues.freeze();
 }
 
 /** @internal */
@@ -407,25 +328,24 @@ export function detectEnumConflictBang(
   this: typeof import("./base.js").Base,
   enumName: string,
   methodName: string,
-  _klassMethod = false,
+  klassMethod = false,
 ): void {
-  if (_klassMethod) {
-    if (isDangerousClassMethod.call(this, methodName)) {
-      raiseConflictError.call(this, enumName, methodName, { type: "class" });
-    }
-    if (isMethodDefinedWithin.call(this, methodName, ActiveRecord.Relation)) {
-      raiseConflictError.call(this, enumName, methodName, {
-        type: "class",
-        source: "ActiveRecord::Relation",
-      });
-    }
-    if (methodName === "id") {
-      raiseConflictError.call(this, enumName, methodName);
-    }
-    return;
-  }
-  if (isDangerousAttributeMethod.call(this as any, methodName)) {
+  if (klassMethod && isDangerousClassMethod.call(this, methodName)) {
+    raiseConflictError.call(this, enumName, methodName, { type: "class" });
+  } else if (klassMethod && isMethodDefinedWithin.call(this, methodName, ActiveRecord.Relation)) {
+    raiseConflictError.call(this, enumName, methodName, {
+      type: "class",
+      source: "ActiveRecord::Relation",
+    });
+  } else if (klassMethod && methodName === "id") {
     raiseConflictError.call(this, enumName, methodName);
+  } else if (!klassMethod && isDangerousAttributeMethod.call(this as any, methodName)) {
+    raiseConflictError.call(this, enumName, methodName);
+  } else if (
+    !klassMethod &&
+    isMethodDefinedWithin.call(this, methodName, this._enumMethodsModule(), Module)
+  ) {
+    raiseConflictError.call(this, enumName, methodName, { source: "another enum" });
   }
 }
 

@@ -1,4 +1,4 @@
-import { fetch, hasKey, hashDelete, rtest } from "@blazetrails/ruby-compat";
+import { hasKey, hashDelete, rtest } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
 import { FixtureSet, type Fixture } from "../fixtures.js";
 import type { TableRows } from "./table-rows.js";
@@ -173,14 +173,9 @@ export class TableRow {
   }
 
   private resolveEnums(): void {
-    const definedEnums = (
-      this.reflectionClass as {
-        _enums?: Map<string, Record<string, number | string | boolean | null>>;
-      }
-    )._enums;
-    for (const [name, values] of definedEnums ?? []) {
+    for (const [name, values] of Object.entries(this.reflectionClass.definedEnums)) {
       if (hasKey(this._row, name)) {
-        this._row[name] = fetch(values, this._row[name] as string, this._row[name]);
+        this._row[name] = values.fetch(this._row[name] as string, this._row[name] as never);
       }
     }
   }

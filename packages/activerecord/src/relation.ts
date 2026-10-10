@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, isPresent, stripThenable, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -21,7 +21,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { RelationMethods as SignedIdRelationMethods } from "./signed-id.js";
 import { RelationMethods as TokenForRelationMethods } from "./token-for.js";
-import { first } from "@blazetrails/ruby-compat";
+import { first, rbFSend } from "@blazetrails/ruby-compat";
 import * as Arel from "@blazetrails/arel";
 import { Table, SelectManager, Nodes, sql, star, type ArelNode } from "@blazetrails/arel";
 import type { Base } from "./base.js";
@@ -1632,7 +1632,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     }
 
     if (timestamp != null) {
-      return `${size}-${toFs(timestamp as Temporal.Instant, this.model.cacheTimestampFormat)}`;
+      return `${size}-${rbFSend(timestamp, "toFs", this.model.cacheTimestampFormat)}`;
     }
     return `${size}`;
   }

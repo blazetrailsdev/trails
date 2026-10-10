@@ -425,10 +425,9 @@ describe("Enum acronym method name consistency", () => {
     const proto = AcroBook.prototype as unknown as Record<string, unknown>;
     expect(typeof proto.isApiKey).toBe("function");
     expect(proto.isAPIKey).toBeUndefined();
-    const recorded = (AcroBook as unknown as { _enumMethodsModuleNames: Set<string> })
-      ._enumMethodsModuleNames;
-    expect(recorded.has("isApiKey")).toBe(true);
-    expect(recorded.has("isAPIKey")).toBe(false);
+    const recorded = (AcroBook as typeof Base)._enumMethodsModule();
+    expect(recorded.isMethodDefined("isApiKey")).toBe(true);
+    expect(recorded.isMethodDefined("isAPIKey")).toBe(false);
   });
 
   it("detects a conflict on the name it actually generates for an acronym label", () => {

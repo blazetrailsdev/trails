@@ -163,6 +163,7 @@ import {
   include,
   prepend,
   extend,
+  extended,
   Module,
   classAttribute,
   benchmark as benchmarkable,
@@ -1037,7 +1038,10 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
+  declare static definedEnums: Record<
+    string,
+    HashWithIndifferentAccess<number | string | boolean | null>
+  >;
 
   declare static enum: typeof _EnumModule.enum;
 
@@ -2152,6 +2156,9 @@ extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
 extend(Base, {
+  [extended](base: object): void {
+    classAttribute.call(base, "definedEnums", { instanceWriter: false, default: {} });
+  },
   enum: _EnumModule.enum,
   _enum: _EnumModule._enum,
   _enumMethodsModule: _EnumModule._enumMethodsModule,

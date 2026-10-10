@@ -1,3 +1,4 @@
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { DateTime as RubyDateTime, Temporal, Time, cCivilToJd } from "@blazetrails/date";
 import { secFraction } from "../../time-ext.js";
 import { DATE_FORMATS } from "../time/conversions.js";
@@ -17,6 +18,10 @@ export function toFs(datetime: DateTime, format = "default"): string {
 }
 
 export const toFormattedS = toFs;
+
+for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], { toFs, toFormattedS });
+}
 
 export function formattedOffset(
   datetime: DateTime,

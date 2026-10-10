@@ -1,6 +1,7 @@
-import { CodeGenerator, include, indexWith, Module, toFs } from "@blazetrails/activesupport";
+import { CodeGenerator, include, indexWith, Module } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import {
+  rbFSend,
   type Concurrent,
   type Hash,
   hasKey,
@@ -473,7 +474,7 @@ export function isMethodDefinedWithin(
   klass: any,
   superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
-  if (name in klass.prototype) {
+  if (klass instanceof Module ? klass.isMethodDefined(name) : name in klass.prototype) {
     if (superklass?.prototype != null && name in superklass.prototype) {
       return instanceMethodOwner(klass, name) !== instanceMethodOwner(superklass, name);
     } else {
@@ -569,7 +570,7 @@ export function formatForInspect(
       value instanceof RubyTime ||
       value instanceof Temporal.Instant
     ) {
-      inspectedValue = `"${toFs(value, "inspect")}"`;
+      inspectedValue = `"${rbFSend(value, "toFs", "inspect")}"`;
     } else {
       inspectedValue = inspect(value);
     }

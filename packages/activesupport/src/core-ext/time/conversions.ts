@@ -1,6 +1,6 @@
 import { DateTime as RubyDateTime, Temporal, Time as RubyTime } from "@blazetrails/date";
 import { formattedOffset as dateTimeFormattedOffset } from "../date-time/conversions.js";
-import { toFs as dateToFs } from "../date/conversions.js";
+import { TEMPORAL_METHOD_TABLE } from "@blazetrails/ruby-compat";
 import { ordinalize } from "../../inflector.js";
 import { TimeWithZone } from "../../time-with-zone.js";
 import { TimeZone } from "../../values/time-zone.js";
@@ -49,36 +49,13 @@ export const DATE_FORMATS: Record<string, string | ((time: DateFormatsReceiver) 
     ).iso8601(),
 };
 
-export function toFs(
-  date: Date | Temporal.Instant | Temporal.PlainDate | RubyTime | TimeWithZone,
-  format: string = "default",
-): string {
-  if (date instanceof TimeWithZone) return date.toFs(format);
-  if (date instanceof Temporal.PlainDate) return dateToFs(date, format);
-  let time: RubyTime;
-  if (date instanceof RubyTime) {
-    time = date;
-  } else {
-    const utc =
-      // boundary: the JS `Date` a caller still holds is the instant this bridges
-      date instanceof Date
-        ? Temporal.Instant.fromEpochMilliseconds(date.getTime()).toZonedDateTimeISO("UTC")
-        : date.toZonedDateTimeISO("UTC");
-    time = RubyTime.utc(
-      utc.year,
-      utc.month,
-      utc.day,
-      utc.hour,
-      utc.minute,
-      utc.second,
-      utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
-    );
-  }
+export function toFs(date: RubyTime, format: string = "default"): string {
   const formatter = DATE_FORMATS[format];
   if (formatter != null) {
-    return typeof formatter === "function" ? String(formatter(time)) : time.strftime(formatter);
+    return typeof formatter === "function" ? String(formatter(date)) : date.strftime(formatter);
+  } else {
+    return date.toS();
   }
-  return time.toS();
 }
 
 export { toFs as toFormattedS };
@@ -102,8 +79,30 @@ export { xmlschema as rfc3339 };
 
 declare module "@blazetrails/date" {
   interface Time {
+    toFs(format?: string): string;
+    toFormattedS(format?: string): string;
     rfc3339(fractionDigits?: number): string;
   }
 }
 
+RubyTime.prototype.toFs = function (this: RubyTime, format?: string): string {
+  return toFs(this, format);
+};
+RubyTime.prototype.toFormattedS = RubyTime.prototype.toFs;
 RubyTime.prototype.rfc3339 = RubyTime.prototype.xmlschema;
+
+(TEMPORAL_METHOD_TABLE["Temporal.Instant"] ??= {}).toFs = (
+  self: Temporal.Instant,
+  format?: string,
+): string => {
+  const utc = self.toZonedDateTimeISO("UTC");
+  return RubyTime.utc(
+    utc.year,
+    utc.month,
+    utc.day,
+    utc.hour,
+    utc.minute,
+    utc.second,
+    utc.millisecond * 1_000 + utc.microsecond + utc.nanosecond / 1_000,
+  ).toFs(format);
+};
