@@ -60,7 +60,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
       throw new NotImplementedError("No async loading for HasManyThroughAssociation yet");
     if (!this.targetReflectionHasAssociatedRecord()) return [];
     if (this.disableJoins) return this.scope().toArray();
-    return super.findTarget();
+    return super.findTarget({ async }) as Promise<Base[]>;
   }
 
   protected targetReflectionHasAssociatedRecord(): boolean {

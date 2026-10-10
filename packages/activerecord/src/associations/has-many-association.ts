@@ -9,27 +9,13 @@ import {
 } from "@blazetrails/ruby-compat";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { NoMethodError } from "@blazetrails/activemodel";
 import type { AssociationDefinition } from "../associations.js";
-import {
-  _builtAssociationScope,
-  _inlineOwnerKey,
-  _inlinePolymorphicKeys,
-  _ownerChainReflection,
-  associationInstanceGet,
-  _scopeForAssociation,
-} from "../associations.js";
-import { strictLoadingViolationBang } from "../core.js";
-import {
-  AssociationNotFoundError,
-  CompositePrimaryKeyMismatchError,
-  DeleteRestrictionError,
-} from "./errors.js";
+
+import { DeleteRestrictionError } from "./errors.js";
 import { CollectionAssociation, isThenable } from "./collection-association.js";
-import type { Association } from "./association.js";
 import { ForeignAssociation } from "./foreign-association.js";
 import { compositeQueryConstraintsList, queryConstraintsList } from "../persistence.js";
-import { eachSlice, min, selectBang, underscore } from "@blazetrails/activesupport";
+import { eachSlice, min, selectBang } from "@blazetrails/activesupport";
 
 export class HasManyAssociation extends CollectionAssociation {
   /** @internal */
@@ -141,17 +127,6 @@ export class HasManyAssociation extends CollectionAssociation {
   ): Promise<boolean> {
     this.setOwnerAttributes(record);
     return super.insertRecord(record, validate, raise, block);
-  }
-
-  protected override async findTarget(): Promise<Base[]> {
-    const records = await findTarget(
-      this.owner,
-      this.reflection.name,
-      this.reflection,
-      this.isViolatesStrictLoading(),
-    );
-    for (const record of records) this.setStrictLoading(record);
-    return records;
   }
 
   /** @internal */
@@ -289,122 +264,6 @@ function difference(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
 /** @internal */
 function intersection(_assoc: HasManyAssociation, a: Base[], b: Base[]): Base[] {
   return a.filter((r) => b.includes(r));
-}
-
-/** @internal */
-async function findTarget(
-  record: Base,
-  assocName: string,
-  assocDef: AssociationDefinition,
-  violatesStrictLoading = false,
-): Promise<Base[]> {
-  const options = assocDef.options;
-  const holder = associationInstanceGet.call(record, assocName) as Association | null;
-  if (holder?.isLoaded() && !(holder._staleStateIsSnapshotted && holder.isStaleTarget())) {
-    return (holder.target ?? []) as Base[];
-  }
-
-  if (violatesStrictLoading) {
-    const ctor = record.constructor as typeof Base;
-    const reflection = ctor._reflectOnAssociation?.(assocName);
-    if (!reflection) throw new AssociationNotFoundError(record, assocName);
-    strictLoadingViolationBang({ owner: ctor, reflection });
-  }
-
-  const ctor = record.constructor as typeof Base;
-
-  const rel = scope(record, assocName, assocDef);
-  if (rel === null) return [];
-
-  const association = record.association(assocName);
-  return (
-    await rel.load((child: Base) => {
-      association.setInverseInstance(child);
-    })
-  ).toArray();
-}
-
-/**
- * @internal
- * @noRailsEquivalent CONVERGEABLE association-helpers-extracted-for-the-collection-proxy-remainder-4
- */
-export function scope(
-  record: Base,
-  assocName: string,
-  assocDef: AssociationDefinition,
-): any | null {
-  const options = assocDef.options;
-  const ctor = record.constructor as typeof Base;
-  const primaryKey = options.primaryKey ?? ctor.primaryKey;
-
-  const targetModel = record.association(assocName).klass;
-
-  const reflection = ctor._reflectOnAssociation?.(assocName);
-  if (options.through && !reflection) return null;
-
-  if (!reflection) throw new NoMethodError(`undefined method 'foreign_key' for nil`);
-  const foreignKey: string | string[] = reflection.foreignKey();
-
-  const reflForOwnerFk = _ownerChainReflection(reflection);
-  const fkCheckPks = reflForOwnerFk
-    ? Array.isArray(reflForOwnerFk.joinForeignKey)
-      ? reflForOwnerFk.joinForeignKey
-      : [reflForOwnerFk.joinForeignKey]
-    : Array.isArray(primaryKey)
-      ? primaryKey
-      : [primaryKey];
-  for (const pk of fkCheckPks) {
-    const v = record._readAttribute(pk);
-    if (v === null || v === undefined) return null;
-  }
-
-  let rel: any;
-  if (reflection) {
-    const built = _builtAssociationScope(record, assocName, reflection, targetModel);
-    const baseRelation = _scopeForAssociation(targetModel);
-    rel = baseRelation.merge(built);
-  } else {
-    if (options.as) {
-      const typeCol = `${underscore(options.as)}_type`;
-      let fkCols: string[];
-      let ownerKeyCols: string[];
-      if (Array.isArray(foreignKey)) {
-        const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-        fkCols = foreignKey;
-        ownerKeyCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
-      } else {
-        ({ fkCols, ownerKeyCols } = _inlinePolymorphicKeys(ctor, options, primaryKey, foreignKey));
-      }
-      const conditions: Record<string, unknown> = { [typeCol]: ctor.polymorphicName() };
-      for (let i = 0; i < fkCols.length; i++) {
-        conditions[fkCols[i]] = record._readAttribute(ownerKeyCols[i]);
-      }
-      rel = _scopeForAssociation(targetModel).where(conditions);
-    } else if (Array.isArray(foreignKey)) {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      const pkCols = Array.isArray(ownerKey) ? ownerKey : [ownerKey];
-      if (pkCols.length !== foreignKey.length) {
-        throw new CompositePrimaryKeyMismatchError({
-          activeRecord: ctor.name,
-          name: assocName,
-          associationPrimaryKey: () => pkCols,
-          foreignKey: () => foreignKey,
-        });
-      }
-      const conditions: Record<string, unknown> = {};
-      for (let i = 0; i < foreignKey.length; i++) {
-        conditions[foreignKey[i]] = record._readAttribute(pkCols[i]);
-      }
-      rel = _scopeForAssociation(targetModel).where(conditions);
-    } else {
-      const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-      rel = _scopeForAssociation(targetModel).where({
-        [foreignKey]: record._readAttribute(ownerKey as string),
-      });
-    }
-    if (assocDef.scope) rel = assocDef.scope.call(rel, record) || rel;
-  }
-  return rel;
 }
 
 Object.assign(HasManyAssociation.prototype, {

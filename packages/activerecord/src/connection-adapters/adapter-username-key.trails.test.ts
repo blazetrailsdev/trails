@@ -16,7 +16,8 @@ async function mysqlPoolConfig(config: Record<string, unknown>): Promise<Record<
 
 function pgClientOptions(config: Record<string, unknown>): Record<string, unknown> {
   const adapter = new PostgreSQLAdapter(config as never);
-  return (adapter as unknown as { _pgClientOptions: Record<string, unknown> })._pgClientOptions;
+  return (adapter as unknown as { _connectionParameters: Record<string, unknown> })
+    ._connectionParameters;
 }
 
 const BASE = { host: "127.0.0.1", database: "d" };

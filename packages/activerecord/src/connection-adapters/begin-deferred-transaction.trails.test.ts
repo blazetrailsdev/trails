@@ -10,7 +10,6 @@ function sqlHost(klass: typeof Mysql2Adapter | typeof PostgreSQLAdapter) {
     internalExecute: { value: vi.fn(async (s: string) => void sql.push(s)) },
     executeBatch: { value: vi.fn(async (stmts: string[]) => void sql.push(...stmts)) },
     withRawConnection: { value: async (_o: unknown, f: () => unknown) => f() },
-    _acquireFreshClient: { value: async () => ({}) },
     _client: { value: null, writable: true },
   });
   return { host: host as Host & { executeBatch: ReturnType<typeof vi.fn> }, sql };
