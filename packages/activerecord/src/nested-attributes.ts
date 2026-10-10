@@ -410,8 +410,7 @@ export function assignNestedAttributesForCollectionAssociation(
 
   if (association.isLoaded()) return assignRecords(association.target);
 
-  const attributeIds = attrs.map((a) => (a as any).id).filter((id) => id != null && id !== false);
-  if (attributeIds.length === 0) return assignRecords([]);
+  const attributeIds = attrs.map((a) => a["id"]).filter((id) => id != null && id !== false);
   if (attrs.every((a) => isBlank(a["id"]))) return assignRecords([]);
 
   const primaryKey = association.klass.primaryKey;

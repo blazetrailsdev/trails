@@ -1298,13 +1298,16 @@ describeIfPg("PostgreSQLAdapter", () => {
         await a.connect();
         const raw = a._rawConnectionForTest() as PGConnection;
         const connect = vi.spyOn(pg.Client.prototype, "connect");
-        connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
-        await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
-        expect(raw.status()).toBe(1);
+        try {
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
+          expect(raw.status()).toBe(1);
 
-        connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
-        await a.reconnect();
-        connect.mockRestore();
+          connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
+          await a.reconnect();
+        } finally {
+          connect.mockRestore();
+        }
 
         expect(a._rawConnectionForTest()).not.toBe(raw);
         expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).rows[0].one).toBe(1);

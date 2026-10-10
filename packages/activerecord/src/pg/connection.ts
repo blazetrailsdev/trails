@@ -56,32 +56,7 @@ export class Connection {
   constructor(client: object, connParams?: pg.ClientConfig) {
     this.client = client as Client;
     this.connParams = connParams;
-    this.listen(this.client);
-  }
-
-  private listen(client: Client): void {
-    const connection = client.connection;
-    if (typeof connection?.on === "function") {
-      connection.on("readyForQuery", (message: { status?: string }) => {
-        if (typeof message?.status === "string") this.readyForQuery = message.status;
-      });
-      connection.on("errorMessage", () => {
-        if (this.readyForQuery === "T") this.readyForQuery = "E";
-      });
-    }
-  }
-
-  private types(): { getTypeParser(oid: number, format?: string): unknown } {
-    return {
-      getTypeParser: (oid: number, format?: string): unknown => {
-        if ((oid === OID_BYTEA || oid === OID_BYTEA_ARRAY) && format !== "binary") {
-          return (value: unknown) => value;
-        }
-        const coder = format !== "binary" && this.typeMapForResults.coders.get(oid);
-        if (coder) return (value: string) => coder.decode(value);
-        return this.client.getTypeParser(oid, format as "text");
-      },
-    };
+    listen(this, this.client);
   }
 
   query(...args: unknown[]): unknown {
@@ -100,26 +75,27 @@ export class Connection {
 
   async reset(): Promise<void> {
     const client = this.client;
-    await client.end().catch(() => {});
-    const { host, port, database, user, password, ssl } = client;
+    const connectionParameters = (client as unknown as { connectionParameters: pg.ClientConfig })
+      .connectionParameters;
     const conn = new (client.constructor as new (config: pg.ClientConfig) => Client)(
-      this.connParams ?? { host, port, database, user, password, ssl },
+      this.connParams ?? { ...connectionParameters, password: client.password },
     );
     for (const event of client.eventNames()) {
       for (const listener of client.rawListeners(event)) {
         conn.on(event as "error", listener as () => void);
       }
     }
-    this.listen(conn);
+    listen(this, conn);
+    this.prepared.clear();
+    this.readyForQuery = "I";
     try {
+      await client.end();
       await conn.connect();
     } catch (error) {
       void conn.end().catch(() => {});
       throw connectionBad(error);
     }
     this.client = conn;
-    this.prepared.clear();
-    this.readyForQuery = "I";
   }
 
   transactionStatus(): number {
@@ -162,7 +138,7 @@ export class Connection {
         text,
         values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
         rowMode: "array",
-        types: this.types(),
+        types: types(this),
       }).catch(raise),
     );
   }
@@ -170,7 +146,7 @@ export class Connection {
   async asyncExec(sql: string | null): Promise<PG.Result> {
     return result(
       await (this.query as unknown as Query)(
-        sql != null ? { text: sql, rowMode: "array", types: this.types() } : sql,
+        sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
       ).catch(raise),
     );
   }
@@ -181,7 +157,7 @@ export class Connection {
         text: sql,
         values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
         rowMode: "array",
-        types: this.types(),
+        types: types(this),
       }).catch(raise),
     );
   }
@@ -248,6 +224,31 @@ export class Connection {
   }
 }
 
+function listen(conn: Connection, client: Client): void {
+  const connection = client.connection;
+  if (typeof connection?.on === "function") {
+    connection.on("readyForQuery", (message: { status?: string }) => {
+      if (typeof message?.status === "string") conn.readyForQuery = message.status;
+    });
+    connection.on("errorMessage", () => {
+      if (conn.readyForQuery === "T") conn.readyForQuery = "E";
+    });
+  }
+}
+
+function types(conn: Connection): { getTypeParser(oid: number, format?: string): unknown } {
+  return {
+    getTypeParser(oid: number, format?: string): unknown {
+      if ((oid === OID_BYTEA || oid === OID_BYTEA_ARRAY) && format !== "binary") {
+        return (value: unknown) => value;
+      }
+      const coder = format !== "binary" && conn.typeMapForResults.coders.get(oid);
+      if (coder) return (value: string) => coder.decode(value);
+      return conn.client.getTypeParser(oid, format as "text");
+    },
+  };
+}
+
 function raise(error: unknown): never {
   throw pgError(error);
 }
@@ -292,9 +293,9 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
 
 const HANDLER: ProxyHandler<Connection> = {
   get(conn, name) {
-    if (name in conn) return Reflect.get(conn, name);
-    const value: unknown = Reflect.get(conn.client, name);
-    return typeof value === "function" ? value.bind(conn.client) : value;
+    const self = name in conn ? conn : conn.client;
+    const value: unknown = Reflect.get(self, name);
+    return typeof value === "function" ? value.bind(self) : value;
   },
   set(conn, name, value) {
     return Reflect.set(name in conn ? conn : conn.client, name, value);
