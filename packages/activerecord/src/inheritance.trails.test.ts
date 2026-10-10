@@ -9,7 +9,7 @@ describe("_instantiate STI dispatch", () => {
   fixtures([]);
 
   it("keeps a row without the inheritance column on the receiver subclass", () => {
-    const record = Client._instantiate({ id: "7", name: "Acme" });
+    const record = Client.instantiate({ id: "7", name: "Acme" });
 
     expect(record).toBeInstanceOf(Client);
   });

@@ -1447,24 +1447,6 @@ export class Base extends Model {
     }
   }
 
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown> | IndexedRow,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = this.discriminateClassForRecord(row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    return this.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
-  }
-
   _newRecord = true;
   _destroyed = false;
   _readonly = false;

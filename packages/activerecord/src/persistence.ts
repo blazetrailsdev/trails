@@ -39,11 +39,6 @@ import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
   new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
-  _instantiate(
-    row: Record<string, unknown> | IndexedRow,
-    block?: (record: any) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): any;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;

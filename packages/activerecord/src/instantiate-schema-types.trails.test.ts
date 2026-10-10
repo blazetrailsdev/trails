@@ -39,7 +39,7 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     const cols = { payload: { sqlType: "doubling", name: "payload", default: null } };
     await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
-    const rec = Widget._instantiate({ payload: "ab" });
+    const rec = Widget.instantiate({ payload: "ab" });
 
     expect((rec as unknown as { payload: string }).payload).toBe("abab");
   });
@@ -51,7 +51,7 @@ describe("_instantiate routes row values through adapter-resolved types", () => 
     const cols = { blob: { sqlType: "unknown", name: "blob", default: null } };
     await establishConnectionTo(Widget, makeAdapter(cols) as never);
 
-    const rec = Widget._instantiate({ blob: "raw" });
+    const rec = Widget.instantiate({ blob: "raw" });
 
     expect((rec as unknown as { blob: string }).blob).toBe("raw");
   });
