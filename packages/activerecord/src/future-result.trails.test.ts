@@ -3,7 +3,7 @@ import { Result } from "./result.js";
 import { FutureResult, Complete, type FutureResultConnection } from "./future-result.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { DatabaseStatements, select } from "./connection-adapters/abstract/database-statements.js";
-import { selectAll as querySelectAll, Store } from "./connection-adapters/abstract/query-cache.js";
+import { QueryCache, Store } from "./connection-adapters/abstract/query-cache.js";
 import { AsynchronousQueryInsideTransactionError, RangeError as ARRangeError } from "./errors.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import {
@@ -15,6 +15,20 @@ import {
 } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "./future-result.js";
 import { setAsyncQueryExecutor } from "./active-record.js";
+
+function overSuper(
+  props: object,
+  superSelectAll: (...args: never[]) => unknown,
+): { selectAll(...args: unknown[]): unknown } {
+  class Parent {
+    selectAll(...args: unknown[]): unknown {
+      return (superSelectAll as (...a: unknown[]) => unknown)(...args);
+    }
+  }
+  class Host extends Parent {}
+  QueryCache.appendFeatures(Host);
+  return Object.assign(new Host(), props);
+}
 
 describe("Result.empty", () => {
   it("returns EMPTY for the sync arm", () => {
@@ -303,7 +317,10 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result).toBe(Result.empty());
   });
 
@@ -314,7 +331,10 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    const result = await DatabaseStatements.selectAll.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("selectAll")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result).toBe(Result.empty());
   });
 
@@ -325,9 +345,9 @@ describe("DatabaseStatements#select_all", () => {
       },
     };
 
-    await expect(DatabaseStatements.selectAll.call(host as never, "SELECT 1")).rejects.toThrow(
-      "boom",
-    );
+    await expect(
+      DatabaseStatements.instanceMethod("selectAll")!.value.call(host as never, "SELECT 1"),
+    ).rejects.toThrow("boom");
   });
 });
 
@@ -357,16 +377,9 @@ describe("QueryCache#select_all", () => {
     ]);
     const superSelectAll = () => pending;
 
-    const returned = querySelectAll.call(
-      cacheHost(store) as never,
-      superSelectAll as never,
-      "SELECT 1",
-      null,
-      [],
-      {
-        async: true,
-      },
-    );
+    const returned = overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+      async: true,
+    });
 
     expect(returned).toBe(pending);
     expect((returned as FutureResult).pending()).toBe(true);
@@ -380,16 +393,9 @@ describe("QueryCache#select_all", () => {
       throw new Error("must not reach super on a cache hit");
     };
 
-    const returned = querySelectAll.call(
-      cacheHost(store) as never,
-      superSelectAll as never,
-      "SELECT 1",
-      null,
-      [],
-      {
-        async: true,
-      },
-    );
+    const returned = overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+      async: true,
+    });
 
     expect(returned).toBeInstanceOf(Complete);
     expect((returned as Complete).pending()).toBe(false);
@@ -403,14 +409,9 @@ describe("QueryCache#select_all", () => {
     const superSelectAll = async () => result;
 
     expect(
-      await querySelectAll.call(
-        cacheHost(store) as never,
-        superSelectAll as never,
-        "SELECT 1",
-        null,
-        [],
-        { async: false },
-      ),
+      await overSuper(cacheHost(store), superSelectAll).selectAll("SELECT 1", null, [], {
+        async: false,
+      }),
     ).toEqual(result);
   });
 });

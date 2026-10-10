@@ -24,6 +24,7 @@ import {
   aryReject,
   initialize,
   kernelInteger,
+  Module,
   rbInspect,
   rtest,
   RuntimeError,
@@ -787,10 +788,13 @@ export function castResult(rawResult: any): never {
 
 export const create = insert;
 
-export const DatabaseStatements = {
-  [initialize](this: DatabaseStatementsHost & { resetTransaction(): void }): void {
+export const DatabaseStatements = new Module((mod) => {
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (
+    this: DatabaseStatementsHost & { resetTransaction(): void },
+  ): void {
     this.resetTransaction();
-  },
+  };
+}).include({
   resetTransaction,
   selectAll(
     this: DatabaseStatementsDefaultsHost,
@@ -1013,7 +1017,7 @@ export const DatabaseStatements = {
   singleValueFromRows,
   arelFromRelation,
   extractTableRefFromInsertSql,
-};
+});
 
 /** @internal */
 export function affectedRows(rawResult: any): never {
