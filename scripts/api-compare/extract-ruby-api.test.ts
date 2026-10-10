@@ -4541,57 +4541,6 @@ describe("Ruby extractor base.class_attribute in self.extended", () => {
 });
 
 describe(
-  "Ruby extractor hook-declared class attributes",
-  { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
-  () => {
-    const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
-
-    it("records a class_attribute an `extended` hook declares on its base", () => {
-      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hook-attr-rb-"));
-      try {
-        fs.writeFileSync(
-          path.join(dir, "enum.rb"),
-          `
-          module ActiveRecord
-            module Enum
-              def self.extended(base)
-                base.class_attribute(:defined_enums, instance_writer: false, default: {})
-                other.class_attribute(:not_the_base)
-              end
-              def self.helper(base)
-                base.class_attribute(:not_a_hook)
-              end
-            end
-          end
-        `,
-        );
-        const driver = `
-        require_relative ${JSON.stringify(RUBY_SCRIPT)}
-        require "json"
-        ex = ApiExtractor.new
-        ex.process_file(File.join(${JSON.stringify(dir)}, "enum.rb"), ${JSON.stringify(dir)})
-        mod = ex.modules["ActiveRecord::Enum"]
-        puts JSON.generate([mod[:classMethods].map { |m| m[:name] }, mod[:instanceMethods].map { |m| m[:name] }])
-      `;
-        const [klass, instance] = JSON.parse(
-          execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }),
-        );
-        expect(klass).toEqual([
-          "extended",
-          "defined_enums",
-          "defined_enums=",
-          "defined_enums?",
-          "helper",
-        ]);
-        expect(instance).toEqual(["defined_enums", "defined_enums?"]);
-      } finally {
-        fs.rmSync(dir, { recursive: true, force: true });
-      }
-    });
-  },
-);
-
-describe(
   "Ruby extractor method_missing forwarding",
   { timeout: RUBY_SUBPROCESS_TIMEOUT_MS },
   () => {

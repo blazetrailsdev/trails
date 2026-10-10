@@ -95,7 +95,6 @@ function makeModel(
     definedEnums: {},
     columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
     typeForAttribute: () => ({ type: () => "integer" }),
-    definedEnums: {},
     findByBang: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),
   } as any;
 }
