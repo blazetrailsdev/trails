@@ -501,16 +501,13 @@ function _collectionIdsKeyOwner(
 
 /** @internal */
 function _extractAssociationAttrs(
-  ctor: typeof Base | undefined,
+  ctor: typeof Base,
   attrs: Record<string, unknown>,
 ): {
   rest: Record<string, unknown>;
   assocs: _PendingAssociationAttr[];
 } | null {
-  const reflections = (ctor as { _reflections?: Record<string, _AssociationDefLike> } | undefined)
-    ?._reflections;
-  if (!reflections) return null;
-  const defs = Object.values(reflections);
+  const defs = Object.values(ctor._reflections);
   if (defs.length === 0) return null;
   let assocs: _PendingAssociationAttr[] | null = null;
   for (const k of Object.keys(attrs)) {

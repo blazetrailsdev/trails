@@ -536,11 +536,12 @@ export class SchemaStatements {
     options: RemoveForeignKeyOptions = {},
   ): Promise<void> {
     if (typeof toTable === "object" && toTable !== null) {
-      options = toTable;
-      toTable = options.toTable;
+      options = { ...toTable, ...options };
+      toTable = undefined;
+    } else {
+      options = { ...options };
     }
     if (!this.useForeignKeys()) return;
-    options = { ...options };
     if (
       hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
       !(await this.foreignKeyExists(fromTable, toTable))
@@ -548,7 +549,7 @@ export class SchemaStatements {
       return;
     }
 
-    const fkNameToDelete = (await this.foreignKeyForBang(fromTable, { ...options, toTable })).name;
+    const fkNameToDelete = (await this.foreignKeyForBang(fromTable, { toTable, ...options })).name;
 
     const at = this.createAlterTable(fromTable);
     at.dropForeignKey(fkNameToDelete);

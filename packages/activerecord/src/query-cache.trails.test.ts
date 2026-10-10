@@ -8,7 +8,6 @@ import { Notifications, type NotificationEvent } from "@blazetrails/activesuppor
 import * as Types from "@blazetrails/activemodel";
 import { Attribute } from "@blazetrails/activemodel";
 import {
-  QueryCache,
   Store,
   selectAll,
   type QueryCacheHost,
@@ -256,9 +255,9 @@ describe("QueryCache.included wires the including adapter class", () => {
   it("unsets the query cache after checkin", () => {
     const callbacks = (
       AbstractAdapter as unknown as {
-        _connectionCallbacks: { checkin: { kind: string; method: unknown }[] };
+        _checkinCallbacks: { entries: { kind: string; filter: unknown }[] };
       }
-    )._connectionCallbacks.checkin;
-    expect(callbacks[0]).toEqual({ kind: "after", method: QueryCache.unsetQueryCacheBang });
+    )._checkinCallbacks.entries;
+    expect(callbacks[0]).toMatchObject({ kind: "after", filter: ":unsetQueryCacheBang" });
   });
 });

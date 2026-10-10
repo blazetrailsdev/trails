@@ -68,6 +68,10 @@ export class Column extends BaseColumn {
     );
   }
 
+  override eql(other: unknown): boolean {
+    return this.equals(other);
+  }
+
   override hash(): number {
     return (
       rbHash(Column) ^ rbHash(super.hash()) ^ rbHash(this.isAutoIncrement()) ^ rbHash(this.rowid)
