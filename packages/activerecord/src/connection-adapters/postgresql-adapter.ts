@@ -17,11 +17,12 @@ import {
   classAttribute,
   include,
   runLoadHooks,
+  compact,
   filterMap,
-  underscore,
+  sliceBang,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
-import { IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
+import { hashDelete, hasKey, IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { Result } from "../result.js";
 import * as Type from "../type.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -106,8 +107,7 @@ import {
   ValueTooLong,
   SQLWarning,
 } from "../errors.js";
-import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
-import { deprecator } from "../deprecator.js";
+import { AbstractAdapter } from "./abstract-adapter.js";
 import { SchemaStatements, type CreateDatabaseOptions } from "./postgresql/schema-statements.js";
 import type { SchemaStatements as AbstractSchemaStatements } from "./abstract/schema-statements.js";
 import type {
@@ -127,6 +127,17 @@ type PGDecoderClass = new (options: { oid: number; name: string }) => PGSimpleDe
 const STRING_OIDS = new Set([
   114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
 ]);
+
+const PG_CLIENT_KEYWORDS: Record<string, string> = {
+  dbname: "database",
+  statementTimeout: "statement_timeout",
+  queryTimeout: "query_timeout",
+  lockTimeout: "lock_timeout",
+  idleInTransactionSessionTimeout: "idle_in_transaction_session_timeout",
+  applicationName: "application_name",
+  fallbackApplicationName: "fallback_application_name",
+  clientEncoding: "client_encoding",
+};
 
 function pgTypeParser(oid: number, format?: string): unknown {
   if (format === "binary") return pg.types.getTypeParser(oid, "binary");
@@ -234,8 +245,19 @@ export class PostgreSQLAdapter
 {
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
-  static async newClient(connParams: pg.ClientConfig): Promise<pg.Client> {
-    const client = pgConnection(new pg.Client(connParams), connParams.stream);
+  static async newClient(connParams: Record<string, unknown>): Promise<pg.Client> {
+    const { getTypeParser } = (connParams.types ?? {}) as Partial<pg.CustomTypesConfig>;
+    const config: pg.ClientConfig = {
+      ...Object.fromEntries(
+        Object.entries(connParams).map(([key, value]) => [PG_CLIENT_KEYWORDS[key] ?? key, value]),
+      ),
+      types: {
+        getTypeParser: ((oid: number, format?: string) =>
+          getTypeParser?.(oid, format as never) ??
+          pgTypeParser(oid, format)) as pg.CustomTypesConfig["getTypeParser"],
+      },
+    };
+    const client = pgConnection(new pg.Client(config), config.stream);
     const { database, user, host } = client;
     try {
       await client.connect();
@@ -382,40 +404,10 @@ export class PostgreSQLAdapter
   supportsTransactionIsolation(): boolean {
     return true;
   }
-  /** @internal */
-  private static readonly VALID_CONN_PARAM_KEYS: ReadonlySet<string> = new Set([
-    "user",
-    "database",
-    "password",
-    "port",
-    "host",
-    "connectionString",
-    "keepAlive",
-    "stream",
-    "statement_timeout",
-    "ssl",
-    "query_timeout",
-    "lock_timeout",
-    "keepAliveInitialDelayMillis",
-    "idle_in_transaction_session_timeout",
-    "application_name",
-    "fallback_application_name",
-    "connectionTimeoutMillis",
-    "types",
-    "options",
-    "client_encoding",
-    "binary",
-    "replication",
-    "enableChannelBinding",
-    "connection",
-    "Promise",
-  ]);
-
   supportsForeignKeys(): boolean {
     return true;
   }
 
-  private _pgClientOptions: pg.ClientConfig | null = null;
   private _typeMap: HashLookupTypeMap | null = null;
   /** @internal */
   _typeMapForResults = new PGTypeMapByOid();
@@ -426,7 +418,6 @@ export class PostgreSQLAdapter
   private _useInsertReturning: unknown = true;
   private _mappedDefaultTimezone: "utc" | "local" | null = null;
   private timestampDecoder: PGSimpleDecoder | null = null;
-  private _minMessages = "warning";
   private _schemaSearchPathMemo: string | null = null;
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   /** @internal */
@@ -529,72 +520,36 @@ export class PostgreSQLAdapter
   /** @internal */
   executeBatch = pgExecuteBatch;
 
-  constructor(config: string | (pg.PoolConfig & PostgreSQLAdapterOptions));
+  constructor(config: (pg.PoolConfig & PostgreSQLAdapterOptions) | DatabaseConfigOptions);
   /** @deprecated */
-  constructor(rawConnection: pg.Client, deprecatedConfig?: Record<string, unknown> | null);
   constructor(
-    config: string | (pg.PoolConfig & PostgreSQLAdapterOptions) | pg.Client,
+    rawConnection: pg.Client,
+    deprecatedLogger?: unknown,
+    deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
-  ) {
-    const deprecatedRawConnection = PostgreSQLAdapter._isDeprecatedRawConnectionArg(config);
-    if (!deprecatedRawConnection && deprecatedConfig != null) {
-      throw new ArgumentError(
-        "when initializing an Active Record adapter with a config hash, that should be the only argument",
-      );
-    }
-    super(
-      deprecatedRawConnection
-        ? { ...deprecatedConfig }
-        : typeof config === "object" && config !== null
-          ? { ...(config as Record<string, unknown>) }
-          : {},
-    );
-    if (deprecatedRawConnection) {
-      deprecator().warn(RAW_CONNECTION_DEPRECATION_MESSAGE);
-      this._acceptDeprecatedRawConnection(pgConnection(config as pg.Client));
-      return;
-    }
-    if (typeof config === "string") {
-      this._minMessages = "warning";
-      this._pgClientOptions = {
-        connectionString: config,
-        types: {
-          getTypeParser: (oid: number, format?: string) => pgTypeParser(oid, format),
-        },
-      };
-      return;
-    }
-    const {
-      statementLimit: _statementLimit,
-      preparedStatements,
-      insertReturning,
-      advisoryLocks,
-      minMessages,
-      variables,
-      ...pgConfig
-    } = config as pg.PoolConfig & PostgreSQLAdapterOptions;
-    this._useInsertReturning =
-      "insertReturning" in this._config
-        ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
-        : true;
-    this._minMessages = minMessages ?? "warning";
-    const userGetTypeParser = (
-      pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
-    )?.getTypeParser;
-    const { username: railsUsername, ...pgDriverConfig } = pgConfig as typeof pgConfig & {
-      username?: string;
-    };
-    this._pgClientOptions = {
-      ...PostgreSQLAdapter._sliceValidConnParams({
-        ...pgDriverConfig,
-        ...(rtest(railsUsername) ? { user: railsUsername } : {}),
-      }),
-      types: {
-        getTypeParser(oid: number, format?: string): unknown {
-          return userGetTypeParser?.(oid, format) ?? pgTypeParser(oid, format);
-        },
-      },
-    };
+  );
+  /** @missingRailsName config — PERMANENT */
+  constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
+    super(...args);
+
+    const connParams: Record<string, unknown> = compact(this._config);
+
+    if (rtest(connParams.username)) connParams.user = hashDelete(connParams, "username");
+    if (rtest(connParams.database)) connParams.dbname = hashDelete(connParams, "database");
+
+    const validConnParamKeys = [...Object.keys(PG.Connection.conndefaultsHash()), "requiressl"];
+    sliceBang(connParams, ...validConnParamKeys);
+
+    this._connectionParameters = connParams;
+
+    this._maxIdentifierLength = null;
+    this._typeMap = null;
+    this._rawConnection = null;
+    this._noticeReceiverSqlWarnings = [];
+
+    this._useInsertReturning = hasKey(this._config, "insertReturning")
+      ? PostgreSQLAdapter.typeCastConfigToBoolean(this._config.insertReturning)
+      : true;
   }
 
   override isConnected(): boolean {
@@ -603,7 +558,7 @@ export class PostgreSQLAdapter
 
   override async active(): Promise<boolean> {
     const rawConnection = this._rawConnection;
-    if (rawConnection === null || this._pgClientOptions == null) return false;
+    if (rawConnection === null) return false;
     try {
       await rawConnection.query(";");
       this.verifiedBang();
@@ -1280,7 +1235,7 @@ export class PostgreSQLAdapter
       );
     }
 
-    await this.setClientMinMessages(this._minMessages);
+    await this.setClientMinMessages((this._config.minMessages as string | undefined) ?? "warning");
     await this.setSchemaSearchPath(
       (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
     );
@@ -1507,19 +1462,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     this._connection = value && pgConnection(value);
   }
 
-  /** @internal */
-  private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {
-    const sliced: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(config)) {
-      if (value === undefined || value === null) continue;
-      const param = PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key) ? key : underscore(key);
-      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(param)) continue;
-      if (param !== key && config[param] != null) continue;
-      sliced[param] = value;
-    }
-    return sliced as pg.ClientConfig;
-  }
-
   private _captureRegtypeOids(records: PgTypeRow[]): void {
     for (const row of records) {
       const oid = Number(row.oid);
@@ -1552,9 +1494,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   private async _acquireFreshClient(): Promise<pg.Client> {
-    if (this._pgClientOptions == null) {
-      throw new ConnectionNotEstablished("connection is closed");
-    }
     if (this._rawConnection) {
       return this._rawConnection;
     }
@@ -1574,7 +1513,9 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
     if (client == null) {
       let newClient: pg.Client;
       try {
-        newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
+        newClient = await PostgreSQLAdapter.newClient(
+          this._connectionParameters as Record<string, unknown>,
+        );
       } catch (error) {
         if (error instanceof ConnectionNotEstablished) {
           error.setPool(this.pool);
@@ -1582,9 +1523,9 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
         throw error;
       }
       const staleGeneration = acquireGen !== this._acquireGeneration;
-      if (this._pgClientOptions == null || this._rawConnection != null || staleGeneration) {
+      if (this._rawConnection != null || staleGeneration) {
         newClient.end().catch(() => {});
-        if (this._pgClientOptions == null || staleGeneration) {
+        if (staleGeneration) {
           throw new ConnectionNotEstablished("connection is closed");
         }
         client = this._rawConnection!;

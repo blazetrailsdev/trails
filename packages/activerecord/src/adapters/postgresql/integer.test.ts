@@ -7,7 +7,7 @@ const TWO_GB = 2 * 1024 * 1024 * 1024;
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

@@ -1,6 +1,6 @@
-import type { DatabaseAdapter } from "@blazetrails/activerecord";
+import { Schema } from "@blazetrails/activerecord";
 
-export default async function defineSchema(ctx: DatabaseAdapter) {
+await Schema.define({}, async ({ connection: ctx }) => {
   await ctx.createTable("follows", { force: "cascade" }, (t) => {
     t.integer("follower_id");
     t.integer("followee_id");
@@ -25,4 +25,4 @@ export default async function defineSchema(ctx: DatabaseAdapter) {
     t.timestamps();
   });
   await ctx.addIndex("users", "handle", { unique: true });
-}
+});

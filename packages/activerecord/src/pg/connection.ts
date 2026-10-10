@@ -317,6 +317,36 @@ export async function cancel(this: pg.Client): Promise<string | null> {
 
 export const asyncCancel = cancel;
 
+export function conndefaultsHash(): Record<string, null> {
+  return {
+    user: null,
+    dbname: null,
+    password: null,
+    port: null,
+    host: null,
+    connectionString: null,
+    keepAlive: null,
+    stream: null,
+    statementTimeout: null,
+    ssl: null,
+    queryTimeout: null,
+    lockTimeout: null,
+    keepAliveInitialDelayMillis: null,
+    idleInTransactionSessionTimeout: null,
+    applicationName: null,
+    fallbackApplicationName: null,
+    connectionTimeoutMillis: null,
+    types: null,
+    options: null,
+    clientEncoding: null,
+    binary: null,
+    replication: null,
+    enableChannelBinding: null,
+    connection: null,
+    Promise: null,
+  };
+}
+
 export function pgConnection<T extends object>(
   client: T,
   stream?: pg.ClientConfig["stream"],

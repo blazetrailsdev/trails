@@ -14,7 +14,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   fixtures([]);
 
   beforeEach(() => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
 
   afterEach(async () => {
@@ -64,7 +64,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   it("a failed connect is stamped before new_client translates it", async () => {
     const connect = vi.spyOn(pg.Client.prototype, "connect");
     await expect(
-      PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, database: "nonexistent" }),
+      PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, dbname: "nonexistent" }),
     ).rejects.toBeInstanceOf(ConnectionNotEstablished);
     const error = (await (connect.mock.results[0].value as Promise<void>).catch(
       (e: unknown) => e,

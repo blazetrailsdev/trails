@@ -8,7 +8,7 @@ class StopLoad extends Error {}
 
 describeIfPg("load_schema_helper: uuid_default without pgcrypto", () => {
   it("defaults the uuid primary keys to uuid_generate_v4()", async () => {
-    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     const emitted = new Map<string, string>();
 
     try {

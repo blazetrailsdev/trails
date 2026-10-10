@@ -772,11 +772,6 @@ function isPlainConfigHash(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
-export const RAW_CONNECTION_DEPRECATION_MESSAGE =
-  "Initializing a connection adapter with a pre-opened raw connection is " +
-  "deprecated and will be removed. Pass a configuration hash (or connection " +
-  "string) and let the adapter open and manage the connection itself.";
-
 export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
   "bigint",
   "binary",
@@ -2081,18 +2076,6 @@ export class AbstractAdapter implements Quoting {
   /** @internal */
   _runCheckinCallbacks(block: () => void): void {
     this._runCallbacks("checkin", block);
-  }
-
-  /** @internal */
-  protected static _isDeprecatedRawConnectionArg(arg: unknown): boolean {
-    if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
-    const proto = Object.getPrototypeOf(arg) as object | null;
-    return proto !== Object.prototype && proto !== null;
-  }
-
-  /** @internal */
-  protected _acceptDeprecatedRawConnection(rawConnection: unknown): void {
-    this._unconfiguredConnection = rawConnection;
   }
 
   inspect(): string {

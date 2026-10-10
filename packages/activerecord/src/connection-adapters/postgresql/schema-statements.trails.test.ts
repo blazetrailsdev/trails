@@ -44,7 +44,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await setup(adapter);
   });
 
@@ -286,7 +286,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("drop database removes the database", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_drop_db_tmp";
-      const rootAdapter = new PostgreSQLAdapter(postgresUrl());
+      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);
@@ -311,7 +311,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("recreate database drops and creates", { timeout: 30000 }, async () => {
       const tmpDb = "trails_test_recreate_tmp";
-      const rootAdapter = new PostgreSQLAdapter(postgresUrl());
+      const rootAdapter = new PostgreSQLAdapter({ connectionString: postgresUrl() });
       try {
         await rootAdapter.execute(`DROP DATABASE IF EXISTS ${tmpDb}`);
         await rootAdapter.createDatabase(tmpDb);

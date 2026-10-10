@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
 
   afterEach(async () => {
@@ -65,7 +65,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     fixtures(["accounts"], { useTransactionalTests: false });
 
     it("connection error", async () => {
-      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter({
+        host: "localhost",
+        port: 59999,
+        database: "nonexistent",
+      });
       const error = await assertRaises([ConnectionNotEstablished], {}, () =>
         bad.execute("SELECT 1"),
       );
@@ -84,7 +88,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const clientSpy = vi
         .spyOn(pgModule, "Client" as never)
         .mockImplementation((() => fakeClient) as never);
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, () =>
           a.execute("SELECT 1"),
@@ -98,7 +102,11 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("bad connection", async () => {
-      const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
+      const bad = new PostgreSQLAdapter({
+        host: "localhost",
+        port: 59999,
+        database: "nonexistent",
+      });
       await expect(bad.execute("SELECT 1")).rejects.toThrow();
       await bad.disconnectBang();
     });
@@ -115,7 +123,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       let connection: PostgreSQLAdapter | null = null;
       try {
         const error = await assertRaises([ConnectionNotEstablished], {}, async () => {
-          connection = new PostgreSQLAdapter(PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"));
+          connection = new PostgreSQLAdapter({
+            connectionString: PG_TEST_URL.replace(/\/[^/?]*(\?|$)/, "/postgres$1"),
+          });
           await connection.execQuery("SELECT 1");
         });
         expect(connection).not.toBeNull();
@@ -140,11 +150,15 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("database exists returns false when the database does not exist", async () => {
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
-      expect(await PostgreSQLAdapter.databaseExists(url.toString())).toBeFalsy();
+      expect(
+        await PostgreSQLAdapter.databaseExists({ connectionString: url.toString() }),
+      ).toBeFalsy();
     });
 
     it("database exists returns true when the database exists", async () => {
-      expect(await PostgreSQLAdapter.databaseExists(PG_TEST_URL)).toBeTruthy();
+      expect(
+        await PostgreSQLAdapter.databaseExists({ connectionString: PG_TEST_URL }),
+      ).toBeTruthy();
     });
 
     it("primary key", async () => {
@@ -841,7 +855,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("date decoding disabled", async () => {
       const saved = PostgreSQLAdapter.decodeDates;
       PostgreSQLAdapter.decodeDates = false;
-      const connection = new PostgreSQLAdapter(PG_TEST_URL);
+      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
       try {
         const date = await connection.selectValue("select '2024-01-01'::date");
         expect(date).toBe("2024-01-01");
