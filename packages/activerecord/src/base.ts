@@ -233,7 +233,7 @@ import {
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
-import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
+import "./attribute-methods/composite-primary-key.js";
 import {
   defineMethodAttribute as _defineMethodAttribute,
   Read as _Read,
@@ -2329,7 +2329,6 @@ include(Base, _Write);
 include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
-include(Base, _CompositePrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
 include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));

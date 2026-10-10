@@ -1,4 +1,4 @@
-import { StringIO } from "@blazetrails/ruby-compat";
+import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -1229,95 +1229,28 @@ describeIfPg("PostgreSQLAdapter", () => {
       if (spy.mock.calls.length < n) throw new Error(`newClient not called ${n} time(s)`);
     };
 
-    it("disconnectBang orphans an in-flight acquire so it is not adopted by a racing reconnect", async () => {
+    it("disconnectBang waits behind a connect holding the adapter lock and closes the client it seats", async () => {
       const a = new PostgreSQLAdapter(PG_TEST_URL);
-      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(orphan, "end");
-      const first = defer();
-      const second = defer();
-      const spy = vi
-        .spyOn(PostgreSQLAdapter, "newClient")
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => second.promise);
-      try {
-        const firstAcquire = a.connect();
-        await waitForNewClientCalls(spy, 1);
-
-        await a.disconnectBang();
-
-        const reconnect = a.reconnect();
-        await waitForNewClientCalls(spy, 2);
-
-        first.resolve(orphan);
-        await expect(firstAcquire).rejects.toBeTruthy();
-
-        expect(endSpy).toHaveBeenCalled();
-        expect(a._rawConnectionForTest()).toBeNull();
-
-        second.resolve(reconnected);
-        await reconnect;
-        expect(a._rawConnectionForTest()).toBe(reconnected);
-      } finally {
-        spy.mockRestore();
-        await a.disconnectBang();
-        await orphan.end().catch(() => {});
-      }
-    });
-
-    it("discardBang orphans an in-flight acquire so no live client is installed", async () => {
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
-      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(orphan, "end");
+      const client = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(client, "end");
       const first = defer();
       const spy = vi
         .spyOn(PostgreSQLAdapter, "newClient")
         .mockImplementationOnce(() => first.promise);
       try {
-        const firstAcquire = a.connect();
+        const connecting = new Thread(() => a.lock.synchronize(() => a.connect())).value();
         await waitForNewClientCalls(spy, 1);
 
-        a.discardBang();
-
-        first.resolve(orphan);
-        await expect(firstAcquire).rejects.toBeTruthy();
+        const disconnecting = new Thread(() => a.disconnectBang()).value();
+        first.resolve(client);
+        await connecting;
+        await disconnecting;
 
         expect(endSpy).toHaveBeenCalled();
         expect(a._rawConnectionForTest()).toBeNull();
       } finally {
         spy.mockRestore();
-        await orphan.end().catch(() => {});
-      }
-    });
-
-    it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
-      const a = new PostgreSQLAdapter(PG_TEST_URL);
-      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
-      const endSpy = vi.spyOn(orphan, "end");
-      const first = defer();
-      const spy = vi
-        .spyOn(PostgreSQLAdapter, "newClient")
-        .mockImplementationOnce(() => first.promise)
-        .mockImplementationOnce(() => Promise.resolve(reconnected));
-      try {
-        const firstAcquire = a.connect();
-        await waitForNewClientCalls(spy, 1);
-
-        await a.disconnectBang();
-
-        await a.reconnect();
-        expect(a._rawConnectionForTest()).toBe(reconnected);
-
-        first.resolve(orphan);
-        await expect(firstAcquire).rejects.toBeTruthy();
-
-        expect(endSpy).toHaveBeenCalled();
-        expect(a._rawConnectionForTest()).toBe(reconnected);
-      } finally {
-        spy.mockRestore();
-        await a.disconnectBang();
-        await orphan.end().catch(() => {});
+        await client.end().catch(() => {});
       }
     });
 

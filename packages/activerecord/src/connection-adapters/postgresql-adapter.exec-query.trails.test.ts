@@ -29,10 +29,6 @@ async function makeAdapter(
   const fakeClient = { query: queryImpl, release: () => {} };
   (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
   adapter.verifiedBang();
-  vi.spyOn(
-    adapter as unknown as { _acquireFreshClient: () => unknown },
-    "_acquireFreshClient",
-  ).mockResolvedValue(fakeClient);
   adapter.typeMap.aliasType(UUID_OID, "uuid");
   adapter.typeMap.aliasType(23, "int4");
   return adapter;
@@ -169,10 +165,6 @@ describe("PostgreSQLAdapter#execQuery prepare override", () => {
     };
     (adapter as unknown as { _rawConnection: unknown })._rawConnection = fakeClient;
     adapter.verifiedBang();
-    vi.spyOn(
-      adapter as unknown as { _acquireFreshClient: () => unknown },
-      "_acquireFreshClient",
-    ).mockResolvedValue(fakeClient);
   });
 
   afterEach(async () => {

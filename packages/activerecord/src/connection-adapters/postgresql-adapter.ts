@@ -415,7 +415,8 @@ export class PostgreSQLAdapter
     return true;
   }
 
-  private _pgClientOptions: pg.ClientConfig | null = null;
+  /** @internal */
+  declare protected _connectionParameters: pg.ClientConfig;
   private _typeMap: HashLookupTypeMap | null = null;
   /** @internal */
   _typeMapForResults = new PGTypeMapByOid();
@@ -431,9 +432,6 @@ export class PostgreSQLAdapter
   private _caseInsensitiveCache: Record<string, boolean> | null = null;
   /** @internal */
   declare _statements: StatementPool;
-  private _acquireGeneration = 0;
-  private _acquiringGen = -1;
-  private _acquiring: Promise<pg.Client> | null = null;
   _noticeReceiverSqlWarnings: SQLWarning[] = [];
 
   async supportsCheckConstraints(): Promise<boolean> {
@@ -556,7 +554,7 @@ export class PostgreSQLAdapter
     }
     if (typeof config === "string") {
       this._minMessages = "warning";
-      this._pgClientOptions = {
+      this._connectionParameters = {
         connectionString: config,
         types: {
           getTypeParser: (oid: number, format?: string) => pgTypeParser(oid, format),
@@ -584,7 +582,7 @@ export class PostgreSQLAdapter
     const { username: railsUsername, ...pgDriverConfig } = pgConfig as typeof pgConfig & {
       username?: string;
     };
-    this._pgClientOptions = {
+    this._connectionParameters = {
       ...PostgreSQLAdapter._sliceValidConnParams({
         ...pgDriverConfig,
         ...(rtest(railsUsername) ? { user: railsUsername } : {}),
@@ -603,7 +601,7 @@ export class PostgreSQLAdapter
 
   override async active(): Promise<boolean> {
     const rawConnection = this._rawConnection;
-    if (rawConnection === null || this._pgClientOptions == null) return false;
+    if (!rawConnection) return false;
     try {
       await rawConnection.query(";");
       this.verifiedBang();
@@ -647,7 +645,6 @@ export class PostgreSQLAdapter
   override async disconnectBang(): Promise<void> {
     await this.lock.synchronize(async () => {
       await super.disconnectBang();
-      this._acquireGeneration++;
       try {
         await this._rawConnection?.end();
       } catch {}
@@ -1248,10 +1245,15 @@ export class PostgreSQLAdapter
     }
     return this._statements.get(sqlKey)!.name;
   }
-  /** @internal */
+  /**
+   * @internal
+   * @missingRailsName connectionParameters — PERMANENT
+   */
   async connect(): Promise<void> {
     try {
-      await this._acquireFreshClient();
+      this._rawConnection = (await (this.constructor as typeof PostgreSQLAdapter).newClient(
+        this._connectionParameters,
+      )) as PGConnection;
     } catch (ex) {
       if (ex instanceof ConnectionNotEstablished) throw ex.setPool(this.pool);
       throw ex;
@@ -1503,7 +1505,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
   /** @internal */
   set _rawConnection(value: PGConnection | null) {
-    this._acquireGeneration++;
     this._connection = value && pgConnection(value);
   }
 
@@ -1549,52 +1550,6 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
       "JOIN pg_type as t ON t.oid = to_regtype(a.name)",
       "LEFT JOIN pg_range as r ON t.oid = r.rngtypid",
     ].join("\n");
-  }
-
-  private async _acquireFreshClient(): Promise<pg.Client> {
-    if (this._pgClientOptions == null) {
-      throw new ConnectionNotEstablished("connection is closed");
-    }
-    if (this._rawConnection) {
-      return this._rawConnection;
-    }
-    if (!this._acquiring || this._acquiringGen !== this._acquireGeneration) {
-      const acquireGen = this._acquireGeneration;
-      const acquiring = this._doAcquire(acquireGen).finally(() => {
-        if (this._acquiring === acquiring) this._acquiring = null;
-      });
-      this._acquiring = acquiring;
-      this._acquiringGen = acquireGen;
-    }
-    return this._acquiring;
-  }
-
-  private async _doAcquire(acquireGen: number): Promise<pg.Client> {
-    let client: pg.Client | null = this._rawConnection;
-    if (client == null) {
-      let newClient: pg.Client;
-      try {
-        newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
-      } catch (error) {
-        if (error instanceof ConnectionNotEstablished) {
-          error.setPool(this.pool);
-        }
-        throw error;
-      }
-      const staleGeneration = acquireGen !== this._acquireGeneration;
-      if (this._pgClientOptions == null || this._rawConnection != null || staleGeneration) {
-        newClient.end().catch(() => {});
-        if (this._pgClientOptions == null || staleGeneration) {
-          throw new ConnectionNotEstablished("connection is closed");
-        }
-        client = this._rawConnection!;
-      } else {
-        newClient.on("error", () => {});
-        this._rawConnection = newClient as PGConnection;
-        client = newClient;
-      }
-    }
-    return client;
   }
 
   /** @internal */

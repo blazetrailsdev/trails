@@ -6,7 +6,6 @@ import { ActiveRecord, Associations as AssociationsNamespace } from "./namespace
 
 import { ArgumentError } from "@blazetrails/activemodel";
 import { AssociationNotFoundError } from "./associations/errors.js";
-import { AssociationScope } from "./associations/association-scope.js";
 import type { Association as AssociationInstance } from "./associations/association.js";
 export { joinTableName as joinHabtmTableNames } from "./migration/join-table.js";
 import { Autoload, DescendantsTracker } from "@blazetrails/activesupport";
@@ -15,13 +14,11 @@ import { HasOne as HasOneBuilder } from "./associations/builder/has-one.js";
 import { HasMany as HasManyBuilder } from "./associations/builder/has-many.js";
 import { HasAndBelongsToMany as HabtmBuilder } from "./associations/builder/has-and-belongs-to-many.js";
 import * as Reflection from "./reflection.js";
-import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
 import {
   Module,
   include,
   rbClassInheritedP,
   rbClassSuperclass,
-  rbInspect,
   rbModConstSet,
   rbModName,
   registerConstant,
@@ -260,143 +257,11 @@ export function isAssociationCached(this: Base, name: string): boolean {
 }
 
 /** @internal */
-export function _ownerChainReflection(reflection: any): any {
-  const chain = reflection?.chain;
-  return (
-    (Array.isArray(chain) && chain.length ? chain[chain.length - 1] : null) ??
-    reflection?.throughReflection ??
-    reflection ??
-    null
-  );
-}
-
-/** @internal */
 export function _scopeForAssociation(model: typeof Base): Relation<Base> {
   return (
     (model as unknown as { scopeForAssociation?(): Relation<Base> }).scopeForAssociation?.() ??
     model.all()
   );
-}
-
-/** @internal */
-export function _builtAssociationScope(
-  record: Base,
-  assocName: string,
-  reflection: ReflectionLike,
-  targetModel: typeof Base,
-): Relation<Base> {
-  let instance: { disableJoins?: boolean; scope?: () => unknown } | undefined;
-  const assocFn = (record as { association?: (n: string) => unknown }).association;
-  if (typeof assocFn === "function") {
-    try {
-      instance = assocFn.call(record, assocName) as typeof instance;
-    } catch (e) {
-      if (e instanceof AssociationNotFoundError) {
-        instance = undefined;
-      } else {
-        throw e;
-      }
-    }
-  }
-  if (instance && !instance.disableJoins && typeof instance.scope === "function") {
-    return instance.scope() as Relation<Base>;
-  }
-  return AssociationScope.scope({
-    owner: record,
-    reflection: reflection as never,
-    klass: targetModel,
-  }) as Relation<Base>;
-}
-
-/** @internal */
-export function _inlineOwnerKey(
-  ctor: typeof Base,
-  options: AssociationOptions,
-  primaryKey: string | string[],
-): string | string[] {
-  if (options.primaryKey !== undefined) {
-    return primaryKey;
-  }
-  if (options.queryConstraints || hasQueryConstraints.call(ctor as any)) {
-    return queryConstraintsList.call(ctor as any) ?? primaryKey;
-  }
-  if (Array.isArray(primaryKey)) {
-    return primaryKey.includes("id") ? "id" : primaryKey;
-  }
-  return primaryKey;
-}
-
-/**
- * Resolve the foreign-key column(s) and matching owner-key column(s) for an
- * inline (no-reflection) polymorphic (`options.as`) association fallback,
- * mirroring the reflection path: `reflection.activeRecordPrimaryKey` for the
- * owner key and `BelongsToReflection#deriveFkQueryConstraints` for the
- * foreign key (reflection.rb).
- *
- * For a query_constraints owner the scalar `${as}_id` FK widens to the
- * composite `[shardKey, ${as}_id]` and the owner key becomes the
- * query_constraints list — so the inline fallback keys against the full
- * query_constraints list (e.g. `[blog_id, id]`) like AssociationScope, not
- * the scalar `id` alone. A plain (non-query_constraints) owner keeps the
- * scalar FK and the `_inlineOwnerKey`-resolved scalar key.
- *
- * @internal trails-only inline fallback helper (no Rails public counterpart);
- * exported solely so its underivable-query_constraints raise can be unit-tested.
- */
-export function _inlinePolymorphicKeys(
-  ctor: typeof Base,
-  options: AssociationOptions,
-  primaryKey: string | string[],
-  scalarFk: string,
-): { fkCols: string[]; ownerKeyCols: string[] } {
-  if (
-    options.primaryKey === undefined &&
-    (options.queryConstraints || hasQueryConstraints.call(ctor as any))
-  ) {
-    const qc = options.queryConstraints ?? queryConstraintsList.call(ctor as any);
-    if (qc) {
-      const ownerPk = ctor.primaryKey;
-
-      if (qc.length > 2) {
-        throw new ArgumentError(
-          `The query constraints list on the \`${ctor.name}\` model has more than 2 ` +
-            `attributes. Active Record is unable to derive the query constraints ` +
-            `for the association. You need to explicitly define the query constraints ` +
-            `for this association.`,
-        );
-      }
-
-      const ownerPkStr = Array.isArray(ownerPk) ? undefined : ownerPk;
-      if (!ownerPkStr || !qc.includes(ownerPkStr)) {
-        throw new ArgumentError(
-          `The query constraints on the \`${ctor.name}\` model does not include the primary ` +
-            `key so Active Record is unable to derive the foreign key constraints for ` +
-            `the association. You need to explicitly define the query constraints for this ` +
-            `association.`,
-        );
-      }
-
-      if (qc.includes(scalarFk)) {
-        return { fkCols: [scalarFk], ownerKeyCols: [ownerPkStr] };
-      }
-
-      const [firstKey, lastKey] = qc;
-      if (firstKey === ownerPkStr) {
-        return { fkCols: [scalarFk, lastKey], ownerKeyCols: qc };
-      } else if (lastKey === ownerPkStr) {
-        return { fkCols: [firstKey, scalarFk], ownerKeyCols: qc };
-      }
-
-      throw new ArgumentError(
-        `Active Record couldn't correctly interpret the query constraints ` +
-          `for the \`${ctor.name}\` model. The query constraints on \`${ctor.name}\` are ` +
-          `\`${rbInspect(qc)}\` and the foreign key is \`${scalarFk}\`. ` +
-          `You need to explicitly set the query constraints for this association.`,
-      );
-    }
-  }
-  const ownerKey = _inlineOwnerKey(ctor, options, primaryKey);
-  return { fkCols: [scalarFk], ownerKeyCols: Array.isArray(ownerKey) ? ownerKey : [ownerKey] };
 }
 
 /** @internal */

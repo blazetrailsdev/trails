@@ -4,7 +4,6 @@ import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
 interface PrivatePgAdapter {
   _rawConnection: unknown;
-  _acquireFreshClient: () => Promise<unknown>;
   reconnect: () => void;
   resetBang: () => void;
   lock: { synchronize: <T>(fn: () => Promise<T> | T) => Promise<T> };
@@ -18,22 +17,6 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     if (adapter) await adapter.disconnectBang().catch(() => undefined);
-  });
-
-  it("routes every concurrent caller to the same persistent client", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
-
-    const persistentClient = {
-      query: async () => ({ rows: [], fields: [] }),
-    };
-    adapter._rawConnection = persistentClient;
-    vi.spyOn(adapter, "_acquireFreshClient").mockResolvedValue(persistentClient);
-
-    const work = Array.from({ length: 11 }, () => adapter._acquireFreshClient());
-    const seen = await Promise.all(work);
-
-    expect(seen).toHaveLength(11);
-    for (const c of seen) expect(c).toBe(persistentClient);
   });
 
   it("isConnected() reflects the raw pg.Client finished? state", () => {
@@ -102,38 +85,5 @@ describe("PostgreSQLAdapter#getClient (single persistent connection)", () => {
     await foreign;
 
     expect(order).toEqual(["ROLLBACK", "DISCARD ALL", "discard-end", "foreign"]);
-  });
-
-  it("serializes the initial connect so concurrent callers share one pg.Client", async () => {
-    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 }) as unknown as PrivatePgAdapter;
-
-    let openCount = 0;
-    let resolveConnect: (() => void) | null = null;
-    const connectGate = new Promise<void>((r) => {
-      resolveConnect = r;
-    });
-    const fakeClient = {
-      query: async () => ({ rows: [], fields: [] }),
-      connect: async () => {
-        openCount++;
-        await connectGate;
-      },
-      end: async () => {},
-      on: () => fakeClient,
-    };
-    const pgModule = (await import("pg")).default;
-    vi.spyOn(pgModule, "Client" as never).mockImplementation((() => fakeClient) as never);
-    vi.spyOn(
-      adapter as unknown as { configureConnection: () => Promise<void> },
-      "configureConnection",
-    ).mockResolvedValue(undefined);
-
-    const calls = Array.from({ length: 5 }, () => adapter._acquireFreshClient());
-    await Promise.resolve();
-    resolveConnect!();
-    const clients = await Promise.all(calls);
-
-    expect(openCount).toBe(1);
-    for (const c of clients) expect(c).toBe(fakeClient);
   });
 });
