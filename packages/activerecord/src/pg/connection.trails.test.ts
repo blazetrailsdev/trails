@@ -199,6 +199,7 @@ describe("PG::Error", () => {
     expect(bug).not.toBeInstanceOf(PG.Error);
     for (const driver of [
       Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+      Object.assign(new Error("getaddrinfo EAI_AGAIN db"), { code: "EAI_AGAIN" }),
       new Error("Query read timeout"),
     ]) {
       await pgConnection({ query: () => Promise.reject(driver) })
