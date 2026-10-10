@@ -2031,7 +2031,6 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
 
 extend(Base, ConnectionHandling.ConnectionHandling);
 extend(Base, Inheritance.ClassMethods);
-prepend(Base, { initializeClone: Inheritance.initializeClone as PrependMethod });
 extend(Base, LockingOptimistic.ClassMethods);
 extend(Base, SignedId.ClassMethods);
 extend(Base, _Persistence.ClassMethods);

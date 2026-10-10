@@ -134,17 +134,17 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-export class ClassMethods {
-  static get abstractClass(): boolean {
+export const ClassMethods = new Module().include({
+  get abstractClass(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
       ? (this as any)._abstractClass
       : false;
-  }
+  },
 
-  static set abstractClass(value: boolean) {
+  set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
-  }
-}
+  },
+});
 
 /** @internal */
 export function findStiClass(this: typeof Base, typeName: string): typeof Base {
@@ -216,14 +216,12 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   return modelClass.computeType(name);
 }
 
-export function initializeClone(
-  this: typeof Base,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeClone(this: typeof Base, other: unknown): void {
+  ClassMethods.superMethod(this, "initializeClone")!(other);
   setBaseClass(this);
 }
+
+ClassMethods.defineMethod("initializeClone", initializeClone);
 
 export function initializeDup(this: Base, other: unknown): void {
   Inheritance.superMethod(this, "initializeDup")!(other);

@@ -1831,7 +1831,8 @@ export function extend<T extends AnyClass | object>(
  * Ruby's `Kernel`, the module `Object` includes and so the last stop of every
  * method search. It holds the instance methods a module's `super` reaches when
  * nothing beneath it in the receiver's ancestry defines one: `initialize_dup`
- * (vendor/ruby/v3.3.11/object.c:654 `rb_obj_init_dup_clone`, which sends
+ * and `initialize_clone` (vendor/ruby/v3.3.11/object.c:654
+ * `rb_obj_init_dup_clone` and :671 `rb_obj_init_clone`, which send
  * `initialize_copy`) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
  * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
@@ -1841,6 +1842,12 @@ export function extend<T extends AnyClass | object>(
 export const Kernel = new Module((mod) => {
   /** @noRailsEquivalent PERMANENT */
   mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
+    const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
+    if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
+    return this;
+  });
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("initializeClone", function (this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;
     if (typeof initializeCopy === "function") initializeCopy.call(this, orig);
     return this;
