@@ -21,7 +21,7 @@ import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { toS } from "@blazetrails/ruby-compat";
 
-/** @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer */
+/** @inventedArm if — CONVERGEABLE sqlite3-quote-asks-finite-through-a-number-or-bigdecimal-ternary */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || value instanceof BigDecimal) {
     if (value instanceof BigDecimal ? value.isFinite() : Number.isFinite(value)) {

@@ -185,8 +185,8 @@ export async function virtualTableExists(
 }
 
 /**
- * @inventedArm loop — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
- * @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
+ * @inventedArm loop — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
+ * @inventedArm if — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
  */
 export async function checkConstraints(
   this: SQLite3SchemaAdapter,
