@@ -3,19 +3,23 @@ import type { AssociationReflection, ThroughReflection } from "../../reflection.
 import { Association } from "./association.js";
 import { Associations } from "../../namespaces.js";
 import { any } from "@blazetrails/activesupport";
-import { first, isEmpty, rbObjRespondTo, union, uniq } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  first,
+  isEmpty,
+  rbObjRespondTo,
+  reduce,
+  union,
+  uniq,
+} from "@blazetrails/ruby-compat";
 
 type AssociationLikeReflection = AssociationReflection | ThroughReflection;
-
-function merge(acc: Map<Base, Base[]>, recordsByOwner: Map<Base, Base[]>): Map<Base, Base[]> {
-  return new Map([...acc, ...recordsByOwner]);
-}
 
 export class ThroughAssociation extends Association {
   private _sourcePreloaders: Association[] | undefined;
   private _throughPreloaders: Association[] | undefined;
-  private _sourceRecordsByOwner: Map<Base, Base[]> | undefined;
-  private _throughRecordsByOwner: Map<Base, Base[]> | undefined;
+  private _sourceRecordsByOwner: Map<Base, Base[]> | null | undefined;
+  private _throughRecordsByOwner: Map<Base, Base[]> | null | undefined;
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
 
@@ -30,7 +34,7 @@ export class ThroughAssociation extends Association {
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     if (this._recordsByOwner !== undefined) return this._recordsByOwner;
 
-    const result = new Map<Base, Base[]>();
+    const result = new Hash<Base, Base[]>();
 
     for (const owner of this.owners) {
       if (this.isLoaded(owner)) {
@@ -38,7 +42,7 @@ export class ThroughAssociation extends Association {
         continue;
       }
 
-      let throughRecords = (await this.throughRecordsByOwner()).get(owner) ?? [];
+      let throughRecords = (await this.throughRecordsByOwner())!.get(owner) ?? [];
 
       if (first(this.owners)!.association(this.throughReflection.name).loaded) {
         const sourceType = this.reflection.options.sourceType;
@@ -49,7 +53,7 @@ export class ThroughAssociation extends Association {
         }
       }
 
-      const sourceRecordsByOwner = await this.sourceRecordsByOwner();
+      const sourceRecordsByOwner = (await this.sourceRecordsByOwner())!;
       let records = throughRecords.flatMap((record) => sourceRecordsByOwner.get(record) ?? []);
 
       records = records.filter((record) => record != null);
@@ -128,24 +132,24 @@ export class ThroughAssociation extends Association {
   }
 
   private async middleRecords(): Promise<Base[]> {
-    return [...(await this.throughRecordsByOwner()).values()].flat();
+    return [...(await this.throughRecordsByOwner())!.values()].flat();
   }
 
   /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
-  private async sourceRecordsByOwner(): Promise<Map<Base, Base[]>> {
+  private async sourceRecordsByOwner(): Promise<Map<Base, Base[]> | null> {
     return (this._sourceRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.sourcePreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      return recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]> | null;
     })());
   }
 
   /** @missingRailsCall map — CONVERGEABLE preloader-through-records-by-owner-map-awaits-each-loader */
-  private async throughRecordsByOwner(): Promise<Map<Base, Base[]>> {
+  private async throughRecordsByOwner(): Promise<Map<Base, Base[]> | null> {
     return (this._throughRecordsByOwner ??= await (async () => {
       const recordsByOwner: Map<Base, Base[]>[] = [];
       for (const l of await this.throughPreloaders()) recordsByOwner.push(await l.recordsByOwner());
-      return recordsByOwner.reduce(merge, new Map<Base, Base[]>());
+      return reduce(recordsByOwner, ":merge") as Map<Base, Base[]> | null;
     })());
   }
 

@@ -10,7 +10,16 @@ import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.j
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
-import { fetch, rbEqual, rbRegMatchP, RuntimeError, slice, toS } from "@blazetrails/ruby-compat";
+import {
+  fetch,
+  include,
+  Module,
+  rbEqual,
+  rbRegMatchP,
+  RuntimeError,
+  slice,
+  toS,
+} from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   bigserial(...names: string[]): unknown;
@@ -78,6 +87,26 @@ export interface ColumnMethods {
   enum(...names: string[]): unknown;
   enum(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
+
+function primaryKey(
+  this: object,
+  name: string,
+  type: ColumnType = "primary_key",
+  options: ColumnOptions = {},
+): unknown {
+  if (type === "uuid") {
+    options = {
+      ...options,
+      default: fetch(options as Record<string, unknown>, "default", "gen_random_uuid()"),
+    };
+  }
+
+  return ColumnMethods.superMethod(this, "primaryKey")!(name, type, options);
+}
+
+export const ColumnMethods = new Module();
+
+ColumnMethods.defineMethod("primaryKey", primaryKey);
 
 export interface ExclusionConstraintOptions {
   name?: string;
@@ -280,25 +309,12 @@ export class TableDefinition extends AbstractTableDefinition {
       return "serial";
     }
   }
-
-  override primaryKey(
-    name: string,
-    type: ColumnType = "primary_key",
-    options: ColumnOptions = {},
-  ): this {
-    if (type === "uuid") {
-      options = {
-        ...options,
-        default: fetch(options as Record<string, unknown>, "default", "gen_random_uuid()"),
-      };
-    }
-
-    return super.primaryKey(name, type, options);
-  }
 }
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:246`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
+
+include(TableDefinition, ColumnMethods);
 
 TableDefinition.defineColumnMethods(
   "bigserial",
@@ -390,6 +406,8 @@ export class Table extends AbstractTable {
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`postgresql/schema_definitions.rb:304`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
+
+include(Table, ColumnMethods);
 
 Table.defineColumnMethods(
   "bigserial",

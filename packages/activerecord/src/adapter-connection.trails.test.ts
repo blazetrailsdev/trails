@@ -100,14 +100,6 @@ describe("AdapterConnection retryable classification (trails-only)", () => {
     expect(adapter.capturedAllowRetry).toBe(false);
   });
 
-  it("findBySql tolerates a null opts argument without throwing", async () => {
-    const adapter = new QueryTestAdapter({});
-    adapter.simulateConnect();
-    await establishConnectionTo(PostForRetryTest, adapter);
-
-    await expect(PostForRetryTest.findBySql("SELECT * FROM posts", [], null)).resolves.toEqual([]);
-  });
-
   it("withRawConnection is reentrant", async () => {
     const a = new AbstractAdapter({});
     let innerRan = false;

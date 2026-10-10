@@ -1,6 +1,6 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ActiveSupport, any, Autoload, InheritableOptions } from "@blazetrails/activesupport";
-import { ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbEqq, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
 import { ActiveRecord } from "./namespaces.js";
 import type { SQLWarning } from "./errors.js";
@@ -87,13 +87,7 @@ export function setSchemaCacheIgnoredTables(
 }
 
 export function isSchemaCacheIgnoredTable(tableName: string): boolean {
-  return any(schemaCacheIgnoredTables(), (ignored) => {
-    if (ignored instanceof RegExp) {
-      ignored.lastIndex = 0;
-      return ignored.test(tableName);
-    }
-    return ignored === tableName;
-  });
+  return any(schemaCacheIgnoredTables(), (ignored) => rbEqq(ignored, tableName));
 }
 
 export function databaseCli(): Record<string, string | string[]> {

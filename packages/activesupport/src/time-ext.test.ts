@@ -383,13 +383,13 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    const t = d(2005, 2, 4, 10, 10, 10);
+    const t = RubyTime.utc(2005, 2, 4, 10, 10, 10);
     const result = toFs(t);
     expect(result).toContain("2005");
   });
 
   it("to fs db", () => {
-    const t = d(2005, 2, 4, 10, 10, 10);
+    const t = RubyTime.utc(2005, 2, 4, 10, 10, 10);
     const result = toFs(t, "db");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
@@ -615,7 +615,7 @@ describe("TimeExtCalculationsTest", () => {
   });
 
   it("to fs custom date format", () => {
-    const t = d(2005, 2, 22, 10, 10, 10);
+    const t = RubyTime.utc(2005, 2, 22, 10, 10, 10);
     const result = toFs(t, "db");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });
@@ -792,7 +792,7 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    const date = d(2005, 2, 21);
+    const date = RubyTime.utc(2005, 2, 21);
     const result = toFs(date);
     expect(result).toContain("2005");
   });
@@ -862,13 +862,13 @@ describe("DateExtCalculationsTest", () => {
   });
 
   it("to fs with single digit day", () => {
-    const date = d(2005, 2, 1);
+    const date = RubyTime.utc(2005, 2, 1);
     const result = toFs(date);
     expect(result).toContain("2005");
   });
 
   it("readable inspect", () => {
-    const date = d(2005, 2, 21);
+    const date = RubyTime.utc(2005, 2, 21);
     const result = toFs(date);
     expect(typeof result).toBe("string");
     expect(result.length).toBeGreaterThan(0);
@@ -1166,7 +1166,7 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("to fs", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = RubyTime.utc(2005, 2, 22, 10, 10, 10);
     const result = toFs(dt);
     expect(result).toContain("2005");
   });
@@ -1367,13 +1367,13 @@ describe("DateTimeExtCalculationsTest", () => {
   });
 
   it("readable inspect", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = RubyTime.utc(2005, 2, 22, 10, 10, 10);
     const result = toFs(dt);
     expect(typeof result).toBe("string");
   });
 
   it("to fs with custom date format", () => {
-    const dt = d(2005, 2, 22, 10, 10, 10);
+    const dt = RubyTime.utc(2005, 2, 22, 10, 10, 10);
     const result = toFs(dt, "db");
     expect(result).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
   });

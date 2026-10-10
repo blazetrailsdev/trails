@@ -1,6 +1,7 @@
-import { CodeGenerator, include, indexWith, Module, toFs } from "@blazetrails/activesupport";
+import { CodeGenerator, include, indexWith, Module } from "@blazetrails/activesupport";
 import { AttributeMethods as AMAttributeMethods, Model } from "@blazetrails/activemodel";
 import {
+  rbFSend,
   type Concurrent,
   type Hash,
   hasKey,
@@ -467,13 +468,14 @@ export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: str
   return dangerousAttributeMethods().has(name);
 }
 
+/** @inventedArm if — CONVERGEABLE method-defined-within-branches-on-a-module-receiver */
 export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
   superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
-  if (name in klass.prototype) {
+  if (klass instanceof Module ? klass.isMethodDefined(name) : name in klass.prototype) {
     if (superklass?.prototype != null && name in superklass.prototype) {
       return instanceMethodOwner(klass, name) !== instanceMethodOwner(superklass, name);
     } else {
@@ -564,12 +566,8 @@ export function formatForInspect(
     let inspectedValue: string;
     if (typeof value === "string" && value.length > 50) {
       inspectedValue = inspect(`${value.slice(0, 50)}...`);
-    } else if (
-      value instanceof Temporal.PlainDate ||
-      value instanceof RubyTime ||
-      value instanceof Temporal.Instant
-    ) {
-      inspectedValue = `"${toFs(value, "inspect")}"`;
+    } else if (value instanceof Temporal.PlainDate || value instanceof RubyTime) {
+      inspectedValue = `"${rbFSend(value, "toFs", "inspect")}"`;
     } else {
       inspectedValue = inspect(value);
     }

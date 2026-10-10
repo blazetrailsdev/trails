@@ -29,7 +29,7 @@ import {
 } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "./hash-utils.js";
 import { Encoding } from "./json/encoding.js";
-import { DATE_FORMATS, toFs } from "./core-ext/time/conversions.js";
+import { DATE_FORMATS } from "./core-ext/time/conversions.js";
 import {
   change as timeChange,
   type ChangeOptions as TimeChangeOptions,
@@ -528,7 +528,7 @@ export class TimeWithZone {
 
   toFs(format: string = "default"): string {
     if (format === "db") {
-      return toFs(this.utc(), format);
+      return this.utc().toFs(format);
     } else {
       const formatter = DATE_FORMATS[format];
       if (formatter != null) {

@@ -92,6 +92,7 @@ function makeModel(
     connectionPool: () => mockPool(adapter),
     unscoped: (block: () => unknown) => block(),
     loadSchema: async () => {},
+    definedEnums: {},
     columns: () => Object.values(doubleColumnsHash(tableName, { [tableName]: [pk] })),
     typeForAttribute: () => ({ type: () => "integer" }),
     findByBang: vi.fn(async (attrs: Record<string, unknown>) => rows.get(attrs[pk]) ?? null),

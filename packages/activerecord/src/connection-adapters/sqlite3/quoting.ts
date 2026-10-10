@@ -21,6 +21,7 @@ import { Database } from "../../sqlite/database.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { toS } from "@blazetrails/ruby-compat";
 
+/** @inventedArm if — CONVERGEABLE sqlite3-quote-asks-finite-through-a-number-or-bigdecimal-ternary */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || value instanceof BigDecimal) {
     if (value instanceof BigDecimal ? value.isFinite() : Number.isFinite(value)) {
@@ -46,8 +47,8 @@ export function quotedTime(this: QuotingDispatchHost, value: QuotedTimeValue): s
   return this.quotedDate(value).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
-const QUOTED_COLUMN_NAMES = new Map<unknown, string>();
-const QUOTED_TABLE_NAMES = new Map<unknown, string>();
+const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
+const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
 export function quotedBinary(value: BinaryData): string {
   return `x'${value.hex()}'`;
@@ -81,6 +82,7 @@ export function quoteDefaultExpression(
   return abstractQuoteDefaultExpression.call(this, value, column);
 }
 
+/** @inventedArm if — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return BigInt(value ? this.unquotedTrue() : this.unquotedFalse());
@@ -101,21 +103,12 @@ const DANGEROUS_KEYWORDS =
   /\b(?:SELECT|INSERT|UPDATE|DELETE|DROP|ALTER|CREATE|UNION|INTO|FROM|WHERE|EXEC|EXECUTE)\b/i;
 
 export function quoteColumnName(name: unknown): string {
-  let quoted = QUOTED_COLUMN_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""')}"`;
-    QUOTED_COLUMN_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_COLUMN_NAMES[name as string] ||= `"${toS(name).replace(/"/g, '""')}"`);
 }
 
 export function quoteTableName(name: unknown): string {
-  let quoted = QUOTED_TABLE_NAMES.get(name);
-  if (quoted === undefined) {
-    quoted = `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`;
-    QUOTED_TABLE_NAMES.set(name, quoted);
-  }
-  return quoted;
+  return (QUOTED_TABLE_NAMES[name as string] ||=
+    `"${toS(name).replace(/"/g, '""').replace(/\./g, '"."')}"`);
 }
 
 function skipBalancedParens(s: string, pos: number): number {

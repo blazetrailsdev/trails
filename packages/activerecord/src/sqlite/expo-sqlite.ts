@@ -313,6 +313,11 @@ class ExpoSqliteConnection implements SqliteConnection {
     }
   }
 
+  async rollback(): Promise<true> {
+    await this.execute("rollback transaction");
+    return true;
+  }
+
   async getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): Promise<unknown> {
     const row = (await this.execute(sql, bindVars))[0];
     if (row) return Object.values(row as object)[0];

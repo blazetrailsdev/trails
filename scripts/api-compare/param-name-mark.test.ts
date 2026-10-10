@@ -5,6 +5,7 @@ import {
   MARK_PATH,
   exceedances,
   measure,
+  staleMarkFailure,
   staleMarks,
   tightened,
   unmarkedPackages,
@@ -61,6 +62,16 @@ describe("staleMarks", () => {
       { package: "arel", dimension: "total", mark: 2, current: 1 },
       { package: "arel", dimension: "a.rb", mark: 2, current: 1 },
     ]);
+  });
+
+  it("fails the gate, naming each row and the tighten script", () => {
+    const marks: ParamNameMarks = { arel: { total: 2, byFile: { "a.rb": 2 } } };
+    const stale = staleMarks(marks, measure([row("arel", "a.rb")]));
+    const failure = staleMarkFailure("param-name gate", "parity:api:params:tighten", stale)!;
+    expect(failure).toContain("param-name gate: 2 STALE mark dimension(s)");
+    expect(failure).toContain("pnpm parity:api:params:tighten");
+    expect(failure).toContain("arel  a.rb: mark 2 → current 1");
+    expect(staleMarkFailure("param-name gate", "t", staleMarks(marks, marks))).toBeNull();
   });
 });
 

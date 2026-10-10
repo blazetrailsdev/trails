@@ -174,7 +174,10 @@ export async function internalBeginTransaction(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ */
 export async function performQuery(
   this: PerformQueryHost,
   rawConnection: SqliteConnection,

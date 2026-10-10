@@ -20,16 +20,17 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
-import { rbObjAsString, rbObjClassname, sprintf, TypeError } from "@blazetrails/ruby-compat";
+import {
+  rbFSend,
+  rbObjAsString,
+  rbObjClassname,
+  sprintf,
+  TypeError,
+} from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { Value as TimeValue } from "../../type/time.js";
-import { toFs as timeToFs } from "@blazetrails/activesupport";
-import { toFs as dateToFs } from "@blazetrails/activesupport/core-ext/date/conversions";
-import {
-  toFs as dateTimeToFs,
-  usec as dateTimeUsec,
-} from "@blazetrails/activesupport/core-ext/date-time/conversions";
+import { usec as dateTimeUsec } from "@blazetrails/activesupport/core-ext/date-time/conversions";
 
 export interface QuotingClassMethods {
   quoteColumnName(columnName: unknown): string;
@@ -201,7 +202,7 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
     }
   }
 
-  const result = toFs(value, "db");
+  const result = rbFSend(value, "toFs", "db") as string;
   if (!(value instanceof Temporal.PlainDate) && usec(value) > 0) {
     return result + "." + sprintf("%06d", usec(value));
   } else {
@@ -290,15 +291,6 @@ function getutc(value: TimeLike): Temporal.ZonedDateTime {
 /** Ruby's `Time#getlocal` (`vendor/ruby/v3.3.11/time.c:4374`). */
 function getlocal(value: TimeLike): Temporal.ZonedDateTime {
   return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
-}
-
-function toFs(value: TemporalDateLike, format: string): string {
-  if (value instanceof TimeWithZone) return value.toFs(format);
-  if (value instanceof Temporal.PlainDate) return dateToFs(value, format);
-  if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
-    return dateTimeToFs(value, format);
-  }
-  return timeToFs(value, format);
 }
 
 /** Ruby's `Time#usec` (`vendor/ruby/v3.3.11/time.c:3861`) and `DateTime#usec` (`activesupport/lib/active_support/core_ext/date_time/conversions.rb:89`). */

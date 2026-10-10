@@ -8,6 +8,7 @@ import {
   rbObjAsString,
   rbObjRespondTo,
   rtest,
+  toS,
 } from "@blazetrails/ruby-compat";
 import { UnknownPrimaryKey } from "../errors.js";
 import { stripThenable } from "@blazetrails/activesupport";
@@ -224,10 +225,8 @@ function resolveAttributes(record: any, attributes: string[]): string[] {
 
 /** @internal */
 function mapEnumAttribute(klass: any, attribute: string, value: unknown): unknown {
-  const enums = klass?.definedEnums?.[String(attribute)];
-  if (value != null && enums && Object.prototype.hasOwnProperty.call(enums, String(value))) {
-    return (enums as Record<string, unknown>)[String(value)];
-  }
+  const mapping = klass.definedEnums[toS(attribute)];
+  if (value != null && value !== false && mapping != null) value = mapping.get(value);
   return value;
 }
 

@@ -24,12 +24,12 @@ describe("NoTouching.klasses", () => {
     });
   });
 
-  it("pops when the block raises", () => {
-    expect(() =>
+  it("pops when the block raises", async () => {
+    await expect(
       applyTo(Base, () => {
         throw new Error("boom");
       }),
-    ).toThrow("boom");
+    ).rejects.toThrow("boom");
 
     expect(isAppliedTo(Base)).toBe(false);
   });

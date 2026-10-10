@@ -605,3 +605,37 @@ describeIfPostgresqlAdapter("TableDefinition#validColumnDefinitionOptions", () =
     expect(opts).toContain("ifNotExists");
   });
 });
+
+describe("ColumnMethods#primary_key", () => {
+  function table() {
+    const addColumn = vi.fn();
+    const t = new Table("posts", { addColumn } as unknown as SchemaStatementsConstraintLike);
+    return { t, addColumn };
+  }
+
+  it("defaults a uuid primary key to gen_random_uuid() on change_table", async () => {
+    const { t, addColumn } = table();
+
+    await t.primaryKey("id", "uuid");
+
+    expect(addColumn).toHaveBeenCalledWith("posts", "id", "uuid", {
+      default: "gen_random_uuid()",
+      primaryKey: true,
+    });
+  });
+
+  it("keeps an explicit nil default and leaves other types alone", async () => {
+    const { t, addColumn } = table();
+
+    await t.primaryKey("id", "uuid", { default: null });
+    await t.primaryKey("other_id");
+
+    expect(addColumn).toHaveBeenNthCalledWith(1, "posts", "id", "uuid", {
+      default: null,
+      primaryKey: true,
+    });
+    expect(addColumn).toHaveBeenNthCalledWith(2, "posts", "other_id", "primary_key", {
+      primaryKey: true,
+    });
+  });
+});

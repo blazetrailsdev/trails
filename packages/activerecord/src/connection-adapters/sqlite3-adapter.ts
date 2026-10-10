@@ -8,6 +8,7 @@ import {
   rbRegMatchP,
   rbStrPartition,
   registerConstant,
+  rbObjAsString,
 } from "@blazetrails/ruby-compat";
 import type { SqliteConnection, SqliteDriver, SqliteStatement } from "../sqlite-adapter.js";
 import { SQLite3Constants } from "../sqlite-adapter.js";
@@ -178,27 +179,22 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     classAttribute.call(this, "strictStringsByDefault", { default: false });
   }
 
-  /**
-   * @missingRailsName config — PERMANENT
-   * @missingRailsName toS — PERMANENT
-   */
+  /** @missingRailsName config — PERMANENT */
   constructor(config: SQLite3Config) {
-    const { database, ...options } = config;
-    let filename = database ?? "";
-    const strict = hasKey(options, "strict")
-      ? options.strict!
-      : SQLite3Adapter.strictStringsByDefault;
-    super({ ...options, strict });
+    super(config);
 
     this._memoryDatabase = false;
-    if (filename === "") {
+    const database = rbObjAsString(this._config.database);
+    if (database === "") {
       throw new ArgumentError("No database file specified. Missing argument: database");
-    } else if (filename === ":memory:") {
+    } else if (database === ":memory:") {
       this._memoryDatabase = true;
-    } else if (/^file:/.test(filename)) {
+    } else if (/^file:/.test(database)) {
     } else {
-      if (trailsRoot() != null) filename = File.expandPath(filename, trailsRoot()!);
-      const dirname = File.dirname(filename);
+      if (trailsRoot() != null) {
+        this._config.database = File.expandPath(this._config.database as string, trailsRoot()!);
+      }
+      const dirname = File.dirname(this._config.database as string);
       if (!File.isDirectory(dirname)) {
         try {
           FileUtils.mkdirP(dirname);
@@ -208,17 +204,21 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
         }
       }
     }
-    this._filename = filename;
-    this._strict = strict;
+
+    if (!hasKey(this._config, "strict")) {
+      this._config.strict = SQLite3Adapter.strictStringsByDefault;
+    }
     this._connectionParameters = merge(this._config as SQLite3Config, {
-      database: filename,
+      database: rbObjAsString(this._config.database),
       resultsAsHash: true,
       defaultTransactionMode: "immediate",
     });
   }
 
   override async databaseExists(): Promise<boolean> {
-    return this._memoryDatabase || File.isExist(this._filename);
+    return (
+      this._config.database === ":memory:" || File.isExist(rbObjAsString(this._config.database))
+    );
   }
 
   override supportsDdlTransactions(): boolean {
@@ -245,12 +245,10 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   }
   /** @internal */
   _connectionParameters: SQLite3ConnectionParameters;
-  private _strict: boolean;
   /** @internal */
   _lastAffectedRows = 0;
   _lastInsertRowid: number | bigint = 0;
   private _memoryDatabase: boolean;
-  private _filename: string;
   /** @internal */
   declare _statements: StatementPool;
 
@@ -1030,7 +1028,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await this._rawConnection!.exec("ROLLBACK");
+        await this._rawConnection!.rollback();
       } catch {}
     } else {
       await this.connect();
@@ -1113,7 +1111,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
 
   /** @internal */
   get _strictStrings(): boolean {
-    return this._strict;
+    return this._config.strict as boolean;
   }
 
   async _freshStatement(rawConnection: SqliteConnection, sql: string): Promise<SqliteStatement> {

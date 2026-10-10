@@ -1,5 +1,5 @@
 import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { max, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { max, rbObjDup, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 export class TypeConflictError extends Error {
   constructor(message?: string) {
@@ -163,6 +163,10 @@ export class DecorationRegistration extends Registration {
 
 export class AdapterSpecificRegistry {
   private _registrations: Registration[] = [];
+
+  initializeCopy(other: AdapterSpecificRegistry): void {
+    this._registrations = rbObjDup(this._registrations);
+  }
 
   /** @internal */
   private get registrations(): Registration[] {

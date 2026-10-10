@@ -1,5 +1,5 @@
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { eachCons, isBlank, isPresent, stripThenable, toFs } from "@blazetrails/activesupport";
+import { eachCons, isBlank, isPresent, stripThenable } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import {
   except,
@@ -364,7 +364,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   protected set _records(records: T[]) {
     this._recordsStore = records;
   }
-  protected _offsets?: Map<number, T | null>;
+  protected _offsets?: Record<number, T | null>;
   private _futureResult?: FutureResult | Complete | Promise<Result>;
   /** @internal */
   _loadResult?: Promise<T[]>;
@@ -1632,7 +1632,7 @@ export class Relation<T extends Base, G extends boolean = false> {
     }
 
     if (timestamp != null) {
-      return `${size}-${toFs(timestamp as Temporal.Instant, this.model.cacheTimestampFormat)}`;
+      return `${size}-${(timestamp as RubyTime).utc().toFs(this.model.cacheTimestampFormat)}`;
     }
     return `${size}`;
   }

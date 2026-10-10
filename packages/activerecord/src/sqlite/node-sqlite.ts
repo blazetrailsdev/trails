@@ -171,6 +171,11 @@ class NodeSqliteConnection implements SqliteConnection, SyncSqliteConnection {
     }
   }
 
+  rollback(): true {
+    this.execute("rollback transaction");
+    return true;
+  }
+
   getFirstValue(sql: string, ...bindVars: SqliteBindValue[]): unknown {
     const row = this.execute(sql, bindVars)[0];
     if (row) return Object.values(row as object)[0];

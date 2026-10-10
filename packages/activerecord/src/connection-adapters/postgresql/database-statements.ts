@@ -1,5 +1,5 @@
 import type { PGTypeMapByOid } from "./pg-text-decoder.js";
-import type { PG } from "../../pg/pg.js";
+import { PG } from "../../pg/pg.js";
 import type { PGConnection } from "../../pg/connection.js";
 import { ArgumentError, type ValueType } from "@blazetrails/activemodel";
 import { sql as arelSql, type Nodes } from "@blazetrails/arel";
@@ -269,7 +269,9 @@ export async function cancelAnyRunningQuery(this: CancelAnyRunningQueryHost): Pr
 
     await this._rawConnection.cancel();
     await this._rawConnection.block();
-  } catch {}
+  } catch (error) {
+    if (!(error instanceof PG.Error)) throw error;
+  }
 }
 
 /** @internal */

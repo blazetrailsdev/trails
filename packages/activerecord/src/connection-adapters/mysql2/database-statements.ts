@@ -8,7 +8,7 @@ import {
   type Mysql2Client,
   type Mysql2Result,
   type Mysql2Statement,
-} from "./mysql2-client.js";
+} from "../../mysql2/client.js";
 import { defaultTimezone } from "../../active-record.js";
 import { ExplainRegistry } from "../../explain-registry.js";
 

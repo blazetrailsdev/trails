@@ -366,7 +366,7 @@ function analyzeTsDepUsage(
   return result;
 }
 
-function visitMethodDeclarations(
+export function visitMethodDeclarations(
   sourceFile: ts.SourceFile,
   // anchor: the node whose leading trivia holds doc comments (e.g. VariableStatement, not its initializer)
   callback: (name: string, node: ts.Node, anchor: ts.Node) => void,
@@ -399,6 +399,20 @@ function visitMethodDeclarations(
             if (!isNotImplementedStub(decl.initializer.body)) {
               // anchor = VariableStatement so lint-deps-ignore above `const foo = ...` is found
               callback(decl.name.text, decl.initializer, node);
+            }
+          } else if (ts.isObjectLiteralExpression(decl.initializer)) {
+            for (const prop of decl.initializer.properties) {
+              if (
+                ts.isPropertyAssignment(prop) &&
+                ts.isIdentifier(prop.name) &&
+                (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
+              ) {
+                if (!isNotImplementedStub(prop.initializer.body)) {
+                  callback(prop.name.text, prop.initializer, prop);
+                }
+              } else if (!ts.isPropertyAssignment(prop)) {
+                visit(prop);
+              }
             }
           }
         }

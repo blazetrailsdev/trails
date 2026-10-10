@@ -1511,7 +1511,7 @@ describe("TimeExtCalculationsTest", () => {
   it("to fs custom date format", () => {
     DATE_FORMATS.custom = "%Y%m%d%H%M%S";
     try {
-      expect(toFs(utc(2005, 2, 21, 14, 30, 0), "custom")).toBe("20050221143000");
+      expect(toFs(RubyTime.utc(2005, 2, 21, 14, 30, 0), "custom")).toBe("20050221143000");
     } finally {
       delete DATE_FORMATS.custom;
     }

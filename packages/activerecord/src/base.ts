@@ -233,7 +233,7 @@ import {
   isDangerousAttributeMethod as _pkIsDangerousAttributeMethod,
   isCompositePrimaryKey as _isCompositePrimaryKey,
 } from "./attribute-methods/primary-key.js";
-import { CompositePrimaryKey as _CompositePrimaryKey } from "./attribute-methods/composite-primary-key.js";
+import "./attribute-methods/composite-primary-key.js";
 import {
   defineMethodAttribute as _defineMethodAttribute,
   Read as _Read,
@@ -741,6 +741,17 @@ export class Base extends Model {
       state._schemaLoadPromise = undefined;
       throw e;
     }
+    if (ModelSchema.isSchemaLoaded.call(this as never) && this._primaryKey === undefined) {
+      const base = this.baseClass;
+      const table = base.tableName as string;
+      if (
+        base.primaryKeyPrefixType == null &&
+        base.connectionPool().schemaReflection.loadedCache?.getCachedPrimaryKeys?.(table) ===
+          undefined
+      ) {
+        await base.schemaCache().primaryKeys(table);
+      }
+    }
   }
 
   /**
@@ -1043,7 +1054,11 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  static _enums: Map<string, Record<string, number | string | boolean | null>> = new Map();
+  declare static definedEnums: Record<
+    string,
+    HashWithIndifferentAccess<number | string | boolean | null>
+  >;
+  declare static isDefinedEnums: boolean;
 
   declare static enum: typeof _EnumModule.enum;
 
@@ -1314,6 +1329,9 @@ export class Base extends Model {
     return _Persistence.instantiate.call(this, attributes, columnTypes, block);
   }
 
+  /** @internal */
+  static instantiateInstanceOf = _Persistence.instantiateInstanceOf;
+
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
   declare static countBySql: typeof Querying.countBySql;
@@ -1448,24 +1466,6 @@ export class Base extends Model {
     } finally {
       _Core._allocation.klass = previous;
     }
-  }
-
-  static _instantiate<T extends typeof Base>(
-    this: T,
-    row: Record<string, unknown> | IndexedRow,
-    block?: (record: InstanceType<T>) => void,
-    columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  ): InstanceType<T> {
-    const klass = this.discriminateClassForRecord(row);
-    if (klass !== this) {
-      return klass._instantiate(
-        row,
-        block as ((record: Base) => void) | undefined,
-        columnTypes,
-      ) as InstanceType<T>;
-    }
-
-    return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
   _newRecord = true;
@@ -2157,16 +2157,7 @@ include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
-extend(Base, {
-  enum: _EnumModule.enum,
-  _enum: _EnumModule._enum,
-  _enumMethodsModule: _EnumModule._enumMethodsModule,
-  detectEnumConflictBang: _EnumModule.detectEnumConflictBang,
-  raiseConflictError: _EnumModule.raiseConflictError,
-  assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
-  assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
-  detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
-});
+extend(Base, _EnumModule.Enum);
 extend(Base, DelegatedType);
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,
@@ -2324,7 +2315,6 @@ include(Base, _Write);
 include(Base, _BeforeTypeCast);
 include(Base, _Query);
 include(Base, _PrimaryKey);
-include(Base, _CompositePrimaryKey);
 include(Base, ModelSchema.ModelSchema);
 include(Base, _TimeZoneConversion);
 include(Base, new Module((mod) => mod.defineMethod("initAttributes", _Core.initAttributes)));

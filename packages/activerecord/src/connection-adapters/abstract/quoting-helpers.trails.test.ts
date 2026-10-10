@@ -1,3 +1,4 @@
+import { NoMethodError } from "@blazetrails/ruby-compat";
 import { quotingHost } from "../../support/quoting-host.js";
 import { NotImplementedError } from "../../errors.js";
 import { describe, expect, it } from "vitest";
@@ -66,7 +67,7 @@ describe("quotedDate", () => {
   });
 
   it("throws for unrecognised types", () => {
-    expect(() => quotedDate("2026-04-26" as never)).toThrow(TypeError);
+    expect(() => quotedDate("2026-04-26" as never)).toThrow(NoMethodError);
   });
 });
 

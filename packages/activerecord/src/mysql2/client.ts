@@ -1,14 +1,15 @@
 import mysql from "mysql2/promise";
 import { rtest } from "@blazetrails/ruby-compat";
-import type { MysqlAdapterOptions } from "../pool-config.js";
+import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
-import { quotedDate } from "../abstract/quoting.js";
-import { defaultTimezone } from "../../active-record.js";
+import { quotedDate } from "../connection-adapters/abstract/quoting.js";
+import { defaultTimezone } from "../active-record.js";
 
 interface QueryOptions {
-  as?: "array";
+  as?: "hash" | "array";
   databaseTimezone?: "utc" | "local";
+  [key: string]: unknown;
 }
 
 type Native = [unknown, mysql.FieldPacket[] | undefined];
@@ -73,7 +74,7 @@ class Statement implements Mysql2Statement {
     const result = storeResult(
       this.client,
       (await this.client
-        .execute(options(this.client, this.sql) as never, args as never)
+        .execute(options(this.client, this.sql, this.client.queryOptions) as never, args as never)
         .catch(driverError)) as Native,
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
@@ -81,26 +82,34 @@ class Statement implements Mysql2Statement {
   }
 
   close(): void {
-    this.client.unprepare(options(this.client, this.sql) as never);
+    this.client.unprepare(options(this.client, this.sql, this.client.queryOptions) as never);
   }
 }
 
-export type Mysql2Client = Omit<mysql.Connection, "query" | "prepare"> & {
+export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"> {
   automaticClose: boolean;
   queryOptions: QueryOptions;
   readTimeout?: number | null;
   affectedRows: number;
   lastId?: number;
-  query(sql: string): Promise<Mysql2Result | null>;
+  readonly warningCount: number;
+  query(sql: string, options?: QueryOptions): Promise<Mysql2Result | null>;
+  /** @internal */
+  _query(sql: string, options: QueryOptions): Promise<Mysql2Result | null>;
   prepare(sql: string): Mysql2Statement;
   abandonResultsBang(): void;
   setServerOption(value: number): Promise<true>;
-};
+}
 
-function options(client: Mysql2Client, sql: string): Record<string, unknown> {
+function options(
+  client: Mysql2Client,
+  sql: string,
+  queryOptions: QueryOptions,
+): Record<string, unknown> {
+  const typeCast = typeCastFor(client, queryOptions);
   return client.readTimeout != null
-    ? { sql, rowsAsArray: true, timeout: client.readTimeout * 1000 }
-    : { sql, rowsAsArray: true };
+    ? { sql, rowsAsArray: true, typeCast, timeout: client.readTimeout * 1000 }
+    : { sql, rowsAsArray: true, typeCast };
 }
 
 function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
@@ -119,9 +128,40 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
     );
   }
   client.affectedRows = result.affectedRows ?? 0;
+  WARNING_COUNT.set(client, result.warningStatus ?? 0);
   if (result.insertId !== undefined) client.lastId = result.insertId;
   return null;
 }
+
+const CLIENT_FLAGS: Record<string, number> = {
+  LONG_PASSWORD: 0x00000001,
+  FOUND_ROWS: 0x00000002,
+  LONG_FLAG: 0x00000004,
+  CONNECT_WITH_DB: 0x00000008,
+  NO_SCHEMA: 0x00000010,
+  COMPRESS: 0x00000020,
+  ODBC: 0x00000040,
+  LOCAL_FILES: 0x00000080,
+  IGNORE_SPACE: 0x00000100,
+  PROTOCOL_41: 0x00000200,
+  INTERACTIVE: 0x00000400,
+  SSL: 0x00000800,
+  IGNORE_SIGPIPE: 0x00001000,
+  TRANSACTIONS: 0x00002000,
+  RESERVED: 0x00004000,
+  SECURE_CONNECTION: 0x00008000,
+  MULTI_STATEMENTS: 0x00010000,
+  MULTI_RESULTS: 0x00020000,
+  PS_MULTI_RESULTS: 0x00040000,
+  PLUGIN_AUTH: 0x00080000,
+  CONNECT_ATTRS: 0x00100000,
+  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
+  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
+  SESSION_TRACK: 0x00800000,
+  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
+  SSL_VERIFY_SERVER_CERT: 0x40000000,
+  REMEMBER_OPTIONS: 0x80000000,
+};
 
 const COM_SET_OPTION = 0x1b;
 
@@ -154,6 +194,39 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
       },
     });
   }).catch(driverError);
+}
+
+let DEFAULT_QUERY_OPTIONS: QueryOptions | undefined;
+
+export function defaultQueryOptions(): QueryOptions {
+  return (DEFAULT_QUERY_OPTIONS ||= {
+    as: "hash",
+    async: false,
+    castBooleans: false,
+    symbolizeKeys: false,
+    databaseTimezone: "local",
+    applicationTimezone: null,
+    cacheRows: true,
+    connectFlags:
+      CLIENT_FLAGS.REMEMBER_OPTIONS |
+      CLIENT_FLAGS.LONG_PASSWORD |
+      CLIENT_FLAGS.LONG_FLAG |
+      CLIENT_FLAGS.TRANSACTIONS |
+      CLIENT_FLAGS.PROTOCOL_41 |
+      CLIENT_FLAGS.SECURE_CONNECTION |
+      CLIENT_FLAGS.CONNECT_ATTRS,
+    cast: true,
+    defaultFile: null,
+    defaultGroup: null,
+  });
+}
+
+export function query(
+  this: Mysql2Client,
+  sql: string,
+  options: QueryOptions = {},
+): Promise<Mysql2Result | null> {
+  return this._query(sql, { ...this.queryOptions, ...options });
 }
 
 function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
@@ -210,6 +283,13 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
   }
 }
 
+const TYPE_CAST = new WeakMap<object, TypeCast>();
+
+function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {
+  const typeCast = TYPE_CAST.get(client);
+  return (field, next) => cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
+}
+
 type Execute = (sql: unknown, values?: unknown[]) => unknown;
 
 function bind(value: unknown): unknown {
@@ -225,6 +305,18 @@ function bind(value: unknown): unknown {
 }
 
 const QUERY_OPTIONS = new WeakSet<object>();
+
+const WARNING_COUNT = new WeakMap<object, number>();
+
+const warningCount: PropertyDescriptor = {
+  configurable: true,
+  get(this: object): number {
+    return WARNING_COUNT.get(this) ?? 0;
+  },
+};
+
+type EofPacket = { offset: number; end: number; isEOF(): boolean; eofWarningCount(): number };
+type PacketHandler = { handlePacket?: (packet?: EofPacket) => unknown };
 
 const AUTOMATIC_CLOSE = new WeakMap<object, boolean>();
 
@@ -245,23 +337,26 @@ const automaticClose: PropertyDescriptor = {
   },
 };
 
-/** @noRailsEquivalent CONVERGEABLE mysql2-client-scores-against-the-vendored-mysql2-gem */
 export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   if (!QUERY_OPTIONS.has(client)) {
     QUERY_OPTIONS.add(client);
-    const queryOptions: QueryOptions = {};
+    const queryOptions = { ...defaultQueryOptions() };
     const execute = (client as { execute?: unknown }).execute;
     if (typeof execute === "function") {
       (client as { execute?: Execute }).execute = (sql, values) =>
         (execute as Execute).call(client, sql, values?.map(bind));
     }
     const native = (client as { query?: (options: object) => Promise<Native> }).query;
-    const query = async function (this: Mysql2Client, sql: string) {
-      return storeResult(this, await native!.call(this, options(this, sql)).catch(driverError));
+    const _query = async function (this: Mysql2Client, sql: string, opts: QueryOptions) {
+      return storeResult(
+        this,
+        await native!.call(this, options(this, sql, opts)).catch(driverError),
+      );
     };
     for (const [name, value] of Object.entries({
       queryOptions,
       affectedRows: 0,
+      _query,
       query,
       prepare,
       abandonResultsBang() {},
@@ -269,15 +364,24 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     })) {
       Object.defineProperty(client, name, { configurable: true, writable: true, value });
     }
+    const connection = (client as { connection?: PacketHandler }).connection;
+    const handlePacket = connection?.handlePacket;
+    if (typeof handlePacket === "function") {
+      connection!.handlePacket = function (packet) {
+        if (packet?.isEOF() && packet.end - packet.offset >= 5) {
+          WARNING_COUNT.set(client, packet.eofWarningCount());
+        }
+        return handlePacket.call(this, packet);
+      };
+    }
+    Object.defineProperty(client, "warningCount", warningCount);
     const config = (client as { config?: { typeCast?: unknown } }).config;
     if (config) {
-      const typeCast = config.typeCast;
+      if (typeof config.typeCast === "function") {
+        TYPE_CAST.set(client, config.typeCast as TypeCast);
+      }
       config.typeCast = (field: Field, next: () => unknown) =>
-        cast(
-          queryOptions,
-          field,
-          typeof typeCast === "function" ? () => (typeCast as TypeCast)(field, next) : next,
-        );
+        typeCastFor(client, (client as unknown as Mysql2Client).queryOptions)(field, next);
     }
   }
   return Object.defineProperty(client, "automaticClose", automaticClose) as T & Mysql2Client;
@@ -286,36 +390,6 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
 function withoutDefaultIgnoreSpace(list: string[]): string[] {
   return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
-
-const CLIENT_FLAGS: Record<string, number> = {
-  LONG_PASSWORD: 0x00000001,
-  FOUND_ROWS: 0x00000002,
-  LONG_FLAG: 0x00000004,
-  CONNECT_WITH_DB: 0x00000008,
-  NO_SCHEMA: 0x00000010,
-  COMPRESS: 0x00000020,
-  ODBC: 0x00000040,
-  LOCAL_FILES: 0x00000080,
-  IGNORE_SPACE: 0x00000100,
-  PROTOCOL_41: 0x00000200,
-  INTERACTIVE: 0x00000400,
-  SSL: 0x00000800,
-  IGNORE_SIGPIPE: 0x00001000,
-  TRANSACTIONS: 0x00002000,
-  RESERVED: 0x00004000,
-  SECURE_CONNECTION: 0x00008000,
-  MULTI_STATEMENTS: 0x00010000,
-  MULTI_RESULTS: 0x00020000,
-  PS_MULTI_RESULTS: 0x00040000,
-  PLUGIN_AUTH: 0x00080000,
-  CONNECT_ATTRS: 0x00100000,
-  PLUGIN_AUTH_LENENC_CLIENT_DATA: 0x00200000,
-  CAN_HANDLE_EXPIRED_PASSWORDS: 0x00400000,
-  SESSION_TRACK: 0x00800000,
-  MULTI_FACTOR_AUTHENTICATION: 0x10000000,
-  SSL_VERIFY_SERVER_CERT: 0x40000000,
-  REMEMBER_OPTIONS: 0x80000000,
-};
 
 async function newClient(
   config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
@@ -377,6 +451,7 @@ export const Mysql2 = {
   },
   Client: {
     new: newClient,
+    defaultQueryOptions,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
     OPTION_MULTI_STATEMENTS_ON: 0,

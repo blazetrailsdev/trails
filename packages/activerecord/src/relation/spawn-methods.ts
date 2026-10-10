@@ -1,6 +1,6 @@
 import { defineModule, slice } from "@blazetrails/activesupport";
 import * as RubyCompat from "@blazetrails/ruby-compat";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, rbInspect, rtest } from "@blazetrails/ruby-compat";
 import { Merger, HashMerger } from "./merger.js";
 import type { ExceptSkip } from "./query-methods.js";
 
@@ -17,14 +17,14 @@ export function spawn<T extends SpawnRelation<T>>(this: T): T {
   return this.isAlreadyInScope(this._model.scopeRegistry()) ? this._model.all() : this.clone();
 }
 
-export function merge<T extends SpawnRelation<T>>(this: T, other: any): T {
+export function merge<T extends SpawnRelation<T>>(this: T, other: any, ...rest: unknown[]): T {
   if (Array.isArray(other)) {
     return recordsIntersection(this, other) as unknown as T;
+  } else if (rtest(other)) {
+    return (this as any).spawn().mergeBang(other, ...rest) as T;
+  } else {
+    throw new ArgumentError(`invalid argument: ${rbInspect(other)}.`);
   }
-  if (other === null || other === undefined || other === false) {
-    throw new ArgumentError(`invalid argument: ${other === false ? "false" : "nil"}.`);
-  }
-  return (this as any).spawn().mergeBang(other) as T;
 }
 
 async function recordsIntersection(rel: any, other: readonly unknown[]): Promise<unknown[]> {

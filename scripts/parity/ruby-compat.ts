@@ -106,6 +106,7 @@ export const RECEIVER_KEYED_RUBY_COMPAT_EXPORTS = new Map<
   ["Array#delete", { tsExport: "aryDelete", receiver: "array" }],
   ["Array#include?", { tsExport: "aryIncludes", receiver: "array" }],
   ["Array#join", { tsExport: "aryJoin", receiver: "array" }],
+  ["Array#reduce", { tsExport: "reduce", receiver: "array" }],
   ["Array#sort", { tsExport: "sort", receiver: "array" }],
   ["Hash#delete", { tsExport: "hashDelete", receiver: "hash" }],
   ["Hash#except", { tsExport: "except", receiver: "hash" }],

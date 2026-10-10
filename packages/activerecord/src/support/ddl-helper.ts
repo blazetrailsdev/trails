@@ -5,6 +5,7 @@ interface DdlConnection {
   dropTable(name: string): Promise<unknown>;
 }
 
+/** @inventedArm if — CONVERGEABLE optional-positional-before-trailing-options-or-block-is-overloaded-on-typeof */
 export async function withExampleTable<T>(
   connection: AbstractAdapter,
   tableName: string,

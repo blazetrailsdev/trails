@@ -15,7 +15,6 @@ import {
 } from "@blazetrails/activesupport";
 import {
   ArgumentError,
-  first,
   excToS,
   isEmpty,
   StandardError,
@@ -48,6 +47,7 @@ export class DatabaseTasks {
 
   private static _env: string | null = null;
 
+  /** @inventedArm toString — CONVERGEABLE database-tasks-env-memoizes-to-s-and-db-dir-expands-by-hand */
   static get env(): string {
     return (this._env ??= TopLevel.Trails!.env.toString());
   }
@@ -69,11 +69,9 @@ export class DatabaseTasks {
 
   private static _dbDir: string | null = null;
 
+  /** @missingRailsCall first — CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
   static get dbDir(): string {
-    return (this._dbDir ??= File.expandPath(
-      first(TopLevel.Trails!.application!.config.paths().get("db")!.toAry())!,
-      TopLevel.Trails!.application!.config.root!,
-    ));
+    return (this._dbDir ??= TopLevel.Trails!.application!.config.paths().get("db")!.firstSync()!);
   }
 
   static set dbDir(value: string) {

@@ -112,10 +112,7 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
 
   it("PostgreSQL begin_db_transaction and commit_db_transaction answer internal_execute's result", async () => {
     const pg = new PostgreSQLAdapter({} as never);
-    Object.assign(pg, {
-      internalExecute: async (sql: string) => sql,
-      _acquireFreshClient: async () => null,
-    });
+    Object.assign(pg, { internalExecute: async (sql: string) => sql });
     expect(await pg.beginDbTransaction()).toBe("BEGIN");
     expect(await pg.commitDbTransaction()).toBe("COMMIT");
   });

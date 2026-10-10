@@ -38,6 +38,17 @@ describe("SqliteDriver — libsql round-trip", () => {
     expect(row["qty"]).toBe(42);
   });
 
+  it("rollback() rolls the open transaction back and answers true, as the gem's Database#rollback does", async () => {
+    const before = await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear");
+    await driver.exec("BEGIN");
+    await driver.execute("UPDATE widgets SET qty = qty + 1 WHERE name = ?", ["gear"]);
+    expect(await driver.rollback()).toBe(true);
+    expect(await driver.getFirstValue("SELECT qty FROM widgets WHERE name = ?", "gear")).toBe(
+      before,
+    );
+    await expect((async () => driver.rollback())()).rejects.toThrow();
+  });
+
   it("execute() returns the statement's rows, frozen, and [] for a non-reader", async () => {
     const rows = await driver.execute("SELECT name FROM widgets WHERE qty = ?", [42]);
     expect(rows).toEqual([{ name: "sprocket" }]);

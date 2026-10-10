@@ -85,6 +85,11 @@ export function status(this: pg.Client): number {
   return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
 }
 
+/**
+ * @inventedArm try — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ * @inventedArm rescue — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ * @inventedArm throw — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ */
 export async function reset(this: pg.Client): Promise<void> {
   try {
     await this.end();
@@ -303,8 +308,9 @@ export function block(this: pg.Client, timeout: number | null = null): Promise<b
  */
 export async function cancel(this: pg.Client): Promise<string | null> {
   const { processID: bePid, secretKey: beKey, connection } = this as Client;
+  if (connection == null) throw connectionBad(new Error("connection is closed"));
   return new Promise<string | null>((resolve) => {
-    const cl = new (connection!.constructor as new () => Protocol)();
+    const cl = new (connection.constructor as new () => Protocol)();
     cl.on("error", (err: unknown) => resolve(String(err)));
     cl.on("end", () => resolve(null));
     cl.once("connect", () => {
@@ -390,6 +396,8 @@ export function pgConnection<T extends object>(
       (client as { query?: unknown }).query = query(native as (...args: unknown[]) => unknown);
     }
     readyForQuery(client);
+    const on = (client as { on?: unknown }).on;
+    if (typeof on === "function") on.call(client, "error", () => {});
   }
   return Object.defineProperty(
     Object.assign(client, {

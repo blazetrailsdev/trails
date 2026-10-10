@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { ArgumentError } from "./argument-error.js";
-import { AsyncEnumerable, Enumerable } from "./enumerable.js";
+import { AsyncEnumerable, Enumerable, reduce } from "./enumerable.js";
+import { Hash } from "./hash.js";
 import { include } from "./include.js";
 import { Rational } from "./rational.js";
+import { TypeError as RbTypeError } from "./type-error.js";
 
 class Bag {
   yielded = 0;
@@ -238,5 +240,60 @@ describe("AsyncEnumerable", () => {
     const seen: unknown[] = [];
     for await (const i of new Included([1, 2]) as unknown as AsyncIterable<unknown>) seen.push(i);
     expect(seen).toEqual([1, 2]);
+  });
+});
+
+describe("Enumerable#reduce", () => {
+  it("answers nil for an empty receiver and the initial value when one is given", () => {
+    expect(reduce([], ":merge")).toBeNull();
+    expect(reduce([], 10, ":+")).toBe(10);
+    expect(reduce(new Bag([]), ":+")).toBeNull();
+  });
+
+  it("answers a lone element without sending the operation", () => {
+    const only = new Hash<string, number>();
+    expect(reduce([only], ":merge")).toBe(only);
+  });
+
+  it("sends the Symbol operation to the memo with each element", () => {
+    expect(reduce([1, 2, 3], ":+")).toBe(6);
+    expect(reduce([1, 2.5], ":+")).toBe(3.5);
+    expect(reduce([1, 2], 10, ":+")).toBe(13);
+    expect(reduce([["a"], ["b"]], "+")).toEqual(["a", "b"]);
+    expect(reduce(new Bag([1, 2, 3]), ":+")).toBe(6);
+  });
+
+  it("merges Hashes into a new one that keeps the first's identity comparison", () => {
+    const identity = new Hash<unknown, number>().compareByIdentity();
+    identity.set("a", 1);
+    const other = new Hash<unknown, number>();
+    other.set("b", 2);
+
+    const merged = reduce([identity, other], ":merge") as Hash<unknown, number>;
+
+    expect([...merged]).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
+    expect(merged).not.toBe(identity);
+    expect(merged.isCompareByIdentity()).toBe(true);
+    expect(identity.size).toBe(1);
+  });
+
+  it("yields the memo and each element to a block", () => {
+    const block = (memo: unknown, i: number) => (memo as number) * i + 1;
+    expect(reduce([1, 2, 3], block)).toBe(10);
+    expect(reduce([1, 2], 3, (memo: unknown, i: number) => (memo as number) - i)).toBe(0);
+    expect(reduce(new Bag([1, 2, 3]), block)).toBe(10);
+  });
+
+  it("answers a promise where each does", async () => {
+    await expect(reduce(new LazyBag([1, 2, 3]), ":+")).resolves.toBe(6);
+  });
+
+  it("checks its arity and its operation", () => {
+    expect(() => reduce([1])).toThrow("wrong number of arguments (given 0, expected 1..2)");
+    expect(() => reduce([1], 1, 2, 3)).toThrow(ArgumentError);
+    expect(() => reduce([1, 2], 3)).toThrow(RbTypeError);
   });
 });

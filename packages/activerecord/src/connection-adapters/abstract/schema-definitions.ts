@@ -2,9 +2,11 @@ import {
   block,
   except,
   fetch,
+  include,
   isSymbol,
   keywordSplat,
   merge,
+  Module,
   rbRegMatchP,
   registerConstant,
   slice,
@@ -520,6 +522,19 @@ export interface ColumnMethods {
   ): unknown;
 }
 
+function primaryKey(
+  this: { column(name: string, type: ColumnType, options: ColumnOptions): unknown },
+  name: string,
+  type: ColumnType = "primary_key",
+  options: ColumnOptions = {},
+): unknown {
+  return this.column(name, type, { ...options, primaryKey: true });
+}
+
+export const ColumnMethods = new Module();
+
+ColumnMethods.defineMethod("primaryKey", primaryKey);
+
 /** @internal */
 export interface ReferenceDefinitionConnection {
   addColumn(
@@ -738,6 +753,8 @@ export type TableOf<A> = A extends {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => this;
+
   readonly name: string;
   protected readonly columnsHash = new Map<string, ColumnDefinition | null>();
   readonly indexes: Array<[string | string[], AddIndexOptions]> = [];
@@ -977,10 +994,6 @@ export class TableDefinition {
     }
   }
 
-  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
-    return this.column(name, type, { ...options, primaryKey: true });
-  }
-
   /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
     for (const columnType of columnTypes) {
@@ -1003,6 +1016,8 @@ export class TableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:367`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
+include(TableDefinition, ColumnMethods);
+
 TableDefinition.defineColumnMethods(
   "bigint",
   "binary",
@@ -1024,6 +1039,8 @@ TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
+  declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => Promise<void>;
+
   get name(): string {
     return this._tableName;
   }
@@ -1245,14 +1262,6 @@ export class Table {
     }
   }
 
-  async primaryKey(
-    name: string,
-    type: ColumnType = "primary_key",
-    options: ColumnOptions = {},
-  ): Promise<void> {
-    await this.column(name, type, { ...options, primaryKey: true });
-  }
-
   async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<unknown> {
     return this._schema.addColumn(this.name, columnName, type, options);
   }
@@ -1260,6 +1269,8 @@ export class Table {
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:716`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
+
+include(Table, ColumnMethods);
 
 Table.defineColumnMethods(
   "bigint",

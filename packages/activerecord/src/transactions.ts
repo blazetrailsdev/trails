@@ -15,7 +15,7 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { mergeBang, Module } from "@blazetrails/ruby-compat";
+import { mergeBang, Module, rtest } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -29,23 +29,14 @@ type TransactionAction = "create" | "update" | "destroy";
 export async function transaction<T>(
   modelClass: typeof Base,
   fn: (tx: PublicTransaction) => Promise<T>,
-  options?: { isolation?: string; requiresNew?: boolean; joinable?: boolean },
+  options: { isolation?: string; requiresNew?: boolean; joinable?: boolean } = {},
 ): Promise<T | undefined> {
-  if (options) {
-    for (const key of Object.keys(options)) {
-      if (key !== "isolation" && key !== "requiresNew" && key !== "joinable") {
-        throw new ArgumentError(`unknown keyword: :${key}`);
-      }
-    }
-  }
-
-  return modelClass.withConnection(async (connection) => {
-    const result = await dbTransaction.call(connection as any, fn as (tx?: unknown) => Promise<T>, {
-      requiresNew: options?.requiresNew,
-      isolation: options?.isolation,
-      joinable: options?.joinable,
-    });
-    return result as T | undefined;
+  return modelClass.withConnection((connection) => {
+    return dbTransaction.call(
+      connection as any,
+      fn as (tx?: unknown) => Promise<T>,
+      options,
+    ) as Promise<T | undefined>;
   });
 }
 
@@ -154,7 +145,7 @@ export function setCallback<T extends typeof Model>(
   const rest = filterList;
   const options = { ...extracted } as Record<string, unknown>;
 
-  if ((name === "commit" || name === "rollback") && options.on !== undefined) {
+  if ((name === "commit" || name === "rollback") && rtest(options.on)) {
     const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
     options.if = [
@@ -221,18 +212,15 @@ export async function rolledbackBang(
 /** @internal */
 export function rememberTransactionRecordState(this: Base): void {
   const r = this as any;
-  if (!r._startTransactionState) {
-    const snapshotAttrs = r._attributes.deepDup();
-    r._startTransactionState = {
-      newRecord: r._newRecord,
-      destroyed: r._destroyed,
-      frozen: this.isFrozen(),
-      id: this.id,
-      previouslyNewRecord: r._previouslyNewRecord,
-      attributes: snapshotAttrs,
-      level: 0,
-    };
-  }
+  r._startTransactionState ||= {
+    id: this.id,
+    newRecord: r._newRecord,
+    previouslyNewRecord: r._previouslyNewRecord,
+    destroyed: r._destroyed,
+    attributes: r._attributes,
+    frozen: this.isFrozen(),
+    level: 0,
+  };
   r._startTransactionState.level += 1;
 
   if (r._committedAlreadyCalled) {
@@ -436,13 +424,12 @@ export function setOptionsForCallbacksBang(
   const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 
-  if (options.on !== undefined) {
-    const fireOn = (Array.isArray(options.on) ? options.on : [options.on]) as string[];
+  if (rtest(options.on)) {
+    const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
-    const existingIf = options.if;
     options.if = [
       (record: Base): boolean => isTransactionIncludeAnyAction.call(record, fireOn),
-      ...(existingIf === undefined ? [] : Array.isArray(existingIf) ? existingIf : [existingIf]),
+      ...kernelArray(options.if),
     ];
   }
 }
