@@ -346,6 +346,8 @@ export interface Base
   config(): Configuration & { performCaching?: boolean };
   get cacheStore(): CacheStore | null;
   set cacheStore(store: LookupStoreArgument);
+  get formats(): ReadonlyArray<string | symbol>;
+  set formats(values: ReadonlyArray<string | symbol> | null);
   helpers(): ActionViewBase;
   urlFor(options?: UrlForOptions): string;
   fullUrlFor(options?: UrlForOptions): string;
@@ -493,7 +495,6 @@ export class Base extends Metal {
   declare readonly lookupContext: LookupContext;
   declare detailsForLookup: typeof detailsForLookup;
   declare readonly viewPaths: PathSet;
-  declare formats: ReadonlyArray<string | symbol>;
   declare locale: string | null;
   declare templateExists: typeof templateExists;
   declare appendViewPath: (path: ViewPathsInput) => void;
