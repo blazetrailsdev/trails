@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { staleMarkFailure } from "./param-name-mark.js";
 import { exceedances, staleMarks, tightened } from "./lint-ambiguous-parents.js";
 
 describe("ambiguous-parent mark", () => {
@@ -20,10 +21,20 @@ describe("ambiguous-parent mark", () => {
     expect(exceedances({ rack: 1 }, {})).toEqual([]);
   });
 
-  it("reports a mark left above the measurement without failing it", () => {
-    expect(staleMarks({ rack: 5 }, { rack: 1 })).toEqual([
-      { package: "rack", mark: 5, current: 1 },
-    ]);
+  it("fails a mark left above the measurement, naming the row and the tighten script", () => {
+    const stale = staleMarks({ rack: 5 }, { rack: 1 });
+    expect(stale).toEqual([{ package: "rack", mark: 5, current: 1 }]);
+    const failure = staleMarkFailure(
+      "ambiguous-parent gate",
+      "parity:api:parents:tighten",
+      stale.map((v) => ({ ...v, dimension: "total" })),
+    )!;
+    expect(failure).toContain("ambiguous-parent gate: 1 STALE mark dimension(s)");
+    expect(failure).toContain("pnpm parity:api:parents:tighten");
+    expect(failure).toContain("rack  total: mark 5 → current 1");
+    expect(
+      staleMarkFailure("ambiguous-parent gate", "t", staleMarks({ rack: 1 }, { rack: 1 })),
+    ).toBeNull();
   });
 
   it("tightens DOWN only, and drops a package that converged to zero", () => {

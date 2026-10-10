@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { staleMarkFailure } from "./param-name-mark.js";
 import {
   COUNTED_PACKAGES,
   GATED_PACKAGES,
@@ -97,6 +98,17 @@ describe("extra-surface mark", () => {
     expect(staleMarks(rubyCompatMark, { "ruby-compat": { novel: 0, total: 34 } })).toEqual([
       { package: "ruby-compat", dimension: "total", mark: 35, current: 34 },
     ]);
+    const failure = staleMarkFailure(
+      "extra-surface gate",
+      "parity:api:extra:tighten",
+      staleMarks(rubyCompatMark, { "ruby-compat": { novel: 0, total: 34 } }),
+    )!;
+    expect(failure).toContain("extra-surface gate: 1 STALE mark dimension(s)");
+    expect(failure).toContain("pnpm parity:api:extra:tighten");
+    expect(failure).toContain("ruby-compat  total: mark 35 → current 34");
+    expect(
+      staleMarkFailure("extra-surface gate", "t", staleMarks(rubyCompatMark, rubyCompatMark)),
+    ).toBeNull();
     expect(tightened(rubyCompatMark, { "ruby-compat": { novel: 0, total: 34 } })).toEqual({
       "ruby-compat": { novel: 0, total: 34 },
     });

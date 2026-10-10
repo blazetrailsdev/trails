@@ -3,8 +3,8 @@
  * CI gate for the ambiguous-parent ratchet (RFC 0126). Fails when a package's
  * unresolved inheritance-edge count rises above its committed mark. The fix is
  * to make `extract-ts-api.ts` record a declaring file for the edge, never to
- * raise the mark; a mark left ABOVE the measurement is reported, not failed —
- * narrow it in the same PR with `--tighten`, which writes DOWN and never up.
+ * raise the mark. It also fails on a mark left ABOVE the measurement — narrow
+ * it in the same PR with `--tighten`, which writes DOWN and never up.
  *
  * Usage:
  *   pnpm tsx scripts/api-compare/lint-ambiguous-parents.ts            # gate
@@ -20,6 +20,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { serializeBaseline } from "./baseline-json.js";
 import { OUTPUT_DIR, ROOT_DIR, SCRIPT_DIR } from "./config.js";
+import { staleMarkFailure } from "./param-name-mark.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 
 export const MARK_PATH = path.join(SCRIPT_DIR, "ambiguous-parent-mark.json");
@@ -48,8 +49,8 @@ export function exceedances(
   return out;
 }
 
-/** Marks sitting ABOVE the measurement. Not a failure — the gate only forbids
- *  growth — but reported so a converged PR narrows its mark. */
+/** Marks sitting ABOVE the measurement, which the gate fails on through
+ *  `staleMarkFailure`: slack lets a regression of that size pass. */
 export function staleMarks(
   marks: AmbiguousParentCounts,
   current: AmbiguousParentCounts,
@@ -130,11 +131,14 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `ambiguous-parent gate: ${v.package} mark ${v.mark} is above the current ` +
-        `${v.current} — narrow it with \`pnpm parity:api:parents:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure(
+    "ambiguous-parent gate",
+    "parity:api:parents:tighten",
+    stale.map((v) => ({ ...v, dimension: "total" })),
+  );
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   console.log("ambiguous-parent gate: OK");
   return 0;
