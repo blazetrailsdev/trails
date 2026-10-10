@@ -468,6 +468,7 @@ export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: str
   return dangerousAttributeMethods().has(name);
 }
 
+/** @inventedArm if — CONVERGEABLE method-defined-within-branches-on-a-module-receiver */
 export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,

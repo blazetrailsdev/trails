@@ -1038,6 +1038,7 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
+  /** @noRailsEquivalent CONVERGEABLE enum-defined-enums-class-attribute-is-uncredited-by-the-ruby-extractor */
   declare static definedEnums: Record<
     string,
     HashWithIndifferentAccess<number | string | boolean | null>
