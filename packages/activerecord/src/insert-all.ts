@@ -21,7 +21,7 @@ import {
   transformKeys,
 } from "@blazetrails/activesupport";
 import { except } from "@blazetrails/ruby-compat";
-import { first } from "@blazetrails/ruby-compat";
+import { aryJoin, first } from "@blazetrails/ruby-compat";
 import { withConnection } from "./connection-handling.js";
 
 type ModelClass = typeof Base;
@@ -540,15 +540,17 @@ export class Builder implements InsertBuilder {
     if (!this._insertAll.updateDuplicates() || !this._insertAll.recordTimestamps()) {
       return "";
     }
-    return filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
-      if (this.touchTimestampAttribute(columnName)) {
-        return `${columnName}=(CASE WHEN (${this.updatableColumns()
-          .map(block)
-          .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
-          this._connection.highPrecisionCurrentTimestamp(),
-        )} END),`;
-      }
-    }).join("");
+    return aryJoin(
+      filterMap(this.model.timestampAttributesForUpdateInModel(), (columnName) => {
+        if (this.touchTimestampAttribute(columnName)) {
+          return `${columnName}=(CASE WHEN (${this.updatableColumns()
+            .map(block)
+            .join(" AND ")}) THEN ${this.model.quotedTableName()}.${columnName} ELSE ${String(
+            this._connection.highPrecisionCurrentTimestamp(),
+          )} END),`;
+        }
+      }),
+    );
   }
 
   /** @internal */

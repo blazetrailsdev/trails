@@ -1030,7 +1030,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   override async reconnect(): Promise<void> {
     if (await this.active()) {
       try {
-        await this._rawConnection!.exec("ROLLBACK");
+        await this._rawConnection!.rollback();
       } catch {}
     } else {
       await this.connect();

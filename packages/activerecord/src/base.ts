@@ -1308,6 +1308,9 @@ export class Base extends Model {
     return _Persistence.instantiate.call(this, attributes, columnTypes, block);
   }
 
+  /** @internal */
+  static instantiateInstanceOf = _Persistence.instantiateInstanceOf;
+
   declare static findBySql: typeof Querying.findBySql;
   declare static asyncFindBySql: typeof Querying.asyncFindBySql;
   declare static countBySql: typeof Querying.countBySql;
@@ -1459,7 +1462,7 @@ export class Base extends Model {
       ) as InstanceType<T>;
     }
 
-    return _Persistence.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
+    return this.instantiateInstanceOf(this, row, columnTypes ?? {}, block as never);
   }
 
   _newRecord = true;
