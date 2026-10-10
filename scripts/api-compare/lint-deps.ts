@@ -401,7 +401,6 @@ export function visitMethodDeclarations(
               callback(decl.name.text, decl.initializer, node);
             }
           } else if (ts.isObjectLiteralExpression(decl.initializer)) {
-            // `export const Extensions = { install() {} }` is a Ruby `module … extend self`.
             visit(decl.initializer);
           }
         }
