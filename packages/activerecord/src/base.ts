@@ -163,7 +163,6 @@ import {
   include,
   prepend,
   extend,
-  extended,
   Module,
   classAttribute,
   benchmark as benchmarkable,
@@ -1038,11 +1037,11 @@ export class Base extends Model {
   declare static validates: typeof Model.validates;
   declare static validatesAssociated: typeof _Validations.validatesAssociated;
 
-  /** @noRailsEquivalent CONVERGEABLE enum-defined-enums-class-attribute-is-uncredited-by-the-ruby-extractor */
   declare static definedEnums: Record<
     string,
     HashWithIndifferentAccess<number | string | boolean | null>
   >;
+  declare static isDefinedEnums: boolean;
 
   declare static enum: typeof _EnumModule.enum;
 
@@ -2156,19 +2155,7 @@ include(Base, _Transactions.Transactions);
 extend(Base, Normalization.ClassMethods);
 include(Base, Normalization.Normalization);
 include(Base, Marshalling.Methods);
-extend(Base, {
-  [extended](base: object): void {
-    classAttribute.call(base, "definedEnums", { instanceWriter: false, default: {} });
-  },
-  enum: _EnumModule.enum,
-  _enum: _EnumModule._enum,
-  _enumMethodsModule: _EnumModule._enumMethodsModule,
-  detectEnumConflictBang: _EnumModule.detectEnumConflictBang,
-  raiseConflictError: _EnumModule.raiseConflictError,
-  assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
-  assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
-  detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
-});
+extend(Base, _EnumModule.Enum);
 extend(Base, DelegatedType);
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,

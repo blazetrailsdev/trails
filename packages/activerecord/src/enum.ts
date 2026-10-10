@@ -2,8 +2,9 @@ import type { Base } from "./base.js";
 import {
   HashWithIndifferentAccess,
   camelize,
+  classAttribute,
   deepDup,
-  underscore,
+  extended,
   isBlank,
   isPlainObject,
   pluralize,
@@ -18,6 +19,7 @@ import {
   rbModDefineMethod,
   registerConstant,
   toS,
+  rbClassSuperclass,
 } from "@blazetrails/ruby-compat";
 import {
   isDangerousAttributeMethod,
@@ -226,7 +228,7 @@ export function _enum(
       return enumValues;
     },
   });
-  if (!Object.prototype.hasOwnProperty.call(this, "__class_attr_definedEnums")) {
+  if (this.definedEnums === rbClassSuperclass(this)?.definedEnums) {
     this.definedEnums = deepDup(this.definedEnums);
   }
   this.definedEnums[name] = enumValues;
@@ -252,18 +254,10 @@ export function _enum(
   const valueMethodNames: string[] = [];
   this._enumMethodsModule().moduleEval(() => {
     prefix =
-      prefix != null && prefix !== false
-        ? prefix === true
-          ? `${underscore(name)}_`
-          : `${underscore(prefix)}_`
-        : null;
+      prefix != null && prefix !== false ? (prefix === true ? `${name}_` : `${prefix}_`) : null;
 
     suffix =
-      suffix != null && suffix !== false
-        ? suffix === true
-          ? `_${underscore(name)}`
-          : `_${underscore(suffix)}`
-        : null;
+      suffix != null && suffix !== false ? (suffix === true ? `_${name}` : `_${suffix}`) : null;
 
     const pairs: [string, EnumValue][] = !Array.isArray(values)
       ? Object.entries(values)
@@ -282,7 +276,7 @@ export function _enum(
         instanceMethods,
       );
 
-      const methodFriendlyLabel = label.replace(/[^\w\x80-￿]+/g, "_");
+      const methodFriendlyLabel = label.replace(/[^\w\x80-\uffff]+/g, "_");
       const valueMethodAlias = `${prefix ?? ""}${methodFriendlyLabel}${suffix ?? ""}`;
 
       if (valueMethodAlias !== valueMethodName && !valueMethodNames.includes(valueMethodAlias)) {
@@ -437,5 +431,19 @@ export function detectNegativeEnumConditionsBang(
     }
   }
 }
+
+export const Enum = {
+  [extended](base: object): void {
+    classAttribute.call(base, "definedEnums", { instanceWriter: false, default: {} });
+  },
+  enum: enumMethod,
+  _enum,
+  _enumMethodsModule,
+  detectEnumConflictBang,
+  raiseConflictError,
+  assertValidEnumDefinitionValues,
+  assertValidEnumOptions,
+  detectNegativeEnumConditionsBang,
+};
 
 registerConstant("ActiveRecord::Enum::EnumType", EnumType);

@@ -88,6 +88,27 @@ describe("Enum name conflict detection", () => {
     }).not.toThrow();
   });
 
+  it("gives a subclass its own defined_enums holding the parent's mappings", () => {
+    class Parent extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { proposed: 0, written: 1 });
+      }
+    }
+    class Child extends Parent {
+      static {
+        this.enum("difficulty", { easy: 0, hard: 1 });
+      }
+    }
+
+    expect(Object.keys(Parent.definedEnums)).toEqual(["status"]);
+    expect(Object.keys(Child.definedEnums)).toEqual(["status", "difficulty"]);
+    expect(Child.definedEnums.status).toBeInstanceOf(HashWithIndifferentAccess);
+    expect(Child.definedEnums.status).not.toBe(Parent.definedEnums.status);
+    expect(Child.definedEnums.status.fetch("written", null)).toBe(1);
+    expect(Child.definedEnums.status.get("proposed")).toBe(0);
+  });
+
   it("does not treat a user class method on an ancestor as a plural-accessor conflict", () => {
     class Parent extends Base {
       static _tableName = "books";

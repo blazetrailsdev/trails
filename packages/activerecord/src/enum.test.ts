@@ -1007,7 +1007,7 @@ describe("EnumTest", () => {
         this.attribute("cover", "integer");
         this.attribute("difficulty", "integer");
         this.enum("cover", { hard: 0, soft: 1 }, { suffix: true });
-        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
+        this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "to_read" });
       }
     }
     const instance = new K();

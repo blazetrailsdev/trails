@@ -964,6 +964,18 @@ class ApiExtractor
     target[:classMethods] << method_info
 
     maybe_update_module_file(fqn, target)
+
+    each_base_class_attribute(node[5]) { |call| process_method_add_arg(call) } if %w[extended included].include?(name)
+  end
+
+  def each_base_class_attribute(node, &block)
+    return unless node.is_a?(Array)
+
+    if node[0] == :method_add_arg && node[1].is_a?(Array) && node[1][0] == :call
+      yield node
+    else
+      node.each { |child| each_base_class_attribute(child, &block) }
+    end
   end
 
   # Update a module's or class's file to where its first method is defined, not
@@ -1075,6 +1087,17 @@ class ApiExtractor
   end
 
   def process_method_add_arg(node)
+    # `base.class_attribute(:foo, …)` inside `def self.extended(base)` /
+    # `def self.included(base)` (activerecord/lib/active_record/enum.rb:166-168)
+    # declares the attribute on whatever extends the module, as the bare
+    # `class_attribute` of an `included do` block does.
+    if node[1].is_a?(Array) && node[1][0] == :call && ident_name(node[1][3]) == "class_attribute" &&
+       node[1][1].is_a?(Array) && %i[var_ref vcall].include?(node[1][1][0]) &&
+       ident_name(node[1][1][1]) == "base"
+      process_mattr(node[2], reader: true, writer: true, predicate: true, class_attr: true)
+      return
+    end
+
     # Handle things like: private(def ...) or public(:method_name)
     if node[1].is_a?(Array) && node[1][0] == :fcall
       cmd_name = ident_name(node[1][1])
