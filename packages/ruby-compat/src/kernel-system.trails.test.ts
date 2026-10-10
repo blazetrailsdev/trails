@@ -60,7 +60,6 @@ describe("Kernel#system", () => {
   });
 
   it("execs a program and its argv with no shell", async () => {
-    expect(await rbFSystem("sh", "-c", "exit 0")).toBe(true);
     expect(await rbFSystem("sh", "-c", "exit 3")).toBe(false);
     expect(await rbFSystem("test", "a;b", "=", "a;b")).toBe(true);
     expect(

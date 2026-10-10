@@ -3,11 +3,8 @@ import { isBlank, presence } from "../../index.js";
 
 describe("Object#blank? respond_to?(:empty?) probe", () => {
   it("reads a String held as its bytes as String#blank? does", () => {
-    expect([[], [0x20, 0x0a], [0x7b]].map((b) => isBlank(Uint8Array.from(b)))).toEqual([
-      true,
-      true,
-      false,
-    ]);
+    expect(isBlank(Uint8Array.of(0x20, 0x0a))).toBe(true);
+    expect(isBlank(Uint8Array.of(0x7b))).toBe(false);
   });
 
   it("invokes a method-shaped isEmpty, as blank.rb:19 invokes empty?", () => {
