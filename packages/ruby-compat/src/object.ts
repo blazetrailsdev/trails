@@ -883,7 +883,9 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     const other = args[0];
     if (mid === "==") return rbEqual(recv, other);
     if (mid === "!=") return !rbEqual(recv, other);
-    if (mid === "+") return rbPlus(recv, other);
+    if (mid === "+" && (isNumeric(recv) || typeof recv === "string" || Array.isArray(recv))) {
+      return rbPlus(recv, other);
+    }
     const [spelling, relop] = RELOPS.get(mid) ?? [];
     if (relop !== undefined && isNumeric(recv) && isNumeric(other)) {
       return relop(recv < other ? -1 : recv > other ? 1 : recv == other ? 0 : NaN);

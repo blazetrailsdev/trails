@@ -9,6 +9,7 @@
  */
 
 import { ArgumentError } from "./argument-error.js";
+import { each } from "./array.js";
 import {
   numericPlus,
   rbBigNorm,
@@ -468,7 +469,10 @@ function aryInjectOp(ary: readonly unknown[], init: unknown, op: string): unknow
  * as readily as an `each` includer, and the block is the trailing function
  * argument. `rb_check_id` turns a String naming a method into its Symbol,
  * which every String here does; `rb_warning("given block not used")` prints
- * only under `$VERBOSE`.
+ * only under `$VERBOSE`. An Array's `each` is `rb_ary_each`
+ * (`vendor/ruby/v3.3.11/array.c:2532`), which has no `each` member to call.
+ * Unported: the `rb_method_basic_definition_p` checks on `each` (`:1044`) and
+ * on `Integer#+` (`:836`), which ask whether a core method was redefined.
  * @noRailsEquivalent PERMANENT
  */
 export function reduce<T, E = unknown>(
@@ -513,13 +517,12 @@ export function reduce<T, E = unknown>(
   }
 
   const memo: InjectMemo<T> = { v1: init, block, op };
-  return rbBlockCall(
-    Array.isArray(obj)
-      ? ({ each: (b) => obj.forEach((i) => b(i)) } as Each<T, E>)
-      : (obj as Each<T, E>),
-    (i) => iter(i, memo),
-    () => (memo.v1 === undef ? null : memo.v1),
-  );
+  const result = () => (memo.v1 === undef ? null : memo.v1);
+  if (Array.isArray(obj)) {
+    each(obj as T[], (i) => iter(i, memo));
+    return result() as Enumerated<E, unknown>;
+  }
+  return rbBlockCall(obj as Each<T, E>, (i) => iter(i, memo), result);
 }
 
 /**
