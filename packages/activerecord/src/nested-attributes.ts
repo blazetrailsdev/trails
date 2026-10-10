@@ -324,10 +324,7 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE reopen-rfc-0087-constructor-arm-for-association-io-at-assignment
- */
+/** @internal */
 export function assignNestedAttributesForCollectionAssociation(
   this: Base,
   associationName: string,
