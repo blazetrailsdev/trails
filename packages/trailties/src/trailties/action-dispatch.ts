@@ -124,7 +124,8 @@ export class Trailtie extends BaseTrailtie {
         const cookiesSerializer = (this.config.get("actionDispatch") as ActionDispatchConfig)
           .cookiesSerializer;
         if (
-          cookiesSerializer?.includes("message_pack") &&
+          typeof cookiesSerializer === "string" &&
+          cookiesSerializer.includes("message_pack") &&
           TopLevel.ActiveSupport!.MessagePack === undefined
         ) {
           await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();

@@ -46,23 +46,22 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
       if (!(error instanceof LoadError)) throw error;
     }
   }
-  const cacheStore = this.config.cacheStore;
-  const serializer = Array.isArray(cacheStore)
-    ? (cacheStore.at(-1) as { serializer?: unknown } | null)?.serializer
-    : undefined;
-  if (
-    typeof serializer === "string" &&
-    serializer.includes("message_pack") &&
-    TopLevel.ActiveSupport!.MessagePack === undefined
-  ) {
-    await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
-  }
-
   const cacheFormatVersion = this.config.activeSupport.cacheFormatVersion;
   delete this.config.activeSupport.cacheFormatVersion;
   if (cacheFormatVersion != null) ActiveSupport.setCacheFormatVersion(cacheFormatVersion);
 
   if (TopLevel.Trails!.cache == null) {
+    const cacheStore = this.config.cacheStore;
+    const serializer = Array.isArray(cacheStore)
+      ? (cacheStore.at(-1) as { serializer?: unknown } | null)?.serializer
+      : undefined;
+    if (
+      typeof serializer === "string" &&
+      serializer.includes("message_pack") &&
+      TopLevel.ActiveSupport!.MessagePack === undefined
+    ) {
+      await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
+    }
     TopLevel.Trails!.cache = lookupStore(this.config.cacheStore);
 
     if (rbObjRespondTo(TopLevel.Trails!.cache, "middleware")) {

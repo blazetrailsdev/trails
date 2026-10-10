@@ -9,7 +9,7 @@ import {
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
 import { Codec } from "@blazetrails/activesupport/messages/codec";
-import { symbolToS } from "@blazetrails/ruby-compat";
+import { isSymbol, symbolToS } from "@blazetrails/ruby-compat";
 
 type HashDigestClass = typeof Digest.hashDigestClass;
 
@@ -24,7 +24,7 @@ export interface ActiveSupportConfig {
   disallowedDeprecation?: DisallowedBehaviorSetting;
   disallowedDeprecationWarnings?: Deprecation["disallowedWarnings"];
   executorAroundTestCase?: boolean | null;
-  messageSerializer?: string | null;
+  messageSerializer?: string | typeof Codec.defaultSerializer | null;
 }
 
 declare module "../trailtie/configuration.js" {
@@ -88,7 +88,9 @@ export class Trailtie extends BaseTrailtie {
           (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
         ).messageSerializer;
         if (messageSerializer != null) {
-          Codec.defaultSerializer = symbolToS(messageSerializer) as typeof Codec.defaultSerializer;
+          Codec.defaultSerializer = (
+            isSymbol(messageSerializer) ? symbolToS(messageSerializer) : messageSerializer
+          ) as typeof Codec.defaultSerializer;
         }
       });
     });
@@ -101,7 +103,8 @@ export class Trailtie extends BaseTrailtie {
           (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
         ).messageSerializer;
         if (
-          messageSerializer?.includes("message_pack") &&
+          typeof messageSerializer === "string" &&
+          messageSerializer.includes("message_pack") &&
           TopLevel.ActiveSupport!.MessagePack === undefined
         ) {
           await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
