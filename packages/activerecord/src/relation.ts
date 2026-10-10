@@ -274,9 +274,9 @@ const CLASS_SPECIFIC_RELATION_HANDLER: ProxyHandler<any> = {
       return value;
     }
     if (/^(0|[1-9]\d*)$/.test(prop)) {
-      return target.isScheduled || target._loadResult
-        ? target.records().then((records: any[]) => records[Number(prop)])
-        : (target.target ?? target._records)[Number(prop)];
+      return target._isRecordsSynchronous
+        ? (target.target ?? target._records)[Number(prop)]
+        : target.records().then((records: any[]) => records[Number(prop)]);
     }
     const enumerable = ENUMERABLE_METHODS[prop];
     if (enumerable) {
