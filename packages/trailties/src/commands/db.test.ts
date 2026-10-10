@@ -901,15 +901,8 @@ describe("schema dump and load", () => {
       const defineSchema = new Function(
         "ctx",
         schema
-          .replace(
-            /^(?:\s*\/\/[^\n]*\n)*\s*export const defineParams[^\n]*\s*\/\*\*[\s\S]*?\*\/\s*/,
-            "",
-          )
-          .replace(
-            /export default async function defineSchema\(ctx(?:: any)?\) \{/,
-            "return (async () => {",
-          )
-          .replace(/}\n$/, "})();"),
+          .replace(/^[\s\S]*?await Schema\.get\([^\n]*\n/, "return (async () => {\n")
+          .replace(/}\);\n$/, "})();"),
       );
       await defineSchema(targetAdapter);
 

@@ -648,6 +648,14 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("changeTableComment", tableName, commentOrChanges);
   }
 
+  async createSchema(schemaName: string): Promise<void> {
+    await this.methodMissing("createSchema", schemaName);
+  }
+
+  async createVirtualTable(tableName: string, moduleName: string, values: string[]): Promise<void> {
+    await this.methodMissing("createVirtualTable", tableName, moduleName, values);
+  }
+
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
     if (options !== undefined) {
       await this.methodMissing("enableExtension", name, options);

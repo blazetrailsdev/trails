@@ -1,4 +1,4 @@
-import type pg from "pg";
+import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
 import { connectionBad, pgError } from "./exceptions.js";
 import { PG } from "./pg.js";
@@ -146,7 +146,7 @@ export class Connection {
       await (this.query as unknown as Query)({
         name: stmtName,
         text,
-        values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
+        values: params.map(param),
         rowMode: "array",
         types: types(this),
       }).catch(raise),
@@ -165,7 +165,7 @@ export class Connection {
     return result(
       await (this.query as unknown as Query)({
         text: sql,
-        values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
+        values: params.map(param),
         rowMode: "array",
         types: types(this),
       }).catch(raise),
@@ -260,6 +260,19 @@ function types(conn: Connection): { getTypeParser(oid: number, format?: string):
   };
 }
 
+type BinaryParam = { value?: unknown; format?: unknown };
+
+function param(value: unknown): unknown {
+  if (value instanceof Number) return value.valueOf();
+  if (typeof value === "object" && value !== null && (value as BinaryParam).format === 1) {
+    const bytes = (value as BinaryParam).value;
+    if (bytes instanceof Uint8Array && Object.keys(value).length === 2) {
+      return Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    }
+  }
+  return value;
+}
+
 function raise(error: unknown): never {
   throw pgError(error);
 }
@@ -321,6 +334,63 @@ const HANDLER: ProxyHandler<Connection> = {
     return Reflect.deleteProperty(name in conn ? conn : conn.client, name);
   },
 };
+
+const STRING_OIDS = new Set([
+  114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
+]);
+
+function pgTypeParser(oid: number, format?: string): unknown {
+  if (format === "binary") return pg.types.getTypeParser(oid, "binary");
+  if (STRING_OIDS.has(oid)) return (v: unknown) => v;
+  return pg.types.getTypeParser(oid, "text");
+}
+
+const CONNINFO_KEYWORDS: Record<string, string> = {
+  user: "user",
+  dbname: "database",
+  password: "password",
+  port: "port",
+  host: "host",
+  connectionString: "connectionString",
+  keepAlive: "keepAlive",
+  stream: "stream",
+  statementTimeout: "statement_timeout",
+  ssl: "ssl",
+  queryTimeout: "query_timeout",
+  lockTimeout: "lock_timeout",
+  keepAliveInitialDelayMillis: "keepAliveInitialDelayMillis",
+  idleInTransactionSessionTimeout: "idle_in_transaction_session_timeout",
+  applicationName: "application_name",
+  fallbackApplicationName: "fallback_application_name",
+  connectionTimeoutMillis: "connectionTimeoutMillis",
+  types: "types",
+  options: "options",
+  clientEncoding: "client_encoding",
+  binary: "binary",
+  replication: "replication",
+  enableChannelBinding: "enableChannelBinding",
+  connection: "connection",
+  Promise: "Promise",
+};
+
+export function conndefaultsHash(): Record<string, null> {
+  return Object.fromEntries(Object.keys(CONNINFO_KEYWORDS).map((keyword) => [keyword, null]));
+}
+
+export async function connect(connParams: Record<string, unknown>): Promise<PGConnection> {
+  const config: pg.ClientConfig = Object.fromEntries(
+    Object.entries(connParams).map(([key, value]) => [CONNINFO_KEYWORDS[key] ?? key, value]),
+  );
+  const { getTypeParser } = (config.types ?? {}) as Partial<pg.CustomTypesConfig>;
+  config.types = {
+    getTypeParser: ((oid: number, format?: string) =>
+      getTypeParser?.(oid, format as never) ??
+      pgTypeParser(oid, format)) as pg.CustomTypesConfig["getTypeParser"],
+  };
+  const client = pgConnection(new pg.Client(config), config);
+  await client.connect();
+  return client;
+}
 
 export function pgConnection<T extends object>(
   client: T,

@@ -62,7 +62,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   }
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.dropTable("enums", { ifExists: true }).catch(() => {});

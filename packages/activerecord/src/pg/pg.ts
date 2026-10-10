@@ -1,3 +1,4 @@
+import { conndefaultsHash, connect } from "./connection.js";
 import {
   ConnectionBad,
   Error as PGError,
@@ -10,6 +11,8 @@ import { Array as TextEncoderArray } from "./text-encoder/array.js";
 
 export const PG = {
   Result: PGResult,
+  Connection: { conndefaultsHash },
+  connect,
   Error: PGError,
   ConnectionBad,
   PG_DIAG_SQLSTATE,

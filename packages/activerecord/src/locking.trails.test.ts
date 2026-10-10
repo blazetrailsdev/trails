@@ -24,6 +24,30 @@ describe("OptimisticLockingTrailsTest", () => {
     expect(record.readAttribute("custom_lock_version")).toBe(0);
   });
 
+  it("a subclass reads the default locking_column, not its parent's", () => {
+    class LockParent extends Base {
+      static {
+        this._tableName = "lock_without_defaults_cust";
+        this.lockingColumn = "custom_lock_version";
+      }
+    }
+    class LockChild extends LockParent {}
+
+    expect(LockParent.lockingColumn).toBe("custom_lock_version");
+    expect(LockChild.lockingColumn).toBe("lock_version");
+  });
+
+  it("hook_attribute_type leaves the type alone when lock_optimistically is nil", async () => {
+    class LockOff extends Base {
+      static {
+        this._tableName = "lock_without_defaults";
+        this.lockOptimistically = null as never;
+      }
+    }
+    await LockOff.loadSchema();
+    expect(LockOff.typeForAttribute("lock_version")).not.toBeInstanceOf(LockingType);
+  });
+
   it("locking_column= stores value.to_s", () => {
     class LockCoerce extends Base {
       static {

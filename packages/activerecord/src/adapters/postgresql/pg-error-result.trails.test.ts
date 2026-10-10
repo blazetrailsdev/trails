@@ -20,7 +20,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   fixtures([]);
 
   beforeEach(() => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
 
   afterEach(async () => {
@@ -70,7 +70,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   it("a failed connect is stamped before new_client translates it", async () => {
     const connect = vi.spyOn(pg.Client.prototype, "connect");
     await expect(
-      PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, database: "nonexistent" }),
+      PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, dbname: "nonexistent" }),
     ).rejects.toBeInstanceOf(ConnectionNotEstablished);
     const error = (await (connect.mock.results[0].value as Promise<void>).catch(
       (e: unknown) => e,
@@ -96,7 +96,7 @@ describeIfPg("PG::Error#result (trails)", () => {
     vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(
       Object.assign(new Error('database "nope" does not exist'), { name: "error", code: "3D000" }),
     );
-    await expect(PostgreSQLAdapter.newClient({ database: "nope" })).rejects.toBeInstanceOf(
+    await expect(PostgreSQLAdapter.newClient({ dbname: "nope" })).rejects.toBeInstanceOf(
       NoDatabaseError,
     );
   });
@@ -104,7 +104,7 @@ describeIfPg("PG::Error#result (trails)", () => {
   it("new_client lets an error the driver did not raise propagate unchanged", async () => {
     const error = new TypeError("not a driver error");
     vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(error);
-    expect(await PostgreSQLAdapter.newClient({ database: "nope" }).catch((e) => e)).toBe(error);
+    expect(await PostgreSQLAdapter.newClient({ dbname: "nope" }).catch((e) => e)).toBe(error);
     expect(error).not.toBeInstanceOf(PG.Error);
   });
 
@@ -123,19 +123,5 @@ describeIfPg("PG::Error#result (trails)", () => {
     const error = Object.assign(new Error("not from the driver"), { result: null });
     expect(error).not.toBeInstanceOf(PG.Error);
     expect(pgError(new Error("Connection terminated unexpectedly"))).toBeInstanceOf(PG.Error);
-  });
-
-  it("a connection string that is not a URL leaves the conn_params keys unset", () => {
-    const params = (config: string) =>
-      (new PostgreSQLAdapter(config) as unknown as { _connectionParameters: pg.ClientConfig })
-        ._connectionParameters;
-    expect(params("host=localhost dbname=blog").database).toBeUndefined();
-    expect(params("postgres://u@h/db%zz").database).toBeUndefined();
-    expect(params("postgres://bob@[::1]/blog").host).toBe("::1");
-    expect(params("postgres://bob@db/blog?host=/var/run/pg&user=ann&dbname=shop")).toMatchObject({
-      database: "shop",
-      user: "ann",
-      host: "/var/run/pg",
-    });
   });
 });

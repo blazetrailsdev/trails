@@ -329,7 +329,10 @@ export async function connectAdapter(config: DatabaseConfig): Promise<DatabaseAd
       const { PostgreSQLAdapter } =
         await import("@blazetrails/activerecord/connection-adapters/postgresql-adapter.js");
       if (config.url) {
-        return new PostgreSQLAdapter(config.url);
+        const { UrlConfig } = await import("@blazetrails/activerecord");
+        return new PostgreSQLAdapter(
+          new UrlConfig(resolveEnv(), "primary", config.url).configurationHash,
+        );
       }
       return new PostgreSQLAdapter({
         host: config.host ?? "localhost",

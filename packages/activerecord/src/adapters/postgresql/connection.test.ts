@@ -10,7 +10,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   let subscriber: SQLSubscriber;
 
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await adapter.verifyBang();
     subscriber = new SQLSubscriber();
     subscriber.start();
@@ -265,7 +265,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("disconnectBang closes the persistent connection", async () => {
-    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     try {
@@ -280,7 +280,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("discardBang abandons the connection without closing the socket", async () => {
-    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await a.execute("SELECT 1");
     const conn = a._rawConnectionForTest();
     const endSpy = conn ? vi.spyOn(conn, "end") : null;
@@ -298,7 +298,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("reconnect resets connection so queries work again", async () => {
-    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await a.reconnect();
       expect(await a.active()).toBe(true);
@@ -310,7 +310,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   });
 
   it("disconnectBang then reconnect restores query capability", async () => {
-    const a = new PostgreSQLAdapter(PG_TEST_URL);
+    const a = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       await a.disconnectBang();
       expect(await a.active()).toBe(false);

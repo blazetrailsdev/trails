@@ -60,16 +60,16 @@ export class Schema<A extends DatabaseAdapter = DatabaseAdapter> extends Current
 
   declare private static _classForVersion: Map<string | number, typeof Migration> | undefined;
 
-  static get(version: string | number): typeof Migration {
+  static get(version: string | number): typeof Migration & { define: DefineClassMethod } {
     this._classForVersion =
       (Object.hasOwn(this, "_classForVersion") ? this._classForVersion : undefined) ?? new Map();
     return (
-      this._classForVersion.get(version) ??
+      (this._classForVersion.get(version) as typeof Migration & { define: DefineClassMethod }) ??
       (() => {
         const klass = class extends (Migration.Compatibility.find(version) as new () => object) {};
         include(klass, Definition);
         this._classForVersion.set(version, klass as unknown as typeof Migration);
-        return klass as unknown as typeof Migration;
+        return klass as unknown as typeof Migration & { define: DefineClassMethod };
       })()
     );
   }

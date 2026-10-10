@@ -45,16 +45,14 @@ export interface CastTypeLookupHost {
 const QUOTED_COLUMN_NAMES: Record<string, string> = Object.create(null);
 const QUOTED_TABLE_NAMES: Record<string, string> = Object.create(null);
 
-export function escapeBytea(
-  value: Buffer | Uint8Array | string | null | undefined,
-): string | undefined {
+export function escapeBytea(value: Uint8Array | string | null | undefined): string | undefined {
   if (value != null) return pgEscapeBytea(value);
 }
 
 export async function unescapeBytea(
   this: { validRawConnection(): unknown },
   value: string | null | undefined,
-): Promise<Buffer | undefined> {
+): Promise<Uint8Array | undefined> {
   if (value != null) {
     return ((await this.validRawConnection()) as PGConnection).unescapeBytea(value);
   }
@@ -152,8 +150,7 @@ export function quoteDefaultExpression(
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof BinaryData) {
-    const u8 = value.toString();
-    return Buffer.from(u8.buffer, u8.byteOffset, u8.byteLength);
+    return { value: value.toString(), format: 1 };
   }
   if (value instanceof XmlData || value instanceof BitData) {
     return value.toString();

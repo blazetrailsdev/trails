@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFile } from "fs/promises";
 import { createRequire } from "module";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
+import { PG } from "../pg/pg.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 
 const require = createRequire(import.meta.url);
@@ -41,11 +42,12 @@ async function deriveDriverKeywords(): Promise<Set<string>> {
 }
 
 function allowlistKeywords(): Set<string> {
-  return (
-    PostgreSQLAdapter as unknown as {
-      VALID_CONN_PARAM_KEYS: ReadonlySet<string>;
-    }
-  ).VALID_CONN_PARAM_KEYS as Set<string>;
+  return new Set(Object.keys(PG.Connection.conndefaultsHash()));
+}
+
+function railsSpelling(keyword: string): string {
+  if (keyword === "database") return "dbname";
+  return keyword.replace(/_([a-z])/g, (_match, letter: string) => letter.toUpperCase());
 }
 
 function sorted(keys: Iterable<string>): string[] {
@@ -62,7 +64,9 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
   });
 
   it("accepts every keyword the installed pg driver reads, and no extras", async () => {
-    expect(sorted(allowlistKeywords()), RECHECK_HINT).toEqual(sorted(await deriveDriverKeywords()));
+    expect(sorted(allowlistKeywords()), RECHECK_HINT).toEqual(
+      sorted([...(await deriveDriverKeywords())].map(railsSpelling)),
+    );
   });
 
   it("still derives the pg@9-deprecated Promise and connection keywords from pg@8", async () => {
@@ -71,39 +75,27 @@ describe("PostgreSQLAdapter conn-param allowlist drift guard (trails)", () => {
     for (const key of PG9_DEPRECATED_KEYWORDS) {
       expect(
         allowlist.has(key) && !driverKeys.has(key),
-        `pg no longer reads "${key}": drop it from VALID_CONN_PARAM_KEYS (removed in pg@9)`,
+        `pg no longer reads "${key}": drop it from PG.Connection.conndefaultsHash (removed in pg@9)`,
       ).toBe(false);
     }
   });
 
-  it("hands a URL query's driver keywords to pg under the names pg reads", () => {
+  it("keeps a URL query's driver keywords and drops keys pg does not read", () => {
     const config = new UrlConfig(
       "default_env",
       "primary",
       "postgres://localhost/foo?application_name=trails&statement_timeout=5000&reaping_frequency=2",
     );
-    const sliced = (
-      PostgreSQLAdapter as unknown as {
-        _sliceValidConnParams(config: Record<string, unknown>): Record<string, unknown>;
+    const connParams = (
+      new PostgreSQLAdapter(config.configurationHash) as unknown as {
+        _connectionParameters: Record<string, unknown>;
       }
-    )._sliceValidConnParams(config.configurationHash);
-    expect(sliced.application_name).toBe("trails");
-    expect(sliced.statement_timeout).toBe("5000");
-    expect(sliced).not.toHaveProperty("reaping_frequency");
-    expect(sliced).not.toHaveProperty("reapingFrequency");
-  });
-
-  it("prefers a keyword written in pg's spelling and drops keys pg does not read", () => {
-    const slice = (
-      PostgreSQLAdapter as unknown as {
-        _sliceValidConnParams(config: Record<string, unknown>): Record<string, unknown>;
-      }
-    )._sliceValidConnParams;
-    expect(
-      slice({ applicationName: "camel", application_name: "snake", schemaSearchPath: "public" }),
-    ).toEqual({ application_name: "snake" });
-    expect(
-      slice({ application_name: "snake", applicationName: "camel", schemaSearchPath: "public" }),
-    ).toEqual({ application_name: "snake" });
+    )._connectionParameters;
+    expect(connParams).toEqual({
+      host: "localhost",
+      dbname: "foo",
+      applicationName: "trails",
+      statementTimeout: "5000",
+    });
   });
 });

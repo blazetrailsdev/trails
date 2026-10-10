@@ -6,7 +6,7 @@ import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oi
 describeIfPg("PostgreSQLAdapter OID::DateTime", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.disconnectBang();

@@ -5,7 +5,7 @@ import { Name, Utils } from "../../connection-adapters/postgresql/utils.js";
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
   });
   afterEach(async () => {
     await adapter.execute("DROP TABLE IF EXISTS utils_reset_pk CASCADE");

@@ -10,7 +10,7 @@ import {
 describeIfPg("Migration", () => {
   let adapter: PostgreSQLAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     await adapter.execute("DROP TABLE IF EXISTS strings");
     await adapter.execute(
       `CREATE TABLE strings (id serial primary key, somedate character varying)`,

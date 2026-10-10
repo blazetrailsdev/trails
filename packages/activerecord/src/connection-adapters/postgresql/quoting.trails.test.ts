@@ -53,10 +53,9 @@ describe("PostgreSQL quoting", () => {
     ).toBe("'{true,false}'");
   });
 
-  it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
+  it("type casts binary data to the binary-format bind hash", () => {
     const cast = typeCast(new BinaryData(new Uint8Array([0xde, 0xad, 0xbe, 0xef])));
-    expect(Buffer.isBuffer(cast)).toBe(true);
-    expect(Array.from(cast as Buffer)).toEqual([0xde, 0xad, 0xbe, 0xef]);
+    expect(cast).toEqual({ value: new Uint8Array([0xde, 0xad, 0xbe, 0xef]), format: 1 });
   });
 
   it("quotes PostgreSQL OID wrapper values before delegating other values", () => {

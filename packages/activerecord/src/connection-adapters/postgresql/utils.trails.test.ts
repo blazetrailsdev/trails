@@ -21,7 +21,7 @@ describe("PostgreSQL::Name#quoted", () => {
 
 describeIfPg("PostgreSQL quote_table_name", () => {
   it("raises quote_ident's TypeError for a nil table name", async () => {
-    const adapter = new PostgreSQLAdapter(PG_TEST_URL);
+    const adapter = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
     try {
       expect(() => adapter.quoteTableName(null)).toThrow(TypeError);
       expect(() => adapter.quoteTableName(null)).toThrow(

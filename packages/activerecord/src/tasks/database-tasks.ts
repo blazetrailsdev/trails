@@ -29,8 +29,8 @@ import {
   abort,
   File,
   FileUtils,
-  getPath,
   rbEqual,
+  rbFLoad,
   rbModConstSet,
   RuntimeError,
 } from "@blazetrails/ruby-compat";
@@ -497,11 +497,6 @@ export class DatabaseTasks {
     return File.join(this.dbDir, filename);
   }
 
-  /** @internal */
-  static _resolveSchemaPath(filename: string): string {
-    return File.isAbsolutePath(filename) ? filename : File.expandPath(filename, this.root);
-  }
-
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
@@ -550,19 +545,9 @@ export class DatabaseTasks {
 
       switch (format) {
         case "ts":
-        case "js": {
-          const mod = (await import(
-            getPath().pathToFileURL!(this._resolveSchemaPath(file)).href
-          )) as {
-            default?: (ctx: unknown) => Promise<void> | void;
-            defineParams?: { version?: string | number };
-          };
-          const defineSchema =
-            mod.default ?? (mod as unknown as (ctx: unknown) => Promise<void> | void);
-          const { Schema } = await import("../schema.js");
-          await Schema.define(mod.defineParams ?? {}, (schema) => defineSchema(schema.connection));
+        case "js":
+          await rbFLoad(file);
           break;
-        }
         case "sql":
           await this.structureLoad(dbConfig, file);
           break;
