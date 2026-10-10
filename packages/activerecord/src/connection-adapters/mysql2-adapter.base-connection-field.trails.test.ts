@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
+import { mysql2Client } from "../mysql2/client.js";
 
 describe("Mysql2Adapter base _rawConnection field", () => {
   afterEach(() => {
@@ -14,7 +15,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
       connection: { _handshakePacket: { serverVersion: "8.0.28" } },
       query: () => Promise.resolve([[]]),
     };
-    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
+    vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(mysql2Client(fakeConn));
     return { end };
   }
 
@@ -70,7 +71,7 @@ describe("Mysql2Adapter base _rawConnection field", () => {
     expect(spy).toHaveBeenCalledTimes(1);
 
     adapter.discardBang();
-    resolve(fakeConn as never);
+    resolve(mysql2Client(fakeConn) as never);
     await reconnect;
     await adapter.lock.synchronize(() => {});
 

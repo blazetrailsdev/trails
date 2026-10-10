@@ -31,7 +31,7 @@ import {
   performQuery as mysql2PerformQuery,
   selectAll as mysql2SelectAll,
 } from "./mysql2/database-statements.js";
-import { Mysql2, mysql2Client, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
+import { Mysql2, type Mysql2Client, type Mysql2Result } from "../mysql2/client.js";
 import { defaultTimezone } from "../active-record.js";
 
 let mysql2TypeMap: TypeMap | null = null;
@@ -90,16 +90,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   );
   /** @deprecated */
   constructor(
-    rawConnection: mysql.Connection,
+    rawConnection: Mysql2Client,
     deprecatedLogger?: unknown,
     deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
   );
-  /** @inventedArm mysql2Client — CONVERGEABLE adapter-constructors-wrap-a-handed-npm-client */
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
 
-    this._unconfiguredConnection &&= mysql2Client(this._unconfiguredConnection);
     this._affectedRowsBeforeWarnings = null;
     this._config.flags ||= 0;
 

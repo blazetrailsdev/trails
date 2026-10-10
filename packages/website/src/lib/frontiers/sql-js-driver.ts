@@ -19,9 +19,7 @@ function bindParams(binds: SqliteBinds | undefined): BindParams {
         : 0
       : (v as unknown) instanceof Number
         ? (v as unknown as { valueOf(): number }).valueOf()
-        : typeof v === "number" && Number.isInteger(v)
-          ? BigInt(v)
-          : v;
+        : v;
   if (Array.isArray(binds)) return (binds as SqliteBindValue[]).map(cast);
   const out: Record<string, SqlValue> = {};
   for (const [k, v] of Object.entries(binds)) out[/^[$:@]/.test(k) ? k : `$${k}`] = cast(v);

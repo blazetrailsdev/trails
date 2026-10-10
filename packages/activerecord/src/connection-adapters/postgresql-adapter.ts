@@ -65,7 +65,7 @@ import { Text as ArText } from "../type/text.js";
 import { Bit } from "./postgresql/oid/bit.js";
 import { BitVarying } from "./postgresql/oid/bit-varying.js";
 import { Bytea } from "./postgresql/oid/bytea.js";
-import { pgConnection, type PGConnection } from "../pg/connection.js";
+import { type PGConnection } from "../pg/connection.js";
 import { Cidr } from "./postgresql/oid/cidr.js";
 import { DateTime as OidDateTime } from "./postgresql/oid/date-time.js";
 import { Decimal } from "./postgresql/oid/decimal.js";
@@ -497,7 +497,7 @@ export class PostgreSQLAdapter
   constructor(config: (pg.PoolConfig & PostgreSQLAdapterOptions) | DatabaseConfigOptions);
   /** @deprecated */
   constructor(
-    rawConnection: pg.Client,
+    rawConnection: PGConnection,
     deprecatedLogger?: unknown,
     deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
@@ -506,7 +506,6 @@ export class PostgreSQLAdapter
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
 
-    this._unconfiguredConnection &&= pgConnection(this._unconfiguredConnection);
     const connParams: Record<string, unknown> = compact(this._config);
 
     if (rtest(connParams.username)) connParams.user = hashDelete(connParams, "username");
