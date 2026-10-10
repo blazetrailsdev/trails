@@ -373,4 +373,29 @@ describe("sync loadSchema on a reflection that has not loaded its cache", () => 
     expect(Post.columnsHash().id).toBe(cols[0]);
     expect(Post.connectionPool().schemaReflection.loadedCache).toBeNull();
   });
+
+  it("reads a table once per reflection and again after its data source cache is cleared", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    let reads = 0;
+    const adapter = adapterDouble({
+      columns: () => {
+        reads++;
+        return [{ sqlType: "integer", name: "id", default: null }];
+      },
+      lookupCastTypeFromColumn: () => defaultValue(),
+    });
+    await establishConnectionTo(Post, adapter as never);
+    await Post.leaseConnection();
+    const schemaCache = Post.connectionPool().schemaCache;
+
+    schemaCache.getCachedColumnsHash("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(1);
+
+    await schemaCache.clearDataSourceCacheBang("posts");
+    schemaCache.getCachedColumnsHash("posts");
+    expect(reads).toBe(2);
+  });
 });

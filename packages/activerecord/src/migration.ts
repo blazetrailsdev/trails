@@ -844,11 +844,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     return (await this.methodMissing("transaction", ...args)) as T | undefined;
   }
 
-  async execute(sql: string, name?: string | null): Promise<unknown> {
-    if (name !== undefined) {
-      return await this.methodMissing("execute", sql, name);
-    }
-    return await this.methodMissing("execute", sql);
+  async execute(...args: [sql: string, name?: string | null]): Promise<unknown> {
+    return await this.methodMissing("execute", ...args);
   }
 
   get name(): string | null {

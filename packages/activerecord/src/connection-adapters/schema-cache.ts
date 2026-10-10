@@ -90,6 +90,7 @@ export class SchemaReflection {
   }
 
   async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
+    this.clearCachedColumnsHash(name);
     if (!this._cache && !this.possibleCacheAvailable()) return;
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
