@@ -474,8 +474,9 @@ export async function pick(
     return enumerablePick(await this.records(), ...(columnNames as never[])) ?? null;
   }
 
-  const values = await this.limit(1).pluck(...columnNames);
-  return values[0] ?? null;
+  return this.limit(1)
+    .pluck(...columnNames)
+    .then((values) => values[0] ?? null);
 }
 
 export function asyncPick(

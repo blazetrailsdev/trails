@@ -120,13 +120,13 @@ export function detailsForLookup(this: ViewPaths): Record<string, DetailValue> {
 export function appendViewPath(this: ViewPaths, path: ViewPathsInput): void {
   lookupContext
     .call(this)
-    .appendViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toArray());
+    .appendViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toAry());
 }
 
 export function prependViewPath(this: ViewPaths, path: ViewPathsInput): void {
   lookupContext
     .call(this)
-    .prependViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toArray());
+    .prependViewPaths(ClassMethods._buildViewPaths.call(this.constructor, path).toAry());
 }
 
 export function templateExists(

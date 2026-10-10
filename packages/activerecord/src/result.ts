@@ -134,8 +134,12 @@ export class Result {
     return iter;
   }
 
-  toArray(): Record<string, unknown>[] {
+  toAry(): Record<string, unknown>[] {
     return this.hashRows();
+  }
+
+  toArray(): Record<string, unknown>[] {
+    return this.toAry();
   }
 
   pluck(key: string): unknown[];

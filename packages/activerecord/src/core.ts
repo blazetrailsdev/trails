@@ -783,6 +783,11 @@ export function constructor(
 }
 
 /** @internal */
+export function toAry(this: CoreRecord): null {
+  return null;
+}
+
+/** @internal */
 export function initInternals(
   this: CoreRecord & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;

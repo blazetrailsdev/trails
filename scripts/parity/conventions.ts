@@ -546,9 +546,8 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "(`object_id`, `equal?`, `class`), reflection (`instance_of?`, " +
       "`instance_variable_get` / `instance_variable_set` / `instance_variables`), " +
       "dispatch (`send`, `public_send`, `tap`, " +
-      "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), " +
-      "`clone`, and `to_ary` / `then`, which JS " +
-      "would read as array destructuring and as a thenable `await` calls.",
+      "`yield_self`), numeric coercion (`to_i`, `to_f`, `to_r`, `to_c`), and " +
+      "`clone`.",
     names: [
       "clone",
       "object_id",
@@ -556,14 +555,12 @@ export const SKIP_GROUPS: SkipGroup[] = [
       "send",
       "public_send",
       "tap",
-      "then",
       "yield_self",
       "instance_of?",
       "equal?",
       "instance_variable_get",
       "instance_variable_set",
       "instance_variables",
-      "to_ary",
       "to_i",
       "to_f",
       "to_r",
@@ -1159,20 +1156,16 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "`Arel::Nodes::Case#then` (nodes/case.rb:19-22) sets the last `when`'s " +
-      "result and is ported at its Rails name. `then` stays on the global " +
-      "skip because everywhere else Ruby's `then` is `Kernel#then` or a " +
-      "promise's continuation, which JS answers with the thenable `await` " +
-      'calls (CLAUDE.md § "`Relation` is evaluated by an async query"). ' +
-      "Scoped to nodes/case.rb so this one definition is scored. Having a " +
-      "`then` member makes every `Case` a thenable, so `await` and an `async` " +
-      "return call it with a resolver and a rejecter; the Rails body alone " +
-      "would store the resolver as the `when` result and never settle. The " +
-      "port therefore rejects when handed two functions, which no Arel " +
-      "caller passes.",
+      "`ActiveRecord::Relation#then` (relation.rb:1157-1165) chains a block " +
+      "onto the relation's `@future_result`, else falls to `Kernel#then`. A " +
+      "trails relation is evaluated by an async query, so `Relation.prototype` " +
+      "carries the `then` / `catch` / `finally` that `await rel` calls, " +
+      "installed by `applyThenable` and declared on the class without a body " +
+      '(packages/activerecord/CLAUDE.md § "`Relation` is evaluated by an ' +
+      'async query"). Scoped to relation.rb so `FutureResult#then` and any ' +
+      "other definition stay scored.",
     names: ["then"],
-    rubyFiles: ["nodes/case.rb"],
-    tsMirrorName: "then",
+    rubyFiles: ["relation.rb"],
   },
 ];
 

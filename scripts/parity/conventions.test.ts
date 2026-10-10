@@ -712,10 +712,12 @@ describe("SCOPED_SKIP_GROUPS", () => {
     ).toBeNull();
   });
 
-  it("scores Arel::Nodes::Case#then through its scoped mirror while then stays skipped", () => {
-    expect(rubyMethodToTs("then")).toBeNull();
-    expect(scopedSkipMirrorName("then", "nodes/case.rb")).toEqual(["then"]);
-    expect(scopedSkipMirrorName("then", "relation.rb")).toBeNull();
+  it("scores then by name and skips it only in relation.rb", () => {
+    expect(rubyMethodToTs("then")).toEqual(["then", "_then"]);
+    expect(isScopedSkip("then", "relation.rb")).toBe(true);
+    expect(isScopedSkip("then", "nodes/case.rb")).toBe(false);
+    expect(isScopedSkip("then", "future_result.rb")).toBe(false);
+    expect(rubyMethodToTs("to_ary")).toEqual(["toAry", "_toAry"]);
   });
 
   it("names every spelling of a port spread over several TS declarations", () => {
