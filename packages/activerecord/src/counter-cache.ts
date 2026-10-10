@@ -8,7 +8,7 @@ import {
   kernelArray,
   wrap,
 } from "@blazetrails/activesupport";
-import { rbEqual, rbFSend, rtest, toSym } from "@blazetrails/ruby-compat";
+import { rbEqual, rbFSend, rtest, toSym, union } from "@blazetrails/ruby-compat";
 import { ThroughReflection } from "./reflection.js";
 import { type CounterCacheTouchOption, type TouchAllOptions } from "./timestamp.js";
 
@@ -123,14 +123,12 @@ export function loadSchemaBang(this: typeof Base, superFn: () => void): void {
 
   const associationNames: string[] = [];
   for (const [name, reflection] of Object.entries(this._reflections)) {
-    if (!reflection.belongsTo?.() || !reflection.counterCacheColumn?.()) continue;
+    if (!(reflection.isBelongsTo() && rtest(reflection.counterCacheColumn()))) continue;
+
     associationNames.push(name);
   }
-  let names = this.counterCachedAssociationNames;
-  for (const name of associationNames) {
-    if (!names.includes(name)) names = [...names, name];
-  }
-  this.counterCachedAssociationNames = names;
+
+  this.counterCachedAssociationNames = union(this.counterCachedAssociationNames, associationNames);
 }
 
 export const ClassMethods = {

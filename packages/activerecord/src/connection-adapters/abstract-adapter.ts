@@ -105,7 +105,14 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import { include, prepend, type PrependMethod } from "@blazetrails/activesupport";
+import {
+  Callbacks,
+  include,
+  prepend,
+  type Extended,
+  type Included,
+  type PrependMethod,
+} from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -197,8 +204,11 @@ export class Version {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractAdapter
   extends
+    Included<typeof Callbacks>,
     Required<Pick<DatabaseStatementsHost, "_transactionManager" | "transactionManager">>,
     Pick<QueryCacheHost, "_queryCache"> {
+  _runCheckoutCallbacks(block?: () => unknown): unknown;
+  _runCheckinCallbacks(block?: () => unknown): unknown;
   queryCache: Store | null;
   readonly queryCacheEnabled: boolean | undefined;
   cache<T>(fn: () => T | Promise<T>): T | Promise<T>;
@@ -757,14 +767,6 @@ export interface AbstractAdapter
 
   readonly schemaCreation?: SchemaCreation;
 }
-/** @internal */
-export type ConnectionCallbackPhase = "checkout" | "checkin";
-/** @internal */
-export type ConnectionCallbackKind = "before" | "after";
-interface ConnectionCallback {
-  kind: ConnectionCallbackKind;
-  method: (this: AbstractAdapter) => void;
-}
 
 function isPlainConfigHash(value: unknown): value is Record<string, unknown> {
   if (value == null || typeof value !== "object") return false;
@@ -794,6 +796,15 @@ export const ABSTRACT_COLUMN_METHOD_NAMES: readonly string[] = [
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractAdapter implements Quoting {
   static readonly ADAPTER_NAME: string = "Abstract";
+
+  declare static defineCallbacks: Extended<typeof Callbacks.ClassMethods>["defineCallbacks"];
+  declare static setCallback: Extended<typeof Callbacks.ClassMethods>["setCallback"];
+
+  static {
+    include(this, Callbacks);
+    this.defineCallbacks("checkout", "checkin");
+  }
+
   static readonly Version = Version;
 
   static readonly COMMENT_REGEX = /(?:--.*\n)|\/\*(?:[^*]|\*[^/])*\*\//;
@@ -1153,11 +1164,6 @@ export class AbstractAdapter implements Quoting {
   supportsDdlTransactions(): boolean {
     return false;
   }
-
-  protected static _connectionCallbacks: Record<ConnectionCallbackPhase, ConnectionCallback[]> = {
-    checkout: [],
-    checkin: [],
-  };
 
   supportsBulkAlter(): boolean {
     return false;
@@ -2053,40 +2059,6 @@ export class AbstractAdapter implements Quoting {
     return abstractSanitizeAsSqlComment(value);
   }
 
-  static setCallback(
-    phase: ConnectionCallbackPhase,
-    kind: ConnectionCallbackKind,
-    method: (this: AbstractAdapter) => void,
-  ): void {
-    if (!Object.prototype.hasOwnProperty.call(this, "_connectionCallbacks")) {
-      const inherited = this._connectionCallbacks;
-      this._connectionCallbacks = {
-        checkout: [...inherited.checkout],
-        checkin: [...inherited.checkin],
-      };
-    }
-    this._connectionCallbacks[phase].push({ kind, method });
-  }
-
-  private _runCallbacks(phase: ConnectionCallbackPhase, block: () => void): void {
-    const callbacks = (this.constructor as typeof AbstractAdapter)._connectionCallbacks[phase];
-    for (const cb of callbacks) if (cb.kind === "before") cb.method.call(this);
-    block();
-    for (let i = callbacks.length - 1; i >= 0; i--) {
-      if (callbacks[i].kind === "after") callbacks[i].method.call(this);
-    }
-  }
-
-  /** @internal */
-  _runCheckoutCallbacks(block: () => void): void {
-    this._runCallbacks("checkout", block);
-  }
-
-  /** @internal */
-  _runCheckinCallbacks(block: () => void): void {
-    this._runCallbacks("checkin", block);
-  }
-
   inspect(): string {
     const q = (v: string): string => JSON.stringify(String(v));
     const dbConfig = this.pool.dbConfig;
@@ -2165,9 +2137,7 @@ include(AbstractAdapter, DatabaseStatements);
 include(AbstractAdapter, SchemaStatements);
 include(AbstractAdapter, QuotingMixin);
 include(AbstractAdapter, QueryCacheMixin);
-AbstractAdapter.setCallback("checkin", "after", function () {
-  this.enableLazyTransactionsBang();
-});
+AbstractAdapter.setCallback("checkin", "after", ":enableLazyTransactionsBang");
 include(AbstractAdapter, SavepointsMixin);
 include(AbstractAdapter, {
   maxIdentifierLength,

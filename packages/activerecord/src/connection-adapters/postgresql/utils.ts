@@ -1,5 +1,5 @@
 import { rbHash } from "@blazetrails/activesupport";
-import { stringValue } from "@blazetrails/ruby-compat";
+import { rbEqual, stringValue } from "@blazetrails/ruby-compat";
 
 export class Name {
   static readonly SEPARATOR = ".";
@@ -25,8 +25,15 @@ export class Name {
     }
   }
 
-  equals(other: Name): boolean {
-    return this.schema === other.schema && this.identifier === other.identifier;
+  equals(o: unknown): boolean {
+    return (
+      (o as Name | null)?.constructor === this.constructor &&
+      rbEqual((o as Name).parts(), this.parts())
+    );
+  }
+
+  eql(o: unknown): boolean {
+    return this.equals(o);
   }
 
   hash(): number {

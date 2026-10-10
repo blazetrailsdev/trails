@@ -445,7 +445,7 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
 export const QueryCache = {
   [included](base: {
     prototype: object;
-    setCallback(phase: "checkin", kind: "after", method: (this: never) => void): void;
+    setCallback(name: string, ...filterList: unknown[]): void;
   }): void {
     dirtiesQueryCache(
       base,
@@ -463,7 +463,7 @@ export const QueryCache = {
       "execInsertAll",
     );
 
-    base.setCallback("checkin", "after", unsetQueryCacheBang);
+    base.setCallback("checkin", "after", ":unsetQueryCacheBang");
   },
   [initialize](this: QueryCacheHost): void {
     this._queryCache = null;

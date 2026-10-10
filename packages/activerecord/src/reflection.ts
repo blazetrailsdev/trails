@@ -1668,8 +1668,7 @@ export function normalizedReflections(
   const cached = _normalizedReflectionsCache.get(modelClass);
   if (cached) return cached;
 
-  const rawReflections: Record<string, RawReflection> =
-    (modelClass as { _reflections?: Record<string, RawReflection> })._reflections ?? {};
+  const rawReflections = modelClass._reflections as Record<string, RawReflection>;
   const result: Record<string, AssociationReflection | ThroughReflection> = {};
   for (const [name, ref] of Object.entries(rawReflections)) {
     const parent = ref.parentReflection;
@@ -1694,11 +1693,7 @@ export function _reflectOnAssociation(
   modelClass: typeof Base,
   association: string,
 ): AssociationReflection | ThroughReflection | null {
-  const rawReflections: Record<string, unknown> = (modelClass as any)._reflections ?? {};
-  return (
-    (rawReflections[toS(association)] as AssociationReflection | ThroughReflection | undefined) ??
-    null
-  );
+  return modelClass._reflections[toS(association)] ?? null;
 }
 
 export function _reflectOnAssociationClassMethod(
