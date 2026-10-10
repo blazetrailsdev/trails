@@ -617,14 +617,17 @@ function checkDefinitionVisibility(
  * answered by a JS accessor's setter or a `setName` method, the entries
  * {@link rbFSend} dispatches to. A false `inherit` answers for `mod`'s
  * own method table only (`check_definition_visibility`, `vm_method.c:2000-2013`).
+ * A `Module` instance keeps its method table on a private carrier and answers
+ * through its own `isMethodDefined`.
  *
  * @noRailsEquivalent PERMANENT
  */
 export function rbModMethodDefined(
-  mod: { prototype: object },
+  mod: { prototype: object } | { isMethodDefined(mid: string): boolean },
   mid: string,
   inherit = true,
 ): boolean {
+  if ("isMethodDefined" in mod) return mod.isMethodDefined(mid);
   return checkDefinitionVisibility(mod, mid, inherit);
 }
 

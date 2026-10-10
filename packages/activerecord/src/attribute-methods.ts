@@ -181,7 +181,13 @@ export function accessedFields(this: AttributeRecord): string[] {
   return this._attributes.accessed();
 }
 
-export class GeneratedAttributeMethods extends Module {}
+export class GeneratedAttributeMethods extends Module {
+  static LOCK = {
+    synchronize<T>(block: () => T): T {
+      return block();
+    },
+  };
+}
 
 export interface AttributeMethodsHost {
   new (...args: never[]): unknown;
@@ -368,18 +374,30 @@ export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
   ) {
     return false;
   }
-  if (!this.isBaseClass()) rbClassSuperclass(this)!.defineAttributeMethods!();
-  if (!this.abstractClass) {
-    loadSchema.call(this as never);
-    AttributeMethods.ClassMethods.defineAttributeMethods.call(
-      this as never,
-      ...this.attributeNames(),
-    );
-    if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
-  }
-  generateAliasAttributes.call(this);
-  this._attributeMethodsGenerated = true;
-  return true;
+  return GeneratedAttributeMethods.LOCK.synchronize(() => {
+    if (
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated
+    ) {
+      return false;
+    }
+
+    if (!this.isBaseClass()) rbClassSuperclass(this)!.defineAttributeMethods!();
+
+    if (!this.abstractClass) {
+      loadSchema.call(this as never);
+      AttributeMethods.ClassMethods.defineAttributeMethods.call(
+        this as never,
+        ...this.attributeNames(),
+      );
+      if (this._hasAttribute("id")) this.aliasAttribute("id_value", "id");
+    }
+
+    generateAliasAttributes.call(this);
+
+    this._attributeMethodsGenerated = true;
+    return true;
+  });
 }
 
 export function generateAliasAttributes(this: AttributeMethodsHost): void {
@@ -405,14 +423,16 @@ export function generateAliasAttributes(this: AttributeMethodsHost): void {
 }
 
 export function undefineAttributeMethods(this: AttributeMethodsHost): void {
-  if (
-    Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
-    this._attributeMethodsGenerated
-  ) {
-    AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
-  }
-  this._attributeMethodsGenerated = false;
-  this._aliasAttributesMassGenerated = false;
+  GeneratedAttributeMethods.LOCK.synchronize(() => {
+    if (
+      Object.prototype.hasOwnProperty.call(this, "_attributeMethodsGenerated") &&
+      this._attributeMethodsGenerated
+    ) {
+      AttributeMethods.ClassMethods.undefineAttributeMethods.call(this as never);
+    }
+    this._attributeMethodsGenerated = false;
+    this._aliasAttributesMassGenerated = false;
+  });
 }
 
 function isOwnedByGeneratedAttributeMethods(klass: any, name: string): boolean {
@@ -468,15 +488,14 @@ export function isDangerousAttributeMethod(this: AttributeMethodsHost, name: str
   return dangerousAttributeMethods().has(name);
 }
 
-/** @inventedArm if — CONVERGEABLE method-defined-within-branches-on-a-module-receiver */
 export function isMethodDefinedWithin(
   this: AttributeMethodsHost,
   name: string,
   klass: any,
   superklass: any = rbClassSuperclass(klass) ?? Object,
 ): boolean {
-  if (klass instanceof Module ? klass.isMethodDefined(name) : name in klass.prototype) {
-    if (superklass?.prototype != null && name in superklass.prototype) {
+  if (rbModMethodDefined(klass, name)) {
+    if (rbModMethodDefined(superklass, name)) {
       return instanceMethodOwner(klass, name) !== instanceMethodOwner(superklass, name);
     } else {
       return true;

@@ -71,6 +71,35 @@ function findAll<T, E = unknown>(this: Each<T, E>, block: (i: T) => unknown): En
 }
 
 /**
+ * Mirrors: Ruby's Enumerable#find — `vendor/ruby/v3.3.11/enum.c:361` `enum_find`,
+ * breaking out of `each` at the first element whose block result `RTEST`s
+ * (`find_i`, `:324`). The block is the last argument.
+ * @noRailsEquivalent PERMANENT
+ */
+function find<T, E = unknown>(this: Each<T, E>, ...argv: unknown[]): Enumerated<E, unknown> {
+  const block = argv.pop() as (i: T) => unknown;
+  checkArity(argv.length, 0, 1);
+  const ifNone = argv.length > 0 ? argv[0] : null;
+  const memo = { v1: null as unknown, cnt: 0 };
+  return rbBlockCall(
+    this,
+    (i) => {
+      const result = block(i);
+      if (result != null && result !== false) {
+        memo.v1 = i;
+        memo.cnt = 1;
+        throw iterBreak;
+      }
+    },
+    () => {
+      if (memo.cnt) return memo.v1;
+      if (ifNone != null) return rbFSend(ifNone, "call");
+      return null;
+    },
+  );
+}
+
+/**
  * Mirrors: Ruby's Enumerable#map — `vendor/ruby/v3.3.11/enum.c:638` `enum_collect`.
  * @noRailsEquivalent PERMANENT
  */
@@ -530,6 +559,7 @@ export function reduce<T, E = unknown>(
  * @noRailsEquivalent PERMANENT
  */
 export const Enumerable = {
+  find,
   findAll,
   select: findAll,
   map,

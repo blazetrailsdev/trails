@@ -18,6 +18,7 @@ function makeAdapter(columns: Record<string, unknown>): unknown {
     dataSourceExists: async () => true,
     columnsHash: async () => columns,
     primaryKeys: async () => null,
+    getCachedPrimaryKeys: () => null,
   };
   return adapterDouble({
     schemaCache: cache,

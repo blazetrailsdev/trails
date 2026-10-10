@@ -1,7 +1,7 @@
 import { Nodes } from "@blazetrails/arel";
 import {
-  NoMethodError,
-  rbObjClassname,
+  Enumerable,
+  type Each,
   rbObjAsString,
   rtest,
   compact,
@@ -122,33 +122,11 @@ function buildPkWhere(pk: string[], tuple: unknown[]): Record<string, unknown> {
   return conditions;
 }
 
-/**
- * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- * @inventedArm loop — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- */
 export function find(this: FinderRelation, block: (record: any) => unknown): Promise<any>;
 export function find(this: FinderRelation, ...args: unknown[]): Promise<any>;
 export async function find(this: FinderRelation, ...args: unknown[]): Promise<any> {
-  const block = args[args.length - 1];
-  if (typeof block === "function") {
-    const ifnoneArgs = args.slice(0, -1);
-    if (ifnoneArgs.length > 1) {
-      throw new ArgumentError(
-        `wrong number of arguments (given ${ifnoneArgs.length}, expected 0..1)`,
-      );
-    }
-    const ifnone = ifnoneArgs[0];
-    for (const record of await this.toArray()) {
-      if (await (block as (record: unknown) => unknown)(record)) return record;
-    }
-    if (ifnone == null) return null;
-    if (typeof ifnone !== "function") {
-      const desc =
-        typeof ifnone === "boolean" ? String(ifnone) : `an instance of ${rbObjClassname(ifnone)}`;
-      throw new NoMethodError(`undefined method \`call' for ${desc}`);
-    }
-    return await ifnone();
+  if (typeof args[args.length - 1] === "function") {
+    return Enumerable.find.call(this as unknown as Each<unknown, Promise<unknown>>, ...args);
   }
   return findWithIds.call(this, ...args);
 }
@@ -222,11 +200,7 @@ export async function takeBang(this: FinderRelation): Promise<any> {
   return (await take.call(this)) || raiseRecordNotFoundExceptionBang.call(this);
 }
 
-/**
- * @internal
- * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- */
+/** @internal */
 export async function findNthWithLimit(
   this: FinderRelation,
   index: number,
@@ -238,10 +212,7 @@ export async function findNthWithLimit(
   let relation: any = orderedRelation.call(this);
   const limitValue = (this as any).limitValue;
   if (limitValue != null) {
-    if (typeof limitValue !== "number") {
-      throw new NoMethodError("undefined method `-' for an instance of String");
-    }
-    limit = Math.min(limitValue - index, limit);
+    limit = Math.min(numericMinus(limitValue, index) as number, limit);
   }
   if (limit <= 0) return [];
   if (index > 0) {
@@ -540,20 +511,10 @@ export function usingLimitableReflections(
   return reflections.every((r) => !r.isCollection());
 }
 
-/**
- * @internal
- * @inventedArm throw — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
- */
+/** @internal */
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
-  if (this.model.compositePrimaryKey && !Array.isArray(ids[0])) {
-    throw new NoMethodError(
-      ids[0] == null
-        ? "undefined method 'first' for nil"
-        : `undefined method 'first' for an instance of ${rbObjClassname(ids[0])}`,
-    );
-  }
   const expectsArray = this.model.compositePrimaryKey
     ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
     : Array.isArray(aryFirst(ids));
@@ -640,7 +601,6 @@ export async function findSome(this: FinderRelation, ids: unknown[]): Promise<an
 /**
  * @internal
  * @missingRailsName size — PERMANENT
- * @inventedArm if — CONVERGEABLE finder-methods-and-authenticate-by-arms-left-after-the-top-level-pass
  */
 export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Promise<any[]> {
   ids =
@@ -655,12 +615,10 @@ export async function findSomeOrdered(this: FinderRelation, ids: unknown[]): Pro
   const result: any[] = await relation.records();
 
   if (result.length === ids.length) {
-    const composite = Array.isArray(pk);
-    const keyOf = (id: unknown): unknown => (composite ? String(id) : id);
     return inOrderOf(
       result,
-      (record: any) => keyOf(record.id),
-      ids.map((id) => keyOf((this.model as any).typeForAttribute(String(pk)).cast(id))),
+      (record: any) => record.id,
+      ids.map((id) => (this.model as any).typeForAttribute(String(pk)).cast(id)),
     );
   } else {
     this.raiseRecordNotFoundExceptionBang(ids, result.length, ids.length);

@@ -90,6 +90,12 @@ return type.
   `Engine#app`'s `@app_build_lock` (`railties/lib/rails/engine.rb:448,516-524`):
   trails' `app()` builds with no `await`, so the `Mutex#synchronize`
   double-check is not ported.
+- **A bare `block()`**: `GeneratedAttributeMethods::LOCK`
+  (`activerecord/lib/active_record/attribute_methods.rb:26`), taken by
+  `define_attribute_methods` (`:108`) and `undefine_attribute_methods`
+  (`:144`). Both bodies are synchronous and are reached from `new`, so the
+  awaited monitor cannot wrap them. `LOCK.synchronize` calls its block in
+  line, as the queue's does, and the `:109` re-check stays inside it.
 
 This is a genuine language shortcoming, ratified repo-wide here. If one of those
 bodies ever gains an `await`, it gains the monitor in the same change.

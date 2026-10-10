@@ -255,7 +255,7 @@ export { KERNEL_METHODS, PROTOCOL_PROBES, methodMissingProxy } from "./method-mi
 export { NameError } from "./name-error.js";
 export { NilClass } from "./nil-class.js";
 export { NoMethodError } from "./no-method-error.js";
-export { anybits, fixDiv, fixMod, isNan, round, toF, toI } from "./numeric.js";
+export { anybits, fixDiv, fixMod, isFinite, isNan, round, toF, toI } from "./numeric.js";
 export {
   intXor,
   numericMinus,
@@ -392,7 +392,7 @@ export { Struct, isStruct, type StructInstance } from "./struct.js";
 export { MatchData } from "./match-data.js";
 export { StringScanner } from "./string-scanner.js";
 export { stringSplit } from "./string/split.js";
-export { rbStrPartition } from "./string/sub.js";
+export { rbStrPartition, rbStrScanSubexpCall } from "./string/sub.js";
 export { rbCheckStringType, rbStrSNew, stringValue, strlen, strUminus } from "./string/support.js";
 export { forceEncoding, isValidEncoding, rbObjEncoding } from "./string/force-encoding.js";
 export { encode } from "./string/encode.js";

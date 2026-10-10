@@ -5,6 +5,7 @@ import {
   hashDelete,
   rbInspect,
   rbObjAsString as toS,
+  rbStrScanSubexpCall,
   slice,
 } from "@blazetrails/ruby-compat";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
@@ -184,10 +185,6 @@ export async function virtualTableExists(
   );
 }
 
-/**
- * @inventedArm loop — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
- * @inventedArm if — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
- */
 export async function checkConstraints(
   this: SQLite3SchemaAdapter,
   tableName: string,
@@ -199,21 +196,7 @@ export async function checkConstraints(
     "SCHEMA",
   )) as string | null;
 
-  const sql = String(tableSql ?? "");
-  const scanned: [name: string, expression: string][] = [];
-  for (const match of sql.matchAll(/CONSTRAINT\s+(\w+)\s+CHECK\s+\(/gi)) {
-    const start = match.index + match[0].length;
-    let depth = 1;
-    let i = start;
-    while (i < sql.length && depth > 0) {
-      if (sql[i] === "(") depth++;
-      else if (sql[i] === ")") depth--;
-      i++;
-    }
-    if (depth !== 0) continue;
-    scanned.push([match[1], sql.slice(start, i - 1)]);
-  }
-  return scanned.map(
+  return rbStrScanSubexpCall(toS(tableSql), /CONSTRAINT\s+(?<name>\w+)\s+CHECK\s+\(/i).map(
     ([name, expression]) => new CheckConstraintDefinition(tableName, expression, { name }),
   );
 }

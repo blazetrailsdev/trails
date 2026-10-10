@@ -620,6 +620,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   await cache.columnsHash(table);
 
   await cache.primaryKeys(table);
+  void (this as unknown as typeof Base).primaryKey;
 
   let currentAdapter: SchemaHost["connection"] | undefined;
   try {
