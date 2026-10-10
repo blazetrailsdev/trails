@@ -162,6 +162,15 @@ function prepare(this: pg.Client, stmtName: string, sql: string): Promise<void> 
   });
 }
 
+function param(value: unknown): unknown {
+  if (value instanceof Number) return value.valueOf();
+  if (typeof value === "object" && value !== null && "format" in value && "value" in value) {
+    const { value: bytes, format } = value as { value: Uint8Array; format: number };
+    return format === 1 ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength) : bytes;
+  }
+  return value;
+}
+
 async function execPrepared(
   this: pg.Client,
   stmtName: string,
@@ -172,7 +181,7 @@ async function execPrepared(
     await (this.query as unknown as Query)({
       name: stmtName,
       text,
-      values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
+      values: params.map(param),
       rowMode: "array",
       types: types(this),
     }).catch(raise),
@@ -195,7 +204,7 @@ async function execParams(
   return result(
     await (this.query as unknown as Query)({
       text: sql,
-      values: params.map((value) => (value instanceof Number ? value.valueOf() : value)),
+      values: params.map(param),
       rowMode: "array",
       types: types(this),
     }).catch(raise),

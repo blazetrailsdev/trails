@@ -703,7 +703,13 @@ export class Base extends Model {
   /** @internal */
   static hookAttributeType(name: string, type: ValueType): ValueType {
     const tzType = tzHookAttributeType.call(this as any, name, type);
-    return LockingOptimistic.hookAttributeType.call(this as any, name, tzType);
+    return LockingOptimistic.hookAttributeType.call(
+      this as any,
+      (attribute, castType) =>
+        AttributeRegistration.ClassMethods.hookAttributeType.call(this as any, attribute, castType),
+      name,
+      tzType,
+    );
   }
 
   static typeForAttribute(name: string, block?: () => ValueType): ValueType | null {

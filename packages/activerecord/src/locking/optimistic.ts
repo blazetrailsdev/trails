@@ -1,4 +1,4 @@
-import { DelegateClass, type Hash, merge, union } from "@blazetrails/ruby-compat";
+import { DelegateClass, type Hash, merge, rtest, union } from "@blazetrails/ruby-compat";
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
@@ -252,11 +252,17 @@ export function _queryConstraintsHash(
 }
 
 /** @internal */
-export function hookAttributeType(this: LockingHost, name: string, castType: ValueType): ValueType {
-  if (this.lockOptimistically !== false && name === this.lockingColumn) {
-    return new LockingType(castType);
+export function hookAttributeType(
+  this: LockingHost,
+  superFn: (name: string, castType: ValueType) => ValueType,
+  name: string,
+  castType: ValueType,
+): ValueType {
+  if (rtest(this.lockOptimistically) && name === this.lockingColumn) {
+    castType = new LockingType(castType);
   }
-  return castType;
+
+  return superFn(name, castType);
 }
 
 Locking.Optimistic = Optimistic;
