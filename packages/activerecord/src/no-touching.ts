@@ -1,5 +1,5 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
-import { Module } from "@blazetrails/ruby-compat";
+import { Module, rbClassInheritedP } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
 export const NoTouching = new Module();
@@ -12,19 +12,12 @@ function klasses(): Array<typeof Base> {
   );
 }
 
-export function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
+export function noTouching<R>(modelClass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
   return applyTo(modelClass, fn);
 }
 
 export function isAppliedTo(klass: typeof Base): boolean {
-  return klasses().some((k) => {
-    let current: unknown = klass;
-    while (typeof current === "function") {
-      if (current === k) return true;
-      current = Object.getPrototypeOf(current);
-    }
-    return false;
-  });
+  return klasses().some((k) => rbClassInheritedP(klass, k));
 }
 
 /** @missingRailsName class — PERMANENT */
@@ -44,21 +37,12 @@ export function touch(this: Base, ...args: unknown[]): Promise<boolean> | undefi
   }
 }
 
-export function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): R | Promise<R> {
+export async function applyTo<R>(klass: typeof Base, fn: () => R | Promise<R>): Promise<R> {
   klasses().push(klass);
-
   try {
-    const result = fn();
-    if (result && typeof (result as any).then === "function") {
-      return Promise.resolve(result).finally(() => {
-        klasses().pop();
-      }) as Promise<R>;
-    }
+    return await fn();
+  } finally {
     klasses().pop();
-    return result;
-  } catch (error) {
-    klasses().pop();
-    throw error;
   }
 }
 

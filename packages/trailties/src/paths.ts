@@ -109,6 +109,13 @@ export class Path {
     return (await this.expanded())[0];
   }
 
+  /** @noRailsEquivalent CONVERGEABLE paths-path-expanded-is-async-over-a-sync-dir-glob */
+  firstSync(): string | undefined {
+    if (this._root.path === null) throw new Error("You need to set a path root");
+    const path = this._paths[0];
+    return path === undefined ? undefined : File.expandPath(path, this._root.path);
+  }
+
   autoloadOnceBang(): void {
     this._autoloadOnce = true;
   }

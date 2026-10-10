@@ -7,11 +7,10 @@
  *     the parameter the way Rails does (camelCased per
  *     docs/ruby-ts-conventions.md), never to raise the mark;
  *   - UNMEASURED — a gated package the run never reported, which would
- *     otherwise disarm the gate silently.
- *
- * A mark left ABOVE the measurement is reported, not failed: narrow it in the
- * same PR that converged the rename with `pnpm parity:api:params:tighten`,
- * which writes each dimension DOWN and never up. There is no reseed — the same
+ *     otherwise disarm the gate silently;
+ *   - STALE — a mark left ABOVE the measurement. Narrow it in the same PR that
+ *     converged the rename with `pnpm parity:api:params:tighten`, which writes
+ *     each dimension DOWN and never up. There is no reseed — the same
  * rule the call baselines carry, for the same reason: a whole-file rewrite
  * buries the one row you meant to retire.
  *
@@ -33,6 +32,7 @@ import {
   exceedances,
   loadMarks,
   measure,
+  staleMarkFailure,
   staleMarks,
   tightened,
   unmarkedPackages,
@@ -108,11 +108,10 @@ async function main(tighten: boolean): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `param-name gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:params:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("param-name gate", "parity:api:params:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const summary = Object.entries(current)
     .map(([name, m]) => `${name} ${m.total}/${marks[name].total}`)

@@ -15,10 +15,9 @@
  *     deleting the name. A rowless package is pinned the same way in `total`
  *     too;
  *   - STRANDED — a mark row for a rowless package, which carries none by
- *     construction.
- *
- * A mark left ABOVE the current measurement is reported, not failed: the mark
- * only shrinks, so narrow it in the same PR that converged the surface with
+ *     construction;
+ *   - STALE — a mark left ABOVE the current measurement. The mark only
+ *     shrinks, so narrow it in the same PR that converged the surface with
  *
  *   pnpm parity:api:extra:tighten
  *
@@ -42,6 +41,7 @@ import { fileURLToPath } from "url";
 import { OUTPUT_DIR, ROOT_DIR } from "./config.js";
 import type { ApiManifest } from "@blazetrails/parity/types";
 import { buildReport, loadConcernHooks } from "./extra-surface.js";
+import { staleMarkFailure } from "./param-name-mark.js";
 import { scopeMismatch, scopeOf, scopedMarks } from "./scope.js";
 import {
   GATED_PACKAGES,
@@ -188,11 +188,10 @@ async function main(tighten: boolean, scope: string | null): Promise<number> {
     return 1;
   }
 
-  for (const v of stale) {
-    console.log(
-      `extra-surface gate: ${v.package} ${v.dimension} mark ${v.mark} is above the ` +
-        `current ${v.current} — narrow it with \`pnpm parity:api:extra:tighten\`.`,
-    );
+  const staleFailure = staleMarkFailure("extra-surface gate", "parity:api:extra:tighten", stale);
+  if (staleFailure !== null) {
+    console.error(staleFailure);
+    return 1;
   }
   const taggedOnly = new Set<string>(TAGGED_ONLY_PACKAGES);
   const rowless = new Set<string>(ROWLESS_PACKAGES);

@@ -124,6 +124,7 @@ export async function addForeignKey(
   });
 }
 
+/** @inventedArm if — CONVERGEABLE optional-positional-before-trailing-options-or-block-is-overloaded-on-typeof */
 export async function removeForeignKey(
   this: SQLite3SchemaAdapter,
   fromTable: string,
@@ -183,6 +184,10 @@ export async function virtualTableExists(
   );
 }
 
+/**
+ * @inventedArm loop — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
+ * @inventedArm if — CONVERGEABLE sqlite3-check-constraints-hand-scans-where-rails-regex-recurses
+ */
 export async function checkConstraints(
   this: SQLite3SchemaAdapter,
   tableName: string,
@@ -227,6 +232,7 @@ export async function addCheckConstraint(
   });
 }
 
+/** @inventedArm if — CONVERGEABLE optional-positional-before-trailing-options-or-block-is-overloaded-on-typeof */
 export async function removeCheckConstraint(
   this: SQLite3SchemaAdapter,
   tableName: string,
@@ -352,7 +358,8 @@ export function dataSourceSql(
   { type }: { type?: string } = {},
 ): string {
   const scope = quotedScope.call(this, name ?? undefined, { type });
-  if (!scope.type) scope.type = "'table','view'";
+  scope.type ||= "'table','view'";
+
   let sql = "SELECT name FROM pragma_table_list WHERE schema <> 'temp'";
   sql += " AND name NOT IN ('sqlite_sequence', 'sqlite_schema')";
   if (scope.name) sql += ` AND name = ${scope.name}`;

@@ -62,7 +62,7 @@ export const TopLevel: {
       config: {
         considerAllRequestsLocal: boolean;
         root?: string | null;
-        paths(): { get(path: string): { toAry(): string[] } | undefined };
+        paths(): { get(path: string): { firstSync(): string | undefined } | undefined };
       };
       reloadRoutesUnlessLoaded(): Promise<boolean | null> | undefined;
       executor: { wrap<T>(block: () => T): T };

@@ -85,6 +85,11 @@ export function status(this: pg.Client): number {
   return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
 }
 
+/**
+ * @inventedArm try — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ * @inventedArm rescue — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ * @inventedArm throw — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+ */
 export async function reset(this: pg.Client): Promise<void> {
   try {
     await this.end();
