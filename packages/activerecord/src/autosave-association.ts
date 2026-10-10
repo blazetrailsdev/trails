@@ -46,17 +46,12 @@ interface AutosaveAssociationHost {
 }
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
-type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
 
-export function reload<T extends Base>(
-  this: T,
-  options: ReloadOptions | undefined,
-  superFn: ReloadFn<T>,
-): Promise<T> {
+export function reload<T extends Base>(this: T, options: ReloadOptions | null = null): Promise<T> {
   const record = this as unknown as AutosaveAssociationHost;
   record._markedForDestruction = false;
   record.destroyedByAssociation = null;
-  return superFn.call(this, options);
+  return AutosaveAssociation.superMethod(this, "reload")!(options) as Promise<T>;
 }
 
 export interface AutosaveAssociation {
@@ -302,6 +297,7 @@ export function initInternals(this: AutosaveAssociationHost): void {
 }
 
 AutosaveAssociation.defineMethod("initInternals", initInternals);
+AutosaveAssociation.defineMethod("reload", reload);
 
 /** @internal */
 export function associatedRecordsToValidateOrSave(

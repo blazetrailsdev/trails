@@ -63,7 +63,6 @@ import {
 } from "./inheritance.js";
 import {
   AutosaveAssociation,
-  reload as _autosaveReload,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
   _registerAssociationBuilderExtension,
@@ -2304,22 +2303,6 @@ include(Base, AutosaveAssociation);
 prepend(Base, { loadSchemaBang: CounterCache.loadSchemaBang as PrependMethod });
 prepend(Base, { loadSchemaBang: _EncryptableRecord.loadSchemaBang as PrependMethod });
 _registerAssociationBuilderExtension(AssociationBuilder.extensions);
-{
-  const inheritedReload = (Base.prototype as any).reload as (
-    this: Base,
-    options?: { lock?: boolean | string; unscoped?: boolean },
-  ) => Promise<Base>;
-  Object.defineProperty(Base.prototype, "reload", {
-    value: function (
-      this: Base,
-      options?: { lock?: boolean | string; unscoped?: boolean },
-    ): Promise<Base> {
-      return _autosaveReload.call(this, options, inheritedReload);
-    },
-    writable: true,
-    configurable: true,
-  });
-}
 include(Base, _NestedAttributes.NestedAttributes);
 include(Base, { association: _association });
 include(Base, _Validations.Validations);

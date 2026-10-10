@@ -1833,7 +1833,7 @@ export function extend<T extends AnyClass | object>(
  * nothing beneath it in the receiver's ancestry defines one: `initialize_dup`
  * and `initialize_clone` (vendor/ruby/v3.3.11/object.c:654
  * `rb_obj_init_dup_clone` and :671 `rb_obj_init_clone`, which send
- * `initialize_copy`) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
+ * `initialize_copy`; `initialize_clone`'s `freeze:` keyword is not ported) and `freeze` (vendor/ruby/v3.3.11/object.c:1284
  * `rb_obj_freeze`), defined at vendor/ruby/v3.3.11/object.c:4382,4385. A gem that reopens
  * `Object` defines its method here, as ActiveSupport does for `as_json`.
  *
