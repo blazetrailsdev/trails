@@ -901,7 +901,7 @@ describe("schema dump and load", () => {
       const defineSchema = new Function(
         "ctx",
         schema
-          .replace(/^[\s\S]*?await Schema\.define\([^\n]*\n/, "return (async () => {\n")
+          .replace(/^[\s\S]*?await Schema\.get\([^\n]*\n/, "return (async () => {\n")
           .replace(/}\);\n$/, "})();"),
       );
       await defineSchema(targetAdapter);

@@ -1,6 +1,6 @@
 import { Schema } from "@blazetrails/activerecord";
 
-await Schema.define({}, async ({ connection: ctx }) => {
+await Schema.get(8).define(async (ctx) => {
   await ctx.createTable("follows", { force: "cascade" }, (t) => {
     t.integer("follower_id");
     t.integer("followee_id");

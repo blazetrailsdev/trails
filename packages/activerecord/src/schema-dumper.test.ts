@@ -78,7 +78,7 @@ describe("SchemaDumperTest", () => {
 
   it("schema dump include migration version", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
-    expect(output).toMatch(/await Schema\.define\(\{ version: [0-9_]+ \}/);
+    expect(output).toMatch(/await Schema\.get\([0-9.]+\)\.define\(\{ version: [0-9_]+ \}/);
   });
 
   it("schema dump", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {

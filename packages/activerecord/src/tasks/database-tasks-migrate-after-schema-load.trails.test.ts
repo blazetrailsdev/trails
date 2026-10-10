@@ -60,7 +60,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
     } finally {
       setSchemaFormat(schemaFormatWas);
     }
-    expect(dumped).toMatch(/await Schema\.define\(\{ version: /);
+    expect(dumped).toMatch(/await Schema\.get\([0-9.]+\)\.define\(\{ version: /);
 
     const schemaFile = join(dir, "schema.js");
     await writeFile(schemaFile, dumped);

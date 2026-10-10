@@ -24,6 +24,7 @@ import {
   isPresent,
 } from "@blazetrails/activesupport";
 import { ActiveRecordError } from "./errors.js";
+import { ActiveRecord } from "./namespaces.js";
 import type { Base } from "./base.js";
 import type {
   CheckConstraintDefinition,
@@ -170,7 +171,9 @@ export abstract class SchemaDumper {
     return Promise.resolve();
   }
 
+  /** @inventedArm if — PERMANENT */
   private async header(stream: IO | StringIO): Promise<void> {
+    const defineParams = await this.defineParams();
     stream.puts(
       [
         "// This file is auto-generated from the current state of the database. Instead",
@@ -187,7 +190,7 @@ export abstract class SchemaDumper {
         "",
         `import { Schema } from "@blazetrails/activerecord";`,
         "",
-        `await Schema.define({ ${await this.defineParams()} }, async ({ connection: ctx }) => {`,
+        `await Schema.get(${ActiveRecord.Migration.currentVersion()}).define(${defineParams === "" ? "" : `{ ${defineParams} }, `}async (ctx) => {`,
       ].join("\n"),
     );
   }

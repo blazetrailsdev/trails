@@ -37,6 +37,17 @@ describe("OptimisticLockingTrailsTest", () => {
     expect(LockChild.lockingColumn).toBe("lock_version");
   });
 
+  it("hook_attribute_type leaves the type alone when lock_optimistically is nil", async () => {
+    class LockOff extends Base {
+      static {
+        this._tableName = "lock_without_defaults";
+        this.lockOptimistically = null as never;
+      }
+    }
+    await LockOff.loadSchema();
+    expect(LockOff.typeForAttribute("lock_version")).not.toBeInstanceOf(LockingType);
+  });
+
   it("locking_column= stores value.to_s", () => {
     class LockCoerce extends Base {
       static {

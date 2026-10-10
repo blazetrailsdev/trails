@@ -124,27 +124,6 @@ import { PGSimpleDecoder, PGTextDecoder, PGTypeMapByOid } from "./postgresql/pg-
 
 type PGDecoderClass = new (options: { oid: number; name: string }) => PGSimpleDecoder;
 
-const STRING_OIDS = new Set([
-  114, 600, 718, 1017, 1082, 1114, 1115, 1182, 1183, 1184, 1185, 1186, 1187, 1270, 3802,
-]);
-
-const PG_CLIENT_KEYWORDS: Record<string, string> = {
-  dbname: "database",
-  statementTimeout: "statement_timeout",
-  queryTimeout: "query_timeout",
-  lockTimeout: "lock_timeout",
-  idleInTransactionSessionTimeout: "idle_in_transaction_session_timeout",
-  applicationName: "application_name",
-  fallbackApplicationName: "fallback_application_name",
-  clientEncoding: "client_encoding",
-};
-
-function pgTypeParser(oid: number, format?: string): unknown {
-  if (format === "binary") return pg.types.getTypeParser(oid, "binary");
-  if (STRING_OIDS.has(oid)) return (v: unknown) => v;
-  return pg.types.getTypeParser(oid, "text");
-}
-
 const VALUE_LIMIT_VIOLATION = "22001";
 const NUMERIC_VALUE_OUT_OF_RANGE = "22003";
 const NOT_NULL_VIOLATION = "23502";
@@ -246,33 +225,31 @@ export class PostgreSQLAdapter
   static override readonly ADAPTER_NAME = "PostgreSQL";
 
   static async newClient(connParams: Record<string, unknown>): Promise<pg.Client> {
-    const { getTypeParser } = (connParams.types ?? {}) as Partial<pg.CustomTypesConfig>;
-    const config: pg.ClientConfig = {
-      ...Object.fromEntries(
-        Object.entries(connParams).map(([key, value]) => [PG_CLIENT_KEYWORDS[key] ?? key, value]),
-      ),
-      types: {
-        getTypeParser: ((oid: number, format?: string) =>
-          getTypeParser?.(oid, format as never) ??
-          pgTypeParser(oid, format)) as pg.CustomTypesConfig["getTypeParser"],
-      },
-    };
-    const client = pgConnection(new pg.Client(config), config.stream);
-    const { database, user, host } = client;
     try {
-      await client.connect();
-      return client;
+      return await PG.connect(connParams);
     } catch (error) {
       if (!(error instanceof Error)) throw error;
       pgError(error);
-      if (database === "postgres") {
+      if (connParams != null && connParams.dbname === "postgres") {
         throw new ConnectionNotEstablished(error.message);
-      } else if (database && error.message.includes(database)) {
-        throw NoDatabaseError.dbError(database);
-      } else if (user && error.message.includes(user)) {
-        throw DatabaseConnectionError.usernameError(user);
-      } else if (host && error.message.includes(host)) {
-        throw DatabaseConnectionError.hostnameError(host);
+      } else if (
+        connParams != null &&
+        rtest(connParams.dbname) &&
+        error.message.includes(connParams.dbname as string)
+      ) {
+        throw NoDatabaseError.dbError(connParams.dbname as string);
+      } else if (
+        connParams != null &&
+        rtest(connParams.user) &&
+        error.message.includes(connParams.user as string)
+      ) {
+        throw DatabaseConnectionError.usernameError(connParams.user as string);
+      } else if (
+        connParams != null &&
+        rtest(connParams.host) &&
+        error.message.includes(connParams.host as string)
+      ) {
+        throw DatabaseConnectionError.hostnameError(connParams.host as string);
       } else {
         throw new ConnectionNotEstablished(error.message);
       }
@@ -1235,7 +1212,9 @@ export class PostgreSQLAdapter
       );
     }
 
-    await this.setClientMinMessages((this._config.minMessages as string | undefined) ?? "warning");
+    await this.setClientMinMessages(
+      ((rtest(this._config.minMessages) && this._config.minMessages) || "warning") as string,
+    );
     await this.setSchemaSearchPath(
       (this._config.schemaSearchPath ?? this._config.schemaOrder ?? null) as string | null,
     );

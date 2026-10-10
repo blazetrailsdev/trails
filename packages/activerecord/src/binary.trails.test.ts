@@ -5,6 +5,11 @@ import { fixtures } from "./test-fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Base } from "./base.js";
 
+function castBytes(cast: unknown): Uint8Array {
+  const bind = cast as Uint8Array | { value: Uint8Array; format: number };
+  return new Uint8Array("format" in bind ? bind.value : bind);
+}
+
 describe("binary bind round-trip", () => {
   fixtures({});
 
@@ -26,15 +31,14 @@ describe("binary type_casted_binds payload", () => {
     const bind = Attribute.withCastValue("data", bytes, new BinaryType());
     expect(bind.valueForDatabase).toBeInstanceOf(BinaryData);
     const out = conn.typeCastedBinds([bind])!;
-    expect(String(out[0])).not.toBe("[object Object]");
-    expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
+    expect(castBytes(out[0])).toEqual(bytes);
   });
 
   it("casts both byte forms Rails reaches type_cast with", async () => {
     const bytes = new Uint8Array([0xde, 0xad]);
     expect(new BinaryType().serialize(bytes)).toBeInstanceOf(BinaryData);
     const conn = await Base.leaseConnection();
-    expect(new Uint8Array(conn.typeCast(new BinaryData(bytes)) as Uint8Array)).toEqual(bytes);
+    expect(castBytes(conn.typeCast(new BinaryData(bytes)))).toEqual(bytes);
     expect(() => conn.typeCast(bytes)).toThrow(TypeError);
   });
 });

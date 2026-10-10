@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { assertRaises, assertNothingRaised } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { UrlConfig } from "../../database-configurations/url-config.js";
 import { withDbWarningsAction } from "../../support/with-db-warnings-action.js";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../support/supports.js";
@@ -151,7 +152,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       const url = new URL(PG_TEST_URL);
       url.pathname = "/non_extant_database";
       expect(
-        await PostgreSQLAdapter.databaseExists({ connectionString: url.toString() }),
+        await PostgreSQLAdapter.databaseExists(
+          new UrlConfig("test", "primary", url.toString()).configurationHash,
+        ),
       ).toBeFalsy();
     });
 
