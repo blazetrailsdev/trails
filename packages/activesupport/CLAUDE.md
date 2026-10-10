@@ -81,20 +81,26 @@ ESM has no synchronous load, and `message-pack.ts` cannot be imported eagerly
 because `@blazetrails/msgpack` is an optional peer. This is the shortcoming
 [packages/activerecord/CLAUDE.md](../activerecord/CLAUDE.md#an-adapter-file-is-loaded-by-an-awaited-step-connectionadaptersresolves-require)
 records for an adapter file, and the answer is the same: **the `require` is
-`await ActiveSupport.loadPath["active_support/message_pack"]()`, run before the
-synchronous reader.** As a consequence:
+`await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]()`, run
+before the synchronous reader.** As a consequence:
 
 - `get` peeks `ActiveSupport.MessagePack` and raises `LoadError` while it is
   unseated, and `isAvailable` answers whether it is seated. Their
   `@missingRailsCall require` receipts are `PERMANENT`.
-- A booted application awaits the load in trailties. `initialize_cache` makes
-  `available?`'s silenced, rescued attempt for every application, so a
+- A booted application awaits the load in trailties. `initialize_cache`, the
+  first initializer to look a serializer up, makes `available?`'s silenced,
+  rescued attempt once for every application (the seated constant is its
+  `@available` memo). `dumped?` is synchronous and cannot start the load at
+  its first call, so the attempt cannot stay lazy. So a
   MessagePack payload is detected wherever the peer is installed, and makes
   `[]`'s raising load when the cache store names the format.
   `active_support.require_message_pack` and
   `action_dispatch.require_message_pack` make the raising load after
   `finisher_hook`, when `active_support.message_serializer` or
-  `action_dispatch.cookies_serializer` names it. With the peer absent the
+  `action_dispatch.cookies_serializer` names it. That is where Rails reads the
+  first (`railtie.rb:148-154` is a `config.after_initialize` block), and
+  `config/initializers` have run by then. The names are not Rails': an
+  `after_initialize` block runs through `run_load_hooks`, which cannot await. With the peer absent the
   raising load prints `message_pack.rb:3-10`'s warning and raises.
 - Code outside a booted application awaits the load itself, or imports
   `@blazetrails/activesupport/message-pack`.

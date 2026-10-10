@@ -1,13 +1,15 @@
 import "./i18n.js";
 import { Trailtie as BaseTrailtie } from "../trailtie.js";
 import {
-  ActiveSupport,
   deprecator,
+  TopLevel,
   type Deprecation,
   type Deprecators,
   type DeprecationBehavior,
 } from "@blazetrails/activesupport";
 import { Digest } from "@blazetrails/activesupport/digest";
+import { Codec } from "@blazetrails/activesupport/messages/codec";
+import { symbolToS } from "@blazetrails/ruby-compat";
 
 type HashDigestClass = typeof Digest.hashDigestClass;
 
@@ -80,6 +82,17 @@ export class Trailtie extends BaseTrailtie {
       }
     });
 
+    this.initializer("active_support.set_default_message_serializer", (app) => {
+      this.config.afterInitialize(() => {
+        const messageSerializer = (
+          (app as TrailtieApp).config.get("activeSupport") as ActiveSupportConfig
+        ).messageSerializer;
+        if (messageSerializer != null) {
+          Codec.defaultSerializer = symbolToS(messageSerializer) as typeof Codec.defaultSerializer;
+        }
+      });
+    });
+
     this.initializer(
       "active_support.require_message_pack",
       { after: "finisher_hook" },
@@ -89,9 +102,9 @@ export class Trailtie extends BaseTrailtie {
         ).messageSerializer;
         if (
           messageSerializer?.includes("message_pack") &&
-          ActiveSupport.MessagePack === undefined
+          TopLevel.ActiveSupport!.MessagePack === undefined
         ) {
-          await ActiveSupport.loadPath["active_support/message_pack"]();
+          await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
         }
       },
     );

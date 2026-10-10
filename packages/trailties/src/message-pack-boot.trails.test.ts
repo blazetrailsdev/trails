@@ -1,4 +1,6 @@
-import { ActiveSupport, resetLoadHooks } from "@blazetrails/activesupport";
+import { resetLoadHooks, runLoadHooks, TopLevel } from "@blazetrails/activesupport";
+import { MessageVerifier } from "@blazetrails/activesupport/message-verifier";
+import { Codec } from "@blazetrails/activesupport/messages/codec";
 import { SerializerWithFallback } from "@blazetrails/activesupport/messages/serializer-with-fallback";
 import { LoadError, verbose } from "@blazetrails/ruby-compat";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -15,7 +17,9 @@ class TestApp extends Bootstrap implements BootstrapHost {
 const MESSAGE_PACK = "active_support/message_pack";
 
 describe("active_support/message_pack is awaited at boot", () => {
+  const ActiveSupport = TopLevel.ActiveSupport!;
   const load = ActiveSupport.loadPath[MESSAGE_PACK];
+  const defaultSerializer = Codec.defaultSerializer;
   let verboseAtLoad: unknown[];
   let savedActiveSupport: unknown;
   let savedActionDispatch: unknown;
@@ -36,6 +40,7 @@ describe("active_support/message_pack is awaited at boot", () => {
     resetLoadHooks();
     Trails.cache = null;
     ActiveSupport.loadPath[MESSAGE_PACK] = load;
+    Codec.defaultSerializer = defaultSerializer;
     ActiveSupportTrailtie.config.set("activeSupport", savedActiveSupport);
     ActionDispatchTrailtie.config.set("actionDispatch", savedActionDispatch);
   });
@@ -97,7 +102,22 @@ describe("active_support/message_pack is awaited at boot", () => {
     const dumped = SerializerWithFallback.get("message_pack").dump({ a: 1 });
     expect(SerializerWithFallback.get("json").load(dumped)).toEqual({ a: 1 });
 
+    const verifier = new MessageVerifier("secret", { serializer: "message_pack" });
+    expect(verifier.verify(verifier.generate({ a: 1 }))).toEqual({ a: 1 });
+
     ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
     await runTrailtieInitializers(ActiveSupportTrailtie, app());
+    await new TestApp().runInitializers("all");
+    expect(TopLevel.ActiveSupport!.MessagePack).toBeDefined();
+  });
+
+  it("sets Codec.default_serializer from config.active_support.message_serializer after initialize", async () => {
+    ActiveSupport.loadPath[MESSAGE_PACK] = load;
+    ActiveSupportTrailtie.config.set("activeSupport", { messageSerializer: ":message_pack" });
+    const railtieApp = app();
+    await runTrailtieInitializers(ActiveSupportTrailtie, railtieApp);
+    expect(Codec.defaultSerializer).toBe(defaultSerializer);
+    runLoadHooks("after_initialize", railtieApp);
+    expect(Codec.defaultSerializer).toBe("message_pack");
   });
 });

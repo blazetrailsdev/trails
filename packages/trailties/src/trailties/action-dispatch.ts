@@ -1,4 +1,4 @@
-import { ActiveSupport, type Deprecators } from "@blazetrails/activesupport";
+import { type Deprecators, TopLevel } from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import {
   ActionDispatch,
@@ -125,9 +125,9 @@ export class Trailtie extends BaseTrailtie {
           .cookiesSerializer;
         if (
           cookiesSerializer?.includes("message_pack") &&
-          ActiveSupport.MessagePack === undefined
+          TopLevel.ActiveSupport!.MessagePack === undefined
         ) {
-          await ActiveSupport.loadPath["active_support/message_pack"]();
+          await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
         }
       },
     );

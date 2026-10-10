@@ -37,10 +37,14 @@ Bootstrap.initializer<BootstrapHost>("initialize_logger", { group: "all" }, func
 });
 
 Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async function () {
-  try {
-    await silenceWarnings(() => ActiveSupport.loadPath["active_support/message_pack"]());
-  } catch (error) {
-    if (!(error instanceof LoadError)) throw error;
+  if (TopLevel.ActiveSupport!.MessagePack === undefined) {
+    try {
+      await silenceWarnings(() =>
+        TopLevel.ActiveSupport!.loadPath["active_support/message_pack"](),
+      );
+    } catch (error) {
+      if (!(error instanceof LoadError)) throw error;
+    }
   }
   const cacheStore = this.config.cacheStore;
   const serializer = Array.isArray(cacheStore)
@@ -49,9 +53,9 @@ Bootstrap.initializer<BootstrapHost>("initialize_cache", { group: "all" }, async
   if (
     typeof serializer === "string" &&
     serializer.includes("message_pack") &&
-    ActiveSupport.MessagePack === undefined
+    TopLevel.ActiveSupport!.MessagePack === undefined
   ) {
-    await ActiveSupport.loadPath["active_support/message_pack"]();
+    await TopLevel.ActiveSupport!.loadPath["active_support/message_pack"]();
   }
 
   const cacheFormatVersion = this.config.activeSupport.cacheFormatVersion;
