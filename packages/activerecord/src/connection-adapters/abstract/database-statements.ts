@@ -386,8 +386,8 @@ export async function truncateTables(
 }
 
 /**
- * @inventedArm if — PERMANENT
- * @inventedArm throw — PERMANENT
+ * @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
+ * @inventedArm throw — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
  */
 export async function transaction<T>(
   this: DatabaseStatementsHost,

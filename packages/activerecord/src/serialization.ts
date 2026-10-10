@@ -6,7 +6,7 @@ import { union } from "@blazetrails/ruby-compat";
 
 export function serializableHash(this: Base, options?: SerializeOptions): Record<string, unknown> {
   const klass = this.constructor as typeof Base;
-  if (klass._hasAttribute(klass.inheritanceColumn!)) {
+  if (klass._hasAttribute(klass.inheritanceColumn as string)) {
     options = options ? { ...options } : {};
 
     options.except = kernelArray(options.except).map((v) => String(v));

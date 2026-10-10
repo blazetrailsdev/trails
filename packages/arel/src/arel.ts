@@ -8,7 +8,7 @@ export type ArelNode = Node | Attribute | SqlLiteral;
 
 export function sql(sqlString: string, options?: { retryable: boolean }): SqlLiteral;
 export function sql(sqlString: string, ...positionalBinds: unknown[]): SqlLiteral | BoundSqlLiteral;
-/** @inventedArm if — PERMANENT */
+/** @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer */
 export function sql(
   sqlString: string,
   ...positionalBinds: unknown[]

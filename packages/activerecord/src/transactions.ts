@@ -15,7 +15,7 @@ import {
   type Extended,
   type FilterListEntry,
 } from "@blazetrails/activesupport";
-import { mergeBang, Module } from "@blazetrails/ruby-compat";
+import { mergeBang, Module, rtest } from "@blazetrails/ruby-compat";
 import type { TouchArgs } from "./timestamp.js";
 import { Rollback } from "./errors.js";
 export { Rollback };
@@ -145,7 +145,7 @@ export function setCallback<T extends typeof Model>(
   const rest = filterList;
   const options = { ...extracted } as Record<string, unknown>;
 
-  if ((name === "commit" || name === "rollback") && options.on !== undefined) {
+  if ((name === "commit" || name === "rollback") && rtest(options.on)) {
     const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
     options.if = [
@@ -217,7 +217,7 @@ export function rememberTransactionRecordState(this: Base): void {
     newRecord: r._newRecord,
     previouslyNewRecord: r._previouslyNewRecord,
     destroyed: r._destroyed,
-    attributes: r._attributes.deepDup(),
+    attributes: r._attributes,
     frozen: this.isFrozen(),
     level: 0,
   };
@@ -424,7 +424,7 @@ export function setOptionsForCallbacksBang(
   const options = mergeBang<unknown>(extractOptionsBang(args), enforcedOptions);
   args.push(options);
 
-  if (options.on !== undefined) {
+  if (rtest(options.on)) {
     const fireOn = kernelArray(options.on) as string[];
     assertValidTransactionAction(fireOn);
     options.if = [

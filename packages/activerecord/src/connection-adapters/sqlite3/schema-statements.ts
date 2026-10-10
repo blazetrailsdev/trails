@@ -185,8 +185,8 @@ export async function virtualTableExists(
 }
 
 /**
- * @inventedArm loop — PERMANENT
- * @inventedArm if — PERMANENT
+ * @inventedArm loop — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
+ * @inventedArm if — CONVERGEABLE top-level-arms-awaiting-a-permanence-ruling-kwargs-finite-regex-recursion-env-inquirer
  */
 export async function checkConstraints(
   this: SQLite3SchemaAdapter,
