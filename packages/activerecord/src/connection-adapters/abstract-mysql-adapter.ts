@@ -1006,9 +1006,9 @@ WHERE fk.referenced_column_name IS NOT NULL
   /** @internal */
   async handleWarnings(sql: string): Promise<void> {
     const rawConnection = this._connection as WarningsConnection;
-    if (dbWarningsAction() == null || (await this.warningCount(rawConnection)) === 0) return;
+    if (dbWarningsAction() == null || rawConnection.warningCount === 0) return;
 
-    const warningCount = await this.warningCount(rawConnection);
+    const warningCount = rawConnection.warningCount;
 
     let result = (await rawConnection.query("SHOW WARNINGS"))!.toA() as [
       string | null,
@@ -1453,18 +1453,11 @@ WHERE fk.referenced_column_name IS NOT NULL
   buildExplainClause(options: ExplainOption[] = []): Promise<string> {
     return mysqlBuildExplainClause.call(this, options);
   }
-
-  /** @internal */
-  protected async warningCount(rawConnection: WarningsConnection): Promise<number> {
-    if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
-    const result = await rawConnection.query("SHOW COUNT(*) WARNINGS");
-    return Number(result?.toA()[0]?.[0] ?? 0) || 0;
-  }
 }
 
 /** @internal */
 interface WarningsConnection {
-  warningCount?: unknown;
+  warningCount: number;
   query(sql: string): Promise<{ toA(): unknown[][] } | null>;
 }
 

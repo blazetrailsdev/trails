@@ -72,7 +72,7 @@ export class PostgreSQLDatabaseTasks {
     await this.create(true);
   }
 
-  async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureDump(filename: string, extraFlags: string | string[] | null): Promise<void> {
     let searchPath: string | undefined;
     if (dumpSchemas() === "schema_search_path") {
       searchPath = this.configurationHash.schemaSearchPath as string | undefined;
@@ -94,7 +94,7 @@ export class PostgreSQLDatabaseTasks {
     }
 
     const { SchemaDumper } = await import("../schema-dumper.js");
-    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    let ignoreTables = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
@@ -110,7 +110,7 @@ export class PostgreSQLDatabaseTasks {
     File.open(filename, "a", (f) => f.write(`SET search_path TO ${connectionSearchPath};\n\n`));
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureLoad(filename: string, extraFlags: string | string[] | null): Promise<void> {
     const args = [
       "--set",
       ON_ERROR_STOP_1,
@@ -150,8 +150,15 @@ export class PostgreSQLDatabaseTasks {
 
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
     if (!(await rbFSystem(this.psqlEnv(), cmd, ...args))) {
-      throw new RuntimeError(runCmdError(cmd, args, action));
+      throw new RuntimeError(this.runCmdError(cmd, args, action));
     }
+  }
+
+  private runCmdError(cmd: string, args: string[], action: string): string {
+    return (
+      `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
+      `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    );
   }
 
   private removeSqlHeaderComments(filename: string): void {
@@ -180,14 +187,6 @@ export class PostgreSQLDatabaseTasks {
   private publicSchemaConfig(): ConfigHash {
     return merge(this.configurationHash, { database: "postgres", schemaSearchPath: "public" });
   }
-}
-
-/** @internal */
-export function runCmdError(cmd: string, args: string[], _action: string): string {
-  return (
-    `failed to execute:\n${cmd} ${args.join(" ")}\n\n` +
-    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
-  );
 }
 
 rbModConstSet(Tasks, "PostgreSQLDatabaseTasks", PostgreSQLDatabaseTasks);

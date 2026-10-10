@@ -160,7 +160,7 @@ describe("PostgreSQLDatabaseTasks", () => {
     ).mockResolvedValue(undefined);
 
     try {
-      await tasks.structureDump("/dev/null");
+      await tasks.structureDump("/dev/null", null);
     } finally {
       SchemaDumper.ignoreTables = previous;
       vi.restoreAllMocks();

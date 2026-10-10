@@ -8,7 +8,7 @@ import {
 } from "./test-helper.js";
 import { SQLWarning } from "../../errors.js";
 import { Base } from "../../base.js";
-import type { Mysql2Result } from "../../connection-adapters/mysql2/mysql2-client.js";
+import type { Mysql2Result } from "../../mysql2/client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -120,10 +120,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("db_warnings_action handles when warning_count does not match returned warnings", async () => {
       await withDbWarningsAction("raise", async () => {
-        vi.spyOn(
-          adapter as unknown as { warningCount: () => Promise<number> },
-          "warningCount",
-        ).mockResolvedValue(1);
+        vi.spyOn(adapter._rawConnection!, "warningCount", "get").mockReturnValue(1);
         const error = await assertRaises([SQLWarning], {}, () => adapter.execute(`SELECT 'x'`));
 
         const expected = `Query had warning_count=1 but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`;

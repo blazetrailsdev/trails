@@ -1,6 +1,6 @@
 import { it, expect, describe, vi } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { Mysql2, mysql2Client } from "./mysql2-client.js";
+import { Mysql2, mysql2Client } from "./client.js";
 
 describe("mysql2Client", () => {
   it("automatic_close = false unrefs and strips listeners, and never closes the socket", () => {
@@ -58,5 +58,49 @@ describe("mysql2Client", () => {
     await client.query("").catch(() => {});
     expect(raised instanceof Mysql2.Error).toBe(true);
     expect(Object.assign(new Error(), { code: "ENOENT" }) instanceof Mysql2.Error).toBe(false);
+  });
+});
+
+describe("Mysql2::Client#warning_count", () => {
+  it("is the count the last EOF or OK packet carried", async () => {
+    const handlePacket = vi.fn();
+    const query = vi.fn(async () => [{ affectedRows: 1, warningStatus: 2 }, undefined]);
+    const client = mysql2Client({ connection: { handlePacket }, query });
+    expect(client.warningCount).toBe(0);
+
+    const eof = Buffer.from([0xfe, 3, 0, 2, 0]);
+    const packet = {
+      offset: 0,
+      end: eof.length,
+      isEOF: () => true,
+      eofWarningCount: () => eof.readInt16LE(1),
+    };
+    (
+      client as unknown as { connection: { handlePacket(p: object): void } }
+    ).connection.handlePacket(packet);
+    expect(handlePacket).toHaveBeenCalledWith(packet);
+    expect(client.warningCount).toBe(3);
+
+    await client.query("UPDATE t SET a = 1");
+    expect(client.warningCount).toBe(2);
+  });
+
+  it("query merges its options over query_options, and _query casts with what it is handed", async () => {
+    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    await client.query("SELECT 1", { databaseTimezone: "utc" });
+    expect(client.queryOptions.databaseTimezone).toBe("local");
+    const { typeCast } = native.mock.calls[0][0] as {
+      typeCast(field: object, next: () => unknown): Time;
+    };
+    const time = typeCast({ type: "DATETIME", string: () => "2026-04-27 14:23:55" }, () => null);
+    expect(time.getutc().hour).toBe(14);
+  });
+
+  it("default_query_options is one shared Hash each client dups", () => {
+    expect(Mysql2.Client.defaultQueryOptions()).toBe(Mysql2.Client.defaultQueryOptions());
+    const { queryOptions } = mysql2Client({});
+    expect(queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
+    expect(queryOptions).not.toBe(Mysql2.Client.defaultQueryOptions());
   });
 });

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { mysql2Client } from "./mysql2-client.js";
+import { mysql2Client } from "./client.js";
 
 type TypeCast = (field: unknown, next: () => unknown) => unknown;
 

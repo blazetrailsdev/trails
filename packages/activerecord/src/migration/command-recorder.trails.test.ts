@@ -328,7 +328,11 @@ describe("CommandRecorder", () => {
         await t.primaryKey("token", "uuid");
       });
       expect(recorder.commands).toEqual([
-        ["addColumn", ["fruits", "token", "uuid", { primaryKey: true }], undefined],
+        [
+          "addColumn",
+          ["fruits", "token", "uuid", { default: "gen_random_uuid()", primaryKey: true }],
+          undefined,
+        ],
       ]);
     });
 

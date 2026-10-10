@@ -60,6 +60,10 @@
     "total": 0,
     "byFile": {}
   },
+  "mysql2": {
+    "total": 0,
+    "byFile": {}
+  },
   "pg": {
     "total": 0,
     "byFile": {}

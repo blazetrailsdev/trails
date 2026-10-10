@@ -1482,7 +1482,7 @@ export class AbstractAdapter implements Quoting {
     if (!(await this.active())) {
       await this.lock.synchronize(async () => {
         if (this._unconfiguredConnection) {
-          this._connection = this._unconfiguredConnection;
+          this._rawConnection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
           await this.attemptConfigureConnection();
           this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -1513,6 +1513,15 @@ export class AbstractAdapter implements Quoting {
       this._rawConnectionDirty = true;
       return conn as RawConnectionOf<Self>;
     });
+  }
+
+  /** @internal */
+  get _rawConnection(): unknown {
+    return this._connection;
+  }
+  /** @internal */
+  set _rawConnection(value: unknown) {
+    this._connection = value;
   }
 
   defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {

@@ -2,6 +2,7 @@ import { it, expect, describe, vi } from "vitest";
 import { IO } from "@blazetrails/ruby-compat";
 import { escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
 import { PG } from "./pg.js";
+import { cancelAnyRunningQuery } from "../connection-adapters/postgresql/database-statements.js";
 
 describe("pgConnection socket_io", () => {
   it("reopen unrefs and strips listeners, and never closes the socket", () => {
@@ -182,5 +183,57 @@ describe("PG::Error#result on every carrier path", () => {
     const client = pgConnection({ query: () => Promise.reject(frozen) });
     await expect(client.asyncExec("SELECT 1")).rejects.toBe(frozen);
     expect("result" in frozen).toBe(false);
+  });
+});
+
+describe("PG::Error", () => {
+  it("is the class of an error the connection's query raised, and of no other", async () => {
+    const failure = Object.assign(new Error("boom"), { name: "error", code: "57014" });
+    const client = pgConnection({ query: () => Promise.reject(failure) });
+    await expect(client.query("SELECT 1")).rejects.toBe(failure);
+    expect(failure).toBeInstanceOf(PG.Error);
+    const bug = Object.assign(new TypeError("values is not iterable"), {
+      code: "ERR_INVALID_ARG_TYPE",
+    });
+    await expect(pgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(bug);
+    expect(bug).not.toBeInstanceOf(PG.Error);
+    for (const driver of [
+      Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
+      Object.assign(new Error("getaddrinfo EAI_AGAIN db"), { code: "EAI_AGAIN" }),
+      new Error("Query read timeout"),
+    ]) {
+      await pgConnection({ query: () => Promise.reject(driver) })
+        .query("")
+        .catch(() => {});
+      expect(driver).toBeInstanceOf(PG.Error);
+    }
+    expect(new TypeError("conn.status is not a function")).not.toBeInstanceOf(PG.Error);
+  });
+
+  it("cancel on a closed connection raises PG::ConnectionBad", async () => {
+    const error = await pgConnection({})
+      .cancel()
+      .catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(PG.ConnectionBad);
+    expect(error).toBeInstanceOf(PG.Error);
+  });
+});
+
+describe("cancel_any_running_query", () => {
+  function host(cancel: () => Promise<string | null>) {
+    return {
+      _rawConnection: { transactionStatus: () => 1, cancel, block: () => Promise.resolve(true) },
+    } as unknown as ThisParameterType<typeof cancelAnyRunningQuery>;
+  }
+
+  it("rescues PG::Error", async () => {
+    await expect(
+      cancelAnyRunningQuery.call(host(pgConnection({}).cancel)),
+    ).resolves.toBeUndefined();
+  });
+
+  it("lets an error the driver did not raise propagate", async () => {
+    const error = new TypeError("this._rawConnection.cancel is not a function");
+    await expect(cancelAnyRunningQuery.call(host(() => Promise.reject(error)))).rejects.toBe(error);
   });
 });
