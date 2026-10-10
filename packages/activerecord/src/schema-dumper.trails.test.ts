@@ -306,7 +306,7 @@ describe("SchemaDumperAdapterTest", () => {
       t.string("title", { null: false });
       t.text("body");
     });
-    const result = await dumpTableSchema(adapter, "horses");
+    const result = await dumpTableSchema("horses");
     expect(result).toContain("horses");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
@@ -317,7 +317,7 @@ describe("SchemaDumperAdapterTest", () => {
       t.integer("post_id");
     });
     await adapter.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
-    const result = await dumpTableSchema(adapter, "testings");
+    const result = await dumpTableSchema("testings");
     expect(result).toContain("t.index(");
     expect(result).toContain("index_testings_on_post_id");
   });
@@ -326,7 +326,7 @@ describe("SchemaDumperAdapterTest", () => {
     await adapter.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
-    const result = await dumpTableSchema(adapter, "octopi");
+    const result = await dumpTableSchema("octopi");
     expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
   });
 
@@ -334,7 +334,7 @@ describe("SchemaDumperAdapterTest", () => {
     await adapter.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
-    const result = await dumpTableSchema(adapter, "barcodes");
+    const result = await dumpTableSchema("barcodes");
     expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
   });
 

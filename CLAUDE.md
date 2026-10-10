@@ -124,6 +124,13 @@ port a body:
 - **kwargs.** A TS default parameter swallows an explicitly-passed `undefined`,
   so a caller forwarding an absent kwarg silently gets the default where Ruby
   would have seen `nil`. Match Ruby's kwarg semantics explicitly when it matters.
+- **An optional positional before trailing options or a block.** Ruby tells
+  `remove_foreign_key(from_table, to_table = nil, **options)` apart by syntax;
+  JS has only position. Keep every Rails parameter in its own slot, with the
+  Rails default, and have the caller pass `undefined` for a positional it
+  skips: `removeForeignKey("astronauts", undefined, { column: "rocket_id" })`,
+  `withExampleTable(connection, "ex", undefined, block)`. Never overload the
+  slot on `typeof`, which is an arm Rails does not have.
 - **Predicates.** A Ruby predicate returns a value, not necessarily a boolean;
   a value-returning predicate ported as a `boolean` breaks every call site that
   used the value.

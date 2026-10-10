@@ -387,7 +387,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "hstores");
+      const output = await dumpTableSchema("hstores");
       expect(output).toMatch(/t\.hstore\("tags",\s+\{?\s*default:\s*\{\}/);
     });
   });

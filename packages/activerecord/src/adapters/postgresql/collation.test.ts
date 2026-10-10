@@ -56,7 +56,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_collations");
+      const output = await dumpTableSchema("postgresql_collations");
       expect(output).toMatch(/t\.string\("string_c",\s*\{\s*collation:\s*"C"\s*\}\)/);
       expect(output).toMatch(/t\.text\("text_posix",\s*\{\s*collation:\s*"POSIX"\s*\}\)/);
     });

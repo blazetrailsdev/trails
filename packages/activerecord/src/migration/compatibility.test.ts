@@ -767,7 +767,7 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
   let migration: Migration | null;
   let verboseWas: boolean | undefined;
   const columnsHash = () => LegacyPrimaryKey.columnsHash() as unknown as Record<string, Column>;
-  const dump = async (table: string) => dumpTableSchema(await ambientConnection(), table);
+  const dump = async (table: string) => dumpTableSchema(table);
 
   beforeEach(() => {
     migration = null;

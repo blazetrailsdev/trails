@@ -107,7 +107,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("schema dump with shorthand", async () => {
-      const output = await dumpTableSchema(connection, "postgresql_network_addresses");
+      const output = await dumpTableSchema("postgresql_network_addresses");
       expect(output).toMatch(/t\.inet\(\s*"inet_address",\s*\{[^}]*default:\s*"192\.168\.1\.1"/);
       expect(output).toMatch(
         /t\.cidr\(\s*"cidr_address",\s*\{[^}]*default:\s*"192\.168\.1\.0\/24"/,

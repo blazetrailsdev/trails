@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { any, isPresent, pluralize, symbolizeKeys } from "@blazetrails/activesupport";
 import {
+  coreHashMergeKwd,
   except,
   hashDelete,
   rbInspect,
@@ -38,7 +39,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeForeignKey(
     fromTable: string,
-    toTable?: string | Record<string, unknown>,
+    toTable?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
@@ -49,7 +50,7 @@ interface SQLite3SchemaAdapter extends DatabaseAdapter {
   ): Promise<void>;
   removeCheckConstraint(
     tableName: string,
-    expression?: string | Record<string, unknown>,
+    expression?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
   fetchTypeMetadata(
@@ -125,19 +126,13 @@ export async function addForeignKey(
   });
 }
 
-/** @inventedArm if — CONVERGEABLE optional-positional-before-trailing-options-or-block-is-overloaded-on-typeof */
 export async function removeForeignKey(
   this: SQLite3SchemaAdapter,
   fromTable: string,
-  toTable?: string | RemoveForeignKeyOptions,
+  toTable: string | null = null,
   options: RemoveForeignKeyOptions = {},
 ): Promise<void> {
-  if (typeof toTable === "object" && toTable !== null) {
-    options = { ...toTable, ...options };
-    toTable = undefined;
-  } else {
-    options = { ...options };
-  }
+  options = { ...options };
   if (
     hashDelete<unknown>(options as Record<string, unknown>, "ifExists") === true &&
     !(await this.foreignKeyExists(fromTable, toTable))
@@ -145,7 +140,7 @@ export async function removeForeignKey(
     return;
   }
 
-  toTable ??= options.toTable;
+  toTable ??= options.toTable ?? null;
   options = except(options as Record<string, unknown>, "name", "toTable", "validate");
   const foreignKeys = await this.foreignKeys(fromTable);
 
@@ -215,31 +210,20 @@ export async function addCheckConstraint(
   });
 }
 
-/** @inventedArm if — CONVERGEABLE optional-positional-before-trailing-options-or-block-is-overloaded-on-typeof */
 export async function removeCheckConstraint(
   this: SQLite3SchemaAdapter,
   tableName: string,
-  expression?:
-    | string
-    | { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
-  options: {
-    name?: string;
-    expression?: string;
-    validate?: boolean;
-    ifExists?: boolean;
-  } = {},
+  expression: string | null = null,
+  {
+    ifExists = false,
+    ...options
+  }: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean } = {},
 ): Promise<void> {
-  const expr = typeof expression === "string" ? expression : undefined;
-  const opts =
-    typeof expression === "object" ? { ...(expression ?? {}), ...options } : { ...options };
-
-  const { ifExists, ...lookupOptions } = opts;
-
-  if (ifExists === true && !(await this.checkConstraintExists(tableName, lookupOptions))) return;
+  if (ifExists && !(await this.checkConstraintExists(tableName, options))) return;
 
   let checkConstraints = await this.checkConstraints(tableName);
   const chkNameToDelete = (
-    await this.checkConstraintForBang(tableName, { expression: expr, ...lookupOptions })
+    await this.checkConstraintForBang(tableName, coreHashMergeKwd({ expression }, options))
   ).name;
   checkConstraints = checkConstraints.filter((chk) => chk.name !== chkNameToDelete);
   await this.alterTable(tableName, await this.foreignKeys(tableName), checkConstraints);

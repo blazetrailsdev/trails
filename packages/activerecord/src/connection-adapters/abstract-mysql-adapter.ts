@@ -1500,7 +1500,7 @@ export interface AbstractMysqlAdapter {
 
   removeForeignKey(
     fromTable: string,
-    toTable?: string | RemoveForeignKeyOptions,
+    toTable?: string | null,
     options?: RemoveForeignKeyOptions,
   ): Promise<void>;
   internalStringOptionsForPrimaryKey(): Promise<Record<string, unknown>>;

@@ -820,12 +820,12 @@ describe("Table exists-predicate forwarders", () => {
     const t = new Table("users", recordingSchema as never);
     await t.foreignKeyExists("authors", { column: "author_id" });
     await t.foreignKeyExists("authors");
-    await t.foreignKeyExists({ column: "author_id" });
+    await t.foreignKeyExists(undefined, { column: "author_id" });
     await t.foreignKeyExists();
     expect(calls).toEqual([
       ["foreignKeyExists", "users", "authors", { column: "author_id" }],
       ["foreignKeyExists", "users", "authors"],
-      ["foreignKeyExists", "users", { column: "author_id" }],
+      ["foreignKeyExists", "users", undefined, { column: "author_id" }],
       ["foreignKeyExists", "users"],
     ]);
   });

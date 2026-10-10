@@ -110,7 +110,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "schema dumping", async () => {
-      const output = await dumpTableSchema(adapter, "virtual_columns");
+      const output = await dumpTableSchema("virtual_columns");
       expect(output).toMatch(
         /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"upper\(\(name\)::text\)",\s*stored:\s*true\s*\}\s*\)/i,
       );

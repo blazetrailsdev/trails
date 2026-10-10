@@ -10,7 +10,7 @@ describe("Migration", () => {
       const connection = (await ambientConnection()) as unknown as PostgreSQLAdapter;
 
       const error = await connection
-        .removeExclusionConstraint("invoices", { name: "nonexistent" })
+        .removeExclusionConstraint("invoices", undefined, { name: "nonexistent" })
         .catch((e) => e);
       expect(error).toBeInstanceOf(ArgumentError);
       expect(error.message).toBe(

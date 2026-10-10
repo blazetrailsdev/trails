@@ -90,7 +90,7 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema((await conn()) as any, "ebooks'");
+    const schema = await dumpTableSchema("ebooks'");
     expect(schema).not.toMatch(/ctx\.createTable\("ebooks'"/);
   });
 });
@@ -151,7 +151,7 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   });
 
   itIfSupports("views", "does not dump view as table", async () => {
-    const schema = await dumpTableSchema((await conn()) as any, "paperbacks");
+    const schema = await dumpTableSchema("paperbacks");
     expect(schema).not.toMatch(/ctx\.createTable\("paperbacks"/);
   });
 });

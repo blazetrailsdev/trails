@@ -100,7 +100,7 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
     });
 
     it("schema dump includes collation", async () => {
-      const output = await dumpTableSchema(adapter, "charset_collations");
+      const output = await dumpTableSchema("charset_collations");
       expect(output).toMatch(
         /createTable\("charset_collations",\s+\{\s+id:\s+\{\s+type:\s+"string",\s+collation:\s+"utf8mb4_bin"\s+\}/,
       );

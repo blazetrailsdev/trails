@@ -100,7 +100,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("timestamp schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
+      const output = await dumpTableSchema("postgresql_timestamps");
       expect(output).toContain("postgresql_timestamps");
       expect(output).toMatch(/t\.datetime\s*\("created_at"/);
     });
@@ -131,7 +131,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("datetime schema dump", async () => {
-      const output = await dumpTableSchema(adapter, "postgresql_timestamps");
+      const output = await dumpTableSchema("postgresql_timestamps");
       expect(output).toContain("postgresql_timestamps");
       expect(output).toMatch(/t\.datetime/);
     });
