@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { rbDefineAllocFunc } from "./include.js";
 import { methodMissingProxy } from "./method-missing-proxy.js";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- TS2545: a mixin base's constructor rest parameter must be typed `any[]`.
@@ -116,6 +117,12 @@ export function DelegateClass<T extends MixinBase>(
   Object.defineProperty(klass.prototype, Symbol.for("@blazetrails/ruby-compat:delegateClass"), {
     value: true,
   });
+
+  rbDefineAllocFunc(klass, (klass) =>
+    methodMissingProxy(Object.create(klass.prototype) as InstanceType<typeof klass>, {
+      delegate: (self) => ("delegateDcObj" in self ? self.__getobj__() : undefined),
+    }),
+  );
 
   const ignores = new Set(["constructor", "toString", "inspect"]);
   for (

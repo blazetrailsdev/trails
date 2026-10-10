@@ -39,7 +39,11 @@ describe("per-instance @primary_key slot", () => {
     await establishConnectionTo(
       ColdToy,
       adapterDouble({
-        schemaCache: { getCachedPrimaryKeys: () => "toy_id" },
+        schemaCache: {
+          getCachedPrimaryKeys: () => "toy_id",
+          getCachedColumnsHash: () => undefined,
+          getCachedDataSourceExists: () => undefined,
+        },
       }) as never,
     );
     await ColdToy.leaseConnection();

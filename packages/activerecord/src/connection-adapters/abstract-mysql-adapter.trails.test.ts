@@ -4,6 +4,7 @@ import { Base } from "../base.js";
 import { describeIfMysqlAdapter } from "../support/describe-if-mysql-adapter.js";
 import { Column } from "./mysql/column.js";
 import { TypeMetadata } from "./mysql/type-metadata.js";
+import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
@@ -18,7 +19,9 @@ function makeColumn(opts: { autoIncrement?: boolean; defaultFunction?: string | 
   return new Column(
     "id",
     null,
-    new TypeMetadata({ sqlType: "bigint" }, { extra: opts.autoIncrement ? "auto_increment" : "" }),
+    new TypeMetadata(new SqlTypeMetadata({ sqlType: "bigint" }), {
+      extra: opts.autoIncrement ? "auto_increment" : "",
+    }),
     false,
     opts.defaultFunction ?? null,
   );
@@ -204,7 +207,7 @@ describeIfMysqlAdapter("AbstractMysqlAdapter#buildChangeColumnDefinition", () =>
     return new Column(
       "body",
       "hello",
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
       true,
       opts.defaultFunction ?? null,
       {
@@ -418,7 +421,7 @@ function makeChangeColumnTextColumn(opts: { null_?: boolean; default_?: string |
   return new Column(
     "body",
     opts.default_ === undefined ? "hello" : opts.default_,
-    new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+    new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
     opts.null_ ?? true,
   );
 }

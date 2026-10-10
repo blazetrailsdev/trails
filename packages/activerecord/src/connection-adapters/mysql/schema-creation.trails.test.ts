@@ -1,6 +1,7 @@
 import { it, expect, beforeAll } from "vitest";
 import { SchemaCreation, type VisitorHostAdapter } from "./schema-creation.js";
 import { TypeMetadata } from "./type-metadata.js";
+import { SqlTypeMetadata } from "../sql-type-metadata.js";
 import {
   AddColumnDefinition,
   ChangeColumnDefinition,
@@ -66,7 +67,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const col = new Column(
       "status",
       null,
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
     );
     const def = new ChangeColumnDefaultDefinition(col, "active");
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toMatch(
@@ -78,7 +79,7 @@ describeIfMysqlAdapter("MySQL::SchemaCreation", () => {
     const col = new Column(
       "status",
       null,
-      new TypeMetadata({ sqlType: "varchar(255)", type: "string" }),
+      new TypeMetadata(new SqlTypeMetadata({ sqlType: "varchar(255)", type: "string" })),
       false,
     );
     const def = new ChangeColumnDefaultDefinition(col, null);

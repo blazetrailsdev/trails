@@ -27,6 +27,8 @@ function makeAdapter(
     columnsHash: async () => hash,
     primaryKeys: async () => null,
     getCachedColumnsHash: () => hash,
+    getCachedPrimaryKeys: () => undefined,
+    getCachedDataSourceExists: () => undefined,
     isCached: () => true,
   };
   return adapterDouble({
@@ -124,6 +126,8 @@ describe("loadSchemaFromAdapter", () => {
       columnsHash: async () => ({ guid: { sqlType: "uuid" } }),
       primaryKeys: async () => null,
       getCachedColumnsHash: () => ({ guid: { sqlType: "uuid" } }),
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
     };
     const adapter = adapterDouble({
       schemaCache: cache,
@@ -143,6 +147,8 @@ describe("loadSchemaFromAdapter", () => {
       columnsHash: async () => mysteryHash,
       primaryKeys: async () => null,
       getCachedColumnsHash: () => mysteryHash,
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
     };
     const adapter = adapterDouble({
       schemaCache: cache,

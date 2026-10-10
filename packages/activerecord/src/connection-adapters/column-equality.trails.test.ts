@@ -62,7 +62,7 @@ describe("ColumnEqualityTrails", () => {
     const pg = new PostgreSQLColumn(
       "id",
       null,
-      new PgTypeMetadata({ sqlType: "integer", type: "integer" }),
+      new PgTypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" })),
       false,
     );
     const metadata = new SqlTypeMetadata({ sqlType: "integer", type: "integer" });
@@ -72,7 +72,7 @@ describe("ColumnEqualityTrails", () => {
   });
 
   it("compares the PostgreSQL identity and serial flags", () => {
-    const opts = new PgTypeMetadata({ sqlType: "integer", type: "integer" });
+    const opts = new PgTypeMetadata(new SqlTypeMetadata({ sqlType: "integer", type: "integer" }));
     const plain = new PostgreSQLColumn("id", null, opts, false);
     expect(plain.equals(new PostgreSQLColumn("id", null, opts, false))).toBe(true);
     expect(
@@ -97,7 +97,12 @@ describe("ColumnEqualityTrails", () => {
 
   it("does not equal a sibling adapter's column", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const pg = new PostgreSQLColumn("id", null, new PgTypeMetadata(opts), false);
+    const pg = new PostgreSQLColumn(
+      "id",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+    );
     const sqlite = new SQLite3Column("id", null, opts, false);
     expect(pg.equals(sqlite)).toBe(false);
     expect(sqlite.equals(pg)).toBe(false);
@@ -120,18 +125,30 @@ describe("ColumnDeduplicationTrails", () => {
 
   it("folds the PostgreSQL identity and serial flags into the key", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false);
-    const serial = new PostgreSQLColumn("dedup_pg", null, new PgTypeMetadata(opts), false, null, {
-      serial: true,
-    });
+    const plain = new PostgreSQLColumn(
+      "dedup_pg",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+    );
+    const serial = new PostgreSQLColumn(
+      "dedup_pg",
+      null,
+      new PgTypeMetadata(new SqlTypeMetadata(opts)),
+      false,
+      null,
+      {
+        serial: true,
+      },
+    );
     expect(plain.deduplicate()).not.toBe(serial.deduplicate());
   });
 
   it("folds the PostgreSQL type metadata oid and fmod into the key", () => {
     const opts = { sqlType: "integer", type: "integer" };
-    const plain = new PgTypeMetadata(opts);
-    const withOid = new PgTypeMetadata(opts, { oid: 23 });
-    const withFmod = new PgTypeMetadata(opts, { fmod: 4 });
+    const plain = new PgTypeMetadata(new SqlTypeMetadata(opts));
+    const withOid = new PgTypeMetadata(new SqlTypeMetadata(opts), { oid: 23 });
+    const withFmod = new PgTypeMetadata(new SqlTypeMetadata(opts), { fmod: 4 });
     expect(plain.hash()).not.toBe(withOid.hash());
     expect(plain.hash()).not.toBe(withFmod.hash());
     expect(plain.deduplicate()).not.toBe(withOid.deduplicate());

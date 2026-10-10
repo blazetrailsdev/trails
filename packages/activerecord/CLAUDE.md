@@ -121,13 +121,17 @@ path and the settled shape splits it the same way:
 - **Synchronous readers peek.** `SchemaCache#getCachedColumnsHash`,
   `#getCachedDataSourceExists`, `#getCachedPrimaryKeys`, `#setColumns` and
   `SchemaReflection#loadedCache` read or seed the memo maps and never query.
+  `BoundSchemaReflection` forwards the three peeks, so a sync reader spells
+  `schemaCache.…` as Rails spells `schema_cache.…`.
 - **A cold peek answers `undefined`, never a query.** `loadSchemaFromCacheSync`
   returns `false` and leaves the model unloaded, `cachedTableExists` returns
   `undefined`, and `getPrimaryKey` (`attribute-methods/primary-key.ts`) falls
-  through to the `"id"` convention. The one exception is `warmColumnsHashSync`,
-  which seeds the cache when the adapter's `columns` itself answers
-  synchronously (a fake test adapter); a real adapter's promise is dropped with
-  its rejection handled, and the cold answer stands. An empty column set was
+  through to the `"id"` convention. The one exception is
+  `SchemaReflection#getCachedColumnsHash`, which reads the columns when the
+  adapter's `columns` itself answers synchronously (a fake test adapter). It
+  seeds a loaded cache, and with none loaded it memoizes per table without
+  seating a cache, so `cache(pool)` still runs `load_cache`; a real adapter's
+  promise is dropped with its rejection handled, and the cold answer stands. An empty column set was
   rejected because it makes a cold model silently attribute-less; `undefined`
   keeps it unloaded so the async warm can still load it.
 

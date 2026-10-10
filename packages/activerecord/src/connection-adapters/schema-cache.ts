@@ -23,6 +23,7 @@ import "./abstract/schema-definitions.js";
 
 export type Pool = {
   withConnection<T>(callback: (connection: any) => T | Promise<T>): T | Promise<T>;
+  withConnectionSync?<T>(callback: (connection: any) => T): T;
 };
 
 export class SchemaReflection {
@@ -31,6 +32,7 @@ export class SchemaReflection {
 
   private _cache: SchemaCache | null;
   private _cachePath: string | null;
+  private _peekedColumnsHash = new Map<string, Record<string, Column>>();
 
   constructor(cachePath?: string | null, cache?: SchemaCache) {
     this._cache = cache ?? null;
@@ -39,6 +41,7 @@ export class SchemaReflection {
 
   clearBang(): void {
     this._cache = this.emptyCache();
+    this._peekedColumnsHash.clear();
   }
 
   async loadBang(pool: Pool): Promise<this> {
@@ -87,6 +90,7 @@ export class SchemaReflection {
   }
 
   async clearDataSourceCacheBang(pool: Pool, name: string): Promise<void> {
+    this.clearCachedColumnsHash(name);
     if (!this._cache && !this.possibleCacheAvailable()) return;
     (await this.cache(pool)).clearDataSourceCacheBang(pool, name);
   }
@@ -165,6 +169,46 @@ export class SchemaReflection {
     const cache = await this.cache(pool);
     await cache.addAll(pool);
     return this;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedColumnsHash(pool: Pool, tableName: string): Record<string, Column> | undefined {
+    const hash =
+      this._cache?.getCachedColumnsHash(tableName) ?? this._peekedColumnsHash.get(tableName);
+    if (hash) return hash;
+    let connection: { columns?: (tableName: string) => unknown } | undefined;
+    try {
+      connection = pool.withConnectionSync?.((connection) => connection);
+    } catch {
+      return undefined;
+    }
+    if (typeof connection?.columns !== "function") return undefined;
+    const columns = connection.columns(tableName);
+    if (columns instanceof Promise) {
+      void columns.catch(() => {});
+      return undefined;
+    }
+    if (!Array.isArray(columns)) return undefined;
+    if (this._cache) {
+      this._cache.setColumns(tableName, columns as Column[]);
+      return this._cache.getCachedColumnsHash(tableName);
+    }
+    const columnsHash = Object.fromEntries(
+      (columns as Column[]).map((column) => [column.name, column]),
+    );
+    this._peekedColumnsHash.set(tableName, columnsHash);
+    return columnsHash;
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  clearCachedColumnsHash(tableName: string): void {
+    this._peekedColumnsHash.delete(tableName);
   }
 
   /**
@@ -259,6 +303,30 @@ export class BoundSchemaReflection {
 
   async dumpTo(filename: string): Promise<SchemaCache> {
     return this._schemaReflection.dumpTo(this._pool, filename);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedColumnsHash(tableName: string): Record<string, Column> | undefined {
+    return this._schemaReflection.getCachedColumnsHash(this._pool, tableName);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedDataSourceExists(name: string): boolean | undefined {
+    return this._schemaReflection.loadedCache?.getCachedDataSourceExists(name);
+  }
+
+  /**
+   * @internal
+   * @noRailsEquivalent PERMANENT
+   */
+  getCachedPrimaryKeys(tableName: string): string | string[] | null | undefined {
+    return this._schemaReflection.loadedCache?.getCachedPrimaryKeys(tableName);
   }
 
   /**
