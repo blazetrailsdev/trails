@@ -12,7 +12,7 @@ describe("find with a block is Enumerable#find over the relation's records", () 
   it("answers the first record the block accepts", async () => {
     const second = topics("second");
     const found = await Topic.order("id").find((topic: Topic) => topic.id === second.id);
-    expect(found.id).toBe(second.id);
+    expect(found?.id).toBe(second.id);
     expect(found).toBeInstanceOf(Topic);
   });
 
@@ -36,6 +36,6 @@ describe("find with a block is Enumerable#find over the relation's records", () 
   it("runs on a loaded relation without another query", async () => {
     const relation = await Topic.order("id").load();
     const first = topics("first");
-    expect((await relation.find((topic: Topic) => topic.id === first.id)).id).toBe(first.id);
+    expect((await relation.find((topic: Topic) => topic.id === first.id))?.id).toBe(first.id);
   });
 });
