@@ -1,4 +1,5 @@
 import { ArgumentError } from "./argument-error.js";
+import { isPlainHash } from "./object.js";
 import { env as processEnv, getProcessAdapter } from "./process-adapter.js";
 import type { WaitStatus } from "./child-process-adapter.js";
 
@@ -7,12 +8,11 @@ interface SystemCallError extends Error {
 }
 
 /**
- * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`):
- * `rb_exec_getargs` (`process.c:2511-2538`) takes a trailing Hash as the
- * options and a leading Hash as the environment, which `rb_execarg_addopt`'s
- * env arm lays over `ENV`, a `nil` value unsetting the name. One remaining
- * argument is a command line and `args` is `null`; more are a program and its
- * argv (`process.c:2531-2536`).
+ * `rb_execarg_new` (`vendor/ruby/v3.3.11/process.c:2767`): `rb_exec_getargs`
+ * (`process.c:2511-2538`) takes a trailing Hash as the options and a leading
+ * Hash as the environment, laid over `ENV` with a `nil` value unsetting the
+ * name. One remaining argument is a command line and `args` is `null`; more
+ * are a program and its argv.
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
  * (`vendor/ruby/v3.3.11/process.c:2767`).
@@ -27,11 +27,11 @@ export function rbExecargNew(
 ] {
   const rest = [...argv];
   let opthash: { out?: string } = {};
-  if (rest.length > 0 && typeof rest[rest.length - 1] === "object") {
+  if (rest.length > 0 && isPlainHash(rest[rest.length - 1])) {
     opthash = rest.pop() as { out?: string };
   }
   const env: Record<string, string | undefined> = { ...processEnv };
-  if (rest.length > 0 && typeof rest[0] === "object") {
+  if (rest.length > 0 && isPlainHash(rest[0])) {
     for (const [name, value] of Object.entries(rest.shift() as Record<string, string | null>)) {
       if (value == null) delete env[name];
       else env[name] = value;

@@ -114,7 +114,8 @@ export const ClassMethods = {
     if (fixtureSetNames.length !== 0) {
       this.fixtureSets = { ...this.fixtureSets };
       for (let fsName of fixtureSetNames) {
-        let key = fsName.includes("/") ? strUminus(fsName.replaceAll("/", "_")) : fsName;
+        const name = isSymbol(fsName) ? symbolToS(fsName) : fsName;
+        let key = name.includes("/") ? strUminus(name.replaceAll("/", "_")) : fsName;
         if (isSymbol(key)) key = strUminus(symbolToS(key));
         if (isSymbol(fsName)) fsName = strUminus(symbolToS(fsName));
         this.fixtureSets[key] = fsName;
