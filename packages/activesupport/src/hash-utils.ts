@@ -470,7 +470,7 @@ function buildQueryParts(value: unknown, key: string): string {
     return value.map((v) => buildQueryParts(v, prefix)).join("&");
   }
   if (isPlainObject(value) || value instanceof Map) return toQuery(value, key);
-  if (typeof (value as { toQuery?: unknown } | null)?.toQuery === "function") {
+  if (rbObjRespondTo(value, "toQuery")) {
     return (value as { toQuery(key: string): string }).toQuery(key);
   }
   return `${encodeQueryKey(key)}=${encodeQueryValue(toParam(value))}`;
