@@ -501,7 +501,10 @@ export interface AbstractAdapter
   removeCheckConstraint(
     tableName: string,
     expression?: string | null,
-    options?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
+    {
+      ifExists,
+      ...options
+    }?: { name?: string; expression?: string; validate?: boolean; ifExists?: boolean },
   ): Promise<void>;
   removeConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   /** @internal */
