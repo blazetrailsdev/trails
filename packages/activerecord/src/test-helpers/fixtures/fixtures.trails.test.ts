@@ -88,6 +88,7 @@ function makeModel(tableName: string, pk = "id") {
     primaryKey: pk,
     loadSchema: async () => {},
     definedEnums: {},
+    _reflections: {},
     columns: () => Object.values(doubleColumnsHash(tableName)),
     typeForAttribute: () => ({ type: () => "integer" }),
     findBy: vi.fn(async (attrs: Record<string, unknown>) => {
