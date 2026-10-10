@@ -721,11 +721,22 @@ export class Base extends Model {
   declare static readonly predicateBuilder: import("./relation/predicate-builder.js").PredicateBuilder;
 
   static async loadSchema(this: typeof Base): Promise<void> {
-    const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
+    const state = this as unknown as {
+      _schemaLoadPromise?: Promise<void>;
+      _schemaLoadPool?: ConnectionPool;
+    };
+    let pool: ConnectionPool | undefined;
+    try {
+      pool = this.connectionPool();
+    } catch {
+      pool = undefined;
+    }
     if (
       !Object.prototype.hasOwnProperty.call(this, "_schemaLoadPromise") ||
-      !state._schemaLoadPromise
+      !state._schemaLoadPromise ||
+      state._schemaLoadPool !== pool
     ) {
+      state._schemaLoadPool = pool;
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
     try {
