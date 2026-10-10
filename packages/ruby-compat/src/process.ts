@@ -13,6 +13,7 @@ interface SystemCallError extends Error {
  * Hash as the env, laid over `ENV` with `nil` unsetting a name. One remaining
  * String is a command line (`args` is `null`); more are a program and its argv.
  *
+ * @inventedArm throw — CONVERGEABLE rb-exec-getargs-ports-rb-check-argv
  * @noRailsEquivalent PERMANENT — Ruby core `rb_execarg_new`
  * (`vendor/ruby/v3.3.11/process.c:2767`).
  */
