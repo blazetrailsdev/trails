@@ -4,7 +4,7 @@ import { Mysql2Adapter } from "../mysql2-adapter.js";
 
 function adapterWith(raw: unknown): Mysql2Adapter {
   const adapter = Object.create(Mysql2Adapter.prototype) as Mysql2Adapter;
-  (adapter as unknown as { _connection: unknown })._connection = raw;
+  (adapter as unknown as { _rawConnection: unknown })._rawConnection = raw;
   return adapter;
 }
 

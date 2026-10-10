@@ -89,6 +89,8 @@ import {
   typeCastedBinds as abstractTypeCastedBinds,
   quoteString as abstractQuoteString,
   ClassMethods as QuotingClassMethods,
+  columnNameMatcher as abstractColumnNameMatcher,
+  columnNameWithOrderMatcher as abstractColumnNameWithOrderMatcher,
   quoteColumnName as abstractQuoteColumnName,
   quoteTableName as abstractQuoteTableName,
   quoteDefaultExpression as abstractQuoteDefaultExpression,
@@ -803,7 +805,8 @@ export class AbstractAdapter implements Quoting {
   }
 
   protected _visitor!: Visitors.ToSql;
-  protected _connection: unknown = null;
+  /** @internal */
+  _rawConnection: unknown = null;
   private _owner: Thread | Fiber | null = null;
   private _preparedStatements: unknown = false;
   private _schemaCache: BoundSchemaReflection | null = null;
@@ -914,7 +917,7 @@ export class AbstractAdapter implements Quoting {
   ) {
     initializeIncludedModules(this);
 
-    this._connection = null;
+    this._rawConnection = null;
     this._unconfiguredConnection = null;
 
     if (isPlainConfigHash(configOrDeprecatedConnection)) {
@@ -1111,7 +1114,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get secondsSinceLastActivity(): number | null {
-    if (!this._connection || !this._lastActivity) return null;
+    if (!this._rawConnection || !this._lastActivity) return null;
     return Process.clockGettime(Process.CLOCK_MONOTONIC) - this._lastActivity;
   }
 
@@ -1380,11 +1383,11 @@ export class AbstractAdapter implements Quoting {
   async checkAllForeignKeysValidBang(): Promise<void> {}
 
   isConnected(): boolean {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async active(): Promise<boolean> {
-    return this._connection !== null;
+    return this._rawConnection !== null;
   }
 
   async reconnectBang(opts: { restoreTransactions?: boolean } = {}): Promise<void> {
@@ -1508,15 +1511,6 @@ export class AbstractAdapter implements Quoting {
       this._rawConnectionDirty = true;
       return conn as RawConnectionOf<Self>;
     });
-  }
-
-  /** @internal */
-  get _rawConnection(): unknown {
-    return this._connection;
-  }
-  /** @internal */
-  set _rawConnection(value: unknown) {
-    this._connection = value;
   }
 
   defaultUniquenessComparison(attribute: Arel.Attribute, value: unknown): Nodes.Node {
@@ -1683,7 +1677,8 @@ export class AbstractAdapter implements Quoting {
     const materializeTransactions = options.materializeTransactions ?? true;
 
     const run = async (): Promise<T> => {
-      if (this._connection === null && this.isReconnectCanRestoreState()) await this.connectBang();
+      if (this._rawConnection === null && this.isReconnectCanRestoreState())
+        await this.connectBang();
       if (materializeTransactions) await this.materializeTransactions();
 
       let retriesAvailable = allowRetry ? this.connectionRetries : 0;
@@ -1786,13 +1781,13 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   anyRawConnection(): unknown {
-    return this._connection ?? this.validRawConnection();
+    return this._rawConnection ?? this.validRawConnection();
   }
 
   /** @internal */
   validRawConnection(): unknown {
     return (
-      (this._verified && this._connection) ||
+      (this._verified && this._rawConnection) ||
       this.withRawConnection({ allowRetry: false, materializeTransactions: false }, (conn) => conn)
     );
   }
@@ -1982,6 +1977,14 @@ export class AbstractAdapter implements Quoting {
     return abstractQuoteString(s);
   }
 
+  static columnNameMatcher(): RegExp {
+    return abstractColumnNameMatcher();
+  }
+
+  static columnNameWithOrderMatcher(): RegExp {
+    return abstractColumnNameWithOrderMatcher();
+  }
+
   static quoteColumnName(columnName: unknown): string {
     return QuotingClassMethods.quoteColumnName(columnName);
   }
@@ -2141,7 +2144,7 @@ export class AbstractAdapter implements Quoting {
 
   /** @internal */
   protected async rawConnectionForBlock(): Promise<unknown> {
-    return this._connection;
+    return this._rawConnection;
   }
 
   /** @internal */

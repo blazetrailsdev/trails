@@ -247,7 +247,6 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
   _connectionParameters: SQLite3ConnectionParameters;
   /** @internal */
   _lastAffectedRows = 0;
-  _lastInsertRowid: number | bigint = 0;
   private _memoryDatabase: boolean;
   /** @internal */
   declare _statements: StatementPool;
@@ -1101,13 +1100,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
   static override quoteTableName = quoteTableName;
 
   /** @internal */
-  get _rawConnection(): SqliteConnection | null {
-    return this._connection as SqliteConnection;
-  }
-  /** @internal */
-  set _rawConnection(value: SqliteConnection | null) {
-    this._connection = value;
-  }
+  declare _rawConnection: SqliteConnection | null;
 
   /** @internal */
   get _strictStrings(): boolean {

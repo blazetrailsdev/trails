@@ -98,6 +98,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
 
+    this._unconfiguredConnection &&= mysql2Client(this._unconfiguredConnection);
     this._affectedRowsBeforeWarnings = null;
     this._config.flags ||= 0;
 
@@ -281,13 +282,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  get _rawConnection(): Mysql2Client | null {
-    return this._connection as Mysql2Client | null;
-  }
-  /** @internal */
-  set _rawConnection(value: mysql.Connection | Mysql2Client | null) {
-    this._connection = value && mysql2Client(value);
-  }
+  declare _rawConnection: Mysql2Client | null;
 
   /** @internal */
   _clientForTest(): Mysql2Client | null {

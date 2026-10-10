@@ -410,9 +410,7 @@ function inOrderOf(
   filter = true,
 ): any {
   (this.model as any).disallowRawSqlBang([column], {
-    permit: (
-      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
-    ).columnNameWithOrderMatcher(),
+    permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
   if (values.length === 0) return noneBang.call(this.spawn());
 
@@ -1418,9 +1416,7 @@ export function sanitizeOrderArguments(this: QueryMethodsHost, orderArgs: unknow
 /** @internal */
 export function preprocessOrderArgs(this: QueryMethodsHost, orderArgs: unknown[]): void {
   this.model.disallowRawSqlBang(flattenedArgs(orderArgs) as (string | symbol | ArelNode)[], {
-    permit: (
-      this.model.adapterClass() as unknown as { columnNameWithOrderMatcher(): RegExp }
-    ).columnNameWithOrderMatcher(),
+    permit: this.model.adapterClass().columnNameWithOrderMatcher(),
   });
 
   validateOrderArgs.call(this, orderArgs);

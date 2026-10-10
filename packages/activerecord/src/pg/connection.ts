@@ -78,18 +78,13 @@ export class Connection {
     return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
   }
 
-  /**
-   * @inventedArm try — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
-   * @inventedArm rescue — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
-   * @inventedArm throw — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
-   */
   async reset(): Promise<void> {
     const client = this.client;
-    const connectionParameters = (client as unknown as { connectionParameters: pg.ClientConfig })
-      .connectionParameters;
-    const conn = new (client.constructor as new (config: pg.ClientConfig) => Client)(
-      this.connParams ?? { ...connectionParameters, password: client.password },
-    );
+    const iopts = this.connParams ?? {
+      ...(client as unknown as { connectionParameters: pg.ClientConfig }).connectionParameters,
+      password: client.password,
+    };
+    const conn = new (client.constructor as new (config: pg.ClientConfig) => Client)(iopts);
     for (const event of client.eventNames()) {
       for (const listener of client.rawListeners(event)) {
         conn.on(event as "error", listener as () => void);
@@ -98,13 +93,13 @@ export class Connection {
     listen(this, conn);
     this.prepared.clear();
     this.readyForQuery = "I";
-    try {
-      await client.end();
-      await conn.connect();
-    } catch (error) {
-      void conn.end().catch(() => {});
-      throw connectionBad(error);
-    }
+    await client
+      .end()
+      .then(() => conn.connect())
+      .catch((error: unknown) => {
+        void conn.end().catch(() => {});
+        return Promise.reject(connectionBad(error));
+      });
     this.client = conn;
   }
 

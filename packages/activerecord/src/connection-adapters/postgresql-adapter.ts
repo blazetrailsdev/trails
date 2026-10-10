@@ -506,6 +506,7 @@ export class PostgreSQLAdapter
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
 
+    this._unconfiguredConnection &&= pgConnection(this._unconfiguredConnection);
     const connParams: Record<string, unknown> = compact(this._config);
 
     if (rtest(connParams.username)) connParams.user = hashDelete(connParams, "username");
@@ -527,7 +528,7 @@ export class PostgreSQLAdapter
   }
 
   override isConnected(): boolean {
-    return this._connection !== null && !this._rawConnectionFinished();
+    return this._rawConnection !== null && !this._rawConnectionFinished();
   }
 
   override async active(): Promise<boolean> {
@@ -1435,13 +1436,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
   }
 
   /** @internal */
-  get _rawConnection(): PGConnection | null {
-    return this._connection as PGConnection | null;
-  }
-  /** @internal */
-  set _rawConnection(value: PGConnection | null) {
-    this._connection = value && pgConnection(value);
-  }
+  declare _rawConnection: PGConnection | null;
 
   private _captureRegtypeOids(records: PgTypeRow[]): void {
     for (const row of records) {
