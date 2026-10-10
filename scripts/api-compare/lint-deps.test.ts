@@ -836,6 +836,9 @@ describe("visitMethodDeclarations", () => {
         install: (registry: Factory): void => {},
         readRecord: function (unpacker: Unpacker) {},
         version: 1,
+        writeRecord: () => {
+          throw new NotImplementedError();
+        },
       };
     `);
     const names: string[] = [];

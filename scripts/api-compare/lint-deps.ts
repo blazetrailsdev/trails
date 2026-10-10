@@ -407,7 +407,9 @@ export function visitMethodDeclarations(
                 ts.isIdentifier(prop.name) &&
                 (ts.isArrowFunction(prop.initializer) || ts.isFunctionExpression(prop.initializer))
               ) {
-                callback(prop.name.text, prop.initializer, prop);
+                if (!isNotImplementedStub(prop.initializer.body)) {
+                  callback(prop.name.text, prop.initializer, prop);
+                }
               } else if (!ts.isPropertyAssignment(prop)) {
                 visit(prop);
               }
