@@ -37,14 +37,19 @@ readonly RATE_LIMIT_RE='rate limit|abuse detection|please wait a few minutes'
 # GitHub asks callers to back off at least a minute on secondary limits, so
 # rate-limit retries use their own (much longer) schedule than 5xx retries.
 # They also get their own, smaller attempt cap: Preflight runs under
-# `timeout-minutes: 10` and makes four of these calls (one merge-conflict read,
-# which may poll, plus the three attribution reads), so a full 4-attempt
+# `timeout-minutes: 10` and makes four of these calls that can hit a rate limit
+# (one merge-conflict read plus the three attribution reads; the merge-conflict
+# step may repeat its read, but only on answers that SUCCEEDED), so a 4-attempt
 # schedule at 60s could exhaust the job budget and leave a bare "cancelled" —
 # the same uninformative signal this script exists to prevent. Two waits per
 # call bounds the worst case at ~8 min across all four, which still fits.
-# A caller that polls MUST bound its own calls against that figure:
-# check-merge-conflict.sh spends its poll budget on sleeps between calls, not
-# on extra retried calls, and fails open, so it cannot push past it.
+# That figure assumes ONE call per check. A caller that polls must not poll
+# THROUGH this script: wrapping it in a 6-attempt loop multiplies the budget by
+# six (~12 min against a persistent rate limit, past the job timeout, which
+# surfaces as the bare "cancelled" this script exists to prevent). So
+# check-merge-conflict.sh polls only while GitHub answers "not computed yet",
+# and stops at the first unreadable answer — the retries that matter already
+# happened in here.
 readonly RATE_LIMIT_DELAY=60
 readonly RATE_LIMIT_MAX_ATTEMPTS=3
 

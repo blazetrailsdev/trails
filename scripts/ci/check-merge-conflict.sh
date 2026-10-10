@@ -58,7 +58,9 @@ classify() {
 # this step: an unreadable API is not a conflict, and this check exists to save
 # runner minutes, not to invent a new way for a mergeable branch to go red.
 # GH_API_RETRY_SOFT keeps the retry script from leaving an `::error::`
-# annotation on a run this check then deliberately passes.
+# annotation on a run this check then deliberately passes. Its own retries are
+# the only ones this check makes against a failing API; check() does not poll
+# on top of them.
 fetch() {
   local repo="$1" pr="$2"
   if [ -n "${MERGE_CONFLICT_FETCH:-}" ]; then
@@ -76,9 +78,17 @@ check() {
     status=0
     answer=$(fetch "$repo" "$pr") || status=$?
     if [ "$status" -ne 0 ]; then
+      # Do NOT poll on an unreadable API. gh-api-retry.sh has already spent its
+      # own retry budget on this call, so another outer attempt just multiplies
+      # it: six attempts against a persistent rate limit would be 6x2x60s, well
+      # past Preflight's `timeout-minutes: 10`, and this step runs first, so the
+      # job would die as the bare "cancelled" that script exists to prevent.
+      # Only null/unknown — a verdict GitHub has not computed YET — is worth
+      # waiting for.
       mergeable=unreadable
       state=unreadable
       verdict=unresolved
+      break
     else
       mergeable=${answer%% *}
       state=${answer##* }
@@ -97,7 +107,7 @@ check() {
       return 1
       ;;
     unresolved)
-      echo "::warning::Could not establish mergeability within $MAX_ATTEMPTS attempts (mergeable=$mergeable, state=$state); treating this PR as mergeable and letting the run continue. An unreadable or uncomputed answer is not a conflict."
+      echo "::warning::Could not establish mergeability (mergeable=$mergeable, state=$state); treating this PR as mergeable and letting the run continue. An unreadable or uncomputed answer is not a conflict. A conflict that appeared behind an unreadable API is therefore missed, which is the intended trade: this check saves runner minutes and must not spend them, or the job's timeout, proving an API is down."
       ;;
     *)
       echo "No merge conflict (mergeable=$mergeable, mergeable_state=$state)."
@@ -122,13 +132,25 @@ classifyCase() {
 # command substitution in a `||` list suppresses `set -e` inside it, so an
 # in-shell call cannot see an abort that CI would see — which is the whole
 # failure mode the fail-open guard in fetch()/check() exists to prevent.
+#
+# Asserts the number of fetch calls as well as the exit status: how many times
+# a failing API is re-read is a timeout-budget property, not an implementation
+# detail, so it is pinned per case.
 checkCase() {
-  local label="$1" expected="$2" script="$3" status=0 out
+  local label="$1" expected="$2" expectedCalls="$3" tag="$4"
+  shift 4
+  local script status=0 out calls
+  script=$(fakeFetch "$selfTestDir" "$tag" "$@")
   out=$(MERGE_CONFLICT_FETCH="$script" MERGE_CONFLICT_SLEEP=0 \
     "$selfTestTarget" owner/repo 1 2>&1) || status=$?
   if [ "$status" != "$expected" ]; then
     echo "self-test FAILED: $label exited $status, expected $expected" >&2
     printf '%s\n' "$out" >&2
+    selfTestStatus=1
+  fi
+  calls=$(cat "$selfTestDir/count-$tag" 2>/dev/null || echo 0)
+  if [ "$calls" != "$expectedCalls" ]; then
+    echo "self-test FAILED: $label made $calls fetch call(s), expected $expectedCalls" >&2
     selfTestStatus=1
   fi
 }
@@ -173,20 +195,25 @@ selfTest() {
   classifyCase 'a PR with failing checks' clean false unstable
   classifyCase 'mergeability not yet computed' unresolved null unknown
 
-  checkCase 'a conflicting PR' 1 "$(fakeFetch "$dir" conflict 'false dirty')"
-  checkCase 'a clean PR' 0 "$(fakeFetch "$dir" clean 'true clean')"
-  checkCase 'a conflict seen only after polling' 1 \
-    "$(fakeFetch "$dir" late 'null unknown' 'null unknown' 'false dirty')"
-  checkCase 'a clean merge seen only after polling' 0 \
-    "$(fakeFetch "$dir" slow 'null unknown' 'true clean')"
-  checkCase 'an API that cannot be read at all' 0 \
-    "$(fakeFetch "$dir" unreadable unreadable unreadable unreadable unreadable unreadable unreadable)"
-  checkCase 'an API failure that clears on a later poll' 0 \
-    "$(fakeFetch "$dir" recovers unreadable 'true clean')"
-  checkCase 'an API failure clearing to reveal a conflict' 1 \
-    "$(fakeFetch "$dir" revealed unreadable 'false dirty')"
-  checkCase 'mergeability that never resolves' 0 \
-    "$(fakeFetch "$dir" never 'null unknown' 'null unknown' 'null unknown' 'null unknown' 'null unknown' 'null unknown')"
+  checkCase 'a conflicting PR' 1 1 conflict 'false dirty'
+  checkCase 'a clean PR' 0 1 clean 'true clean'
+  checkCase 'a conflict seen only after polling' 1 3 late \
+    'null unknown' 'null unknown' 'false dirty'
+  checkCase 'a clean merge seen only after polling' 0 2 slow \
+    'null unknown' 'true clean'
+  checkCase 'mergeability that never resolves' 0 6 never \
+    'null unknown' 'null unknown' 'null unknown' \
+    'null unknown' 'null unknown' 'null unknown'
+
+  # An unreadable API is read ONCE: gh-api-retry.sh has already retried inside
+  # that call, so polling it again would multiply its budget past the job's
+  # timeout. The cost is that a conflict sitting behind a failed read is missed
+  # rather than waited out, which is the documented trade.
+  checkCase 'an API that cannot be read at all' 0 1 unreadable unreadable
+  checkCase 'an API failure that would have cleared' 0 1 recovers \
+    unreadable 'true clean'
+  checkCase 'a conflict hidden behind a failed read' 0 1 revealed \
+    unreadable 'false dirty'
 
   [ "$selfTestStatus" -eq 0 ] && echo "check-merge-conflict: self-test passed."
   return "$selfTestStatus"
