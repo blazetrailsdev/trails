@@ -23,7 +23,7 @@ import {
   ValueTooLong,
 } from "../../errors.js";
 import { PG } from "../../pg/pg.js";
-import type { PGConnection } from "../../pg/connection.js";
+import { Connection, type PGConnection } from "../../pg/connection.js";
 import { withSecondAdapter } from "../../support/second-connection.js";
 import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 import { captureSql } from "../../testing/sql-capture.js";
@@ -1197,7 +1197,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       const client = await PostgreSQLAdapter.newClient({
         connectionString: PG_TEST_URL,
       });
-      expect(client).toBeInstanceOf(pg.Client);
+      expect(client).toBeInstanceOf(Connection);
       await client.end();
     });
 
@@ -1258,13 +1258,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       const a = new PostgreSQLAdapter(PG_TEST_URL);
       try {
         await a.connect();
-        const raw = a._rawConnectionForTest() as PGConnection;
+        const raw = a._rawConnectionForTest() as PGConnection & Connection;
+        const client = raw.client;
         const pid = (await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid;
         await raw.query("BEGIN");
 
         await a.reconnect();
 
         expect(a._rawConnectionForTest()).toBe(raw);
+        expect(raw.client).not.toBe(client);
         expect(raw.transactionStatus()).toBe(0);
         expect((await raw.query("SELECT pg_backend_pid() AS pid")).rows[0].pid).not.toBe(pid);
       } finally {
@@ -1295,11 +1297,14 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         await a.connect();
         const raw = a._rawConnectionForTest() as PGConnection;
-        vi.spyOn(raw, "connect").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+        const connect = vi.spyOn(pg.Client.prototype, "connect");
+        connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
         await expect(raw.reset()).rejects.toBeInstanceOf(PG.ConnectionBad);
+        expect(raw.status()).toBe(1);
 
-        vi.spyOn(raw, "connect").mockRejectedValueOnce(new Error("connect ECONNREFUSED"));
+        connect.mockRejectedValueOnce(new Error("connect ECONNREFUSED") as never);
         await a.reconnect();
+        connect.mockRestore();
 
         expect(a._rawConnectionForTest()).not.toBe(raw);
         expect((await a._rawConnectionForTest()!.query("SELECT 1 AS one")).rows[0].one).toBe(1);

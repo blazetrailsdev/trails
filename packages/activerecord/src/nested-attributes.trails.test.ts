@@ -18,6 +18,7 @@ import { Bird } from "./test-helpers/models/bird.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Developer } from "./test-helpers/models/developer.js";
+import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 const cols = (record: Base): Record<string, unknown> =>
   record as unknown as Record<string, unknown>;
@@ -473,5 +474,44 @@ describe("nested attributes existing record lookup (trails-only)", () => {
 
     expect(((await CpkChapter.find([1, 3])) as CpkChapter).title).toBe("New title");
     expect(((await CpkChapter.find([1, 4])) as CpkChapter).title).toBe("Other");
+  });
+
+  it("keeps a blank-string id in the existing-record lookup", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    const bird = await Bird.createBang({ name: "Old", pirate_id: pirate.id });
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.association("birds").isLoaded()).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      await nested(reloaded).setBirdsAttributes([
+        { id: bird.id, name: "Renamed" },
+        { id: "", name: "Blank" },
+      ]);
+    });
+    await reloaded.save();
+
+    expect((await Bird.where({ pirate_id: pirate.id }).pluck("name")).sort()).toEqual([
+      "Blank",
+      "Renamed",
+    ]);
+  });
+
+  it("makes no existing-record lookup when every id is blank", async () => {
+    const pirate = await Pirate.createBang({ catchphrase: "Arr" });
+    const reloaded = await Pirate.find(pirate.id);
+
+    await assertNoQueries(false, async () => {
+      await nested(reloaded).setBirdsAttributes([{ id: "", name: "Blank" }]);
+    });
+  });
+
+  it("builds a blank-string id's attributes on a record under construction", async () => {
+    const pirate = new Pirate({
+      catchphrase: "Arr",
+      birdsAttributes: [{ id: "", name: "Blank" }],
+    });
+    await pirate.save();
+
+    expect(await Bird.where({ pirate_id: pirate.id }).pluck("name")).toEqual(["Blank"]);
   });
 });

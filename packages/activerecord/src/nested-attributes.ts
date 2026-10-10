@@ -324,7 +324,10 @@ export function assignNestedAttributesForOneToOneAssociation(
   }
 }
 
-/** @internal */
+/**
+ * @internal
+ * @inventedArm if — CONVERGEABLE reopen-rfc-0087-constructor-arm-for-association-io-at-assignment
+ */
 export function assignNestedAttributesForCollectionAssociation(
   this: Base,
   associationName: string,
@@ -407,10 +410,9 @@ export function assignNestedAttributesForCollectionAssociation(
 
   if (association.isLoaded()) return assignRecords(association.target);
 
-  const attributeIds = attrs
-    .map((a) => (a as any).id)
-    .filter((id) => id != null && id !== false && id !== "");
+  const attributeIds = attrs.map((a) => (a as any).id).filter((id) => id != null && id !== false);
   if (attributeIds.length === 0) return assignRecords([]);
+  if (attrs.every((a) => isBlank(a["id"]))) return assignRecords([]);
 
   const primaryKey = association.klass.primaryKey;
   const scope = association.scope();

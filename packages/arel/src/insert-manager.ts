@@ -4,7 +4,7 @@ import { Attribute } from "./attributes/attribute.js";
 import { ValuesList } from "./nodes/values-list.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { Table } from "./table.js";
-import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
+import { first, isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
 import { Arel } from "./namespaces.js";
 import type { ArelNode } from "./arel.js";
 
@@ -32,13 +32,13 @@ export class InsertManager extends TreeManager<InsertStatement> {
     return this;
   }
 
-  insert(fields: string | [ArelNode, unknown][]): this | undefined {
+  insert(fields: string | [ArelNode, unknown][] | Map<ArelNode, unknown>): this | undefined {
     if (isEmpty(fields)) return;
 
     if (typeof fields === "string") {
       this.ast.values = new SqlLiteral(fields);
     } else {
-      this.ast.relation ||= (fields[0][0] as Attribute).relation as Table | ArelNode;
+      this.ast.relation ||= (first(first(fields)!) as Attribute).relation as Table | ArelNode;
 
       const values: unknown[] = [];
 

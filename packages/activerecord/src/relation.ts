@@ -486,9 +486,11 @@ export class Relation<T extends Base, G extends boolean = false> {
     this._model.connectionPool().withConnectionSync((c: DatabaseAdapter) => {
       if (!c.asyncEnabled()) {
         const token = this._loadToken;
-        void this.load().catch(() => {
-          if (token === this._loadToken) this._loaded = false;
-        });
+        void c.lock
+          .synchronize(() => this.load())
+          .catch(() => {
+            if (token === this._loadToken) this._loaded = false;
+          });
         this._loaded = true;
         return;
       }

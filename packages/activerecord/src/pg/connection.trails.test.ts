@@ -159,7 +159,8 @@ describe("PG::Error#result on every carrier path", () => {
     });
     const bare = Object.assign(new Error("socket"), { code: "08006" });
     const client = pgConnection({ query: (error: unknown) => Promise.reject(error) });
-    const query = client.query as unknown as (error: Error) => Promise<unknown>;
+    const query = (error: Error) =>
+      (client.query as unknown as (error: Error) => Promise<unknown>)(error);
     await query(server).catch(() => {});
     await query(bare).catch(() => {});
     const { result } = server as unknown as { result: { errorField(code: number): string } };
