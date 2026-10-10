@@ -290,8 +290,9 @@ export function block(this: pg.Client, timeout: number | null = null): Promise<b
  */
 export async function cancel(this: pg.Client): Promise<string | null> {
   const { processID: bePid, secretKey: beKey, connection } = this as Client;
+  if (connection == null) throw connectionBad(new Error("connection is closed"));
   return new Promise<string | null>((resolve) => {
-    const cl = new (connection!.constructor as new () => Protocol)();
+    const cl = new (connection.constructor as new () => Protocol)();
     cl.on("error", (err: unknown) => resolve(String(err)));
     cl.on("end", () => resolve(null));
     cl.once("connect", () => {

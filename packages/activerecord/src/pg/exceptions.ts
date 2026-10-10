@@ -1,5 +1,13 @@
 export const PG_DIAG_SQLSTATE = 67;
 
+const ERRORS = new WeakSet<object>();
+
+export class Error {
+  static [Symbol.hasInstance](error: unknown): boolean {
+    return typeof error === "object" && error !== null && ERRORS.has(error);
+  }
+}
+
 const CONNECTION_BAD = new WeakMap<object, boolean>();
 
 export class ConnectionBad {
@@ -15,8 +23,10 @@ export class ConnectionBad {
 
 /** @noRailsEquivalent CONVERGEABLE pg-translate-exception-respond-to-result */
 export function pgError(error: unknown): unknown {
-  if (!(error instanceof Error) || "result" in error || !Object.isExtensible(error)) return error;
-  const { code, message } = error as Error & { code?: unknown };
+  if (!(error instanceof globalThis.Error)) return error;
+  ERRORS.add(error);
+  if ("result" in error || !Object.isExtensible(error)) return error;
+  const { code, message } = error as globalThis.Error & { code?: unknown };
   let result: { errorField(fieldcode: number): string | null } | null = null;
   if (error.name === "error" && typeof code === "string") {
     result = { errorField: (fieldcode) => (fieldcode === PG_DIAG_SQLSTATE ? code : null) };
@@ -37,8 +47,8 @@ export function pgError(error: unknown): unknown {
   });
 }
 
-export function connectionBad(error: unknown): Error {
-  const bad = error instanceof Error ? error : new Error(String(error));
+export function connectionBad(error: unknown): globalThis.Error {
+  const bad = error instanceof globalThis.Error ? error : new globalThis.Error(String(error));
   pgError(bad);
   CONNECTION_BAD.set(bad, true);
   return bad;

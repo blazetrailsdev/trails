@@ -1482,7 +1482,7 @@ export class AbstractAdapter implements Quoting {
     if (!(await this.active())) {
       await this.lock.synchronize(async () => {
         if (this._unconfiguredConnection) {
-          this._connection = this._unconfiguredConnection;
+          this._rawConnection = this._unconfiguredConnection;
           this._unconfiguredConnection = null;
           await this.attemptConfigureConnection();
           this._lastActivity = Process.clockGettime(Process.CLOCK_MONOTONIC);
@@ -2088,6 +2088,15 @@ export class AbstractAdapter implements Quoting {
     if (typeof arg !== "object" || arg === null || Array.isArray(arg)) return false;
     const proto = Object.getPrototypeOf(arg) as object | null;
     return proto !== Object.prototype && proto !== null;
+  }
+
+  /** @internal */
+  get _rawConnection(): unknown {
+    return this._connection;
+  }
+  /** @internal */
+  set _rawConnection(value: unknown) {
+    this._connection = value;
   }
 
   /** @internal */

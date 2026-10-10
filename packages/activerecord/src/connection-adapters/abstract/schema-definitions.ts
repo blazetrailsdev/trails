@@ -2,9 +2,12 @@ import {
   block,
   except,
   fetch,
+  include,
+  included,
   isSymbol,
   keywordSplat,
   merge,
+  Module,
   rbRegMatchP,
   registerConstant,
   slice,
@@ -481,6 +484,7 @@ export class IndexDefinition {
 }
 
 export interface ColumnMethods {
+  primaryKey(name: string, type?: ColumnType, options?: ColumnOptions): unknown;
   string(...names: string[]): unknown;
   string(...args: [...names: string[], options: ColumnOptions]): unknown;
   text(...names: string[]): unknown;
@@ -519,6 +523,44 @@ export interface ColumnMethods {
     ]
   ): unknown;
 }
+
+function primaryKey(
+  this: { column(name: string, type: ColumnType, options: ColumnOptions): unknown },
+  name: string,
+  type: ColumnType = "primary_key",
+  options: ColumnOptions = {},
+): unknown {
+  return this.column(name, type, { ...options, primaryKey: true });
+}
+
+export const ColumnMethods = Object.assign(new Module(), {
+  [included](base: {
+    defineColumnMethods(...columnTypes: string[]): void;
+    prototype: ColumnMethods;
+  }): void {
+    base.defineColumnMethods(
+      "bigint",
+      "binary",
+      "boolean",
+      "date",
+      "datetime",
+      "decimal",
+      "float",
+      "integer",
+      "json",
+      "string",
+      "text",
+      "time",
+      "timestamp",
+      "virtual",
+    );
+
+    base.prototype.blob = base.prototype.binary;
+    base.prototype.numeric = base.prototype.decimal;
+  },
+});
+
+ColumnMethods.defineMethod("primaryKey", primaryKey);
 
 /** @internal */
 export interface ReferenceDefinitionConnection {
@@ -977,10 +1019,6 @@ export class TableDefinition {
     }
   }
 
-  primaryKey(name: string, type: ColumnType = "primary_key", options: ColumnOptions = {}): this {
-    return this.column(name, type, { ...options, primaryKey: true });
-  }
-
   /** @internal */
   static defineColumnMethods(...columnTypes: string[]): void {
     for (const columnType of columnTypes) {
@@ -1003,24 +1041,7 @@ export class TableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:367`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
-TableDefinition.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-TableDefinition.prototype.blob = TableDefinition.prototype.binary;
-TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
+include(TableDefinition, ColumnMethods);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
@@ -1245,14 +1266,6 @@ export class Table {
     }
   }
 
-  async primaryKey(
-    name: string,
-    type: ColumnType = "primary_key",
-    options: ColumnOptions = {},
-  ): Promise<void> {
-    await this.column(name, type, { ...options, primaryKey: true });
-  }
-
   async add(columnName: string, type: ColumnType, options?: ColumnOptions): Promise<unknown> {
     return this._schema.addColumn(this.name, columnName, type, options);
   }
@@ -1261,23 +1274,6 @@ export class Table {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`abstract/schema_definitions.rb:716`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
 
-Table.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-Table.prototype.blob = Table.prototype.binary;
-Table.prototype.numeric = Table.prototype.decimal;
+include(Table, ColumnMethods);
 
 registerConstant("ActiveRecord::ConnectionAdapters::IndexDefinition", IndexDefinition);

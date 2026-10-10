@@ -2177,7 +2177,9 @@ export class StatementPool extends GenericStatementPool<PreparedStatement> {
           await conn.query(`DEALLOCATE ${pgQuoteColumnName(key.name)}`);
         }
       }
-    } catch {}
+    } catch (error) {
+      if (!(error instanceof PG.Error)) throw error;
+    }
   }
 }
 

@@ -1,5 +1,5 @@
-import { ArgumentError, ValueType } from "@blazetrails/activemodel";
-import { isPlainObject } from "@blazetrails/activesupport";
+import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
+import { include, isPlainObject } from "@blazetrails/activesupport";
 import {
   rbEqual,
   rbObjRespondTo,
@@ -12,7 +12,8 @@ import { StringKeyedHashAccessor } from "../../../store.js";
 
 const ERROR = "Invalid Hstore document: %s";
 
-export class Hstore extends ValueType<Record<string, string | null>> {
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
+export class Hstore extends ValueType {
   override type(): string {
     return "hstore";
   }
@@ -91,24 +92,24 @@ export class Hstore extends ValueType<Record<string, string | null>> {
   override isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     return !rbEqual(this.deserialize(rawOldValue), newValue);
   }
-
-  override isMutable(): boolean {
-    return true;
-  }
-
-  cast(value: unknown): Record<string, string | null> | null {
-    if (value == null) return null;
-    const serialized = this.serialize(value);
-    if (typeof serialized !== "string") return null;
-    return this.deserialize(serialized);
-  }
 }
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- the merge carries `include ActiveModel::Type::Helpers::Mutable`'s members onto the class; it declares none of its own.
+export interface Hstore extends Mutable {}
+
+include(Hstore, Mutable);
 
 /** @internal */
 function escapeHstore(value: string | null | undefined): string {
-  if (value == null) return "NULL";
-  if (value === "") return '""';
-  return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
+  if (value == null) {
+    return "NULL";
+  } else {
+    if (value === "") {
+      return '""';
+    } else {
+      return `"${String(value).replace(/(["\\])/g, "\\$1")}"`;
+    }
+  }
 }
 
 registerConstant("ActiveRecord::ConnectionAdapters::PostgreSQL::OID::Hstore", Hstore);

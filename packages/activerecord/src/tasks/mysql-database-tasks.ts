@@ -51,7 +51,7 @@ export class MySQLDatabaseTasks {
     return (await this.connection()).collation();
   }
 
-  async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureDump(filename: string, extraFlags: string | string[] | null): Promise<void> {
     let args = this.prepareCommandOptions();
     args.push("--result-file", `${filename}`);
     args.push("--no-data");
@@ -59,7 +59,7 @@ export class MySQLDatabaseTasks {
     args.push("--skip-comments");
 
     const { SchemaDumper } = await import("../schema-dumper.js");
-    let ignoreTables: (string | RegExp)[] = SchemaDumper.ignoreTables;
+    let ignoreTables = SchemaDumper.ignoreTables;
     if (ignoreTables.length > 0) {
       const dataSources = await (await this.connection()).dataSources();
       ignoreTables = dataSources.filter((table) =>
@@ -76,7 +76,7 @@ export class MySQLDatabaseTasks {
     await this.runCmd("mysqldump", args, "dumping");
   }
 
-  async structureLoad(filename: string, extraFlags?: string | string[] | null): Promise<void> {
+  async structureLoad(filename: string, extraFlags: string | string[] | null): Promise<void> {
     const args = this.prepareCommandOptions();
     args.push(
       "--execute",
@@ -126,7 +126,15 @@ export class MySQLDatabaseTasks {
   }
 
   private async runCmd(cmd: string, args: string[], action: string): Promise<void> {
-    if (!(await rbFSystem(cmd, ...args))) throw new RuntimeError(runCmdError(cmd, args, action));
+    if (!(await rbFSystem(cmd, ...args)))
+      throw new RuntimeError(this.runCmdError(cmd, args, action));
+  }
+
+  private runCmdError(cmd: string, _args: string[], _action: string): string {
+    return (
+      `failed to execute: \`${cmd}\`\n` +
+      `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
+    );
   }
 
   /** @internal */
@@ -143,14 +151,6 @@ export class MySQLDatabaseTasks {
   private configurationHashWithoutDatabase(): ConfigHash {
     return merge(this.configurationHash, { database: null });
   }
-}
-
-/** @internal */
-export function runCmdError(cmd: string, _args: string[], _action: string): string {
-  return (
-    `failed to execute: \`${cmd}\`\n` +
-    `Please check the output above for any errors and make sure that \`${cmd}\` is installed in your PATH and has proper permissions.\n\n`
-  );
 }
 
 rbModConstSet(Tasks, "MySQLDatabaseTasks", MySQLDatabaseTasks);
