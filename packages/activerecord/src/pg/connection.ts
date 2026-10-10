@@ -57,6 +57,7 @@ export class Connection {
     this.client = client as Client;
     this.connParams = connParams;
     listen(this, this.client);
+    if (typeof this.client.on === "function") this.client.on("error", () => {});
   }
 
   query(...args: unknown[]): unknown {
@@ -73,6 +74,11 @@ export class Connection {
     return _ending === true || _ended === true ? CONNECTION_BAD : CONNECTION_OK;
   }
 
+  /**
+   * @inventedArm try — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+   * @inventedArm rescue — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+   * @inventedArm throw — CONVERGEABLE sqlite3-pg-and-load-schema-driver-shaped-arms-left-after-the-top-level-pass
+   */
   async reset(): Promise<void> {
     const client = this.client;
     const connectionParameters = (client as unknown as { connectionParameters: pg.ClientConfig })
@@ -204,8 +210,9 @@ export class Connection {
    */
   async cancel(): Promise<string | null> {
     const { processID: bePid, secretKey: beKey, connection, host, port } = this.client;
+    if (connection == null) throw connectionBad(new Error("connection is closed"));
     return new Promise<string | null>((resolve) => {
-      const cl = new (connection!.constructor as new () => Protocol)();
+      const cl = new (connection.constructor as new () => Protocol)();
       cl.on("error", (err: unknown) => resolve(String(err)));
       cl.on("end", () => resolve(null));
       cl.once("connect", () => {
