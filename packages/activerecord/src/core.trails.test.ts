@@ -8,7 +8,7 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
-import { rbHash, uniq } from "@blazetrails/ruby-compat";
+import { rbCheckArrayType, rbHash, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
 import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 import { hasQueryConstraints, queryConstraints } from "./persistence.js";
 
@@ -20,6 +20,12 @@ describe("frozen / isFrozen", () => {
     await topic.delete();
     expect(topic.isDestroyed()).toBe(true);
     expect(topic.isFrozen()).toBe(true);
+  });
+
+  it("a record does not respond to to_ary and is not converted to an Array", () => {
+    const topic = new Topic({ title: "Alice" });
+    expect(rbObjRespondTo(topic, "toAry")).toBe(false);
+    expect(rbCheckArrayType(topic)).toBeNull();
   });
 
   it("freeze clones the attribute set so prior references stay mutable", async () => {

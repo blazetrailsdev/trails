@@ -57,7 +57,7 @@ export class PathSet implements Iterable<PathSetResolver> {
     for (const r of this.paths) yield r;
   }
 
-  toArray(): PathSetResolver[] {
+  toAry(): PathSetResolver[] {
     return this.paths.slice();
   }
 

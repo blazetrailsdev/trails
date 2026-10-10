@@ -18,6 +18,14 @@ describe("Result::IndexedRow", () => {
     expect(Object.keys(rows[1].toH())).toEqual(["col_1", "col_2"]);
   });
 
+  it("to_ary returns the hash rows to_a returns", () => {
+    expect(result.toAry()).toEqual([
+      { col_1: "row 1 col 1", col_2: "row 1 col 2" },
+      { col_1: "row 2 col 1", col_2: null },
+    ]);
+    expect(result.toArray()).toBe(result.toAry());
+  });
+
   it("to_hash is to_h", () => {
     const row = result.indexedRows[0];
     expect(row.toHash()).toEqual(row.toH());

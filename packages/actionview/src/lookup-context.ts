@@ -286,11 +286,11 @@ export class LookupContext extends (Object as unknown as new () => Accessors) {
   }
 
   appendViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
-    this._viewPaths = this.buildViewPaths([...this._viewPaths.toArray(), ...paths]);
+    this._viewPaths = this.buildViewPaths([...this._viewPaths.toAry(), ...paths]);
   }
 
   prependViewPaths(paths: ReadonlyArray<PathSetResolver>): void {
-    this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toArray()]);
+    this._viewPaths = this.buildViewPaths([...paths, ...this._viewPaths.toAry()]);
   }
 
   find(
