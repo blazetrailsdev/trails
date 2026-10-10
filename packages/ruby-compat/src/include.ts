@@ -480,7 +480,7 @@ export class Module<I extends object = Record<never, never>> {
     if (typeof instanceInitializer === "function") {
       trackInstanceInitializer(base.prototype, instanceInitializer);
     }
-    const proto = base.prototype as object;
+    const proto = classOrigins.get(base.prototype as object) ?? (base.prototype as object);
     const link = Object.create(Object.getPrototypeOf(proto)) as object;
     Object.defineProperties(link, Object.getOwnPropertyDescriptors(carrierOf(this)));
     let links = includerCarriers.get(this);
@@ -504,10 +504,18 @@ export class Module<I extends object = Record<never, never>> {
       trackInstanceInitializer(base.prototype, instanceInitializer, prependedInstanceInitializers);
     }
     const source = carrierOf(this);
+    const proto = base.prototype as object;
+    const origin = Object.create(Object.getPrototypeOf(proto)) as object;
     for (const key of Object.getOwnPropertyNames(source)) {
-      const descriptor = Object.getOwnPropertyDescriptor(source, key);
-      if (descriptor) Object.defineProperty(base.prototype, key, descriptor);
+      const own = Object.getOwnPropertyDescriptor(proto, key);
+      if (own) Object.defineProperty(origin, key, own);
+      Object.defineProperty(proto, key, Object.getOwnPropertyDescriptor(source, key)!);
     }
+    Object.setPrototypeOf(proto, origin);
+    if (!classOrigins.has(proto)) classOrigins.set(proto, origin);
+    let origins = prependOrigins.get(this);
+    if (!origins) prependOrigins.set(this, (origins = new WeakMap()));
+    origins.set(proto, origin);
   }
 
   /**
@@ -578,10 +586,11 @@ export class Module<I extends object = Record<never, never>> {
    */
   superMethod(receiver: object, name: string): ((...args: unknown[]) => unknown) | undefined {
     for (let proto = Object.getPrototypeOf(receiver) as object | null; proto; ) {
-      if (isLinkOf(this, proto)) {
+      const origin = prependOrigins.get(this)?.get(proto);
+      if (origin !== undefined || isLinkOf(this, proto)) {
         const writer = name.endsWith("=");
         const key = writer ? name.slice(0, -1) : name;
-        for (let next = Object.getPrototypeOf(proto) as object | null; next; ) {
+        for (let next = origin ?? (Object.getPrototypeOf(proto) as object | null); next; ) {
           const descriptor = Object.getOwnPropertyDescriptor(next, key);
           next = Object.getPrototypeOf(next) as object | null;
           if (descriptor === undefined) continue;
@@ -682,6 +691,13 @@ function isUndefEntry(carrier: Record<string, unknown>, name: string): boolean {
 }
 
 const includerCarriers = new WeakMap<Module, object[]>();
+/* `rb_prepend_module` (`vendor/ruby/v3.3.11/class.c:1430`) moves the class's
+   method table to an origin iclass and searches the prepended module first.
+   `prependOrigins` is the origin each module's `super` resumes at, per class
+   prototype, and `classOrigins` the first one made for a prototype, beneath
+   which a later `include` splices. */
+const prependOrigins = new WeakMap<Module, WeakMap<object, object>>();
+const classOrigins = new WeakMap<object, object>();
 
 const singletonCarriers = new WeakMap<
   Module,

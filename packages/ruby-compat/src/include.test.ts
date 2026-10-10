@@ -1680,3 +1680,64 @@ describe("include — a module's own `included` shadows the one it was extended 
     expect(calls).toEqual(["appendFeatures", "own included", "appendFeatures", "own included"]);
   });
 });
+
+describe("Module#prependFeatures keeps the class's method beneath the module", () => {
+  it("super from a prepended method reaches the class's own method", () => {
+    class Greeter {
+      greet(name: string): string {
+        return `hello ${name}`;
+      }
+    }
+    const Loud = new Module((mod) => {
+      mod.defineMethod("greet", function (this: Greeter, name: string): string {
+        return `${String(Loud.superMethod(this, "greet")!(name))}!`;
+      });
+    });
+    Loud.prependFeatures(Greeter);
+
+    expect(new Greeter().greet("a")).toBe("hello a!");
+    expect(Object.hasOwn(Greeter.prototype, "greet")).toBe(true);
+  });
+
+  it("a later prepend runs first and each super resumes beneath its own module", () => {
+    class Greeter {
+      greet(): string {
+        return "class";
+      }
+    }
+    const First = new Module((mod) => {
+      mod.defineMethod("greet", function (this: Greeter): string {
+        return `first(${String(First.superMethod(this, "greet")!())})`;
+      });
+    });
+    const Second = new Module((mod) => {
+      mod.defineMethod("greet", function (this: Greeter): string {
+        return `second(${String(Second.superMethod(this, "greet")!())})`;
+      });
+    });
+    First.prependFeatures(Greeter);
+    Second.prependFeatures(Greeter);
+
+    expect(new Greeter().greet()).toBe("second(first(class))");
+  });
+
+  it("a module included after the prepend sits beneath the class's own method", () => {
+    class Greeter {
+      greet(): string {
+        return "class";
+      }
+    }
+    const Wrapper = new Module((mod) => {
+      mod.defineMethod("greet", function (this: Greeter): string {
+        return `prepended(${String(Wrapper.superMethod(this, "greet")!())})`;
+      });
+    });
+    const Fallback = new Module((mod) => {
+      mod.defineMethod("greet", () => "included");
+    });
+    Wrapper.prependFeatures(Greeter);
+    include(Greeter, Fallback);
+
+    expect(new Greeter().greet()).toBe("prepended(class)");
+  });
+});
