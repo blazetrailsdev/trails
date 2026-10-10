@@ -241,13 +241,6 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
     qc.dirties = true;
   });
 
-  mod.defineMethod("clearQueryCache", function (this: ConnectionPoolConfigurationHost): void {
-    if (this._pinnedConnection) {
-      this._queryCacheVersion.value++;
-    }
-    this.queryCache.clear();
-  });
-
   mod.include({
     get queryCacheEnabled(): boolean {
       return (this as unknown as ConnectionPoolConfigurationHost).queryCache.enabled;
@@ -256,7 +249,16 @@ export const ConnectionPoolConfiguration: Module = new Module((mod) => {
     get dirtiesQueryCache(): boolean {
       return (this as unknown as ConnectionPoolConfigurationHost).queryCache.dirties;
     },
+  });
 
+  mod.defineMethod("clearQueryCache", function (this: ConnectionPoolConfigurationHost): void {
+    if (this._pinnedConnection) {
+      this._queryCacheVersion.value++;
+    }
+    this.queryCache.clear();
+  });
+
+  mod.include({
     get queryCache(): Store {
       const pool = this as unknown as ConnectionPoolConfigurationHost;
       return pool._threadQueryCaches.computeIfAbsent(IsolatedExecutionState.context(), () => {

@@ -28,6 +28,7 @@ import {
   initialize,
   initializeIncludedModules,
   isModuleIncluded,
+  methodOwner,
   rbModAncestors,
   defineModule,
   moduleVisibility,
@@ -1761,5 +1762,49 @@ describe("Module#prependFeatures", () => {
 
     expect(Child.build()).toBe("module > child");
     expect(new Child()).toBeInstanceOf(Parent);
+    expect(rbClassSuperclass(Child)).toBe(Parent);
+    expect(methodOwner(Child, "build")).toBe(mod);
+  });
+
+  it("answers the class as the owner of a method moved to its origin", () => {
+    class Parent {}
+    class Klass extends Parent {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod: Module = new Module((m) => {
+      m.defineMethod("greet", function (this: object) {
+        return mod.superMethod(this, "greet")!();
+      });
+    });
+    prepend(Klass, mod);
+
+    const origin = Object.getPrototypeOf(Object.getPrototypeOf(Klass.prototype)) as object;
+    expect(methodOwner(Klass.prototype, "greet")).toBe(mod);
+    expect(methodOwner(origin, "greet")).toBe(Klass);
+    expect(rbClassSuperclass(Klass)).toBe(Parent);
+    expect(Object.getPrototypeOf(origin)).toBe(Parent.prototype);
+  });
+
+  it("raises where the class's own property of a module name cannot be moved", () => {
+    class Klass {}
+    Object.defineProperty(Klass.prototype, "greet", { value: () => "class" });
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+
+    expect(() => prepend(Klass, mod)).toThrow("prepend: cannot move greet");
+  });
+
+  it("leaves a method assigned to the class after the prepend above the module", () => {
+    class Klass {
+      greet(): string {
+        return "class";
+      }
+    }
+    const mod = new Module((m) => m.defineMethod("greet", () => "module"));
+    prepend(Klass, mod);
+    (Klass.prototype as unknown as DynMethods).greet = () => "reopened";
+
+    expect(new Klass().greet()).toBe("reopened");
   });
 });

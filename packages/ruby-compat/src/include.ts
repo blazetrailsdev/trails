@@ -500,7 +500,16 @@ export class Module<I extends object = Record<never, never>> {
    * resumes at the class's own method. Here the origin holds the class's
    * methods of the names the module defines; a later `include` is spliced
    * beneath it, as `rb_include_module` splices at `RCLASS_ORIGIN`
-   * (class.c:1186).
+   * (class.c:1186). The origin is an iclass owned by the class, so
+   * `rbClassSuperclass` skips it and `methodOwner` answers the class for a
+   * method it holds.
+   *
+   * Two things MRI does have no JS counterpart. A method assigned to the
+   * class after the prepend lands on the class, above the module, where
+   * Ruby's `def` lands in the origin; and a moved method that calls
+   * `super.name()` resumes from the class, its home object, and so re-enters
+   * the module. A class whose own property of one of the module's names
+   * cannot be moved raises `TypeError`.
    *
    * @noRailsEquivalent PERMANENT — a Ruby core method, not a Rails one.
    */
@@ -515,12 +524,18 @@ export class Module<I extends object = Record<never, never>> {
     let origin = prependOrigins.get(proto);
     if (!origin) {
       origin = iclassBeneath(proto, Object.getPrototypeOf(proto) as object | null);
+      Object.defineProperty(origin, T_ICLASS, {
+        value: typeof proto === "function" ? proto : proto.constructor,
+      });
       prependOrigins.set(proto, origin);
       Object.setPrototypeOf(proto, origin);
     }
     for (const key of Object.getOwnPropertyNames(source)) {
       const descriptor = Object.getOwnPropertyDescriptor(proto, key);
-      if (!descriptor?.configurable) continue;
+      if (descriptor === undefined) continue;
+      if (!descriptor.configurable) {
+        throw new TypeError(`prepend: cannot move ${key}, a non-configurable own property`);
+      }
       Object.defineProperty(origin, key, descriptor);
       delete (proto as Record<string, unknown>)[key];
     }

@@ -220,7 +220,7 @@ export class ExecutorHooks {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `prepend QueryCache::ConnectionPoolConfiguration` (connection_pool.rb:218); the class/interface merge is how `include()` surfaces on the type side.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `prepend QueryCache::ConnectionPoolConfiguration` (connection_pool.rb:218); the class/interface merge is how `prepend()` surfaces on the type side.
 export class ConnectionPool implements ReapablePool {
   static readonly WeakThreadKeyMap = WeakThreadKeyMap;
 
