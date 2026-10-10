@@ -829,4 +829,34 @@ describe("visitMethodDeclarations", () => {
     visitMethodDeclarations(sf, (name) => names.push(name));
     expect(names).toEqual(["install", "writeRecord", "helper"]);
   });
+
+  it("visits an object literal's function-valued properties and skips its data", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        install: (registry: Factory): void => {},
+        readRecord: function (unpacker: Unpacker) {},
+        version: 1,
+      };
+    `);
+    const names: string[] = [];
+    visitMethodDeclarations(sf, (name) => names.push(name));
+    expect(names).toEqual(["install", "readRecord"]);
+  });
+
+  it("anchors an object literal's member on the member, so an opt-out is per member", () => {
+    const sf = makeSourceFile(`
+      export const Extensions = {
+        // lint-deps-ignore: arel
+        install(registry: Factory): void {},
+        // lint-deps-ignore: arel
+        writeRecord: (record: Base): void => {},
+        readRecord(unpacker: Unpacker) {},
+      };
+    `);
+    const covered: Record<string, boolean> = {};
+    visitMethodDeclarations(sf, (name, node, anchor) => {
+      covered[name] = methodUsesDepImport(node, new Set(["Nodes"]), new Set(), "arel", sf, anchor);
+    });
+    expect(covered).toEqual({ install: true, writeRecord: true, readRecord: false });
+  });
 });

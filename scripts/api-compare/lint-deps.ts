@@ -407,7 +407,11 @@ export function visitMethodDeclarations(
       }
       return;
     }
-    if (ts.isPropertyDeclaration(node) && node.name && ts.isIdentifier(node.name)) {
+    if (
+      (ts.isPropertyDeclaration(node) || ts.isPropertyAssignment(node)) &&
+      node.name &&
+      ts.isIdentifier(node.name)
+    ) {
       if (
         node.initializer &&
         (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
