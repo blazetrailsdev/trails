@@ -84,8 +84,6 @@ export function quoteDefaultExpression(
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value instanceof BigDecimal || value instanceof Rational) {
     return toF(value);
-  } else if (typeof value === "string") {
-    return abstractTypeCast.call(this, value);
   } else {
     return abstractTypeCast.call(this, value);
   }

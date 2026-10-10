@@ -95,6 +95,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     deprecatedConnectionOptions?: unknown,
     deprecatedConfig?: Record<string, unknown> | null,
   );
+  /** @inventedArm mysql2Client — CONVERGEABLE adapter-constructors-wrap-a-handed-npm-client */
   constructor(...args: [unknown, unknown?, unknown?, unknown?]) {
     super(...args);
 
