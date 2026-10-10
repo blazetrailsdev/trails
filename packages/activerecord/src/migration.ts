@@ -1,6 +1,7 @@
 import {
   getEnv,
   camelize,
+  constantize,
   groupBy,
   underscore,
   humanize,
@@ -8,7 +9,6 @@ import {
   extractOptionsBang,
   FileUpdateChecker,
   Monitor,
-  NameError,
   symbolizeKeys,
   TopLevel,
   Autoload,
@@ -22,8 +22,10 @@ import {
   max,
   stdout,
   excToS,
+  rbFLoad,
   rbFPublicSend,
   rbInspect,
+  rbModRemoveConst,
   rbObjRespondTo,
   block as rbBlock,
   rbBlockGivenP,
@@ -612,9 +614,9 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   async validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    options: { name?: string; expression?: string | null; validate?: boolean } = {},
   ): Promise<void> {
-    await this.methodMissing("validateCheckConstraint", tableName, nameOrOptions);
+    await this.methodMissing("validateCheckConstraint", tableName, options);
   }
 
   async validateForeignKey(
@@ -1363,8 +1365,6 @@ Migration.JoinTable = JoinTableModule;
 Migration.ExecutionStrategy = ExecutionStrategy;
 Migration.DefaultStrategy = DefaultStrategy;
 
-let loadMigrationSeq = 0;
-
 export class MigrationProxy {
   name: string;
   version: number;
@@ -1409,15 +1409,14 @@ export class MigrationProxy {
 
   /** @internal */
   async loadMigration(): Promise<Migration> {
-    const { pathToFileURL } = await import("node:url");
-    const url = pathToFileURL(this.filename);
-    url.search = `?${(loadMigrationSeq += 1)}`;
-    const mod = (await import(url.href)) as Record<string, unknown>;
-    const klass = mod[this.name];
-    if (typeof klass !== "function") {
-      throw new NameError(`uninitialized constant ${this.name}`, this.name);
+    try {
+      rbModRemoveConst(Object, this.name);
+    } catch (e) {
+      if (!(e instanceof StandardError)) throw e;
     }
-    return new (klass as new (name?: string, version?: number) => Migration)(
+
+    await rbFLoad(File.expandPath(this.filename));
+    return new (constantize(this.name) as new (name?: string, version?: number) => Migration)(
       this.name,
       this.version,
     );

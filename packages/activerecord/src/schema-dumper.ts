@@ -323,7 +323,7 @@ export abstract class SchemaDumper {
 
   /**
    * @internal
-   * @inventedArm if — CONVERGEABLE schema-dumper-option-brace-arm-in-four-statement-builders
+   * @inventedArm if — PERMANENT
    */
   protected async checkConstraintsInCreate(
     table: string,
@@ -494,7 +494,7 @@ export abstract class SchemaDumper {
 
   /**
    * @internal
-   * @inventedArm if — CONVERGEABLE schema-dumper-option-brace-arm-in-four-statement-builders
+   * @inventedArm if — PERMANENT
    */
   async foreignKeys(table: string, stream: IO | StringIO): Promise<undefined> {
     const foreignKeys = await this.connection.foreignKeys(table);

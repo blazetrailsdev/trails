@@ -40,11 +40,12 @@ export class StatementPool<T = unknown> {
     return this.cache.size;
   }
 
-  set(sql: string, stmt: T): void {
+  set(sql: string, stmt: T): T {
     while (this._statementLimit <= this.cache.size) {
       void this.dealloc(last(this.cache.shift()!) as T);
     }
     this.cache.set(sql, stmt);
+    return stmt;
   }
 
   clear(): void {

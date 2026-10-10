@@ -4,7 +4,7 @@ import { describeIfMysqlAdapter, Mysql2Adapter, ARUNIT_DATABASE } from "./test-h
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
 import { fixtures } from "../../test-fixtures.js";
-import type { Mysql2RawResult } from "../../connection-adapters/mysql2/database-statements.js";
+import type { Mysql2Result } from "../../connection-adapters/mysql2/mysql2-client.js";
 
 describeIfMysqlAdapter("Mysql2Adapter", () => {
   fixtures([]);
@@ -62,15 +62,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594'",
-        )) as Mysql2RawResult;
-        expect(result.rows!.length).toEqual(1);
+        )) as Mysql2Result;
+        expect(result.size).toEqual(1);
       });
     });
 
     it("doesnt error when a show query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2RawResult;
-        expect(result.rows!.length).toEqual(2);
+        const result = (await conn.execute("SHOW FULL FIELDS FROM `engines`")) as Mysql2Result;
+        expect(result.size).toEqual(2);
       });
     });
 
@@ -84,15 +84,15 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
 
     it("doesnt error when a describe query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("DESCRIBE engines")) as Mysql2RawResult;
-        expect(result.rows!.length).toEqual(2);
+        const result = (await conn.execute("DESCRIBE engines")) as Mysql2Result;
+        expect(result.size).toEqual(2);
       });
     });
 
     it("doesnt error when a desc query is called while preventing writes", async () => {
       await Base.whilePreventingWrites(async () => {
-        const result = (await conn.execute("DESC engines")) as Mysql2RawResult;
-        expect(result.rows!.length).toEqual(2);
+        const result = (await conn.execute("DESC engines")) as Mysql2Result;
+        expect(result.size).toEqual(2);
       });
     });
 
@@ -102,8 +102,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "/*action:index*/(\n( SELECT `engines`.* FROM `engines` WHERE `engines`.`car_id` = '138853948594' ) )",
-        )) as Mysql2RawResult;
-        expect(result.rows!.length).toEqual(1);
+        )) as Mysql2Result;
+        expect(result.size).toEqual(1);
       });
     });
 
@@ -120,8 +120,8 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       await Base.whilePreventingWrites(async () => {
         const result = (await conn.execute(
           "SELECT CONNECTION_ID() as connection_id",
-        )) as Mysql2RawResult;
-        const connId = result.rows![0][0];
+        )) as Mysql2Result;
+        const connId = result.toA()[0][0];
         await assertRaises([QueryCanceled], {}, async () => {
           await conn.execute(`KILL QUERY ${connId}`);
         });

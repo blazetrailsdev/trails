@@ -170,6 +170,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   return abstractTypeCast.call(this, value);
 }
 
+/** @inventedArm try — PERMANENT */
 export function lookupCastTypeFromColumn(
   this: { typeMap: LookupableTypeMap; verifyBang(): Promise<void> },
   column: CastableColumn,

@@ -87,7 +87,7 @@ export interface ValidateConstraintStatements {
   validateConstraint(tableName: string, constraintName: string | undefined): Promise<void>;
   validateCheckConstraint(
     tableName: string,
-    nameOrOptions: string | { name: string },
+    options?: { name?: string; expression?: string | null; validate?: boolean },
   ): Promise<void>;
   validateForeignKey(
     fromTable: string,

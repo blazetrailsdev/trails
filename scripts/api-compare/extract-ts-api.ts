@@ -107,6 +107,11 @@ const OPTION_READER_FUNCTIONS = new Set([
  * is a call to that method; a computed name is Ruby's own `send(name)`.
  */
 const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
+/**
+ * ruby-compat's `Kernel#load` (`rb_f_load`, vendor/ruby/v3.3.11/load.c:903),
+ * which is a call to Ruby's `load`.
+ */
+const KERNEL_CALLEES = new Map([["rbFLoad", "load"]]);
 const OPTION_READER_METHODS = new Set(["fetch", "get", "has", "delete", "hasOwnProperty"]);
 const OPTION_COPY_FUNCTIONS = new Set(["slice", "except", "merge", "rbObjDup", "rbObjClone"]);
 
@@ -6682,6 +6687,8 @@ function collectCalls(
         if (SEND_CALLEES.has(resolve(callee.text)) && sent && ts.isStringLiteralLike(sent)) {
           called.push(sent.text);
         }
+        const kernel = KERNEL_CALLEES.get(resolve(callee.text));
+        if (kernel !== undefined) called.push(kernel);
         if (!skipHoistedClosures && callee.text === "String" && n.arguments.length > 0) {
           names.add(`${NATIVE_FORM_PREFIX}String`);
         }

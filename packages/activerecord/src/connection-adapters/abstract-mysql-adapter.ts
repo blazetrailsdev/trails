@@ -1005,30 +1005,33 @@ WHERE fk.referenced_column_name IS NOT NULL
 
   /** @internal */
   async handleWarnings(sql: string): Promise<void> {
-    const rawConnection = this._connection as {
-      warningCount?: unknown;
-      query(sql: string): Promise<[unknown, unknown]>;
-    };
+    const rawConnection = this._connection as WarningsConnection;
     if (dbWarningsAction() == null || (await this.warningCount(rawConnection)) === 0) return;
 
     const warningCount = await this.warningCount(rawConnection);
 
-    const [rawRows] = await rawConnection.query("SHOW WARNINGS");
-    let result = rawRows as Array<{ Level?: string; Code?: number | string; Message?: string }>;
+    let result = (await rawConnection.query("SHOW WARNINGS"))!.toA() as [
+      string | null,
+      number | string | null,
+      string,
+    ][];
     if (result.length === 0) {
       result = [
-        {
-          Level: "Warning",
-          Code: undefined,
-          Message: `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
-        },
+        [
+          "Warning",
+          null,
+          `Query had warning_count=${warningCount} but ‘SHOW WARNINGS’ did not return the warnings. Check MySQL logs or database configuration.`,
+        ],
       ];
     }
-    for (const row of result) {
-      const level = row.Level ?? null;
-      const code = row.Code == null ? null : String(row.Code);
-      const message = row.Message ?? "";
-      const warning = new SQLWarning(message, code, level, sql, this.pool);
+    for (const [level, code, message] of result) {
+      const warning = new SQLWarning(
+        message,
+        code == null ? null : String(code),
+        level,
+        sql,
+        this.pool,
+      );
       if (this.isWarningIgnored(warning as unknown as { level?: string; message?: string }))
         continue;
 
@@ -1452,21 +1455,20 @@ WHERE fk.referenced_column_name IS NOT NULL
   }
 
   /** @internal */
-  protected async warningCount(rawConnection: {
-    warningCount?: unknown;
-    query(sql: string): Promise<[unknown, unknown]>;
-  }): Promise<number> {
+  protected async warningCount(rawConnection: WarningsConnection): Promise<number> {
     if (typeof rawConnection.warningCount === "number") return rawConnection.warningCount;
-    const [rows] = await rawConnection.query("SHOW COUNT(*) WARNINGS");
-    const row = (rows as Record<string, unknown>[])[0];
-    if (!row) return 0;
-    const value = Object.values(row)[0];
-    return typeof value === "number" ? value : Number(value) || 0;
+    const result = await rawConnection.query("SHOW COUNT(*) WARNINGS");
+    return Number(result?.toA()[0]?.[0] ?? 0) || 0;
   }
 }
 
+/** @internal */
+interface WarningsConnection {
+  warningCount?: unknown;
+  query(sql: string): Promise<{ toA(): unknown[][] } | null>;
+}
+
 export interface MysqlPreparedStatement {
-  sql: string;
   close(): void;
 }
 

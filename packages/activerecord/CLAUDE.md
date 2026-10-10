@@ -589,3 +589,50 @@ This is a genuine language shortcoming, ratified here by the repo owner
 (2026-10-08). `load` carries `@noRailsEquivalent PERMANENT` and
 `resolvePoolConfig` carries `@inventedArm load — PERMANENT` against this
 section. There is no story to remove the step.
+
+## A migration file is loaded by `Kernel#load` (`MigrationProxy#load_migration`)
+
+Rails' `MigrationProxy#load_migration`
+(`activerecord/lib/active_record/migration.rb:1196-1201`) is
+`Object.send(:remove_const, name) rescue nil`, `load(File.expand_path(filename))`,
+`name.constantize.new(name, version)`. `load` evaluates the file every time it is
+called, and the file binds its class as a top-level constant.
+
+ESM keeps one module record per URL, and a module exports its class rather
+than binding it anywhere. **`Kernel#load` is `rbFLoad` in ruby-compat**
+(`rb_f_load`, `vendor/ruby/v3.3.11/load.c:903`):
+
+- It awaits an `import()` of the file under a URL no earlier load used, so a
+  changed file is evaluated again.
+- It seats every constant-named export in the top-level constant table, where
+  `constantize` reads it. `rbModRemoveConst` (`rb_mod_remove_const`,
+  `vendor/ruby/v3.3.11/variable.c:3302`) removes one.
+- `loadMigration` is Rails' three lines in Rails' order and is async, as every
+  caller of `MigrationProxy#migration` already is.
+
+This is a genuine language shortcoming, ratified here by the repo owner
+(2026-10-09). It covers `Kernel#load` of a file Rails loads by path at run
+time. A `require` is not ported this way on the strength of this section; see
+§ "An adapter file is loaded by an awaited step".
+
+## A dumped statement wraps its trailing options in braces (`SchemaDumper`'s `parts.join(", ")`)
+
+Rails builds a dumped statement as a list of parts and joins it:
+`"    #{parts.join(', ')}"`
+(`activerecord/lib/active_record/connection_adapters/postgresql/schema_dumper.rb:44-62,65-82`,
+`activerecord/lib/active_record/schema_dumper.rb:290,341`). The first part is
+the call and the rest are keyword arguments, which Ruby writes with no
+delimiter around them.
+
+trails dumps a TypeScript call. Its trailing options are one object literal, so
+they need `{ }` exactly when there are any, and a statement with none takes no
+second argument. **The builder keeps one arm for that**:
+`parts.length > 0 ? ", { … }" : ""`. Always emitting the braces was rejected
+because an option-less statement would dump as `t.uniqueConstraint(["a"], {})`.
+
+This is a genuine language shortcoming, ratified here by the repo owner
+(2026-10-09). The arm carries `@inventedArm if — PERMANENT` against this
+section at each builder: `exclusionConstraintsInCreate` and
+`uniqueConstraintsInCreate` in `postgresql/schema-dumper.ts`, and the base
+dumper's builders in `schema-dumper.ts`. It is the brace arm only. Any other
+extra branch in a builder is still a deviation to converge.

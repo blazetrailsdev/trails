@@ -2,7 +2,7 @@ import { ArgumentError } from "./argument-error.js";
 import { Exception } from "./exception.js";
 import { rbModAncestors } from "./include.js";
 import { NameError } from "./name-error.js";
-import { classpaths, rbCSymbol } from "./object.js";
+import { classpaths, rbCSymbol, rbModName } from "./object.js";
 import { Range } from "./range.js";
 import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
@@ -63,6 +63,26 @@ export function registerConstant(name: string, value: unknown): void {
 export function unregisterConstant(name: string, expected: unknown): void {
   if (_constants.get(name) !== expected) return;
   _constants.delete(name);
+}
+
+/**
+ * `rb_mod_remove_const` (`vendor/ruby/v3.3.11/variable.c:3302`),
+ * `Module#remove_const`: removes the constant from `mod`'s own table and
+ * answers its value. `rb_const_remove` (`vendor/ruby/v3.3.11/variable.c:3313`)
+ * raises `NameError` through `undefined_constant` for a name `mod` does not
+ * hold. `rb_cObject`'s table is the one `registerConstant` fills.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rbModRemoveConst(mod: object, name: string): unknown {
+  const tbl = mod as Record<string, unknown>;
+  if (mod === Object ? !_constants.has(name) : !Object.prototype.hasOwnProperty.call(mod, name)) {
+    throw new NameError(`constant ${rbModName(mod)}::${name} not defined`, name);
+  }
+  const val = mod === Object ? _constants.get(name) : tbl[name];
+  if (mod === Object) _constants.delete(name);
+  else delete tbl[name];
+  return val;
 }
 
 /**
