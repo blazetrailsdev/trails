@@ -91,7 +91,7 @@ export interface ValidateConstraintStatements {
   ): Promise<void>;
   validateForeignKey(
     fromTable: string,
-    toTable?: string,
+    toTable?: string | null,
     options?: Omit<ForeignKeyLookupOptions, "toTable">,
   ): Promise<void>;
 }

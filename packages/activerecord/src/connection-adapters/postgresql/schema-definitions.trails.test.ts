@@ -557,8 +557,8 @@ describe("Table delegation", () => {
   it("removeExclusionConstraint delegates to schema.removeExclusionConstraint", async () => {
     const schema = makeSchema();
     const table = new Table("products", schema);
-    await table.removeExclusionConstraint({ name: "price_check" });
-    expect(schema.removeExclusionConstraint).toHaveBeenCalledWith("products", {
+    await table.removeExclusionConstraint(undefined, { name: "price_check" });
+    expect(schema.removeExclusionConstraint).toHaveBeenCalledWith("products", undefined, {
       name: "price_check",
     });
   });

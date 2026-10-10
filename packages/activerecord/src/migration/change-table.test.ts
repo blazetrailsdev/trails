@@ -417,8 +417,12 @@ describe("Migration", () => {
 
     it("remove exclusion constraint removes exclusion constraint", async () => {
       await withPgChangeTable(async (t, expect) => {
-        expect("removeExclusionConstraint", null, ["delete_me", { name: "date_overlap" }]);
-        await t.removeExclusionConstraint({ name: "date_overlap" });
+        expect("removeExclusionConstraint", null, [
+          "delete_me",
+          undefined,
+          { name: "date_overlap" },
+        ]);
+        await t.removeExclusionConstraint(undefined, { name: "date_overlap" });
       });
     });
 

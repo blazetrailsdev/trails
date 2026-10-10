@@ -1836,7 +1836,7 @@ export interface PostgreSQLAdapter {
 
   validateForeignKey(
     fromTable: string,
-    toTable?: string,
+    toTable?: string | null,
     options?: ForeignKeyLookupOptions,
   ): Promise<void>;
 
@@ -1968,7 +1968,7 @@ export interface PostgreSQLAdapter {
 
   removeExclusionConstraint(
     tableName: string,
-    expression?: string | Record<string, unknown> | null,
+    expression?: string | null,
     options?: Record<string, unknown>,
   ): Promise<void>;
 

@@ -357,7 +357,11 @@ export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
     expression: string,
     options?: ExclusionConstraintOptions,
   ): Promise<void>;
-  removeExclusionConstraint(tableName: string, options?: { name?: string }): Promise<void>;
+  removeExclusionConstraint(
+    tableName: string,
+    expression?: string | null,
+    options?: { name?: string },
+  ): Promise<void>;
   addUniqueConstraint(
     tableName: string,
     column: string | string[],
@@ -383,8 +387,10 @@ export class Table extends AbstractTable {
     return this._pgSchema.addExclusionConstraint(this._pgTableName, expression, options);
   }
 
-  removeExclusionConstraint(options?: { name?: string }): Promise<void> {
-    return this._pgSchema.removeExclusionConstraint(this._pgTableName, options);
+  removeExclusionConstraint(
+    ...args: [expression?: string | null, options?: { name?: string }]
+  ): Promise<void> {
+    return this._pgSchema.removeExclusionConstraint(this._pgTableName, ...args);
   }
 
   uniqueConstraint(column: string | string[], options?: UniqueConstraintOptions): Promise<void> {
