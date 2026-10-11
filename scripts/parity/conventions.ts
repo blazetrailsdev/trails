@@ -1616,18 +1616,20 @@ export const COPY_HOOKS: ReadonlyMap<string, readonly string[]> = new Map([
  * skipped method still never counts as a missing port.
  */
 /**
- * What a caller asks for when the `new` it holds is a class's own `self.new`,
- * or a `ClassMethods#new` in the class's own Ruby file (RFC 0188). Ruby's
- * `Klass.new` and JS's `new Klass` are one operation, so it is the constructor
- * whether or not an `initialize` sits beside it.
+ * The TS candidates for a class's own `self.new`, or for a `ClassMethods#new`
+ * a class in the same Ruby file extends (RFC 0188). Ruby's `Klass.new` and
+ * JS's `new Klass` are one operation, so it is the constructor whether or not
+ * an `initialize` sits beside it. `rubyMethodToTs("new", …)` is the rule for
+ * every other `new`.
  */
-export const OWN_NEW = "self.new";
+export function rubyOwnNewToTs(): string[] {
+  return ["constructor"];
+}
 
 /** Ruby names whose TS counterpart is a fixed JS spelling, not a portable identifier. */
 const FIXED_TS_SPELLINGS = new Set([
   "initialize",
   "new",
-  OWN_NEW,
   "to_s",
   "to_str",
   "to_json",
@@ -1661,7 +1663,6 @@ function rubyMethodToTsWithoutUnderscore(
   siblingRubyNames?: ReadonlySet<string>,
 ): string[] | null {
   if (OPERATORS.has(name)) return null;
-  if (name === OWN_NEW) return ["constructor"];
   // An instance-level or module-level `new` beside `initialize`
   // (`ActionController::Renderer#new`, `renderer.rb:72`, next to `#initialize`
   // at `:111`) WRAPS the constructor; it is a second Ruby member, not a second

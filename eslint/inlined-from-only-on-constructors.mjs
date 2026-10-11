@@ -37,15 +37,17 @@ const kebab = (rubyPath) => rubyPath.replaceAll("_", "-");
 /**
  * Whether `filename` is the file that mirrors the cited `.rb`:
  * `activemodel/lib/active_model/api.rb` is `packages/activemodel/src/api.ts`,
- * and `actionpack/lib/action_controller/metal.rb` keeps its namespace
- * directory as `packages/actionpack/src/action-controller/metal.ts`.
+ * the gem's own namespace directory dropped, and
+ * `actionpack/lib/action_controller/metal.rb` keeps a directory that is not
+ * the gem's name as `packages/actionpack/src/action-controller/metal.ts`.
  */
 function mirrorsCitedFile(filename, rubyPath) {
   const ts = /(?:^|\/)packages\/([^/]+)\/src\/(.+)\.ts$/.exec(filename.replaceAll("\\", "/"));
   const rb = /^([^/]+)\/lib\/(.+)$/.exec(rubyPath);
   if (ts === null || rb === null || ts[1] !== rb[1]) return false;
-  const cited = kebab(rb[2]);
-  return cited === ts[2] || cited.slice(cited.indexOf("/") + 1) === ts[2];
+  const [namespace, ...rest] = kebab(rb[2]).split("/");
+  const cited = namespace.replaceAll("-", "") === rb[1] ? rest : [namespace, ...rest];
+  return cited.join("/") === ts[2];
 }
 
 function isConstructor(sourceCode, comment) {

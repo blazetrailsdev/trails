@@ -176,17 +176,26 @@ export interface TaggedConstructor {
   tsFile: string;
 }
 
-/** Every tagged constructor in the TS manifest, keyed by the `Module#hook` it cites. */
-export function inlinedHookTags(ts: ApiManifest): Map<string, TaggedConstructor[]> {
+/**
+ * Every tagged constructor in the TS manifest, keyed by the `Module#hook` it
+ * cites. Each tag is resolved through {@link inlinedHookBody} first, so one
+ * that names no `def`, or cites it at a stale span, throws here and credits
+ * nothing.
+ */
+export function inlinedHookTags(
+  ts: ApiManifest,
+  ruby: ApiManifest,
+): Map<string, TaggedConstructor[]> {
   const byHook = new Map<string, TaggedConstructor[]>();
   for (const [name, pkg] of Object.entries(ts.packages)) {
-    for (const klass of Object.values(pkg.classes) as unknown as ClassInfo[]) {
+    for (const [owner, klass] of Object.entries(pkg.classes) as unknown as [string, ClassInfo][]) {
       for (const member of klass.instanceMethods) {
         if (member.name !== "constructor") continue;
         for (const tag of member.inlinedFrom ?? []) {
           const key = `${tag.module}#${tag.hook}`;
           const tsFile = member.file ?? klass.file;
           if (tsFile === undefined) continue;
+          inlinedHookBody(ruby, tag, `${name}/${tsFile} ${owner}#constructor`);
           byHook.set(key, [...(byHook.get(key) ?? []), { package: name, tsFile }]);
         }
       }
@@ -202,7 +211,7 @@ export function inlinedHookTags(ts: ApiManifest): Map<string, TaggedConstructor[
  * file that includes, prepends or extends the module. `includerFiles` are
  * those mirrors within the module's own package. The include graph is built
  * per package, so a constructor in another package is credited on its tag,
- * and {@link inlinedHookBody} is what holds that tag to a real `def`.
+ * which {@link inlinedHookTags} has already resolved to the module's `def`.
  */
 export function inlinedHookCreditedBy(
   module: string,
@@ -214,6 +223,29 @@ export function inlinedHookCreditedBy(
   return tags
     .get(`${module}#${hook}`)
     ?.find((tagged) => tagged.package !== pkg || includerFiles.has(tagged.tsFile));
+}
+
+/**
+ * Whether a `self.new` names its block only to hand it on through a bare
+ * `super` (`DeprecationProxy.new(*args, **kwargs, &block)`,
+ * `deprecation/proxy_wrappers.rb:6-11`). `Class#new` passes that block to
+ * `initialize`, so whether the constructor takes one is `initialize`'s
+ * signature to say, and the `new` row has no block of its own to compare.
+ */
+export function blockRidesZsuper(rubyNew: MethodInfo): boolean {
+  const block = rubyNew.params.find((param) => param.kind === "block")?.name;
+  const sites = rubyNew.callArgs ?? [];
+  return (
+    block !== undefined &&
+    sites.some((site) => site.name === "super" && site.flags.includes("zsuper")) &&
+    !sites.some(
+      (site) =>
+        site.name === "yield" ||
+        site.flags.includes("blockpass") ||
+        site.recv === `id:${block}` ||
+        site.args.includes(`id:${block}`),
+    )
+  );
 }
 
 const consumesSuper = (segments: readonly MethodInfo[], index: number): boolean =>

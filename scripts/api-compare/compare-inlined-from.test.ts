@@ -63,6 +63,7 @@ function compare({
   rubyClass = true,
   moduleFile = "api.rb",
   rubyNew = false,
+  classMethodsNew = false,
 }: {
   tsCalls?: string[];
   inlinedFrom?: InlinedFrom[];
@@ -71,6 +72,7 @@ function compare({
   rubyClass?: boolean;
   moduleFile?: string;
   rubyNew?: boolean;
+  classMethodsNew?: boolean;
 } = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
@@ -88,7 +90,13 @@ function compare({
           method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
           ...helpers(["assign_attributes", "build_reflection", "lookup_reflection"]),
         ],
-        rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
+        rubyInitialize
+          ? [
+              "ActiveModel::API",
+              ...(sameFileModule ? ["Local"] : []),
+              ...(classMethodsNew ? ["ActiveModel::Naming"] : []),
+            ]
+          : [],
       ),
       classMethods: rubyNew ? [method("new", ["lookup_reflection", "super"])] : [],
     },
@@ -102,6 +110,16 @@ function compare({
           method("initialize", ["assign_attributes", "super"], cited(80, 84)),
         ]),
         ...(sameFileModule ? { "ActiveModel::Thing::Local": local } : {}),
+        ...(classMethodsNew
+          ? {
+              "ActiveModel::Naming": entity("ActiveModel::Naming", "naming.rb", []),
+              "ActiveModel::Naming::ClassMethods": entity(
+                "ActiveModel::Naming::ClassMethods",
+                "naming.rb",
+                [method("new", ["lookup_reflection", "super"], cited(13, 15))],
+              ),
+            }
+          : {}),
       },
     },
   });
@@ -172,6 +190,32 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(moduleRow({ inlinedFrom: [] })).toMatchObject({
       matched: 1,
       moves: [{ rubyName: "initialize", actualFile: "thing.ts" }],
+    });
+  });
+
+  const naming = tag({ module: "ActiveModel::Naming::ClassMethods", hook: "new", firstLine: 13 });
+  const namingRow = (inlinedFrom: InlinedFrom[]) => {
+    compare({ classMethodsNew: true, inlinedFrom });
+    const report = JSON.parse(
+      fs.readFileSync(path.join(output.dir, "api-comparison.json"), "utf-8"),
+    );
+    return report.results[0].files.find(
+      (file: { rubyFile: string }) => file.rubyFile === "naming.rb",
+    );
+  };
+
+  it("scores a ClassMethods#new as matched through its tag, with nothing to relocate", () => {
+    expect(namingRow([tag(), { ...naming, lastLine: 15 }])).toMatchObject({
+      matched: 1,
+      missing: 0,
+      moves: [],
+    });
+  });
+
+  it("still reports an untagged ClassMethods#new on the includer's constructor as one to relocate", () => {
+    expect(namingRow([tag()])).toMatchObject({
+      matched: 1,
+      moves: [{ rubyName: "new", actualFile: "thing.ts" }],
     });
   });
 

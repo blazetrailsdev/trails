@@ -9,6 +9,7 @@ import type {
 import { dropWeakCalls, significantMissingCalls } from "./compare.js";
 import { compareArms, type SkeletonRow } from "./report-arms.js";
 import {
+  blockRidesZsuper,
   inlinedHookCreditedBy,
   inlinedHookTags,
   inlinedRubyBody,
@@ -412,6 +413,32 @@ describe("the chain follows the class's ancestor order", () => {
   });
 });
 
+describe("a self.new whose block only rides a bare super", () => {
+  const rubyNew = (callArgs: CallSite[], params = ["block"]): MethodInfo => ({
+    ...body([]),
+    name: "new",
+    params: params.map((name) => ({ name, kind: "block" })),
+    callArgs,
+  });
+  const zsuper: CallSite = { name: "super", args: [], flags: ["zsuper"] };
+
+  it("has no block of its own to compare", () => {
+    expect(blockRidesZsuper(rubyNew([site("first"), zsuper]))).toBe(true);
+  });
+
+  it("keeps its block when the body calls, passes or yields to it, or never reaches super", () => {
+    expect(blockRidesZsuper(rubyNew([site("first")]))).toBe(false);
+    expect(blockRidesZsuper(rubyNew([site("super", ["id:name"])]))).toBe(false);
+    expect(blockRidesZsuper(rubyNew([zsuper, site("yield")]))).toBe(false);
+    expect(blockRidesZsuper(rubyNew([zsuper, { ...site("call"), recv: "id:block" }]))).toBe(false);
+    expect(blockRidesZsuper(rubyNew([zsuper, site("tap", ["id:block"])]))).toBe(false);
+    expect(blockRidesZsuper(rubyNew([zsuper, { ...site("each"), flags: ["blockpass"] }]))).toBe(
+      false,
+    );
+    expect(blockRidesZsuper(rubyNew([zsuper], []))).toBe(false);
+  });
+});
+
 describe("a module hook is credited through the tag on an includer's constructor", () => {
   const tagOf = (module: string, hook: InlinedFrom["hook"] = "initialize"): InlinedFrom => ({
     module,
@@ -439,7 +466,39 @@ describe("a module hook is credited through the tag on an includer's constructor
       },
     },
   } as unknown as ApiManifest;
-  const tags = inlinedHookTags(ts);
+  const def = (name: string) => ({
+    ...body([]),
+    name,
+    vendorFile: "rails/v8.0.2/x.rb",
+    line: 1,
+    endLine: 2,
+  });
+  const ruby = {
+    packages: {
+      activemodel: {
+        modules: { "ActiveModel::API": entity("api.rb", [], [def("initialize")]) },
+      },
+      activerecord: {
+        modules: {
+          "ActiveRecord::Inheritance::ClassMethods": entity("inheritance.rb", [], [def("new")]),
+        },
+      },
+    },
+  } as unknown as ApiManifest;
+  const tags = inlinedHookTags(ts, ruby);
+
+  it("credits nothing on a tag that resolves to no def, or cites it at a stale span", () => {
+    const tagged = (tag: InlinedFrom) =>
+      ({
+        packages: { activerecord: { classes: { Base: tsClass("base.ts", [tag]) } } },
+      }) as unknown as ApiManifest;
+    expect(() => inlinedHookTags(tagged(tagOf("ActiveModel::APl")), ruby)).toThrow(
+      /^@inlinedFrom names no Ruby body: activerecord\/base\.ts Base#constructor/,
+    );
+    expect(() =>
+      inlinedHookTags(tagged({ ...tagOf("ActiveModel::API"), lastLine: 3 }), ruby),
+    ).toThrow(/^@inlinedFrom citation is stale: activerecord\/base\.ts Base#constructor/);
+  });
 
   it("credits the module when the tagged constructor's file mirrors an includer", () => {
     expect(
@@ -454,9 +513,10 @@ describe("a module hook is credited through the tag on an includer's constructor
   });
 
   it("leaves it uncredited when the tagged file in its package includes no such module", () => {
-    const only = inlinedHookTags({
-      packages: { activemodel: ts.packages.activemodel },
-    } as unknown as ApiManifest);
+    const only = inlinedHookTags(
+      { packages: { activemodel: ts.packages.activemodel } } as unknown as ApiManifest,
+      ruby,
+    );
     expect(
       inlinedHookCreditedBy(
         "ActiveModel::API",
