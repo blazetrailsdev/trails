@@ -25,7 +25,6 @@ import {
   Errors,
   Base,
 } from "./test-helpers.js";
-import { Configurable } from "./configurable.js";
 import { AttributeRegistration, Model as ActiveModel } from "@blazetrails/activemodel";
 import { assertNoChanges, include } from "@blazetrails/activesupport";
 import { itIfSupports } from "../support/supports.js";
@@ -63,7 +62,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
-    Configurable.config.previousSchemes = [];
+    Encryption.config.previousSchemes = [];
     configureEncryption();
   });
 
@@ -90,7 +89,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("attribute is not accessible with the wrong key", async () => {
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
     await freshAdapter();
     const Post = makeEncryptedPost();
     const post = await Post.createBang({ title: "The Starfleet is here!", body: "take cover!" });
@@ -241,7 +240,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("can work with pre-encryption nil values", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await Encryption.withoutEncryption(() => Book.create({ name: null }));
@@ -249,7 +248,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("can work with pre-encryption empty values", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Book = makeEncryptedBook();
     const book = await Encryption.withoutEncryption(() => Book.create({ name: "" }));
@@ -257,7 +256,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("reading a not encrypted value won't raise a Decryption error when :support_unencrypted_data is true", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Author = makeEncryptedAuthor();
     const author = await Encryption.withoutEncryption(() =>
@@ -268,7 +267,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("reading a not encrypted value will raise a Decryption error when :support_unencrypted_data is false", async () => {
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
     await freshAdapter();
     const Author = makeEncryptedAuthor();
     const author = await Encryption.withoutEncryption(() =>
@@ -336,7 +335,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   it("track previous changes properly for encrypted attributes", async () => {
     await freshAdapter();
     const Book = makeEncryptedBook();
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     const book = await Book.createBang({ name: "Dune" });
     await book.updateBang({ created_at: RubyTime.now().minus(3600) });
     expect(book.attributePreviouslyChanged("name")).toBeFalsy();
@@ -356,7 +355,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     Post.encrypts("title");
 
-    Configurable.configure({
+    Encryption.configure({
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
@@ -465,7 +464,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forces encoding for deterministic attributes based on the configured option", async () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "ASCII";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "ASCII";
     const adp = await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
@@ -474,7 +473,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forced encoding for deterministic attributes will replace invalid characters", async () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "ASCII";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "ASCII";
     await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
@@ -484,7 +483,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forced encoding for deterministic attributes can be disabled", async () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "";
     const adp = await freshAdapter();
     const Book = makeEncryptedBook();
     new Book();
@@ -522,7 +521,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     await Book.loadSchema();
 
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
 
     const book = await Encryption.withoutEncryption(() => Book.create({}));
     expect(book.name).toBe("<untitled>");
@@ -547,7 +546,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const type = Book.typeForAttribute("name");
     expect(type._default).toBe("<untitled>");
 
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
 
     const book = await Encryption.withoutEncryption(() => Book.create({ name: "<untitled>" }));
     const reloaded = await Book.find(book.id);
@@ -568,7 +567,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     expect(loadedBook.name).toBe("Dune");
   });
   it("supports decrypting data encrypted non deterministically with SHA1 when digest class is SHA256", async () => {
-    Configurable.configure({
+    Encryption.configure({
       primaryKey: "the primary key",
       deterministicKey: "the deterministic key",
       keyDerivationSalt: "the salt",
@@ -621,7 +620,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("when ignore_case: true, it returns the actual value when not encrypted", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     await freshAdapter();
     const Book = makeEncryptedBookThatIgnoresCase();
     new Book();
@@ -806,7 +805,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("EncryptableRecord.decryptAttributes stores plaintext in DB", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     const adp = await freshAdapter();
     const Post = makeEncryptedPost();
     new Post();
@@ -840,7 +839,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   let restoreEncryption: (() => void) | undefined;
   beforeAll(() => {
     const snapshot = snapshotEncryptionConfig();
-    Configurable.config.previousSchemes = [];
+    Encryption.config.previousSchemes = [];
     configureEncryption();
     restoreEncryption = () => restoreEncryptionConfig(snapshot);
   });
@@ -902,7 +901,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   });
 
   it("raises when the original_<name> column is missing and supportUnencryptedData is false", () => {
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
     const modelClass = makeMockModel(["name"]);
     expect(() =>
       encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
@@ -917,7 +916,7 @@ describe("EncryptableRecord.encryptAttribute — scheme-based ignore_case wiring
   });
 
   it("does not raise when supportUnencryptedData is true even if the column is missing", () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
     const modelClass = makeMockModel(["id", "name"]);
     expect(() =>
       encrypts.call(modelClass, "name", { deterministic: true, ignoreCase: true }),
@@ -931,7 +930,7 @@ describe("EncryptableRecord — ignore_case original_<name> column requirement",
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
     configureEncryption();
-    Configurable.config.supportUnencryptedData = false;
+    Encryption.config.supportUnencryptedData = false;
   });
 
   afterEach(() => {

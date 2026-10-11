@@ -3,7 +3,7 @@ import { KeyProvider } from "./key-provider.js";
 import { Key } from "./key.js";
 import { Message } from "./message.js";
 import { Encryptor } from "./encryptor.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import * as crypto from "crypto";
 
 function makeKey(): Key {
@@ -21,14 +21,14 @@ describe("ActiveRecord::Encryption::KeyProviderTest", () => {
   let originalStoreKeyReferences: boolean;
 
   beforeEach(() => {
-    originalStoreKeyReferences = Configurable.config.storeKeyReferences;
+    originalStoreKeyReferences = Encryption.config.storeKeyReferences;
     message = new Message({ payload: "some secret" });
     keys = buildKeys(3);
     keyProvider = new KeyProvider(keys);
   });
 
   afterEach(() => {
-    Configurable.config.storeKeyReferences = originalStoreKeyReferences;
+    Encryption.config.storeKeyReferences = originalStoreKeyReferences;
   });
 
   it("serves a single key for encrypting and decrypting", () => {
@@ -48,7 +48,7 @@ describe("ActiveRecord::Encryption::KeyProviderTest", () => {
   });
 
   it("when store_key_references is true, the encryption key contains a reference to the key itself", () => {
-    Configurable.config.storeKeyReferences = true;
+    Encryption.config.storeKeyReferences = true;
 
     expect(keyProvider.encryptionKey().publicTags.encryptedDataKeyId).toBe(
       keys[keys.length - 1].id,
@@ -68,13 +68,13 @@ describe("ActiveRecord::Encryption::KeyProviderTest", () => {
   });
 
   it("work with multiple keys when config.store_key_references is false", () => {
-    Configurable.config.storeKeyReferences = false;
+    Encryption.config.storeKeyReferences = false;
 
     assertEncryptorWorksWith(keyProvider);
   });
 
   it("work with multiple keys when config.store_key_references is true", () => {
-    Configurable.config.storeKeyReferences = true;
+    Encryption.config.storeKeyReferences = true;
 
     assertEncryptorWorksWith(keyProvider);
   });

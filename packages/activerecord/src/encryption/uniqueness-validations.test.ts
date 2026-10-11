@@ -5,7 +5,7 @@ import {
   restoreEncryptionConfig,
 } from "./test-helpers.js";
 import { fixtures } from "../test-fixtures.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
@@ -28,8 +28,8 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
-    savedExtendQueries = Configurable.config.extendQueries;
-    Configurable.config.previousSchemes = [];
+    savedExtendQueries = Encryption.config.extendQueries;
+    Encryption.config.previousSchemes = [];
     configureEncryption();
 
     savedMethods.where = Relation.prototype.where;
@@ -38,7 +38,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
     savedMethods.findBy = (Base as any).findBy;
     savedMethods.serialize = EncryptedAttributeType.prototype.serialize;
 
-    Configurable.config.extendQueries = true;
+    Encryption.config.extendQueries = true;
     ExtendedDeterministicQueries.installSupport();
   });
 
@@ -51,7 +51,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
 
     restoreEncryptionConfig(configSnapshot);
-    Configurable.config.extendQueries = savedExtendQueries;
+    Encryption.config.extendQueries = savedExtendQueries;
   });
 
   it("uniqueness validations work", async () => {
@@ -72,7 +72,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
 
     class EncryptedBookWithDowncaseName extends Base {
       static {
@@ -99,7 +99,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations do not work when mixing encrypted an unencrypted data and unencrypted data is opted out per-attribute", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
 
     class EncryptedBookWithUnencryptedDataOptedOut extends Base {
       static {
@@ -126,7 +126,7 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work when mixing encrypted an unencrypted data and unencrypted data is opted in per-attribute", async () => {
-    Configurable.config.supportUnencryptedData = true;
+    Encryption.config.supportUnencryptedData = true;
 
     class EncryptedBookWithUnencryptedDataOptedIn extends Base {
       static {
@@ -153,8 +153,8 @@ describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   });
 
   it("uniqueness validations work when using old encryption schemes", async () => {
-    Configurable.config.supportUnencryptedData = false;
-    Configurable.config.previous = [{ downcase: true, deterministic: true }];
+    Encryption.config.supportUnencryptedData = false;
+    Encryption.config.previous = [{ downcase: true, deterministic: true }];
 
     class OldEncryptionBook extends Base {
       static {

@@ -1,15 +1,15 @@
 import { describe, it, expect, afterEach } from "vitest";
 import * as crypto from "crypto";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { Encryptor } from "./encryptor.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
 
 describe("ActiveRecord::Encryption::Encryptor (trails)", () => {
-  const saved = Configurable.config.forcedEncodingForDeterministicEncryption;
+  const saved = Encryption.config.forcedEncodingForDeterministicEncryption;
 
   afterEach(() => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = saved;
+    Encryption.config.forcedEncodingForDeterministicEncryption = saved;
   });
 
   function encryptDeterministically(clearText: Uint8Array): string | Uint8Array {
@@ -23,12 +23,12 @@ describe("ActiveRecord::Encryption::Encryptor (trails)", () => {
   }
 
   it("deterministic encryption replaces the non-ASCII bytes of a binary clear text under a forced encoding", () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
     expect(encryptDeterministically(Uint8Array.of(0x68, 0xe9, 0x6c))).toBe("h?l");
   });
 
   it("deterministic encryption replaces the non-ASCII bytes of a binary clear text forced to UTF-8", () => {
-    Configurable.config.forcedEncodingForDeterministicEncryption = "UTF-8";
+    Encryption.config.forcedEncodingForDeterministicEncryption = "UTF-8";
     expect(encryptDeterministically(Uint8Array.of(0x68, 0xe9, 0x6c))).toBe("h�l");
   });
 });

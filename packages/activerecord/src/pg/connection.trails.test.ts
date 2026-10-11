@@ -1,3 +1,4 @@
+import pg from "pg";
 import { it, expect, describe, vi } from "vitest";
 import { IO } from "@blazetrails/ruby-compat";
 import { escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
@@ -130,46 +131,43 @@ describe("PG::Connection#cancel and #block", () => {
 describe("PG::Error#result on every carrier path", () => {
   const terminated = () => new Error("Connection terminated unexpectedly");
 
-  it("stamps a rejection from async_exec, exec_params, exec_prepared and query", async () => {
-    const client = pgConnection({ query: (_config: unknown) => Promise.resolve({}) });
-    const raised: Error[] = [];
-    client.query = () => {
-      raised.push(terminated());
-      return Promise.reject(raised[raised.length - 1]);
-    };
-    const wrapped = pgConnection({ query: () => Promise.reject(terminated()) });
+  it("rewraps a rejection from async_exec, exec_params, exec_prepared and query", async () => {
+    const client = pgConnection({
+      _ended: true,
+      query: (_config: unknown) => Promise.reject(terminated()),
+    });
     const errors = [
       await client.asyncExec("SELECT 1").catch((e: unknown) => e),
       await client.execParams("SELECT $1", [1]).catch((e: unknown) => e),
       await client.execPrepared("a1", [1]).catch((e: unknown) => e),
-      await (wrapped.query as () => Promise<unknown>)().catch((e: unknown) => e),
+      await client.query("").catch((e: unknown) => e),
     ];
-    expect(errors.slice(0, 3)).toEqual(raised);
     for (const error of errors) {
       expect(error).toBeInstanceOf(PG.ConnectionBad);
-      expect(PG.ConnectionBad.isLibpq(error as Error)).toBe(true);
-      expect((error as { result: unknown }).result).toBeNull();
+      expect((error as PG.Error).message).toBe("Connection terminated unexpectedly\n");
+      expect((error as PG.Error).result).toBeNull();
+      expect((error as PG.Error).connection).not.toBeNull();
     }
   });
 
-  it("a server error keeps its 08 SQLSTATE in result, and a bare 08 code is a ConnectionBad", async () => {
-    const server = Object.assign(new Error("terminating connection"), {
-      name: "error",
+  it("a server error keeps its 08 SQLSTATE in result and is not a ConnectionBad", async () => {
+    const server = Object.assign(new pg.DatabaseError("terminating connection", 0, "error"), {
       code: "08006",
     });
     const bare = Object.assign(new Error("socket"), { code: "08006" });
     const client = pgConnection({ query: (error: unknown) => Promise.reject(error) });
     const query = client.query as unknown as (error: Error) => Promise<unknown>;
-    await query(server).catch(() => {});
-    await query(bare).catch(() => {});
-    const { result } = server as unknown as { result: { errorField(code: number): string } };
-    expect(result.errorField(PG.PG_DIAG_SQLSTATE)).toBe("08006");
-    expect(server).not.toBeInstanceOf(PG.ConnectionBad);
-    expect(bare).toBeInstanceOf(PG.ConnectionBad);
+    const raised = (await query(server).catch((e: unknown) => e)) as PG.Error;
+    expect(raised).toBeInstanceOf(PG.ServerError);
+    expect(raised).not.toBeInstanceOf(PG.ConnectionBad);
+    expect(raised.result!.errorField(PG.PG_DIAG_SQLSTATE)).toBe("08006");
+    expect(raised.cause).toBe(server);
+    expect(await query(bare).catch((e: unknown) => e)).toBeInstanceOf(PG.UnableToSend);
   });
 
-  it("stamps the error prepare is handed", async () => {
+  it("rewraps the error prepare is handed", async () => {
     const client = pgConnection({
+      _queryable: false,
       query: (submittable: { handleError(error: unknown): void }) => {
         submittable.handleError(terminated());
       },
@@ -178,36 +176,43 @@ describe("PG::Error#result on every carrier path", () => {
     expect(error).toBeInstanceOf(PG.ConnectionBad);
   });
 
-  it("hands on a frozen error unstamped instead of raising TypeError", async () => {
-    const frozen = Object.freeze(terminated());
-    const client = pgConnection({ query: () => Promise.reject(frozen) });
-    await expect(client.asyncExec("SELECT 1")).rejects.toBe(frozen);
-    expect("result" in frozen).toBe(false);
+  it("a finished connection raises the gem's connection is closed", async () => {
+    const client = pgConnection({
+      _ending: true,
+      query: () => Promise.reject(new Error("Client was closed and is not queryable")),
+    });
+    const error = (await client.asyncExec("SELECT 1").catch((e: unknown) => e)) as PG.Error;
+    expect(error).toBeInstanceOf(PG.ConnectionBad);
+    expect(error.message).toBe("connection is closed");
+  });
+
+  it("rewraps an error raised by a member the client answers", async () => {
+    const client = pgConnection({ end: () => Promise.reject(terminated()) });
+    await expect(client.end()).rejects.toBeInstanceOf(PG.UnableToSend);
   });
 });
 
 describe("PG::Error", () => {
-  it("is the class of an error the connection's query raised, and of no other", async () => {
-    const failure = Object.assign(new Error("boom"), { name: "error", code: "57014" });
-    const client = pgConnection({ query: () => Promise.reject(failure) });
-    await expect(client.query("SELECT 1")).rejects.toBe(failure);
-    expect(failure).toBeInstanceOf(PG.Error);
-    const bug = Object.assign(new TypeError("values is not iterable"), {
-      code: "ERR_INVALID_ARG_TYPE",
-    });
+  it("is the class of every error the connection raises, and of no other", async () => {
+    const bug = new TypeError("values is not iterable");
     await expect(pgConnection({ query: () => Promise.reject(bug) }).query("")).rejects.toBe(bug);
     expect(bug).not.toBeInstanceOf(PG.Error);
     for (const driver of [
+      new pg.DatabaseError("boom", 0, "error"),
       Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNREFUSED" }),
-      Object.assign(new Error("getaddrinfo EAI_AGAIN db"), { code: "EAI_AGAIN" }),
+      new AggregateError([], "getaddrinfo EAI_AGAIN db"),
       new Error("Query read timeout"),
+      new Error("a message no shape test knew"),
     ]) {
-      await pgConnection({ query: () => Promise.reject(driver) })
+      const error = await pgConnection({ query: () => Promise.reject(driver) })
         .query("")
-        .catch(() => {});
-      expect(driver).toBeInstanceOf(PG.Error);
+        .catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(PG.Error);
+      expect(error).toBeInstanceOf(Error);
     }
-    expect(new TypeError("conn.status is not a function")).not.toBeInstanceOf(PG.Error);
+    expect(new PG.ConnectionBad()).toBeInstanceOf(PG.Error);
+    expect(new PG.ServerError()).not.toBeInstanceOf(PG.ConnectionBad);
+    expect(new PG.Error("m").error).toBe("m");
   });
 
   it("cancel on a closed connection raises PG::ConnectionBad", async () => {

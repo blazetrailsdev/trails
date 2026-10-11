@@ -5,7 +5,7 @@ import {
   snapshotEncryptionConfig,
   restoreEncryptionConfig,
 } from "./test-helpers.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { fixtures } from "../test-fixtures.js";
 import {
   EncryptedBookWithSerializedFirstBinary,
@@ -29,7 +29,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
   beforeEach(() => {
     configSnapshot = snapshotEncryptionConfig();
-    Configurable.config.previousSchemes = [];
+    Encryption.config.previousSchemes = [];
     configureEncryption();
   });
 
@@ -39,7 +39,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
   it("adds the encrypted column's length validation at schema load", async () => {
     await freshAdapter();
-    Configurable.config.validateColumnSize = true;
+    Encryption.config.validateColumnSize = true;
 
     class EncryptedBookValidatingColumnSize extends Base {
       static _tableName = "encrypted_books";

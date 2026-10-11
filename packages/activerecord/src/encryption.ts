@@ -9,6 +9,7 @@ export { Cipher };
 export type EncryptsOptions = SchemeOptions;
 
 extend(Encryption, Configurable);
+include(Encryption, Configurable);
 extend(Encryption, Contexts);
 include(Encryption, Contexts);
 

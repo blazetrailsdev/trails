@@ -45,9 +45,7 @@ describeIfPg("PostgreSQLAdapter exec_rollback_db_transaction", () => {
       await adapter.beginDbTransaction();
       await (client(adapter) as { end(): Promise<void> }).end();
 
-      await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(
-        /Client was closed and is not queryable/,
-      );
+      await expect(adapter.execRollbackDbTransaction()).rejects.toThrow(/connection is closed/);
 
       expect(await inTransaction(adapter)).toBe(false);
 

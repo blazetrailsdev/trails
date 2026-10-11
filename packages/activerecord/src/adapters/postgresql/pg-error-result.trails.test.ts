@@ -7,12 +7,9 @@ import {
   NoDatabaseError,
   StatementInvalid,
 } from "../../errors.js";
-import type { PGConnection } from "../../pg/connection.js";
-import { pgError } from "../../pg/exceptions.js";
+import { pgConnection, type PGConnection } from "../../pg/connection.js";
 import { PG } from "../../pg/pg.js";
 import { fixtures } from "../../test-fixtures.js";
-
-type Stamped = Error & { result: { errorField(fieldcode: number): string | null } | null };
 
 describeIfPg("PG::Error#result (trails)", () => {
   let adapter: PostgreSQLAdapter;
@@ -38,50 +35,50 @@ describeIfPg("PG::Error#result (trails)", () => {
       .execute("SELECT * FROM missing_error_result_table")
       .catch((e: unknown) => e)) as StatementInvalid;
     expect(error).toBeInstanceOf(StatementInvalid);
-    const cause = error.cause as Stamped;
-    expect(cause).toBeInstanceOf(pg.DatabaseError);
+    const cause = error.cause as PG.Error;
+    expect(cause).toBeInstanceOf(PG.ServerError);
+    expect(cause.cause).toBeInstanceOf(pg.DatabaseError);
     expect(cause.result?.errorField(PG.PG_DIAG_SQLSTATE)).toBe("42P01");
-    expect(Object.keys(cause)).not.toContain("result");
+    expect(cause.connection).not.toBeNull();
     expect(cause).not.toBeInstanceOf(PG.ConnectionBad);
   });
 
-  it("a server error from prepare is the object node-pg raised", async () => {
+  it("a server error from prepare is a PG::ServerError", async () => {
     const conn = await rawConnection();
     const error = (await conn
       .prepare("pg_error_result", "SELEC 1")
-      .catch((e: unknown) => e)) as Stamped;
-    expect(error).toBeInstanceOf(pg.DatabaseError);
-    expect((error as unknown as pg.DatabaseError).code).toBe("42601");
+      .catch((e: unknown) => e)) as PG.Error;
+    expect(error).toBeInstanceOf(PG.ServerError);
     expect(error.result?.errorField(PG.PG_DIAG_SQLSTATE)).toBe("42601");
-    expect(Object.prototype.propertyIsEnumerable.call(error, "result")).toBe(false);
   });
 
   it("a connection-level failure answers a nil result and is a ConnectionBad", async () => {
     const conn = await rawConnection();
     await conn.end();
-    const error = (await conn.asyncExec("SELECT 1").catch((e: unknown) => e)) as Stamped;
-    expect(error).not.toBeInstanceOf(pg.DatabaseError);
-    expect("result" in error).toBe(true);
+    const error = (await conn.asyncExec("SELECT 1").catch((e: unknown) => e)) as PG.Error;
     expect(error.result).toBeNull();
     expect(error).toBeInstanceOf(PG.ConnectionBad);
-    expect(PG.ConnectionBad.isLibpq(error)).toBe(false);
+    expect(error.message).toBe("connection is closed");
   });
 
-  it("a failed connect is stamped before new_client translates it", async () => {
-    const connect = vi.spyOn(pg.Client.prototype, "connect");
+  it("a failed connect is a ConnectionBad before new_client translates it", async () => {
+    const params = { host: "localhost", port: 59999, database: "nonexistent" };
     await expect(
       PostgreSQLAdapter.newClient({ host: "localhost", port: 59999, dbname: "nonexistent" }),
     ).rejects.toBeInstanceOf(ConnectionNotEstablished);
-    const error = (await (connect.mock.results[0].value as Promise<void>).catch(
-      (e: unknown) => e,
-    )) as Stamped;
-    expect("result" in error).toBe(true);
+    const error = (await pgConnection(new pg.Client(params))
+      .connect()
+      .catch((e: unknown) => e)) as PG.Error;
+    expect(error).toBeInstanceOf(PG.ConnectionBad);
+    expect(error.message.endsWith("\n")).toBe(true);
     expect(error.result).toBeNull();
   });
 
   it("a severed connection met by a mocked raw query is still a ConnectionFailed", async () => {
     const conn = await rawConnection();
-    vi.spyOn(conn, "query").mockRejectedValue(new Error("Connection terminated unexpectedly"));
+    vi.spyOn(conn, "query").mockRejectedValue(
+      new PG.ConnectionBad("Connection terminated unexpectedly\n"),
+    );
     const error = await adapter.execute("SELECT 1").catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ConnectionFailed);
     expect((error as Error).cause).toBeInstanceOf(PG.ConnectionBad);
@@ -94,7 +91,9 @@ describeIfPg("PG::Error#result (trails)", () => {
 
   it("new_client rescues a driver error and reads the database from conn_params", async () => {
     vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(
-      Object.assign(new Error('database "nope" does not exist'), { name: "error", code: "3D000" }),
+      Object.assign(new pg.DatabaseError('database "nope" does not exist', 0, "error"), {
+        code: "3D000",
+      }),
     );
     await expect(PostgreSQLAdapter.newClient({ dbname: "nope" })).rejects.toBeInstanceOf(
       NoDatabaseError,
@@ -108,20 +107,21 @@ describeIfPg("PG::Error#result (trails)", () => {
     expect(error).not.toBeInstanceOf(PG.Error);
   });
 
-  it("is_cached_plan_failure? reads SQLSTATE and source function through result", () => {
-    const error = Object.assign(new Error("cached plan must not change result type"), {
-      name: "error",
-      code: "0A000",
-      routine: "RevalidateCachedQuery",
-    });
+  it("is_cached_plan_failure? reads SQLSTATE and source function through result", async () => {
+    const error = Object.assign(
+      new pg.DatabaseError("cached plan must not change result type", 0, "error"),
+      { code: "0A000", routine: "RevalidateCachedQuery" },
+    );
+    const raised = await pgConnection({ query: () => Promise.reject(error) })
+      .asyncExec("SELECT 1")
+      .catch((e: unknown) => e);
     expect(adapter.isCachedPlanFailure(error as never)).toBe(false);
-    expect(adapter.isCachedPlanFailure(pgError(error) as never)).toBe(true);
-    expect(adapter.isCachedPlanFailure(pgError(new Error("gone")) as never)).toBe(false);
+    expect(adapter.isCachedPlanFailure(raised as never)).toBe(true);
+    expect(adapter.isCachedPlanFailure(new PG.ConnectionBad("gone"))).toBe(false);
   });
 
   it("an Error that merely carries a result is not a PG::Error", () => {
     const error = Object.assign(new Error("not from the driver"), { result: null });
     expect(error).not.toBeInstanceOf(PG.Error);
-    expect(pgError(new Error("Connection terminated unexpectedly"))).toBeInstanceOf(PG.Error);
   });
 });

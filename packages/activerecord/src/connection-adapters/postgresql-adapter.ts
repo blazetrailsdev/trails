@@ -9,6 +9,7 @@ import {
   excSetupMessage,
   fetch,
   rbModConstSet,
+  rbObjRespondTo,
   setEnv,
   valuesAt,
 } from "@blazetrails/ruby-compat";
@@ -20,6 +21,7 @@ import {
   compact,
   filterMap,
   sliceBang,
+  tryCall,
 } from "@blazetrails/activesupport";
 import { Nodes, Visitors, type ArelNode } from "@blazetrails/arel";
 import { hashDelete, hasKey, IO, rbRegMatchP, rtest, RuntimeError } from "@blazetrails/ruby-compat";
@@ -1019,27 +1021,20 @@ export class PostgreSQLAdapter
   }
   /** @internal */
   translateException(
-    exception: unknown,
+    exception: PG.Error,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
-    if (!(exception instanceof Error)) return exception;
-    const noConnection =
-      /connection is closed/i.test(exception.message) ||
-      /no connection to the server/i.test(exception.message);
-    if (
-      !(exception instanceof pg.DatabaseError) &&
-      !(exception instanceof PG.ConnectionBad) &&
-      !noConnection
-    ) {
-      return exception;
-    }
+    if (!rbObjRespondTo(exception, "result")) return exception;
 
-    switch (exception instanceof pg.DatabaseError ? exception.code : undefined) {
+    switch (tryCall(exception.result, "errorField", PG.PG_DIAG_SQLSTATE) ?? undefined) {
       case undefined:
-        if (noConnection) {
+        if (
+          rbRegMatchP(/connection is closed/i, exception.message) ||
+          rbRegMatchP(/no connection to the server/i, exception.message)
+        ) {
           return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
         } else if (exception instanceof PG.ConnectionBad) {
-          if (PG.ConnectionBad.isLibpq(exception)) {
+          if (exception.message.endsWith("\n")) {
             return new ConnectionFailed(exception, { connectionPool: this.pool });
           } else {
             return new ConnectionNotEstablished(exception, { connectionPool: this.pool });

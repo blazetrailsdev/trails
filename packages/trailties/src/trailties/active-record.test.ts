@@ -14,10 +14,7 @@ import { resetLoadHooks, runLoadHooks } from "@blazetrails/activesupport";
 import { SchemaReflection } from "@blazetrails/activerecord";
 import { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 import { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
-import {
-  Configurable as EncryptionConfigurable,
-  Encryption,
-} from "@blazetrails/activerecord/encryption";
+import { Encryption } from "@blazetrails/activerecord/encryption";
 import { ExtendedDeterministicUniquenessValidator } from "@blazetrails/activerecord";
 import { UniquenessValidator } from "@blazetrails/activerecord";
 import { deprecator } from "@blazetrails/activerecord";
@@ -74,12 +71,12 @@ describe("RailtieTest", () => {
     savedCheckSchemaCacheDumpVersion = SchemaReflection.checkSchemaCacheDumpVersion;
     savedStrictStrings = SQLite3Adapter.strictStringsByDefault;
     savedDecodeDates = PostgreSQLAdapter.decodeDates;
-    savedAddToFilterParameters = EncryptionConfigurable.config.addToFilterParameters;
-    savedEncryptionSupportUnencryptedData = EncryptionConfigurable.config.supportUnencryptedData;
+    savedAddToFilterParameters = Encryption.config.addToFilterParameters;
+    savedEncryptionSupportUnencryptedData = Encryption.config.supportUnencryptedData;
     savedPartialInserts = Base.partialInserts;
     savedRaiseOnAssignToAttrReadonly = raiseOnAssignToAttrReadonly();
-    savedExtendQueries = EncryptionConfigurable.config.extendQueries;
-    savedEncryptFixtures = EncryptionConfigurable.config.encryptFixtures;
+    savedExtendQueries = Encryption.config.extendQueries;
+    savedEncryptFixtures = Encryption.config.encryptFixtures;
     savedFixtureInitialize = Fixture.prototype.initialize;
 
     resetLoadHooks();
@@ -97,12 +94,12 @@ describe("RailtieTest", () => {
     SchemaReflection.checkSchemaCacheDumpVersion = savedCheckSchemaCacheDumpVersion;
     SQLite3Adapter.strictStringsByDefault = savedStrictStrings;
     PostgreSQLAdapter.decodeDates = savedDecodeDates;
-    EncryptionConfigurable.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
+    Encryption.config.supportUnencryptedData = savedEncryptionSupportUnencryptedData;
     Base.partialInserts = savedPartialInserts;
     setRaiseOnAssignToAttrReadonly(savedRaiseOnAssignToAttrReadonly);
-    EncryptionConfigurable.config.addToFilterParameters = savedAddToFilterParameters;
-    EncryptionConfigurable.config.extendQueries = savedExtendQueries;
-    EncryptionConfigurable.config.encryptFixtures = savedEncryptFixtures;
+    Encryption.config.addToFilterParameters = savedAddToFilterParameters;
+    Encryption.config.extendQueries = savedExtendQueries;
+    Encryption.config.encryptFixtures = savedEncryptFixtures;
     Fixture.prototype.initialize = savedFixtureInitialize;
     setVerifyForeignKeysForFixtures(false);
     if (savedExtendQueries) {
@@ -185,7 +182,7 @@ describe("RailtieTest", () => {
     const cfg = Trailtie.config.get("activeRecord") as ActiveRecordConfig;
     cfg.encryption = { supportUnencryptedData: true };
     await runTrailtieInitializers(Trailtie, blogApp());
-    expect(EncryptionConfigurable.config.supportUnencryptedData).toBe(true);
+    expect(Encryption.config.supportUnencryptedData).toBe(true);
   });
 
   it("runInitializers enables auto filtered parameters when add_to_filter_parameters is set", async () => {
@@ -194,10 +191,10 @@ describe("RailtieTest", () => {
       config: { filterParameters: [] as Array<string | RegExp> },
       credentials,
     };
-    EncryptionConfigurable.config.addToFilterParameters = true;
+    Encryption.config.addToFilterParameters = true;
 
     await runTrailtieInitializers(Trailtie, app);
-    EncryptionConfigurable.encryptedAttributeWasDeclared(class Person {}, "name");
+    Encryption.encryptedAttributeWasDeclared(class Person {}, "name");
 
     expect(app.config.filterParameters).toContain("person.name");
   });
@@ -208,17 +205,17 @@ describe("RailtieTest", () => {
       config: { filterParameters: [] as Array<string | RegExp> },
       credentials,
     };
-    EncryptionConfigurable.config.addToFilterParameters = false;
+    Encryption.config.addToFilterParameters = false;
 
     await runTrailtieInitializers(Trailtie, app);
-    EncryptionConfigurable.encryptedAttributeWasDeclared(class Person {}, "name");
+    Encryption.encryptedAttributeWasDeclared(class Person {}, "name");
 
     expect(app.config.filterParameters).toEqual([]);
   });
 
   it("runInitializers installs extended deterministic query support when extend_queries is set", async () => {
     const validateEach = UniquenessValidator.prototype.validateEach;
-    EncryptionConfigurable.config.extendQueries = true;
+    Encryption.config.extendQueries = true;
 
     try {
       await runTrailtieInitializers(Trailtie, blogApp());
@@ -232,7 +229,7 @@ describe("RailtieTest", () => {
 
   it("runInitializers does not install extended deterministic query support when extend_queries is unset", async () => {
     const validateEach = UniquenessValidator.prototype.validateEach;
-    EncryptionConfigurable.config.extendQueries = false;
+    Encryption.config.extendQueries = false;
 
     try {
       await runTrailtieInitializers(Trailtie, blogApp());
@@ -281,7 +278,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers prepends EncryptedFixtures when encrypt_fixtures is set", async () => {
-    EncryptionConfigurable.config.encryptFixtures = true;
+    Encryption.config.encryptFixtures = true;
     await runTrailtieInitializers(Trailtie, blogApp());
     runLoadHooks("active_record_fixture_set", FixtureSet);
 
@@ -289,7 +286,7 @@ describe("RailtieTest", () => {
   });
 
   it("runInitializers does not prepend EncryptedFixtures when encrypt_fixtures is unset", async () => {
-    EncryptionConfigurable.config.encryptFixtures = false;
+    Encryption.config.encryptFixtures = false;
     await runTrailtieInitializers(Trailtie, blogApp());
     runLoadHooks("active_record_fixture_set", FixtureSet);
 
