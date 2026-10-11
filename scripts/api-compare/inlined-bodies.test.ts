@@ -11,6 +11,8 @@ import {
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedSegments,
+  moduleAncestors,
+  type ModuleBody,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
@@ -29,11 +31,17 @@ function body(calls: string[], extra: Partial<MethodInfo> = {}): MethodInfo {
   } as MethodInfo;
 }
 
-function entity(file: string, includes: string[], methods: MethodInfo[] = []): ClassInfo {
+function entity(
+  file: string,
+  includes: string[],
+  methods: MethodInfo[] = [],
+  prepends: string[] = [],
+): ClassInfo {
   return {
     name: file,
     file,
     includes,
+    prepends,
     extends: [],
     instanceMethods: methods,
     classMethods: [],
@@ -43,6 +51,10 @@ function entity(file: string, includes: string[], methods: MethodInfo[] = []): C
 const api = body(["assign_attributes", "super"]);
 const core = body(["init_internals", "initialize_internals_callback", "super", "run_callbacks"]);
 const own = body(["build_reflection", "super"]);
+const none = { prepended: [], included: [] };
+const of = (module: string, body: MethodInfo): ModuleBody => ({ module, body });
+const API = of("ActiveModel::API", api);
+const CORE = of("ActiveRecord::Core", core);
 
 const camel = (rc: string) => [rc.replace(/_(\w)/g, (_, c: string) => c.toUpperCase())];
 const significant = { has: () => true };
@@ -63,13 +75,13 @@ function flagged(segments: MethodInfo[], tsCalls: string[]): string[] {
 
 describe("a tagged constructor's Rails call set", () => {
   it("is the tagged module's initialize when the class defines none", () => {
-    const segments = inlinedSegments(undefined, [], [api]);
+    const segments = inlinedSegments(undefined, none, [], [API]);
     expect(inlinedRubyBody(segments).calls).toEqual(["assign_attributes", "super"]);
     expect(flagged(segments, ["assignAttributes", "super"])).toEqual([]);
   });
 
   it("joins two modules in tag order, the first one's super consumed by the second", () => {
-    const segments = inlinedSegments(undefined, [], [core, api]);
+    const segments = inlinedSegments(undefined, none, [], [CORE, API]);
     expect(inlinedRubyBody(segments).calls).toEqual([
       "init_internals",
       "initialize_internals_callback",
@@ -87,7 +99,7 @@ describe("a tagged constructor's Rails call set", () => {
   });
 
   it("puts the class's own initialize ahead of a module", () => {
-    const segments = inlinedSegments(own, [], [api]);
+    const segments = inlinedSegments(own, none, [], [API]);
     expect(inlinedRubyBody(segments).calls).toEqual([
       "build_reflection",
       "assign_attributes",
@@ -97,7 +109,7 @@ describe("a tagged constructor's Rails call set", () => {
   });
 
   it("flags a tagged body's call the constructor drops", () => {
-    const segments = inlinedSegments(own, [], [api]);
+    const segments = inlinedSegments(own, none, [], [API]);
     expect(flagged(segments, ["buildReflection", "assignAttributes", "super"])).toEqual([]);
     expect(flagged(segments, ["buildReflection", "super"])).toEqual([
       "assign_attributes → assignAttributes",
@@ -111,8 +123,8 @@ describe("a tagged constructor's Rails call set", () => {
   });
 
   it("leaves a class with no same-file module and no tag to the ordinary gate", () => {
-    expect(inlinedSegments(own, [], [])).toEqual([]);
-    expect(inlinedSegments(undefined, [], [])).toEqual([]);
+    expect(inlinedSegments(own, none, [], [])).toEqual([]);
+    expect(inlinedSegments(undefined, none, [], [])).toEqual([]);
   });
 });
 
@@ -127,14 +139,16 @@ describe("same-file module bodies join by convention", () => {
   const resolve = (inc: string) =>
     Object.keys(modules).find((fqn) => fqn === inc || fqn.endsWith(`::${inc}`)) ?? inc;
   const chain = entity("backend/chain.rb", ["Implementation", "Flatten", "Fallbacks"]);
-  const sameFile = sameFileInitializeModules(chain, "I18n::Backend::Chain", modules, resolve);
+  const ancestors = moduleAncestors(chain, "I18n::Backend::Chain", modules, resolve);
+  const sameFile = sameFileInitializeModules(chain, ancestors, modules);
+  const IMPLEMENTATION = of("I18n::Backend::Chain::Implementation", implementation);
 
   it("finds the same-file modules that define initialize, in ancestor order", () => {
     expect(sameFile).toEqual(["I18n::Backend::Fallbacks", "I18n::Backend::Chain::Implementation"]);
   });
 
   it("joins a same-file module with no tag", () => {
-    const segments = inlinedSegments(undefined, [implementation], []);
+    const segments = inlinedSegments(undefined, ancestors, [IMPLEMENTATION], []);
     expect(flagged(segments, ["super"])).toEqual(["backends → backends"]);
   });
 
@@ -173,8 +187,8 @@ describe("same-file module bodies join by convention", () => {
 
   it("joins a cross-file module only through its tag", () => {
     const tagged = taggedBodies(ruby, [tag("ActiveModel::API")], sameFile, at);
-    expect(tagged.map((m) => m.calls)).toEqual([api.calls]);
-    expect(inlinedSegments(undefined, [], tagged)).toEqual(tagged);
+    expect(tagged.map((m) => [m.module, m.body.calls])).toEqual([["ActiveModel::API", api.calls]]);
+    expect(inlinedSegments(undefined, none, [], tagged)).toEqual(tagged.map((m) => m.body));
   });
 
   it("reds on a tag that resolves to no Ruby body", () => {
@@ -225,18 +239,63 @@ describe("same-file module bodies join by convention", () => {
 
   it("runs a tagged ClassMethods#new ahead of every initialize, its super consumed", () => {
     const klassNew = { ...body(["subclass_from_attributes", "super"]), name: "new" };
-    const segments = inlinedSegments(own, [], [core, klassNew, api]);
+    const NEW = of("ActiveRecord::Inheritance::ClassMethods", klassNew);
+    const segments = inlinedSegments(own, none, [], [CORE, NEW, API]);
     expect(segments).toEqual([klassNew, own, core, api]);
     expect(inlinedRubyBody(segments).calls.filter((c) => c === "super")).toHaveLength(1);
   });
 
-  it("orders a class with both: own, same-file, then tagged", () => {
-    const segments = inlinedSegments(own, [implementation], [api]);
+  it("orders a class with both: own, same-file, then a tag naming no ancestor", () => {
+    const segments = inlinedSegments(own, ancestors, [IMPLEMENTATION], [API]);
     expect(inlinedRubyBody(segments).calls).toEqual([
       "build_reflection",
       "backends",
       "assign_attributes",
       "super",
     ]);
+  });
+});
+
+describe("the chain follows the class's ancestor order", () => {
+  const resolve = (inc: string) => inc;
+  const dirties = body(["dirties", "super"]);
+  const flash = body(["flash", "super"]);
+  const lock = body(["mon_initialize", "super"]);
+  const modules: Record<string, ClassInfo> = {
+    Dirties: entity("pool.rb", [], [dirties]),
+    Flash: entity("pool.rb", ["Lock"], [flash], ["Dirties"]),
+    Lock: entity("pool.rb", [], [lock]),
+    Plain: entity("pool.rb", [], []),
+  };
+  const sameFileBodies = (klass: ClassInfo) => {
+    const ancestors = moduleAncestors(klass, "Pool", modules, resolve);
+    const sameFile = sameFileInitializeModules(klass, ancestors, modules);
+    return { ancestors, sameFile: sameFile.map((fqn) => of(fqn, modules[fqn].instanceMethods[0])) };
+  };
+
+  it("lists prepended modules last prepend first, each between its own prepends and includes", () => {
+    const pool = entity("pool.rb", ["Plain", "API"], [], ["Lock", "Flash"]);
+    expect(moduleAncestors(pool, "Pool", modules, resolve)).toEqual({
+      prepended: ["Dirties", "Flash", "Lock"],
+      included: ["API", "Plain"],
+    });
+  });
+
+  it("runs a prepended same-file module ahead of the class's own body", () => {
+    const { ancestors, sameFile } = sameFileBodies(entity("pool.rb", ["Lock"], [], ["Dirties"]));
+    const segments = inlinedSegments(own, ancestors, sameFile, []);
+    expect(segments).toEqual([dirties, own, lock]);
+    expect(inlinedRubyCallArgs(segments).map((s) => s.name)).toEqual([
+      "dirties",
+      "build_reflection",
+      "mon_initialize",
+      "super",
+    ]);
+  });
+
+  it("places a same-file module between two tagged ones", () => {
+    const pool = entity("pool.rb", ["ActiveModel::API", "Lock", "ActiveRecord::Core"]);
+    const { ancestors, sameFile } = sameFileBodies(pool);
+    expect(inlinedSegments(own, ancestors, sameFile, [API, CORE])).toEqual([own, core, lock, api]);
   });
 });

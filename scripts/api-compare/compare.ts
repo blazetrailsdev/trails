@@ -188,6 +188,7 @@ import {
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedSegments,
+  moduleAncestors,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
@@ -5538,12 +5539,13 @@ export function main() {
           (rubyPkg.modules[fqn] as unknown as ClassInfo | undefined)?.instanceMethods.find(
             (m) => m.name === "initialize",
           );
-        const sameFile = sameFileInitializeModules(
+        const ancestors = moduleAncestors(
           klass,
           rubyModule,
           rubyPkg.modules,
           (incName, contextFqn) => resolveModuleName(incName, contextFqn, moduleFqnByShort),
         );
+        const sameFile = sameFileInitializeModules(klass, ancestors, rubyPkg.modules);
         const byOwner = tsInlinedFromByFileOwner.get(tsFile);
         const tsClass =
           byOwner === undefined
@@ -5552,7 +5554,11 @@ export function main() {
         if (byOwner?.has(tsClass ?? "")) inlinedTagsCompared.add(`${tsFile} ${tsClass}`);
         return inlinedSegments(
           klass.instanceMethods.find((m) => m.name === "initialize"),
-          sameFile.map(initializeOf).filter((m) => m !== undefined),
+          ancestors,
+          sameFile.flatMap((module) => {
+            const body = initializeOf(module);
+            return body === undefined ? [] : [{ module, body }];
+          }),
           taggedBodies(
             ruby,
             byOwner?.get(tsClass ?? "") ?? [],

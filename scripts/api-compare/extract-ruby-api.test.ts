@@ -99,7 +99,10 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
   });
 
   // Class fqn -> the module names recorded as `includes` on it.
-  function rubyIncludes(fixtures: Record<string, string>): Record<string, string[]> {
+  function rubyIncludes(
+    fixtures: Record<string, string>,
+    edge = "includes",
+  ): Record<string, string[]> {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "includes-rb-"));
     try {
       for (const [rel, src] of Object.entries(fixtures)) {
@@ -116,7 +119,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
           ex.process_file(File.join(${JSON.stringify(dir)}, rel), ${JSON.stringify(dir)})
         end
         out = {}
-        ex.classes.each { |fqn, info| out[fqn] = info[:includes] }
+        ex.classes.merge(ex.modules).each { |fqn, info| out[fqn] = normalize_class_info(info)[${JSON.stringify(edge)}.to_sym] }
         puts JSON.generate(out)
       `;
       return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
@@ -157,6 +160,34 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
       `,
     });
     expect(includes["ActiveRecord::Base"]).toEqual(["ActiveRecord::Core"]);
+  });
+
+  it("records a prepend edge on a class and on a module, absolute names kept as include keeps them", () => {
+    const fixtures = {
+      "connection_pool.rb": `
+        module ActiveRecord
+          module ConnectionAdapters
+            module QueryCache
+              prepend(Dirties)
+            end
+            class ConnectionPool
+              prepend QueryCache::ConnectionPoolConfiguration
+              prepend ::MonitorMixin
+              include ::MonitorMixin
+            end
+          end
+        end
+      `,
+    };
+    const prepends = rubyIncludes(fixtures, "prepends");
+    expect(prepends["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
+      "QueryCache::ConnectionPoolConfiguration",
+      "::MonitorMixin",
+    ]);
+    expect(rubyIncludes(fixtures)["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
+      "::MonitorMixin",
+    ]);
+    expect(prepends["ActiveRecord::ConnectionAdapters::QueryCache"]).toEqual(["Dirties"]);
   });
 
   it("unrolls an include loop over a constant list of modules", () => {

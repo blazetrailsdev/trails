@@ -309,6 +309,8 @@ export const rbCFalseClass = rbDefineClass("FalseClass");
  * @noRailsEquivalent PERMANENT
  */
 export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+/** `Integer#integer?` (`vendor/ruby/v3.3.11/numeric.rb:178`). */
+rbModDefineMethod(rbCInteger, "isInteger", () => true);
 
 /**
  * `rb_cFloat` (`vendor/ruby/v3.3.11/numeric.c:6259`).
@@ -316,6 +318,25 @@ export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
  */
 export const rbCFloat = rbDefineClass("Float", rbCNumeric);
 const rbCProc = rbDefineClass("Proc");
+
+const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
+  rbCNilClass,
+  rbCTrueClass,
+  rbCFalseClass,
+  rbCInteger,
+  rbCFloat,
+  rbCString,
+]);
+
+function classSeatMethodTable(recv: unknown): object | null {
+  if (typeof recv === "function") return null;
+  if (recv && typeof recv === "object" && !(recv instanceof Number || recv instanceof Uint8Array)) {
+    return null;
+  }
+  if (isSymbol(recv)) return rbCSymbol.prototype;
+  const klass = rbObjClass(recv);
+  return SPECIAL_CONST_CLASSES.has(klass) ? (klass.prototype as object) : null;
+}
 
 /**
  * `rb_mod_singleton_p` (`vendor/ruby/v3.3.11/object.c:3050`), `Module#singleton_class?`.
@@ -559,6 +580,13 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
     }
   }
   if (klass && Object.hasOwn(CLASS_METHOD_TABLE, mid)) return true;
+  for (
+    let o = classSeatMethodTable(obj);
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    if (typeof Object.getOwnPropertyDescriptor(o, mid)?.value === "function") return true;
+  }
   let cme: PropertyDescriptor | undefined;
   for (
     let o: object | null = Object(obj);
@@ -940,6 +968,14 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
     if (setter) return setter.call(recv, args[0]);
     const set = writer === undefined ? undefined : Object.getOwnPropertyDescriptor(o, writer);
     if (typeof set?.value === "function") return (set.value as AnyFunction).apply(recv, args);
+  }
+  for (
+    let o = classSeatMethodTable(recv);
+    o && o !== Object.prototype;
+    o = Object.getPrototypeOf(o) as object | null
+  ) {
+    const desc = Object.getOwnPropertyDescriptor(o, mid);
+    if (typeof desc?.value === "function") return (desc.value as AnyFunction).apply(recv, args);
   }
   if (mid === "isInclude") {
     if (typeof recv === "string") return recv.includes(stringValue(args[0]));
