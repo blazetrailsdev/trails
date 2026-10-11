@@ -126,7 +126,7 @@ export abstract class AbstractReflection {
   }
 
   buildAssociation(
-    attributes: Record<string, unknown> = {},
+    attributes: Record<string, unknown> | Map<string, unknown> = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): InstanceType<typeof Base> {
     return new (this.klass as any)(attributes, block);

@@ -1,62 +1,72 @@
+import { type HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
+import { type Hash, eachPair, isEmpty, keys } from "@blazetrails/ruby-compat";
+
 export class ProtectedParams {
   [key: string]: unknown;
 
-  #parameters: Record<string, unknown>;
+  static #targets = new WeakMap<ProtectedParams, ProtectedParams>();
+
+  #parameters: HashWithIndifferentAccess;
   #permitted = false;
   #self: this;
 
   constructor(parameters: Record<string, unknown> = {}) {
-    this.#parameters = { ...parameters };
-    const params = this.#parameters;
+    this.#parameters = withIndifferentAccess(parameters);
     const target = this;
     const isParameter = (key: string | symbol): key is string =>
       typeof key === "string" &&
-      Object.hasOwn(params, key) &&
+      target.#parameters.isKey(key) &&
       !Object.hasOwn(ProtectedParams.prototype, key);
 
     this.#self = new Proxy(this, {
       get(_t, key) {
-        if (isParameter(key)) return params[key];
+        if (isParameter(key)) return target.#parameters.get(key);
         const value = Reflect.get(target, key);
         return typeof value === "function" ? value.bind(target) : value;
       },
       set(_t, key, value) {
-        if (typeof key === "string") params[key] = value;
+        if (typeof key === "string") target.#parameters.set(key, value);
         return true;
       },
       has(_t, key) {
         return isParameter(key) || Reflect.has(target, key);
       },
       ownKeys() {
-        return Object.keys(params);
+        return keys(target.#parameters);
       },
       getOwnPropertyDescriptor(_t, key) {
         if (!isParameter(key)) return undefined;
-        return { value: params[key], writable: true, enumerable: true, configurable: true };
+        return {
+          value: target.#parameters.get(key),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
       },
       deleteProperty(_t, key) {
-        if (typeof key === "string") delete params[key];
+        if (typeof key === "string") target.#parameters.delete(key);
         return true;
       },
     });
 
+    ProtectedParams.#targets.set(this.#self, this);
     return this.#self;
   }
 
   keys(): string[] {
-    return Object.keys(this.#parameters);
+    return keys(this.#parameters);
   }
 
   isKey(key: string): boolean {
-    return Object.hasOwn(this.#parameters, key);
+    return this.#parameters.isKey(key);
   }
 
   hasKey(key: string): boolean {
-    return this.isKey(key);
+    return this.#parameters.hasKey(key);
   }
 
   isEmpty(): boolean {
-    return this.keys().length === 0;
+    return isEmpty(this.#parameters);
   }
 
   isPermitted(): boolean {
@@ -68,22 +78,24 @@ export class ProtectedParams {
     return this.#self;
   }
 
-  toH(): Record<string, unknown> {
-    return { ...this.#parameters };
+  toH(): Hash<string, unknown> {
+    return this.#parameters.toH();
   }
 
-  toUnsafeH(): Record<string, unknown> {
+  toUnsafeH(): Hash<string, unknown> {
     return this.toH();
   }
 
   eachPair(block: (key: string, value: unknown) => void): this {
-    for (const [key, value] of Object.entries(this.#parameters)) block(key, value);
+    eachPair(this.#parameters, block);
     return this.#self;
   }
 
   dup(): this {
-    const duplicate = new ProtectedParams(this.#parameters);
-    if (this.#permitted) duplicate.permitBang();
+    const duplicate = new ProtectedParams();
+    const target = ProtectedParams.#targets.get(duplicate)!;
+    target.#parameters = this.#parameters;
+    target.#permitted = this.#permitted;
     return duplicate as this;
   }
 }

@@ -8,6 +8,7 @@ import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesuppor
 import {
   except,
   hasKey,
+  keys,
   rbEnsure,
   rbEqual,
   rbInspect,
@@ -287,14 +288,17 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     ) as AssociationDefinition;
   }
 
-  initializeAttributes(record: Base, exceptFromScopeAttributes?: Record<string, unknown>): void {
+  initializeAttributes(
+    record: Base,
+    exceptFromScopeAttributes?: Record<string, unknown> | Map<string, unknown>,
+  ): void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
       this.reflection.foreignKey(),
       this.reflection.type,
     ].filter((key) => key != null);
     let assignedKeys = record.changedAttributeNamesToSave;
-    assignedKeys = assignedKeys.concat(Object.keys(exceptFromScopeAttributes).map(String));
+    assignedKeys = assignedKeys.concat(keys(exceptFromScopeAttributes).map(String));
     const attributes = except(
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
@@ -341,7 +345,10 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   ): Promise<Base | Base[] | null>;
 
   /** @internal */
-  buildRecord(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
+  buildRecord(
+    attributes?: Record<string, unknown> | Map<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base | null {
     return this.reflection.buildAssociation(attributes, (record: Base) => {
       this.initializeAttributes(record, attributes);
       if (block) block(record);

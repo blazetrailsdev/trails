@@ -120,7 +120,7 @@ export class Model {
   declare static _parseValidatesOptions: Extended<typeof Validates>["_parseValidatesOptions"];
 
   /** @missingRailsCall assign_attributes — CONVERGEABLE activemodel-api-initialize-concern-constructor */
-  constructor(attributes: Record<string, unknown> = {}) {
+  constructor(attributes: Record<string, unknown> | Map<string, unknown> = {}) {
     const ctor = this.constructor as typeof Model;
 
     Object.defineProperty(this, "_initializingAttributes", {

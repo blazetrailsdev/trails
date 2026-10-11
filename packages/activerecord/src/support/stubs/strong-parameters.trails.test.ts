@@ -18,7 +18,7 @@ describe("ProtectedParams", () => {
 
     expect(params.keys()).toEqual(["first_name"]);
     expect(params.isKey("permitted")).toBe(false);
-    expect(params.toH()).toEqual({ first_name: "Guille" });
+    expect(Object.fromEntries(params.toH())).toEqual({ first_name: "Guille" });
   });
 
   it("a parameter named after a method does not shadow the method", () => {
@@ -32,7 +32,7 @@ describe("ProtectedParams", () => {
     expect(params.keys()).toEqual(["keys", "permitted", "toH", "first_name"]);
     expect(params.isPermitted()).toBe(false);
     expect(params.isEmpty()).toBe(false);
-    expect(params.toH()).toEqual({
+    expect(Object.fromEntries(params.toH())).toEqual({
       keys: ["shadow"],
       permitted: true,
       toH: "not a method",
@@ -54,7 +54,7 @@ describe("ProtectedParams", () => {
   it("to_unsafe_h returns to_h regardless of permitted?", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
 
-    expect(params.toUnsafeH()).toEqual({ first_name: "Guille" });
+    expect(Object.fromEntries(params.toUnsafeH())).toEqual({ first_name: "Guille" });
     expect(params.toUnsafeH()).toEqual(params.toH());
     expect(params.isPermitted()).toBe(false);
   });
@@ -70,7 +70,7 @@ describe("ProtectedParams", () => {
     ]);
   });
 
-  it("dup preserves permitted? and gives the copy its own parameters", () => {
+  it("dup preserves permitted? and shares the parameters, as Object#dup does", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
     params.permitBang();
 
@@ -78,11 +78,11 @@ describe("ProtectedParams", () => {
 
     expect(duplicate).not.toBe(params);
     expect(duplicate.isPermitted()).toBe(true);
-    expect(duplicate.toH()).toEqual({ first_name: "Guille" });
+    expect(Object.fromEntries(duplicate.toH())).toEqual({ first_name: "Guille" });
 
     duplicate["gender"] = "m";
-    expect(params.toH()).toEqual({ first_name: "Guille" });
-    expect(duplicate.toH()).toEqual({ first_name: "Guille", gender: "m" });
+    expect(Object.fromEntries(params.toH())).toEqual({ first_name: "Guille", gender: "m" });
+    expect(Object.fromEntries(duplicate.toH())).toEqual({ first_name: "Guille", gender: "m" });
   });
 
   it("dup of an unpermitted params object stays unpermitted", () => {

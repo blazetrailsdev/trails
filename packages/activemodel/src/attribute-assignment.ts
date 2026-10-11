@@ -5,6 +5,7 @@ import {
   NotImplementedError,
   RuntimeError,
   TypeError,
+  eachPair,
   isEmpty,
   rbFPublicSend,
   rbObjClassname,
@@ -29,11 +30,11 @@ export function assignAttributes(this: AttributeAssignment, newAttributes: unkno
 /** @internal */
 export function _assignAttributes(
   this: AttributeAssignment,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): void {
-  for (const [k, v] of Object.entries(attributes)) {
+  eachPair(attributes, (k, v) => {
     void this._assignAttribute(k, v);
-  }
+  });
 }
 
 export function setAttributes(
@@ -76,17 +77,23 @@ export function _assignAttribute(this: AttributeAssignment, k: string, v: unknow
 export interface AttributeAssignment {
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForMassAssignment(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
   /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): unknown;
 }
 
-function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
+function respondToEachPair(
+  attrs: unknown,
+): attrs is Record<string, unknown> | Map<string, unknown> {
   if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
   const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return true;
+  if (proto === Object.prototype || proto === null || attrs instanceof Map) return true;
   return isParamsLikeWrapper(attrs);
 }
 

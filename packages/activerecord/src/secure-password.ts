@@ -1,18 +1,19 @@
 import { camelize } from "@blazetrails/activesupport";
 import { ArgumentError, hasSecurePassword } from "@blazetrails/activemodel";
-import { partition, toH } from "@blazetrails/ruby-compat";
+import { hashAref, keys, partition, toH } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
 export { hasSecurePassword };
 
 export async function authenticateBy(
   this: typeof Base,
-  attributes: Record<string, unknown> | { toH(): Record<string, unknown> },
+  attributes: Record<string, unknown> | { toH(): Record<string, unknown> | Map<string, unknown> },
 ): Promise<Base | null> {
+  const hash = toH(attributes);
   const [passwords, identifiers] = partition(
-    Object.entries(toH(attributes)),
-    ([name]) => !this.hasAttribute(name) && this.hasAttribute(`${name}_digest`),
-  ).map((pairs) => Object.fromEntries(pairs));
+    keys(hash),
+    (name) => !this.hasAttribute(name) && this.hasAttribute(`${name}_digest`),
+  ).map((names) => Object.fromEntries(names.map((name) => [name, hashAref(hash, name)])));
 
   if (Object.keys(passwords).length === 0) {
     throw new ArgumentError("One or more password arguments are required");

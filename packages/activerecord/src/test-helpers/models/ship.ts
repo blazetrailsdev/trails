@@ -1,4 +1,4 @@
-import { kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
+import { isEmpty, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Developer } from "./developer.js";
@@ -34,7 +34,7 @@ export class Ship extends Base {
     this.acceptsNestedAttributesFor("parts", { allowDestroy: true });
     this.acceptsNestedAttributesFor("pirate", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("updateOnlyPirate", { updateOnly: true });
 

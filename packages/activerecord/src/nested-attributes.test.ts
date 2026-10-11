@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   Base,
@@ -222,7 +223,7 @@ describe("TestNestedAttributesInGeneral", () => {
   });
 
   it("reject if with indifferent keys", async () => {
-    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !a["name"] });
+    Pirate.acceptsNestedAttributesFor("ship", { rejectIf: (a) => !hashAref(a, "name") });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ name: "Hello Pearl" });
     await assertDifference(
@@ -282,7 +283,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if is not short circuited if allow destroy is false", async () => {
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (a) => a["name"] === "The Golden Hind",
+      rejectIf: (a) => hashAref(a, "name") === "The Golden Hind",
       allowDestroy: false,
     });
     const pirate = await Pirate.createBang({
@@ -315,7 +316,7 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("reject if with blank nested attributes id", async () => {
     Pirate.acceptsNestedAttributesFor("ship", {
-      rejectIf: (a) => a["id"] == null || a["id"] === "",
+      rejectIf: (a) => hashAref(a, "id") == null || hashAref(a, "id") === "",
     });
     const pirate = new Pirate({ catchphrase: "Stop wastin' me time" });
     await (pirate as any).setShipAttributes({ id: "" });
@@ -1549,7 +1550,7 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
         indexErrors: "nestedAttributesOrder",
       });
       this.acceptsNestedAttributesFor("tuningPegs", {
-        rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
+        rejectIf: (a) => Number(hashAref(a, "pitch")) % 2 === 1,
       });
     }
   }

@@ -18,7 +18,10 @@ import { Translation } from "./translation.js";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any -- `include()`'s own AnyClass shape.
 type IncludingClass = (new (...args: any[]) => any) & { prototype: object };
 
-export function initialize(this: APIHost, attributes: Record<string, unknown> = {}): void {
+export function initialize(
+  this: APIHost,
+  attributes: Record<string, unknown> | Map<string, unknown> = {},
+): void {
   if (attributes != null) this.assignAttributes(attributes);
 
   initializeIncludedModules(this);
@@ -57,18 +60,24 @@ export class API {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include` (api.rb:58); the class/interface merge is how `include()` surfaces on the type side.
 export interface API extends Conversion {
   /** @internal */
-  initialize(attributes?: Record<string, unknown>): void;
+  initialize(attributes?: Record<string, unknown> | Map<string, unknown>): void;
   assignAttributes(newAttributes: unknown): void;
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): unknown;
   /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForMassAssignment(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
   /** @internal */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForbiddenAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
 
   /** @internal */
   contextForValidation(): ValidationContext;

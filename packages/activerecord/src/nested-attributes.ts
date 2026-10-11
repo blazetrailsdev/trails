@@ -13,6 +13,8 @@ import {
 } from "@blazetrails/activesupport";
 import {
   except,
+  hashAref,
+  keys as hashKeys,
   rbEqual,
   rbFSend,
   rbObjMethod,
@@ -31,12 +33,14 @@ export function _destroy(this: Base): boolean {
   return this.markedForDestruction();
 }
 
-export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean =>
-  Object.entries(attributes).every(([key, value]) => key === "_destroy" || isBlank(value));
+export const REJECT_ALL_BLANK_PROC = (
+  attributes: Record<string, unknown> | Map<string, unknown>,
+): boolean =>
+  hashKeys(attributes).every((key) => key === "_destroy" || isBlank(hashAref(attributes, key)));
 
 export interface NestedAttributeOptions {
   allowDestroy?: boolean;
-  rejectIf?: ((attributes: Record<string, unknown>) => boolean) | string;
+  rejectIf?: ((attributes: Record<string, unknown> | Map<string, unknown>) => boolean) | string;
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
 }
@@ -82,8 +86,8 @@ const UNASSIGNABLE_KEYS = ["id", "_destroy"] as const;
 const _booleanType = new BooleanType();
 
 /** @internal */
-export function hasDestroyFlag(hash: Record<string, unknown>): boolean {
-  return _booleanType.cast(hash["_destroy"]) === true;
+export function hasDestroyFlag(hash: Record<string, unknown> | Map<string, unknown>): boolean {
+  return _booleanType.cast(hashAref(hash, "_destroy")) === true;
 }
 
 /** @internal */
@@ -96,7 +100,7 @@ export function isAllowDestroy(this: Base, associationName: string): boolean {
 export function isWillBeDestroyed(
   this: Base,
   associationName: string,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): boolean {
   return isAllowDestroy.call(this, associationName) && hasDestroyFlag(attributes);
 }
@@ -105,7 +109,7 @@ export function isWillBeDestroyed(
 export function callRejectIf(
   this: Base,
   associationName: string,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): boolean | undefined {
   if (isWillBeDestroyed.call(this, associationName, attributes)) return false;
 
@@ -126,7 +130,7 @@ export function callRejectIf(
 export function isRejectNewRecord(
   this: Base,
   associationName: string,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): boolean | undefined {
   return (
     isWillBeDestroyed.call(this, associationName, attributes) ||
@@ -140,7 +144,7 @@ export function isRejectNewRecord(
  */
 export function assignToOrMarkForDestruction(
   record: Base,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
   allowDestroy: boolean,
 ): Promise<void> | void {
   const pending = record.setAttributes(except(attributes, ...UNASSIGNABLE_KEYS));
@@ -182,7 +186,7 @@ export function raiseNestedAttributesRecordNotFoundBang(
 export function checkRecordLimitBang(
   this: Base,
   limit: number | string | (() => number) | null | undefined,
-  attributesCollection: unknown[] | Record<string, unknown>,
+  attributesCollection: unknown[] | Record<string, unknown> | Map<string, unknown>,
 ): void {
   if (limit != null) {
     if (typeof limit === "string") {
@@ -261,10 +265,12 @@ function nestedTypeName(value: unknown): string {
 export function assignNestedAttributesForOneToOneAssociation(
   this: Base,
   associationName: string,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): Promise<void> | void {
   if (rbObjRespondTo(attributes, "isPermitted")) {
-    attributes = (attributes as unknown as { toH(): Record<string, unknown> }).toH();
+    attributes = (
+      attributes as unknown as { toH(): Record<string, unknown> | Map<string, unknown> }
+    ).toH();
   }
 
   if (typeof attributes !== "object" || attributes === null || Array.isArray(attributes)) {
@@ -277,7 +283,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 
   const assoc = this.association(associationName) as unknown as OneToOneAssociation;
   if (
-    (options.updateOnly || !isBlank(attributes["id"])) &&
+    (options.updateOnly || !isBlank(hashAref(attributes, "id"))) &&
     assoc.isLoaded() === false &&
     "reader" in assoc
   ) {
@@ -291,15 +297,15 @@ export function assignNestedAttributesForOneToOneAssociation(
   const existingRecord = assoc.target ?? null;
 
   if (
-    (options.updateOnly || !isBlank(attributes["id"])) &&
+    (options.updateOnly || !isBlank(hashAref(attributes, "id"))) &&
     existingRecord &&
-    (options.updateOnly || String(existingRecord.id) === String(attributes["id"]))
+    (options.updateOnly || String(existingRecord.id) === String(hashAref(attributes, "id")))
   ) {
     if (!callRejectIf.call(this, associationName, attributes)) {
       return assignToOrMarkForDestruction(existingRecord, attributes, options.allowDestroy!);
     }
-  } else if (isPresent(attributes["id"])) {
-    raiseNestedAttributesRecordNotFoundBang.call(this, associationName, attributes["id"]);
+  } else if (isPresent(hashAref(attributes, "id"))) {
+    raiseNestedAttributesRecordNotFoundBang.call(this, associationName, hashAref(attributes, "id"));
   } else if (!isRejectNewRecord.call(this, associationName, attributes)) {
     const assignableAttributes = except(attributes, ...UNASSIGNABLE_KEYS);
 
@@ -331,11 +337,18 @@ export function assignNestedAttributesForOneToOneAssociation(
 export function assignNestedAttributesForCollectionAssociation(
   this: Base,
   associationName: string,
-  attributesCollection: Record<string, unknown>[] | Record<string, Record<string, unknown>>,
+  attributesCollection:
+    | (Record<string, unknown> | Map<string, unknown>)[]
+    | Record<string, Record<string, unknown> | Map<string, unknown>>
+    | Map<string, Record<string, unknown> | Map<string, unknown>>,
 ): Promise<void> | void {
   const options = (this.constructor as typeof Base).nestedAttributesOptions[associationName];
   if (rbObjRespondTo(attributesCollection, "isPermitted")) {
-    attributesCollection = (attributesCollection as unknown as { toH(): never }).toH();
+    attributesCollection = (
+      attributesCollection as unknown as {
+        toH(): Map<string, Record<string, unknown> | Map<string, unknown>>;
+      }
+    ).toH();
   }
 
   if (typeof attributesCollection !== "object" || attributesCollection === null) {
@@ -346,15 +359,17 @@ export function assignNestedAttributesForCollectionAssociation(
 
   checkRecordLimitBang.call(this, options.limit, attributesCollection);
 
-  let attrs: Record<string, unknown>[];
+  let attrs: (Record<string, unknown> | Map<string, unknown>)[];
   if (Array.isArray(attributesCollection)) {
     attrs = attributesCollection;
   } else {
-    const keys = Object.keys(attributesCollection);
+    const keys = hashKeys(attributesCollection);
     if (keys.includes("id")) {
-      attrs = [attributesCollection as unknown as Record<string, unknown>];
+      attrs = [attributesCollection];
     } else {
-      attrs = keys.map((k) => (attributesCollection as any)[k]);
+      attrs = keys.map(
+        (k) => hashAref(attributesCollection, k) as Record<string, unknown> | Map<string, unknown>,
+      );
     }
   }
 
@@ -365,23 +380,23 @@ export function assignNestedAttributesForCollectionAssociation(
     let pending: Promise<void> | undefined;
     for (let a of attrs) {
       if (rbObjRespondTo(a, "isPermitted")) {
-        a = (a as unknown as { toH(): Record<string, unknown> }).toH();
+        a = (a as unknown as { toH(): Record<string, unknown> | Map<string, unknown> }).toH();
       }
 
-      if (isBlank(a["id"])) {
+      if (isBlank(hashAref(a, "id"))) {
         if (!isRejectNewRecord.call(this, associationName, a)) {
           nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
           nestedTarget.push(null);
         }
       } else {
-        let existingRecord = findRecordById(association.klass, existingRecords, (a as any).id);
+        let existingRecord = findRecordById(association.klass, existingRecords, hashAref(a, "id"));
         if (existingRecord) {
           if (!callRejectIf.call(this, associationName, a)) {
             const targetRecord = findRecordById(
               association.klass,
               association.target,
-              (a as any).id,
+              hashAref(a, "id"),
             );
             if (targetRecord) {
               existingRecord = targetRecord;
@@ -400,7 +415,7 @@ export function assignNestedAttributesForCollectionAssociation(
             nestedTarget.push(null);
           }
         } else {
-          raiseNestedAttributesRecordNotFoundBang.call(this, associationName, a["id"]);
+          raiseNestedAttributesRecordNotFoundBang.call(this, associationName, hashAref(a, "id"));
         }
       }
     }
@@ -410,9 +425,11 @@ export function assignNestedAttributesForCollectionAssociation(
 
   if (association.isLoaded()) return assignRecords(association.target);
 
-  const attributeIds = attrs.map((a) => a["id"]).filter((id) => id != null && id !== false);
+  const attributeIds = attrs
+    .map((a) => hashAref(a, "id"))
+    .filter((id) => id != null && id !== false);
   if (attributeIds.length === 0) return assignRecords([]);
-  if (attrs.every((a) => isBlank(a["id"]))) return assignRecords([]);
+  if (attrs.every((a) => isBlank(hashAref(a, "id")))) return assignRecords([]);
 
   const primaryKey = association.klass.primaryKey;
   const scope = association.scope();
