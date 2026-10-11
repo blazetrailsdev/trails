@@ -330,11 +330,11 @@ interface ComparableRecord {
 }
 
 export function isPresent(this: CoreRecord): boolean {
-  return this.isPersisted();
+  return true;
 }
 
 export function isBlank(this: CoreRecord): boolean {
-  return !isPresent.call(this);
+  return false;
 }
 
 interface ReadonlyFields {

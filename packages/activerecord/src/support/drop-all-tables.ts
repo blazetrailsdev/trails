@@ -1,5 +1,5 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { ActiveRecordError } from "../errors.js";
+import { ActiveRecordError, ConnectionFailed, ConnectionNotEstablished } from "../errors.js";
 import { canonicalForeignKeyDependents } from "./canonical-schema.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { typeRegistryKeyFor } from "./type-registry-key.js";
@@ -118,19 +118,6 @@ async function truncateNonEmpty(adapter: DatabaseAdapter, candidates: string[]):
   if (toTruncate.length > 0) await adapter.truncateTables(...toTruncate);
 }
 
-function _isPgConnectionError(e: unknown): boolean {
-  const err = e as { code?: string; message?: string } | null;
-  if (!err) return false;
-  if (typeof err.code === "string" && err.code.startsWith("08")) return true;
-  const msg = typeof err.message === "string" ? err.message : "";
-  return (
-    msg.includes("invalid frontend message") ||
-    msg.includes("Connection terminated") ||
-    msg.includes("client has already ended") ||
-    msg.includes("Client has encountered a connection error")
-  );
-}
-
 async function resetPgTables(
   adapter: DatabaseAdapter,
   mode: ResetMode,
@@ -139,7 +126,7 @@ async function resetPgTables(
   try {
     await _resetPgTablesOnce(adapter, mode, bootLaid);
   } catch (e) {
-    if (_isPgConnectionError(e)) {
+    if (e instanceof ConnectionFailed || e instanceof ConnectionNotEstablished) {
       await _resetPgTablesOnce(adapter, mode, bootLaid);
     } else {
       throw e;
@@ -159,7 +146,7 @@ async function _resetPgTablesOnce(
     try {
       await adapter.execute(`DROP MATERIALIZED VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
-      if (_isPgConnectionError(e)) throw e;
+      if (e instanceof ConnectionFailed || e instanceof ConnectionNotEstablished) throw e;
     }
   }
   for (const { schemaname: s, name: n } of (await adapter.execute(
@@ -168,7 +155,7 @@ async function _resetPgTablesOnce(
     try {
       await adapter.execute(`DROP VIEW IF EXISTS "${s}"."${n}" CASCADE`);
     } catch (e) {
-      if (_isPgConnectionError(e)) throw e;
+      if (e instanceof ConnectionFailed || e instanceof ConnectionNotEstablished) throw e;
     }
   }
 
@@ -184,7 +171,7 @@ async function _resetPgTablesOnce(
     try {
       await adapter.execute(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
     } catch (e) {
-      if (_isPgConnectionError(e)) throw e;
+      if (e instanceof ConnectionFailed || e instanceof ConnectionNotEstablished) throw e;
     }
   }
   await truncateNonEmpty(adapter, toTruncate);

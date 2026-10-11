@@ -6245,7 +6245,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           tokens.push(`ref:${callee.text}`);
         } else if (ts.isPropertyAccessExpression(callee)) {
           visit(callee.expression);
-          tokens.push(`ref:${callee.name.text}`);
+          tokens.push(`ref:${memberNameText(callee.name)}`);
         } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
           tokens.push("ref:super");
         } else {
@@ -6465,7 +6465,7 @@ function callSiteName(call: ts.CallExpression | ts.NewExpression): string | unde
   const name = ts.isIdentifier(callee)
     ? callee.text
     : ts.isPropertyAccessExpression(callee)
-      ? callee.name.text
+      ? memberNameText(callee.name)
       : undefined;
   if (name === undefined || name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
   return name;
@@ -6793,7 +6793,7 @@ function collectCalls(
         }
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
-        const prop = callee.name.text;
+        const prop = memberNameText(callee.name);
         called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
@@ -7580,13 +7580,17 @@ function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return modifiers?.some((m) => m.kind === kind) ?? false;
 }
 
+function memberNameText(name: ts.MemberName): string {
+  return ts.isPrivateIdentifier(name) ? name.text.slice(1) : name.text;
+}
+
 function getMemberName(member: ts.ClassElement): string | undefined {
   if (member.name) {
     if (ts.isIdentifier(member.name)) {
       return member.name.text;
     }
     if (ts.isPrivateIdentifier(member.name)) {
-      return member.name.text;
+      return ts.isPropertyDeclaration(member) ? member.name.text : member.name.text.slice(1);
     }
     if (ts.isStringLiteral(member.name)) {
       return member.name.text;
