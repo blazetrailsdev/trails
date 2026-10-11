@@ -104,7 +104,7 @@ export interface RedirectOptions {
   status?: number;
 }
 
-type MapperCallback = () => void;
+type MapperCallback = (this: Mapper) => void;
 type ConcernBlock = (this: Mapper, options: Record<string, unknown>) => void;
 type ConcernCallback = (mapper: Mapper, options: Record<string, unknown>) => void;
 type ConcernCallable =
@@ -992,7 +992,7 @@ export class Mapper {
     };
     this.withScopeLevel("resources", () =>
       this.resourceScope(resource, () => {
-        if (cb) cb();
+        if (cb) cb.call(this);
 
         if (options.concerns) this.concerns(options.concerns);
       }),
@@ -1103,7 +1103,7 @@ export class Mapper {
     };
     this.withScopeLevel("resource", () =>
       this.resourceScope(resource, () => {
-        if (cb) cb();
+        if (cb) cb.call(this);
 
         if (options.concerns) this.concerns(options.concerns);
       }),
@@ -1244,7 +1244,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new(scope);
     try {
-      cb();
+      cb.call(this);
     } finally {
       this._scope = previous;
     }
@@ -1258,10 +1258,10 @@ export class Mapper {
     this.withScopeLevel("member", () => {
       if (this.isShallow()) {
         this.shallowScope(() => {
-          this.pathScope(this.parentResource()!.memberScope, () => callback());
+          this.pathScope(this.parentResource()!.memberScope, () => callback.call(this));
         });
       } else {
-        this.pathScope(this.parentResource()!.memberScope, () => callback());
+        this.pathScope(this.parentResource()!.memberScope, () => callback.call(this));
       }
     });
   }
@@ -1272,7 +1272,7 @@ export class Mapper {
     }
 
     this.withScopeLevel("collection", () => {
-      this.pathScope(this.parentResource()!.collectionScope, () => callback());
+      this.pathScope(this.parentResource()!.collectionScope, () => callback.call(this));
     });
   }
 
@@ -1302,7 +1302,9 @@ export class Mapper {
     }
 
     this.withScopeLevel("new", () => {
-      this.pathScope(this.parentResource()!.newScope(this.actionPath("new")), () => callback());
+      this.pathScope(this.parentResource()!.newScope(this.actionPath("new")), () =>
+        callback.call(this),
+      );
     });
   }
 
@@ -1310,7 +1312,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new({ shallow: true });
     try {
-      callback();
+      callback.call(this);
     } finally {
       this._scope = previous;
     }
@@ -1475,7 +1477,7 @@ export class Mapper {
     const previous = this._scope;
     this._scope = this._scope.new({ controller });
     try {
-      callback();
+      callback.call(this);
     } finally {
       this._scope = previous;
     }
@@ -1489,7 +1491,7 @@ export class Mapper {
     );
     this._scope = this._scope.new({ defaults: merged });
     try {
-      callback();
+      callback.call(this);
     } finally {
       this._scope = previous;
     }
