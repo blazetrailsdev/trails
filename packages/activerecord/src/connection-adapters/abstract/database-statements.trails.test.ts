@@ -957,7 +957,7 @@ describe("returningColumnValues", () => {
     expect(await returningColumnValues.call(host, result)).toEqual([42]);
   });
 
-  it("returns [undefined] for empty result", async () => {
+  it("returns [null] for empty result", async () => {
     const host: DatabaseStatementsHost = {
       ...hostDefaults,
       pool,
@@ -965,7 +965,7 @@ describe("returningColumnValues", () => {
       log,
       lastInsertedId,
     };
-    expect(await returningColumnValues.call(host, Result.empty())).toEqual([undefined]);
+    expect(await returningColumnValues.call(host, Result.empty())).toEqual([null]);
   });
 
   it("answers through the adapter's own lastInsertedId", async () => {

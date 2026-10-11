@@ -1245,7 +1245,7 @@ describe("FinderTest", () => {
     await expect(Post.find({ foo: "bar", bar: "baz" } as never)).rejects.toThrow(RecordNotFound);
   });
 
-  // PERMANENT-SKIP: a Ruby Symbol is a JS string, so there is no symbol table to count (CLAUDE.md, "Ruby idioms that do not translate literally").
+  // PERMANENT-SKIP: a Ruby Symbol is a JS string, so there is no symbol table to count (CLAUDE.md, "Ruby idioms that do not translate literally", "Runtime facts Node does not expose").
   it.skip("symbols table ref", async () => {
     Post.where({ author_id: null });
     const x = (Symbol as any).allSymbols().length;
@@ -1254,7 +1254,7 @@ describe("FinderTest", () => {
   });
 
   it("any with scope on hash includes", async () => {
-    const post = await (authors("david") as any).posts.first();
+    const post = await authors("david").posts.first();
     const categories = Categorization.includes({ author: "posts" }).where({
       posts: { id: rid(post) },
     });
@@ -1444,12 +1444,15 @@ describe("FinderTest", () => {
   });
 
   it("find one message on primary key", async () => {
-    await expect(CanonicalCar.find(0)).rejects.toThrow(RecordNotFound);
-    const e = (await CanonicalCar.find(0).catch((err: unknown) => err)) as RecordNotFound;
-    expect(e.id).toBe(0);
-    expect(e.primaryKey).toBe("id");
-    expect(e.model).toBe("Car");
-    expect(e.message).toBe("Couldn't find Car with 'id'=0");
+    const e = await CanonicalCar.find(0).then(
+      () => null,
+      (err: unknown) => err as RecordNotFound,
+    );
+    expect(e).toBeInstanceOf(RecordNotFound);
+    expect(e!.id).toBe(0);
+    expect(e!.primaryKey).toBe("id");
+    expect(e!.model).toBe("Car");
+    expect(e!.message).toBe("Couldn't find Car with 'id'=0");
   });
 
   it("find without primary key", async () => {
