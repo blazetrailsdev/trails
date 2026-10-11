@@ -162,7 +162,7 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     expect(includes["ActiveRecord::Base"]).toEqual(["ActiveRecord::Core"]);
   });
 
-  it("records a prepend edge on a class and on a module", () => {
+  it("records a prepend edge on a class and on a module, absolute names kept as include keeps them", () => {
     const fixtures = {
       "connection_pool.rb": `
         module ActiveRecord
@@ -172,6 +172,8 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
             end
             class ConnectionPool
               prepend QueryCache::ConnectionPoolConfiguration
+              prepend ::MonitorMixin
+              include ::MonitorMixin
             end
           end
         end
@@ -180,6 +182,10 @@ describe("Ruby extractor body call capture", { timeout: RUBY_SUBPROCESS_TIMEOUT_
     const prepends = rubyIncludes(fixtures, "prepends");
     expect(prepends["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
       "QueryCache::ConnectionPoolConfiguration",
+      "::MonitorMixin",
+    ]);
+    expect(rubyIncludes(fixtures)["ActiveRecord::ConnectionAdapters::ConnectionPool"]).toEqual([
+      "::MonitorMixin",
     ]);
     expect(prepends["ActiveRecord::ConnectionAdapters::QueryCache"]).toEqual(["Dirties"]);
   });
