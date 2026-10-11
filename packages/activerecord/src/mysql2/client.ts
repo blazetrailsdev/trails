@@ -208,7 +208,6 @@ let DEFAULT_QUERY_OPTIONS: QueryOptions | undefined;
 export function defaultQueryOptions(): QueryOptions {
   return (DEFAULT_QUERY_OPTIONS ||= {
     as: "hash",
-    async: false,
     castBooleans: false,
     symbolizeKeys: false,
     databaseTimezone: "local",

@@ -1660,13 +1660,6 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
   }
 }
 
-/**
- * `rb_class_s_alloc` (`vendor/ruby/v3.3.11/class.c:364`, over `class_alloc`, `:230`) for
- * the copy `rb_mod_init_copy` (`:524`) fills: a constructor with `orig`'s
- * superclass (`RCLASS_SET_SUPER`, `:560`) whose `new` runs `orig`'s
- * constructor body and field initializers, which JS cannot copy, against the
- * copy's own method table.
- */
 function classAlloc(orig: AnyClass, superclass: object | null): object {
   const clone = function (...args: never[]): object {
     if (new.target === undefined) {
@@ -1677,7 +1670,6 @@ function classAlloc(orig: AnyClass, superclass: object | null): object {
   return Object.setPrototypeOf(clone, superclass);
 }
 
-/** The `RCLASS_M_TBL` copy of `rb_mod_init_copy` (`vendor/ruby/v3.3.11/class.c:548-554`). */
 function copyMethodTable(
   orig: AnyClass,
   clone: object,
