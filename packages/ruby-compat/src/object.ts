@@ -309,6 +309,7 @@ export const rbCFalseClass = rbDefineClass("FalseClass");
  * @noRailsEquivalent PERMANENT
  */
 export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
+/** `Integer#integer?` (`vendor/ruby/v3.3.11/numeric.rb:178`). */
 rbModDefineMethod(rbCInteger, "isInteger", () => true);
 
 /**

@@ -25,14 +25,14 @@ files do (CLAUDE.md, "Call-time constant resolution").
 ruby-compat keeps for each (`rbCNilClass`, `rbCTrueClass`, `rbCFalseClass`,
 `rbCInteger`, `rbCFloat`, `rbCString`, `rbCSymbol`) and defines
 `toMsgpackWithPacker` there, and `rbFSend` looks a method up on that seat:
-`128.to_msgpack` is `rbFSend(128, "toMsgpack")`. A `Hash` instance answers
-`toMsgpack` itself.
+`128.to_msgpack` is `rbFSend(128, "toMsgpack")`.
 
 `rbObjClass([])` is the global `Array` and a plain record has no class in its
 prototype chain, and trails patches neither `Array.prototype` nor
-`Object.prototype`. `core-ext.ts` exports an `Array` and a `Hash` class for
-those two, each taking the receiver first: `[].to_msgpack` is
-`Array.toMsgpack([])`.
+`Object.prototype`. For those two `core-ext.ts` exports an `Array` and a `Hash`
+class that take the receiver first: `[].to_msgpack` is `Array.toMsgpack([])`.
+They are imported from `@blazetrails/msgpack/core-ext`, since their names are
+Ruby's top-level ones; the package index exports `CoreExt` alone.
 
 ## Where a JS value differs from the Ruby one
 

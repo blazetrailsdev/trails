@@ -1,5 +1,4 @@
 import {
-  Hash as RubyHash,
   include,
   rbCFalseClass,
   rbCFloat,
@@ -69,10 +68,14 @@ rbModDefineMethod(
 );
 
 export class Array {
-  static toMsgpack(self: unknown[], packerOrIo: unknown = null): Uint8Array | Packer | null {
+  static toMsgpack<T>(
+    this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
+    self: T,
+    packerOrIo: unknown = null,
+  ): Uint8Array | Packer | null {
     if (packerOrIo != null && packerOrIo !== false) {
       if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-        return Array.toMsgpackWithPacker(self, packerOrIo as Packer);
+        return this.toMsgpackWithPacker(self, packerOrIo as Packer);
       } else {
         return MessagePack.pack(self, packerOrIo);
       }
@@ -88,24 +91,8 @@ export class Array {
   }
 }
 
-include(RubyHash, CoreExt);
-rbModDefineMethod(RubyHash, "toMsgpackWithPacker", function (this: object, packer: Packer) {
-  packer.writeHash(this);
-  return packer;
-});
-
 export class Hash {
-  static toMsgpack(self: object, packerOrIo: unknown = null): Uint8Array | Packer | null {
-    if (packerOrIo != null && packerOrIo !== false) {
-      if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-        return Hash.toMsgpackWithPacker(self, packerOrIo as Packer);
-      } else {
-        return MessagePack.pack(self, packerOrIo);
-      }
-    } else {
-      return MessagePack.pack(self);
-    }
-  }
+  static toMsgpack = Array.toMsgpack;
 
   /** @internal */
   static toMsgpackWithPacker(self: object, packer: Packer): Packer {

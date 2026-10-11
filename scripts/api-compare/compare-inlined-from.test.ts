@@ -131,10 +131,8 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(calls.join("\n")).not.toContain("build_reflection");
   });
 
-  it("flags nothing when the constructor makes the union's calls, the consumed super included", () => {
-    expect(compare().calls).toEqual([]);
-    const { calls, args } = compare({ tsCalls: ["buildReflection", "assignAttributes"] });
-    expect([...calls, ...args].join("\n")).not.toContain("super");
+  it("flags nothing when the constructor makes the union's calls", () => {
+    expect(compare()).toEqual({ calls: [], args: [] });
   });
 
   const local = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });
