@@ -3185,10 +3185,25 @@ describe("extractClass — internal tagging", () => {
         #field = 1;
       }
     `);
-    const hidden = info.instanceMethods.find((m) => m.name === "#hidden")!;
+    const hidden = info.instanceMethods.find((m) => m.name === "hidden")!;
     expect(hidden.visibility).toBe("private");
     expect(hidden.internal).toBe(true);
     expect(info.instanceMethods.find((m) => m.name === "#field")!.internal).toBe(true);
+  });
+
+  it("credits a `#name` method, and a call to it, under the bare name", () => {
+    const info = extractFromSource(`
+      export class Foo {
+        scope() {
+          return this.#addConstraints();
+        }
+        #addConstraints() {}
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "addConstraints")!.visibility).toBe(
+      "private",
+    );
+    expect(info.instanceMethods.find((m) => m.name === "scope")!.calls).toContain("addConstraints");
   });
 
   it("tags static private members and keeps them on classMethods", () => {
@@ -4559,7 +4574,7 @@ describe("extractFromProgram — @noRailsEquivalent beats @internal (RFC 0121)",
       `,
     });
     const cls = info.classes["updater.ts:Updater"];
-    for (const name of ["factory", "priv", "prot", "#hidden"]) {
+    for (const name of ["factory", "priv", "prot", "hidden"]) {
       expect(cls.instanceMethods.find((m) => m.name === name)!.internal).toBe(true);
     }
     expect(cls.instanceMethods.find((m) => m.name === "seam")!.internal).toBeUndefined();

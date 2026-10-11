@@ -17,8 +17,6 @@ type ChainEntry = AbstractReflection & {
 
 type JoinIds = unknown[] | DeferredPluck;
 
-type EvalScope = { evalScope: AssociationScope["evalScope"] };
-
 export class DisableJoinsAssociationScope extends AssociationScope {
   override scope(association: AssociationScopeable): unknown {
     const sourceReflection = association.reflection;
@@ -32,8 +30,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
     const [lastReflection, lastOrdered, lastJoinIds] = this.lastScopeChain(reverseChain, owner);
 
-    return addConstraints.call(
-      this,
+    return this.#addConstraints(
       lastReflection,
       lastReflection.joinPrimaryKey(),
       lastJoinIds,
@@ -52,7 +49,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
     return reverseChain.reduce(([reflection, ordered, joinIds], nextReflection) => {
       const key = reflection.joinPrimaryKey();
-      const records = addConstraints.call(this, reflection, key, joinIds, owner, ordered);
+      const records = this.#addConstraints(reflection, key, joinIds, owner, ordered);
       const foreignKey = nextReflection.joinForeignKey;
       const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey].flat());
       const recordsOrdered = records != null && any(records.orderValues);
@@ -60,48 +57,46 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       return [nextReflection, recordsOrdered, recordIds];
     }, firstScope);
   }
-}
 
-/** @internal */
-export function addConstraints(
-  this: DisableJoinsAssociationScope,
-  reflection: ChainEntry,
-  key: string | string[],
-  joinIds: JoinIds,
-  owner: Base,
-  ordered: boolean,
-): Relation<Base> | DisableJoinsAssociationRelation<Base> {
-  let scope: Relation<Base> = reflection
-    .buildScope(reflection.aliasedTable)
-    .where(new Map([[key, joinIds]]));
+  #addConstraints(
+    reflection: ChainEntry,
+    key: string | string[],
+    joinIds: JoinIds,
+    owner: Base,
+    ordered: boolean,
+  ): Relation<Base> | DisableJoinsAssociationRelation<Base> {
+    let scope: Relation<Base> = reflection
+      .buildScope(reflection.aliasedTable)
+      .where(new Map([[key, joinIds]]));
 
-  const relation: Relation<Base> = reflection.klass.scopeForAssociation();
-  scope.mergeBang(
-    relation.except(
-      "select",
-      "createWith",
-      "includes",
-      "preload",
-      "eagerLoad",
-      "joins",
-      "leftOuterJoins",
-    ),
-  );
+    const relation: Relation<Base> = reflection.klass.scopeForAssociation();
+    scope.mergeBang(
+      relation.except(
+        "select",
+        "createWith",
+        "includes",
+        "preload",
+        "eagerLoad",
+        "joins",
+        "leftOuterJoins",
+      ),
+    );
 
-  scope = reflection.constraints().reduce((memo, scopeChainItem) => {
-    const item = (this as unknown as EvalScope).evalScope(reflection, scopeChainItem, owner);
-    scope.unscopeBang(...item.unscopeValues);
-    scope.whereClause = scope.whereClause.plus(item.whereClause);
-    scope.orderValues = union(item.orderValues, scope.orderValues);
-    return scope;
-  }, scope);
+    scope = reflection.constraints().reduce((memo, scopeChainItem) => {
+      const item = this.evalScope(reflection, scopeChainItem, owner);
+      scope.unscopeBang(...item.unscopeValues);
+      scope.whereClause = scope.whereClause.plus(item.whereClause);
+      scope.orderValues = union(item.orderValues, scope.orderValues);
+      return scope;
+    }, scope);
 
-  if (isEmpty(scope.orderValues) && ordered) {
-    const splitScope = DisableJoinsAssociationRelation.create(scope.model, key, joinIds);
-    splitScope.whereClause = splitScope.whereClause.plus(scope.whereClause);
-    return splitScope;
-  } else {
-    return scope;
+    if (isEmpty(scope.orderValues) && ordered) {
+      const splitScope = DisableJoinsAssociationRelation.create(scope.model, key, joinIds);
+      splitScope.whereClause = splitScope.whereClause.plus(scope.whereClause);
+      return splitScope;
+    } else {
+      return scope;
+    }
   }
 }
 

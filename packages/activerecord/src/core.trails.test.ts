@@ -11,9 +11,21 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { BooleanType, IntegerType, StringType } from "@blazetrails/activemodel";
 import { establishConnectionTo } from "./test-helpers/adapter-double.js";
+import { compactBlank, isBlank } from "@blazetrails/activesupport";
 import { rbCheckArrayType, rbHash, rbModToS, rbObjRespondTo, uniq } from "@blazetrails/ruby-compat";
 import { _allocation, equals as coreEquals, hash as coreHash } from "./core.js";
 import { hasQueryConstraints, queryConstraints } from "./persistence.js";
+
+describe("present? / blank?", () => {
+  fixtures(["topics"]);
+
+  it("a new record is present, and compactBlank keeps it", () => {
+    const topic = new Topic();
+    expect(isBlank(topic)).toBe(false);
+    expect(topic.isPresent()).toBe(true);
+    expect(compactBlank([topic])).toEqual([topic]);
+  });
+});
 
 describe("frozen / isFrozen", () => {
   fixtures(["topics"]);

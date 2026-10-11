@@ -82,7 +82,7 @@ export class AssociationScope {
     const chain = this.getChain(reflection, association, scope.aliasTracker());
 
     scope.extendingBang(...reflection.extensions());
-    scope = this.addConstraints(scope, owner, chain);
+    scope = this.#addConstraints(scope, owner, chain);
     if (!reflection.isCollection()) scope.limitBang(1);
     return scope;
   }
@@ -177,7 +177,7 @@ export class AssociationScope {
     return scope.joinsBang(this.join(foreignTable, constraints));
   }
 
-  private addConstraints(
+  #addConstraints(
     scope: Relation<Base>,
     owner: Base,
     chain: Array<ChainReflection>,
