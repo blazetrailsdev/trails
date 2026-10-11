@@ -54,7 +54,7 @@ import {
 } from "./test-helpers/models/company.js";
 import { PreparedStatementInvalid, StatementInvalid, UnknownPrimaryKey } from "./index.js";
 import { ForbiddenAttributesError, MissingAttributeError } from "@blazetrails/activemodel";
-import { assertRespondTo, assertNotEmpty } from "@blazetrails/activesupport";
+import { assertRespondTo, assertNotEmpty, assertRaises } from "@blazetrails/activesupport";
 
 function assertNotCalledFlag(called: boolean): void {
   if (called) throw new Error("Expected instantiate not to be called");
@@ -1444,15 +1444,13 @@ describe("FinderTest", () => {
   });
 
   it("find one message on primary key", async () => {
-    const e = await CanonicalCar.find(0).then(
-      () => null,
-      (err: unknown) => err as RecordNotFound,
-    );
-    expect(e).toBeInstanceOf(RecordNotFound);
-    expect(e!.id).toBe(0);
-    expect(e!.primaryKey).toBe("id");
-    expect(e!.model).toBe("Car");
-    expect(e!.message).toBe("Couldn't find Car with 'id'=0");
+    const e = (await assertRaises([RecordNotFound], {}, () =>
+      CanonicalCar.find(0),
+    )) as RecordNotFound;
+    expect(e.id).toBe(0);
+    expect(e.primaryKey).toBe("id");
+    expect(e.model).toBe("Car");
+    expect(e.message).toBe("Couldn't find Car with 'id'=0");
   });
 
   it("find without primary key", async () => {
