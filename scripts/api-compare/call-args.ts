@@ -1019,8 +1019,8 @@ function hashFormKeys(ruby: CallSite, ts: CallSite): [string, string] | CallArgS
   if (rubyKey === undefined) return "opaqueRubyArg";
   const tsKey = ts.args[0]?.match(/^str:(.*)$/s)?.[1];
   if (tsKey === undefined) return "opaqueTsArg";
-  const bare = kind === "sym" ? tsKey.replace(/^:/, "") : tsKey;
-  return [`str:${normalizeRubyKey(rubyKey)}`, `str:${normalizeRubyKey(bare)}`];
+  if (kind === "str") return [`str:${rubyKey}`, `str:${tsKey}`];
+  return [`str:${normalizeRubyKey(rubyKey)}`, `str:${normalizeRubyKey(tsKey.replace(/^:/, ""))}`];
 }
 
 /** The descriptor of a `&blk` block-pass the Ruby site's argument list dropped

@@ -314,9 +314,11 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  * is a `shape` row (call-args.ts#hashFormKeys). A key is literal when Ruby's
  * is a Symbol or String literal and the TS one a string literal or a property
  * name (`delete options.public`); a computed key on either side is not
- * compared. Both go through `normalizeRubyKey`, the translation a kwarg key
- * gets, so `:only_path` is `"onlyPath"`, and a Symbol key is also `":params"`,
- * the spelling a hash holding Symbol and String keys keeps it under. A Ruby
+ * compared. A Symbol key goes through `normalizeRubyKey` on both sides, the
+ * translation a kwarg key gets, so `:only_path` is `"onlyPath"`, and is also
+ * `":params"`, the spelling a hash holding Symbol and String keys keeps it
+ * under. A String key is compared verbatim: `"only_path"` is not `"onlyPath"`.
+ * A Ruby
  * site on a local receiver, which the gate otherwise drops as `weak`, is kept
  * where the body has a form site on that receiver. `@assign`, `@spread` and
  * `@entries` name no key and are not recorded.

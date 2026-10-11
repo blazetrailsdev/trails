@@ -6379,6 +6379,19 @@ describe("callArgs", () => {
       ["@in", ["id:k"]],
       ["hasOwn", ["id:h", "id:k"]],
     ]);
+    expect(
+      site(
+        `class Foo {
+          #priv = 1;
+          create(h: any) {
+            return Object.prototype.hasOwnProperty.call(h, "k") || #priv in h;
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:k"], flags: [], recv: "id:h" },
+      { name: "@in", args: ["?"], flags: [], recv: "id:h" },
+    ]);
   });
 
   it("records a call's own receiver, but not a namespace qualifier", () => {

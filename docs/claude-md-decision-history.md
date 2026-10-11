@@ -292,7 +292,11 @@ RFC 0129 put the hash helpers (`hasKey`, `hashDelete`, `mergeBang`, `eachPair`,
 `hashAref`, `hashAset`) on every option-hash site on purpose. `key?` and
 `has_key?` had sat in `NO_JS_CALL_FORM`, because `in` was "a shape the gate
 cannot tell from a dropped guard", and a helper call gave the call gate a
-callee to see. By 2026-10-10 that was about 336 helper call sites in source.
+callee to see. RFC 0190 § "What the helpers are" (tasks repo,
+`rfcs/0190-native-js-hash-forms/README.md`) measured that on 2026-10-10 at
+trails `ddd629745a`: lines calling each helper name in `packages/*/src/**/*.ts`
+with `hash.ts` excluded, which came to about 336 helper call sites in source
+once member calls on ported classes were taken out.
 
 The repo owner ruled on 2026-10-10: "I don't want things to use hash or
 hashwithindifferentaccess unless specific features are necessary." RFC 0190
@@ -305,6 +309,6 @@ Rails names. That receiver match is what an exemption could not give: a dropped
 Putting the names in `NO_JS_CALL_FORM` was rejected for that reason. A native
 form for `fetch` was rejected because `h.k ?? d` replaces a stored `nil`.
 `in` for every key was rejected because it walks the prototype chain, which is
-why a computed key is `Object.hasOwn`. 76 of the 94 `hashDelete` sites use the
-removed value, so the helper stays there, and the RFC reports that residual
+why a computed key is `Object.hasOwn`. By the same count, 76 of the 94
+`hashDelete` call lines use the removed value and 18 are a bare statement, so the helper stays there, and the RFC reports that residual
 instead of promising zero helper calls.

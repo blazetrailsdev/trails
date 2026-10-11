@@ -1571,6 +1571,18 @@ describe("a native hash form's literal key (RFC 0190)", () => {
     expect(verdict(on("delete", "id:env", ["str:params"]), form)).toEqual(["mismatch"]);
   });
 
+  it("compares a String key verbatim", () => {
+    const ruby = on("delete", "id:env", ["str:only_path"]);
+    expect(verdict(ruby, on("@delete", "id:env", ["str:only_path"]))).toEqual(["match"]);
+    expect(verdict(ruby, on("@delete", "id:env", ["str:onlyPath"]))).toEqual(["mismatch"]);
+  });
+
+  it.each(["has_key?", "include?", "member?"])("compares the key of %s against @in", (name) => {
+    const ruby = on(name, "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:path"]))).toEqual(["mismatch"]);
+  });
+
   it("does not compare a computed key on either side", () => {
     expect(
       verdict(on("delete", "id:options", ["id:key"]), on("@delete", "id:options", ["str:public"])),
