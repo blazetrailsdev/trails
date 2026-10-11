@@ -8,7 +8,6 @@ import {
   getFs,
   getPath,
   Hash,
-  hasKey,
   hashDelete,
   included,
   initialize,
@@ -353,9 +352,9 @@ export async function thor(
   ...args: unknown[]
 ): Promise<string | boolean | null | undefined> {
   const config = (rbObjIsKindOf(last(args), Hash) ? args.pop() : {}) as Record<string, unknown>;
-  const verbose = hasKey(config, "verbose") ? hashDelete(config, "verbose") : true;
-  const pretend = hasKey(config, "pretend") ? hashDelete(config, "pretend") : false;
-  const capture = hasKey(config, "capture") ? hashDelete(config, "capture") : false;
+  const verbose = "verbose" in config ? hashDelete(config, "verbose") : true;
+  const pretend = "pretend" in config ? hashDelete(config, "pretend") : false;
+  const capture = "capture" in config ? hashDelete(config, "capture") : false;
 
   args.unshift(command);
   args.push(Options.toSwitches(config));

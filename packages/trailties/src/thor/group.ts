@@ -3,7 +3,6 @@ import {
   first,
   fetch,
   flatten,
-  hasKey,
   include,
   initializeIncludedModules,
   last,
@@ -123,7 +122,7 @@ export class Group {
     const verbose = fetch(options, "verbose", ":white");
 
     (names as string[]).forEach((name) => {
-      if (!hasKey(this.classOptions(), name)) {
+      if (!Object.hasOwn(this.classOptions(), name)) {
         throw new ArgumentError(
           `You have to define the option ${rbInspect(name)} ` +
             "before setting invoke_from_option.",

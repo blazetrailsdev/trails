@@ -849,7 +849,7 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     await this.copyTableIndexes(from, to, options.rename ?? {});
 
     const columnsToCopy = definition.columns
-      .filter((col) => !hasKey(col.options as Record<string, unknown>, "as"))
+      .filter((col) => !("as" in (col.options as Record<string, unknown>)))
       .map((col) => col.name);
     await this.copyTableContents(from, to, columnsToCopy, options.rename ?? {});
   }
@@ -1062,7 +1062,7 @@ WHERE type = 'table' AND name = ${this.quote(tableName)}
       ...pragmas,
     })) {
       const setter = `set${camelize(pragma)}`;
-      if (hasKey(Pragmas, setter)) {
+      if (Object.hasOwn(Pragmas, setter)) {
         await (Pragmas[setter as keyof typeof Pragmas] as (value: unknown) => unknown).call(
           this._rawConnection!,
           value,

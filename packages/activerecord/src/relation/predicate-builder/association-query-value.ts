@@ -1,4 +1,4 @@
-import { hasKey, isEmpty, rbFPublicSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
+import { isEmpty, rbFPublicSend, rbObjRespondTo, toH, zip } from "@blazetrails/ruby-compat";
 import type { Base } from "../../base.js";
 import { ActiveRecord } from "../../namespaces.js";
 import type { Relation } from "../../relation.js";
@@ -82,7 +82,7 @@ export class AssociationQueryValue {
   private isPolymorphicClause(): boolean {
     return (
       this.primaryType() != null &&
-      !hasKey((this.value as Relation<Base, boolean>).whereValuesHash(), this.primaryType()!)
+      !Object.hasOwn((this.value as Relation<Base, boolean>).whereValuesHash(), this.primaryType()!)
     );
   }
 

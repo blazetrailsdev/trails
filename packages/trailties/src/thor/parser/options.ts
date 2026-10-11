@@ -2,7 +2,6 @@ import {
   aryDelete,
   compact,
   eachPair,
-  hasKey,
   isEmpty,
   keys,
   matchOperator,
@@ -359,10 +358,10 @@ export class Options extends Arguments {
         this.shift();
         return false;
       } else {
-        return hasKey(this.switches, switch_) || this.isNoOrSkip(switch_) == null;
+        return Object.hasOwn(this.switches, switch_) || this.isNoOrSkip(switch_) == null;
       }
     } else {
-      return hasKey(this.switches, switch_) || this.isNoOrSkip(switch_) == null;
+      return Object.hasOwn(this.switches, switch_) || this.isNoOrSkip(switch_) == null;
     }
   }
 

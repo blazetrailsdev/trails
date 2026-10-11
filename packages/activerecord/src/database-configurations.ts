@@ -2,7 +2,6 @@ import {
   TypeError,
   compact,
   groupBy,
-  hasKey,
   isSymbol,
   rbEqual,
   rbInspect,
@@ -101,7 +100,7 @@ export class DatabaseConfigurations {
     }
 
     if (configKey != null) {
-      configs = configs.filter((dbConfig) => hasKey(dbConfig.configurationHash, configKey));
+      configs = configs.filter((dbConfig) => Object.hasOwn(dbConfig.configurationHash, configKey));
     }
 
     if (name != null) {

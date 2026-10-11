@@ -21,7 +21,6 @@ import {
   stringDelete,
   toS,
   valuesAt,
-  hasKey,
   coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { SchemaStatements as AbstractSchemaStatements } from "../abstract/schema-statements.js";
@@ -1513,9 +1512,7 @@ export class SchemaStatements extends AbstractSchemaStatements {
     tableName: string,
     options: Record<string, unknown> = {},
   ): Promise<UniqueConstraintDefinition | undefined> {
-    const name = hasKey(options, "column")
-      ? undefined
-      : this.uniqueConstraintName(tableName, options);
+    const name = "column" in options ? undefined : this.uniqueConstraintName(tableName, options);
     const constraints = await this.uniqueConstraints(tableName);
     return constraints.find((c) => c.definedFor(coreHashMergeKwd({ name }, options)));
   }

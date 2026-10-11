@@ -10,7 +10,6 @@ import {
   File,
   Hash,
   hashDelete,
-  hasKey,
   include,
   included,
   initialize,
@@ -342,9 +341,9 @@ export const ClassMethods = {
     this.noCommands(() => this.attrAccessor(name));
 
     let required: unknown;
-    if (hasKey(options, "optional")) {
+    if ("optional" in options) {
       required = !rtest(options.optional);
-    } else if (hasKey(options, "required")) {
+    } else if ("required" in options) {
       required = options.required;
     } else {
       required = options.default == null;

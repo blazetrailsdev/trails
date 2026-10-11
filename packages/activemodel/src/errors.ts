@@ -10,7 +10,6 @@ import {
   FrozenError,
   groupBy,
   type Hash,
-  hasKey,
   isEmpty,
   rbEqual,
   rbInspect,
@@ -95,7 +94,7 @@ export class Errors<TBase extends object = object> {
     overrideOptions: { attribute?: string; type?: string } = {},
   ): void {
     for (const key of ["attribute", "type"] as const) {
-      if (hasKey(overrideOptions, key)) {
+      if (Object.hasOwn(overrideOptions, key)) {
         overrideOptions[key] = toSym(overrideOptions[key]);
       }
     }

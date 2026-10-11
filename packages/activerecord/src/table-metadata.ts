@@ -1,4 +1,3 @@
-import { hasKey } from "@blazetrails/ruby-compat";
 import { Table } from "@blazetrails/arel";
 import { singularize } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
@@ -26,7 +25,7 @@ export class TableMetadata {
 
   hasColumn(columnName: string): boolean | null {
     const columnsHash = this.klass?.columnsHash();
-    return columnsHash == null ? null : hasKey(columnsHash, columnName);
+    return columnsHash == null ? null : Object.hasOwn(columnsHash, columnName);
   }
 
   isAssociatedWith(tableName: string): any {

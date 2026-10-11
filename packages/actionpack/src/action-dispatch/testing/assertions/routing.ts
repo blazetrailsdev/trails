@@ -1,7 +1,6 @@
 import {
   deleteIf,
   extend,
-  hasKey,
   include,
   InvalidURIError,
   Module,
@@ -252,7 +251,7 @@ export function assertRouting(
   ) {
     options = { ...options, controller: `/${controller}` };
   }
-  const generateOptions = deleteIf({ ...options }, (k) => hasKey(defaults, k));
+  const generateOptions = deleteIf({ ...options }, (k) => Object.hasOwn(defaults, k));
   const pathStr = typeof path === "string" ? path : path.path;
   assertGenerates.call(this, pathStr, generateOptions, defaults, extras, message);
 }

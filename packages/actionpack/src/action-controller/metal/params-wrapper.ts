@@ -2,7 +2,6 @@ import {
   deleteAt,
   except,
   flatten,
-  hasKey,
   last,
   merge,
   mergeBang,
@@ -312,7 +311,7 @@ export function _wrapperEnabled(this: ParamsWrapperHost): boolean {
     return (
       this._wrapperFormats().includes(ref!) &&
       this._wrapperKey() != null &&
-      !hasKey(this.request.parameters, this._wrapperKey()!)
+      !Object.hasOwn(this.request.parameters, this._wrapperKey()!)
     );
   } catch (err) {
     if (err instanceof ParseError) return false;

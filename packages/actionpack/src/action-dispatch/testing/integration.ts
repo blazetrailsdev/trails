@@ -6,7 +6,6 @@ import {
   HTTPS,
   RuntimeError,
   URI,
-  hasKey,
   include,
   rbFPublicSend,
   rbFSend,
@@ -275,7 +274,7 @@ export class IntegrationTest extends TestCase {
       ? this.request.method.toLowerCase()
       : "get";
 
-    if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => hasKey(headers, key))) {
+    if (![":HTTP_REFERER", "HTTP_REFERER"].some((key) => Object.hasOwn(headers, key))) {
       headers["HTTP_REFERER"] = this.request.url;
     }
 

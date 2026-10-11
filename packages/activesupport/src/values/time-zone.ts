@@ -16,7 +16,6 @@ import { Temporal, Date as RubyDate, Time, tzdataIsdst } from "@blazetrails/date
 import {
   equals as cmpEquals,
   fetch,
-  hasKey,
   KeyError,
   Rational,
   sprintf,
@@ -837,7 +836,7 @@ export class TimeZone {
 
       let month: number;
       let day: number;
-      if (hasKey(parts, "yday")) {
+      if ("yday" in parts) {
         const ordinalDate = RubyDate.ordinal(year, fetch<number>(parts, "yday"));
         month = ordinalDate.month;
         day = ordinalDate.day;

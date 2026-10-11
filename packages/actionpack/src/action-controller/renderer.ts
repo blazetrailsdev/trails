@@ -1,4 +1,4 @@
-import { dup, hasKey, merge, mergeBang } from "@blazetrails/ruby-compat";
+import { dup, merge, mergeBang } from "@blazetrails/ruby-compat";
 
 import type { RouteSetLike } from "../abstract-controller/url-for.js";
 import { statusCode } from "@blazetrails/rack";
@@ -92,7 +92,7 @@ export class Renderer {
   private envForRequest(): Record<string, unknown> {
     type EnvSlice = Pick<RouteSetLike, "defaultEnv">;
     const routes = (this._controller as { _routes?: EnvSlice | null } | null | undefined)?._routes;
-    if (hasKey(this._env, "HTTP_HOST") || !routes) {
+    if ("HTTP_HOST" in this._env || !routes) {
       return dup(this._env);
     }
     return merge(routes.defaultEnv ?? {}, this._env);

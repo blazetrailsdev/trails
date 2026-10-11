@@ -1,4 +1,4 @@
-import { deleteIf, hasKey, KeyError } from "@blazetrails/ruby-compat";
+import { deleteIf, KeyError } from "@blazetrails/ruby-compat";
 import { stringifyKeys } from "@blazetrails/activesupport";
 
 /** @noRailsEquivalent PERMANENT */
@@ -198,7 +198,7 @@ export class Session {
 
   hasKey(key: unknown): boolean {
     this.loadForReadBang();
-    return hasKey(this.delegate, String(key));
+    return Object.hasOwn(this.delegate, String(key));
   }
 
   isKey(key: unknown): boolean {

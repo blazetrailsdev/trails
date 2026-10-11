@@ -7,7 +7,6 @@ import type { AssociationReflection, ThroughReflection } from "../reflection.js"
 import { kernelArray, safeConstantize, tryCall } from "@blazetrails/activesupport";
 import {
   except,
-  hasKey,
   keys,
   rbEnsure,
   rbEqual,
@@ -437,7 +436,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
 
     if ((this.owner as { _validationContext?: unknown })._validationContext != null) return false;
 
-    if (hasKey(this.reflection.options, "strictLoading")) {
+    if ("strictLoading" in this.reflection.options) {
       return this.reflection.options.strictLoading === true;
     }
 

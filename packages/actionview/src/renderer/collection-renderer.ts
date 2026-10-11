@@ -1,5 +1,5 @@
 import { Notifications, type SafeBuffer } from "@blazetrails/activesupport";
-import { NotImplementedError, hasKey, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { NotImplementedError, rbObjRespondTo } from "@blazetrails/ruby-compat";
 
 import {
   EmptyCollection,
@@ -259,7 +259,7 @@ export class CollectionRenderer extends PartialRenderer implements ObjectRenderi
       },
       (payload) => {
         let spacer: RenderedTemplate;
-        if (hasKey(this.options, "spacerTemplate")) {
+        if ("spacerTemplate" in this.options) {
           const spacerTemplate = this.findTemplate(
             String(this.options.spacerTemplate),
             Object.keys(this.locals),

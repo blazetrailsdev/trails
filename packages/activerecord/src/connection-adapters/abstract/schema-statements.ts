@@ -12,7 +12,6 @@ import {
   rtest,
   RuntimeError,
   toI,
-  hasKey,
   toS,
   coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
@@ -1085,7 +1084,7 @@ export class SchemaStatements {
     tableName: string,
     options: { name?: string; expression?: string; validate?: boolean } = {},
   ): Promise<boolean> {
-    if (!hasKey(options, "name") && !hasKey(options, "expression")) {
+    if (!("name" in options) && !("expression" in options)) {
       throw new ArgumentError("At least one of :name or :expression must be supplied");
     }
     return (await this.checkConstraintFor(tableName, options)) !== undefined;
