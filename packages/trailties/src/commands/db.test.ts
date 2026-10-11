@@ -2928,9 +2928,6 @@ export class CreateOwners extends Migration {
       await runDb(["drop"]);
       await runDb(["drop"]);
       expect(process.exitCode ?? 0).toBe(0);
-      await runDb(["drop"]);
-      await runDb(["drop"]);
-      expect(process.exitCode ?? 0).toBe(0);
     },
   );
 
