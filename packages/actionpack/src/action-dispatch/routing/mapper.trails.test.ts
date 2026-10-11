@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
@@ -11,6 +11,8 @@ import {
   type MountableApp,
 } from "./mapper.js";
 import { RouteSet } from "./route-set.js";
+import { controllerConstants } from "../http/request.js";
+import type { DispatchableControllerClass } from "./dispatcher.js";
 import type { Request } from "../http/request.js";
 import { X_CASCADE } from "../constants.js";
 import { deprecator } from "../deprecator.js";
@@ -397,5 +399,91 @@ describe("Mapper#mount", () => {
     });
 
     expect(options).toEqual({ as: undefined, via: ":all" });
+  });
+});
+
+describe("Mapper block receivers", () => {
+  class StubController {}
+
+  beforeAll(() => {
+    for (const name of ["health", "owners", "reports", "admin/posts", "pages", "profiles"]) {
+      controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
+    }
+  });
+
+  it("binds a nested constraints block to the mapper, as draw binds its own", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("up", { to: "health#show" });
+
+      this.constraints({ owner: /blazetrailsdev/ }, function () {
+        this.get(":owner", { to: "owners#show" });
+      });
+    });
+
+    expect(routes.recognizePath("/up").action).toBe("show");
+    expect(routes.recognizePath("/blazetrailsdev").controller).toBe("owners");
+  });
+
+  it("binds a nested scope block to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.scope("admin", function () {
+        this.scope("reports", function () {
+          this.get("daily", { to: "reports#daily" });
+        });
+      });
+    });
+
+    const m = routes.recognizePath("/admin/reports/daily");
+    expect([m.controller, m.action]).toEqual(["reports", "daily"]);
+  });
+
+  it("binds namespace, resources, member and collection blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.namespace("admin", function () {
+        this.resources("posts", function () {
+          this.member(function () {
+            this.get("preview", { to: "posts#preview" });
+          });
+          this.collection(function () {
+            this.get("archive", { to: "posts#archive" });
+          });
+        });
+      });
+    });
+
+    expect(routes.recognizePath("/admin/posts/1/preview").action).toBe("preview");
+    expect(routes.recognizePath("/admin/posts/archive").action).toBe("archive");
+  });
+
+  it("binds controller, defaults and resource blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.controller("pages", function () {
+        this.defaults({ format: "html" }, function () {
+          this.get("about", { action: "about" });
+        });
+      });
+      this.resource("profile", function () {
+        this.get("avatar", { to: "profiles#avatar" });
+      });
+    });
+
+    const about = routes.recognizePath("/about");
+    expect([about.controller, about.action]).toEqual(["pages", "about"]);
+    expect(routes.recognizePath("/profile/avatar").action).toBe("avatar");
+  });
+
+  it("leaves an arrow block's lexical this alone", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.scope("api", () => {
+        this.get("ping", { to: "health#ping" });
+      });
+    });
+
+    expect(routes.recognizePath("/api/ping").action).toBe("ping");
   });
 });
