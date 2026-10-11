@@ -38,6 +38,8 @@ const manifestPath = () =>
 // in one shot.
 const RUN_CALLBACK_CALLEES = new Set(["runCallbacks", "runAllCallbacks"]);
 
+const GENERATED_RUN = /^_run([A-Z][A-Za-z]*)Callbacks$/;
+
 function loadJson(p, fallback) {
   if (!fs.existsSync(p)) return fallback;
   const mtime = fs.statSync(p).mtimeMs;
@@ -93,6 +95,11 @@ function eventsFired(fnNode, sourceCode) {
         const s = stringValue(arg);
         if (s !== null) fired.add(s);
       }
+    }
+    const generated =
+      node.type === "CallExpression" && GENERATED_RUN.exec(calleeName(node.callee) ?? "");
+    if (generated) {
+      fired.add(generated[1].replace(/(?!^)([A-Z])/g, "_$1").toLowerCase());
     }
     for (const key of sourceCode.visitorKeys[node.type] ?? []) {
       const child = node[key];

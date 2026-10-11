@@ -342,9 +342,9 @@ describe("PrimaryKeysTest", () => {
         this.primaryKey = ["author_id", "id"];
       }
     }
-    expect(AnonCpkBooks.compositePrimaryKey).toBeTruthy();
+    expect(AnonCpkBooks.isCompositePrimaryKey()).toBeTruthy();
     AnonCpkBooks.primaryKey = "id";
-    expect(AnonCpkBooks.compositePrimaryKey).toBeFalsy();
+    expect(AnonCpkBooks.isCompositePrimaryKey()).toBeFalsy();
   });
 
   it("primary key values present", () => {

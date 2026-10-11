@@ -674,9 +674,7 @@ export class Base extends Model {
 
   declare static lockingEnabled: boolean;
 
-  static get compositePrimaryKey(): boolean {
-    return _isCompositePrimaryKey.call(this);
-  }
+  static isCompositePrimaryKey = _isCompositePrimaryKey;
 
   static _buildPkWhere(idValue: unknown): string {
     return ModelSchema.buildPkWhere.call(this, idValue);
@@ -980,8 +978,6 @@ export class Base extends Model {
   static set ignoredColumns(columns: string[]) {
     ModelSchema.setIgnoredColumns.call(this, columns);
   }
-
-  static _suppressInitializeCallback = false;
 
   static _suppressAbstractCheck = false;
 
@@ -1497,23 +1493,9 @@ export class Base extends Model {
     let assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
     const ctor = new.target;
-    const suppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
-    const hadOwn = Object.prototype.hasOwnProperty.call(suppressor, "_suppressInitializeCallback");
-    const previouslySuppressed = suppressor._suppressInitializeCallback;
-    const wasSuppressed = allocating || previouslySuppressed;
-    suppressor._suppressInitializeCallback = true;
-    try {
-      if (allocating) _Core._allocation.klass = ctor;
-      super(attrs);
-    } finally {
-      if (hadOwn) {
-        suppressor._suppressInitializeCallback = previouslySuppressed;
-      } else {
-        delete (suppressor as { _suppressInitializeCallback?: boolean })
-          ._suppressInitializeCallback;
-      }
-    }
-    if (!wasSuppressed) {
+    if (allocating) _Core._allocation.klass = ctor;
+    super(attrs);
+    if (!allocating) {
       inheritanceInitializeInternalsCallback.call(this as any);
       if (_shouldApplyScopeAttributes(ctor)) {
         _applyScopeAttributes(
@@ -1527,12 +1509,33 @@ export class Base extends Model {
         assocPending = null;
       }
       initBlock?.(this as unknown as Base);
-      void this.runCallbacks("initialize", undefined, { strict: "sync" });
+      this._runInitializeCallbacks();
     }
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
     }
   }
+
+  /** @internal */
+  declare _runInitializeCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runFindCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runTouchCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runSaveCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runCreateCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runUpdateCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runDestroyCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runBeforeCommitCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runCommitCallbacks: (block?: () => unknown) => unknown;
+  /** @internal */
+  declare _runRollbackCallbacks: (block?: () => unknown) => unknown;
 
   declare isNewRecord: typeof _Persistence.isNewRecord;
   declare isPersisted: typeof _Persistence.isPersisted;
@@ -1978,7 +1981,7 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
     options?: { validate?: boolean; touch?: boolean },
     block?: (record: this) => void,
   ): Promise<true | undefined>;
-  destroy(): Promise<this | false>;
+  destroy(): Promise<this | boolean>;
   destroyBang(): Promise<this>;
   update(attrs: Record<string, unknown> | PermittedAttributes): Promise<boolean | undefined>;
   updateBang(attrs: Record<string, unknown> | PermittedAttributes): Promise<true | undefined>;

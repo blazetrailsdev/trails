@@ -52,12 +52,7 @@ import { withConnection } from "./connection-handling.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import type { AttributeSet, YAMLEncoder } from "@blazetrails/activemodel";
 import { LegacyYamlAdapter } from "./legacy-yaml-adapter.js";
-import {
-  classAttribute,
-  included,
-  type Callbacks,
-  type Included,
-} from "@blazetrails/activesupport";
+import { classAttribute, included } from "@blazetrails/activesupport";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 
 type FindByStatementCache = Map<boolean, InstanceType<typeof Concurrent.Map<unknown, any>>>;
@@ -420,7 +415,8 @@ export function initWithAttributes<T extends CoreRecord>(
     _attributes: any;
     _newRecord: boolean;
     initInternals(): void;
-    runCallbacks: Included<typeof Callbacks>["runCallbacks"];
+    _runFindCallbacks(): unknown;
+    _runInitializeCallbacks(): unknown;
   },
   attributes: any,
   newRecord = false,
@@ -432,8 +428,8 @@ export function initWithAttributes<T extends CoreRecord>(
 
   if (block) block(this);
 
-  void this.runCallbacks("find", undefined, { strict: "sync" });
-  void this.runCallbacks("initialize", undefined, { strict: "sync" });
+  this._runFindCallbacks();
+  this._runInitializeCallbacks();
 
   return this;
 }
@@ -442,13 +438,13 @@ export function initAttributes(
   this: CoreRecord & {
     _attributes: any;
     _primaryKey?: string | string[] | null;
-    constructor: { compositePrimaryKey: boolean };
+    constructor: { isCompositePrimaryKey(): boolean };
   },
   _: unknown,
 ): any {
   const attrs = this._attributes.deepDup();
 
-  if (this.constructor.compositePrimaryKey) {
+  if (this.constructor.isCompositePrimaryKey()) {
     for (const key of this._primaryKey as string[]) attrs.reset(key);
   } else {
     attrs.reset(this._primaryKey);
@@ -489,7 +485,6 @@ interface CoreHost {
   name: string;
   tableName?: string | null;
   primaryKey?: string | string[];
-  compositePrimaryKey?: boolean;
   filterAttributes: FilterAttributes;
   _filterAttributes?: FilterAttributes;
   _inspectionFilter?: any;
@@ -748,10 +743,39 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-/** @inventedArm if — PERMANENT */
+function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
+  Object.defineProperty(record, "_attributes", {
+    get(this: object) {
+      const klass = record.constructor as unknown as {
+        _defaultAttributes(): AttributeSet;
+      };
+      if (this === record && isSchemaLoaded.call(klass as never)) {
+        attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
+        Object.defineProperty(record, "_attributes", {
+          value: attributes,
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        });
+      }
+      return attributes;
+    },
+    set(this: object, value: AttributeSet) {
+      if (this === record) attributes = value;
+      else completeAttributesOnSchemaLoad(this, value);
+    },
+    enumerable: true,
+    configurable: true,
+  });
+}
+
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
+ */
 export function constructor(
   this: CoreRecord & {
-    _attributes: import("@blazetrails/activemodel").AttributeSet;
+    _attributes: AttributeSet;
     _newRecord: boolean;
     initInternals(): void;
   },
@@ -764,11 +788,14 @@ export function constructor(
     this._newRecord = true;
     this._attributes = (
       this.constructor as unknown as {
-        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+        _defaultAttributes(): AttributeSet;
       }
     )
       ._defaultAttributes()
       .deepDup();
+    if (!isSchemaLoaded.call(this.constructor as never)) {
+      completeAttributesOnSchemaLoad(this, this._attributes);
+    }
   }
 
   this.initInternals();
@@ -821,7 +848,7 @@ export function initializeDup(
     _previouslyNewRecord: boolean;
     _destroyed: boolean;
     _startTransactionState: unknown;
-    runCallbacks: Included<typeof Callbacks>["runCallbacks"];
+    _runInitializeCallbacks(): unknown;
   },
   other: unknown,
 ): void {
@@ -829,7 +856,7 @@ export function initializeDup(
     this as unknown as { initAttributes(other: unknown): unknown }
   ).initAttributes(other);
 
-  void this.runCallbacks("initialize", undefined, { strict: "sync" });
+  this._runInitializeCallbacks();
 
   this._newRecord = true;
   this._previouslyNewRecord = false;

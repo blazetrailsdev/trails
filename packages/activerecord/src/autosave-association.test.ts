@@ -3549,7 +3549,7 @@ describe("computePrimaryKey", () => {
       constructor: {
         primaryKey: opts.primaryKey ?? "id",
         _primaryKey: opts.primaryKey ?? "id",
-        _compositePrimaryKey: Array.isArray(opts.primaryKey),
+        isCompositePrimaryKey: () => Array.isArray(opts.primaryKey),
         _queryConstraintsList: opts.queryConstraintsList ?? null,
         _hasQueryConstraints: opts.hasQueryConstraints ?? false,
       },

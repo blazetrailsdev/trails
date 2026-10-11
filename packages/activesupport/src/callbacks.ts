@@ -34,6 +34,7 @@ export interface DefineCallbacksOptions<T extends object = object> {
   terminator?: ((target: T, fn: () => unknown) => boolean | Promise<boolean>) | false;
   skipAfterCallbacksIfTerminated?: boolean;
   scope?: string[];
+  strict?: "sync";
 }
 
 export type BeforeCallback<T extends object = object> = (target: T) => unknown;
@@ -1168,11 +1169,12 @@ function runCallbacks(
   type?: CallbackKind,
 ): unknown {
   const callbacks = (this as { __callbacks: Record<string, CallbackChain> }).__callbacks[kind];
+  const strict = opts?.strict ?? callbacks.config.strict;
 
   if (callbacks.isEmpty) {
     const r = block?.();
     if (!isThenable(r)) return r;
-    if (opts?.strict === "sync") {
+    if (strict === "sync") {
       swallowRejection(r);
       throw new RuntimeError("Async block on chain with no callbacks");
     }
@@ -1182,7 +1184,7 @@ function runCallbacks(
     target: this,
     halted: false,
     value: undefined,
-    syncChain: opts?.strict === "sync" ? callbacks.name : undefined,
+    syncChain: strict === "sync" ? callbacks.name : undefined,
   };
 
   let nextSequence = callbacks.compile(type);

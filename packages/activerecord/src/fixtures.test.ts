@@ -96,6 +96,7 @@ describe("PrimaryKeyErrorTest", () => {
       connectionPool: () => pool,
       tableName: "authors",
       primaryKey: "id",
+      isCompositePrimaryKey: () => false,
       loadSchema: async () => {},
       columns: () => Object.values(doubleColumnsHash("authors")),
       typeForAttribute: () => ({ type: () => "integer" }),

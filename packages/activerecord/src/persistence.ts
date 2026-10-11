@@ -577,7 +577,7 @@ export async function destroy<T extends DestroyRecord>(this: T): Promise<T> {
   return self.freeze();
 }
 
-export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | false> }>(
+export async function destroyBang<T extends DestroyRecord & { destroy(): Promise<T | boolean> }>(
   this: T,
 ): Promise<T> {
   return (await this.destroy()) || (this as any)._raiseRecordNotDestroyed();

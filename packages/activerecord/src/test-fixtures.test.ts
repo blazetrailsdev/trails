@@ -89,6 +89,7 @@ function makeModel(
   return {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     connectionPool: () => mockPool(adapter),
     unscoped: (block: () => unknown) => block(),
     loadSchema: async () => {},

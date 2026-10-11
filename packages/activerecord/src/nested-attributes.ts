@@ -22,7 +22,6 @@ import {
   size,
 } from "@blazetrails/ruby-compat";
 import { defineAutosaveValidationCallbacks } from "./autosave-association.js";
-import { isCompositePrimaryKey } from "./attribute-methods/primary-key.js";
 import { ArgumentError, BooleanType } from "@blazetrails/activemodel";
 
 export class TooManyRecords extends ActiveRecordError {}
@@ -158,7 +157,7 @@ export function assignToOrMarkForDestruction(
 
 /** @internal */
 export function findRecordById(klass: typeof Base, records: Base[], id: unknown): Base | undefined {
-  if (isCompositePrimaryKey.call(klass)) {
+  if (klass.isCompositePrimaryKey()) {
     id = kernelArray(id).map(String);
     return records.find((record) => rbEqual(kernelArray(record.id).map(String), id));
   } else {

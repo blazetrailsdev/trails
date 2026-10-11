@@ -85,6 +85,7 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     loadSchema: async () => {},
     definedEnums: {},
     _reflections: {},
@@ -146,7 +147,7 @@ describe("createFixtures", () => {
     const Model = {
       tableName: "orders",
       primaryKey: ["shop_id", "id"],
-      compositePrimaryKey: true,
+      isCompositePrimaryKey: () => true,
       loadSchema: async () => {},
       definedEnums: {},
       _reflections: {},

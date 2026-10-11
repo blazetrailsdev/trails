@@ -1,4 +1,4 @@
-import { fetch, rbEqual, rbFCaller, rbFPublicSend } from "@blazetrails/ruby-compat";
+import { fetch, rbEqual, rbFCaller, rbFPublicSend, rbObjAsString } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import { kernelArray } from "@blazetrails/activesupport";
@@ -21,20 +21,20 @@ export class BelongsToAssociation extends SingularAssociation {
         const foreignKey = this.reflection.foreignKey();
         if (Array.isArray(foreignKey)) {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = foreignKey.map((col) => (this.owner as any)[col]);
+          id = foreignKey.map((col) => rbFPublicSend(this.owner, col));
         } else {
           primaryKeyColumn = this.reflection.activeRecordPrimaryKey;
-          id = (this.owner as any)[foreignKey];
+          id = rbFPublicSend(this.owner, foreignKey);
         }
 
         const associationClass = this.reflection.isPolymorphic()
-          ? (this.owner as any)[this.reflection.foreignType!]
-          : this.reflection.klass.name;
+          ? rbFPublicSend(this.owner, this.reflection.foreignType!)
+          : this.reflection.klass;
 
         this.enqueueDestroyAssociation({
-          ownerModelName: this.owner.constructor.name,
+          ownerModelName: rbObjAsString(this.owner.constructor),
           ownerId: this.owner.id,
-          associationClass: String(associationClass),
+          associationClass: rbObjAsString(associationClass),
           associationIds: [id],
           associationPrimaryKeyColumn: primaryKeyColumn,
           ensuringOwnerWasMethod: fetch(
