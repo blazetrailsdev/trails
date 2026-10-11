@@ -1,5 +1,5 @@
-import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
-import type { Hash } from "@blazetrails/ruby-compat";
+import { type HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
+import { type Hash, eachPair, isEmpty, keys } from "@blazetrails/ruby-compat";
 
 export class ProtectedParams {
   [key: string]: unknown;
@@ -8,8 +8,8 @@ export class ProtectedParams {
   #permitted = false;
   #self: this;
 
-  constructor(parameters: Record<string, unknown> | HashWithIndifferentAccess = {}) {
-    this.#parameters = new HashWithIndifferentAccess(parameters);
+  constructor(parameters: Record<string, unknown> = {}) {
+    this.#parameters = withIndifferentAccess(parameters);
     const params = this.#parameters;
     const target = this;
     const isParameter = (key: string | symbol): key is string =>
@@ -47,7 +47,7 @@ export class ProtectedParams {
   }
 
   keys(): string[] {
-    return [...this.#parameters.keys()];
+    return keys(this.#parameters);
   }
 
   isKey(key: string): boolean {
@@ -55,11 +55,11 @@ export class ProtectedParams {
   }
 
   hasKey(key: string): boolean {
-    return this.isKey(key);
+    return this.#parameters.hasKey(key);
   }
 
   isEmpty(): boolean {
-    return this.#parameters.size === 0;
+    return isEmpty(this.#parameters);
   }
 
   isPermitted(): boolean {
@@ -80,12 +80,12 @@ export class ProtectedParams {
   }
 
   eachPair(block: (key: string, value: unknown) => void): this {
-    for (const [key, value] of this.#parameters) block(key, value);
+    eachPair(this.#parameters, block);
     return this.#self;
   }
 
   dup(): this {
-    const duplicate = new ProtectedParams(this.#parameters);
+    const duplicate = new ProtectedParams(Object.fromEntries(this.#parameters));
     if (this.#permitted) duplicate.permitBang();
     return duplicate as this;
   }

@@ -1,3 +1,4 @@
+import { hashAref } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { indexNestedAttributeErrors, setIndexNestedAttributeErrors } from "../active-record.js";
@@ -43,8 +44,8 @@ describe("AssociationsNestedErrorInNestedAttributesOrderTest", () => {
         indexErrors: "nestedAttributesOrder",
       });
       this.acceptsNestedAttributesFor("tuningPegs", {
-        rejectIf: (attrs: Record<string, unknown>) =>
-          attrs["pitch"] != null && Number(attrs["pitch"]) % 2 === 1,
+        rejectIf: (attrs) =>
+          hashAref(attrs, "pitch") != null && Number(hashAref(attrs, "pitch")) % 2 === 1,
       });
     }
   }

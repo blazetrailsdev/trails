@@ -173,13 +173,16 @@ export abstract class CollectionAssociation extends Association {
   }
 
   build(attributes: Record<string, unknown>[], block?: (record: Base) => void): Base[];
-  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base;
   build(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | Map<string, unknown>,
+    block?: (record: Base) => void,
+  ): Base;
+  build(
+    attributes?: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[],
     block?: (record: Base) => void,
   ): Base | Base[];
   build(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[],
     block?: (record: Base) => void,
   ): Base | Base[] {
     if (Array.isArray(attributes)) {

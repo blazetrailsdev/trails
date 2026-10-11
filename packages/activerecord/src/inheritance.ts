@@ -10,7 +10,7 @@ import {
   isPresent,
   safeConstantize,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import {
   hashAref,
   Module,
@@ -282,10 +282,10 @@ export function typeCondition(
 /** @internal */
 export function subclassFromAttributes(
   this: typeof Base,
-  attrs: Record<string, unknown> | Map<string, unknown> | null | undefined,
+  attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes | null | undefined,
 ): typeof Base | null {
   if (rbObjRespondTo(attrs, "isPermitted")) {
-    attrs = (attrs as unknown as { toH(): Record<string, unknown> | Map<string, unknown> }).toH();
+    attrs = (attrs as PermittedAttributes).toH();
   }
 
   if (attrs instanceof Map || isPlainObject(attrs)) {

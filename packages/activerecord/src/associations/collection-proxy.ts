@@ -191,9 +191,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(attributes?: Record<string, unknown> | Map<string, unknown>, block?: (r: T) => void): T;
   build(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     return this._association.build(attributes, block as (record: Base) => void) as T | T[];

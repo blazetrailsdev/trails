@@ -1455,7 +1455,7 @@ export class Base extends Model {
   _previouslyNewRecord = false;
 
   constructor(
-    attributes: Record<string, unknown> | PermittedAttributes = {},
+    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
     initBlock?: (record: Base) => void,
   ) {
     const allocating = _Core._allocation.klass === new.target;
@@ -1472,7 +1472,7 @@ export class Base extends Model {
       if (klass._suppressStiNewDispatch !== klass) {
         let subclass: typeof Base | null = null;
         if (klass._hasAttribute(klass.inheritanceColumn as string)) {
-          subclass = klass.subclassFromAttributes(attributes as Record<string, unknown>);
+          subclass = klass.subclassFromAttributes(attributes);
 
           let scopeAttributes;
           if (
@@ -1504,7 +1504,7 @@ export class Base extends Model {
     suppressor._suppressInitializeCallback = true;
     try {
       if (allocating) _Core._allocation.klass = ctor;
-      super(attrs as Record<string, unknown>);
+      super(attrs);
     } finally {
       if (hadOwn) {
         suppressor._suppressInitializeCallback = previouslySuppressed;
@@ -2007,7 +2007,7 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
   assignAttributes(attrs: Record<string, unknown>): void;
-  setAttributes(attrs: Record<string, unknown>): Promise<void> | void;
+  setAttributes(attrs: Record<string, unknown> | Map<string, unknown>): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;

@@ -88,7 +88,9 @@ export interface AttributeAssignment {
   _assignAttribute(k: string, v: unknown): unknown;
 }
 
-function respondToEachPair(attrs: unknown): attrs is Record<string, unknown> {
+function respondToEachPair(
+  attrs: unknown,
+): attrs is Record<string, unknown> | Map<string, unknown> {
   if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null || attrs instanceof Map) return true;
