@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect } from "vitest";
 import { DelegationError, I18n, InheritableOptions, htmlSafe } from "@blazetrails/activesupport";
 import { Base } from "./base.js";
+import { logger } from "./helpers/controller-helper.js";
 import { LookupContext } from "./lookup-context.js";
 import { OutputBuffer } from "./buffers.js";
 import { TemplateHandlers } from "./template/handlers.js";
@@ -200,7 +201,8 @@ describe("ActionView::Base include ControllerHelper", () => {
 
   it("logger reads through to the controller's", () => {
     const view = new (Base.withEmptyTemplateCache())(null, {}, controller);
-    expect((view as unknown as { logger(): unknown }).logger()).toBe(controller.logger);
+    expect(logger.call(view as never)).toBe(controller.logger);
+    expect((view as unknown as { logger: unknown }).logger).toBe(Base.logger);
   });
 
   it("makes params reachable as a bare identifier in a template", () => {

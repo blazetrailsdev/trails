@@ -42,6 +42,7 @@ import {
   include,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
+import { Tse } from "./template/handlers/tse.js";
 import { Resolver } from "./template/resolver.js";
 
 export type CompiledMethod = ((
@@ -89,6 +90,8 @@ export class Base {
   declare annotateRenderedViewWithFilenames: boolean;
   declare static _routes: unknown;
   declare static is_routes: boolean;
+  declare static logger: unknown;
+  declare static isLogger: boolean;
 
   static {
     cattrAccessor.call(this, "fieldErrorProc", {
@@ -105,9 +108,12 @@ export class Base {
     cattrAccessor.call(this, "automaticallyDisableSubmitTag", { default: true });
     cattrAccessor.call(this, "annotateRenderedViewWithFilenames", { default: false });
     classAttribute.call(this, "_routes");
+    classAttribute.call(this, "logger");
   }
 
-  static logger: unknown = null;
+  static set tseTrimMode(value: string) {
+    Tse.tseTrimMode = value;
+  }
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();
 

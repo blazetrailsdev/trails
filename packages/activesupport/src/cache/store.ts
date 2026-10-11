@@ -93,10 +93,11 @@ export class WriteOptions {
 
 /** @internal */
 export abstract class Store {
-  static logger: CacheLogger | null = null;
+  declare static logger: CacheLogger | null | undefined;
   declare static raiseOnInvalidCacheExpirationTime: boolean;
 
   static {
+    cattrAccessor.call(this, "logger", { instanceWriter: true });
     cattrAccessor.call(this, "raiseOnInvalidCacheExpirationTime", { default: false });
   }
 
