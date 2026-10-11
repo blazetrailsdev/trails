@@ -593,8 +593,8 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  * story `latch-primary-key-resolution-into-reset-primary-key-memo`.
  *
  * @internal
- * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  * @inventedArm try — CONVERGEABLE load-schema-from-adapter-swallows-every-error-on-its-checkout-arm
+ * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
