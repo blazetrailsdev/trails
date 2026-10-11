@@ -9,7 +9,6 @@ import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js
 import type { AbstractMysqlAdapter } from "../connection-adapters/abstract-mysql-adapter.js";
 import type { Column as MysqlColumn } from "../connection-adapters/mysql/column.js";
 import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
-import type { Column } from "../connection-adapters/column.js";
 import { ambientConnection } from "../support/rocket-tables.js";
 import {
   currentAdapter,
@@ -766,7 +765,7 @@ function legacyPrimaryKeyTestCases(migrationClass: () => ReturnType<typeof Migra
   fixtures({}, { useTransactionalTests: false });
   let migration: Migration | null;
   let verboseWas: boolean | undefined;
-  const columnsHash = () => LegacyPrimaryKey.columnsHash() as unknown as Record<string, Column>;
+  const columnsHash = () => LegacyPrimaryKey.columnsHash();
   const dump = async (table: string) => dumpTableSchema(table);
 
   beforeEach(() => {

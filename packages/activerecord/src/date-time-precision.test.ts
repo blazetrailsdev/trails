@@ -38,8 +38,8 @@ describe("DateTimePrecisionTest", () => {
     await adapter.addColumn("foos", "created_at", "datetime", { precision: 0 });
     await adapter.addColumn("foos", "updated_at", "datetime", { precision: 5 });
     await Foo.loadSchema();
-    expect((Foo.columnsHash() as any)["created_at"].precision).toBe(0);
-    expect((Foo.columnsHash() as any)["updated_at"].precision).toBe(5);
+    expect(Foo.columnsHash()["created_at"].precision).toBe(0);
+    expect(Foo.columnsHash()["updated_at"].precision).toBe(5);
   });
 
   itIfSupports(
@@ -85,8 +85,8 @@ describe("DateTimePrecisionTest", () => {
       t.timestamps({ precision: 4 });
     });
     await Foo.loadSchema();
-    expect((Foo.columnsHash() as any)["created_at"].precision).toBe(4);
-    expect((Foo.columnsHash() as any)["updated_at"].precision).toBe(4);
+    expect(Foo.columnsHash()["created_at"].precision).toBe(4);
+    expect(Foo.columnsHash()["updated_at"].precision).toBe(4);
   });
 
   itIfSupports(
@@ -97,8 +97,8 @@ describe("DateTimePrecisionTest", () => {
         t.timestamps({ precision: 4 });
       });
       await Foo.loadSchema();
-      expect((Foo.columnsHash() as any)["created_at"].limit).toBeNull();
-      expect((Foo.columnsHash() as any)["updated_at"].limit).toBeNull();
+      expect(Foo.columnsHash()["created_at"].limit).toBeNull();
+      expect(Foo.columnsHash()["updated_at"].limit).toBeNull();
     },
   );
 

@@ -76,6 +76,38 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     }
   });
 
+  it("memoizes columnDefaults as one frozen hash until the schema is reloaded", async () => {
+    const columnDefaults = Topic.columnDefaults;
+    expect(Object.isFrozen(columnDefaults)).toBe(true);
+    expect(Topic.columnDefaults).toBe(columnDefaults);
+
+    await Topic.resetColumnInformation();
+    await Topic.loadSchema();
+
+    expect(Topic.columnDefaults).not.toBe(columnDefaults);
+    expect(Topic.columnDefaults).toEqual(columnDefaults);
+  });
+
+  it("copies an STI base class's defaults once per new", () => {
+    void Topic.columnDefaults;
+    const defaults = (
+      Topic as unknown as { _defaultAttributes(): { deepDup(): unknown } }
+    )._defaultAttributes();
+    const proto = Object.getPrototypeOf(defaults) as { deepDup(): unknown };
+    const deepDup = proto.deepDup;
+    let copies = 0;
+    proto.deepDup = function (this: unknown) {
+      if (this === defaults) copies++;
+      return deepDup.call(this);
+    };
+    try {
+      new Topic({ title: "Bob" });
+      expect(copies).toBe(1);
+    } finally {
+      proto.deepDup = deepDup;
+    }
+  });
+
   it("loads STI subclass rows through the base class without building either default set", async () => {
     type DefaultsHost = { _defaultAttributes(): { deepDup(): unknown } };
     const topicDefaults = (Topic as unknown as DefaultsHost)._defaultAttributes();

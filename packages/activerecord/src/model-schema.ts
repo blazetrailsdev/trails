@@ -29,7 +29,7 @@ import {
 import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { TableNotSpecified } from "./errors.js";
-import { NullColumn } from "./connection-adapters/column.js";
+import { NullColumn, type Column } from "./connection-adapters/column.js";
 import { withConnection, isConnected } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
@@ -171,23 +171,12 @@ export function columnNames(this: typeof Base): string[] {
     ))) as string[];
 }
 
-export interface ColumnLike {
-  name: string;
-  type?: string | null;
-  sqlType?: string;
-  default?: unknown;
-  [key: string]: unknown;
-}
-
-export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
+export function columnsHash(this: typeof Base): Record<string, Column> {
   if (ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") == null) {
     loadSchema.call(this as SchemaHost);
   }
 
-  return (ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") ?? {}) as Record<
-    string,
-    ColumnLike
-  >;
+  return ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash") ?? {};
 }
 
 export function contentColumns(this: typeof Base): any[] {
@@ -225,7 +214,7 @@ export interface SchemaHost {
   _ignoredColumns?: string[];
   _protectedEnvironments?: string[];
   _defaultAttributes(): AttributeSet;
-  _columnsHash?: Record<string, unknown>;
+  _columnsHash?: Record<string, Column>;
   _columns?: any[];
   _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
@@ -237,6 +226,8 @@ export interface SchemaHost {
   _columnNames?: readonly string[];
   /** @internal */
   _contentColumns?: any[];
+  /** @internal */
+  _columnDefaults?: Readonly<Record<string, unknown>>;
   /** @internal */
   _symbolColumnToStringNameHash?: Record<string, string>;
   connection: any;
@@ -384,6 +375,14 @@ export function columnForAttribute(this: SchemaHost, name: string): any {
   );
 }
 
+export function columnDefaults(this: SchemaHost): Record<string, unknown> {
+  loadSchema.call(this);
+  return (
+    ownSchemaMemo(this, "_columnDefaults") ??
+    (this._columnDefaults = Object.freeze(this._defaultAttributes().deepDup().toHash()))
+  );
+}
+
 export function symbolColumnToString(this: SchemaHost, nameSymbol: string): string | null {
   const symbolColumnToStringNameHash =
     ownSchemaMemo(this, "_symbolColumnToStringNameHash") ??
@@ -470,6 +469,7 @@ export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void 
   this._columnNames = undefined;
   this._symbolColumnToStringNameHash = undefined;
   this._contentColumns = undefined;
+  this._columnDefaults = undefined;
   this._attributesBuilder = undefined;
   this._columns = undefined;
   this._columnsHash = undefined;
@@ -515,17 +515,9 @@ export function loadSchemaBang(this: SchemaHost): void {
   this._columnsHash = {};
 }
 
-function getColumnsHash(host: SchemaHost): Record<string, unknown> {
-  const own = ownSchemaMemo(host, "_columnsHash");
-  if (own != null) return own;
-  const ch = (host as any).columnsHash;
-  if (typeof ch === "function") return ch.call(host) ?? {};
-  return {};
-}
-
-function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void {
+function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void {
   const ignored = new Set(host._ignoredColumns ?? []);
-  const filteredHash: Record<string, unknown> = {};
+  const filteredHash: Record<string, Column> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) continue;
     filteredHash[name] = column;
@@ -540,6 +532,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
     _columns?: unknown;
     _columnNames?: unknown;
     _contentColumns?: unknown;
+    _columnDefaults?: unknown;
     _symbolColumnToStringNameHash?: unknown;
     _attributeNames?: unknown;
   };
@@ -551,6 +544,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, unknown>): void
   bag._columns = undefined;
   bag._columnNames = undefined;
   bag._contentColumns = undefined;
+  bag._columnDefaults = undefined;
   bag._symbolColumnToStringNameHash = undefined;
   bag._attributeNames = undefined;
   host._columnsHash = filteredHash;
@@ -716,10 +710,6 @@ export function ignoredColumns(this: SchemaHost): string[] {
 export function setIgnoredColumns(this: SchemaHost, columns: string[]): void {
   this.reloadSchemaFromCache();
   this._ignoredColumns = Object.freeze(columns.map(String)) as string[];
-}
-
-export function columnDefaults(this: SchemaHost): Record<string, unknown> {
-  return this._defaultAttributes().deepDup().toHash();
 }
 
 /**

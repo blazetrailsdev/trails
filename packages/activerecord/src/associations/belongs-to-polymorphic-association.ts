@@ -22,7 +22,7 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
     );
   }
 
-  override isSavedChangeToTarget(): boolean {
+  override isSavedChangeToTarget(): boolean | undefined {
     return (
       super.isSavedChangeToTarget() ||
       this.owner.isSavedChangeToAttribute(this.reflection.foreignType!)

@@ -317,7 +317,7 @@ export function jsonSharedTestCases(host: JSONSharedTestCasesHost): void {
     host.insertStatementPerDatabase ??
     ((values: string) => `insert into json_data_type (payload) VALUES ('${values}')`);
 
-  async function assertTypeMatch(type: string, sqlType: string | undefined): Promise<void> {
+  async function assertTypeMatch(type: string, sqlType: string | null): Promise<void> {
     const nativeType = (
       (await Base.leaseConnection()).nativeDatabaseTypes()[type] as { name: string }
     ).name;

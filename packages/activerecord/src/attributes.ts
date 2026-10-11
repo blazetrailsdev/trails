@@ -7,6 +7,7 @@ import {
 } from "@blazetrails/activemodel";
 import { registerSubclass } from "@blazetrails/activesupport";
 import { block, hashAset, transformValues } from "@blazetrails/ruby-compat";
+import type { Column } from "./connection-adapters/column.js";
 import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import {
   isSchemaLoaded,
@@ -59,14 +60,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       registerSubclass(Object.getPrototypeOf(this), this);
 
       const attributesHash = this.connectionPool().withConnectionSync((connection: unknown) =>
-        transformValues(
-          this.columnsHash() as Record<string, { name: string; default?: unknown }>,
-          (column) =>
-            Attribute.fromDatabase(
-              column.name,
-              column.default ?? null,
-              typeForColumn.call(this, connection, column),
-            ),
+        transformValues(this.columnsHash() as Record<string, Column>, (column) =>
+          Attribute.fromDatabase(
+            column.name,
+            column.default ?? null,
+            typeForColumn.call(this, connection, column),
+          ),
         ),
       );
 

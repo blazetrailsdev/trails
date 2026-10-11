@@ -52,9 +52,9 @@ export class V7_0 extends V7_1 {
     /** @internal */
     legacyIndexName(tableName: string, options: Options | string | string[]): string {
       if (typeof options === "object" && !Array.isArray(options)) {
-        if (options.column != null) {
+        if (rtest(options.column)) {
           return `index_${tableName}_on_${[options.column].flat().join("_and_")}`;
-        } else if (options.name != null) {
+        } else if (rtest(options.name)) {
           return options.name as string;
         } else {
           throw new ArgumentError("You must specify the index name");

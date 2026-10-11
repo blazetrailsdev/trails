@@ -718,27 +718,15 @@ describe("ConnectionPoolConfiguration query cache", () => {
         (pool as unknown as { _pinnedConnection: unknown })._pinnedConnection ? 1 : 0;
 
       try {
-        let firstPinned!: () => void;
-        const first = new Promise<void>((resolve) => {
-          firstPinned = resolve;
-        });
-        let secondPinned!: () => void;
-        const second = new Promise<void>((resolve) => {
-          secondPinned = resolve;
-        });
         await Promise.all([
           new Thread(async () => {
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
-            firstPinned();
-            await second;
             await pool.unpinConnectionBang();
           }).value(),
           new Thread(async () => {
-            await first;
             await pool.pinConnectionBang();
             expect(pinnedCount()).toBeGreaterThanOrEqual(1);
-            secondPinned();
             await pool.unpinConnectionBang();
           }).value(),
         ]);

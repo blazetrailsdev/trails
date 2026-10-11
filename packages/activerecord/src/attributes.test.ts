@@ -133,14 +133,8 @@ describe("CustomPropertiesTest", () => {
       }
     }
 
-    expect(
-      (UnoverloadedType.columnsHash() as Record<string, { limit?: number }>)
-        .overloaded_string_with_limit.limit,
-    ).toBe(255);
-    expect(
-      (WithDefault.columnsHash() as Record<string, { limit?: number }>).overloaded_string_with_limit
-        .limit,
-    ).toBe(255);
+    expect(UnoverloadedType.columnsHash().overloaded_string_with_limit.limit).toBe(255);
+    expect(WithDefault.columnsHash().overloaded_string_with_limit.limit).toBe(255);
 
     expect((new UnoverloadedType() as any).overloaded_string_with_limit).toBeNull();
     expect((new WithDefault() as any).overloaded_string_with_limit).toBe("the overloaded default");
@@ -237,10 +231,7 @@ describe("CustomPropertiesTest", () => {
   });
 
   it("defaults are not touched on the columns", () => {
-    expect(
-      (OverloadedType.columnsHash() as Record<string, { default?: unknown }>).string_with_default
-        .default,
-    ).toBe("the original default");
+    expect(OverloadedType.columnsHash().string_with_default.default).toBe("the original default");
   });
 
   it("children inherit custom properties", () => {

@@ -40,8 +40,8 @@ describe("TimePrecisionTest", () => {
     await adapter.addColumn("foos", "finish", "time", { precision: 6 });
     const Foo = makeFoo();
     await Foo.loadSchema();
-    expect((Foo.columnsHash() as any)["start"].precision).toBe(3);
-    expect((Foo.columnsHash() as any)["finish"].precision).toBe(6);
+    expect(Foo.columnsHash()["start"].precision).toBe(3);
+    expect(Foo.columnsHash()["finish"].precision).toBe(6);
   });
 
   itIfSupports("datetime_with_precision", "time precision is truncated on assignment", async () => {
@@ -90,8 +90,8 @@ describe("TimePrecisionTest", () => {
       });
       const Foo = makeFoo();
       await Foo.loadSchema();
-      expect((Foo.columnsHash() as any)["start"].limit).toBeNull();
-      expect((Foo.columnsHash() as any)["finish"].limit).toBeNull();
+      expect(Foo.columnsHash()["start"].limit).toBeNull();
+      expect(Foo.columnsHash()["finish"].limit).toBeNull();
     },
   );
 
