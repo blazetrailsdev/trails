@@ -7,7 +7,7 @@ import {
   tsModule,
 } from "../../../template-builder/index.js";
 import { NamedBase } from "../../named-base.js";
-import { File } from "@blazetrails/ruby-compat";
+import { File, rbObjAsString } from "@blazetrails/ruby-compat";
 import { Migration } from "@blazetrails/activerecord";
 import { migrationTemplate } from "../../migration.js";
 import { nextMigrationNumber } from "../../active-record/migration.js";
@@ -19,7 +19,7 @@ export function emitMigrationSource(className: string, timestamp: string): strin
       tsClass({
         name: className,
         extends: refs.Migration,
-        extendsArguments: `.get(${Migration.currentVersion().toFixed(1)})`,
+        extendsArguments: `.get(${rbObjAsString(new Number(Migration.currentVersion()))})`,
         body: [
           tsField("version", "string", {
             static: true,

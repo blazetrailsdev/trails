@@ -2,6 +2,7 @@ import { mkdir, writeFile, access } from "fs/promises";
 import { join } from "path";
 import { camelize, underscore, pluralize } from "@blazetrails/activesupport";
 import { Migration } from "@blazetrails/activerecord";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 
 export interface FieldSpec {
   name: string;
@@ -132,7 +133,7 @@ export function renderMigration(snakeName: string, fields: FieldSpec[]): string 
   const className = camelize(snakeName);
   return (
     `import { Migration } from "@blazetrails/activerecord";\n\n` +
-    `export class ${className} extends Migration.get(${Migration.currentVersion().toFixed(1)}) {\n` +
+    `export class ${className} extends Migration.get(${rbObjAsString(new Number(Migration.currentVersion()))}) {\n` +
     `  async change(): Promise<void> {\n` +
     `${renderBody(snakeName, fields)}\n` +
     `  }\n` +
