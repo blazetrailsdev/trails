@@ -169,13 +169,28 @@ describe("ForbiddenAttributesProtectionRelationTest", () => {
     expect(bird.name).toBe("Posideons Killer");
   });
 
-  it("a permitted attribute wins over the association scope's attribute on build", async () => {
+  it("initialize_attributes leaves alone a scope attribute named by a params object's keys reader", async () => {
+    class ReaderParams {
+      get keys(): string[] {
+        return ["title"];
+      }
+      isPermitted(): boolean {
+        return true;
+      }
+      toH(): Record<string, unknown> {
+        return {};
+      }
+    }
     const author = await Author.create({ name: "David" });
-    const post = author.thinkingPosts.build(
-      new ProtectedParams({ title: "Not thinking" }).permitBang(),
-    );
-    expect(post.title).toBe("Not thinking");
-    expect(author.thinkingPosts.build().title).toBe("So I was thinking");
+    const association = author.association("thinkingPosts");
+
+    const named = new Post();
+    association.initializeAttributes(named, new ReaderParams());
+    expect(named.title).toBeNull();
+
+    const unnamed = new Post();
+    association.initializeAttributes(unnamed, {});
+    expect(unnamed.title).toBe("So I was thinking");
   });
 
   it("forbidden attributes cannot be used for Relation#new, Relation#create and a collection build", async () => {
