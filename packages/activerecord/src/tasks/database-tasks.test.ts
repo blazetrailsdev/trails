@@ -11,9 +11,19 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { assertEmpty, assertNothingRaised, assertRaises, getEnv } from "@blazetrails/activesupport";
+import {
+  assertCalled,
+  assertCalledWith as assertCalledWithArgs,
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+  getEnv,
+} from "@blazetrails/activesupport";
 import { stdout, stderr, setEnv, getProcessAdapter, RuntimeError } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
+import { MySQLDatabaseTasks } from "./mysql-database-tasks.js";
+import { PostgreSQLDatabaseTasks } from "./postgresql-database-tasks.js";
+import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import {
@@ -69,6 +79,19 @@ async function assertCalledForConfigs(
     calls!.length === configs.length && configs.every((call, i) => sameCall(calls[i], call)),
   ).toBeTruthy();
 }
+
+const tasks = {
+  mysqlTasks: MySQLDatabaseTasks.prototype,
+  postgresqlTasks: PostgreSQLDatabaseTasks.prototype,
+  sqliteTasks: SQLiteDatabaseTasks.prototype,
+} as unknown as Record<string, Record<string, unknown>>;
+
+const ADAPTERS_TASKS = {
+  mysql2: "mysqlTasks",
+  trilogy: "mysqlTasks",
+  postgresql: "postgresqlTasks",
+  sqlite3: "sqliteTasks",
+};
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
@@ -445,6 +468,18 @@ function captureStdoutAndStderr(): void {
   });
 }
 
+describe("DatabaseTasksCreateTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} create`, async () => {
+      await assertCalled(tasks[v], "create", null, {}, async () => {
+        await DatabaseTasks.create({ adapter: k });
+      });
+    });
+  }
+});
+
 describe("DatabaseTasksCreateAllTest", () => {
   captureStdoutAndStderr();
 
@@ -676,6 +711,18 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     await DatabaseTasks.createCurrent("development");
     assertCalledWith(establishSpy, [":development"]);
   });
+});
+
+describe("DatabaseTasksDropTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} drop`, async () => {
+      await assertCalled(tasks[v], "drop", null, {}, async () => {
+        await DatabaseTasks.drop({ adapter: k });
+      });
+    });
+  }
 });
 
 describe("DatabaseTasksDropAllTest", () => {
@@ -1187,6 +1234,18 @@ describe("DatabaseTasksMigrateErrorTest", () => {
   });
 });
 
+describe("DatabaseTasksPurgeTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} purge`, async () => {
+      await assertCalled(tasks[v], "purge", null, {}, async () => {
+        await DatabaseTasks.purge({ adapter: k });
+      });
+    });
+  }
+});
+
 describe("DatabaseTasksPurgeCurrentTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
@@ -1364,6 +1423,14 @@ describe("DatabaseTasksCharsetTest", () => {
     vi.restoreAllMocks();
   });
 
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} charset`, async () => {
+      await assertCalled(tasks[v], "charset", null, {}, async () => {
+        await DatabaseTasks.charset({ adapter: k });
+      });
+    });
+  }
+
   it("charset current", async () => {
     const charsetSpy = vi.spyOn(DatabaseTasks, "charset").mockResolvedValue(undefined as never);
     Base.configurations({
@@ -1384,6 +1451,14 @@ describe("DatabaseTasksCollationTest", () => {
     vi.restoreAllMocks();
   });
 
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} collation`, async () => {
+      await assertCalled(tasks[v], "collation", null, {}, async () => {
+        await DatabaseTasks.collation({ adapter: k });
+      });
+    });
+  }
+
   it("collation current", async () => {
     const collationSpy = vi.spyOn(DatabaseTasks, "collation").mockResolvedValue(undefined as never);
     Base.configurations({
@@ -1394,6 +1469,42 @@ describe("DatabaseTasksCollationTest", () => {
 
     assertCalledWith(collationSpy, [configFor("production", "primary")]);
   });
+});
+
+describe("DatabaseTasksStructureDumpTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure dump`, async () => {
+      await assertCalledWithArgs(
+        tasks[v],
+        "structureDump",
+        ["awesome-file.sql", null],
+        {},
+        async () => {
+          await DatabaseTasks.structureDump({ adapter: k }, "awesome-file.sql");
+        },
+      );
+    });
+  }
+});
+
+describe("DatabaseTasksStructureLoadTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure load`, async () => {
+      await assertCalledWithArgs(
+        tasks[v],
+        "structureLoad",
+        ["awesome-file.sql", null],
+        {},
+        async () => {
+          await DatabaseTasks.structureLoad({ adapter: k }, "awesome-file.sql");
+        },
+      );
+    });
+  }
 });
 
 describe("DatabaseTaskTargetVersionTest", () => {
@@ -1522,6 +1633,7 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
 });
 
 describe("DatabaseTasksCheckSchemaFileMethods", () => {
+  const FORMATS: Record<string, "ts" | "sql"> = { ruby: "ts", sql: "sql" };
   let originalSchema: string | undefined;
   let originalDbDir: string;
   beforeEach(() => {
@@ -1549,6 +1661,14 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     process.env.SCHEMA = "schema_path";
     expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe("schema_path");
   });
+
+  for (const [fmt, filename] of Object.entries({ ruby: "schema.ts", sql: "structure.sql" })) {
+    it(`check dump filename for ${fmt} format`, () => {
+      expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!, FORMATS[fmt])).toBe(
+        `/tmp/${filename}`,
+      );
+    });
+  }
 
   it("check dump filename defaults for non primary databases", () => {
     Base.configurations({
@@ -1582,6 +1702,20 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
       "schema_path",
     );
   });
+
+  for (const [fmt, filename] of Object.entries({ ruby: "schema.ts", sql: "structure.sql" })) {
+    it(`check dump filename for ${fmt} format with non primary databases`, () => {
+      Base.configurations({
+        development: {
+          primary: { adapter: "abstract", database: "dev-db" },
+          secondary: { adapter: "abstract", database: "secondary-dev-db" },
+        },
+      });
+      expect(
+        DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!, FORMATS[fmt]),
+      ).toBe(`/tmp/secondary_${filename}`);
+    });
+  }
 });
 
 describe("DatabaseTasksWithTemporaryPoolTest", () => {
