@@ -451,9 +451,13 @@ and the synchronous body peeks at the warmed value.**
   settled when the lookup runs, so its failure cannot be the one raised. The
   started promise carries a handler that drops its rejection, so a failed
   connect is not also an unhandled rejection. A caller that can reach it on a
-  connection nothing has verified warms first: `buildFixtureSql` awaits
-  `verifyBang` when the type map is unset, and that await is where the
-  connection error surfaces.
+  connection nothing has verified warms first, awaiting `verifyBang` when the
+  type map is unset, and that await is where the connection error surfaces.
+  There are two warm steps. `buildFixtureSql` is one. `loadSchemaFromAdapter`
+  is the other: a schema cache loaded from a dump answers its columns with no
+  query, so nothing has verified the connection when `loadSchemaBang` reaches
+  `typeForColumn`. `loadSchemaFromAdapter` drops a failed warm, except one
+  that leaves the leased connection with no type map.
 - `mismatchedForeignKey` has no fact to warm, because the table and column are
   only known once the failed statement is in hand. It is the one member here
   that answers a value or a promise of it: the `sql` arm returns a promise of

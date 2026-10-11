@@ -605,12 +605,18 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
     startingAdapter = undefined;
   }
   if (!startingAdapter) {
+    let leased: SchemaHost["connection"] | undefined;
     try {
-      return await withConnection.call<typeof Base, [() => Promise<void>], Promise<void>>(
-        this as unknown as typeof Base,
-        () => loadSchemaFromAdapter.call(this),
-      );
-    } catch {
+      return await withConnection.call<
+        typeof Base,
+        [(connection: SchemaHost["connection"]) => Promise<void>],
+        Promise<void>
+      >(this as unknown as typeof Base, (connection) => {
+        leased = connection;
+        return loadSchemaFromAdapter.call(this);
+      });
+    } catch (error) {
+      if (leased?.typeMap === null) throw error;
       return;
     }
   }
@@ -625,6 +631,8 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   await cache.columnsHash(table);
 
   await cache.primaryKeys(table);
+
+  if (startingAdapter.typeMap === null) await startingAdapter.verifyBang();
 
   let currentAdapter: SchemaHost["connection"] | undefined;
   try {

@@ -240,7 +240,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by field", async () => {
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").sum("credit_limit");
     for (const firmId of [1, 6, 2]) {
       expect([...c.keys()], `Group ${String(c)} does not contain firm_id ${firmId}`).toContain(
         firmId,
@@ -250,9 +250,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by arel attribute", async () => {
-    const c = (await Account.group(Account.arelTable.get("firm_id")).sum(
-      "credit_limit",
-    )) as Grouped;
+    const c = await Account.group(Account.arelTable.get("firm_id")).sum("credit_limit");
     for (const firmId of [1, 6, 2]) {
       expect([...c.keys()], `Group ${String(c)} does not contain firm_id ${firmId}`).toContain(
         firmId,
@@ -288,7 +286,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by multiple fields having functions", async () => {
-    const c = (await Topic.group("author_name", "COALESCE(type, title)").count(":all")) as Grouped;
+    const c = await Topic.group("author_name", "COALESCE(type, title)").count(":all");
     const get = (key: unknown[]): unknown =>
       [...c.entries()].find(([k]) => JSON.stringify(k) === JSON.stringify(key))?.[1];
     expect(get(["Carl", "The Third Topic of the day"])).toEqual(1);
@@ -355,7 +353,7 @@ describe("CalculationsTest", () => {
     await developer.auditLogs.create({ message: "first log" });
     await developer.auditLogs.create({ message: "second log" });
 
-    const c = (await developer.auditLogs.joins(":developer").group("id").count()) as Grouped;
+    const c = await developer.auditLogs.joins(":developer").group("id").count();
 
     expect(c.size).toEqual(await developer.auditLogs.count());
     for (const log of await developer.auditLogs) {
@@ -372,43 +370,41 @@ describe("CalculationsTest", () => {
       undefined,
       false,
       async () => {
-        const c = (await Account.group("firm_id")
-          .order("accounts_firm_id")
-          .sum("credit_limit")) as Grouped;
+        const c = await Account.group("firm_id").order("accounts_firm_id").sum("credit_limit");
         expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2, 6, 9]);
       },
     );
   });
 
   it("should order by grouped field", async () => {
-    const c = (await Account.group("firm_id").order("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").order("firm_id").sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2, 6, 9]);
   });
 
   it("should order by calculation", async () => {
-    const c = (await Account.group("firm_id")
+    const c = await Account.group("firm_id")
       .order("sum_credit_limit desc, firm_id")
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].map((k) => c.get(k))).toEqual([105, 60, 53, 50, 50]);
     expect([...c.keys()].filter((k) => k != null)).toEqual([6, 2, 9, 1]);
   });
 
   it("should limit calculation", async () => {
-    const c = (await Account.where("firm_id IS NOT NULL")
+    const c = await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
       .limit(2)
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([1, 2]);
   });
 
   it("should limit calculation with offset", async () => {
-    const c = (await Account.where("firm_id IS NOT NULL")
+    const c = await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
       .limit(2)
       .offset(1)
-      .sum("credit_limit")) as Grouped;
+      .sum("credit_limit");
     expect([...c.keys()].filter((k) => k != null)).toEqual([2, 6]);
   });
 
@@ -642,9 +638,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by summed field having condition", async () => {
-    const c = (await Account.group("firm_id")
-      .having("sum(credit_limit) > 50")
-      .sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").having("sum(credit_limit) > 50").sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toEqual(105);
     expect(c.get(2)).toEqual(60);
@@ -653,10 +647,10 @@ describe("CalculationsTest", () => {
   it.skipIf(adapterType === "postgres")(
     "should group by summed field having condition from select",
     async () => {
-      const c = (await Account.select("MIN(credit_limit) AS min_credit_limit")
+      const c = await Account.select("MIN(credit_limit) AS min_credit_limit")
         .group("firm_id")
         .having("min_credit_limit > 50")
-        .sum("credit_limit")) as Grouped;
+        .sum("credit_limit");
       expect(c.get(1)).toBeUndefined();
       expect(c.get(2)).toBe(60);
       expect(c.get(9)).toBe(53);
@@ -686,13 +680,13 @@ describe("CalculationsTest", () => {
   });
 
   it("should return type casted values with group and expression", async () => {
-    expect(
-      ((await Account.group("firm_name").sum("0.01 * credit_limit")) as Grouped).get("37signals"),
-    ).toEqual(0.5);
+    expect((await Account.group("firm_name").sum("0.01 * credit_limit")).get("37signals")).toEqual(
+      0.5,
+    );
   });
 
   it("should group by summed field with conditions", async () => {
-    const c = (await Account.where("firm_id > 1").group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.where("firm_id > 1").group("firm_id").sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
@@ -700,7 +694,7 @@ describe("CalculationsTest", () => {
 
   it("should group by summed field with conditions and having", async () => {
     const relation = Account.where("firm_id > 1").group("firm_id").having("sum(credit_limit) > 60");
-    const c = (await relation.sum("credit_limit")) as Grouped;
+    const c = await relation.sum("credit_limit");
     expect(c.get(1)).toBeUndefined();
     expect(c.get(6)).toEqual(105);
     expect(c.get(2)).toBeUndefined();
@@ -709,14 +703,14 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by fields with table alias", async () => {
-    const c = (await Account.group("accounts.firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("accounts.firm_id").sum("credit_limit");
     expect(c.get(1)).toBe(50);
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
   });
 
   it("should calculate grouped with longer field", async () => {
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Grouped;
+    const c = await Account.group("firm_id").sum("credit_limit");
     expect(c.get(1)).toBe(50);
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
@@ -728,7 +722,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped with invalid field", async () => {
-    const c = (await Account.group("accounts.firm_id").count(":all")) as Grouped;
+    const c = await Account.group("accounts.firm_id").count(":all");
     expect(c.get(1)).toBe(1);
     expect(c.get(6)).toBe(2);
     expect(c.get(2)).toBe(1);
@@ -745,7 +739,7 @@ describe("CalculationsTest", () => {
     await Speedometer.createBang({ speedometer_id: "ABC" });
     await Minivan.createBang({ minivan_id: "OMG", speedometer_id: "ABC" });
 
-    const c = (await Minivan.group("speedometer").count(":all")) as Grouped;
+    const c = await Minivan.group("speedometer").count(":all");
     const firstKey = [...c.keys()][0] as Speedometer;
     expect(firstKey.constructor).toEqual(Speedometer);
     expect(c.get(firstKey)).toEqual(1);
@@ -764,7 +758,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function", async () => {
-    const c = (await Company.group(`UPPER(${quoteTableName("type")})`).count(":all")) as Grouped;
+    const c = await Company.group(`UPPER(${quoteTableName("type")})`).count(":all");
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -772,9 +766,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function with table alias", async () => {
-    const c = (await Company.group(`UPPER(companies.${quoteTableName("type")})`).count(
-      ":all",
-    )) as Grouped;
+    const c = await Company.group(`UPPER(companies.${quoteTableName("type")})`).count(":all");
     expect(c.get(null)).toBe(2);
     expect(c.get("DEPENDENTFIRM")).toBe(1);
     expect(c.get("CLIENT")).toBe(5);
@@ -812,14 +804,14 @@ describe("CalculationsTest", () => {
 
   it("should group by scoped field", async () => {
     const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
-    const c = (await railsCore.companies.group("name").sum("id")) as Grouped;
+    const c = await railsCore.companies.group("name").sum("id");
     expect(c.get("Leetsoft")).toBe(7);
     expect(c.get("Jadedpixel")).toBe(8);
   });
 
   it("should group by summed field through association and having", async () => {
     const railsCore = (await Company.find(companies("rails_core").id)) as DependentFirm;
-    const c = (await railsCore.companies.group("name").having("sum(id) > 7").sum("id")) as Grouped;
+    const c = await railsCore.companies.group("name").having("sum(id) > 7").sum("id");
     expect(c.get("Leetsoft")).toBeUndefined();
     expect(c.get("Jadedpixel")).toBe(8);
   });
@@ -946,9 +938,7 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table with group by", async () => {
-    const c = (await Account.group("accounts.firm_id")
-      .joins(":firm")
-      .count("companies.id")) as Grouped;
+    const c = await Account.group("accounts.firm_id").joins(":firm").count("companies.id");
 
     for (const firmId of [1, 6, 2, 9]) expect([...c.keys()]).toContain(firmId);
   });
@@ -1149,12 +1139,10 @@ describe("CalculationsTest", () => {
   });
 
   it("distinct is honored when used with count operation after group", async () => {
-    const approvedTopicsCount = (
-      (await Topic.group("approved").count("author_name")) as Grouped
-    ).get(true);
+    const approvedTopicsCount = (await Topic.group("approved").count("author_name")).get(true);
     expect(approvedTopicsCount).toBe(4);
     const distinctAuthorsForApprovedCount = (
-      (await Topic.group("approved").distinct().count("author_name")) as Grouped
+      await Topic.group("approved").distinct().count("author_name")
     ).get(true);
     expect(distinctAuthorsForApprovedCount).toBe(3);
   });

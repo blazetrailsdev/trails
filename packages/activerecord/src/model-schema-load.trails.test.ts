@@ -3,6 +3,10 @@ import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
 import { defaultValue } from "./type.js";
+import { ConnectionNotEstablished } from "./errors.js";
+import { Column } from "./connection-adapters/column.js";
+import { SchemaCache } from "./connection-adapters/schema-cache.js";
+import { lookupCastTypeFromColumn } from "./connection-adapters/postgresql/quoting.js";
 import { adapterDouble, establishConnectionTo } from "./test-helpers/adapter-double.js";
 
 class UuidType extends ValueType {
@@ -291,6 +295,53 @@ describe("loadSchemaFromAdapter integration details", () => {
 
     expect(Object.hasOwn(host, "_schemaLoaded")).toBe(false);
     expect(Object.hasOwn(host, "_columnsHash")).toBe(false);
+  });
+});
+
+describe("a schema cache loaded from a dump", () => {
+  function dumpLoadedCache(): SchemaCache {
+    const dumped = new SchemaCache();
+    dumped.setColumns("posts", [new Column("guid", null)]);
+    (dumped as unknown as { _primaryKeys: Map<string, string> })._primaryKeys.set("posts", "guid");
+    const cache = new SchemaCache();
+    cache.marshalLoad(dumped.marshalDump());
+    return cache;
+  }
+
+  it("raises the connection error when the type map is unset and verify! fails", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const adapter = adapterDouble({
+      typeMap: null,
+      lookupCastTypeFromColumn,
+      async verifyBang(): Promise<void> {
+        throw new ConnectionNotEstablished("connection refused");
+      },
+    });
+    await establishConnectionTo(Post, adapter as never);
+    Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
+
+    await expect(Post.loadSchema()).rejects.toThrow(ConnectionNotEstablished);
+  });
+
+  it("verifies before load_schema! so the lookup reads the warmed type map", async () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    const adapter = adapterDouble({
+      typeMap: null as { lookup(): ValueType } | null,
+      lookupCastTypeFromColumn,
+      async verifyBang(): Promise<void> {
+        this.typeMap = { lookup: () => new UuidType() };
+      },
+    });
+    await establishConnectionTo(Post, adapter as never);
+    Post.connectionPool().schemaReflection.loadedCache = dumpLoadedCache();
+
+    await Post.loadSchema();
+
+    expect(Post.typeForAttribute("guid")!.type()).toBe("uuid");
   });
 });
 

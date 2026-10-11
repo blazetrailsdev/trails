@@ -79,4 +79,20 @@ describe("ActiveRecord::Encryption::Configurable (trails)", () => {
       Encryption.defaultContext = context;
     }
   });
+
+  it("skips a property neither Config nor Context has a writer for", () => {
+    const context = Encryption.defaultContext;
+    try {
+      Configurable.configure({
+        primaryKey: "the primary key",
+        keyDerivationSalt: "the salt",
+        noSuchProperty: "ignored",
+      });
+
+      expect("noSuchProperty" in Configurable.config).toBe(false);
+      expect("noSuchProperty" in Encryption.defaultContext).toBe(false);
+    } finally {
+      Encryption.defaultContext = context;
+    }
+  });
 });

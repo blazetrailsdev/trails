@@ -132,9 +132,9 @@ describe("multi-field grouped bigint sum", () => {
     await NumericData.create({ world_population: 2n ** 62n, my_house_population: 1n });
     await NumericData.create({ world_population: 2n ** 62n, my_house_population: 2n });
 
-    const result = (await NumericData.group("my_house_population", "world_population").sum(
+    const result = await NumericData.group("my_house_population", "world_population").sum(
       "atoms_in_universe",
-    )) as Map<unknown, unknown>;
+    );
 
     const keys = [...result.keys()] as unknown[][];
     expect(keys).toHaveLength(2);
@@ -170,7 +170,7 @@ describe("ungrouped calculation HAVING", () => {
 
   it("emits HAVING with no GROUP BY and filters the single aggregate row", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
-    const total = (await Account.sum("credit_limit")) as number;
+    const total = await Account.sum("credit_limit");
     expect(total).toBeGreaterThan(100);
     expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
     expect(await Account.having("sum(credit_limit) > 100000").sum("credit_limit")).toBe(0);

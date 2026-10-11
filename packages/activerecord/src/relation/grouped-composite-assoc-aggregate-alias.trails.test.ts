@@ -78,7 +78,7 @@ describe("CpkBook grouped calculation over a composite-key belongs_to aliases th
     await seedOrders();
     let result: Map<unknown, unknown> = new Map();
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.group("order").sum("order_id")) as Map<unknown, unknown>;
+      result = await CpkBook.group("order").sum("order_id");
     });
 
     const groupedSql = sqls.find((s) => /GROUP BY/i.test(s));

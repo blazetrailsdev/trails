@@ -120,10 +120,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await seedBooksWithOrders();
     let result!: Map<unknown, unknown>;
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.eagerLoad(":order").group("order").count("cpk_books.id")) as Map<
-        unknown,
-        unknown
-      >;
+      result = await CpkBook.eagerLoad(":order").group("order").count("cpk_books.id");
     });
     const groupSql = sqls.find((s) => /GROUP BY/i.test(s)) ?? "";
     expect(groupSql).toMatch(/LEFT OUTER JOIN .*cpk_orders/i);
@@ -134,10 +131,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   it("eager_load(:x).group(:composite_fk_belongs_to).sum folds the eager JD", async () => {
     await seedBooksWithOrders();
-    const result = (await CpkBook.eagerLoad(":order").group("order").sum("id")) as Map<
-      unknown,
-      unknown
-    >;
+    const result = await CpkBook.eagerLoad(":order").group("order").sum("id");
     const sums = byOrderId(result);
     expect(sums.get(100)).toBe(3);
     expect(sums.get(200)).toBe(3);
