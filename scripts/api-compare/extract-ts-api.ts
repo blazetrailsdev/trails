@@ -6373,6 +6373,16 @@ function extractCallArgs(node: ts.Node | undefined): CallSite[] | undefined {
 
 function walkForCallArgs(node: ts.Node, sites: CallSite[]): void {
   const visit = (n: ts.Node): void => {
+    for (const [form, receiver, key] of nativeHashForms(n)) {
+      const tail = receiver === undefined ? undefined : receiverTailName(receiver);
+      if (key === undefined || tail === undefined) continue;
+      sites.push({
+        name: `${NATIVE_FORM_PREFIX}${form}`,
+        args: [key],
+        flags: [],
+        recv: `id:${tail}`,
+      });
+    }
     if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
       recordCallSite(n, sites, visit);
       return;
@@ -6917,7 +6927,17 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
-function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | undefined][] {
+/**
+ * The native hash forms (RFC 0190) a node is, each with the receiver it is on.
+ * `in` and `delete` also answer the KEY, in {@link describeArg}'s spelling: a
+ * `delete options.public` names it as the string `delete options["public"]`
+ * does. {@link walkForCallArgs} records the pair as an `@in` / `@delete` site,
+ * so `parity:api:calls:args` compares the key the call-set gate cannot see
+ * (call-args.ts#hashFormKeys).
+ */
+function nativeHashForms(
+  n: ts.Node,
+): [form: string, receiver: ts.Expression | undefined, key?: string][] {
   if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.InKeyword) {
     let test: ts.Node = n;
     while (ts.isParenthesizedExpression(test.parent) || ts.isPrefixUnaryExpression(test.parent)) {
@@ -6927,12 +6947,15 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
     if (ts.isIfStatement(guard) && guard.expression === test && isArgumentBindingGuard(guard)) {
       return [];
     }
-    return [["in", n.right]];
+    return [["in", n.right, describeArg(n.left, [])]];
   }
   if (ts.isDeleteExpression(n)) {
     const target = n.expression;
-    if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
-      return [["delete", target.expression]];
+    if (ts.isPropertyAccessExpression(target)) {
+      return [["delete", target.expression, `str:${escapeDescriptorText(target.name.text)}`]];
+    }
+    if (ts.isElementAccessExpression(target)) {
+      return [["delete", target.expression, describeArg(target.argumentExpression, [])]];
     }
     return [];
   }
@@ -6951,7 +6974,8 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
   if (!ts.isCallExpression(n)) return [];
   const callee = n.expression.getText();
   if (callee === "Object.hasOwn" || callee === "Object.prototype.hasOwnProperty.call") {
-    return [["in", n.arguments[0]]];
+    const key = n.arguments[1];
+    return [["in", n.arguments[0], key === undefined ? undefined : describeArg(key, [])]];
   }
   if (callee === "Object.assign") return [["assign", n.arguments[0]]];
   return [];

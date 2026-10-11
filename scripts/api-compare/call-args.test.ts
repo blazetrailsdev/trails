@@ -1533,3 +1533,69 @@ describe("compareCallArgs function-form Module#prepend / include / extend", () =
     ).toBe("mismatch");
   });
 });
+
+describe("a native hash form's literal key (RFC 0190)", () => {
+  const on = (name: string, recv: string, args: string[], flags: string[] = []): CallSite => ({
+    ...site(name, args, flags),
+    recv,
+  });
+  const verdict = (ruby: CallSite, ...ts: CallSite[]) =>
+    pairCallSites(
+      comparableRubySites([ruby], ts, () => false),
+      ts,
+    ).map((p) => compareCallArgs(p.ruby, p.ts).verdict);
+  const publicDelete = on("delete", "id:options", ["sym:public"], ["weak"]);
+
+  it("passes options.delete(:public) with delete options.public", () => {
+    expect(verdict(publicDelete, on("@delete", "id:options", ["str:public"]))).toEqual(["match"]);
+  });
+
+  it("reports options.delete(:public) with delete options.private as a shape row", () => {
+    const [pair] = pairCallSites([publicDelete], [on("@delete", "id:options", ["str:private"])]);
+    expect(compareCallArgs(pair.ruby, pair.ts)).toEqual({
+      verdict: "mismatch",
+      class: "shape",
+      rubyArgs: ["str:public"],
+      tsArgs: ["str:private"],
+    });
+  });
+
+  it('passes options.key?(:only_path) with "onlyPath" in options', () => {
+    const ruby = on("key?", "id:@options", ["sym:only_path"]);
+    expect(verdict(ruby, on("@in", "id:options", ["str:onlyPath"]))).toEqual(["match"]);
+  });
+
+  it("reads a colon-spelled key as the Symbol, and only for a Symbol", () => {
+    const form = on("@delete", "id:env", ["str::params"]);
+    expect(verdict(on("delete", "id:env", ["sym:params"]), form)).toEqual(["match"]);
+    expect(verdict(on("delete", "id:env", ["str:params"]), form)).toEqual(["mismatch"]);
+  });
+
+  it("does not compare a computed key on either side", () => {
+    expect(
+      verdict(on("delete", "id:options", ["id:key"]), on("@delete", "id:options", ["str:public"])),
+    ).toEqual(["skip"]);
+    expect(verdict(publicDelete, on("@delete", "id:options", ["id:key"]))).toEqual(["skip"]);
+  });
+
+  it("pairs a form only with the Ruby site on the same receiver name", () => {
+    expect(verdict(publicDelete, on("@delete", "id:other", ["str:private"]))).toEqual([]);
+    expect(
+      verdict(on("delete", "call:env", ["sym:public"]), on("@delete", "id:env", ["str:public"])),
+    ).toEqual(["match"]);
+  });
+
+  it("prefers the form holding the Ruby key over a sibling on the same receiver", () => {
+    const pairs = pairCallSites(
+      [publicDelete],
+      [on("@delete", "id:options", ["str:etag"]), on("@delete", "id:options", ["str:public"])],
+    );
+    expect(pairs.map((p) => p.ts.args)).toEqual([["str:public"]]);
+  });
+
+  it("leaves a weak site dropped when the body has no form on its receiver", () => {
+    expect(
+      comparableRubySites([publicDelete], [site("hashDelete", ["id:options"])], () => false),
+    ).toEqual([]);
+  });
+});

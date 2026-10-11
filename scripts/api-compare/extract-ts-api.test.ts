@@ -6352,6 +6352,35 @@ describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
 
+  it("records a native hash form's key as an @in / @delete site (RFC 0190)", () => {
+    expect(
+      site(
+        `class Foo {
+          create(options: any, key: string) {
+            if ("public" in options) delete options.public;
+            delete this.env["etag"];
+            delete options[key];
+            Object.assign(options, { a: 1 });
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:etag"], flags: [], recv: "id:env" },
+      { name: "@delete", args: ["id:key"], flags: [], recv: "id:options" },
+    ]);
+    expect(
+      site(`class Foo { create(h: any, k: string) { return Object.hasOwn(h, k); } }`).map((s) => [
+        s.name,
+        s.args,
+      ]),
+    ).toEqual([
+      ["@in", ["id:k"]],
+      ["hasOwn", ["id:h", "id:k"]],
+    ]);
+  });
+
   it("records a call's own receiver, but not a namespace qualifier", () => {
     expect(
       site(

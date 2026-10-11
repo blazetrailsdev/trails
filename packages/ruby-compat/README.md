@@ -180,6 +180,31 @@ keys by value. Reach for `Hash` when the key is an object, an Array or a number
 that must stay a number, or when the site sets a default, freezes the hash or
 compares by identity. Otherwise write `{}`.
 
+### The hash helpers are for the arms JS lacks
+
+A Hash call on a plain object is written as the JS form: `k in h` /
+`Object.hasOwn(h, k)`, `h[k]`, `h[k] = v`, `delete h[k]`,
+`Object.assign(h, other)`, `{ ...h, ...other }`, and
+`for (const [k, v] of Object.entries(h))`. The call gates credit each form
+(`NATIVE_FORM_ANALOGUES`, `scripts/api-compare/enumerable-idioms.ts`). The
+helpers in `hash.ts` stay for what those forms cannot do:
+
+| helper                 | MRI anchor                        | the arm JS has no form for                                                                                |
+| ---------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `hasKey`               | `hash.c:3671` `rb_hash_has_key`   | dispatch to a `Map`, a `Hash` or an `isKey` member; an `undefined`-valued keyword read as absent          |
+| `hashAref`             | `hash.c:2121` `rb_hash_aref`      | a miss that answers `null`; a `Hash` default; a computed key that could name an `Object.prototype` member |
+| `hashAset`             | `hash.c:2941` `rb_hash_aset`      | a caller-supplied `"__proto__"` key; `FrozenError`; a `Map` or `set` receiver                             |
+| `hashDelete`           | `hash.c:2441` `rb_hash_delete_m`  | the removed value as the result; the miss block; `FrozenError`                                            |
+| `mergeBang` / `update` | `hash.c:4028` `rb_hash_update`    | the conflict block; a `Map` on either side                                                                |
+| `merge`                | `hash.c:4144` `rb_hash_merge`     | the conflict block; a result with no prototype, so `__proto__` is an ordinary key                         |
+| `eachPair`             | `hash.c:3149` `rb_hash_each_pair` | a `Map` or `each` receiver; the receiver as the call's result                                             |
+| `fetch`                | `hash.c:2176` `rb_hash_fetch_m`   | all of it: a stored `nil` beats the default, and a miss with no default raises `KeyError`                 |
+| `deleteIf` / `keepIf`  | `hash.c:2564`, `hash.c:2844`      | all of it: an in-place filter with Ruby truthiness on the block result                                    |
+| `hashReplace`          | `hash.c:2967` `rb_hash_replace`   | all of it: clear-then-copy with a `FrozenError`                                                           |
+
+A site that needs none of those arms uses the form, and an arm with no caller
+left is deleted under rule 1.
+
 ## The contract
 
 Four rules govern this package. Rules 2 and 3 are mechanically enforced, rule 4

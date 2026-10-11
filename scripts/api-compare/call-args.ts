@@ -16,7 +16,11 @@ import { rubyMethodToTsIgnoringSkip, snakeToCamel } from "@blazetrails/parity/co
 import { stripThis, isReceiverParam } from "./arity.js";
 import { decodeRubyString, normalizeConstantSpelling, normalizeLiteral } from "./literals.js";
 import { normalizeRubyKey } from "./options-keys.js";
-import { JS_ENUMERABLE_ALIASES, NATIVE_FORM_ANALOGUES } from "./enumerable-idioms.js";
+import {
+  JS_ENUMERABLE_ALIASES,
+  NATIVE_FORM_ANALOGUES,
+  NATIVE_FORM_PREFIX,
+} from "./enumerable-idioms.js";
 import { NO_JS_CALL_FORM } from "./compare.js";
 import { RECEIVER_AS_FIRST_ARG } from "./receiver-as-first-arg.js";
 import {
@@ -994,8 +998,44 @@ function tsCallNameKeys(rubyName: string): string[] {
   const quantity = NATIVE_FORM_ANALOGUES.get(rubyName)?.argument;
   if (quantity !== undefined) return [quantity.tsCall];
   if (rubyName === "new") return ["constructor"];
-  if (/[?!=]$/.test(rubyName)) return rubyMethodToTsIgnoringSkip(rubyName) ?? [];
-  return [snakeToCamel(rubyName)];
+  const keyed = keyedFormName(rubyName);
+  const forms = keyed === undefined ? [] : [keyed];
+  if (/[?!=]$/.test(rubyName)) return [...(rubyMethodToTsIgnoringSkip(rubyName) ?? []), ...forms];
+  return [snakeToCamel(rubyName), ...forms];
+}
+
+/** The site name the TS extractor records for the native form of a Ruby hash
+ *  call whose row declares `key` (`@in` for `key?`, `@delete` for `delete`;
+ *  extract-ts-api.ts#nativeHashForms). */
+function keyedFormName(rubyName: string): string | undefined {
+  const analogue = NATIVE_FORM_ANALOGUES.get(rubyName);
+  return analogue?.key === true ? `${NATIVE_FORM_PREFIX}${analogue.form}` : undefined;
+}
+
+/** Whether a native-form site is on the receiver the Ruby site names, the
+ *  name match `hasNativeFormAnalogue` (compare.ts) credits the call by:
+ *  `@options.key?(:x)` is `"x" in this.options`, never `"x" in this.other`. */
+function onSameHash(ruby: CallSite, ts: CallSite): boolean {
+  const tail = ruby.recv?.match(/^(?:id|call):@*(\w+)$/)?.[1];
+  return tail !== undefined && ts.recv === `id:${snakeToCamel(tail)}`;
+}
+
+/**
+ * The key a Ruby hash call and its native form each name, or the side that
+ * names none. Ruby's is a Symbol or String literal in argument 1, the TS one a
+ * string literal or a property name; a computed key on either side is not
+ * compared. Both go through {@link normalizeRubyKey}, the translation a kwarg
+ * key gets, so `:only_path` is `"onlyPath"`. A Symbol key is also `":params"`,
+ * the spelling a hash holding Symbol and String keys keeps it under
+ * (CLAUDE.md, "Symbols vs strings").
+ */
+function hashFormKeys(ruby: CallSite, ts: CallSite): [string, string] | CallArgSkipReason {
+  const [, kind, rubyKey] = ruby.args[0]?.match(/^(sym|str):(.*)$/s) ?? [];
+  if (rubyKey === undefined) return "opaqueRubyArg";
+  const tsKey = ts.args[0]?.match(/^str:(.*)$/s)?.[1];
+  if (tsKey === undefined) return "opaqueTsArg";
+  const bare = kind === "sym" ? tsKey.replace(/^:/, "") : tsKey;
+  return [`str:${normalizeRubyKey(rubyKey)}`, `str:${normalizeRubyKey(bare)}`];
 }
 
 /** The descriptor of a `&blk` block-pass the Ruby site's argument list dropped
@@ -1197,6 +1237,7 @@ export function pairCallSites(
     tsSites.forEach((ts, tsIdx) => {
       if (!keys.has(ts.name)) return;
       if (TS_CALL_HOMONYMS.has(ts.name)) return;
+      if (ts.name.startsWith(NATIVE_FORM_PREFIX) && !onSameHash(ruby, ts)) return;
       if (isSelfReaderAgainstLocalSend(ruby, ts)) return;
       candidates.push({
         rubyIdx,
@@ -1280,8 +1321,16 @@ export function comparableRubySites(
   return rubySites.filter(
     (ruby) =>
       !ruby.flags.includes("weak") ||
-      (!TS_CALL_HOMONYMS.has(ruby.name) && declaredInComparedFile(ruby.name) && consume(ruby.name)),
+      (!TS_CALL_HOMONYMS.has(ruby.name) &&
+        declaredInComparedFile(ruby.name) &&
+        consume(ruby.name)) ||
+      hasNativeFormSite(ruby, tsSites),
   );
+}
+
+function hasNativeFormSite(ruby: CallSite, tsSites: readonly CallSite[]): boolean {
+  const keyed = keyedFormName(ruby.name);
+  return keyed !== undefined && tsSites.some((ts) => ts.name === keyed && onSameHash(ruby, ts));
 }
 
 interface Quantity {
@@ -1437,6 +1486,15 @@ export function compareCallArgs(
     rubyArgs: [],
     tsArgs: [],
   });
+  if (ts.name.startsWith(NATIVE_FORM_PREFIX)) {
+    if (hasUncomparableFlag(ruby)) return skipped("uncomparableFlag");
+    const keys = hashFormKeys(ruby, ts);
+    if (!Array.isArray(keys)) return skipped(keys);
+    const [rubyKey, tsKey] = keys;
+    return rubyKey === tsKey
+      ? { verdict: "match", rubyArgs: [rubyKey], tsArgs: [tsKey] }
+      : { verdict: "mismatch", class: "shape", rubyArgs: [rubyKey], tsArgs: [tsKey] };
+  }
   if (isSkippedCallName(ruby.name)) return skipped("excludedCallName");
   if (hasUncomparableFlag(ruby) || hasUncomparableFlag(ts)) return skipped("uncomparableFlag");
 

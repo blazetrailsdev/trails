@@ -285,3 +285,26 @@ one driver, since `postgresql-adapter.ts` imports `pg` and `mysql2-adapter.ts`
 imports `mysql2/promise`. Moving each driver import into the adapter's
 `connect` would make the built-ins importable but leaves a third-party adapter
 registered by path unloadable, and drops `resolve`'s two `LoadError` arms.
+
+## Ruby idioms that do not translate literally: Hash calls on a plain object
+
+RFC 0129 put the hash helpers (`hasKey`, `hashDelete`, `mergeBang`, `eachPair`,
+`hashAref`, `hashAset`) on every option-hash site on purpose. `key?` and
+`has_key?` had sat in `NO_JS_CALL_FORM`, because `in` was "a shape the gate
+cannot tell from a dropped guard", and a helper call gave the call gate a
+callee to see. By 2026-10-10 that was about 336 helper call sites in source.
+
+The repo owner ruled on 2026-10-10: "I don't want things to use hash or
+hashwithindifferentaccess unless specific features are necessary." RFC 0190
+then taught the TS extractor to mark each native form (`@in`, `@delete`,
+`@assign`, `@spread`, `@entries`) with its receiver's name, and the comparator
+to credit the Ruby call only where the body carries the form on the receiver
+Rails names. That receiver match is what an exemption could not give: a dropped
+`options.key?(:public)` still flags.
+
+Putting the names in `NO_JS_CALL_FORM` was rejected for that reason. A native
+form for `fetch` was rejected because `h.k ?? d` replaces a stored `nil`.
+`in` for every key was rejected because it walks the prototype chain, which is
+why a computed key is `Object.hasOwn`. 76 of the 94 `hashDelete` sites use the
+removed value, so the helper stays there, and the RFC reports that residual
+instead of promising zero helper calls.
