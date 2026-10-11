@@ -143,6 +143,9 @@ port a body:
   turns on `Symbol === key`, or it meets a hash already carrying `":name"`
   keys. `symbolize_keys` is in `NO_JS_CALL_FORM`, so the call gate will not
   catch a wrong omission. Check these three cases yourself.
+- **A Ruby Hash is a plain object unless it needs a `Hash` feature.** The
+  features, each with its MRI citation, are in
+  [packages/ruby-compat/README.md](packages/ruby-compat/README.md#when-a-ruby-hash-is-a-hash-and-when-it-is-an-object).
 - **Symbols vs strings.** Where Rails accepts a Symbol _or_ a String, port both
   arms — dropping the string arm is a common silent gap.
 - **A Ruby Symbol is a JS string, never a JS `Symbol`.** `:short` is `"short"`.

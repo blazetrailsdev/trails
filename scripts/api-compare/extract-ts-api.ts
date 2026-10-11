@@ -6643,11 +6643,14 @@ function collectCalls(
     map.set(name, (map.get(name) ?? 0) + 1);
   };
   const promiseSettlers: string[] = [];
+  // Held apart from `names` until the end: a body whose only names are hash
+  // forms still records no call set, so marking them moves no comparison.
+  const hashForms = new Set<string>();
   const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
     if (skipHoistedClosures || receiver === undefined) return;
-    names.add(`${NATIVE_FORM_PREFIX}${form}`);
+    hashForms.add(`${NATIVE_FORM_PREFIX}${form}`);
     const tail = receiverTailName(receiver);
-    if (tail !== undefined) names.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+    if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
   };
   const visit = (n: ts.Node): void => {
     for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
@@ -6825,7 +6828,7 @@ function collectCalls(
     }
   }
   if (names.size === 0) return undefined;
-  return [...names];
+  return [...names, ...hashForms];
 }
 
 /**

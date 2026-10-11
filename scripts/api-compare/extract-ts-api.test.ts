@@ -2148,12 +2148,12 @@ describe("body call capture", () => {
     const cls = extractFromSource(
       `class Foo {
         key(opts: Record<string, object>, name: string) {
-          return "a" in opts[name];
+          return use("a" in opts[name]);
         }
       }`,
     );
     const m = cls.instanceMethods.find((m) => m.name === "key")!;
-    expect(m.calls!.filter((c) => c.startsWith("@in"))).toEqual(["@in"]);
+    expect(m.calls!.filter((c) => /^@in(:|$)/.test(c))).toEqual(["@in"]);
   });
 
   it("marks no native hash form for Object.keys, a spreadless literal or a missing-keyword guard", () => {
@@ -2172,6 +2172,17 @@ describe("body call capture", () => {
     for (const m of cls.instanceMethods) {
       expect(m.calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))).toEqual([]);
     }
+  });
+
+  it("records no call set for a body whose only names are native hash forms", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        key(options: Record<string, unknown>) {
+          return "a" in options;
+        }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "key")!.calls).toBeUndefined();
   });
 
   it("keeps the native hash forms out of the ORDER stream", () => {

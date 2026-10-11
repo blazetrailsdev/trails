@@ -154,6 +154,32 @@ hash's own header (`RHASH_PASS_AS_KEYWORDS`, `internal/hash.h:23`). It is not a
 property, so `Object.keys`, a spread and `JSON.stringify` never see it, and a
 copy of a flagged hash is unflagged.
 
+### When a Ruby Hash is a `Hash` and when it is an object
+
+A Ruby Hash is a plain JS object. It is a `Hash` (`hash.ts`, `extends Map`)
+only where the site needs one of the features below, none of which an object
+can hold. The class is permanent for these and is not convergence debt. That
+does not license a `new Hash()` where Rails has a string-keyed `{}`.
+
+| feature                                    | field                 | MRI anchor                                                                                        | a trails call site                                                                                                                                                                     |
+| ------------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| the `default` seat, `Hash.new(obj)`        | `#default`            | `hash.c:1782` `rb_hash_initialize`, `hash.c:2068` `rb_hash_default_value`                         | `activerecord/src/associations/has-many-through-association.ts:90` (`Hash.new(0)`, `has_many_through_association.rb:194`)                                                              |
+| the `default_proc` seat, `Hash.new { }`    | `#defaultProc`        | `hash.c:2308` `rb_hash_set_default_proc`                                                          | `activerecord/src/associations/join-dependency.ts:275` (`Hash.new { \|h, klass\| h[klass] = {} }`, `join_dependency.rb:114`)                                                           |
+| key equality by `eql?` / `hash`            | `#eqlKeys`, `#stHash` | `hash.c:126` `rb_any_cmp`, `hash.c:171` `any_hash`; Array keys: `array.c:5165,5205`               | `activerecord/src/connection-adapters/deduplicable.ts:27` (`registry[self]`, `deduplicable.rb:9-19`); Array keys: `actionview/src/renderer/partial-renderer/collection-caching.ts:114` |
+| a binary String key `eql?` to a 7-bit one  | `#binaryKeys`         | `string.c:3773` `rb_str_eql`, `string.c:3629` `rb_str_hash`                                       | none outside `hash.ts`; pinned by `hash.trails.test.ts:204`                                                                                                                            |
+| `compare_by_identity`                      | `#identhash`          | `hash.c:4427` `rb_hash_compare_by_id`                                                             | `activerecord/src/associations/preloader/association.ts:133` (`{}.compare_by_identity`, `preloader/association.rb:200`)                                                                |
+| `FL_FREEZE` on the hash, a `FrozenError`   | `#frozen`             | `hash.c:105` `rb_hash_freeze`, `hash.c:1602` `rb_hash_modify_check`                               | `activemodel/src/errors.ts:164,174` (`hash.freeze`, `errors.rb:271,281`)                                                                                                               |
+| the iteration level, a write during `each` | `#iterLev`            | `hash.c:1345` `hash_iter_lev_inc`, `hash.c:1630` "can't add a new key into hash during iteration" | none outside `hash.ts`; every `for…of` over a `Hash` raises it, pinned by `hash.trails.test.ts:1019`                                                                                   |
+
+`#binaryKeys` is not a feature of its own. It is the flag that keeps a String
+lookup off the `eql?` buckets until a `Uint8Array` key has been stored, so it
+belongs to the key-equality row and is listed apart only because it is a field.
+
+A key that is a string needs none of this: a JS object already compares string
+keys by value. Reach for `Hash` when the key is an object, an Array or a number
+that must stay a number, or when the site sets a default, freezes the hash or
+compares by identity. Otherwise write `{}`.
+
 ## The contract
 
 Four rules govern this package. Rules 2 and 3 are mechanically enforced, rule 4

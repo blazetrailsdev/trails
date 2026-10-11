@@ -978,7 +978,9 @@ type MapBoundaryReturn = any;
  * has nowhere to put: `Hash.new(obj)` stores a value returned for every miss,
  * `Hash.new { |hash, key| … }` stores a proc run on every miss — the one that
  * lets `hash[key]` populate the hash as it reads it. It subclasses `Map`
- * because Ruby's key equality is `eql?`, not string coercion.
+ * because Ruby's key equality is `eql?`, not string coercion. Which features
+ * make a Ruby Hash a `Hash` rather than a plain object is in the README,
+ * § "When a Ruby Hash is a `Hash` and when it is an object".
  *
  * @noRailsEquivalent PERMANENT — Ruby core `Hash` (`vendor/ruby/v3.3.11/hash.c:7182`).
  */
