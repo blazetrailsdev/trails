@@ -85,7 +85,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
   };
 
   const impliedLayoutName = this._impliedLayoutName();
-  const prefixes = /\blayouts/.test(impliedLayoutName) ? [] : ["layouts"];
+  const prefixes = /(?<![\w-])layouts/.test(impliedLayoutName) ? [] : ["layouts"];
   const defaultBehavior: LayoutMethod = function (lookupContext, formats, keys) {
     return (
       (lookupContext.findAll(impliedLayoutName, prefixes, false, keys, { formats })[0] as

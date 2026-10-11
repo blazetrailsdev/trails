@@ -22,7 +22,7 @@ import { Base as ActionViewBase } from "@blazetrails/actionview";
 
 export class ClientDisconnected extends RuntimeError {}
 
-type ErrorCallback = () => void;
+type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
@@ -37,7 +37,7 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   constructor(response: DispatchResponse) {
     const klass = new.target;
     super(response, klass.prototype.buildQueue(klass.queueSize));
-    this._errorCallback = () => {};
+    this._errorCallback = () => true;
     this._aborted = false;
     this.ignoreDisconnect = false;
   }
@@ -96,8 +96,8 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     this._errorCallback = block;
   }
 
-  callOnError(): void {
-    this._errorCallback();
+  callOnError(): unknown {
+    return this._errorCallback();
   }
 
   /** @internal */
