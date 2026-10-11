@@ -466,7 +466,7 @@ async function newClient(
       .createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        compress: names.some((f) => f.toUpperCase() === "COMPRESS"),
+        compress: connOptions.compress || names.some((f) => f.toUpperCase() === "COMPRESS"),
         flags: withoutDefaultIgnoreSpace(names),
       })
       .catch(driverError),

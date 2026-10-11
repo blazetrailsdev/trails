@@ -7,6 +7,7 @@ import {
   rbObjClassname,
   rbObjIsKindOf,
   rbObjRespondTo,
+  stringValue,
   TypeError,
 } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
@@ -128,14 +129,25 @@ export class Buffer {
     return this.topReadableSize() === 0;
   }
 
-  write(string: string | Uint8Array): number {
+  write(stringOrBuffer: string | Uint8Array): number {
+    let string = stringOrBuffer;
+    if (!(string instanceof Uint8Array)) {
+      string = stringValue(string);
+    }
+
     const length = this.appendString(string);
 
     return length;
   }
 
-  append(string: string | Uint8Array): this {
+  append(stringOrBuffer: string | Uint8Array): this {
+    let string = stringOrBuffer;
+    if (!(string instanceof Uint8Array)) {
+      string = stringValue(string);
+    }
+
     this.appendString(string);
+
     return this;
   }
 
@@ -186,7 +198,7 @@ export class Buffer {
     }
 
     if (all) {
-      return this._readAll(out);
+      return this.bufferReadAll(out);
     }
 
     if (n === 0) {
@@ -228,7 +240,7 @@ export class Buffer {
     }
 
     if (all) {
-      return this._readAll(out);
+      return this.bufferReadAll(out);
     }
 
     if (n === 0) {
@@ -358,7 +370,7 @@ export class Buffer {
     if (length > this.writeReferenceThreshold) {
       this.appendLongString(bytes, typeof string !== "string");
     } else {
-      this._append(bytes);
+      this.bufferAppend(bytes);
     }
 
     return length;
@@ -370,14 +382,14 @@ export class Buffer {
       if (ascii8bit) {
         rbFSend(this._io, this.ioWriteAllMethod, string);
       } else {
-        this._append(string);
+        this.bufferAppend(string);
       }
     } else {
       this.chunks.push(string);
     }
   }
 
-  private _append(data: Uint8Array): void {
+  private bufferAppend(data: Uint8Array): void {
     if (data.length === 0) {
       return;
     }
@@ -393,7 +405,7 @@ export class Buffer {
           let rl: number;
           if (max === 0) {
             if (out == null) {
-              rl = this._skip(this.ioBufferSize);
+              rl = this.bufferSkip(this.ioBufferSize);
             } else {
               rl = this.readToString(out, this.ioBufferSize);
             }
@@ -403,7 +415,7 @@ export class Buffer {
             sz += rl;
           } else {
             if (out == null) {
-              rl = this._skip(max);
+              rl = this.bufferSkip(max);
             } else {
               rl = this.readToString(out, max);
             }
@@ -424,7 +436,7 @@ export class Buffer {
       return sz;
     } else {
       if (max === 0) {
-        max = Infinity;
+        max = Number.MAX_SAFE_INTEGER;
       }
       if (out == null) {
         return this.skipNonblock(max);
@@ -434,7 +446,7 @@ export class Buffer {
     }
   }
 
-  private _readAll(out: unknown): Uint8Array {
+  private bufferReadAll(out: unknown): Uint8Array {
     if (out == null && this._io == null) {
       const str = this.toStr();
       this.clear();
@@ -502,7 +514,7 @@ export class Buffer {
     }
   }
 
-  private _skip(length: number): number {
+  private bufferSkip(length: number): number {
     if (length === 0) {
       return 0;
     }
