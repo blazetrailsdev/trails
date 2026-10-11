@@ -910,13 +910,12 @@ export async function executeGroupedCalculation(
       connection.selectAll(relation.arel(), `${rel.model.name} ${opName}`),
     );
 
-    let keyRecords: any;
+    let keyRecords: Record<string | number, Base> | undefined;
     if (association) {
       const keyIds = calculatedData.toArray().map((row) => row[first(groupAliases)!]);
-      keyRecords = association.klass.baseClass.where(
-        new Map([[association.klass.baseClass.primaryKey, keyIds]]),
-      );
-      keyRecords = await keyRecords.indexBy((record: Base) => record.id);
+      keyRecords = await (association.klass.baseClass as typeof Base)
+        .where(new Map([[association.klass.baseClass.primaryKey, keyIds]]))
+        .indexBy((record) => record.id as string | number);
     }
 
     const keyTypes: ColumnTypes = {};
@@ -948,7 +947,7 @@ export async function executeGroupedCalculation(
     for (const row of hashRows) {
       let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
       if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
-      if (associated) key = hashAref(keyRecords, key);
+      if (associated) key = hashAref(keyRecords!, key);
 
       result.set(key, typeCastCalculatedValue(row[columnAlias], fn, type));
     }

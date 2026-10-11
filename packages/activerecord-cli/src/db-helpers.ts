@@ -14,7 +14,9 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const raw = mod.default ?? mod;
   const configs = normalizeSqlitePaths(new DatabaseConfigurations(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
-  Base.configurations(DatabaseTasks.databaseConfiguration);
+  if (Base.configurations().empty) {
+    Base.configurations(DatabaseTasks.databaseConfiguration);
+  }
   DatabaseTasks.root = cwd;
   DatabaseTasks.dbDir = resolve(join(cwd, "db"));
   Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));

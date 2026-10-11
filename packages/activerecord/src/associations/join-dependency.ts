@@ -22,7 +22,11 @@ import type { Base } from "../base.js";
 import type { Result } from "../result.js";
 import type { AssociationSpec } from "../relation/query-methods.js";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
-import { _reflectOnAssociation } from "../reflection.js";
+import {
+  _reflectOnAssociation,
+  type AssociationReflection,
+  type ThroughReflection,
+} from "../reflection.js";
 import { Associations } from "../namespaces.js";
 import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
@@ -135,7 +139,7 @@ export class JoinDependency {
     return this.joinRoot.baseKlass;
   }
 
-  get reflections(): any[] {
+  get reflections(): (AssociationReflection | ThroughReflection)[] {
     return this.joinRoot.drop(1).map((node) => (node as JoinAssociation).reflection);
   }
 

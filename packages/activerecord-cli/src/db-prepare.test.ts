@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -56,6 +56,7 @@ describe("DbPrepareTest", () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     DatabaseTasks.seedLoader = null;
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
