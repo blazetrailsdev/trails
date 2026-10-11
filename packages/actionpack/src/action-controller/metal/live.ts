@@ -36,18 +36,18 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
 
   constructor(response: DispatchResponse | null) {
     const klass = new.target;
-    super(response as DispatchResponse, klass.prototype.buildQueue(klass.queueSize));
+    super(response, klass.prototype.buildQueue(klass.queueSize));
     this._errorCallback = () => true;
     this._aborted = false;
     this.ignoreDisconnect = false;
   }
 
   override write(string: string): void {
-    if (!this._response.committed) {
-      if (this._response.headers.get("Cache-Control") === undefined) {
-        this._response.headers.set("Cache-Control", "no-cache");
+    if (!this._response!.committed) {
+      if (this._response!.headers.get("Cache-Control") === undefined) {
+        this._response!.headers.set("Cache-Control", "no-cache");
       }
-      this._response.deleteHeader("Content-Length");
+      this._response!.deleteHeader("Content-Length");
     }
 
     super.write(string);
