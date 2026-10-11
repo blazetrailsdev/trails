@@ -182,6 +182,9 @@ describe("Mysql2::Client#warning_count", () => {
     ) as Time;
     expect(time.isUtc()).toBe(true);
     expect(client.queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
+
+    await stmt.execute(1, Temporal.PlainDate.from("2020-01-02"));
+    expect(execute.mock.calls[2]).toMatchObject([{ rowsAsArray: false }, [1, "2020-01-02"]]);
   });
 
   it("default_query_options is one shared Hash each client dups", () => {
