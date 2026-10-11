@@ -186,3 +186,38 @@ export function inlinedRubyCallArgs(segments: readonly MethodInfo[]): CallSite[]
     ),
   );
 }
+
+/**
+ * The control + call skeleton of a chain, in chain order. A consumed `super`
+ * leaves no token, as it leaves no call in {@link inlinedRubyBody}.
+ */
+export function inlinedRubySkeleton(segments: readonly MethodInfo[]): string[] {
+  return segments.flatMap((segment, index) =>
+    (segment.skeleton ?? []).filter(
+      (token) => !(token === "ref:super" && consumesSuper(segments, index)),
+    ),
+  );
+}
+
+/**
+ * The Rails classes of one Ruby file that reach no `initialize` of their own
+ * or through a same-package `include`, and whose constructor is tagged and not
+ * yet compared. The ordinary pairing has no `initialize` row for such a class,
+ * so its only Rails body is the one a tag cites from another package.
+ */
+export function initializeLessTaggedClasses(
+  fqns: readonly string[],
+  classes: Record<string, unknown>,
+  reachingInitialize: ReadonlySet<string>,
+  tagged: ReadonlyMap<string, unknown> | undefined,
+  compared: ReadonlySet<string>,
+  tsFile: string,
+  tsOwnerOf: (fqn: string) => string | undefined,
+): string[] {
+  if (tagged === undefined) return [];
+  return fqns.filter((fqn) => {
+    if (!Object.hasOwn(classes, fqn) || reachingInitialize.has(fqn)) return false;
+    const owner = tsOwnerOf(fqn);
+    return owner !== undefined && tagged.has(owner) && !compared.has(`${tsFile} ${owner}`);
+  });
+}

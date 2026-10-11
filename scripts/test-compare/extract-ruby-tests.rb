@@ -195,6 +195,9 @@ class TestExtractor
     @in_non_test_class = false
     @non_test_classes = []
     @test_cases = []
+    # Names read with a `#{...}` dropped, keyed by the blanked name: the same
+    # name with each interpolation as INTERPOLATION_PLACEHOLDER.
+    @interpolated_names = {}
     @source_lines = source.lines
     @quote_styles = build_quote_styles(source)
     @gate_stack = []
@@ -249,6 +252,12 @@ class TestExtractor
     flush_collected_modules
 
     return if @test_cases.empty?
+
+    @test_cases.each do |tc|
+      segments = tc[:ancestors] + [tc[:description]]
+      next unless segments.any? { |name| @interpolated_names.key?(name) }
+      tc[:pattern] = segments.map { |name| @interpolated_names.fetch(name, name) }
+    end
 
     # Determine top-level class name from file path
     class_name = File.basename(rel_path, "_test.rb")
@@ -2401,13 +2410,24 @@ class TestExtractor
     end
   end
 
+  # What an unexpandable `#{...}` reads as in a case's `pattern`; the TS
+  # extractor's DYNAMIC_TITLE_PLACEHOLDER (extract-ts-core.ts).
+  INTERPOLATION_PLACEHOLDER = "<expr>"
+
   def extract_string_content(node)
     return nil unless node.is_a?(Array)
     if node[0] == :string_literal
       content = node[1]
       if content.is_a?(Array) && content[0] == :string_content
         parts = content[1..]
-        return parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1] : "" }.join
+        blanked = parts.map { |p| p.is_a?(Array) && p[0] == :@tstring_content ? p[1] : "" }.join
+        if @interpolated_names && parts.any? { |p| p.is_a?(Array) && p[0] == :string_embexpr }
+          @interpolated_names[blanked] = parts.map { |p|
+            next "" unless p.is_a?(Array)
+            p[0] == :@tstring_content ? p[1] : (p[0] == :string_embexpr ? INTERPOLATION_PLACEHOLDER : "")
+          }.join
+        end
+        return blanked
       end
     end
     nil

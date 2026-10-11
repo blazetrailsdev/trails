@@ -187,7 +187,9 @@ import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
 import {
   inlinedRubyBody,
   inlinedRubyCallArgs,
+  inlinedRubySkeleton,
   inlinedSegments,
+  initializeLessTaggedClasses,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
@@ -5275,6 +5277,7 @@ export function main() {
       const rubyReaderNames = new Set<string>();
       const rubyOwnerShortNames = new Set<string>();
       const rubyOwnersDefiningInitialize = new Set<string>();
+      const rubyFqnsReachingInitialize = new Set<string>();
       // See rubyCallToTsForReceivers.
       let rubyFileDefinesInstanceNew = false;
       // (owner, name) pairs the extractor bucketed as CLASS methods — the
@@ -5294,6 +5297,7 @@ export function main() {
         rubyOwnerShortNames.add(itemShort);
         if (rubyMethods.some((rm) => rm.name === "initialize")) {
           rubyOwnersDefiningInitialize.add(itemShort);
+          rubyFqnsReachingInitialize.add(item.fqn);
         }
         if (f.instance.some((rm) => rm.name === "new")) rubyFileDefinesInstanceNew = true;
         for (const rm of rubyMethods) {
@@ -5682,9 +5686,12 @@ export function main() {
           negatedTsCalls,
           rubyOwned?.calls ?? rubyCalls,
         );
-        const rubySkeleton = ownsBody(rubyName)
-          ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
-          : rubySkeletonByName.get(rubyName);
+        const rubySkeleton =
+          segments.length > 0
+            ? inlinedRubySkeleton(segments)
+            : ownsBody(rubyName)
+              ? rubySkeletonByOwnerName.get(rubyBodyKey(rubyModule, level, rubyName))
+              : rubySkeletonByName.get(rubyName);
         const mirrorFile = rubyFileToTs(rubyFile, pkg, false);
         const mirrored =
           mirrorFile === tsFile
@@ -6470,6 +6477,20 @@ export function main() {
         };
         missingMethods.push(missed);
         if (declOnly) declarationOnly.push(missed);
+      }
+
+      for (const fqn of initializeLessTaggedClasses(
+        items.map((item) => item.fqn),
+        rubyPkg.classes,
+        rubyFqnsReachingInitialize,
+        tsInlinedFromByFileOwner.get(expectedTs),
+        inlinedTagsCompared,
+        expectedTs,
+        (rubyModule) =>
+          resolveOwner("initialize", "constructor", expectedTs, rubyModule, "instance").tsClass,
+      )) {
+        checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
+        checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }
 
       const total = fileMatched + fileMissing;
