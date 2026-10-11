@@ -2,6 +2,7 @@ import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
 import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
+import { isSchemaLoaded } from "./model-schema.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -98,11 +99,17 @@ interface ScopingHost {
   _assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
+/** @inventedArm if — PERMANENT */
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
   if (!klass.isScopeAttributes()) return;
 
-  const attributes = scopeAttributes.call(klass);
+  let attributes = scopeAttributes.call(klass);
+  if (!isSchemaLoaded.call(klass)) {
+    attributes = Object.fromEntries(
+      Object.entries(attributes).filter(([name]) => klass.hasAttribute(name)),
+    );
+  }
   if (!isEmpty(attributes)) {
     assertAssignedSynchronously(
       this._assignAttributes(attributes),
