@@ -736,6 +736,12 @@ describe("inspect wrapper class name", () => {
     expect(await relation.inspect()).toMatch(/^#<ActiveRecord::Relation \[#<Post /);
   });
 
+  it("renders a Relation subclass under its own name", async () => {
+    class CustomRelation extends Relation<InstanceType<typeof CanonPost>> {}
+    const relation = new CustomRelation(CanonPost).limit(0);
+    expect(await relation.inspect()).toBe("#<CustomRelation []>");
+  });
+
   it("defaults an unordered reverseOrder to the primary key descending", () => {
     expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
     expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);

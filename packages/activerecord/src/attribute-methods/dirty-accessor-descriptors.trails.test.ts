@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
+import { Dirty } from "./dirty.js";
 
 describe("AttributeMethods::Dirty accessor descriptors", () => {
   const SAVE_SIDE_READERS = [
@@ -12,7 +13,8 @@ describe("AttributeMethods::Dirty accessor descriptors", () => {
 
   it("save-side dirty readers are accessor properties on Base", () => {
     for (const name of SAVE_SIDE_READERS) {
-      const descriptor = Object.getOwnPropertyDescriptor(Base.prototype, name);
+      const descriptor = Dirty.instanceMethod(name);
+      expect(name in Base.prototype, name).toBe(true);
       expect(descriptor, name).toBeDefined();
       expect(typeof descriptor!.get, name).toBe("function");
       expect(descriptor!.value, name).toBeUndefined();

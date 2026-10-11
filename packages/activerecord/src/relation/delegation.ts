@@ -27,6 +27,7 @@ import {
   rbEql,
   rbFPublicSend,
   rbModConstSet,
+  rbModName,
   rbObjIvarGet,
   rbObjIvarSet,
   rbObjRespondTo,
@@ -78,7 +79,7 @@ export class DelegateCache {
     for (const klass of delegatedClasses()) {
       const delegate = class extends (klass as new (...args: never[]) => object) {} as FamilyCtor;
       include(delegate, ClassSpecificRelation);
-      Object.defineProperty(delegate, "name", { value: klass.name, configurable: true });
+      Object.defineProperty(delegate, "name", { value: rbModName(klass), configurable: true });
       DelegateCache.includeRelationMethods.call(this, delegate);
       cache.set(klass, delegate);
     }

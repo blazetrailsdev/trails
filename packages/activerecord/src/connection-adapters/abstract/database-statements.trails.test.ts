@@ -101,7 +101,7 @@ const hostDefaults: Pick<
   dirtyCurrentTransaction: () => {},
   castResult,
   affectedRows,
-  isWriteQuery: DatabaseStatements.isWriteQuery,
+  isWriteQuery: DatabaseStatements.instanceMethod("isWriteQuery")!.value,
   execute: async () => undefined,
   buildTruncateStatements,
   executeBatch: async () => undefined,
@@ -798,7 +798,10 @@ describe("internal_exec_query is a virtual call", () => {
 
   it("execQuery reaches the adapter override", async () => {
     const { host, seen } = makeOverrideHost();
-    const result = await DatabaseStatements.execQuery.call(host as never, "SELECT 1");
+    const result = await DatabaseStatements.instanceMethod("execQuery")!.value.call(
+      host as never,
+      "SELECT 1",
+    );
     expect(result.columns).toEqual(["overridden"]);
     expect(seen).toEqual(["SELECT 1"]);
   });

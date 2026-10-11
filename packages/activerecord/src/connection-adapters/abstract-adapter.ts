@@ -74,7 +74,6 @@ import { type Transaction, type NullTransaction } from "./abstract/transaction.j
 import {
   Store,
   checkVersion as checkVersionMixin,
-  selectAll as querySelectAll,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -107,14 +106,7 @@ import {
   Quoting as QuotingMixin,
 } from "./abstract/quoting.js";
 import type { Quoting, QuotedTimeValue } from "./abstract/quoting.js";
-import {
-  Callbacks,
-  include,
-  prepend,
-  type Extended,
-  type Included,
-  type PrependMethod,
-} from "@blazetrails/activesupport";
+import { Callbacks, include, type Extended, type Included } from "@blazetrails/activesupport";
 import {
   SchemaStatements,
   type CommentOrChanges,
@@ -2150,7 +2142,5 @@ include(AbstractAdapter, {
   indexNameLength,
   bindParamsLength,
 });
-
-prepend(AbstractAdapter.prototype, { selectAll: querySelectAll as PrependMethod });
 
 rbModConstSet(ConnectionAdapters, "AbstractAdapter", AbstractAdapter);

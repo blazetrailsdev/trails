@@ -8,8 +8,8 @@ import { Notifications, type NotificationEvent } from "@blazetrails/activesuppor
 import * as Types from "@blazetrails/activemodel";
 import { Attribute } from "@blazetrails/activemodel";
 import {
+  QueryCache,
   Store,
-  selectAll,
   type QueryCacheHost,
 } from "./connection-adapters/abstract/query-cache.js";
 import { DatabaseStatements } from "./connection-adapters/abstract/database-statements.js";
@@ -37,6 +37,20 @@ async function capture(fn: () => Promise<void>): Promise<SqlPayload[]> {
     Notifications.unsubscribe(sub);
   }
   return payloads;
+}
+
+function overSuper(
+  props: object,
+  superSelectAll: (...args: never[]) => unknown,
+): { selectAll(...args: unknown[]): unknown } {
+  class Parent {
+    selectAll(...args: unknown[]): unknown {
+      return (superSelectAll as (...a: unknown[]) => unknown)(...args);
+    }
+  }
+  class Host extends Parent {}
+  QueryCache.appendFeatures(Host);
+  return Object.assign(new Host(), props);
 }
 
 describe("cacheNotificationInfo payload (trails)", () => {
@@ -222,7 +236,7 @@ describe("select_all async arm on a cache miss (trails)", () => {
       lookupSqlCache: () => undefined,
     } as unknown as QueryCacheHost;
 
-    const result = selectAll.call(host, () => future, "SELECT 1", null, [], { async: true });
+    const result = overSuper(host, () => future).selectAll("SELECT 1", null, [], { async: true });
 
     expect(result).toBe(future);
   });

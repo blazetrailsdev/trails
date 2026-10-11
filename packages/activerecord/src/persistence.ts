@@ -823,8 +823,8 @@ type PersistenceInstanceChainHost = {
 };
 
 /** @internal */
-export function initInternals(this: PersistencePrivateHost, super_: () => void): void {
-  super_();
+export function initInternals(this: PersistencePrivateHost): void {
+  Persistence.superMethod(this, "initInternals")!();
   (this as any)._triggerDestroyCallback = (this as any)._triggerUpdateCallback = null;
   this._previouslyNewRecord = false;
 }
@@ -1007,6 +1007,9 @@ export const Persistence = new Module((mod) => {
     },
   );
   mod.defineMethod("_createRecord", _createRecord);
+  mod.defineMethod("initInternals", initInternals);
+  mod.defineMethod("incrementBang", incrementBang);
+  mod.defineMethod("reload", reload);
 });
 
 /** @internal */

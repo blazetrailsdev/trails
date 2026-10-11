@@ -120,9 +120,11 @@ describe("Inheritance::ClassMethods#initialize_clone", () => {
 
   it("calls super with the original before set_base_class", () => {
     const calls: unknown[] = [];
-    const copy = Object.create(Client) as typeof Client;
+    const copy = Object.assign(Object.create(Client) as typeof Client, {
+      initializeCopy: (other: unknown) => calls.push(other),
+    });
 
-    initializeClone.call(copy, (other) => calls.push(other), Client);
+    initializeClone.call(copy, Client);
 
     expect(calls).toEqual([Client]);
   });

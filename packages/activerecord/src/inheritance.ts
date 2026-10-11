@@ -11,7 +11,13 @@ import {
   safeConstantize,
 } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { hashAref, rbClassSuperclass, rbModName, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  hashAref,
+  Module,
+  rbClassSuperclass,
+  rbModName,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 import { demodulize } from "@blazetrails/activesupport";
 import { applicationRecordClass, setApplicationRecordClass } from "./active-record.js";
 
@@ -20,14 +26,14 @@ export interface Inheritance {
   readonly storeFullStiClass: boolean;
 }
 
-export const Inheritance = {
+export const Inheritance = Object.assign(new Module(), {
   [included](base: object): void {
     classAttribute.call(base, "storeFullClassName", { instanceWriter: false, default: true });
     classAttribute.call(base, "storeFullStiClass", { instanceWriter: false, default: true });
 
     setBaseClass(base as typeof Base);
   },
-};
+});
 
 /**
  * @internal
@@ -128,17 +134,17 @@ export function baseClass(this: typeof Base): typeof Base {
   return (this as any)._computedBaseClass as typeof Base;
 }
 
-export class ClassMethods {
-  static get abstractClass(): boolean {
+export const ClassMethods = new Module().include({
+  get abstractClass(): boolean {
     return Object.prototype.hasOwnProperty.call(this, "_abstractClass")
       ? (this as any)._abstractClass
       : false;
-  }
+  },
 
-  static set abstractClass(value: boolean) {
+  set abstractClass(value: boolean) {
     (this as any)._abstractClass = value;
-  }
-}
+  },
+});
 
 /** @internal */
 export function findStiClass(this: typeof Base, typeName: string): typeof Base {
@@ -210,19 +216,19 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   return modelClass.computeType(name);
 }
 
-export function initializeClone(
-  this: typeof Base,
-  super_: (other: unknown) => void,
-  other: unknown,
-): void {
-  super_(other);
+export function initializeClone(this: typeof Base, other: unknown): void {
+  ClassMethods.superMethod(this, "initializeClone")!(other);
   setBaseClass(this);
 }
 
-export function initializeDup(this: Base, super_: (other: unknown) => void, other: unknown): void {
-  super_(other);
+ClassMethods.defineMethod("initializeClone", initializeClone);
+
+export function initializeDup(this: Base, other: unknown): void {
+  Inheritance.superMethod(this, "initializeDup")!(other);
   ensureProperType.call(this);
 }
+
+Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {

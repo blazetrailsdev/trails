@@ -1,7 +1,7 @@
 import { Result } from "../../result.js";
 import { combineMultiStatements, type MaxAllowedPacketHost } from "../mysql/database-statements.js";
 import { lastInsertedId as abstractLastInsertedId } from "../abstract/database-statements.js";
-import { anybits, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
+import { anybits, Module, rbObjIvarGet, rbObjIvarSet } from "@blazetrails/ruby-compat";
 import type { StatementPool } from "../statement-pool.js";
 import {
   Mysql2,
@@ -45,17 +45,19 @@ interface SelectAllHost {
   unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> | T;
 }
 
-export function selectAll(
-  this: SelectAllHost,
-  super_: (...args: unknown[]) => unknown,
-  ...args: unknown[]
-): unknown {
+export function selectAll(this: SelectAllHost, ...args: unknown[]): unknown {
   if (ExplainRegistry.isCollect() && this.preparedStatements) {
-    return this.unpreparedStatement(() => super_(...args));
+    return this.unpreparedStatement(() =>
+      DatabaseStatements.superMethod(this, "selectAll")!(...args),
+    );
   } else {
-    return super_(...args);
+    return DatabaseStatements.superMethod(this, "selectAll")!(...args);
   }
 }
+
+export const DatabaseStatements = new Module((mod) => {
+  mod.defineMethod("selectAll", selectAll);
+});
 
 /** @internal */
 interface ExecuteBatchHost extends MaxAllowedPacketHost {

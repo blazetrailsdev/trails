@@ -187,14 +187,16 @@ export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
 
 export function incrementBang<T>(
   this: any,
-  super_: (...args: unknown[]) => Promise<T>,
   attribute: string,
   by: number = 1,
   options: { touch?: unknown } = {},
 ): Promise<T> {
   return rtest(options.touch)
-    ? (this.runCallbacks("touch", () => super_(attribute, by, options)) as Promise<T>)
-    : super_(attribute, by, options);
+    ? (this.runCallbacks(
+        "touch",
+        () => Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>,
+      ) as Promise<T>)
+    : (Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>);
 }
 
 /** @internal */
@@ -241,3 +243,4 @@ export async function _updateRecord(
 }
 
 Callbacks.defineMethod("touch", touch);
+Callbacks.defineMethod("incrementBang", incrementBang);

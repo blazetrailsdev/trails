@@ -3,6 +3,7 @@ import {
   Cipher,
   OpenSSL,
   rbDefineInspectCustom,
+  rbModName,
   rbObjId,
   sprintf,
   type Bytes,
@@ -19,9 +20,6 @@ function toBytes(value: string | Bytes): Bytes {
 }
 
 export class Aes256Gcm {
-  /** @internal */
-  static _railsClassName = "ActiveRecord::Encryption::Cipher::Aes256Gcm";
-
   static readonly CIPHER_TYPE = "aes-256-gcm";
   static keyLength = KEY_LENGTH;
   static ivLength = IV_LENGTH;
@@ -91,7 +89,7 @@ export class Aes256Gcm {
   }
 
   inspect(): string {
-    return `#<${(this.constructor as typeof Aes256Gcm)._railsClassName}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
+    return `#<${rbModName(this.constructor)}:${sprintf("%#016x", rbObjId(this) << 1)}>`;
   }
 
   /** @internal */

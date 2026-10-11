@@ -318,7 +318,6 @@ export function clearQueryCache(this: QueryCacheHost): void {
 /** @inventedArm if — PERMANENT */
 export function selectAll(
   this: QueryCacheHost,
-  super_: BaseSelectAll,
   arel: string | unknown,
   name: string | null = null,
   binds?: unknown[],
@@ -340,7 +339,12 @@ export function selectAll(
     if (opts?.async) {
       const result =
         this.lookupSqlCache(sql, name, binds ?? []) ??
-        super_.call(this, sql, name, binds, forwardOpts);
+        (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
+          sql,
+          name,
+          binds,
+          forwardOpts,
+        );
       return result instanceof Promise
         ? result.then((result) => FutureResult.wrap(result))
         : FutureResult.wrap(result);
@@ -349,10 +353,21 @@ export function selectAll(
       sql,
       name,
       binds ?? [],
-      async () => await super_.call(this, sql, name, binds, forwardOpts),
+      async () =>
+        await (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
+          sql,
+          name,
+          binds,
+          forwardOpts,
+        ),
     );
   }
-  return super_.call(this, sql, name, binds, forwardOpts);
+  return (QueryCache.superMethod(this, "selectAll") as OmitThisParameter<BaseSelectAll>)(
+    sql,
+    name,
+    binds,
+    forwardOpts,
+  );
 }
 
 /** @internal */
@@ -468,32 +483,16 @@ function sqlCacheKey(sql: string, binds: unknown[]): string {
     : sql;
 }
 
-export const QueryCache = {
-  [included](base: {
+export const QueryCache: Module & {
+  [included]?: (base: {
     prototype: object;
     setCallback(name: string, ...filterList: unknown[]): void;
-  }): void {
-    dirtiesQueryCache(
-      base,
-      "execQuery",
-      "execute",
-      "create",
-      "insert",
-      "update",
-      "delete",
-      "truncate",
-      "truncateTables",
-      "rollbackToSavepoint",
-      "rollbackDbTransaction",
-      "restartDbTransaction",
-      "execInsertAll",
-    );
-
-    base.setCallback("checkin", "after", ":unsetQueryCacheBang");
-  },
-  [initialize](this: QueryCacheHost): void {
+  }) => void;
+} = new Module((mod) => {
+  (mod as unknown as Record<symbol, unknown>)[initialize] = function (this: QueryCacheHost): void {
     this._queryCache = null;
-  },
+  };
+}).include({
   get queryCache(): Store | null {
     return (this as unknown as QueryCacheHost)._queryCache;
   },
@@ -513,4 +512,28 @@ export const QueryCache = {
   cacheSql,
   cacheNotificationInfoResult,
   cacheNotificationInfo,
+  selectAll,
+});
+
+QueryCache[included] = function (base: {
+  prototype: object;
+  setCallback(name: string, ...filterList: unknown[]): void;
+}): void {
+  dirtiesQueryCache(
+    base,
+    "execQuery",
+    "execute",
+    "create",
+    "insert",
+    "update",
+    "delete",
+    "truncate",
+    "truncateTables",
+    "rollbackToSavepoint",
+    "rollbackDbTransaction",
+    "restartDbTransaction",
+    "execInsertAll",
+  );
+
+  base.setCallback("checkin", "after", ":unsetQueryCacheBang");
 };

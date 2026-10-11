@@ -78,12 +78,12 @@ _registry.register("string", StringType, { override: false });
 _registry.register("text", Text, { override: false });
 _registry.register("time", Time, { override: false });
 
-export function registry(r?: AdapterSpecificRegistry): AdapterSpecificRegistry {
-  if (r !== undefined) {
-    _registry = r;
-    _defaultValue = undefined;
-  }
+export function registry(): AdapterSpecificRegistry {
   return _registry;
+}
+
+export function setRegistry(registry: AdapterSpecificRegistry): void {
+  _registry = registry;
 }
 
 export function register(

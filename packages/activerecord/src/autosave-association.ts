@@ -1,5 +1,6 @@
 import {
   kernelThrow,
+  Module,
   rbEnsure,
   rbEqual,
   rbFSend,
@@ -45,20 +46,39 @@ interface AutosaveAssociationHost {
 }
 
 type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
-type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
 
-export function reload<T extends Base>(
-  this: T,
-  options: ReloadOptions | undefined,
-  superFn: ReloadFn<T>,
-): Promise<T> {
+export function reload<T extends Base>(this: T, options: ReloadOptions | null = null): Promise<T> {
   const record = this as unknown as AutosaveAssociationHost;
   record._markedForDestruction = false;
   record.destroyedByAssociation = null;
-  return superFn.call(this, options);
+  return AutosaveAssociation.superMethod(this, "reload")!(options) as Promise<T>;
 }
 
-export const AutosaveAssociation = {
+export interface AutosaveAssociation {
+  markForDestruction(): void;
+  markedForDestruction(): boolean;
+  destroyedByAssociation: unknown;
+  changedForAutosave(): boolean;
+  isValidatingBelongsToFor(association: unknown): boolean;
+  isAutosavingBelongsToFor(association: unknown): boolean;
+  associatedRecordsToValidateOrSave: OmitThisParameter<typeof associatedRecordsToValidateOrSave>;
+  isNestedRecordsChangedForAutosave: OmitThisParameter<typeof isNestedRecordsChangedForAutosave>;
+  validateHasOneAssociation: OmitThisParameter<typeof validateHasOneAssociation>;
+  validateBelongsToAssociation: OmitThisParameter<typeof validateBelongsToAssociation>;
+  validateCollectionAssociation: OmitThisParameter<typeof validateCollectionAssociation>;
+  isAssociationValid: OmitThisParameter<typeof isAssociationValid>;
+  aroundSaveCollectionAssociation: OmitThisParameter<typeof aroundSaveCollectionAssociation>;
+  saveCollectionAssociation: OmitThisParameter<typeof saveCollectionAssociation>;
+  saveHasOneAssociation: OmitThisParameter<typeof saveHasOneAssociation>;
+  is_recordChanged: OmitThisParameter<typeof is_recordChanged>;
+  isAssociationForeignKeyChanged: OmitThisParameter<typeof isAssociationForeignKeyChanged>;
+  isInversePolymorphicAssociationChanged: OmitThisParameter<
+    typeof isInversePolymorphicAssociationChanged
+  >;
+  saveBelongsToAssociation: OmitThisParameter<typeof saveBelongsToAssociation>;
+}
+
+export const AutosaveAssociation = new Module().include({
   markForDestruction(this: AutosaveAssociationHost): void {
     this._markedForDestruction = true;
   },
@@ -107,7 +127,7 @@ export const AutosaveAssociation = {
   isAssociationForeignKeyChanged,
   isInversePolymorphicAssociationChanged,
   saveBelongsToAssociation,
-};
+});
 
 export function build(model: typeof Base, reflection: unknown): unknown {
   return addAutosaveAssociationCallbacks.call(model, reflection);
@@ -271,10 +291,13 @@ export async function saveBelongsToAssociation(this: AutosaveAssociationHost, re
 }
 
 /** @internal */
-export function initInternals(this: AutosaveAssociationHost, super_: () => void): void {
-  super_();
+export function initInternals(this: AutosaveAssociationHost): void {
+  AutosaveAssociation.superMethod(this, "initInternals")!();
   this._alreadyCalled = null;
 }
+
+AutosaveAssociation.defineMethod("initInternals", initInternals);
+AutosaveAssociation.defineMethod("reload", reload);
 
 /** @internal */
 export function associatedRecordsToValidateOrSave(
