@@ -13,9 +13,11 @@
  * clause (a `catch`'s `instanceof` is Ruby's `rescue` arm, not a duck test)
  * and not against `Promise` (async plumbing), and whose TS stream — its
  * same-file helpers spliced in, the way the arms report forgives an extracted
- * helper — calls neither `rbObjRespondTo` nor `actsLike`. `actsLike` takes its
- * receiver as `this`, and the stream spells `actsLike.call(x, "time")` as a
- * bare `ref:call`, so that form is read off the source too.
+ * helper — leaves one of them unported in kind: a `respond_to?` with no
+ * `rbObjRespondTo`, or an `acts_like?` with no `actsLike`. `actsLike` takes
+ * its receiver as `this`, and the stream spells `actsLike.call(x, "time")` as
+ * a bare `ref:call`, so that form is read off the source, through the name the
+ * file imports it under.
  *
  * The skeleton stream carries no `instanceof` token, so the TS half re-reads
  * the source: every declaration in `tsFile` named `tsName` is searched, which
@@ -36,14 +38,25 @@ import { section, tally } from "./lint-call-mismatches.js";
 import { spliceHelperSkeletons, type SkeletonArtifact, type SkeletonRow } from "./report-arms.js";
 
 const DUCK_TESTS: ReadonlySet<string> = new Set(["ref:respond_to?", "ref:acts_like?"]);
-const DUCK_PORTS: ReadonlySet<string> = new Set(["ref:rbObjRespondTo", "ref:actsLike"]);
+const DUCK_PORT_OF: ReadonlyMap<string, string> = new Map([
+  ["ref:respond_to?", "ref:rbObjRespondTo"],
+  ["ref:acts_like?", "ref:actsLike"],
+]);
 
 export function asksDuckType(row: SkeletonRow): boolean {
   return row.ruby.some((token) => DUCK_TESTS.has(token));
 }
 
-export function portsDuckType(row: SkeletonRow): boolean {
-  return spliceHelperSkeletons(row.ts, row.tsHelpers).some((token) => DUCK_PORTS.has(token));
+/**
+ * The duck tests the Rails body asks that the TS stream does not port in
+ * kind: `respond_to?` by `rbObjRespondTo`, `acts_like?` by `actsLike`. A body
+ * that asks both and ports one is still listed for the other.
+ */
+export function unportedDuckTests(row: SkeletonRow): string[] {
+  const stream = new Set(spliceHelperSkeletons(row.ts, row.tsHelpers));
+  return [...DUCK_PORT_OF]
+    .filter(([ask, port]) => row.ruby.includes(ask) && !stream.has(port))
+    .map(([ask]) => ask);
 }
 
 function declarationName(node: ts.Node): string | undefined {
@@ -86,17 +99,60 @@ function hasGuardInstanceof(body: ts.Node): boolean {
   return found;
 }
 
-function callsActsLike(body: ts.Node): boolean {
+/** The local names `source` imports `actsLike` under, the bare name included. */
+function actsLikeNames(file: ts.SourceFile): Set<string> {
+  const names = new Set(["actsLike"]);
+  for (const statement of file.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (bindings === undefined || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if ((element.propertyName ?? element.name).text === "actsLike") names.add(element.name.text);
+    }
+  }
+  return names;
+}
+
+function callsActsLike(body: ts.Node, names: ReadonlySet<string>): boolean {
   let found = false;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (ts.isCallExpression(n) && n.expression.getText() === "actsLike.call") {
+    if (ts.isCallExpression(n)) {
+      const callee = n.expression;
+      const target = ts.isPropertyAccessExpression(callee) ? callee.expression : callee;
+      const dispatch = ts.isPropertyAccessExpression(callee) ? callee.name.text : undefined;
+      if (
+        ts.isIdentifier(target) &&
+        names.has(target.text) &&
+        (dispatch === undefined || dispatch === "call" || dispatch === "apply")
+      ) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(body);
+  return found;
+}
+
+/**
+ * Whether any declaration of `name` in `source` calls `actsLike`, under
+ * whatever name the file imports it and through `.call` / `.apply`.
+ */
+export function declaresActsLikeCall(source: string, name: string): boolean {
+  const file = ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest, true);
+  const names = actsLikeNames(file);
+  let found = false;
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    if (declarationName(n) === name && callsActsLike(n, names)) {
       found = true;
       return;
     }
     ts.forEachChild(n, visit);
   };
-  visit(body);
+  visit(file);
   return found;
 }
 
@@ -106,7 +162,7 @@ export function declaresInstanceofGuard(source: string, name: string): boolean {
   let found = false;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (declarationName(n) === name && hasGuardInstanceof(n) && !callsActsLike(n)) {
+    if (declarationName(n) === name && hasGuardInstanceof(n)) {
       found = true;
       return;
     }
@@ -128,9 +184,16 @@ export async function duckTypeRows(artifact: SkeletonArtifact): Promise<Skeleton
   };
   const rows: SkeletonRow[] = [];
   for (const row of artifact.skeletons) {
-    if (!asksDuckType(row) || portsDuckType(row)) continue;
+    const unported = unportedDuckTests(row);
+    if (unported.length === 0) continue;
     const source = await read(path.join(packageSrcDir(row.package), row.tsFile));
-    if (source !== undefined && declaresInstanceofGuard(source, row.tsName)) rows.push(row);
+    if (source === undefined || !declaresInstanceofGuard(source, row.tsName)) continue;
+    if (
+      unported.every((ask) => ask === "ref:acts_like?") &&
+      declaresActsLikeCall(source, row.tsName)
+    )
+      continue;
+    rows.push(row);
   }
   return rows;
 }
