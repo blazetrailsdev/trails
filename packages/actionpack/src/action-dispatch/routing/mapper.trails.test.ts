@@ -406,7 +406,15 @@ describe("Mapper block receivers", () => {
   class StubController {}
 
   beforeAll(() => {
-    for (const name of ["health", "owners", "reports", "admin/posts", "pages", "profiles"]) {
+    for (const name of [
+      "health",
+      "owners",
+      "reports",
+      "admin/posts",
+      "posts",
+      "pages",
+      "profiles",
+    ]) {
       controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
     }
   });
@@ -474,6 +482,25 @@ describe("Mapper block receivers", () => {
     const about = routes.recognizePath("/about");
     expect([about.controller, about.action]).toEqual(["pages", "about"]);
     expect(routes.recognizePath("/profile/avatar").action).toBe("avatar");
+  });
+
+  it("binds shallow, nested and new blocks to the mapper", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.shallow(function () {
+        this.resources("posts", function () {
+          this.new(function () {
+            this.get("draft", { to: "posts#draft" });
+          });
+          this.nested(function () {
+            this.get("stats", { to: "posts#stats" });
+          });
+        });
+      });
+    });
+
+    expect(routes.recognizePath("/posts/new/draft").action).toBe("draft");
+    expect(routes.recognizePath("/posts/1/stats").action).toBe("stats");
   });
 
   it("leaves an arrow block's lexical this alone", () => {
