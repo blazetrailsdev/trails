@@ -512,19 +512,17 @@ export class AssociationReflection extends MacroReflection {
     options: Record<string, unknown>,
     activeRecord: typeof Base,
   ) {
-    const opts = { ...options };
-
-    if (Array.isArray(opts.foreignKey)) {
-      opts.queryConstraints = opts.foreignKey;
-      delete opts.foreignKey;
-    }
-
-    super(name, scope, opts, activeRecord);
+    super(name, scope, options, activeRecord);
     if (options.queryConstraints != null && options.queryConstraints !== false) {
       throw new ConfigurationError(
         `Setting \`queryConstraints:\` option on \`${rbModName(activeRecord)}.${this.macro} :${name}\` ` +
           `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
       );
+    }
+
+    if (Array.isArray(this.options.foreignKey)) {
+      this.options.queryConstraints = this.options.foreignKey;
+      delete this.options.foreignKey;
     }
 
     this.ensureOptionNotGivenAsClassBang("className");
