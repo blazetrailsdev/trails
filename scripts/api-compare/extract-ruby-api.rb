@@ -2948,17 +2948,26 @@ class ApiExtractor
   # Ripper node kind => the slot holding its statement list.
   STATEMENT_SLOTS = {
     bodystmt: 1, if: 2, elsif: 2, unless: 2, else: 1, while: 2, until: 2,
-    when: 2, ensure: 1, rescue: 3, brace_block: 2
+    when: 2, ensure: 1, rescue: 3, brace_block: 2, for: 3
   }.freeze
 
+  # Modifier node kind => the slot holding the one statement it wraps.
+  MODIFIER_SLOTS = { if_mod: 2, unless_mod: 2, while_mod: 2, until_mod: 2, rescue_mod: 1 }.freeze
+
   # The statements whose value nothing reads: every statement of a list but
-  # its last, which may be the value of the method, block or branch.
+  # its last, which may be the value of the method, block or branch, and the
+  # statement a void modifier wraps (`options.delete(:k) if cond`).
   def void_statements(node, found = Set.new.compare_by_identity)
     return found unless node.is_a?(Array)
 
     slot = node[0].is_a?(Symbol) && STATEMENT_SLOTS[node[0]]
     stmts = slot && node[slot]
-    stmts[0...-1].each { |stmt| found << stmt } if stmts.is_a?(Array) && stmts[0].is_a?(Array)
+    if stmts.is_a?(Array) && stmts[0].is_a?(Array)
+      stmts[0...-1].each do |stmt|
+        found << stmt
+        found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
+      end
+    end
     node.each { |child| void_statements(child, found) }
     found
   end

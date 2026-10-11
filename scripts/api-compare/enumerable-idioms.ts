@@ -295,8 +295,11 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   conflict block of `merge!` / `merge` (`hash.c:4028`, `:4144`) have no
  *   native form. Nor does a `delete` whose removed value is used, since JS
  *   `delete` answers a boolean. The Ruby extractor leaves each such site's
- *   receiver unnamed. A lone `{ ...h }` is a copy, not a merge, and is not
- *   marked.
+ *   receiver unnamed. A spread is marked only where it LEADS a literal that
+ *   holds something more (`{ ...h, ...other }`, `{ ...h, k: v }`): a lone
+ *   `{ ...h }` is a copy, and `{ ...other, ...h }` lets `h` win a conflict
+ *   that `merge` gives to its argument. What follows the leading spread is not
+ *   paired with the Ruby argument.
  *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
  *   drops it for every receiver. `fetch` has none either, because JS has no
  *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which

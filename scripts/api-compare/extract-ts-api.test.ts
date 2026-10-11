@@ -2125,7 +2125,7 @@ describe("body call capture", () => {
           Object.assign(options, other);
         }
         merge(options: Record<string, unknown>, opts: Record<string, object>, name: string) {
-          return { a: 1, ...this.options, ...options, ...opts[name] };
+          return [{ ...this.options, a: 1 }, { ...options, ...opts[name] }];
         }
         eachPair(options: Record<string, unknown>) {
           for (const [k, v] of Object.entries(this.options)) use(k, v);
@@ -6269,6 +6269,10 @@ describe("a native hash form credits the Hash call it ports", () => {
     expect(credited("merge", `return { ...other };`, ["local"], ["options"])).toBe(false);
     expect(credited("merge", `return { ...options };`, ["local"], ["options"])).toBe(false);
     expect(credited("merge", `return { ...options, a: 1 };`, ["local"], ["options"])).toBe(true);
+    expect(credited("merge", `return { ...other, ...options };`, ["local"], ["options"])).toBe(
+      false,
+    );
+    expect(credited("merge", `return { a: 1, ...options };`, ["local"], ["options"])).toBe(false);
     expect(credited("merge", `return { a: 1, b: options };`, ["local"], ["options"])).toBe(false);
   });
 
