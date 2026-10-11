@@ -268,13 +268,6 @@ export const rbCString = rbDefineClass("String");
  */
 export const rbCSymbol = rbDefineClass("Symbol");
 
-Object.assign(rbCSymbol.prototype, {
-  /** `rb_sym_to_s` (`vendor/ruby/v3.3.11/string.c:11734`). */
-  toS(this: string): string {
-    return symbolToS(this);
-  },
-});
-
 /**
  * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
  * @noRailsEquivalent PERMANENT

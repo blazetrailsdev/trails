@@ -1036,11 +1036,6 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
         }
       }
 
-      // Pass 1.75: a Ruby case whose `context` / `it` name kept an
-      // interpolation the extractor could not expand is ONE row for a loop the
-      // TS extractor expands statically, so it takes every TS case its pattern
-      // generates: the first one implemented is the match, the rest are that
-      // row's siblings.
       for (let ri = 0; ri < file.testCases.length; ri++) {
         if (matchedRuby.has(ri)) continue;
         const tc = file.testCases[ri];
