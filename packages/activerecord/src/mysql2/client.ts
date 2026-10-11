@@ -425,6 +425,7 @@ function withoutDefaultIgnoreSpace(list: string[]): string[] {
   return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
 }
 
+/** @inventedArm some — PERMANENT */
 async function newClient(
   config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
 ): Promise<Mysql2Client> {
