@@ -1876,7 +1876,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   none(): Relation<T, G>;
   readonly(value?: boolean): Relation<T, G>;
   strictLoading(value?: boolean): Relation<T, G>;
-  createWith(value: Record<string, unknown> | null): Relation<T, G>;
+  createWith(value: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
   from(value: string | Relation<any, boolean> | ArelNode, subqueryName?: string): Relation<T, G>;
   extending<M extends Record<string, (...args: any[]) => any>>(mod: M): Relation<T, G> & M;
   extending<M extends Record<string, (...args: any[]) => any>>(
@@ -1940,7 +1940,7 @@ export interface Relation<T extends Base, G extends boolean = false>
   where(sql: string | Nodes.SqlLiteral, ...binds: unknown[]): Relation<T, G>;
   where(args: Nodes.Node | Nodes.SqlLiteral): Relation<T, G>;
   where(args: unknown[]): Relation<T, G>;
-  rewhere(conditions: Record<string, unknown> | null): Relation<T, G>;
+  rewhere(conditions: Record<string, unknown> | Map<string, unknown> | null): Relation<T, G>;
   invertWhere(): Relation<T, G>;
   structurallyCompatible(other: Relation<T, boolean>): boolean;
   and(other: Relation<T, boolean>): Relation<T, G>;

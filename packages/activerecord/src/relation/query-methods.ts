@@ -673,9 +673,12 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
   return this;
 }
 
-function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | null): any {
+function rewhere(
+  this: QueryMethodsHost,
+  conditions: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   if (conditions == null) return unscope.call(this, ":where");
-  conditions = sanitizeForbiddenAttributes(conditions) as Record<string, unknown>;
+  conditions = sanitizeForbiddenAttributes(conditions);
   const rel = this.spawn();
   const newClause = buildWhereClause.call(rel, conditions);
   rel.whereClause = rel.whereClause.except(...newClause.extractAttributes());
@@ -949,13 +952,19 @@ function strictLoadingBang(this: QueryMethodsHost, value = true): any {
   return this;
 }
 
-function createWith(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
+function createWith(
+  this: QueryMethodsHost,
+  value: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   return createWithBang.call(this.spawn(), value);
 }
 
-function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
+function createWithBang(
+  this: QueryMethodsHost,
+  value: Record<string, unknown> | Map<string, unknown> | null,
+): any {
   if (value) {
-    value = sanitizeForbiddenAttributes(value) as Record<string, unknown>;
+    value = sanitizeForbiddenAttributes(value);
     this.createWithValue = merge(this.createWithValue, value);
   } else {
     this.createWithValue = {};
