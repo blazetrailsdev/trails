@@ -97,6 +97,16 @@ describe("OutputBuffer", () => {
     expect(buf.toStr()).toBe("x<b>");
   });
 
+  it("safeExprAppend appends the value's to_s", () => {
+    const buf = new OutputBuffer();
+    buf.safeExprAppend(new Number(8.0));
+    buf.safeExprAppend(" ");
+    buf.safeExprAppend(8.12);
+    buf.safeExprAppend(" ");
+    buf.safeExprAppend([1, "a"]);
+    expect(buf.toStr()).toBe('8.0 8.12 [1, "a"]');
+  });
+
   it("rawBuffer getter exposes underlying string", () => {
     const buf = new OutputBuffer("hello");
     expect(buf.rawBuffer).toBe("hello");
