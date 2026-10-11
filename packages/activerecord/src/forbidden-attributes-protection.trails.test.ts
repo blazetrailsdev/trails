@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { ForbiddenAttributesError, SecurePassword } from "@blazetrails/activemodel";
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -143,7 +145,13 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
 });
 
 describe("ForbiddenAttributesProtectionRelationTest", () => {
-  fixtures({ people: [Person, {}], pirates: [Pirate, {}], birds: [Bird, {}] });
+  fixtures({
+    people: [Person, {}],
+    pirates: [Pirate, {}],
+    birds: [Bird, {}],
+    authors: [Author, {}],
+    posts: [Post, {}],
+  });
 
   it("permitted attributes can be used for Relation#new, Relation#create and a collection build", async () => {
     const relation = Person.where({ gender: "f" });
@@ -159,6 +167,15 @@ describe("ForbiddenAttributesProtectionRelationTest", () => {
     const pirate = await Pirate.create({ catchphrase: "Arr" });
     const bird = pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }).permitBang());
     expect(bird.name).toBe("Posideons Killer");
+  });
+
+  it("a permitted attribute wins over the association scope's attribute on build", async () => {
+    const author = await Author.create({ name: "David" });
+    const post = author.thinkingPosts.build(
+      new ProtectedParams({ title: "Not thinking" }).permitBang(),
+    );
+    expect(post.title).toBe("Not thinking");
+    expect(author.thinkingPosts.build().title).toBe("So I was thinking");
   });
 
   it("forbidden attributes cannot be used for Relation#new, Relation#create and a collection build", async () => {

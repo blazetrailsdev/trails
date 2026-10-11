@@ -302,8 +302,14 @@ function cast(
       }
     }
     case "FLOAT":
-    case "DOUBLE":
-      return next();
+    case "DOUBLE": {
+      const columnToDouble = next();
+      if (columnToDouble === 0) {
+        return 0.0;
+      } else {
+        return columnToDouble;
+      }
+    }
     case "TIME": {
       const raw = field.string();
       if (raw === null) return null;
@@ -394,6 +400,7 @@ function cast(
 
 const TYPE_CAST = new WeakMap<object, TypeCast>();
 
+/** @noRailsEquivalent PERMANENT */
 const INVALID_DATE = new WeakMap<object, Error>();
 
 function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {

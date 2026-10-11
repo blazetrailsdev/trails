@@ -263,6 +263,12 @@ describe("mysql2Client cast", () => {
     it("takes the driver's number for LONG and DOUBLE", () => {
       expect(typeCast(field("LONG", "42"), () => 42)).toBe(42);
       expect(typeCast(field("DOUBLE", "1.5"), () => 1.5)).toBe(1.5);
+      expect(
+        Object.is(
+          typeCast(field("DOUBLE", "-0"), () => -0),
+          0,
+        ),
+      ).toBe(true);
     });
   });
 

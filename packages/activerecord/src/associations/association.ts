@@ -301,7 +301,7 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
     ].filter((key) => key != null);
     let assignedKeys = record.changedAttributeNamesToSave;
     assignedKeys = assignedKeys.concat(
-      keys(exceptFromScopeAttributes as Record<string, unknown>).map(String),
+      keys(exceptFromScopeAttributes as Parameters<typeof keys>[0]).map(String),
     );
     const attributes = except(
       this.scopeForCreate(),

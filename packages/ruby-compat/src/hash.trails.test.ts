@@ -509,6 +509,17 @@ describe("a Hash send to a receiver that defines the method itself", () => {
     expect(fetch(hash, "missing", 2)).toBe(2);
   });
 
+  it("reads keys off an object that answers keys as a reader", () => {
+    class Params {
+      marker = true;
+      get keys(): string[] {
+        return ["title"];
+      }
+    }
+    expect(keys(new Params())).toEqual(["title"]);
+    expect(keys({ keys: ["a"] })).toEqual(["keys"]);
+  });
+
   it("answers the keys of a Map", () => {
     expect(keys(new Map([["a", 1]]))).toEqual(["a"]);
   });
