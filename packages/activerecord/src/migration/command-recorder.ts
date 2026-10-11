@@ -401,7 +401,7 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveColumns(args: unknown[]): [string, unknown[]] {
     const last = args[args.length - 1];
-    if (!(typeof last === "object" && last !== null && "type" in last)) {
+    if (!(isPlainObject(last) && "type" in last)) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_columns is only reversible if given a type.",
       );
