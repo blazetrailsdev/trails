@@ -135,13 +135,6 @@ export class NullPool implements AbstractPool {
   get dirtiesQueryCache(): boolean {
     return true;
   }
-
-  inspect(): string {
-    const v = this._serverVersion;
-    return `#<ActiveRecord::ConnectionAdapters::NullPool @server_version=${v == null ? "nil" : String(v)}>`;
-  }
-
-  disconnect(): void {}
 }
 
 export class WeakThreadKeyMap<V> {

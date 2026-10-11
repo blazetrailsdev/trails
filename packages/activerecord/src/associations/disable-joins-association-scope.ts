@@ -11,8 +11,8 @@ import { Associations } from "../namespaces.js";
 
 type ChainEntry = AbstractReflection & {
   aliasedTable: Table | Nodes.TableAlias;
-  joinPrimaryKey(): string | string[];
-  joinForeignKey: string | string[];
+  joinPrimaryKey(): string;
+  joinForeignKey: string;
 };
 
 type JoinIds = unknown[] | DeferredPluck;
@@ -44,14 +44,14 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     const firstScope: [ChainEntry, boolean, JoinIds] = [
       firstItem,
       false,
-      [owner._readAttribute(firstItem.joinForeignKey as string)],
+      [owner._readAttribute(firstItem.joinForeignKey)],
     ];
 
     return reverseChain.reduce(([reflection, ordered, joinIds], nextReflection) => {
       const key = reflection.joinPrimaryKey();
       const records = this.#addConstraints(reflection, key, joinIds, owner, ordered);
       const foreignKey = nextReflection.joinForeignKey;
-      const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey as string]);
+      const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey]);
       const recordsOrdered = records != null && any(records.orderValues);
 
       return [nextReflection, recordsOrdered, recordIds];
@@ -60,7 +60,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
 
   #addConstraints(
     reflection: ChainEntry,
-    key: string | string[],
+    key: string,
     joinIds: JoinIds,
     owner: Base,
     ordered: boolean,

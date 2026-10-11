@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
-import { rbScanArgs, rtest } from "@blazetrails/ruby-compat";
+import { Rational, rbScanArgs, rtest } from "@blazetrails/ruby-compat";
 import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
-import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { quotedDate } from "../connection-adapters/abstract/quoting.js";
 import { defaultTimezone } from "../active-record.js";
@@ -117,6 +117,7 @@ function options(
   sql: string,
   queryOptions: QueryOptions,
 ): Record<string, unknown> {
+  INVALID_DATE.delete(client);
   const typeCast = typeCastFor(client, queryOptions);
   const rowsAsArray = queryOptions.as === "array";
   return client.readTimeout != null
@@ -256,7 +257,15 @@ type Field = {
 };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
 
-function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): unknown {
+const MYSQL2_MAX_TIME = 315578267999;
+const MYSQL2_MIN_TIME = 2678400;
+
+function cast(
+  client: object,
+  queryOptions: QueryOptions,
+  field: Field,
+  next: () => unknown,
+): unknown {
   if (!rtest(queryOptions.cast)) return field.string();
   switch (field.type) {
     case "BIT": {
@@ -266,13 +275,12 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       }
       return next();
     }
-    case "TINY": {
+    case "TINY":
       if (rtest(queryOptions.castBooleans) && field.length === 1) {
         const raw = field.string();
         return raw === null ? null : raw !== "0";
       }
-      return next();
-    }
+    // eslint-disable-next-line no-fallthrough
     case "SHORT":
     case "LONG":
     case "INT24":
@@ -285,8 +293,13 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
     case "NEWDECIMAL": {
       const raw = next();
       if (typeof raw !== "string") return raw;
-      if (raw.includes(".")) return new BigDecimal(raw);
-      return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
+      if (!raw.includes(".")) {
+        return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
+      } else if (Number(raw) === 0) {
+        return new BigDecimal("0.0");
+      } else {
+        return new BigDecimal(raw);
+      }
     }
     case "FLOAT":
     case "DOUBLE":
@@ -320,7 +333,29 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
         year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + min * 60 + sec;
       if (seconds === 0) return null;
       if (month < 1 || day < 1) {
-        throw new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
+        if (!INVALID_DATE.has(client)) {
+          INVALID_DATE.set(
+            client,
+            new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`),
+          );
+        }
+        return null;
+      }
+      if (seconds < MYSQL2_MIN_TIME || seconds > MYSQL2_MAX_TIME) {
+        let offset: number | Rational = 0;
+        if (queryOptions.databaseTimezone === "local") {
+          offset = Mysql2.Client.localOffset();
+        }
+        let val = new DateTime(year, month, day, hour, min, sec, offset);
+        if (queryOptions.applicationTimezone != null) {
+          if (queryOptions.applicationTimezone === "local") {
+            offset = Mysql2.Client.localOffset();
+            val = val.newOffset(offset);
+          } else {
+            val = val.newOffset(0);
+          }
+        }
+        return val.toDatetime();
       }
       const msec = Number((tokens[7] ?? "").padEnd(6, "0"));
       let val = Time[queryOptions.databaseTimezone!](year, month, day, hour, min, sec, msec);
@@ -342,7 +377,13 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       const [year, month, day] = tokens.slice(1, 4).map(Number);
       if (year + month + day === 0) return null;
       if (month < 1 || day < 1) {
-        throw new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
+        if (!INVALID_DATE.has(client)) {
+          INVALID_DATE.set(
+            client,
+            new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`),
+          );
+        }
+        return null;
       }
       return new RubyDate(year, month, day).toDate();
     }
@@ -357,15 +398,8 @@ const INVALID_DATE = new WeakMap<object, Error>();
 
 function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {
   const typeCast = TYPE_CAST.get(client);
-  return (field, next) => {
-    try {
-      return cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
-    } catch (e) {
-      if (!(e instanceof Mysql2.Error)) throw e;
-      if (!INVALID_DATE.has(client)) INVALID_DATE.set(client, e as Error);
-      return null;
-    }
-  };
+  return (field, next) =>
+    cast(client, queryOptions, field, typeCast ? () => typeCast(field, next) : next);
 }
 
 type Execute = (sql: unknown, values?: unknown[]) => unknown;
@@ -534,6 +568,10 @@ export const Mysql2 = {
   },
   Client: {
     new: newClient,
+    /** @internal */
+    localOffset(): Rational {
+      return new Rational(Time.local(2010).utcOffset, 86400);
+    },
     defaultQueryOptions,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,

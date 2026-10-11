@@ -1,3 +1,4 @@
+import type { PermittedAttributes } from "@blazetrails/activemodel";
 import {
   fetch,
   first,
@@ -164,7 +165,7 @@ export class HasManyAssociation extends CollectionAssociation {
 
   /** @internal */
   protected override async _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void,
   ): Promise<Base | Base[] | null> {

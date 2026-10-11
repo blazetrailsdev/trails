@@ -72,13 +72,69 @@ describe("mysql2Client cast", () => {
   it("converts to queryOptions.applicationTimezone only when it is set", () => {
     const app: { typeCast?: TypeCast } = {};
     const raw = mysql2Client({ config: app });
+    raw.queryOptions.databaseTimezone = "local";
+    const read = () => app.typeCast!(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime;
+    const unset = read();
+    expect(unset.isUtc()).toBe(false);
+    raw.queryOptions.applicationTimezone = "utc";
+    expect(read().isUtc()).toBe(true);
+    expect(read().toF()).toBe(unset.toF());
     raw.queryOptions.databaseTimezone = "utc";
     raw.queryOptions.applicationTimezone = "local";
-    const val = app.typeCast!(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime;
+    expect(read().isUtc()).toBe(false);
+  });
+
+  it("answers a local TIMESTAMP from Result#toA when applicationTimezone is unset", async () => {
+    const local: { typeCast?: TypeCast } = {};
+    const raw = mysql2Client({
+      config: local,
+      query: async () => [
+        [[local.typeCast!(field("TIMESTAMP", "2026-04-27 14:23:55"), next)]],
+        [{ name: "created_at" }],
+      ],
+    });
+    raw.queryOptions.databaseTimezone = "local";
+    const [[val]] = (await raw.query("SELECT created_at FROM t"))!.toA() as [[RubyTime]];
     expect(val.isUtc()).toBe(false);
-    expect(val.toF()).toBe(
-      (config.typeCast!(field("DATETIME", "2026-04-27 14:23:55"), next) as RubyTime).toF(),
-    );
+    expect([val.year, val.month, val.day, val.hour, val.min, val.sec]).toEqual([
+      2026, 4, 27, 14, 23, 55,
+    ]);
+  });
+
+  it("raises Mysql2::Error from to_a for an invalid date read by a prepared statement", async () => {
+    const invalid: { typeCast?: TypeCast } = {};
+    const raw = mysql2Client({
+      config: invalid,
+      unprepare() {},
+      execute: async () => (
+        invalid.typeCast!(
+          { ...field("DATETIME", "2026-00-27 14:23:55"), name: "created_at" },
+          next,
+        ),
+        [[[null]], [{ name: "created_at" }]]
+      ),
+    });
+    const result = (await raw.prepare("SELECT created_at FROM t WHERE id = ?").execute(1))!;
+    expect(() => result.toA()).toThrow(Mysql2.Error as never);
+    expect(() => result.toA()).toThrow("Invalid date in field 'created_at': 2026-00-27 14:23:55");
+  });
+
+  it("drops an invalid date parked by a query the driver rejected", async () => {
+    const invalid: { typeCast?: TypeCast } = {};
+    let reject = true;
+    const raw = mysql2Client({
+      config: invalid,
+      query: async () => {
+        if (reject) {
+          invalid.typeCast!(field("DATE", "2026-00-00"), next);
+          throw new Error("server error mid-result");
+        }
+        return [[[1]], [{ name: "x" }]];
+      },
+    });
+    await expect(raw.query("SELECT d FROM t")).rejects.toThrow("server error mid-result");
+    reject = false;
+    expect((await raw.query("SELECT 1 AS x"))!.toA()).toEqual([[1]]);
   });
 
   it("raises Mysql2::Error from to_a for a non-zero date with a zero month or day", async () => {
@@ -226,6 +282,12 @@ describe("mysql2Client cast", () => {
       expect(typeCast(field("NEWDECIMAL", "9007199254740993"), () => "9007199254740993")).toBe(
         9007199254740993n,
       );
+    });
+
+    it("casts a scaled zero to BigDecimal 0.0", () => {
+      const result = typeCast(field("NEWDECIMAL", "0.00"), () => "0.00");
+      expect(result).toBeInstanceOf(BigDecimal);
+      expect((result as BigDecimal).toString()).toBe(new BigDecimal("0.0").toString());
     });
 
     it("returns null for NULL", () => {

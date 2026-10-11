@@ -1,3 +1,4 @@
+import type { PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import { Association } from "./association.js";
 import { exceptBang, kernelArray } from "@blazetrails/activesupport";
@@ -20,7 +21,7 @@ export class SingularAssociation extends Association<Base> {
    * @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
    */
   build(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | PermittedAttributes,
     block?: (record: Base) => void,
   ): Base | null | Promise<Base | null> {
     const record = this.buildRecord(attributes, block);
@@ -87,7 +88,7 @@ export class SingularAssociation extends Association<Base> {
 
   /** @inventedArm detachDisplacedOnBuild — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target */
   protected override async _createRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | PermittedAttributes,
     raiseError = false,
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | null> {

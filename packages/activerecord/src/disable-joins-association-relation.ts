@@ -4,14 +4,13 @@ import { compact, groupBy, rbFSend, rbModConstSet, take, uniq } from "@blazetrai
 import { stripThenable } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
 
-export type DjarKey = string | string[];
 export type DjarIds = unknown[] | PromiseLike<unknown[]>;
 
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T, boolean> {
-  readonly key: DjarKey;
+  readonly key: string;
   private readonly _ids: DjarIds;
 
-  constructor(klass: typeof Base, key: DjarKey, ids: DjarIds) {
+  constructor(klass: typeof Base, key: string, ids: DjarIds) {
     super(klass);
     this._ids = ids;
     this.key = key;
@@ -42,7 +41,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
     await super.load(block);
     let records: (T | undefined)[] = this._records;
 
-    const recordsById = groupBy(records as T[], (record) => record.get(this.key as string));
+    const recordsById = groupBy(records as T[], (record) => record.get(this.key));
 
     records = (await this.ids()).flatMap((id) => recordsById.get(id));
     records = compact(records);
