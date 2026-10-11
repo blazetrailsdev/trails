@@ -257,7 +257,7 @@ import { ApplicationController, Rack } from "../../../test-helpers/abstract-unit
       t = new TestLayout(task.name);
     });
 
-    // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+    // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
     it.skip("builder works with layouts", async () => {
       await t.get(":withBuilderAndLayout");
       assertResponse("<html>\n<p>Hello</p>\n</html>\n");
