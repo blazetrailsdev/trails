@@ -6,10 +6,9 @@ import type { NumberToHumanSizeOptions } from "../number-helper.js";
 const STORAGE_UNITS = ["byte", "kb", "mb", "gb", "tb", "pb", "eb", "zb"];
 
 export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSizeOptions> {
-  static override namespace = "human";
-
-  protected get validateFloat(): boolean {
-    return true;
+  static {
+    this.namespace = "human";
+    this.validateFloat = true;
   }
 
   protected convert(): string {

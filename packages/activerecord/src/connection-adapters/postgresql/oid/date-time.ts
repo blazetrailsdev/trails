@@ -1,7 +1,7 @@
 import { Time as RubyTime } from "@blazetrails/date";
 import { format, rbStrSend, toI, registerConstant } from "@blazetrails/ruby-compat";
 import { DateTime as ArDateTime } from "../../../type/date-time.js";
-import { pgDatetimeConfig } from "../pg-datetime-config.js";
+import { ConnectionAdapters } from "../../../namespaces.js";
 import {
   DateInfinity,
   DateNegativeInfinity,
@@ -32,7 +32,7 @@ export class DateTime extends ArDateTime {
   }
 
   protected realTypeUnlessAliased(realType: string): string {
-    return pgDatetimeConfig.datetimeType === realType ? "datetime" : realType;
+    return ConnectionAdapters.PostgreSQLAdapter.datetimeType === realType ? "datetime" : realType;
   }
 }
 

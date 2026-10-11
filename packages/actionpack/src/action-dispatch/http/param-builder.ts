@@ -5,6 +5,7 @@ import {
   type Encoding,
   type Hash,
 } from "@blazetrails/ruby-compat";
+import { cattrAccessor } from "@blazetrails/activesupport";
 import { deprecator } from "../deprecator.js";
 import { UploadedFile } from "./upload.js";
 import { QueryParser, type QueryPair } from "./query-parser.js";
@@ -32,9 +33,16 @@ export class ParamBuilder {
     return new ParamBuilder(paramDepthLimit);
   }
 
-  static ignoreLeadingBrackets: boolean | null = null;
+  declare static ignoreLeadingBrackets: boolean | null | undefined;
+  declare ignoreLeadingBrackets: boolean | null | undefined;
+  declare static default: ParamBuilder;
+  declare default: ParamBuilder;
 
-  static default: ParamBuilder = ParamBuilder.makeDefault(100);
+  static {
+    cattrAccessor.call(this, "ignoreLeadingBrackets");
+    cattrAccessor.call(this, "default");
+    this.default = this.makeDefault(100);
+  }
 
   static fromQueryString(
     qs: string | null | undefined,
@@ -125,8 +133,8 @@ export class ParamBuilder {
     if (name === null || name === undefined) {
       k = after = "";
     } else if (depth === 0) {
-      const ignoreLeading = ParamBuilder.ignoreLeadingBrackets;
-      if (ignoreLeading === true || (ignoreLeading === null && LEADING_BRACKETS_COMPAT)) {
+      const ignoreLeading = this.ignoreLeadingBrackets;
+      if (ignoreLeading === true || (ignoreLeading == null && LEADING_BRACKETS_COMPAT)) {
         const m = name.match(/^([[\]]*)([^[\]]+)\]*/);
         if (m) {
           k = m[2];

@@ -1,3 +1,4 @@
+import { cattrAccessor } from "@blazetrails/activesupport";
 import { ArgumentError, bytes, strNew } from "@blazetrails/ruby-compat";
 
 const DEFAULT_SEP = /& */;
@@ -11,7 +12,12 @@ const COMMON_SEP: Record<string, RegExp> = Object.assign(Object.create(null), {
 export type QueryPair = [string, string | null];
 
 export class QueryParser {
-  static strictQueryStringSeparator: boolean | null = null;
+  declare static strictQueryStringSeparator: boolean | null | undefined;
+  declare strictQueryStringSeparator: boolean | null | undefined;
+
+  static {
+    cattrAccessor.call(this, "strictQueryStringSeparator");
+  }
 
   static *eachPair(s: string | null | undefined, separator?: string | null): Generator<QueryPair> {
     const str = s ?? "";

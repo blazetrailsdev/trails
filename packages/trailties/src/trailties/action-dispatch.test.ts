@@ -18,7 +18,7 @@ function cfg(): ActionDispatchConfig {
 describe("ActionDispatch::Trailtie", () => {
   let savedConfig: ActionDispatchConfig;
   let savedTldLength: number;
-  let savedStrictQuery: boolean | null;
+  let savedStrictQuery: boolean | null | undefined;
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
   let savedDefaultCharset: string | null;

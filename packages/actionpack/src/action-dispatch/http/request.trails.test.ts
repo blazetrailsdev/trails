@@ -44,3 +44,21 @@ describe("Request ENV_METHODS readers", () => {
     expect(req.rawHostWithPort).toBe("example.com:8080");
   });
 });
+
+describe("Request include MimeNegotiation", () => {
+  it("keeps its own format / formats / variant readers beside the module's writers", () => {
+    for (const name of ["format", "formats", "variant"]) {
+      const descriptor = Object.getOwnPropertyDescriptor(Request.prototype, name);
+      expect(typeof descriptor?.get).toBe("function");
+      expect(typeof descriptor?.set).toBe("function");
+    }
+    const req = new Request({ HTTP_ACCEPT: "application/json" });
+    expect(String(req.format)).toBe("application/json");
+  });
+
+  it("seats ignore_accept_header on the includer", () => {
+    expect(Object.hasOwn(Request, "ignoreAcceptHeader")).toBe(true);
+    expect(Request.ignoreAcceptHeader).toBe(false);
+    expect(new Request({}).ignoreAcceptHeader).toBe(false);
+  });
+});

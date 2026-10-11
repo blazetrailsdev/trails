@@ -76,9 +76,13 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   declare static namespace: string | undefined;
   declare static isNamespace: boolean;
+  declare static validateFloat: boolean | undefined;
+  declare static isValidateFloat: boolean;
+  declare isValidateFloat: boolean;
 
   static {
     classAttribute.call(this, "namespace");
+    classAttribute.call(this, "validateFloat");
   }
 
   static convert(number: unknown, options?: any): any {
@@ -92,15 +96,11 @@ export abstract class NumberConverter<TOptions extends NumberFormatOptions = Num
 
   execute(): unknown {
     if (this.number == null || this.number === false) return null;
-    if (this.validateFloat && !this.validBigdecimal()) return this.number;
+    if (this.isValidateFloat && !this.validBigdecimal()) return this.number;
     return this.convert();
   }
 
   protected abstract convert(): string;
-
-  protected get validateFloat(): boolean {
-    return false;
-  }
 
   protected validBigdecimal(): BigDecimal | null {
     const number = this.number;

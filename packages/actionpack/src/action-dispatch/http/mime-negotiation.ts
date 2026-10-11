@@ -1,4 +1,4 @@
-import { ArrayInquirer } from "@blazetrails/activesupport";
+import { ArrayInquirer, included, mattrAccessor } from "@blazetrails/activesupport";
 import { BadRequest } from "../../action-controller/metal/exceptions.js";
 import { MimeType, NullType } from "./mime-type.js";
 import { ParseError } from "./parameters.js";
@@ -29,7 +29,9 @@ export class MimeNegotiation {
   /** @internal */
   declare _variant?: ArrayInquirer<string> & Record<string, () => boolean>;
 
-  static ignoreAcceptHeader = false;
+  static [included](base: object): void {
+    mattrAccessor.call(base, "ignoreAcceptHeader", { default: false });
+  }
 
   set variant(value: string | string[] | null | undefined) {
     const arr = Array.isArray(value) ? value : value == null ? [] : [value];
@@ -170,7 +172,8 @@ export function validAcceptHeader(this: MimeNegotiationHost): boolean {
 
 /** @internal */
 export function useAcceptHeader(this: MimeNegotiationHost): boolean {
-  return !MimeNegotiation.ignoreAcceptHeader;
+  return !(this.constructor as typeof MimeNegotiation & { ignoreAcceptHeader: boolean })
+    .ignoreAcceptHeader;
 }
 
 /** @internal */

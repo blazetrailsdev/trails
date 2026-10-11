@@ -1,5 +1,5 @@
 import type { Time } from "@blazetrails/date";
-import { include, presence } from "@blazetrails/activesupport";
+import { cattrAccessor, include, presence } from "@blazetrails/activesupport";
 import { File, IO, IOError, stringSplit } from "@blazetrails/ruby-compat";
 import {
   deleteSetCookieHeaderBang,
@@ -206,7 +206,15 @@ export class FileBody {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
-  static defaultCharset: string | null = "utf-8";
+  declare static defaultCharset: string | null;
+  declare defaultCharset: string | null;
+  declare static defaultHeaders: Record<string, string> | undefined;
+  declare defaultHeaders: Record<string, string> | undefined;
+
+  static {
+    cattrAccessor.call(this, "defaultCharset", { default: "utf-8" });
+    cattrAccessor.call(this, "defaultHeaders");
+  }
 
   private _status: number;
   private _headers: Headers;
@@ -216,7 +224,6 @@ export class Response {
   private _sent = false;
   stream: unknown = null;
   request: Request | null = null;
-  static defaultHeaders: Record<string, string> | undefined;
 
   constructor(status = 200, headers: Record<string, string> = {}, body: string[] = []) {
     this._status = status;

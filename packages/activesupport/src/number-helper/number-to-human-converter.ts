@@ -31,10 +31,9 @@ for (const [exp, name] of Object.entries(DECIMAL_UNITS)) {
 }
 
 export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions> {
-  static override namespace = "human";
-
-  protected get validateFloat(): boolean {
-    return true;
+  static {
+    this.namespace = "human";
+    this.validateFloat = true;
   }
 
   protected convert(): string {

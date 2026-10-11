@@ -492,7 +492,7 @@ class MetalTestController extends Metal {
 
   async accessingLoggerInTemplate(): Promise<void> {
     await this.render({
-      inline: '<%= logger() == null ? "NilClass" : logger().constructor.name %>',
+      inline: '<%= logger == null ? "NilClass" : logger.constructor.name %>',
     });
   }
 }
