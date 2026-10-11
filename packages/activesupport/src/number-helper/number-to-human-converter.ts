@@ -33,9 +33,7 @@ for (const [exp, name] of Object.entries(DECIMAL_UNITS)) {
 export class NumberToHumanConverter extends NumberConverter<NumberToHumanOptions> {
   static override namespace = "human";
 
-  protected get validateFloat(): boolean {
-    return true;
-  }
+  static override validateFloat = true;
 
   protected convert(): string {
     this.number = new RoundingHelper(this.options).round(this.number) as BigDecimal;

@@ -4,17 +4,17 @@ import { TemplateHandlers } from "../handlers.js";
 import { Tse, type TseImplementation } from "./tse.js";
 
 describe("Template::Handlers::Tse", () => {
-  const originalImpl = Tse.implementation;
+  const originalImpl = Tse.tseImplementation;
   const originalEscapeIgnore = Tse.escapeIgnoreList;
   const originalStrip = Tse.stripTrailingNewlines;
-  const originalTrim = Tse.trimMode;
+  const originalTrim = Tse.tseTrimMode;
   const originalAnnotate = Base.annotateRenderedViewWithFilenames;
 
   afterEach(() => {
-    Tse.implementation = originalImpl;
+    Tse.tseImplementation = originalImpl;
     Tse.escapeIgnoreList = originalEscapeIgnore;
     Tse.stripTrailingNewlines = originalStrip;
-    Tse.trimMode = originalTrim;
+    Tse.tseTrimMode = originalTrim;
     Base.annotateRenderedViewWithFilenames = originalAnnotate;
     TemplateHandlers.clear();
   });
@@ -28,7 +28,7 @@ describe("Template::Handlers::Tse", () => {
   });
 
   it("defaults trimMode to '-'", () => {
-    expect(Tse.trimMode).toBe("-");
+    expect(Tse.tseTrimMode).toBe("-");
   });
 
   it("defaults escapeIgnoreList to ['text/plain']", () => {
@@ -75,7 +75,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("strips a single trailing newline when stripTrailingNewlines is enabled", () => {
     const captured: string[] = [];
-    Tse.implementation = ((source: string) => {
+    Tse.tseImplementation = ((source: string) => {
       captured.push(source);
       return { code: "", localsSignature: null, typesAnnotation: null };
     }) as TseImplementation;
@@ -91,7 +91,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("stripTrailingNewlines chomps \\n, \\r\\n, and lone \\r like Ruby String#chomp", () => {
     const captured: string[] = [];
-    Tse.implementation = ((source: string) => {
+    Tse.tseImplementation = ((source: string) => {
       captured.push(source);
       return { code: "", localsSignature: null, typesAnnotation: null };
     }) as TseImplementation;
@@ -105,7 +105,7 @@ describe("Template::Handlers::Tse", () => {
 
   it("delegates compilation to the swappable implementation", () => {
     const calls: Array<{ source: string; escapeIgnore: boolean | undefined }> = [];
-    Tse.implementation = ((source, options) => {
+    Tse.tseImplementation = ((source, options) => {
       calls.push({ source, escapeIgnore: options?.escapeIgnore });
       return { code: "STUB", localsSignature: null, typesAnnotation: null };
     }) as TseImplementation;

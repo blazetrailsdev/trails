@@ -189,7 +189,6 @@ import {
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
-import { pgDatetimeConfig } from "./postgresql/pg-datetime-config.js";
 import { PG } from "../pg/pg.js";
 import { type NativeDatabaseTypes } from "./abstract/native-database-types.js";
 import { databaseCli, defaultTimezone } from "../active-record.js";
@@ -289,13 +288,6 @@ export class PostgreSQLAdapter
     return this.findCmdAndExec(databaseCli()["postgresql"], config.database!);
   }
 
-  static get datetimeType(): string {
-    return pgDatetimeConfig.datetimeType;
-  }
-  static set datetimeType(v: string) {
-    pgDatetimeConfig.datetimeType = v;
-  }
-
   supportsBulkAlter(): boolean {
     return true;
   }
@@ -372,11 +364,17 @@ export class PostgreSQLAdapter
   declare static createUnloggedTables: boolean;
   declare static isCreateUnloggedTables: () => boolean;
 
+  declare static datetimeType: string;
+  declare static isDatetimeType: () => boolean;
+  declare static decodeDates: boolean;
+  declare static isDecodeDates: () => boolean;
+  declare decodeDates: boolean;
+
   static {
     classAttribute.call(this, "createUnloggedTables", { default: false });
+    classAttribute.call(this, "datetimeType", { default: "timestamp" });
+    classAttribute.call(this, "decodeDates", { default: false });
   }
-
-  static decodeDates = true;
 
   supportsTransactionIsolation(): boolean {
     return true;
@@ -1371,7 +1369,7 @@ export class PostgreSQLAdapter
       timestamp: PGTextDecoder.TimestampUtc,
       timestamptz: PGTextDecoder.TimestampWithTimeZone,
     };
-    if (PostgreSQLAdapter.decodeDates) codersByName["date"] = PGTextDecoder.Date;
+    if (this.decodeDates) codersByName["date"] = PGTextDecoder.Date;
 
     const knownCoderTypes = Object.keys(codersByName).map((n) => this.quote(n));
     const query = `SELECT t.oid, t.typname
@@ -1577,7 +1575,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
       boolean: "boolean",
       date: "date",
       datetime:
-        pgDatetimeConfig.datetimeType === "timestamptz"
+        PostgreSQLAdapter.datetimeType === "timestamptz"
           ? "timestamp with time zone"
           : "timestamp without time zone",
       timestamp: "timestamp without time zone",

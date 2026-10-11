@@ -93,6 +93,7 @@ import {
   SchemaStatements,
 } from "./mysql/schema-statements.js";
 import {
+  classAttribute,
   compactBlank,
   extractOptionsBang,
   groupBy,
@@ -164,12 +165,12 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
 
   protected abstract getFullVersion(): Promise<string | null>;
 
-  get emulateBooleans(): boolean {
-    return this._emulateBooleans;
-  }
+  declare static emulateBooleans: boolean;
+  declare static isEmulateBooleans: () => boolean;
+  declare emulateBooleans: boolean;
 
-  set emulateBooleans(value: boolean) {
-    this._emulateBooleans = value;
+  static {
+    classAttribute.call(this, "emulateBooleans", { default: true });
   }
 
   static dbconsole(config: DatabaseConfig, options: Record<string, unknown> = {}): never {
@@ -997,9 +998,9 @@ WHERE fk.referenced_column_name IS NOT NULL
   /** @internal */
   override extendedTypeMapKey(): { defaultTimezone?: string; emulateBooleans: boolean } | null {
     if (this._defaultTimezone != null) {
-      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this._emulateBooleans };
+      return { defaultTimezone: this._defaultTimezone, emulateBooleans: this.emulateBooleans };
     }
-    if (this._emulateBooleans) return { emulateBooleans: true };
+    if (this.emulateBooleans) return { emulateBooleans: true };
     return null;
   }
 
@@ -1232,8 +1233,6 @@ WHERE fk.referenced_column_name IS NOT NULL
 
     await this.rawExecute(`SET ${encoding} ${sqlModeAssignment} ${variableAssignments}`, "SCHEMA");
   }
-
-  private _emulateBooleans = true;
 
   /** @internal */
   async columnDefinitions(tableName: string): Promise<Record<string, unknown>[]> {

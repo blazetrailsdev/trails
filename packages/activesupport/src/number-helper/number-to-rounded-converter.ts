@@ -7,9 +7,7 @@ import type { NumberToRoundedOptions } from "../number-helper.js";
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {
   static override namespace = "precision";
 
-  protected get validateFloat(): boolean {
-    return true;
-  }
+  static override validateFloat = true;
 
   protected convert(): string {
     const options = this.options;

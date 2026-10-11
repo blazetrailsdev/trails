@@ -8,9 +8,7 @@ const STORAGE_UNITS = ["byte", "kb", "mb", "gb", "tb", "pb", "eb", "zb"];
 export class NumberToHumanSizeConverter extends NumberConverter<NumberToHumanSizeOptions> {
   static override namespace = "human";
 
-  protected get validateFloat(): boolean {
-    return true;
-  }
+  static override validateFloat = true;
 
   protected convert(): string {
     this.number = kernelFloat(this.number);

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { IntegerOutOf64BitRange } from "../../connection-adapters/postgresql/quoting.js";
 import { RangeType } from "../../connection-adapters/postgresql/oid/range.js";
@@ -69,9 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("quote date", async () => {
       const rows = await adapter.execute("SELECT DATE '2023-01-15' AS val");
-      const val = rows[0].val as Temporal.PlainDate;
-      expect(val).toBeInstanceOf(Temporal.PlainDate);
-      expect(val.year).toBe(2023);
+      expect(rows[0].val).toBe("2023-01-15");
     });
 
     it("quote time", async () => {

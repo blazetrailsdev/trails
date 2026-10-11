@@ -29,6 +29,15 @@ import { ConnectionBad } from "../../pg/exceptions.js";
 
 const EX_DEFAULT = "id serial primary key, number integer, data character varying(255)";
 
+async function withPostgresqlApdaterDecodeDates(fn: () => Promise<void>): Promise<void> {
+  PostgreSQLAdapter.decodeDates = true;
+  try {
+    await fn();
+  } finally {
+    PostgreSQLAdapter.decodeDates = false;
+  }
+}
+
 async function withExampleTable(
   adapter: PostgreSQLAdapter,
   fn: () => Promise<void>,
@@ -852,22 +861,30 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("date decoding enabled", async () => {
-      const date = (await adapter.selectValue("select '2024-01-01'::date")) as Temporal.PlainDate;
-      expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
-      expect(date.constructor).toBe(Temporal.PlainDate);
+      const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+
+      try {
+        await withPostgresqlApdaterDecodeDates(async () => {
+          const date = (await connection.selectValue(
+            "select '2024-01-01'::date",
+          )) as Temporal.PlainDate;
+          expect(date).toEqual(Temporal.PlainDate.from("2024-01-01"));
+          expect(date.constructor).toBe(Temporal.PlainDate);
+        });
+      } finally {
+        await connection.disconnectBang();
+      }
     });
 
     it("date decoding disabled", async () => {
-      const saved = PostgreSQLAdapter.decodeDates;
-      PostgreSQLAdapter.decodeDates = false;
       const connection = new PostgreSQLAdapter({ connectionString: PG_TEST_URL });
+
       try {
         const date = await connection.selectValue("select '2024-01-01'::date");
         expect(date).toBe("2024-01-01");
         expect((date as string).constructor).toBe(String);
       } finally {
         await connection.disconnectBang();
-        PostgreSQLAdapter.decodeDates = saved;
       }
     });
 

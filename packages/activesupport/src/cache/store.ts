@@ -17,6 +17,7 @@ import { DeserializationError } from "./deserialization-error.js";
 import { Notifications } from "../notifications.js";
 import { toParam } from "../hash-utils.js";
 import { currentErrorReporter } from "../error-reporter.js";
+import { cattrAccessor } from "../module-ext.js";
 import type { EventPayload } from "../notifications/instrumenter.js";
 import { isEmpty } from "@blazetrails/ruby-compat";
 
@@ -93,7 +94,11 @@ export class WriteOptions {
 /** @internal */
 export abstract class Store {
   static logger: CacheLogger | null = null;
-  static raiseOnInvalidCacheExpirationTime = false;
+  declare static raiseOnInvalidCacheExpirationTime: boolean;
+
+  static {
+    cattrAccessor.call(this, "raiseOnInvalidCacheExpirationTime", { default: false });
+  }
 
   static with<T>(options: { logger: CacheLogger }, fn: () => T): T {
     const prev = Store.logger;
