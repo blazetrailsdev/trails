@@ -7101,11 +7101,15 @@ describe("extractFromProgram — a Module on a static property", () => {
     const info = extractFromFiles("/p", {
       "compatibility.ts": `export class V7_0 {
         static TableDefinition = new Module().include({ column(name: string) {} });
-      }`,
+      }
+      V7_0.TableDefinition.aliasMethod("change", "column");`,
     });
     const mod = info.modules["compatibility.ts:V7_0.TableDefinition"];
     expect(mod.name).toBe("TableDefinition");
-    expect(mod.instanceMethods.map((m) => m.name)).toEqual(["column"]);
+    expect(mod.instanceMethods.map((m) => [m.name, m.aliasOf])).toEqual([
+      ["column", undefined],
+      ["change", "column"],
+    ]);
   });
 });
 

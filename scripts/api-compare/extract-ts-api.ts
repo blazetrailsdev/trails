@@ -1134,6 +1134,20 @@ export function extractFromProgram(
       }
     });
 
+    for (const statement of sourceFile.statements) {
+      const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
+      if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
+        continue;
+      }
+      const [alias, original] = call.arguments;
+      if (call.expression.name.text !== "aliasMethod" || !alias || !original) continue;
+      if (!ts.isStringLiteralLike(alias) || !ts.isStringLiteralLike(original)) continue;
+      const mod = info.modules[`${relPath}:${call.expression.expression.getText(sourceFile)}`];
+      const aliased = mod?.instanceMethods.find((m) => m.name === original.text);
+      if (!mod || !aliased || mod.instanceMethods.some((m) => m.name === alias.text)) continue;
+      mod.instanceMethods.push({ ...aliased, name: alias.text, aliasOf: original.text });
+    }
+
     for (const generated of collectDefineColumnMethodsMembers(sourceFile)) {
       const entity = info.classes[`${relPath}:${generated.receiver}`];
       if (entity === undefined) continue;

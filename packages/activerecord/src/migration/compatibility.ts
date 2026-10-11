@@ -318,10 +318,6 @@ export class V6_0 extends V6_1 {
       return V6_0.TableDefinition.superMethod(this, "references")!(...args, options);
     },
 
-    belongsTo(this: object, ...args: unknown[]) {
-      return V6_0.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
-    },
-
     column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
       return V6_0.TableDefinition.superMethod(this, "column")!(name, type, options);
@@ -358,6 +354,8 @@ export class V6_0 extends V6_1 {
     return super.compatibleTableDefinition(t);
   }
 }
+
+V6_0.TableDefinition.aliasMethod("belongsTo", "references");
 
 export class V5_2 extends V6_0 {
   static override TableDefinition: Module = new Module().include({
@@ -478,10 +476,6 @@ export class V5_0 extends V5_1 {
       });
     },
 
-    belongsTo(this: object, ...args: unknown[]) {
-      return V5_0.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
-    },
-
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
   });
@@ -569,6 +563,8 @@ export class V5_0 extends V5_1 {
   }
 }
 
+V5_0.TableDefinition.aliasMethod("belongsTo", "references");
+
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
 export class V4_2 extends V5_0 {
@@ -580,10 +576,6 @@ export class V4_2 extends V5_0 {
         ...options,
         index: options.index ?? false,
       });
-    },
-
-    belongsTo(this: object, ...args: unknown[]) {
-      return V4_2.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
     },
 
     timestamps(this: object, options: Options = {}) {
@@ -677,5 +669,7 @@ export class V4_2 extends V5_0 {
     return indexName;
   }
 }
+
+V4_2.TableDefinition.aliasMethod("belongsTo", "references");
 
 Migration.Compatibility = Compatibility;
