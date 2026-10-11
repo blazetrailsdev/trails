@@ -166,7 +166,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   protected abstract getFullVersion(): Promise<string | null>;
 
   declare static emulateBooleans: boolean;
-  declare static isEmulateBooleans: () => boolean;
+  declare static isEmulateBooleans: boolean;
   declare emulateBooleans: boolean;
 
   static {

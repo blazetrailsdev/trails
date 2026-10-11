@@ -5,9 +5,10 @@ import { BigDecimal, format, regexpEscape } from "@blazetrails/ruby-compat";
 import type { NumberToRoundedOptions } from "../number-helper.js";
 
 export class NumberToRoundedConverter extends NumberConverter<NumberToRoundedOptions> {
-  static override namespace = "precision";
-
-  static override validateFloat = true;
+  static {
+    this.namespace = "precision";
+    this.validateFloat = true;
+  }
 
   protected convert(): string {
     const options = this.options;

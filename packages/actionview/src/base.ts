@@ -42,7 +42,6 @@ import {
   include,
   rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
-import { Tse } from "./template/handlers/tse.js";
 import { Resolver } from "./template/resolver.js";
 
 export type CompiledMethod = ((
@@ -109,10 +108,6 @@ export class Base {
     cattrAccessor.call(this, "annotateRenderedViewWithFilenames", { default: false });
     classAttribute.call(this, "_routes");
     classAttribute.call(this, "logger");
-  }
-
-  static set tseTrimMode(value: string) {
-    Tse.tseTrimMode = value;
   }
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();

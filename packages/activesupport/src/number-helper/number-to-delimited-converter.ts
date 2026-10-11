@@ -5,7 +5,9 @@ import type { NumberWithDelimiterOptions } from "../number-helper.js";
 export class NumberToDelimitedConverter extends NumberConverter<NumberWithDelimiterOptions> {
   static DEFAULT_DELIMITER_REGEX = /(\d)(?=(\d\d\d)+(?!\d))/g;
 
-  static override validateFloat = true;
+  static {
+    this.validateFloat = true;
+  }
 
   protected convert(): string {
     return this.parts().join(this.options.separator as string);

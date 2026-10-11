@@ -362,12 +362,13 @@ export class PostgreSQLAdapter
   }
 
   declare static createUnloggedTables: boolean;
-  declare static isCreateUnloggedTables: () => boolean;
+  declare static isCreateUnloggedTables: boolean;
 
   declare static datetimeType: string;
-  declare static isDatetimeType: () => boolean;
+  declare static isDatetimeType: boolean;
+  declare datetimeType: string;
   declare static decodeDates: boolean;
-  declare static isDecodeDates: () => boolean;
+  declare static isDecodeDates: boolean;
   declare decodeDates: boolean;
 
   static {
@@ -1575,7 +1576,7 @@ WHERE t.typname IN (${knownCoderTypes.join(", ")})
       boolean: "boolean",
       date: "date",
       datetime:
-        PostgreSQLAdapter.datetimeType === "timestamptz"
+        this.datetimeType === "timestamptz"
           ? "timestamp with time zone"
           : "timestamp without time zone",
       timestamp: "timestamp without time zone",

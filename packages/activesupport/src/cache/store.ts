@@ -94,6 +94,7 @@ export class WriteOptions {
 /** @internal */
 export abstract class Store {
   declare static logger: CacheLogger | null | undefined;
+  declare logger: CacheLogger | null | undefined;
   declare static raiseOnInvalidCacheExpirationTime: boolean;
 
   static {
@@ -451,7 +452,7 @@ export abstract class Store {
     payload: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T {
-    if (Store.logger?.isDebug?.() && !this.silence) {
+    if (this.logger?.isDebug?.() && !this.silence) {
       const key = payload.key;
       const multiSize = Array.isArray(key)
         ? key.length
@@ -465,7 +466,7 @@ export abstract class Store {
           : "";
       const debugOptions =
         options && Object.keys(options).length > 0 ? ` (${JSON.stringify(options)})` : "";
-      Store.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
+      this.logger.debug?.(`Cache ${operation}${debugKey}${debugOptions}`);
     }
     payload.store = this.constructor.name;
     if (options) Object.assign(payload, options);
