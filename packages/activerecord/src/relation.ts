@@ -1570,11 +1570,11 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   /** @internal */
-  async computeCacheVersion(timestampColumn = "updated_at"): Promise<string> {
+  async computeCacheVersion(timestampColumn: string): Promise<string> {
     timestampColumn = String(timestampColumn);
 
-    let size: unknown = 0;
-    let timestamp: unknown = null;
+    let size: unknown;
+    let timestamp: unknown;
 
     if (this.isLoaded) {
       const records = await this.records();
@@ -2137,10 +2137,7 @@ async function computeCacheKey(
 }
 
 /** @internal */
-async function computeCacheVersion(
-  rel: Relation<Base>,
-  timestampColumn = "updated_at",
-): Promise<string> {
+async function computeCacheVersion(rel: Relation<Base>, timestampColumn: string): Promise<string> {
   return rel.computeCacheVersion(timestampColumn);
 }
 

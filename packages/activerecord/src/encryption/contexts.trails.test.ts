@@ -118,8 +118,54 @@ describe("ActiveRecord::Encryption::Contexts accessors", () => {
       return Encryption.context.encryptor;
     });
 
-    expect(Encryption.context.encryptor).toBe(encryptor);
+    expect(Encryption.context).toBe(Encryption.defaultContext);
     expect(await result).toBe(encryptor);
+    expect(Encryption.customContexts).toEqual([]);
+  });
+
+  it("sibling async blocks each read their own context until they settle", async () => {
+    const encryptor = new NullEncryptor();
+    const release: (() => void)[] = [];
+    const gate = () => new Promise<void>((resolve) => release.push(resolve));
+    const seen: unknown[][] = [[], []];
+
+    const first = Encryption.withEncryptionContext({ encryptor }, async () => {
+      await gate();
+      seen[0].push(Encryption.context.encryptor, Encryption.context.frozenEncryption);
+    });
+    const second = Encryption.withEncryptionContext({ frozenEncryption: true }, async () => {
+      seen[1].push(Encryption.context.frozenEncryption);
+      await gate();
+      seen[1].push(Encryption.context.frozenEncryption, Encryption.customContexts!.length);
+    });
+
+    release[0]();
+    await first;
+    release[1]();
+    await Promise.all([first, second]);
+
+    expect(seen).toEqual([
+      [encryptor, false],
+      [true, true, 1],
+    ]);
+    expect(Encryption.customContexts).toEqual([]);
+  });
+
+  it("a block nested in an async block sees and restores the outer context", async () => {
+    const encryptor = new NullEncryptor();
+
+    await Encryption.withEncryptionContext({ encryptor }, async () => {
+      await Promise.resolve();
+      await Encryption.withEncryptionContext({ frozenEncryption: true }, async () => {
+        await Promise.resolve();
+        expect(Encryption.context.encryptor).toBe(Encryption.defaultContext.encryptor);
+        expect(Encryption.context.frozenEncryption).toBe(true);
+        expect(Encryption.customContexts!.length).toBe(2);
+      });
+      expect(Encryption.context.encryptor).toBe(encryptor);
+      expect(Encryption.customContexts!.length).toBe(1);
+    });
+
     expect(Encryption.customContexts).toEqual([]);
   });
 
