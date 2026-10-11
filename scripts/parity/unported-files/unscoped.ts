@@ -166,95 +166,13 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "fixtures_test.rb",
-    className: "LoadAllFixturesTest",
-    tests: ["all there"],
-    reason:
-      "fixtures :all scans fixture_paths on disk and asserts the .yml layout under " +
-      "test/fixtures/all (fixtures_test.rb:1237-1247). trails has no fixture_paths and no " +
-      "fixtures :all; the corpus is TS modules, as in the YAML-path row above.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "LoadAllFixturesWithArrayTest",
-    tests: ["all there"],
-    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1250-1260), with two fixture_paths.",
-  },
-  {
-    testFile: "fixtures_test.rb",
     className: "LoadAllFixturesWithPathnameTest",
     tests: ["all there"],
-    reason: "Same as LoadAllFixturesTest (fixtures_test.rb:1263-1273), with a Pathname.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FasterFixturesTest",
-    tests: ["cache"],
     reason:
-      "Asserts FixtureSet.fixture_is_cached? and setup_fixture_accessors " +
-      "(fixtures_test.rb:1276-1297). trails' fixtures() reloads every set per test and " +
-      "keeps no connection-keyed fixture cache, so there is nothing cached to assert.",
-  },
-
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: ["complete instantiation", "fixtures from root yml with instantiation"],
-    reason:
-      "Both read an ivar that use_instantiated_fixtures = true assigns per fixture row — " +
-      "@first.title, @unknown.credit_limit (fixtures_test.rb:43,511,515). trails never " +
-      "instantiates ivars: useFixtures (test-fixtures.ts:189-206) returns an accessor " +
-      "closure and nothing else, so there is no ivar to read.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesWithoutInstantiationTest",
-    tests: [
-      "fixtures from root yml without instantiation",
-      "visibility of accessor method",
-      "without complete instantiation",
-    ],
-    reason:
-      "The mirror image of the row above: these assert the ABSENCE of those ivars under " +
-      "use_instantiated_fixtures = false, and that the accessor is private — " +
-      "defined?(@first), respond_to?(:topics, false) (fixtures_test.rb:756-773). trails has " +
-      "only the non-instantiating mode, so the flag selects nothing and there is no ivar " +
-      "whose absence could be observed; JS also has no runtime method visibility to test " +
-      "(see CLAUDE.md, 'Method visibility is compile-time only'). 'accessor " +
-      "methods', the case in this class that asserts the accessor itself, IS ported.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesWithoutInstanceInstantiationTest",
-    tests: ["without instance instantiation"],
-    reason:
-      "Asserts defined?(@first) is false under use_instantiated_fixtures = :no_instances " +
-      "(fixtures_test.rb:796-803) — the third value of a flag trails does not have. Same " +
-      "missing surface as the two rows above.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesTest",
-    tests: [
-      "fixture method and private alias",
-      "fixture method does not clash with a test case method",
-      "fixtures are set up with database env variable",
-    ],
-    reason:
-      "Each builds an anonymous Class.new(ActiveRecord::TestCase), declares fixtures inside " +
-      "it, and calls test_case.new(:test_fixtures).run to assert the result passed " +
-      "(fixtures_test.rb:604-646). Minitest's runnable-per-instance model has no vitest " +
-      "counterpart: a describe is registered at collection time and cannot be constructed " +
-      "and run from inside another test.",
-  },
-  {
-    testFile: "fixtures_test.rb",
-    className: "FixturesResetPkSequenceTest",
-    tests: ["create fixtures resets sequences when not cached"],
-    reason:
-      "Reads create_fixtures(table_name).first.fixtures after FixtureSet.reset_cache " +
-      "(fixtures_test.rb:713-716,740-745); trails' FixtureSet has no instance form, " +
-      "fixture-set cache or reset_cache. " +
-      "CONVERGEABLE fixture-set-instance-form-and-all-loaded-fixtures.",
+      'Sets fixture_paths to [Pathname.new(FIXTURES_ROOT).join("all")] ' +
+      "(fixtures_test.rb:1263-1273). ruby-compat's Pathname has no #join, and File.join " +
+      "does not take a Pathname, so `fixtures :all` cannot glob one. CONVERGEABLE " +
+      "ruby-compat-pathname-join-and-file-join-to-path.",
   },
   {
     testFile: "fixture_set/file_test.rb",
@@ -266,18 +184,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "Ruby module nesting; an ESM module has no nesting to resolve against and no " +
       "`defined?`, so there is nothing to assert. The other 13 cases are ported in " +
       "fixture-set/file.test.ts.",
-  },
-  {
-    testFile: "test_fixtures_test.rb",
-    className: "TestFixturesTest",
-    tests: ["doesnt rely on active support test case specific methods"],
-    reason:
-      "Builds a `Class.new(Minitest::Test)` at run time, points its fixture_paths at a " +
-      "tmpdir holding a zines.yml, and runs it through Minitest's own runner, asserting " +
-      "the result passed? (test_fixtures_test.rb:33-72). Vitest has no runnable-per-" +
-      "instance test object to construct and run from inside another test, and trails' " +
-      "fixture corpus is TS modules rather than .yml on disk, so neither half of the " +
-      "setup has a counterpart. The other 3 cases are ported in test-fixtures.test.ts.",
   },
   {
     pattern: "destroy_association_async_job.rb", // no test counterpart

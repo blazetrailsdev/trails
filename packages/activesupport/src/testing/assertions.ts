@@ -14,10 +14,13 @@ import {
   rbEqual,
   rbModToS,
   rbObjClass,
+  rbFSend,
   rbObjClassname,
   rbStrRespondTo,
   regexpEscape,
+  SignalException,
   stderr,
+  SystemExit,
   verbose,
 } from "@blazetrails/ruby-compat";
 import { _testCaseIdentity, taggedLogger } from "./tagged-logging.js";
@@ -52,6 +55,13 @@ export class Skip extends Assertion {
 /** @noRailsEquivalent PERMANENT */
 export class Test {
   /** @noRailsEquivalent PERMANENT */
+  static PASSTHROUGH_EXCEPTIONS = [SignalException, SystemExit];
+  /** @noRailsEquivalent PERMANENT */
+  static SETUP_METHODS = ["beforeSetup", "setup", "afterSetup"];
+  /** @noRailsEquivalent PERMANENT */
+  static TEARDOWN_METHODS = ["beforeTeardown", "teardown", "afterTeardown"];
+
+  /** @noRailsEquivalent PERMANENT */
   name: string;
   /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
@@ -79,6 +89,44 @@ export class Test {
   }
 
   /** @noRailsEquivalent PERMANENT */
+  isPassed(): boolean {
+    return !this.failure;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async run(): Promise<this> {
+    await this.captureExceptions(async () => {
+      for (const hook of Test.SETUP_METHODS) {
+        await rbFSend(this, hook);
+      }
+
+      await rbFSend(this, this.name);
+    });
+
+    for (const hook of Test.TEARDOWN_METHODS) {
+      await this.captureExceptions(async () => {
+        await rbFSend(this, hook);
+      });
+    }
+
+    return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async captureExceptions(block: () => unknown): Promise<void> {
+    try {
+      await block();
+    } catch (e) {
+      if (Test.PASSTHROUGH_EXCEPTIONS.some((klass) => e instanceof klass)) throw e;
+      if (e instanceof Assertion) {
+        this.failures.push(e);
+      } else {
+        this.failures.push(new UnexpectedError(e as Error));
+      }
+    }
+  }
+
+  /** @noRailsEquivalent PERMANENT */
   isSkipped(): boolean {
     return this.failure != null && this.failure instanceof Skip;
   }
@@ -95,6 +143,16 @@ export class Test {
 
   /** @noRailsEquivalent PERMANENT */
   setup(): void {}
+
+  /** @noRailsEquivalent PERMANENT */
+  afterSetup(): unknown {
+    return undefined;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  beforeTeardown(): unknown {
+    return undefined;
+  }
 
   /** @noRailsEquivalent PERMANENT */
   teardown(): unknown {

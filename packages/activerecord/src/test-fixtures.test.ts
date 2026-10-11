@@ -1,7 +1,7 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, beforeEach, afterAll } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
-import { include } from "@blazetrails/ruby-compat";
-import { onLoad } from "@blazetrails/activesupport";
+import { Dir, FileUtils, File as RubyFile, include } from "@blazetrails/ruby-compat";
+import { Minitest, Notifications, onLoad } from "@blazetrails/activesupport";
 import { fixtureRegistry, isJoinTableEntry } from "./test-helpers/fixtures-registry.js";
 import { registerModel } from "./associations.js";
 import { Fixture, FixtureSet } from "./fixtures.js";
@@ -22,6 +22,12 @@ import {
 import { Visitors } from "@blazetrails/arel";
 import { doubleColumnsHash } from "./test-helpers/double-columns.js";
 import { NullPool } from "./connection-adapters/abstract/connection-pool.js";
+import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
+import { cleanUpConnectionHandler } from "./cases/helper.js";
+import { inMemoryDb } from "./support/adapter-helper.js";
+import { Zine } from "./test-helpers/models/zine.js";
+
+registerModel(Zine);
 
 async function resolvePrimaryModel(entry: {
   model: () => Promise<typeof Base | readonly (typeof Base)[]>;
@@ -793,6 +799,8 @@ describe("fixtures() pins every pool its sets seed through", () => {
 });
 
 describe("TestFixturesTest", () => {
+  const { self } = fixtures([], { useTransactionalTests: false });
+
   let klass: new () => object;
 
   beforeEach(() => {
@@ -821,5 +829,48 @@ describe("TestFixturesTest", () => {
     expect((klass as unknown as { fixturePaths: string[] }).fixturePaths).toContain(
       "test/fixtures",
     );
+  });
+
+  it.skipIf(inMemoryDb())("doesnt rely on active support test case specific methods", async () => {
+    const tmpDir = Dir.mktmpdir();
+    let oldHandler: ConnectionHandler | undefined;
+    try {
+      RubyFile.write(RubyFile.join(tmpDir, "zines.yml"), "going_out:\n  title: Hello\n");
+
+      const klass = class extends Minitest.Test {
+        declare static fixturePaths: string[];
+        declare static useTransactionalTests: boolean;
+        declare static fixtures: (...fixtureSetNames: unknown[]) => void;
+        declare zines: (name: string) => Promise<Zine>;
+
+        static {
+          include(this, TestFixtures);
+
+          this.fixturePaths = [tmpDir];
+          this.useTransactionalTests = true;
+
+          this.fixtures(":all");
+        }
+
+        async testRunSuccessfully() {
+          expect(((await Zine.first()) as Zine).title).toBe("Hello");
+          expect((await this.zines("going_out")).title).toBe("Hello");
+        }
+      };
+
+      Notifications.unsubscribe(self()._connectionSubscriber);
+      self()._connectionSubscriber = null;
+
+      oldHandler = Base.connectionHandler;
+      Base.connectionHandler = new ConnectionHandler();
+      await Base.establishConnection(":arunit");
+
+      const testResult = await new klass("testRunSuccessfully").run();
+      expect(testResult.isPassed()).toBeTruthy();
+    } finally {
+      Base.connectionHandler = oldHandler!;
+      cleanUpConnectionHandler();
+      FileUtils.rmR(tmpDir);
+    }
   });
 });

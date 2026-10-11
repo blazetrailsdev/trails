@@ -7,6 +7,10 @@
  * `const { x } = useFixtures(...)` / `useHandlerFixtures(...)` destructuring
  * anywhere in scope.
  *
+ * A test body that builds a test case class of its own, declares a set on it
+ * with `this.fixtures("accounts")` and calls `this.accounts(...)` satisfies the
+ * check too: the accessor it calls is that class's.
+ *
  * A fixture surface called without destructuring a named accessor — e.g.
  * `fixtures([])` — exposes no accessor, so it never satisfies the check: a
  * test's result must not depend on which describe it sits in.
@@ -214,6 +218,42 @@ function collectCallNamesIn(node, out = new Set()) {
   return out;
 }
 
+/**
+ * Whether a subtree declares a fixture set on a test case class of its own and
+ * reads it back off the instance: `this.fixtures("accounts")` in a class's
+ * static block and `this.accounts(...)` in one of its methods. That is the
+ * shape of a Rails body that builds a `Class.new(ActiveRecord::TestCase)` with
+ * `fixtures :accounts` and calls `accounts(:signals37)` inside it.
+ */
+function callsOwnTestCaseAccessor(node) {
+  const declared = new Set();
+  const called = new Set();
+  (function visit(n) {
+    if (!n || typeof n !== "object") return;
+    if (
+      n.type === "CallExpression" &&
+      n.callee?.type === "MemberExpression" &&
+      n.callee.object?.type === "ThisExpression" &&
+      n.callee.property?.type === "Identifier"
+    ) {
+      if (n.callee.property.name === "fixtures") {
+        for (const arg of n.arguments) {
+          if (arg.type === "Literal" && typeof arg.value === "string") declared.add(arg.value);
+        }
+      } else {
+        called.add(n.callee.property.name);
+      }
+    }
+    for (const key of Object.keys(n)) {
+      if (key === "parent") continue;
+      const v = n[key];
+      if (Array.isArray(v)) v.forEach(visit);
+      else if (v && typeof v === "object" && v.type) visit(v);
+    }
+  })(node);
+  return [...declared].some((name) => called.has(name));
+}
+
 // Fixture helpers that produce a named accessor via destructuring.
 const ACCESSOR_HELPERS = new Set(["useFixtures", "useHandlerFixtures", "fixtures"]);
 
@@ -305,6 +345,8 @@ const rule = {
 
       "Program:exit"() {
         for (const { node, test, ancestors, callbackBody } of toCheck) {
+          if (callbackBody && callsOwnTestCaseAccessor(callbackBody)) continue;
+
           // Build the set of accessor names available in any enclosing scope (or file scope).
           const scopes = [null, ...ancestors];
 

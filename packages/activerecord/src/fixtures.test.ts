@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFile } from "fs/promises";
-import { include, rbObjRespondTo, RuntimeError } from "@blazetrails/ruby-compat";
+import {
+  env,
+  File as RubyFile,
+  include,
+  rbObjRespondTo,
+  RuntimeError,
+  setEnv,
+  toI,
+} from "@blazetrails/ruby-compat";
 import { FixtureSet, FixtureError } from "./fixtures.js";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "./test-helpers/fixtures-registry.js";
@@ -57,6 +65,7 @@ import { Book } from "./test-helpers/models/book.js";
 import { Course } from "./test-helpers/models/course.js";
 import { College } from "./test-helpers/models/college.js";
 import { withSecondPool } from "./support/setup-second-pool.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 import { Account } from "./test-helpers/models/account.js";
 import { Binary } from "./test-helpers/models/binary.js";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -72,9 +81,21 @@ import {
 import "./relation.js";
 import { setVerifyForeignKeysForFixtures, verifyForeignKeysForFixtures } from "./active-record.js";
 
-for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot]) {
+for (const model of [Topic, Reply, Task, Aircraft, Tree, Parrot, Account, Company, Course, Post]) {
   registerModel(model);
 }
+
+type TestCaseClass = (new (name: string) => InstanceType<typeof Minitest.Test>) & {
+  fixturePaths: unknown[];
+  fixtureTableNames: string[];
+  fixtureClassNames: Record<string, typeof Base | string | null>;
+  fixtures(...fixtureSetNames: unknown[]): void;
+  setupFixtureAccessors(fixtureSetNames?: string | string[] | null): void;
+};
+
+const ActiveRecordTestCase = class extends Minitest.Test {} as unknown as TestCaseClass;
+include(ActiveRecordTestCase, TestFixtures);
+ActiveRecordTestCase.fixturePaths = [TS_FIXTURES_ROOT];
 
 describe("PrimaryKeyErrorTest", () => {
   it("generates the correct value", async () => {
@@ -569,6 +590,66 @@ describe("FixturesTest", () => {
   it("serialized fixtures", () => {
     expect(trafficLights("uk").state).toEqual(["Green", "Red", "Orange"]);
   });
+
+  it("fixtures are set up with database env variable", async () => {
+    const dbUrlTmp = env["DATABASE_URL"];
+    setEnv("DATABASE_URL", "sqlite3::memory:");
+    const configurations = vi.spyOn(Base, "configurations").mockReturnValue({} as never);
+    try {
+      const testCase = class extends ActiveRecordTestCase {
+        declare accounts: (name: string) => Promise<Account>;
+
+        static {
+          this.fixtures("accounts");
+        }
+
+        async testFixtures() {
+          expect(await this.accounts("signals37")).toBeTruthy();
+        }
+      };
+
+      const result = await new testCase("testFixtures").run();
+
+      expect(
+        result.isPassed(),
+        `Expected ${result.name} to pass:\n${result.failure?.message}`,
+      ).toBeTruthy();
+    } finally {
+      configurations.mockRestore();
+      setEnv("DATABASE_URL", dbUrlTmp);
+    }
+  });
+
+  it("fixture method and private alias", () => {
+    expect(topics("first").title).toBe("The First Topic");
+    expect((self().fixture("topics", "first") as Topic).title).toBe("The First Topic");
+    expect((self().activeRecordFixture("topics", "first") as Topic).title).toBe("The First Topic");
+  });
+
+  it("fixture method does not clash with a test case method", async () => {
+    const testCase = class extends ActiveRecordTestCase {
+      declare accounts: (name: string) => Promise<Account>;
+
+      static {
+        this.fixtures("accounts");
+      }
+
+      async testFixtures() {
+        expect(await this.accounts("signals37")).toBeTruthy();
+      }
+
+      private fixture() {
+        return new Account();
+      }
+    };
+
+    const result = await new testCase("testFixtures").run();
+
+    expect(
+      result.isPassed(),
+      `Expected ${result.name} to pass:\n${result.failure?.message}`,
+    ).toBeTruthy();
+  });
 });
 
 describe("FixturesWithoutInstantiationTest", () => {
@@ -577,14 +658,14 @@ describe("FixturesWithoutInstantiationTest", () => {
   });
 
   it("without complete instantiation", () => {
-    expect("@first" in self()).toBe(false);
-    expect("@topics" in self()).toBe(false);
-    expect("@developers" in self()).toBe(false);
-    expect("@accounts" in self()).toBe(false);
+    expect("@first" in self()).toBeFalsy();
+    expect("@topics" in self()).toBeFalsy();
+    expect("@developers" in self()).toBeFalsy();
+    expect("@accounts" in self()).toBeFalsy();
   });
 
   it("fixtures from root yml without instantiation", () => {
-    expect("@unknown" in self(), "@unknown is not defined").toBe(false);
+    expect("@unknown" in self(), "@unknown is not defined").toBeFalsy();
   });
 
   it("visibility of accessor method", () => {
@@ -617,7 +698,7 @@ describe("FixturesWithoutInstanceInstantiationTest", () => {
   });
 
   it("without instance instantiation", () => {
-    expect("@first" in self(), "@first is not defined").toBe(false);
+    expect("@first" in self(), "@first is not defined").toBeFalsy();
   });
 });
 
@@ -745,7 +826,7 @@ describe("SetFixtureClassPrevailsTest", () => {
 });
 
 describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTest", () => {
-  fixtures(["accounts", "companies"], { useTransactionalTests: false });
+  const { self } = fixtures(["accounts", "companies"], { useTransactionalTests: false });
   withSecondPool();
 
   let instances: Base[];
@@ -757,6 +838,7 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
       new Company({ name: "RoR Consulting" }),
       new Course({ name: "Test" }),
     ];
+    FixtureSet.resetCache();
   });
 
   it("resets to min pk with specified pk and sequence", async () => {
@@ -792,6 +874,27 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
       await instance.saveBang();
       expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(1);
+    }
+  });
+
+  it("create fixtures resets sequences when not cached", async () => {
+    for (const instance of instances) {
+      const model = instance.constructor as typeof Base;
+      const maxId = Object.entries(
+        (
+          await FixtureSet.createFixtures(
+            TS_FIXTURES_ROOT,
+            model.tableName!,
+            self().fixtureClassNames,
+          )
+        )[0].fixtures,
+      ).reduce((_maxId, [, fixture]) => {
+        const fixtureId = Number(toI(fixture.get("id")));
+        return fixtureId > _maxId ? fixtureId : _maxId;
+      }, 0);
+
+      await instance.saveBang();
+      expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
     }
   });
 });
@@ -884,6 +987,90 @@ describe("ManyToManyFixturesWithClassDefined", () => {
 });
 
 const TIMESTAMP_COLUMNS = ["created_at", "created_on", "updated_at", "updated_on"] as const;
+
+describe("LoadAllFixturesTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as unknown as TestCaseClass).fixturePaths = [TS_FIXTURES_ROOT + "/all"];
+      (self().constructor as unknown as TestCaseClass).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("LoadAllFixturesWithArrayTest", () => {
+  const { self } = fixtures([]);
+
+  it("all there", () => {
+    try {
+      (self().constructor as unknown as TestCaseClass).fixturePaths = [
+        TS_FIXTURES_ROOT + "/all",
+        TS_FIXTURES_ROOT + "/categories",
+      ];
+      (self().constructor as unknown as TestCaseClass).fixtures(":all");
+
+      if (RubyFile.isSymlink(TS_FIXTURES_ROOT + "/all/admin")) {
+        expect([...self().fixtureTableNames].sort()).toEqual([
+          "admin/accounts",
+          "admin/users",
+          "developers",
+          "namespaced/accounts",
+          "people",
+          "special_categories",
+          "subsubdir/arbitrary_filename",
+          "tasks",
+        ]);
+      }
+    } finally {
+      FixtureSet.resetCache();
+    }
+  });
+});
+
+describe("FasterFixturesTest", () => {
+  const { self } = fixtures(["categories", "authors", "authorAddresses"], {
+    useTransactionalTests: false,
+  });
+
+  async function loadExtraFixture(name: string) {
+    const fixture = (
+      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, name, self().fixtureClassNames)
+    )[0];
+    expect(fixture instanceof FixtureSet).toBeTruthy();
+    self()._loadedFixtures[fixture.tableName] = fixture;
+  }
+
+  it("cache", async () => {
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "categories")).toBeTruthy();
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
+
+    await assertNoQueries(false, async () => {
+      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "categories", self().fixtureClassNames);
+      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "authors", self().fixtureClassNames);
+    });
+
+    await loadExtraFixture("posts");
+    expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "posts")).toBeTruthy();
+    (self().constructor as unknown as TestCaseClass).setupFixtureAccessors("posts");
+    expect(
+      (await (self() as unknown as { posts(name: string): Promise<Post> }).posts("welcome")).title,
+    ).toBe("Welcome to the weblog");
+  });
+});
 
 describe("FoxyFixturesTest", () => {
   const {
