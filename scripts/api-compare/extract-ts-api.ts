@@ -6643,8 +6643,6 @@ function collectCalls(
     map.set(name, (map.get(name) ?? 0) + 1);
   };
   const promiseSettlers: string[] = [];
-  // Held apart from `names` until the end: a body whose only names are hash
-  // forms still records no call set, so marking them moves no comparison.
   const hashForms = new Set<string>();
   const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
     if (skipHoistedClosures || receiver === undefined) return;
@@ -6831,15 +6829,6 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
-/**
- * The native JS hash forms `n` itself is, each with the expression standing
- * where the Ruby receiver does (RFC 0190): `k in h` / `Object.hasOwn(h, k)` /
- * `Object.prototype.hasOwnProperty.call(h, k)` are `in`, `delete h[k]` is
- * `delete`, `Object.assign(h, o)` is `assign`, each operand of
- * `{ ...h, ...o }` is a `spread`, and `for (… of Object.entries(h))` is
- * `entries`. The `in` of a missing-keyword guard is Ruby's required keyword,
- * not a membership test, and is left to {@link isArgumentBindingGuard}.
- */
 function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | undefined][] {
   if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.InKeyword) {
     let test: ts.Node = n;
