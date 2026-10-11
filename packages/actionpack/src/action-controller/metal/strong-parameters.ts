@@ -13,6 +13,7 @@ import {
   aryIncludes,
   block as blockOf,
   type ConflictBlock,
+  eachKey,
   eachPair,
   type Enumerator,
   hashAset,
@@ -29,6 +30,7 @@ import {
   rbModConstSet,
   rbModName,
   rbObjClass,
+  rbObjClassname,
   rbObjDup,
   rbObjRespondTo,
   toEnum,
@@ -131,6 +133,8 @@ const PERMITTED_SCALAR_TYPES: ((value: unknown) => boolean)[] = [
   (value) => value instanceof RackTestUploadedFile,
 ];
 
+type PermitFilter = string | Record<string, unknown> | (string | Record<string, unknown>)[];
+
 type IsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never;
 
 type ExpectedHashFilter = readonly [
@@ -177,6 +181,14 @@ export class Parameters {
     parameters: Record<string, unknown> | Hash<string, unknown> = {},
     loggingContext: Record<string, unknown> = {},
   ) {
+    eachKey(parameters, (key: unknown) => {
+      if (!(typeof key === "string")) {
+        throw new InvalidParameterKey(
+          `all keys must be Strings or Symbols, got: ${rbObjClassname(key)}`,
+        );
+      }
+    });
+
     this.parameters = withIndifferentAccess(parameters);
     this.loggingContext = loggingContext;
     this._permitted = Parameters.permitAllParameters;
@@ -193,7 +205,7 @@ export class Parameters {
     return this._permitted;
   }
 
-  permit(...filters: (string | Record<string, unknown>)[]): Parameters {
+  permit(...filters: PermitFilter[]): Parameters {
     return this.permitFilters(filters, {
       onUnpermitted: Parameters.actionOnUnpermittedParameters,
       explicitArrays: false,
@@ -348,11 +360,17 @@ export class Parameters {
 
   declare withDefaultsBang: Parameters["reverseMergeBang"];
 
-  transformKeys(fn: (key: string) => string): Parameters {
+  transformKeys(): Enumerator<string>;
+  transformKeys(fn: (key: string) => string): Parameters;
+  transformKeys(fn?: (key: string) => string): Parameters | Enumerator<string> {
+    if (!fn) return toEnum(this, "transformKeys");
     return this._newWithInheritedPermitted(this.parameters.transformKeys(fn));
   }
 
-  transformKeysBang(fn: (key: string) => string): this {
+  transformKeysBang(): Enumerator<string>;
+  transformKeysBang(fn: (key: string) => string): this;
+  transformKeysBang(fn?: (key: string) => string): this | Enumerator<string> {
+    if (!fn) return toEnum(this, "transformKeysBang");
     this.parameters.transformKeysBang(fn);
     return this;
   }
@@ -370,13 +388,19 @@ export class Parameters {
     return this;
   }
 
-  transformValues(fn: (value: unknown) => unknown): Parameters {
+  transformValues(): Enumerator<unknown>;
+  transformValues(fn: (value: unknown) => unknown): Parameters;
+  transformValues(fn?: (value: unknown) => unknown): Parameters | Enumerator<unknown> {
+    if (!fn) return toEnum(this, "transformValues");
     return this._newWithInheritedPermitted(
       this.parameters.transformValues((v) => fn(this.convertValueToParameters(v))),
     );
   }
 
-  transformValuesBang(fn: (value: unknown) => unknown): this {
+  transformValuesBang(): Enumerator<unknown>;
+  transformValuesBang(fn: (value: unknown) => unknown): this;
+  transformValuesBang(fn?: (value: unknown) => unknown): this | Enumerator<unknown> {
+    if (!fn) return toEnum(this, "transformValuesBang");
     this.parameters.transformValuesBang((v) => fn(this.convertValueToParameters(v)));
     return this;
   }
@@ -680,7 +704,7 @@ export class Parameters {
 
   /** @internal */
   permitFilters(
-    filters: (string | Record<string, unknown>)[],
+    filters: PermitFilter[],
     {
       onUnpermitted = null,
       explicitArrays = true,

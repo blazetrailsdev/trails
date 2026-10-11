@@ -43,7 +43,7 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
   private nameSet: boolean;
 
   static fromHash(hash: Record<string, unknown>): Options {
-    const name = (hash.name ?? null) as string | null;
+    const name = (hash.name ?? null) as string | false | null;
     const format = rbFArray(hash.format) as string[];
     const include =
       hash.include != null && hash.include !== false
@@ -57,7 +57,7 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
   }
 
   constructor(
-    name: string | null,
+    name: string | false | null,
     format: string[],
     include: string[] | null,
     exclude: string[] | null,
@@ -66,11 +66,12 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
   ) {
     super(name, format, include, exclude, klass, model);
     this.includeSet = include != null;
-    this.nameSet = name != null;
+    this.nameSet = name != null && name !== false;
   }
 
   get model(): unknown {
-    return super.model ?? (this.model = this._defaultWrapModel());
+    const model = super.model;
+    return model != null && model !== false ? model : (this.model = this._defaultWrapModel());
   }
 
   set model(model: unknown) {
@@ -125,7 +126,7 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
     const m = this.model as WrapModel | null;
     this.nameSet = true;
 
-    if (!(super.name != null || isAnonymous(this.klass!))) {
+    if (!((super.name != null && super.name !== false) || isAnonymous(this.klass!))) {
       return (this.name =
         m != null ? underscore(demodulize(toS(m))) : singularize(this.klass!.controllerName()!));
     }

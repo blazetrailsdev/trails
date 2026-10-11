@@ -154,6 +154,27 @@ describe("compareCallArgs colon-kept Symbol spelling", () => {
   });
 });
 
+describe("compareCallArgs marked method-name Symbol", () => {
+  // strong_parameters.rb:911 `return to_enum(:transform_keys!) unless block_given?`.
+  it("reads a bang-named Symbol as the TS spelling of that method", () => {
+    expect(
+      compareCallArgs(
+        site("to_enum", ["sym:transform_keys!"]),
+        site("to_enum", ["str:transformKeysBang"]),
+      ).verdict,
+    ).toBe("match");
+  });
+
+  it("still mismatches a different method's name", () => {
+    expect(
+      compareCallArgs(
+        site("to_enum", ["sym:transform_keys!"]),
+        site("to_enum", ["str:transformKeys"]),
+      ).verdict,
+    ).toBe("mismatch");
+  });
+});
+
 describe("compareCallArgs to_s and reserved-word locals", () => {
   // postgresql/schema_statements.rb:436-437 `clear_data_source_cache!(table_name.to_s)`.
   it("reads a Ruby to_s argument as the TS toString call", () => {
