@@ -65,7 +65,6 @@ tester.run("rails-callback-invocations", rule, {
         `  this.runCallbacks("initialize");\n` +
         `}\n`,
     },
-    // The generated `_run<Event>Callbacks` names its event.
     {
       filename: srcFile,
       code:
@@ -104,7 +103,6 @@ tester.run("rails-callback-invocations", rule, {
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
       errors: [{ messageId: "missingCallback", data: { name: "destroy", event: "destroy" } }],
     },
-    // A generated runner for another event does not stand in for the required one.
     {
       filename: srcFile,
       code: `export function destroy(this: any) { return this._runBeforeCommitCallbacks(); }\n`,

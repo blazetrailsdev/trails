@@ -773,7 +773,10 @@ function completeAttributesOnSchemaLoad(
   });
 }
 
-/** @inventedArm if — PERMANENT */
+/**
+ * @inventedArm if — PERMANENT
+ * @inventedArm completeAttributesOnSchemaLoad — CONVERGEABLE save-chain-schema-warm-and-cold-built-records
+ */
 export function constructor(
   this: CoreRecord & {
     _attributes: import("@blazetrails/activemodel").AttributeSet;
