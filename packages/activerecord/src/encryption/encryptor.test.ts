@@ -3,7 +3,6 @@ import { Cipher } from "./cipher.js";
 import { Encryptor } from "./encryptor.js";
 import { Key } from "./key.js";
 import { KeyProvider } from "./key-provider.js";
-import { Configurable } from "./configurable.js";
 import { Encryption as ActiveRecordEncryption } from "../encryption.js";
 import { Decryption, ForbiddenClass, Encryption } from "./errors.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
@@ -182,9 +181,9 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("deterministic encryption replaces unencodable characters based on forcedEncodingForDeterministicEncryption", () => {
     const key = generateKey();
     const enc = new Encryptor({ compress: false });
-    const saved = Configurable.config.forcedEncodingForDeterministicEncryption;
+    const saved = ActiveRecordEncryption.config.forcedEncodingForDeterministicEncryption;
     try {
-      Configurable.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
+      ActiveRecordEncryption.config.forcedEncodingForDeterministicEncryption = "US-ASCII";
       const encrypted = enc.encrypt("héllo", {
         keyProvider: new KeyProvider(new Key(key)),
         cipherOptions: { deterministic: true },
@@ -192,7 +191,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
       const decrypted = enc.decrypt(encrypted, { keyProvider: new KeyProvider(new Key(key)) });
       expect(decrypted).toBe("h?llo");
     } finally {
-      Configurable.config.forcedEncodingForDeterministicEncryption = saved;
+      ActiveRecordEncryption.config.forcedEncodingForDeterministicEncryption = saved;
     }
   });
 
@@ -207,24 +206,24 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
     assertEncryptText(enc, generateKey(), content);
   });
 
-  describe("default key provider from Configurable.config", () => {
+  describe("default key provider from ActiveRecordEncryption.config", () => {
     let savedPrimaryKey: string | string[] | undefined;
     let savedSalt: string | undefined;
 
     beforeEach(() => {
-      savedPrimaryKey = Configurable.config.primaryKey;
-      savedSalt = Configurable.config.keyDerivationSalt;
+      savedPrimaryKey = ActiveRecordEncryption.config.primaryKey;
+      savedSalt = ActiveRecordEncryption.config.keyDerivationSalt;
     });
 
     afterEach(() => {
-      Configurable.config.primaryKey = savedPrimaryKey;
-      Configurable.config.keyDerivationSalt = savedSalt;
+      ActiveRecordEncryption.config.primaryKey = savedPrimaryKey;
+      ActiveRecordEncryption.config.keyDerivationSalt = savedSalt;
       ActiveRecordEncryption.resetDefaultContext();
     });
 
     it("encrypts and decrypts using global primaryKey when no key/keyProvider is passed", () => {
-      Configurable.config.primaryKey = "a".repeat(32);
-      Configurable.config.keyDerivationSalt = "testsalt";
+      ActiveRecordEncryption.config.primaryKey = "a".repeat(32);
+      ActiveRecordEncryption.config.keyDerivationSalt = "testsalt";
       const enc = new Encryptor({ compress: false });
       const encrypted = enc.encrypt("hello from config");
       const decrypted = enc.decrypt(encrypted);
@@ -235,7 +234,7 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   it("cipher delegates to the configured cipher singleton", () => {
     const enc = new Encryptor();
     expect((enc as any).cipher()).toBeInstanceOf(Cipher);
-    expect((enc as any).cipher()).toBe(Configurable.cipher);
+    expect((enc as any).cipher()).toBe(ActiveRecordEncryption.cipher);
   });
 
   it("cipher reads from the current encryption context", () => {
@@ -246,11 +245,11 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
   });
 
   it("buildEncryptedMessage dispatches through cipher() for encrypt and decrypt", () => {
-    const savedKey = Configurable.config.primaryKey;
-    const savedSalt = Configurable.config.keyDerivationSalt;
+    const savedKey = ActiveRecordEncryption.config.primaryKey;
+    const savedSalt = ActiveRecordEncryption.config.keyDerivationSalt;
     try {
-      Configurable.config.primaryKey = "a".repeat(32);
-      Configurable.config.keyDerivationSalt = "testsalt";
+      ActiveRecordEncryption.config.primaryKey = "a".repeat(32);
+      ActiveRecordEncryption.config.keyDerivationSalt = "testsalt";
       ActiveRecordEncryption.resetDefaultContext();
       const enc = new Encryptor({ compress: false });
       const cipherSpy = vi.spyOn(enc as any, "cipher");
@@ -260,8 +259,8 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
       expect(decrypted).toBe("secret text");
       cipherSpy.mockRestore();
     } finally {
-      Configurable.config.primaryKey = savedKey;
-      Configurable.config.keyDerivationSalt = savedSalt;
+      ActiveRecordEncryption.config.primaryKey = savedKey;
+      ActiveRecordEncryption.config.keyDerivationSalt = savedSalt;
       ActiveRecordEncryption.resetDefaultContext();
     }
   });

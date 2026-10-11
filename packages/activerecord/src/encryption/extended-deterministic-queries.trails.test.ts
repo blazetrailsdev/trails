@@ -4,7 +4,7 @@ import { ExtendedDeterministicQueries, AdditionalValue } from "./extended-determ
 import { NoMethodError } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import { deterministicEncryptedAttributes } from "./encryptable-record.js";
 
 import { YAMLColumn } from "../coders/yaml-column.js";
@@ -44,22 +44,22 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
   let PreviousSchemeYamlBook: ReturnType<typeof buildSerializedBook>;
 
   const savedConfig = {
-    extendQueries: Configurable.config.extendQueries,
-    supportUnencryptedData: Configurable.config.supportUnencryptedData,
-    keyDerivationSalt: Configurable.config.keyDerivationSalt,
-    primaryKey: Configurable.config.primaryKey,
-    deterministicKey: Configurable.config.deterministicKey,
+    extendQueries: Encryption.config.extendQueries,
+    supportUnencryptedData: Encryption.config.supportUnencryptedData,
+    keyDerivationSalt: Encryption.config.keyDerivationSalt,
+    primaryKey: Encryption.config.primaryKey,
+    deterministicKey: Encryption.config.deterministicKey,
   };
   const relProto = Relation.prototype as unknown as Record<string, unknown>;
   const baseStatics = Base as unknown as Record<string, unknown>;
   const savedMethods: Record<string, unknown> = {};
 
   beforeAll(async () => {
-    Configurable.config.extendQueries = true;
-    Configurable.config.supportUnencryptedData = true;
-    Configurable.config.keyDerivationSalt = "test-salt";
-    Configurable.config.primaryKey = "test-primary-key";
-    Configurable.config.deterministicKey = "test-deterministic-key";
+    Encryption.config.extendQueries = true;
+    Encryption.config.supportUnencryptedData = true;
+    Encryption.config.keyDerivationSalt = "test-salt";
+    Encryption.config.primaryKey = "test-primary-key";
+    Encryption.config.deterministicKey = "test-deterministic-key";
 
     savedMethods.where = relProto.where;
     savedMethods.isExists = relProto.isExists;
@@ -85,11 +85,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
 
-    Configurable.config.extendQueries = savedConfig.extendQueries;
-    Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
-    Configurable.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
-    Configurable.config.primaryKey = savedConfig.primaryKey;
-    Configurable.config.deterministicKey = savedConfig.deterministicKey;
+    Encryption.config.extendQueries = savedConfig.extendQueries;
+    Encryption.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
+    Encryption.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
+    Encryption.config.primaryKey = savedConfig.primaryKey;
+    Encryption.config.deterministicKey = savedConfig.deterministicKey;
   });
 
   it("finds records by plaintext when a deterministic attribute is serialized after encryption", async () => {

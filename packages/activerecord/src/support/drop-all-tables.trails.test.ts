@@ -7,7 +7,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import { typeRegistryKeyFor } from "./type-registry-key.js";
 import { fixtures } from "../test-fixtures.js";
 import { ConnectionFailed, ConnectionNotEstablished } from "../errors.js";
-import { connectionBad, pgError } from "../pg/exceptions.js";
+import { PG } from "../pg/pg.js";
 
 let adapter: DatabaseAdapter;
 
@@ -54,7 +54,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
   it("retries exactly once when execute throws a connection error and succeeds on retry", async () => {
     const connErr = new ConnectionFailed("Connection terminated unexpectedly", {
-      cause: connectionBad(new Error("Connection terminated unexpectedly")),
+      cause: new PG.ConnectionBad("Connection terminated unexpectedly\n"),
     });
 
     let executeCallCount = 0;
@@ -88,7 +88,7 @@ describe("dropAllTables (PG connection-error retry, fake adapter)", () => {
 
   it("retries when a DROP throws a connection error mid-loop", async () => {
     const connErr = new ConnectionNotEstablished("client has already ended", {
-      cause: pgError(new Error("client has already ended")),
+      cause: new PG.ConnectionBad("connection is closed"),
     });
 
     let mutationCallCount = 0;

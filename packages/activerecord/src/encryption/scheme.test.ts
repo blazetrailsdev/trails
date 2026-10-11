@@ -5,7 +5,6 @@ import { Book } from "../test-helpers/models/book.js";
 import { Scheme } from "./scheme.js";
 import { Encryptor } from "./encryptor.js";
 import { Configuration } from "./errors.js";
-import { Configurable } from "./configurable.js";
 import { Encryption } from "../encryption.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { DeterministicKeyProvider } from "./deterministic-key-provider.js";
@@ -43,14 +42,14 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   });
 
   it("keyProvider resolves from bare key: option via DerivedSecretKeyProvider, using config salt", () => {
-    const originalSalt = Configurable.config.keyDerivationSalt;
+    const originalSalt = Encryption.config.keyDerivationSalt;
     try {
-      Configurable.config.keyDerivationSalt = "salt-one";
+      Encryption.config.keyDerivationSalt = "salt-one";
       const schemeA = new Scheme({ key: "mykey" });
       expect(schemeA.keyProvider).toBeInstanceOf(DerivedSecretKeyProvider);
       const secretA = (schemeA.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
 
-      Configurable.config.keyDerivationSalt = "salt-two";
+      Encryption.config.keyDerivationSalt = "salt-two";
       const schemeB = new Scheme({ key: "mykey" });
       const secretB = (schemeB.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
 
@@ -58,48 +57,48 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       expect(secretB).toBeDefined();
       expect(secretA).not.toBe(secretB);
     } finally {
-      Configurable.config.keyDerivationSalt = originalSalt;
+      Encryption.config.keyDerivationSalt = originalSalt;
     }
   });
 
   it("keyProvider resolves from deterministic: true via DeterministicKeyProvider when config.deterministicKey is set", () => {
-    const originalKey = Configurable.config.deterministicKey;
-    const originalSalt = Configurable.config.keyDerivationSalt;
-    Configurable.config.deterministicKey = "det-key";
-    Configurable.config.keyDerivationSalt = "test-salt";
+    const originalKey = Encryption.config.deterministicKey;
+    const originalSalt = Encryption.config.keyDerivationSalt;
+    Encryption.config.deterministicKey = "det-key";
+    Encryption.config.keyDerivationSalt = "test-salt";
     try {
       const scheme = new Scheme({ deterministic: true });
       expect(scheme.keyProvider).toBeInstanceOf(DeterministicKeyProvider);
     } finally {
-      Configurable.config.deterministicKey = originalKey;
-      Configurable.config.keyDerivationSalt = originalSalt;
+      Encryption.config.deterministicKey = originalKey;
+      Encryption.config.keyDerivationSalt = originalSalt;
     }
   });
 
   it("keyProvider raises Configuration when deterministic: true but config.deterministicKey is not set", () => {
-    const originalKey = Configurable.config.deterministicKey;
-    Configurable.config.deterministicKey = undefined;
+    const originalKey = Encryption.config.deterministicKey;
+    Encryption.config.deterministicKey = undefined;
     try {
       const scheme = new Scheme({ deterministic: true });
       expect(() => scheme.keyProvider).toThrow(Configuration);
     } finally {
-      Configurable.config.deterministicKey = originalKey;
+      Encryption.config.deterministicKey = originalKey;
     }
   });
 
   it("keyProvider memoizes — returns same instance on repeated calls", () => {
-    const originalSalt = Configurable.config.keyDerivationSalt;
-    Configurable.config.keyDerivationSalt = "memo-salt";
+    const originalSalt = Encryption.config.keyDerivationSalt;
+    Encryption.config.keyDerivationSalt = "memo-salt";
     try {
       const scheme = new Scheme({ key: "mykey" });
       expect(scheme.keyProvider).toBe(scheme.keyProvider);
     } finally {
-      Configurable.config.keyDerivationSalt = originalSalt;
+      Encryption.config.keyDerivationSalt = originalSalt;
     }
   });
 
   it("keyProvider raises when no key/keyProvider/deterministic configured", () => {
-    const c = Configurable.config;
+    const c = Encryption.config;
     const saved = {
       primaryKey: c.primaryKey,
       deterministicKey: c.deterministicKey,
@@ -138,16 +137,16 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   describe("isSupportUnencryptedData", () => {
     let originalValue: boolean;
     beforeEach(() => {
-      originalValue = Configurable.config.supportUnencryptedData;
-      Configurable.config.supportUnencryptedData = false;
+      originalValue = Encryption.config.supportUnencryptedData;
+      Encryption.config.supportUnencryptedData = false;
     });
     afterEach(() => {
-      Configurable.config.supportUnencryptedData = originalValue;
+      Encryption.config.supportUnencryptedData = originalValue;
     });
 
     it("falls back to config when not set on the scheme", () => {
       expect(new Scheme().isSupportUnencryptedData()).toBe(false);
-      Configurable.config.supportUnencryptedData = true;
+      Encryption.config.supportUnencryptedData = true;
       expect(new Scheme().isSupportUnencryptedData()).toBe(true);
     });
 

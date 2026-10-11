@@ -12,7 +12,7 @@ import {
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { NullEncryptor } from "./null-encryptor.js";
-import { Configurable } from "./configurable.js";
+import { Encryption } from "../encryption.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
@@ -76,11 +76,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   let books: ReturnType<typeof buildBooks>;
 
   const savedConfig = {
-    extendQueries: Configurable.config.extendQueries,
-    supportUnencryptedData: Configurable.config.supportUnencryptedData,
-    keyDerivationSalt: Configurable.config.keyDerivationSalt,
-    primaryKey: Configurable.config.primaryKey,
-    deterministicKey: Configurable.config.deterministicKey,
+    extendQueries: Encryption.config.extendQueries,
+    supportUnencryptedData: Encryption.config.supportUnencryptedData,
+    keyDerivationSalt: Encryption.config.keyDerivationSalt,
+    primaryKey: Encryption.config.primaryKey,
+    deterministicKey: Encryption.config.deterministicKey,
   };
   const savedMethods: {
     where?: (...args: any[]) => unknown;
@@ -91,11 +91,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
   } = {};
 
   beforeAll(async () => {
-    Configurable.config.extendQueries = true;
-    Configurable.config.supportUnencryptedData = true;
-    Configurable.config.keyDerivationSalt = "test-salt";
-    Configurable.config.primaryKey = "test-primary-key";
-    Configurable.config.deterministicKey = "test-deterministic-key";
+    Encryption.config.extendQueries = true;
+    Encryption.config.supportUnencryptedData = true;
+    Encryption.config.keyDerivationSalt = "test-salt";
+    Encryption.config.primaryKey = "test-primary-key";
+    Encryption.config.deterministicKey = "test-deterministic-key";
 
     savedMethods.where = Relation.prototype.where;
     savedMethods.isExists = (Relation.prototype as any).isExists;
@@ -119,11 +119,11 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     EncryptedAttributeType.prototype.serialize =
       savedMethods.serialize as typeof EncryptedAttributeType.prototype.serialize;
 
-    Configurable.config.extendQueries = savedConfig.extendQueries;
-    Configurable.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
-    Configurable.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
-    Configurable.config.primaryKey = savedConfig.primaryKey;
-    Configurable.config.deterministicKey = savedConfig.deterministicKey;
+    Encryption.config.extendQueries = savedConfig.extendQueries;
+    Encryption.config.supportUnencryptedData = savedConfig.supportUnencryptedData;
+    Encryption.config.keyDerivationSalt = savedConfig.keyDerivationSalt;
+    Encryption.config.primaryKey = savedConfig.primaryKey;
+    Encryption.config.deterministicKey = savedConfig.deterministicKey;
   });
 
   it("Finds records when data is unencrypted", async () => {

@@ -1,5 +1,5 @@
 import { mattrAccessor, mattrReader } from "@blazetrails/activesupport";
-import { rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { included, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Config } from "./config.js";
 import { Encryption } from "../namespaces.js";
 import { Context } from "./context.js";
@@ -16,9 +16,9 @@ export class Configurable {
   declare config: Config;
   declare encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
 
-  static {
-    mattrReader.call(this, "config", { default: new Config() });
-    mattrAccessor.call(this, "encryptedAttributeDeclarationListeners");
+  static [included](base: object): void {
+    mattrReader.call(base, "config", { default: new Config() });
+    mattrAccessor.call(base, "encryptedAttributeDeclarationListeners");
   }
 
   static get keyProvider(): unknown {

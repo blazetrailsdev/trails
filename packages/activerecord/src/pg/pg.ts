@@ -4,6 +4,8 @@ import {
   Error as PGError,
   PG_DIAG_SOURCE_FUNCTION,
   PG_DIAG_SQLSTATE,
+  ServerError,
+  UnableToSend,
 } from "./exceptions.js";
 import { Result as PGResult } from "./result.js";
 import { Array as TextDecoderArray } from "./text-decoder/array.js";
@@ -15,6 +17,8 @@ export const PG = {
   connect,
   Error: PGError,
   ConnectionBad,
+  ServerError,
+  UnableToSend,
   PG_DIAG_SQLSTATE,
   PG_DIAG_SOURCE_FUNCTION,
   TextEncoder: { Array: TextEncoderArray },
@@ -23,6 +27,7 @@ export const PG = {
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace PG {
   export type Result = PGResult;
+  export type Error = PGError;
   // eslint-disable-next-line @typescript-eslint/no-namespace
   export namespace TextEncoder {
     export type Array = TextEncoderArray;

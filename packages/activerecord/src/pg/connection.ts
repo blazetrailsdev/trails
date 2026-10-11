@@ -1,6 +1,13 @@
 import pg from "pg";
 import { PGTypeMapByOid } from "../connection-adapters/postgresql/pg-text-decoder.js";
-import { connectionBad, pgError } from "./exceptions.js";
+import {
+  ConnectionBad,
+  Error as PGError,
+  PG_DIAG_SOURCE_FUNCTION,
+  PG_DIAG_SQLSTATE,
+  ServerError,
+  UnableToSend,
+} from "./exceptions.js";
 import { PG } from "./pg.js";
 
 export interface PGConnection extends pg.Client {
@@ -44,6 +51,8 @@ type Client = Omit<pg.Client, "connection"> & {
   _activeQuery?: unknown;
   _ending?: boolean;
   _ended?: boolean;
+  _queryable?: boolean;
+  _connectionError?: boolean;
 };
 
 export class Connection {
@@ -66,11 +75,11 @@ export class Connection {
       | null
       | undefined;
     if (typeof pending?.catch !== "function") return pending;
-    return (pending as Promise<unknown>).catch(raise);
+    return (pending as Promise<unknown>).catch((error: unknown) => raise(this, error));
   }
 
   connect(): Promise<unknown> {
-    return this.client.connect().catch(raise);
+    return this.client.connect().catch((error: unknown) => raise(this, error, ConnectionBad));
   }
 
   status(): number {
@@ -96,7 +105,7 @@ export class Connection {
     await client
       .end()
       .then(() => conn.connect())
-      .catch((error: unknown) => Promise.reject(connectionBad(error)));
+      .catch((error: unknown) => raise(this, error, ConnectionBad));
     this.client = conn;
   }
 
@@ -122,7 +131,7 @@ export class Connection {
           connection.sync();
           return null;
         },
-        handleError: (error: unknown) => reject(pgError(error)),
+        handleError: (error: unknown) => reject(pgError(this, error)),
         handleReadyForQuery: () => {
           this.prepared.set(stmtName, sql);
           resolve();
@@ -141,7 +150,7 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch(raise),
+      }).catch((error: unknown) => raise(this, error)),
     );
   }
 
@@ -149,7 +158,7 @@ export class Connection {
     return result(
       await (this.query as unknown as Query)(
         sql != null ? { text: sql, rowMode: "array", types: types(this) } : sql,
-      ).catch(raise),
+      ).catch((error: unknown) => raise(this, error)),
     );
   }
 
@@ -160,7 +169,7 @@ export class Connection {
         values: params.map(param),
         rowMode: "array",
         types: types(this),
-      }).catch(raise),
+      }).catch((error: unknown) => raise(this, error)),
     );
   }
 
@@ -206,7 +215,7 @@ export class Connection {
    */
   async cancel(): Promise<string | null> {
     const { processID: bePid, secretKey: beKey, connection, host, port } = this.client;
-    if (connection == null) throw connectionBad(new Error("connection is closed"));
+    if (connection == null) throw new ConnectionBad("connection is closed", { connection: this });
     return new Promise<string | null>((resolve) => {
       const cl = new (connection.constructor as new () => Protocol)();
       cl.on("error", (err: unknown) => resolve(String(err)));
@@ -265,8 +274,46 @@ function param(value: unknown): unknown {
   return value;
 }
 
-function raise(error: unknown): never {
-  throw pgError(error);
+function pgError(conn: Connection, error: unknown, klass?: typeof PGError): unknown {
+  if (
+    !(error instanceof Error) ||
+    error instanceof PGError ||
+    error instanceof TypeError ||
+    error instanceof RangeError ||
+    error instanceof ReferenceError ||
+    error instanceof SyntaxError
+  ) {
+    return error;
+  }
+  const { _ending, _ended, _queryable, _connectionError } = conn.client;
+  let wrapped: PGError;
+  if (klass != null) {
+    wrapped = new klass(`${error.message}\n`, { connection: conn });
+  } else if (error instanceof pg.DatabaseError) {
+    const { code, routine } = error;
+    const errorField = (fieldcode: number): string | null =>
+      fieldcode === PG_DIAG_SQLSTATE
+        ? (code ?? null)
+        : fieldcode === PG_DIAG_SOURCE_FUNCTION
+          ? (routine ?? null)
+          : null;
+    wrapped = new ServerError(error.message, {
+      connection: conn,
+      result: { errorField, resultErrorField: errorField },
+    });
+  } else if (_ending === true) {
+    wrapped = new ConnectionBad("connection is closed", { connection: conn });
+  } else if (_ended === true || _queryable === false || _connectionError === true) {
+    wrapped = new ConnectionBad(`${error.message}\n`, { connection: conn });
+  } else {
+    wrapped = new UnableToSend(`${error.message}\n`, { connection: conn });
+  }
+  wrapped.cause = error;
+  return wrapped;
+}
+
+function raise(conn: Connection, error: unknown, klass?: typeof PGError): never {
+  throw pgError(conn, error, klass);
 }
 
 function result(raw: pg.QueryResult | pg.QueryResult[]): PG.Result {
@@ -309,9 +356,22 @@ export function unescapeBytea(value: string | Uint8Array): Buffer {
 
 const HANDLER: ProxyHandler<Connection> = {
   get(conn, name) {
-    const self = name in conn ? conn : conn.client;
-    const value: unknown = Reflect.get(self, name);
-    return typeof value === "function" ? value.bind(self) : value;
+    if (name in conn) {
+      const value: unknown = Reflect.get(conn, name);
+      return typeof value === "function" ? value.bind(conn) : value;
+    }
+    const client = conn.client;
+    const value: unknown = Reflect.get(client, name);
+    if (typeof value !== "function") return value;
+    return (...args: unknown[]): unknown => {
+      try {
+        const pending: unknown = value.apply(client, args);
+        if (!(pending instanceof Promise)) return pending;
+        return pending.catch((error: unknown) => raise(conn, error));
+      } catch (error) {
+        raise(conn, error);
+      }
+    };
   },
   set(conn, name, value) {
     return Reflect.set(name in conn ? conn : conn.client, name, value);

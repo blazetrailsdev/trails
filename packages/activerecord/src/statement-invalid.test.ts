@@ -1,4 +1,3 @@
-import pg from "pg";
 import { describe, it, expect, beforeAll } from "vitest";
 import { assertNot, assertRaises } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
@@ -9,7 +8,7 @@ import { adapterType } from "./test-adapter.js";
 class MockDatabaseError extends Error {}
 
 function mockDatabaseError(): Error {
-  if (adapterType === "postgres") return new pg.DatabaseError("MockDatabaseError", 0, "error");
+  if (adapterType === "postgres") return Object.assign(new MockDatabaseError(), { result: 0 });
   if (adapterType === "mysql") return Object.assign(new MockDatabaseError(), { errno: 1 });
   return new MockDatabaseError();
 }

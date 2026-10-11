@@ -6,7 +6,6 @@ import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 export { Base };
-import { Configurable } from "./configurable.js";
 import { type Compressor } from "./config.js";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryptor as EncryptorImpl } from "./encryptor.js";
@@ -38,12 +37,12 @@ interface ConfigSnapshot {
   keyDerivationSalt: string | null | undefined;
   supportUnencryptedData: boolean;
   encryptFixtures: boolean;
-  previousSchemes: typeof Configurable.config.previousSchemes;
+  previousSchemes: typeof Encryption.config.previousSchemes;
   forcedEncodingForDeterministicEncryption: string;
 }
 
 export function snapshotEncryptionConfig(): ConfigSnapshot {
-  const c = Configurable.config;
+  const c = Encryption.config;
   return {
     primaryKey: c.hasPrimaryKey(),
     deterministicKey: c.hasDeterministicKey(),
@@ -56,7 +55,7 @@ export function snapshotEncryptionConfig(): ConfigSnapshot {
 }
 
 export function restoreEncryptionConfig(snapshot: ConfigSnapshot): void {
-  const c = Configurable.config;
+  const c = Encryption.config;
   c.primaryKey = snapshot.primaryKey;
   c.deterministicKey = snapshot.deterministicKey;
   c.keyDerivationSalt = snapshot.keyDerivationSalt;
@@ -76,16 +75,16 @@ export function configureEncryption(
     encryptFixtures: boolean;
   }> = {},
 ): void {
-  Configurable.configure({
+  Encryption.configure({
     primaryKey: overrides.primaryKey ?? TEST_PRIMARY_KEY,
     deterministicKey: overrides.deterministicKey ?? TEST_DETERMINISTIC_KEY,
     keyDerivationSalt: overrides.keyDerivationSalt ?? TEST_KEY_DERIVATION_SALT,
   });
   if (overrides.supportUnencryptedData !== undefined) {
-    Configurable.config.supportUnencryptedData = overrides.supportUnencryptedData;
+    Encryption.config.supportUnencryptedData = overrides.supportUnencryptedData;
   }
-  Configurable.config.encryptFixtures = overrides.encryptFixtures ?? true;
-  Configurable.config.previousSchemes.length = 0;
+  Encryption.config.encryptFixtures = overrides.encryptFixtures ?? true;
+  Encryption.config.previousSchemes.length = 0;
 }
 
 export const AUTHOR_NAME_LIMIT = 100;
@@ -226,10 +225,10 @@ export function makeEncryptedAuthor() {
 export function makeEncryptedBookWithCustomCompressor() {
   const customCompressor: Compressor = {
     deflate(data: string): Buffer | Uint8Array {
-      return Configurable.config.compressor.deflate(data);
+      return Encryption.config.compressor.deflate(data);
     },
     inflate(data: Buffer | Uint8Array): Buffer {
-      return Buffer.from("[compressed] " + Configurable.config.compressor.inflate(data));
+      return Buffer.from("[compressed] " + Encryption.config.compressor.inflate(data));
     },
   };
   return class EncryptedBookWithCustomCompressor extends Base {
