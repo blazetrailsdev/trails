@@ -1,4 +1,5 @@
 import {
+  Hash as RubyHash,
   include,
   rbCFalseClass,
   rbCFloat,
@@ -15,19 +16,36 @@ import {
 import { MessagePack } from "./namespaces.js";
 import type { Packer } from "./packer.js";
 
-function toMsgpack(this: unknown, packerOrIo: unknown = null): Uint8Array | Packer | null {
+function toMsgpack<T>(
+  this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
+  self: T,
+  packerOrIo: unknown = null,
+): Uint8Array | Packer | null {
   if (packerOrIo != null && packerOrIo !== false) {
     if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-      return rbFSend(this, "toMsgpackWithPacker", packerOrIo) as Packer;
+      return this.toMsgpackWithPacker(self, packerOrIo as Packer);
     } else {
-      return MessagePack.pack(this, packerOrIo);
+      return MessagePack.pack(self, packerOrIo);
     }
   } else {
-    return MessagePack.pack(this);
+    return MessagePack.pack(self);
   }
 }
 
-export const CoreExt = { name: "MessagePack::CoreExt", toMsgpack };
+export const CoreExt = {
+  name: "MessagePack::CoreExt",
+  toMsgpack(this: unknown, packerOrIo: unknown = null): Uint8Array | Packer | null {
+    if (packerOrIo != null && packerOrIo !== false) {
+      if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
+        return rbFSend(this, "toMsgpackWithPacker", packerOrIo) as Packer;
+      } else {
+        return MessagePack.pack(this, packerOrIo);
+      }
+    } else {
+      return MessagePack.pack(this);
+    }
+  },
+};
 
 include(rbCNilClass, CoreExt);
 rbModDefineMethod(rbCNilClass, "toMsgpackWithPacker", function (this: null, packer: Packer) {
@@ -68,21 +86,7 @@ rbModDefineMethod(
 );
 
 export class Array {
-  static toMsgpack<T>(
-    this: { toMsgpackWithPacker(self: T, packer: Packer): Packer },
-    self: T,
-    packerOrIo: unknown = null,
-  ): Uint8Array | Packer | null {
-    if (packerOrIo != null && packerOrIo !== false) {
-      if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-        return this.toMsgpackWithPacker(self, packerOrIo as Packer);
-      } else {
-        return MessagePack.pack(self, packerOrIo);
-      }
-    } else {
-      return MessagePack.pack(self);
-    }
-  }
+  static toMsgpack = toMsgpack;
 
   /** @internal */
   static toMsgpackWithPacker(self: unknown[], packer: Packer): Packer {
@@ -91,8 +95,13 @@ export class Array {
   }
 }
 
+include(RubyHash, CoreExt);
+rbModDefineMethod(RubyHash, "toMsgpackWithPacker", function (this: object, packer: Packer) {
+  return Hash.toMsgpackWithPacker(this, packer);
+});
+
 export class Hash {
-  static toMsgpack = Array.toMsgpack;
+  static toMsgpack = toMsgpack;
 
   /** @internal */
   static toMsgpackWithPacker(self: object, packer: Packer): Packer {

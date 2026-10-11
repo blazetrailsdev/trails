@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NoMethodError, TypeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Hash, NoMethodError, TypeError, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { ExtensionValue, Packer } from "./index.js";
 
 describe("MessagePack::CoreExt", () => {
@@ -17,13 +17,14 @@ describe("MessagePack::CoreExt", () => {
     );
   });
 
-  it("seats to_msgpack on each core class and ExtensionValue", () => {
+  it("seats to_msgpack on each core class, a Hash and ExtensionValue", () => {
     const packed = (v: unknown) => (rbFSend(v, "toMsgpack", new Packer()) as Packer).toStr();
     expect(packed(null)).toEqual(Uint8Array.of(0xc0));
     expect(packed(true)).toEqual(Uint8Array.of(0xc3));
     expect(packed(false)).toEqual(Uint8Array.of(0xc2));
     expect(packed(new Number(1))).toEqual(Uint8Array.of(0xcb, 0x3f, 0xf0, 0, 0, 0, 0, 0, 0));
     expect(packed("a")).toEqual(Uint8Array.of(0xa1, 0x61));
+    expect(packed(new Hash().set("a", 1))).toEqual(Uint8Array.of(0x81, 0xa1, 0x61, 0x01));
     expect(packed(new ExtensionValue(1, "a"))).toEqual(Uint8Array.of(0xd4, 0x01, 0x61));
     expect(new ExtensionValue(1, "a").toMsgpack()).toEqual(Uint8Array.of(0xd4, 0x01, 0x61));
     expect(rbObjRespondTo(128, "toMsgpack")).toBe(true);
