@@ -2107,6 +2107,88 @@ describe("body call capture", () => {
     );
   });
 
+  it("marks the native hash forms with the receiver each one ends in", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        key(options: Record<string, unknown>, opts: Record<string, Record<string, unknown>>, name: string) {
+          return "a" in this.options || Object.hasOwn(options, "b") ||
+            Object.prototype.hasOwnProperty.call(opts[name], "c");
+        }
+        remove(options: Record<string, unknown>, name: string) {
+          delete this.options.a;
+          delete options[name];
+        }
+        update(options: Record<string, unknown>, other: object) {
+          Object.assign(this.options, other);
+          Object.assign(options, other);
+        }
+        merge(options: Record<string, unknown>, opts: Record<string, object>, name: string) {
+          return { a: 1, ...this.options, ...options, ...opts[name] };
+        }
+        eachPair(options: Record<string, unknown>) {
+          for (const [k, v] of Object.entries(this.options)) use(k, v);
+          for (const [k, v] of Object.entries(options)) use(k, v);
+        }
+      }`,
+    );
+    const marks = (name: string): string[] =>
+      cls.instanceMethods
+        .find((m) => m.name === name)!
+        .calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))
+        .sort();
+    expect(marks("key")).toEqual(["@in", "@in:options"]);
+    expect(marks("remove")).toEqual(["@delete", "@delete:options"]);
+    expect(marks("update")).toEqual(["@assign", "@assign:options"]);
+    expect(marks("merge")).toEqual(["@spread", "@spread:options"]);
+    expect(marks("eachPair")).toEqual(["@entries", "@entries:options"]);
+  });
+
+  it("names no receiver for a native hash form over an element access", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        key(opts: Record<string, object>, name: string) {
+          return "a" in opts[name];
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "key")!;
+    expect(m.calls!.filter((c) => c.startsWith("@in"))).toEqual(["@in"]);
+  });
+
+  it("marks no native hash form for Object.keys, a spreadless literal or a missing-keyword guard", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        keys(recv: object) {
+          for (const k of Object.keys(recv)) use(k);
+          return { a: 1, b: recv };
+        }
+        build(kwargs: { name?: string }) {
+          if (!("name" in kwargs)) throw new ArgumentError("missing keyword: :name");
+          return kwargs.name;
+        }
+      }`,
+    );
+    for (const m of cls.instanceMethods) {
+      expect(m.calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))).toEqual([]);
+    }
+  });
+
+  it("keeps the native hash forms out of the ORDER stream", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        merge(options: Record<string, unknown>, other: object) {
+          if ("a" in options) delete options.a;
+          Object.assign(options, other);
+          for (const [k, v] of Object.entries(options)) use(k, v);
+          return { ...options };
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "merge")!;
+    expect(m.callSeq!.some((c) => c.startsWith("@"))).toBe(false);
+  });
+
   it("marks an unshift() call as a native form", () => {
     const cls = extractFromSource(
       `class Foo {
