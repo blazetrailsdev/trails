@@ -405,7 +405,7 @@ export interface AbstractAdapter
   indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options: { name?: string; column?: string | string[] },
+    options: { name?: string | null; column?: string | string[] },
   ): Promise<string>;
   /** @internal */
   extractForeignKeyAction(specifier: string): "cascade" | "nullify" | "restrict" | undefined;
