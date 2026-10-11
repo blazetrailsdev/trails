@@ -47,23 +47,20 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
   throw new Error(`${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`.`);
 }
 
-/** One module's body in a chain, under the module's FQN. */
 export interface ModuleBody {
   module: string;
   body: MethodInfo;
 }
 
-/**
- * The modules among a class's ancestors, as FQNs in the order Ruby looks them
- * up: `prepended` sit ahead of the class and `included` behind it. The last
- * `prepend` / `include` comes first, and each module stands between the
- * modules it prepends and the ones it includes.
- */
 export interface ModuleAncestors {
   prepended: string[];
   included: string[];
 }
 
+/**
+ * The modules ahead of and behind a class in its ancestors, as FQNs: the last
+ * `prepend` / `include` first, each module between its own prepends and includes.
+ */
 export function moduleAncestors(
   klass: ClassInfo,
   klassFqn: string,
@@ -88,10 +85,7 @@ export function moduleAncestors(
   return ancestors;
 }
 
-/**
- * The ancestors of a class that define `initialize` in the class's own Ruby
- * file, in ancestor order.
- */
+/** The ancestors that define `initialize` in the class's own Ruby file. */
 export function sameFileInitializeModules(
   klass: ClassInfo,
   ancestors: ModuleAncestors,
@@ -148,11 +142,10 @@ export function uncomparedInlinedTags(
 /**
  * The Rails chain a constructor that inlines module bodies answers to
  * (RFC 0188), in the order Ruby runs it: a tagged `ClassMethods#new`, which
- * `Class#new` enters before any `initialize`, then the `initialize` of each
- * prepended module, the class's own, and each included module's. A tagged
- * module that is not among `ancestors` follows them in tag order. Empty when
- * the class has neither a same-file module nor a tag, which leaves the pair to
- * the ordinary gate.
+ * `Class#new` enters before any `initialize`, then each prepended module's
+ * `initialize`, the class's own, each included module's, and any tagged module
+ * outside `ancestors` in tag order. Empty when the class has neither a
+ * same-file module nor a tag, which leaves the pair to the ordinary gate.
  */
 export function inlinedSegments(
   own: MethodInfo | undefined,

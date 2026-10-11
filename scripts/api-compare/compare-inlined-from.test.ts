@@ -55,20 +55,17 @@ const tag = (overrides: Partial<InlinedFrom> = {}): InlinedFrom => ({
   ...overrides,
 });
 
-interface Fixture {
-  tsCalls?: string[];
-  inlinedFrom?: InlinedFrom[];
-  rubyInitialize?: boolean;
-  sameFileModule?: boolean;
-}
-
-/** Runs `compare.ts --calls` over a two-file package and returns its call rows. */
 function compare({
   tsCalls = ["buildReflection", "assignAttributes", "super"],
   inlinedFrom = [tag()],
   rubyInitialize = true,
   sameFileModule = false,
-}: Fixture = {}): { calls: string[]; args: string[] } {
+}: {
+  tsCalls?: string[];
+  inlinedFrom?: InlinedFrom[];
+  rubyInitialize?: boolean;
+  sameFileModule?: boolean;
+} = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
   const helpers = (names: string[]) => names.map((name) => method(name, [], { params: PARAMS }));
@@ -140,29 +137,21 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect([...calls, ...args].join("\n")).not.toContain("super");
   });
 
-  it("throws on a stale citation", () => {
-    expect(() => compare({ inlinedFrom: [tag({ firstLine: 81 })] })).toThrow(
-      /@inlinedFrom citation is stale: activemodel\/thing\.ts Thing#constructor/,
-    );
-  });
-
-  it("throws on a tag that resolves to no Ruby body", () => {
-    expect(() => compare({ inlinedFrom: [tag({ module: "ActiveModel::Missing" })] })).toThrow(
-      /@inlinedFrom names no Ruby body: activemodel\/thing\.ts Thing#constructor/,
-    );
-  });
-
-  it("throws on a tag naming a same-file module", () => {
-    const sameFile = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });
-    expect(() => compare({ inlinedFrom: [sameFile], sameFileModule: true })).toThrow(
-      /@inlinedFrom is redundant: activemodel\/thing\.ts Thing#constructor/,
-    );
-  });
-
-  it("throws on a tag sitting on a constructor no Rails initialize paired", () => {
-    expect(() => compare({ rubyInitialize: false })).toThrow(
-      "@inlinedFrom was never compared, no Rails `initialize` paired: " +
-        "activemodel/thing.ts Thing#constructor",
+  const local = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });
+  it.each([
+    ["a stale citation", "citation is stale", { inlinedFrom: [tag({ firstLine: 81 })] }],
+    ["an unresolvable tag", "names no Ruby body", { inlinedFrom: [tag({ module: "A::Missing" })] }],
+    ["a same-file tag", "is redundant", { inlinedFrom: [local], sameFileModule: true }],
+    [
+      "an unpaired constructor",
+      "was never compared, no Rails `initialize` paired",
+      {
+        rubyInitialize: false,
+      },
+    ],
+  ])("throws its own message on %s", (_what, message, fixture) => {
+    expect(() => compare(fixture)).toThrow(
+      new RegExp(`^@inlinedFrom ${message}: activemodel/thing\\.ts Thing#constructor`),
     );
   });
 });
