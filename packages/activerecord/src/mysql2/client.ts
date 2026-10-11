@@ -510,10 +510,7 @@ const NOT_DRIVER_OPTIONS =
 
 const CLIENT_ONLY_FLAGS = ["SSL_VERIFY_SERVER_CERT", "REMEMBER_OPTIONS"];
 
-/**
- * @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection
- * @inventedArm if — PERMANENT
- */
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
 async function connect(
   this: Wrapper,
   user: string | null,
