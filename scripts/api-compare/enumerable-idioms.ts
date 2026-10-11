@@ -287,11 +287,16 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   (`scripts/parity/ruby-compat.ts`'s `Array#include?` row), so they credit
  *   only where every site is a proven `hash`. `delete`, `merge!`, `update` and
  *   `merge` credit where no site's kind disproves a Hash, the rule
- *   `rubyCompatAliases` applies to their helpers. A site of one of those four
- *   that passes a block never credits: the miss block of `delete`
- *   (`hash.c:2441`) and the conflict block of `merge!` / `merge`
- *   (`hash.c:4028`, `:4144`) have no native form, so the Ruby extractor leaves
- *   that site's receiver unnamed.
+ *   `rubyCompatAliases` applies to their helpers. That is weaker than a
+ *   proven `hash`: a `local`, `ivar` or `expr` receiver is admitted on its
+ *   name alone, so an Array local a port wrongly deletes from by index would
+ *   credit too. A site of one of those four that passes a block, literal or
+ *   `&blk`, never credits: the miss block of `delete` (`hash.c:2441`) and the
+ *   conflict block of `merge!` / `merge` (`hash.c:4028`, `:4144`) have no
+ *   native form. Nor does a `delete` whose removed value is used, since JS
+ *   `delete` answers a boolean. The Ruby extractor leaves each such site's
+ *   receiver unnamed. A lone `{ ...h }` is a copy, not a merge, and is not
+ *   marked.
  *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
  *   drops it for every receiver. `fetch` has none either, because JS has no
  *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which

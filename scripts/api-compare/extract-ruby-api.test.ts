@@ -3760,6 +3760,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             options[:html].include?(:a)
             { a: 1 }.member?(:a)
             options.delete(:a)
+            options[:html].delete(:b)
             @options.merge!(other)
             options.update(other)
             DEFAULTS.merge(options)
@@ -3774,6 +3775,24 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             options.merge!(other) do |_k, a, _b| a end
             options.update(other) { |_k, a, _b| a }
           end
+
+          def passed(options, other, &block)
+            options.merge(other, &block)
+            options.delete(:a, &block)
+            options.update(other)
+          end
+
+          def used(options)
+            value = options.delete(:a)
+            use(options.delete(:b))
+            options.delete(:c)
+          end
+
+          def void(options)
+            options.delete(:a)
+            options.delete :b
+            options
+          end
         end
       `,
     };
@@ -3783,12 +3802,23 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
       "merge!": ["?"],
       update: ["?"],
     });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#passed"]).toEqual({
+      delete: ["?"],
+      merge: ["?"],
+      update: ["options"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#used"]).toEqual({
+      delete: ["?"],
+    });
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#void"]).toEqual({
+      delete: ["options"],
+    });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#call"]).toEqual({
       "key?": ["options"],
       "has_key?": ["@options"],
       "include?": ["html"],
       "member?": ["?"],
-      delete: ["options"],
+      delete: ["html", "options"],
       "merge!": ["@options"],
       update: ["options"],
       merge: ["DEFAULTS"],

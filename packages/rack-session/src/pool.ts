@@ -19,7 +19,10 @@ export class Pool extends PersistedSecure {
 
   protected allowFallback: unknown;
 
-  /** @missingRailsCall new — PERMANENT */
+  /**
+   * @missingRailsCall new — PERMANENT
+   * @missingRailsCall delete — PERMANENT
+   */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     super(app, options);
     this.pool = {};

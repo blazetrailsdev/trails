@@ -6849,6 +6849,7 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
     return [];
   }
   if (ts.isObjectLiteralExpression(n)) {
+    if (n.properties.length < 2) return [];
     return n.properties.filter(ts.isSpreadAssignment).map((p) => ["spread", p.expression]);
   }
   if (ts.isForOfStatement(n)) {

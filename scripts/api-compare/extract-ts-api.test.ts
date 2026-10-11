@@ -6267,6 +6267,8 @@ describe("a native hash form credits the Hash call it ports", () => {
       true,
     );
     expect(credited("merge", `return { ...other };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options, a: 1 };`, ["local"], ["options"])).toBe(true);
     expect(credited("merge", `return { a: 1, b: options };`, ["local"], ["options"])).toBe(false);
   });
 
