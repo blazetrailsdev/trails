@@ -27,6 +27,26 @@ describe("Time", () => {
     expect(Time.at(-0.5).strftime("%Y-%m-%d %H:%M:%S")).toBe("1969-12-31 23:59:59");
   });
 
+  it("Time.new carries a day past the end of the month into the next, as MRI does", () => {
+    const wall = (t: Time) => [t.year, t.mon, t.day, t.hour, t.min, t.sec];
+    expect(wall(Time.new(2026, 2, 30, 1, 2, 3, 0))).toEqual([2026, 3, 2, 1, 2, 3]);
+    expect(wall(Time.new(2025, 2, 29, 24, 0, 0, 0))).toEqual([2025, 3, 2, 0, 0, 0]);
+    expect(wall(Time.new(2024, 2, 29, 0, 0, 0, 0))).toEqual([2024, 2, 29, 0, 0, 0]);
+    expect(wall(Time.new(1900, 2, 29, 0, 0, 0, 0))).toEqual([1900, 3, 1, 0, 0, 0]);
+    expect(Time.new(2026, 2, 30, 1, 2, 3, 0).toI()).toBe(1772413323);
+  });
+
+  it("utc keeps the wall clock at offset zero and moves it from any other offset", () => {
+    const wall = (t: Time) => [t.year, t.mon, t.day, t.hour, t.min, t.sec];
+    const zero = Time.new(2026, 10, 11, 12, 34, 56, 0);
+    expect(wall(zero)).toEqual([2026, 10, 11, 12, 34, 56]);
+    expect(wall(zero.utc())).toEqual([2026, 10, 11, 12, 34, 56]);
+    const east = Time.new(2026, 4, 31, 0, 0, 0, 3600);
+    expect(wall(east)).toEqual([2026, 5, 1, 0, 0, 0]);
+    expect(wall(east.utc())).toEqual([2026, 4, 30, 23, 0, 0]);
+    expect(east.toI()).toBe(1777590000);
+  });
+
   it("Time.new builds a time at the given offset", () => {
     const time = new Time(2008, 3, 1, 6, 0, 0, "-05:00");
     expect(time.hour).toBe(6);
