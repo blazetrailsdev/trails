@@ -283,11 +283,19 @@ describe("Hash#update", () => {
   });
 
   it("converts an argument that answers to_hash, as rb_hash_update_call does", () => {
-    const params = {
-      permitted: true,
-      toHash: () => new Hash<string, number>().set("b", 2),
-    };
-    expect(mergeBang({ a: 1 }, Object.create(params))).toEqual({ a: 1, b: 2 });
+    class Params {
+      permitted = true;
+      toHash(): Hash<string, number> {
+        return new Hash<string, number>().set("b", 2);
+      }
+    }
+    expect(mergeBang({ a: 1 }, new Params())).toEqual({ a: 1, b: 2 });
+  });
+
+  it("raises TypeError for an argument with no to_hash, as rb_convert_type does", () => {
+    expect(() => mergeBang({ a: 1 }, new Date(0) as never)).toThrow(
+      new TypeError("no implicit conversion of Time into Hash"),
+    );
   });
 });
 
@@ -311,7 +319,9 @@ describe("Hash#merge! with a conflict block", () => {
     const hash = { a: 1 };
     const unmarked = ((_key: string, left: number): number =>
       left) as unknown as ConflictBlock<number>;
-    update(hash, { a: 2 }, unmarked);
+    expect(() => update(hash, { a: 2 }, unmarked)).toThrow(
+      new TypeError("no implicit conversion of Proc into Hash"),
+    );
     expect(hash).toEqual({ a: 2 });
   });
 

@@ -9,6 +9,7 @@ import {
 import { MockRequest, type RackEnv, type RackResponse } from "@blazetrails/rack";
 import {
   chomp,
+  eachKey,
   except,
   extend,
   type Hash,
@@ -16,7 +17,6 @@ import {
   include,
   type Included,
   InvalidURIError,
-  keys,
   merge,
   mergeBang,
   Module,
@@ -399,10 +399,10 @@ export class UrlHelper {
       } else {
         pathParams = [...pathParams];
       }
-      for (const key of keys(innerOptions)) {
+      eachKey(innerOptions, (key) => {
         const at = pathParams.indexOf(key);
         if (at !== -1) pathParams.splice(at, 1);
-      }
+      });
 
       args.forEach((arg, index) => {
         const param = pathParams[index];

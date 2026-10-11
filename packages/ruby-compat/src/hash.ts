@@ -1,7 +1,7 @@
 import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
-import { rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
+import { isPlainHash, rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
@@ -279,13 +279,16 @@ type ToHash = { toHash(): object };
 /**
  * MRI's `to_hash` (`vendor/ruby/v3.3.11/hash.c:1909`, `rb_to_hash_type`), the implicit
  * conversion `rb_hash_update_call` (`vendor/ruby/v3.3.11/hash.c:3960`) applies to
- * each argument: a Hash is itself, and anything else is asked for `to_hash`.
+ * each argument: a Hash is itself, anything else is asked for `to_hash`, and
+ * one that does not answer it raises `TypeError` (`rb_convert_type_with_id`).
  */
 function toHash<T>(
   hash: Record<string, T> | Map<string, T> | ToHash,
 ): Record<string, T> | Map<string, T> {
+  if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;
   const own = ownMethod(hash, "toHash");
-  return (own ? own.call(hash) : hash) as Record<string, T> | Map<string, T>;
+  if (!own) throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(hash)} into Hash`);
+  return own.call(hash) as Record<string, T> | Map<string, T>;
 }
 
 /**
