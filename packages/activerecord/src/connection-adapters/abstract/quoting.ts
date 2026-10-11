@@ -18,7 +18,7 @@
  */
 
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
-import { BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
+import { actsLike, BigDecimal, Chars, TimeWithZone } from "@blazetrails/activesupport";
 import { Attribute as ModelAttribute, BinaryData, type ValueType } from "@blazetrails/activemodel";
 import {
   rbFSend,
@@ -194,11 +194,11 @@ export function unquotedFalse(): boolean {
 }
 
 export function quotedDate(this: { defaultTimezone: string }, value: TemporalDateLike): string {
-  if (actsLikeTime(value)) {
+  if (actsLike.call(value, "time")) {
     if (this.defaultTimezone === "utc") {
-      if (!isUtc(value)) value = getutc(value);
+      if (!rbFSend(value, "isUtc")) value = rbFSend(value, "getutc") as TemporalDateLike;
     } else {
-      value = getlocal(value);
+      value = rbFSend(value, "getlocal") as TemporalDateLike;
     }
   }
 
@@ -240,8 +240,6 @@ export function typeCastedBinds(
   });
 }
 
-type TimeLike = TimeWithZone | RubyTime | Date | Temporal.Instant | Temporal.ZonedDateTime;
-
 /** @internal */
 export function lookupCastType(
   this: { typeMap: TypeMap },
@@ -256,41 +254,6 @@ export function columnNameMatcher(): RegExp {
 
 export function columnNameWithOrderMatcher(): RegExp {
   return /^((?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)(?:\s*,\s*(?:(?:\w+\.)?\w+|\w+\((?:|(?:(?:\w+\.)?\w+|\w+\((?:|(?:\w+\.)?\w+)\)))\))(?:\s+ASC|\s+DESC)?(?:\s+NULLS\s+(?:FIRST|LAST))?)*$/i;
-}
-
-function actsLikeTime(value: unknown): value is TimeLike {
-  return (
-    value instanceof TimeWithZone ||
-    value instanceof RubyTime ||
-    value instanceof Date ||
-    value instanceof Temporal.Instant ||
-    value instanceof Temporal.ZonedDateTime
-  );
-}
-
-function instantOf(value: TimeLike): Temporal.Instant {
-  if (value instanceof TimeWithZone) value = value.utc();
-  if (value instanceof RubyTime) return value.toZonedDateTime().toInstant();
-  if (value instanceof Date) return Temporal.Instant.fromEpochMilliseconds(value.getTime());
-  if (value instanceof Temporal.ZonedDateTime) return value.toInstant();
-  return value;
-}
-
-/** Ruby's `Time#utc?` (`vendor/ruby/v3.3.11/time.c:4340`). */
-function isUtc(value: TimeLike): boolean {
-  if (value instanceof TimeWithZone || value instanceof RubyTime) return value.isUtc();
-  if (value instanceof Temporal.ZonedDateTime) return value.timeZoneId === "UTC";
-  return false;
-}
-
-/** Ruby's `Time#getutc` (`vendor/ruby/v3.3.11/time.c:4425`). */
-function getutc(value: TimeLike): Temporal.ZonedDateTime {
-  return instantOf(value).toZonedDateTimeISO("UTC");
-}
-
-/** Ruby's `Time#getlocal` (`vendor/ruby/v3.3.11/time.c:4374`). */
-function getlocal(value: TimeLike): Temporal.ZonedDateTime {
-  return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
 }
 
 /** @internal */
