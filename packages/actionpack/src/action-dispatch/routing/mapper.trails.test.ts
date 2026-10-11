@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { TopLevel } from "@blazetrails/activesupport";
 import { Engine } from "@blazetrails/trailties/engine";
 import { Trailtie } from "@blazetrails/trailties/trailtie";
@@ -405,18 +405,16 @@ describe("Mapper#mount", () => {
 describe("Mapper block receivers", () => {
   class StubController {}
 
+  const names = ["health", "owners", "reports", "admin/posts", "posts", "pages", "profiles"];
+
   beforeAll(() => {
-    for (const name of [
-      "health",
-      "owners",
-      "reports",
-      "admin/posts",
-      "posts",
-      "pages",
-      "profiles",
-    ]) {
+    for (const name of names) {
       controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
     }
+  });
+
+  afterAll(() => {
+    for (const name of names) controllerConstants.delete(name);
   });
 
   it("binds a nested constraints block to the mapper, as draw binds its own", () => {
