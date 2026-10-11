@@ -3,10 +3,13 @@ import {
   classAttribute,
   Concern,
   mattrWriter,
-  reverseMerge,
+  reverseMergeBang,
 } from "@blazetrails/activesupport";
 import {
+  eachPair,
   extend,
+  type Hash,
+  hashDelete,
   include,
   initialize as moduleInitialize,
   isSymbol,
@@ -14,6 +17,7 @@ import {
   rbFPublicSend,
   rbObjRespondTo,
   symbolToS,
+  toH,
 } from "@blazetrails/ruby-compat";
 import { Parameters } from "../../action-controller/metal/strong-parameters.js";
 import {
@@ -76,11 +80,14 @@ export function fullUrlFor(this: UrlForHost, options?: UrlForOptions): string {
     }
     return this.polymorphicUrl(components, opts);
   }
-  const asHash = coerceHashOrParameters(options);
-  if (asHash) {
-    const routeName = asHash["useRoute"];
-    delete asHash["useRoute"];
-    const mergedUrlOptions = reverseMerge({ ...asHash }, this.urlOptions());
+  if (isPlainObject(options) || options instanceof Parameters) {
+    const routeName =
+      options instanceof Parameters ? options.delete("useRoute") : hashDelete(options, "useRoute");
+    const mergedUrlOptions: Record<string, unknown> = {};
+    eachPair(toH<Record<string, unknown> | Hash<string, unknown>>(options), (key, value) => {
+      mergedUrlOptions[key] = value;
+    });
+    reverseMergeBang(mergedUrlOptions, this.urlOptions());
     return this._routes!.urlFor(
       mergedUrlOptions,
       routeName == null ? null : isSymbol(routeName) ? symbolToS(routeName) : String(routeName),
@@ -144,13 +151,6 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (value == null || typeof value !== "object") return false;
   const proto = Object.getPrototypeOf(value);
   return proto === null || proto === Object.prototype;
-}
-
-/** @internal */
-function coerceHashOrParameters(value: unknown): Record<string, unknown> | null {
-  if (isPlainObject(value)) return value;
-  if (value instanceof Parameters) return Object.fromEntries(value.toH());
-  return null;
 }
 
 /** @internal */

@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
@@ -277,12 +278,12 @@ export function merge<T>(
 type ToHash = { toHash(): object };
 
 /**
- * MRI's `to_hash` (`vendor/ruby/v3.3.11/hash.c:1909`, `rb_to_hash_type`), the implicit
+ * MRI's `rb_to_hash_type` (`vendor/ruby/v3.3.11/hash.c:1904`, `to_hash` at `:1909`), the implicit
  * conversion `rb_hash_update_call` (`vendor/ruby/v3.3.11/hash.c:3960`) applies to
  * each argument: a Hash is itself, anything else is asked for `to_hash`, and
  * one that does not answer it raises `TypeError` (`rb_convert_type_with_id`).
  */
-function toHash<T>(
+function rbToHashType<T>(
   hash: Record<string, T> | Map<string, T> | ToHash,
 ): Record<string, T> | Map<string, T> {
   if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;
@@ -323,7 +324,7 @@ export function update<T>(
     ? (others.pop() as ConflictBlock<T>)
     : undefined;
   for (const arg of others as (Record<string, T> | Map<string, T> | ToHash)[]) {
-    const other = toHash(arg);
+    const other = rbToHashType(arg);
     for (const [key, value] of other instanceof Map ? other : Object.entries(other)) {
       if (hash instanceof Map) {
         hash.set(
@@ -1223,7 +1224,7 @@ export class Hash<K, V> extends Map<K, V> {
   /**
    * `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555` `rb_hash_to_h`). With a block,
    * `rb_hash_to_h_block` (`hash.c:3528`): a new bare Hash of the pairs the block
-   * returns. With none, the receiver itself when it IS a Hash (`hash.c:3560`),
+   * returns, each checked by `rb_hash_set_pair` (`hash.c:3503`). With none, the receiver itself when it IS a Hash (`hash.c:3560`),
    * otherwise a `hash_dup` (`hash.c:3562`) into a bare Hash that carries the
    * same entries and the same `default` / `default_proc`.
    *
@@ -1234,7 +1235,18 @@ export class Hash<K, V> extends Map<K, V> {
   toH(block?: (key: K, value: V) => [unknown, unknown]): Hash<unknown, unknown> {
     if (block !== undefined) {
       const h = new Hash<unknown, unknown>();
-      for (const [key, value] of this) h.set(...block(key, value));
+      for (const [key, value] of this) {
+        const pair: unknown = block(key, value);
+        if (!Array.isArray(pair)) {
+          throw new TypeError(`wrong element type ${rbBuiltinClassName(pair)} (expected array)`);
+        }
+        if (pair.length !== 2) {
+          throw new ArgumentError(
+            `element has wrong array length (expected 2, was ${pair.length})`,
+          );
+        }
+        h.set(pair[0], pair[1]);
+      }
       return h;
     }
     if (this.constructor === Hash) return this;

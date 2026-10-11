@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Enumerator } from "./enumerator.js";
 import { describe, expect, it } from "vitest";
 import {
@@ -681,6 +682,17 @@ describe("Hash#default", () => {
 
     expect(result.constructor).toBe(Hash);
     expect([...result]).toEqual([["a_modified", 2]]);
+  });
+
+  it("raises for a to_h block result that is not a pair, as rb_hash_set_pair does", () => {
+    const hash = new Hash<string, number>().set("a", 1);
+
+    expect(() => hash.toH((key) => key as never)).toThrow(
+      new TypeError("wrong element type String (expected array)"),
+    );
+    expect(() => hash.toH((key, value) => [key, value, 3] as never)).toThrow(
+      new ArgumentError("element has wrong array length (expected 2, was 3)"),
+    );
   });
 
   it("replaces the table and the default without going through a subclass's []=, as rb_hash_replace does", () => {
