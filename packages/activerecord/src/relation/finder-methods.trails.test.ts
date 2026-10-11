@@ -315,7 +315,7 @@ function makeRelForOrder(mc: {
   implicitOrderColumn?: string | null;
   _queryConstraintsList?: string[] | null;
 }): any {
-  const model = { isBaseClass: () => true, ...mc };
+  const model = { queryConstraintsList: () => mc._queryConstraintsList ?? null, ...mc };
   return { _model: model, model, primaryKey: mc.primaryKey };
 }
 

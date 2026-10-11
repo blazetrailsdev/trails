@@ -25,7 +25,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   fixtures({});
 
   it("uses real table names for through+target when no collision", () => {
-    const jd = new JoinDependency(Author, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, Author.arelTable, "comments", Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
@@ -47,7 +47,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   it("uses the Rails alias_candidate when the target real name collides", () => {
     const jd = new JoinDependency(
       Author,
-      null,
+      Author.arelTable,
       ["comments", "commentsWithForeignKey"],
       Nodes.OuterJoin,
     );
@@ -71,7 +71,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   });
 
   it("builds one JoinAssociation for a has_many :through, not a node per chain link", () => {
-    const jd = new JoinDependency(Author, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, Author.arelTable, "comments", Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const node = nodeAt(jd, "comments");
     expect(node).not.toBeNull();
@@ -87,7 +87,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   });
 
   it("emits canonical self-join aliases when a nested-through chain references a table multiple times", () => {
-    const jd = new JoinDependency(Author, null, "similarPosts", Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, Author.arelTable, "similarPosts", Nodes.OuterJoin);
     const node = nodeAt(jd, "similarPosts");
     expect(node).not.toBeNull();
 
@@ -103,7 +103,12 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   });
 
   it("aliases a referenced through-target table to the reference name when free", () => {
-    const jd = new JoinDependency(Author, null, "commentsWithForeignKey", Nodes.OuterJoin);
+    const jd = new JoinDependency(
+      Author,
+      Author.arelTable,
+      "commentsWithForeignKey",
+      Nodes.OuterJoin,
+    );
     const target = nodeAt(jd, "commentsWithForeignKey");
     expect(target.table).toBeNull();
 
@@ -117,7 +122,12 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   });
 
   it("reuses one chain-tail alias for two distinct through associations sharing it", () => {
-    const jd = new JoinDependency(Author, null, ["comments", "taggings"], Nodes.OuterJoin);
+    const jd = new JoinDependency(
+      Author,
+      Author.arelTable,
+      ["comments", "taggings"],
+      Nodes.OuterJoin,
+    );
     const effectiveNames = joinedTableNames(jd.joinConstraints([], aliasTrackerFor(jd), []));
     expect(effectiveNames.filter((n) => n === "posts").length).toBe(1);
     expect(effectiveNames.some((n) => n.includes("posts") && n.includes("_join"))).toBe(false);
@@ -127,7 +137,7 @@ describe("JoinDependency has_many :through real-table-name reuse", () => {
   });
 
   it("uses the Rails alias_candidate with _join when the through real name collides", () => {
-    const jd = new JoinDependency(Author, null, ["posts", "comments"], Nodes.OuterJoin);
+    const jd = new JoinDependency(Author, Author.arelTable, ["posts", "comments"], Nodes.OuterJoin);
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     const directNode = nodeAt(jd, "posts");
     const node = nodeAt(jd, "comments");

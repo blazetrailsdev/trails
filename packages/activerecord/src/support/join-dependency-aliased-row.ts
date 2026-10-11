@@ -25,6 +25,7 @@ export function aliasedRow(
   spec: Record<string, Record<string, unknown>>,
 ): Record<string, unknown> {
   const inner = jd as unknown as AliasReadableJoinDependency;
+  jd.applyColumnAliases(jd.baseKlass.all());
   const aliases = inner.aliases();
   const row: Record<string, unknown> = {};
   for (const [path, columns] of Object.entries(spec)) {

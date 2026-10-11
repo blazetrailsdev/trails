@@ -2,7 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { File as FixtureFile } from "./fixture-set/file.js";
 import { Fixture, FixtureError, FixtureSet, FormatError } from "./fixtures.js";
 import { StandardError } from "@blazetrails/ruby-compat";
-import { OID_NAMESPACE, onLoad, uuidV5 } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  OID_NAMESPACE,
+  onLoad,
+  uuidV5,
+} from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import {
   defaultInsertValue,
@@ -127,6 +132,21 @@ describe("createFixtures", () => {
     expect(users.mary).toEqual({ id: FixtureSet.identify("mary"), name: "Mary" });
     const deleteSql = executedStatements(adapter).find((s) => s.includes("DELETE FROM"));
     expect(deleteSql).toContain('"users"');
+  });
+
+  it("resolve_enums leaves an Integer row value alone when a label is spelled like it", async () => {
+    const Book = makeModel("books", new Map());
+    Book.definedEnums = { status: new HashWithIndifferentAccess({ "5": 0, published: 1 }) };
+
+    const books = await createFixtures(makeAdapter(), Book, {
+      integer: { status: 5 },
+      label: { status: "published" },
+      digits: { status: "5" },
+    });
+
+    expect(books.integer.status).toBe(5);
+    expect(books.label.status).toBe(1);
+    expect(books.digits.status).toBe(0);
   });
 
   it("deterministic IDs are stable across multiple createFixtures calls", async () => {

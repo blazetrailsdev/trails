@@ -3,7 +3,6 @@ import { mkdtemp, mkdir, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 import { UnknownMigrationVersionError } from "../migration.js";
@@ -33,7 +32,7 @@ describe("DatabaseTasksRollbackTest", () => {
 
   afterEach(async () => {
     delete (globalThis as Record<string, unknown>)[REVERT_LOG];
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -55,7 +54,7 @@ describe("DatabaseTasksRollbackTest", () => {
     const animalsPath = await migrationsPath([3, "AnimalsOnly"]);
 
     const env = DatabaseTasks.env.toString();
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: {
         primary: {
           adapter: "sqlite3",
@@ -88,7 +87,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rollback goes through move, not Migrator's applied-version walk", async () => {
     const path = await migrationsPath([1, "First"], [2, "Second"], [3, "Third"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",
@@ -109,7 +108,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rollback raises UnknownMigrationVersionError for an unknown current version", async () => {
     const path = await migrationsPath([1, "Known"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",
@@ -128,7 +127,7 @@ describe("DatabaseTasksRollbackTest", () => {
   it("rolls back off the ambient pool when no configurations are loaded", async () => {
     const path = await migrationsPath([1, "Ambient"]);
 
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     await Base.establishConnection({
       adapter: "sqlite3",
       database: ":memory:",

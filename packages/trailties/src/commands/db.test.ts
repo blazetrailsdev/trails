@@ -26,7 +26,7 @@ import {
   schemaFormat,
   setSchemaFormat,
 } from "@blazetrails/activerecord";
-import { DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, MigrationProxy } from "@blazetrails/activerecord";
 import { Trails, _resetTrailsEnv } from "../rails.js";
 import { parse as yamlParse } from "@blazetrails/ruby-compat/psych-adapter";
 
@@ -1231,14 +1231,14 @@ export class CreatePosts extends Migration {
     const configurations = new DatabaseConfigurations([
       new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
-    const previous = DatabaseTasks.databaseConfiguration;
-    DatabaseTasks.databaseConfiguration = configurations;
+    const previous = Base.configurations();
+    Base.configurations(configurations);
     try {
       await expect(
         DatabaseTasks.checkProtectedEnvironmentsBang("production"),
       ).rejects.toBeInstanceOf(ProtectedEnvironmentError);
     } finally {
-      DatabaseTasks.databaseConfiguration = previous;
+      Base.configurations(previous);
     }
   });
 
@@ -1269,8 +1269,8 @@ export class CreatePosts extends Migration {
     const configurations = new DatabaseConfigurations([
       new HashConfig("development", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
-    const previous = DatabaseTasks.databaseConfiguration;
-    DatabaseTasks.databaseConfiguration = configurations;
+    const previous = Base.configurations();
+    Base.configurations(configurations);
     try {
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang("development").catch(
         (e: unknown) => e,
@@ -1280,7 +1280,7 @@ export class CreatePosts extends Migration {
         new RegExp(`        bin/trails db environment:set TRAILS_ENV=${Trails.env}\n\n$`),
       );
     } finally {
-      DatabaseTasks.databaseConfiguration = previous;
+      Base.configurations(previous);
     }
   });
 
@@ -1306,16 +1306,16 @@ export class CreatePosts extends Migration {
     const configurations = new DatabaseConfigurations([
       new HashConfig("production", "primary", { adapter: "sqlite3", database: dbFile }),
     ]);
-    const previous = DatabaseTasks.databaseConfiguration;
+    const previous = Base.configurations();
     const origEnv = process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
-    DatabaseTasks.databaseConfiguration = configurations;
+    Base.configurations(configurations);
     process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = "1";
     try {
       await expect(
         DatabaseTasks.checkProtectedEnvironmentsBang("production"),
       ).resolves.toBeUndefined();
     } finally {
-      DatabaseTasks.databaseConfiguration = previous;
+      Base.configurations(previous);
       if (origEnv === undefined) delete process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK;
       else process.env.DISABLE_DATABASE_ENVIRONMENT_CHECK = origEnv;
     }

@@ -30,7 +30,7 @@ describe("JoinBase.table", () => {
   });
 
   it("is accessible via joinRoot on JoinDependency", () => {
-    const jd = new JoinDependency(Post, null, null, Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, [], Nodes.OuterJoin);
     expect(jd.joinRoot.table).toBeInstanceOf(Table);
     expect(jd.joinRoot.table.name).toBe(Post.tableName);
   });
@@ -59,7 +59,7 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits InnerJoin when joinType is InnerJoin", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.InnerJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.InnerJoin);
 
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);
@@ -69,7 +69,7 @@ describe("joinType propagation in joinConstraints", () => {
   });
 
   it("emits OuterJoin when joinType is OuterJoin", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
     const joins = jd.joinConstraints([], aliasTrackerFor(jd), []);
     expect(joins.length).toBeGreaterThan(0);

@@ -90,11 +90,9 @@ export namespace Aliases {
 }
 
 export class JoinDependency {
-  private _baseModel: typeof Base;
-  private _baseAlias: string;
   private _aliasTracker!: AliasTracker;
   private _aliasesCache?: Aliases;
-  private _joinRootAlias = true;
+  private _joinRootAlias?: boolean;
   private readonly _joinRoot: JoinBase;
   private readonly _joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
   private _references: Map<string, string> = new Map();
@@ -103,16 +101,13 @@ export class JoinDependency {
     new Hash();
   constructor(
     base: typeof Base,
-    table: ArelTable | Nodes.TableAlias | null,
-    associations: AssociationSpec | AssociationSpec[] | null,
-    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin | null,
+    table: ArelTable | Nodes.TableAlias,
+    associations: AssociationSpec | AssociationSpec[],
+    joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ) {
-    this._baseModel = base;
-    table ??= (base as any).arelTable;
-    this._baseAlias = (table as any).name ?? (base as any).tableName;
-    this._joinType = joinType ?? Nodes.OuterJoin;
-    const tree = JoinDependency.makeTree(associations ?? []);
+    const tree = JoinDependency.makeTree(associations);
     this._joinRoot = new JoinBase(base, table as ArelTable, this.build(tree, base));
+    this._joinType = joinType;
   }
 
   /** @internal */
@@ -137,14 +132,11 @@ export class JoinDependency {
   }
 
   get baseKlass(): typeof Base {
-    return this._baseModel;
+    return this.joinRoot.baseKlass;
   }
 
   get reflections(): any[] {
-    return this.joinRoot
-      .drop(1)
-      .map((node) => (node as any).reflection)
-      .filter((reflection) => reflection != null);
+    return this.joinRoot.drop(1).map((node) => (node as JoinAssociation).reflection);
   }
 
   /** @internal */
@@ -374,10 +366,10 @@ export class JoinDependency {
 
     for (const node of parent.children) {
       if (node.reflection.isCollection()) {
-        const other = arParent.association((node.reflection as any).name);
+        const other = arParent.association(node.reflection.name);
         other.loadedBang();
-      } else if (arParent.isAssociationCached((node.reflection as any).name)) {
-        const model = arParent.association((node.reflection as any).name).target;
+      } else if (arParent.isAssociationCached(node.reflection.name)) {
+        const model = arParent.association(node.reflection.name).target;
         this.construct(model, node, row, seen, modelCache, strictLoadingValue);
         continue;
       }
@@ -390,14 +382,14 @@ export class JoinDependency {
         );
         id = keys.map((key) => row[key]);
       } else {
-        keys = kernelArray((node.reflection as any).joinPrimaryKey()).map(
+        keys = kernelArray(node.reflection.joinPrimaryKey()).map(
           (column: unknown) => this.aliases().columnAlias(node, toS(column))!,
         );
         id = keys.map(() => null);
       }
 
       if (keys.some((key) => row[key] == null)) {
-        const nilAssociation = arParent.association((node.reflection as any).name);
+        const nilAssociation = arParent.association(node.reflection.name);
         nilAssociation.loadedBang();
         continue;
       }
@@ -412,8 +404,8 @@ export class JoinDependency {
     }
   }
 
-  protected get joinRootAlias(): string {
-    return this._baseAlias;
+  private get joinRootAlias(): boolean | undefined {
+    return this._joinRootAlias;
   }
 
   private get aliasTracker(): AliasTracker {
@@ -436,7 +428,7 @@ export class JoinDependency {
     return (this._aliasesCache ??= new Aliases(
       [...this.joinRoot].map((joinPart, i) => {
         let columnNames: string[];
-        if (joinPart === this.joinRoot && !this._joinRootAlias) {
+        if (joinPart === this.joinRoot && !rtest(this.joinRootAlias)) {
           const primaryKey = this.joinRoot.primaryKey;
           columnNames = primaryKey != null ? [primaryKey] : [];
         } else {
@@ -458,7 +450,7 @@ export class JoinDependency {
     id: unknown[],
     strictLoadingValue?: boolean | null,
   ): any {
-    const other = record.association((node.reflection as any).name);
+    const other = record.association(node.reflection.name);
 
     let model = modelCache.get(node)!.get(id);
     if (model == null) {

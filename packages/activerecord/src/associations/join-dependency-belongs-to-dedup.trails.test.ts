@@ -35,7 +35,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   });
 
   it("shares a single author instance across posts with the same author", () => {
-    const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "author", Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {
@@ -67,7 +67,7 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
   });
 
   it("creates distinct instances for different authors", () => {
-    const jd = new JoinDependency(Post, null, "author", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "author", Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {

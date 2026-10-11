@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ArgumentError } from "@blazetrails/ruby-compat";
+import { ArgumentError, KeyError } from "@blazetrails/ruby-compat";
 import { Result } from "./result.js";
 
 describe("Result::IndexedRow", () => {
@@ -38,6 +38,26 @@ describe("Result::IndexedRow", () => {
     expect(row.equals(row)).toBe(true);
     expect(row.equals(other)).toBe(false);
     expect(row.equals(["row 1 col 1", "row 1 col 2"])).toBe(false);
+  });
+
+  it("== compares values as Hash#== does", () => {
+    const row = new Result(["tags"], [[["a", "b"]]]).indexedRows[0];
+    expect(row.equals({ tags: ["a", "b"] })).toBe(true);
+  });
+
+  it("fetch yields for a missing column and raises KeyError with the inspected key", () => {
+    const row = result.indexedRows[0];
+    expect(row.fetch("col_2")).toBe("row 1 col 2");
+    expect(row.fetch("nope", () => "fallback")).toBe("fallback");
+    expect(() => row.fetch("nope")).toThrow(new KeyError('key not found: "nope"'));
+    expect(() => row.fetch("toString")).toThrow(KeyError);
+  });
+
+  it("[] answers nil for a missing column", () => {
+    const row = result.indexedRows[1];
+    expect(row.get("col_1")).toBe("row 2 col 1");
+    expect(row.get("nope")).toBeNull();
+    expect(row.get("toString")).toBeNull();
   });
 });
 

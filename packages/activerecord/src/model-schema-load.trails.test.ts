@@ -103,6 +103,38 @@ describe("loadSchemaFromAdapter", () => {
     expect(Object.keys((Post as typeof Base).columnsHash())).toContain("guid");
   });
 
+  it("loads columns on a later loadSchema once the table exists", async () => {
+    let exists = false;
+    let warms = 0;
+    const hash = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    const cache = {
+      dataSourceExists: async () => {
+        warms += 1;
+        return exists;
+      },
+      columnsHash: async () => hash,
+      primaryKeys: async () => null,
+      getCachedColumnsHash: () => (exists ? hash : undefined),
+      getCachedPrimaryKeys: () => undefined,
+      getCachedDataSourceExists: () => undefined,
+      isCached: () => exists,
+    };
+    const adapter = adapterDouble({
+      schemaCache: cache,
+      lookupCastTypeFromColumn: () => new UuidType(),
+    });
+    await establishConnectionTo(Model, adapter as never);
+
+    await Promise.all([Model.loadSchema(), Model.loadSchema()]);
+    expect(warms).toBe(1);
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBeFalsy();
+
+    exists = true;
+    await Model.loadSchema();
+    expect((Model as unknown as { _schemaLoaded?: boolean })._schemaLoaded).toBe(true);
+    expect(Object.keys(Model.columnsHash())).toContain("guid");
+  });
+
   it("is a no-op when data source does not exist (explicit false)", async () => {
     const cache = {
       dataSourceExists: async () => false,

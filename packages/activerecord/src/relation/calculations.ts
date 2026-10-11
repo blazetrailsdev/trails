@@ -23,6 +23,7 @@ import {
   block,
   fetch,
   first,
+  hashAref,
   Hash,
   isEmpty,
   isModuleIncluded,
@@ -909,19 +910,13 @@ export async function executeGroupedCalculation(
       connection.selectAll(relation.arel(), `${rel.model.name} ${opName}`),
     );
 
-    const keyOf = (vals: unknown[]): string => vals.map((v) => String(v)).join("\u0000");
-    let keyRecords: Map<string, unknown> | null = null;
+    let keyRecords: any;
     if (association) {
-      const klass = association.klass.baseClass ?? association.klass;
-      const primaryKey = kernelArray<string>(klass.primaryKey);
-      const keyIds = calculatedData
-        .toArray()
-        .map((row) => groupAliases.map((aliaz) => row[aliaz]))
-        .filter((vals) => vals.every((v) => v != null));
-      const records: any[] = await klass.where(new Map([[primaryKey, keyIds]])).toArray();
-      keyRecords = new Map(
-        records.map((r) => [keyOf(primaryKey.map((k) => r._readAttribute(k))), r]),
+      const keyIds = calculatedData.toArray().map((row) => row[first(groupAliases)!]);
+      keyRecords = association.klass.baseClass.where(
+        new Map([[association.klass.baseClass.primaryKey, keyIds]]),
       );
+      keyRecords = await keyRecords.indexBy((record: Base) => record.id);
     }
 
     const keyTypes: ColumnTypes = {};
@@ -953,7 +948,7 @@ export async function executeGroupedCalculation(
     for (const row of hashRows) {
       let key: unknown = groupAliases.map((aliaz) => row[aliaz]);
       if ((key as unknown[]).length === 1) key = (key as unknown[])[0];
-      if (associated) key = keyRecords!.get(keyOf([key].flat())) ?? null;
+      if (associated) key = hashAref(keyRecords, key);
 
       result.set(key, typeCastCalculatedValue(row[columnAlias], fn, type));
     }

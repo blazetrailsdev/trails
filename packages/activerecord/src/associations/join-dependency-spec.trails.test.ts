@@ -50,7 +50,7 @@ describe("JoinDependency#build", () => {
   const paths = (jd: JoinDependency) => nodePaths(jd).sort();
 
   const buildEager = (spec: AssociationSpec | AssociationSpec[]) =>
-    new JoinDependency(Post, null, spec, Nodes.OuterJoin);
+    new JoinDependency(Post, Post.arelTable, spec, Nodes.OuterJoin);
 
   it("joins a nested hash spec instead of falling back to preload", () => {
     expect(paths(buildEager({ comments: "author" }))).toEqual(["comments", "comments.author"]);
