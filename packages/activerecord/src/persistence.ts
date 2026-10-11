@@ -450,9 +450,9 @@ export async function incrementBang<T extends CounterBangRecord>(
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
   this.increment(attribute, by);
-  const inDatabase = rbFPublicSend(this, `${attribute}InDatabase`);
   const change =
-    (rbFPublicSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
+    (rbFPublicSend(this, attribute) as number) -
+    ((rbFPublicSend(this, `${attribute}InDatabase`) as number | null) ?? 0);
   await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
   rbFPublicSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
   return this;
@@ -852,13 +852,15 @@ export function _findRecord(
 export function _inMemoryQueryConstraintsHash(
   this: PersistencePrivateHost,
 ): Record<string, unknown> {
-  const constraintsList = queryConstraintsList.call(this.constructor as any);
-  if (!constraintsList) {
+  if (queryConstraintsList.call(this.constructor as any) == null) {
     return { [this._primaryKey as string]: this.id };
+  } else {
+    return Object.fromEntries(
+      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+        this.attribute(columnName),
+      ),
+    );
   }
-  return Object.fromEntries(
-    constraintsList.map((columnName) => [columnName, this.attribute(columnName)]),
-  );
 }
 
 /** @internal */
