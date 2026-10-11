@@ -1,3 +1,4 @@
+import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 import { Options as ParamsWrapperOptions, inheritedParamsWrapper } from "./metal/params-wrapper.js";
@@ -86,7 +87,7 @@ describe("Base ParamsWrapper wiring", () => {
   });
 
   it("processAction wraps request params and exposes them via this.params", async () => {
-    let seen: Record<string, unknown> | null = null;
+    let seen: HashWithIndifferentAccess | null = null;
     class WidgetsController extends Base {
       static actions = ["create"];
       create(): void {
@@ -105,15 +106,12 @@ describe("Base ParamsWrapper wiring", () => {
     const controller = new WidgetsController();
     await controller.dispatch("create", request, new Response());
     expect(seen).not.toBeNull();
-    expect((seen as unknown as Record<string, unknown>).widget).toEqual({
-      name: "alpha",
-      color: "blue",
-    });
-    expect((seen as unknown as Record<string, unknown>).name).toBe("alpha");
+    assertEqual({ name: "alpha", color: "blue" }, seen!.get("widget"));
+    expect(seen!.get("name")).toBe("alpha");
   });
 
   it("processAction does not wrap when format does not match request content-type", async () => {
-    let seen: Record<string, unknown> | null = null;
+    let seen: HashWithIndifferentAccess | null = null;
     class ThingsController extends Base {
       static actions = ["create"];
       create(): void {
@@ -132,7 +130,7 @@ describe("Base ParamsWrapper wiring", () => {
     const controller = new ThingsController();
     await controller.dispatch("create", request, new Response());
     expect(seen).not.toBeNull();
-    expect((seen as unknown as Record<string, unknown>).thing).toBeUndefined();
-    expect((seen as unknown as Record<string, unknown>).name).toBe("beta");
+    expect(seen!.get("thing")).toBeUndefined();
+    expect(seen!.get("name")).toBe("beta");
   });
 });

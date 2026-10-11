@@ -19,6 +19,7 @@ import {
   hashAset,
   hashDelete,
   keys as hashKeys,
+  merge,
   isEmpty,
   isModuleIncluded,
   rbBlockGivenP,
@@ -34,6 +35,8 @@ import {
   rbObjDup,
   rbObjRespondTo,
   toEnum,
+  toH,
+  transformValues,
 } from "@blazetrails/ruby-compat";
 import { coderTag, type Psych } from "@blazetrails/ruby-compat/psych";
 import { YAML } from "@blazetrails/ruby-compat/yaml";
@@ -58,6 +61,8 @@ import {
 
 import { UploadedFile } from "../../action-dispatch/http/upload.js";
 import { ActionController } from "../../namespaces.js";
+
+type OtherHash = Record<string, unknown> | HashWithIndifferentAccess;
 
 export class ParameterMissing extends KeyError {
   readonly param: string;
@@ -325,13 +330,11 @@ export class Parameters {
   }
 
   merge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    return this._newWithInheritedPermitted(this.parameters.merge(otherData));
+    return this._newWithInheritedPermitted(this.parameters.merge(toH<OtherHash>(otherHash)));
   }
 
   mergeBang(otherHash: Parameters | Record<string, unknown>, block?: ConflictBlock<unknown>): this {
-    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    this.parameters.mergeBang(otherData, ...(block ? [block] : []));
+    this.parameters.mergeBang(toH<OtherHash>(otherHash), ...(block ? [block] : []));
     return this;
   }
 
@@ -346,15 +349,16 @@ export class Parameters {
   }
 
   reverseMerge(otherHash: Parameters | Record<string, unknown>): Parameters {
-    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    return this._newWithInheritedPermitted(withIndifferentAccess(otherData).merge(this.parameters));
+    return this._newWithInheritedPermitted(merge(toH<OtherHash>(otherHash), this.parameters));
   }
 
   declare withDefaults: Parameters["reverseMerge"];
 
   reverseMergeBang(otherHash: Parameters | Record<string, unknown>): this {
-    const otherData = otherHash instanceof Parameters ? otherHash.toH() : otherHash;
-    this.parameters.mergeBang(otherData, (_key: string, left: unknown, _right: unknown) => left);
+    this.parameters.mergeBang(
+      toH<OtherHash>(otherHash),
+      (_key: string, left: unknown, _right: unknown) => left,
+    );
     return this;
   }
 
@@ -382,9 +386,9 @@ export class Parameters {
   }
 
   deepTransformKeysBang(fn: (key: string) => string): this {
-    this.parameters = withIndifferentAccess(
-      (this._deepTransformKeysInObject(this.parameters, fn) as Parameters).toUnsafeH(),
-    );
+    this.parameters = (
+      this._deepTransformKeysInObject(this.parameters, fn) as Parameters
+    ).toUnsafeH();
     return this;
   }
 
@@ -511,35 +515,31 @@ export class Parameters {
     return this.convertValueToParameters(this.parameters.delete(key, block));
   }
 
-  toH(block?: (key: string, value: unknown) => [string, unknown]): Record<string, unknown> {
-    if (!this._permitted) {
+  toH(block?: (key: string, value: unknown) => [string, unknown]): HashWithIndifferentAccess {
+    if (this.isPermitted()) {
+      return this._convertParametersToHashes(
+        this.parameters,
+        "toH",
+        block,
+      ) as HashWithIndifferentAccess;
+    } else {
       throw new UnfilteredParameters();
     }
-    const result = this._convertParametersToHashes(this.parameters, "toH");
-    if (block) {
-      const transformed: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(result as Record<string, unknown>)) {
-        const [nk, nv] = block(k, v);
-        transformed[nk] = nv;
-      }
-      return transformed;
-    }
-    return result as Record<string, unknown>;
   }
 
-  toHash(): Record<string, unknown> {
-    if (this._permitted) {
-      return this._convertParametersToHashes(this.parameters, "toHash") as Record<string, unknown>;
-    }
-    throw new UnfilteredParameters();
+  toHash(): Hash<string, unknown> {
+    return this.toH().toHash();
   }
 
   asJson(options: Record<string, unknown> | null = null): Record<string, unknown> {
     return asJson(this.parameters, options) as Record<string, unknown>;
   }
 
-  toUnsafeH(): Record<string, unknown> {
-    return this._convertParametersToHashes(this.parameters, "toUnsafeH") as Record<string, unknown>;
+  toUnsafeH(): HashWithIndifferentAccess {
+    return this._convertParametersToHashes(
+      this.parameters,
+      "toUnsafeH",
+    ) as HashWithIndifferentAccess;
   }
 
   declare toUnsafeHash: Parameters["toUnsafeH"];
@@ -653,31 +653,23 @@ export class Parameters {
     return p;
   }
 
-  private _convertParametersToHashes(value: unknown, using: string): unknown {
+  private _convertParametersToHashes(
+    value: unknown,
+    using: "toH" | "toUnsafeH",
+    block?: (key: string, value: unknown) => [string, unknown],
+  ): unknown {
     if (Array.isArray(value)) {
       return value.map((v) => this._convertParametersToHashes(v, using));
+    } else if (value instanceof Hash) {
+      const transformed = transformValues(value as Hash<string, unknown>, (v) =>
+        this._convertParametersToHashes(v, using),
+      );
+      return withIndifferentAccess(block ? transformed.toH(block) : transformed);
+    } else if (value instanceof Parameters) {
+      return value[using]();
+    } else {
+      return value;
     }
-    if (value instanceof Hash) {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of value) {
-        result[k as string] = this._convertParametersToHashes(v, using);
-      }
-      return result;
-    }
-    if (value instanceof Parameters) {
-      if (using === "toUnsafeH") {
-        return value.toUnsafeH();
-      }
-      return value.toH();
-    }
-    if (isPlainObject(value)) {
-      const result: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(value)) {
-        result[k] = this._convertParametersToHashes(v, using);
-      }
-      return result;
-    }
-    return value;
   }
 
   private _convertHashesToParameters(key: string, value: unknown): unknown {
@@ -731,7 +723,7 @@ export class Parameters {
   }
 
   /** @internal */
-  convertParametersToHashes(value: unknown, using: string): unknown {
+  convertParametersToHashes(value: unknown, using: "toH" | "toUnsafeH"): unknown {
     return this._convertParametersToHashes(value, using);
   }
 

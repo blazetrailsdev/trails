@@ -1,4 +1,4 @@
-import { assertEqual } from "@blazetrails/activesupport";
+import { type HashWithIndifferentAccess, assertEqual } from "@blazetrails/activesupport";
 import { registerConstant } from "@blazetrails/ruby-compat";
 import { beforeEach, describe, it } from "vitest";
 import { API } from "../../api.js";
@@ -7,7 +7,7 @@ import { SharedTestRoutes } from "../../../test-helpers/abstract-unit.js";
 
 describe("ParamsWrapperForApiTest", () => {
   class UsersController extends API {
-    lastParameters: Record<string, unknown> | undefined;
+    lastParameters: HashWithIndifferentAccess | undefined;
 
     static {
       this.wrapParameters("person", { format: [":json"] });

@@ -299,4 +299,29 @@ describe("ActionDispatch::Routing::RouteSet::NamedRouteCollection#define_url_hel
     const params = new Parameters({ id: "7", page: "2" }).permit("id", "page");
     expect(helpers.postPath(params)).toBe("/posts/7?page=2");
   });
+
+  it("carries a nested hash of the Parameters into the query string", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.get("/posts/:id", { to: "posts#show", as: "post" });
+    });
+    const helpers = routes.urlHelpers() as unknown as {
+      postPath(...args: unknown[]): string;
+      urlFor(options: unknown): string;
+    };
+    const params = new Parameters({ id: "7", filter: { a: "1", tags: ["x", "y"] } });
+    params.permitBang();
+    const query = "filter%5Ba%5D=1&filter%5Btags%5D%5B%5D=x&filter%5Btags%5D%5B%5D=y";
+    expect(helpers.postPath(params)).toBe(`/posts/7?${query}`);
+
+    const options = new Parameters({
+      controller: "posts",
+      action: "show",
+      id: "7",
+      filter: { a: "1", tags: ["x", "y"] },
+    });
+    options.set("onlyPath", true);
+    options.permitBang();
+    expect(helpers.urlFor(options)).toBe(`/posts/7?${query}`);
+  });
 });

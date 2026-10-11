@@ -1,3 +1,4 @@
+import { ArgumentError } from "./argument-error.js";
 import { Enumerator } from "./enumerator.js";
 import { describe, expect, it } from "vitest";
 import {
@@ -281,6 +282,22 @@ describe("Hash#update", () => {
     update(defaults, options);
     expect(defaults).toEqual({ type: "submit", class: "extra" });
   });
+
+  it("converts an argument that answers to_hash, as rb_hash_update_call does", () => {
+    class Params {
+      permitted = true;
+      toHash(): Hash<string, number> {
+        return new Hash<string, number>().set("b", 2);
+      }
+    }
+    expect(mergeBang({ a: 1 }, new Params())).toEqual({ a: 1, b: 2 });
+  });
+
+  it("raises TypeError for an argument with no to_hash, as rb_convert_type does", () => {
+    expect(() => mergeBang({ a: 1 }, new Date(0) as never)).toThrow(
+      new TypeError("no implicit conversion of Time into Hash"),
+    );
+  });
 });
 
 describe("Hash#merge! with a conflict block", () => {
@@ -303,7 +320,9 @@ describe("Hash#merge! with a conflict block", () => {
     const hash = { a: 1 };
     const unmarked = ((_key: string, left: number): number =>
       left) as unknown as ConflictBlock<number>;
-    update(hash, { a: 2 }, unmarked);
+    expect(() => update(hash, { a: 2 }, unmarked)).toThrow(
+      new TypeError("no implicit conversion of Proc into Hash"),
+    );
     expect(hash).toEqual({ a: 2 });
   });
 
@@ -654,6 +673,26 @@ describe("Hash#default", () => {
     expect(dup(hash)).toBeInstanceOf(Upcased);
     expect([...dup(hash)]).toEqual([["a", 1]]);
     expect(hash.toH().constructor).toBe(Hash);
+  });
+
+  it("builds a bare Hash from the pairs a to_h block returns, as rb_hash_to_h_block does", () => {
+    const hash = new Upcased();
+    Hash.prototype.set.call(hash, "a", 1);
+    const result = hash.toH((key, value) => [`${key}_modified`, value + 1]);
+
+    expect(result.constructor).toBe(Hash);
+    expect([...result]).toEqual([["a_modified", 2]]);
+  });
+
+  it("raises for a to_h block result that is not a pair, as rb_hash_set_pair does", () => {
+    const hash = new Hash<string, number>().set("a", 1);
+
+    expect(() => hash.toH((key) => key as never)).toThrow(
+      new TypeError("wrong element type String (expected array)"),
+    );
+    expect(() => hash.toH((key, value) => [key, value, 3] as never)).toThrow(
+      new ArgumentError("element has wrong array length (expected 2, was 3)"),
+    );
   });
 
   it("replaces the table and the default without going through a subclass's []=, as rb_hash_replace does", () => {

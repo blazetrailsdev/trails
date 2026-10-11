@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import {
   Hash,
   KeyError,
@@ -24,6 +24,7 @@ import {
   assertNil,
   assertNot,
   assertNotEqual,
+  assertNotKindOf,
   assertNotPredicate,
   assertPredicate,
   assertRaises,
@@ -530,22 +531,20 @@ describe("ParametersPermitTest", () => {
     });
   });
 
-  // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access
-  it.skip("to_h returns converted hash on permitted params", () => {
+  it("to_h returns converted hash on permitted params", () => {
     params.permitBang();
 
     assertInstanceOf(HashWithIndifferentAccess, params.toH());
-    expect(params.toH()).not.toBeInstanceOf(Parameters);
+    assertNotKindOf(Parameters, params.toH());
   });
 
-  // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access
-  it.skip("to_h returns converted hash when .permit_all_parameters is set", () => {
+  it("to_h returns converted hash when .permit_all_parameters is set", () => {
     try {
       Parameters.permitAllParameters = true;
       const params = new Parameters({ crab: "Senjougahara Hitagi" });
 
       assertInstanceOf(HashWithIndifferentAccess, params.toH());
-      expect(params.toH()).not.toBeInstanceOf(Parameters);
+      assertNotKindOf(Parameters, params.toH());
       assertEqual({ crab: "Senjougahara Hitagi" }, params.toH());
     } finally {
       Parameters.permitAllParameters = false;
@@ -562,15 +561,14 @@ describe("ParametersPermitTest", () => {
     params.permitBang();
 
     assertInstanceOf(Hash, params.toHash());
-    expect(params.toHash()).not.toBeInstanceOf(Parameters);
+    assertNotKindOf(Parameters, params.toHash());
   });
 
-  // BLOCKED: hash-merge-bang-does-not-convert-its-argument-with-to-hash
-  it.skip("parameters can be implicit converted to Hash", () => {
+  it("parameters can be implicit converted to Hash", () => {
     const params = new Parameters();
     params.permitBang();
 
-    assertEqual({ a: 1 }, mergeBang({ a: 1 }, params as unknown as Record<string, unknown>));
+    assertEqual({ a: 1 }, mergeBang({ a: 1 }, params));
   });
 
   it("to_hash returns converted hash when .permit_all_parameters is set", () => {
@@ -579,17 +577,16 @@ describe("ParametersPermitTest", () => {
       const params = new Parameters({ crab: "Senjougahara Hitagi" });
 
       assertInstanceOf(Hash, params.toHash());
-      expect(params.toHash()).not.toBeInstanceOf(Parameters);
+      assertNotKindOf(Parameters, params.toHash());
       assertEqual({ crab: "Senjougahara Hitagi" }, params.toHash());
     } finally {
       Parameters.permitAllParameters = false;
     }
   });
 
-  // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access
-  it.skip("to_unsafe_h returns unfiltered params", () => {
+  it("to_unsafe_h returns unfiltered params", () => {
     assertInstanceOf(HashWithIndifferentAccess, params.toUnsafeH());
-    expect(params.toUnsafeH()).not.toBeInstanceOf(Parameters);
+    assertNotKindOf(Parameters, params.toUnsafeH());
   });
 
   it("to_unsafe_h returns unfiltered params even after accessing few keys", () => {

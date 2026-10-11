@@ -87,6 +87,7 @@ export const RECEIVER_AS_FIRST_ARG = new Set([
   // as `except(hash, ...keys)`.
   "except",
   "merge!",
+  "reverse_merge!",
   // Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`), the
   // `rb_hash_update` body `merge!` above is an alias of, exported by
   // ruby-compat as `update(hash, ...others)`.

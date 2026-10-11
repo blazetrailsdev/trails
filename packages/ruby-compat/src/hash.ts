@@ -1,7 +1,8 @@
+import { ArgumentError } from "./argument-error.js";
 import { Enumerator } from "./enumerator.js";
 import { FrozenError } from "./frozen-error.js";
 import { KeyError } from "./key-error.js";
-import { rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
+import { isPlainHash, rbBuiltinClassName, rbInspect, rbObjClass } from "./object.js";
 import { rbEql, rbEqual } from "./rb-equal.js";
 import { rbHash } from "./rb-hash.js";
 import { RuntimeError } from "./runtime-error.js";
@@ -264,14 +265,31 @@ export function merge<H extends object, const O extends object>(
 ): Omit<H, keyof O> & O;
 export function merge<T>(
   hash: Record<string, T>,
-  ...others: (Record<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | ToHash | ConflictBlock<T>)[]
 ): Record<string, T>;
 /** @noRailsEquivalent PERMANENT — Ruby core `Hash#merge` (`vendor/ruby/v3.3.11/hash.c:4144`). */
 export function merge<T>(
   hash: Record<string, T>,
-  ...others: (Record<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | ToHash | ConflictBlock<T>)[]
 ): Record<string, T> {
   return update(dup(hash), ...others);
+}
+
+type ToHash = { toHash(): object };
+
+/**
+ * MRI's `rb_to_hash_type` (`vendor/ruby/v3.3.11/hash.c:1904`, `to_hash` at `:1909`), the implicit
+ * conversion `rb_hash_update_call` (`vendor/ruby/v3.3.11/hash.c:3960`) applies to
+ * each argument: a Hash is itself, anything else is asked for `to_hash`, and
+ * one that does not answer it raises `TypeError` (`rb_convert_type_with_id`).
+ */
+function rbToHashType<T>(
+  hash: Record<string, T> | Map<string, T> | ToHash,
+): Record<string, T> | Map<string, T> {
+  if (hash instanceof Map || isPlainHash(hash)) return hash as Record<string, T> | Map<string, T>;
+  const own = ownMethod(hash, "toHash");
+  if (!own) throw new TypeError(`no implicit conversion of ${rbBuiltinClassName(hash)} into Hash`);
+  return own.call(hash) as Record<string, T> | Map<string, T>;
 }
 
 /**
@@ -286,7 +304,7 @@ export function merge<T>(
  */
 export function update<T>(
   hash: Record<string, T>,
-  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | Map<string, T> | ToHash | ConflictBlock<T>)[]
 ): Record<string, T>;
 /**
  * The Map arm: a `Hash` receiver is written through its own `[]=`, as
@@ -295,17 +313,18 @@ export function update<T>(
  */
 export function update<T, H extends Map<string, T>>(
   hash: H,
-  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | Map<string, T> | ToHash | ConflictBlock<T>)[]
 ): H;
 /** @noRailsEquivalent PERMANENT — Ruby core `Hash#update` (`vendor/ruby/v3.3.11/hash.c:4028`). */
 export function update<T>(
   hash: Record<string, T> | Map<string, T>,
-  ...others: (Record<string, T> | Map<string, T> | ConflictBlock<T>)[]
+  ...others: (Record<string, T> | Map<string, T> | ToHash | ConflictBlock<T>)[]
 ): Record<string, T> | Map<string, T> {
   const block = rbBlockGivenP(others[others.length - 1])
     ? (others.pop() as ConflictBlock<T>)
     : undefined;
-  for (const other of others as (Record<string, T> | Map<string, T>)[]) {
+  for (const arg of others as (Record<string, T> | Map<string, T> | ToHash)[]) {
+    const other = rbToHashType(arg);
     for (const [key, value] of other instanceof Map ? other : Object.entries(other)) {
       if (hash instanceof Map) {
         hash.set(
@@ -1203,14 +1222,33 @@ export class Hash<K, V> extends Map<K, V> {
   }
 
   /**
-   * `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3018` `rb_hash_to_h`) with no block: the
-   * receiver itself when it IS a Hash (`hash.c:3024`), otherwise a `hash_dup`
-   * (`hash.c:3026`, `rb_hash_to_h_block`'s sibling arm) into a bare Hash that
-   * carries the same entries and the same `default` / `default_proc`.
+   * `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555` `rb_hash_to_h`). With a block,
+   * `rb_hash_to_h_block` (`hash.c:3528`): a new bare Hash of the pairs the block
+   * returns, each checked by `rb_hash_set_pair` (`hash.c:3503`). With none, the receiver itself when it IS a Hash (`hash.c:3560`),
+   * otherwise a `hash_dup` (`hash.c:3562`) into a bare Hash that carries the
+   * same entries and the same `default` / `default_proc`.
    *
-   * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3018`).
+   * @noRailsEquivalent PERMANENT — Ruby core `Hash#to_h` (`vendor/ruby/v3.3.11/hash.c:3555`).
    */
-  toH(): Hash<K, V> {
+  toH(): Hash<K, V>;
+  toH<K2, V2>(block: (key: K, value: V) => [K2, V2]): Hash<K2, V2>;
+  toH(block?: (key: K, value: V) => [unknown, unknown]): Hash<unknown, unknown> {
+    if (block !== undefined) {
+      const h = new Hash<unknown, unknown>();
+      for (const [key, value] of this) {
+        const pair: unknown = block(key, value);
+        if (!Array.isArray(pair)) {
+          throw new TypeError(`wrong element type ${rbBuiltinClassName(pair)} (expected array)`);
+        }
+        if (pair.length !== 2) {
+          throw new ArgumentError(
+            `element has wrong array length (expected 2, was ${pair.length})`,
+          );
+        }
+        h.set(pair[0], pair[1]);
+      }
+      return h;
+    }
     if (this.constructor === Hash) return this;
     return hashDup(this, Hash<K, V>);
   }
