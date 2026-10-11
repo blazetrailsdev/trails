@@ -318,12 +318,12 @@ export class Fanout {
       if (pattern instanceof StringMatcher) {
         const list = this.stringSubscribers.get(pattern.pattern);
         if (list) {
-          const idx = list.indexOf(subscriberOrName!);
+          const idx = list.indexOf(subscriberOrName as Evented);
           if (idx !== -1) list.splice(idx, 1);
         }
         this.clearCache(pattern.pattern);
       } else {
-        const idx = this.otherSubscribers.indexOf(subscriberOrName!);
+        const idx = this.otherSubscribers.indexOf(subscriberOrName as Evented);
         if (idx !== -1) this.otherSubscribers.splice(idx, 1);
         this.clearCache();
       }

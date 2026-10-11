@@ -166,6 +166,12 @@ describe("test-fixture-parity rule", () => {
       ],
       invalid: [
         {
+          name: "set declared on one class and read off another → warns",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { it("find single value object", () => { const a = class extends Base { static { this.fixtures("customers"); } }; const b = class extends Base { run() { this.customers("david"); } }; }); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
           name: "own test case class declares a set it never reads → warns",
           filename: AR("aggregations.test.ts"),
           code: `describe("T", () => { it("find single value object", () => { const k = class extends Base { static { this.fixtures("customers"); } run() { this.other("david"); } }; }); });`,

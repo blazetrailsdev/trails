@@ -65,6 +65,8 @@ export class Test {
   name: string;
   /** @noRailsEquivalent PERMANENT */
   failures: Assertion[];
+  /** @noRailsEquivalent PERMANENT */
+  time: number | null = null;
   private _assertions: number;
 
   /** @noRailsEquivalent PERMANENT */
@@ -95,21 +97,34 @@ export class Test {
 
   /** @noRailsEquivalent PERMANENT */
   async run(): Promise<this> {
-    await this.captureExceptions(async () => {
-      for (const hook of Test.SETUP_METHODS) {
-        await rbFSend(this, hook);
-      }
+    await this.timeIt(async () => {
+      await this.captureExceptions(async () => {
+        for (const hook of Test.SETUP_METHODS) {
+          await rbFSend(this, hook);
+        }
 
-      await rbFSend(this, this.name);
+        await rbFSend(this, this.name);
+      });
+
+      for (const hook of Test.TEARDOWN_METHODS) {
+        await this.captureExceptions(async () => {
+          await rbFSend(this, hook);
+        });
+      }
     });
 
-    for (const hook of Test.TEARDOWN_METHODS) {
-      await this.captureExceptions(async () => {
-        await rbFSend(this, hook);
-      });
-    }
-
     return this;
+  }
+
+  /** @noRailsEquivalent PERMANENT */
+  async timeIt(block: () => unknown): Promise<void> {
+    const t0 = performance.now() / 1000;
+
+    try {
+      await block();
+    } finally {
+      this.time = performance.now() / 1000 - t0;
+    }
   }
 
   /** @noRailsEquivalent PERMANENT */

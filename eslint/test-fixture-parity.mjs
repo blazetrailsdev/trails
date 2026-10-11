@@ -219,39 +219,50 @@ function collectCallNamesIn(node, out = new Set()) {
 }
 
 /**
- * Whether a subtree declares a fixture set on a test case class of its own and
- * reads it back off the instance: `this.fixtures("accounts")` in a class's
- * static block and `this.accounts(...)` in one of its methods. That is the
- * shape of a Rails body that builds a `Class.new(ActiveRecord::TestCase)` with
- * `fixtures :accounts` and calls `accounts(:signals37)` inside it.
+ * Whether a subtree defines a test case class that declares a fixture set on
+ * itself and reads it back off the instance: `this.fixtures("accounts")` in the
+ * class's static block and `this.accounts(...)` in one of its methods, both
+ * inside the same class body. That is the shape of a Rails body that builds a
+ * `Class.new(ActiveRecord::TestCase)` with `fixtures :accounts` and calls
+ * `accounts(:signals37)` inside it.
  */
 function callsOwnTestCaseAccessor(node) {
-  const declared = new Set();
-  const called = new Set();
-  (function visit(n) {
-    if (!n || typeof n !== "object") return;
-    if (
-      n.type === "CallExpression" &&
-      n.callee?.type === "MemberExpression" &&
-      n.callee.object?.type === "ThisExpression" &&
-      n.callee.property?.type === "Identifier"
-    ) {
-      if (n.callee.property.name === "fixtures") {
-        for (const arg of n.arguments) {
+  let found = false;
+  walk(node, (n) => {
+    if (found || (n.type !== "ClassExpression" && n.type !== "ClassDeclaration")) return;
+    const declared = new Set();
+    const called = new Set();
+    walk(n.body, (m) => {
+      if (
+        m.type !== "CallExpression" ||
+        m.callee?.type !== "MemberExpression" ||
+        m.callee.object?.type !== "ThisExpression" ||
+        m.callee.property?.type !== "Identifier"
+      ) {
+        return;
+      }
+      if (m.callee.property.name === "fixtures") {
+        for (const arg of m.arguments) {
           if (arg.type === "Literal" && typeof arg.value === "string") declared.add(arg.value);
         }
       } else {
-        called.add(n.callee.property.name);
+        called.add(m.callee.property.name);
       }
-    }
-    for (const key of Object.keys(n)) {
-      if (key === "parent") continue;
-      const v = n[key];
-      if (Array.isArray(v)) v.forEach(visit);
-      else if (v && typeof v === "object" && v.type) visit(v);
-    }
-  })(node);
-  return [...declared].some((name) => called.has(name));
+    });
+    found = [...declared].some((name) => called.has(name));
+  });
+  return found;
+}
+
+function walk(node, visit) {
+  if (!node || typeof node !== "object") return;
+  visit(node);
+  for (const key of Object.keys(node)) {
+    if (key === "parent") continue;
+    const v = node[key];
+    if (Array.isArray(v)) v.forEach((c) => walk(c, visit));
+    else if (v && typeof v === "object" && v.type) walk(v, visit);
+  }
 }
 
 // Fixture helpers that produce a named accessor via destructuring.

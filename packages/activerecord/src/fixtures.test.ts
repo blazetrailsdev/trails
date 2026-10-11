@@ -52,9 +52,32 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Tree } from "./test-helpers/models/tree.js";
 import { nakedYmlParrotsFixtureData } from "./test-helpers/fixtures/naked/yml/parrots.js";
 import { nakedYmlTreesFixtureData } from "./test-helpers/fixtures/naked/yml/trees.js";
+import { allDevelopersFixtureData } from "./test-helpers/fixtures/all/developers.js";
+import { allPeopleFixtureData } from "./test-helpers/fixtures/all/people.js";
+import { allTasksFixtureData } from "./test-helpers/fixtures/all/tasks.js";
+import { toBeLinkedAccountsFixtureData } from "./test-helpers/fixtures/to-be-linked/accounts.js";
+import { toBeLinkedUsersFixtureData } from "./test-helpers/fixtures/to-be-linked/users.js";
+import { categoriesSpecialCategoriesFixtureData } from "./test-helpers/fixtures/categories/special-categories.js";
+import { categoriesSubsubdirArbitraryFilenameFixtureData } from "./test-helpers/fixtures/categories/subsubdir/arbitrary-filename.js";
 
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/parrots.ts`, nakedYmlParrotsFixtureData);
 FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/naked/yml/trees.ts`, nakedYmlTreesFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/developers.ts`, allDevelopersFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/people.ts`, allPeopleFixtureData);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/tasks.ts`, allTasksFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/all/admin/accounts.ts`,
+  toBeLinkedAccountsFixtureData,
+);
+FixtureFile.registerModule(`${TS_FIXTURES_ROOT}/all/admin/users.ts`, toBeLinkedUsersFixtureData);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/special_categories.ts`,
+  categoriesSpecialCategoriesFixtureData,
+);
+FixtureFile.registerModule(
+  `${TS_FIXTURES_ROOT}/categories/subsubdir/arbitrary_filename.ts`,
+  categoriesSubsubdirArbitraryFilenameFixtureData,
+);
 import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { Parrot } from "./test-helpers/models/parrot.js";
 import { Reply } from "./test-helpers/models/reply.js";
@@ -831,6 +854,14 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
 
   let instances: Base[];
 
+  function createFixtures(...fixtureSetNames: string[]) {
+    return FixtureSet.createFixtures(
+      ActiveRecordTestCase.fixturePaths as string[],
+      fixtureSetNames,
+      self().fixtureClassNames,
+    );
+  }
+
   beforeEach(async () => {
     await Course.loadSchema();
     instances = [
@@ -880,18 +911,13 @@ describe.skipIf(!currentAdapter("PostgreSQLAdapter"))("FixturesResetPkSequenceTe
   it("create fixtures resets sequences when not cached", async () => {
     for (const instance of instances) {
       const model = instance.constructor as typeof Base;
-      const maxId = Object.entries(
-        (
-          await FixtureSet.createFixtures(
-            TS_FIXTURES_ROOT,
-            model.tableName!,
-            self().fixtureClassNames,
-          )
-        )[0].fixtures,
-      ).reduce((_maxId, [, fixture]) => {
-        const fixtureId = Number(toI(fixture.get("id")));
-        return fixtureId > _maxId ? fixtureId : _maxId;
-      }, 0);
+      const maxId = Object.entries((await createFixtures(model.tableName!))[0].fixtures).reduce(
+        (_maxId, [, fixture]) => {
+          const fixtureId = Number(toI(fixture.get("id")));
+          return fixtureId > _maxId ? fixtureId : _maxId;
+        },
+        0,
+      );
 
       await instance.saveBang();
       expect(instance.id, `Sequence reset for ${model.tableName} failed.`).toBe(maxId + 1);
@@ -1046,10 +1072,16 @@ describe("FasterFixturesTest", () => {
     useTransactionalTests: false,
   });
 
+  function createFixtures(...fixtureSetNames: string[]) {
+    return FixtureSet.createFixtures(
+      ActiveRecordTestCase.fixturePaths as string[],
+      fixtureSetNames,
+      self().fixtureClassNames,
+    );
+  }
+
   async function loadExtraFixture(name: string) {
-    const fixture = (
-      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, name, self().fixtureClassNames)
-    )[0];
+    const fixture = (await createFixtures(name))[0];
     expect(fixture instanceof FixtureSet).toBeTruthy();
     self()._loadedFixtures[fixture.tableName] = fixture;
   }
@@ -1059,8 +1091,8 @@ describe("FasterFixturesTest", () => {
     expect(FixtureSet.isFixtureIsCached(Base.connectionPool(), "authors")).toBeTruthy();
 
     await assertNoQueries(false, async () => {
-      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "categories", self().fixtureClassNames);
-      await FixtureSet.createFixtures(TS_FIXTURES_ROOT, "authors", self().fixtureClassNames);
+      await createFixtures("categories");
+      await createFixtures("authors");
     });
 
     await loadExtraFixture("posts");
