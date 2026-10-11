@@ -15,7 +15,7 @@ export class RelationHandler {
 
     if (isEmpty(value.selectValues)) {
       const model = value.model;
-      if (model.compositePrimaryKey) {
+      if (model.isCompositePrimaryKey()) {
         throw new ArgumentError(
           `Cannot map composite primary key ${rbInspect(model.primaryKey)} to ${attribute.name}`,
         );

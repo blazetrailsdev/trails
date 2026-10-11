@@ -12,7 +12,11 @@ type CollectionProxyLike = {
 type RecordInternals = {
   _attributes: { writeCastValue(name: string, value: unknown): void };
   _readAttribute(name: string): unknown;
-  association(name: string): { find(...args: unknown[]): Promise<Base | Base[] | null> };
+  association(name: string): {
+    find(...args: unknown[]): Promise<Base | Base[] | null>;
+    findByScan(args: unknown[]): Promise<Base | Base[] | undefined>;
+    isLoaded(): boolean;
+  };
   clientsOfFirm: CollectionProxyLike;
 };
 
@@ -49,5 +53,16 @@ describe("CollectionAssociation BigInt PK / number find(id) key match", () => {
 
     const found = (await internals(firm).clientsOfFirm.find(numberId)) as Base;
     expect(Number(internals(found)._readAttribute("id"))).toBe(numberId);
+  });
+
+  it("find_by_scan loads the target of an unloaded collection before scanning it", async () => {
+    const firm = (await Firm.find(companies("first_firm").id)) as Base;
+    const assoc = internals(firm).association("clientsOfFirm");
+    expect(assoc.isLoaded()).toBe(false);
+
+    const id = companies("second_client").id;
+    const found = (await assoc.findByScan([id])) as Base;
+    expect(assoc.isLoaded()).toBe(true);
+    expect(internals(found)._readAttribute("id")).toBe(id);
   });
 });

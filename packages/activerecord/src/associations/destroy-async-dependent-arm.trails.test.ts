@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
+import { rbModConstSet, registerConstant, unregisterConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
@@ -34,6 +34,17 @@ class AsyncEssay extends Base {
   }
 }
 
+const AsyncShelf = { name: "AsyncShelf" };
+
+class Essay extends Base {
+  static _tableName = "essays";
+  static {
+    this.destroyAssociationAsyncJob = "DestroyAsyncTestJob";
+    this.belongsTo("book", { dependent: "destroyAsync", className: "AsyncBook" });
+  }
+}
+rbModConstSet(AsyncShelf, "Essay", Essay);
+
 class AsyncContent extends Base {
   static _tableName = "content";
 }
@@ -67,6 +78,16 @@ describe("destroy_async dependent arm", () => {
       associationPrimaryKeyColumn: "id",
       ensuringOwnerWasMethod: null,
     });
+  });
+
+  it("belongs_to enqueues a namespaced owner's qualified name", async () => {
+    const book = await AsyncBook.create({ name: "Der be gold" });
+    const essay = await Essay.create({ name: "essay", book_id: book.id });
+
+    await essay.destroy();
+
+    expect(jobsFor(essay)[0][1].ownerModelName).toBe("AsyncShelf::Essay");
+    expect(jobsFor(essay)[0][1].associationClass).toBe("AsyncBook");
   });
 
   it("has_many enqueues every target id in one batch", async () => {

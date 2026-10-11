@@ -164,7 +164,7 @@ export function setCallback<T extends typeof Model>(
 }
 
 export async function beforeCommittedBang(this: Base): Promise<void> {
-  await this.runCallbacks("before_commit");
+  await this._runBeforeCommitCallbacks();
 }
 
 export async function committedBang(
@@ -176,8 +176,7 @@ export async function committedBang(
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
       r._committedAlreadyCalled = true;
-      const ctor = this.constructor as typeof Base;
-      await this.runCallbacks("commit");
+      await this._runCommitCallbacks();
     }
   } finally {
     r._committedAlreadyCalled = false;
@@ -195,8 +194,7 @@ export async function rolledbackBang(
 ): Promise<void> {
   try {
     if (shouldRunCallbacks && isTriggerTransactionalCallbacks.call(this)) {
-      const ctor = this.constructor as typeof Base;
-      await this.runCallbacks("rollback");
+      await this._runRollbackCallbacks();
     }
   } finally {
     restoreTransactionRecordState.call(this, forceRestoreState);
@@ -248,7 +246,7 @@ export function restoreTransactionRecordState(this: Base, forceRestoreState = fa
       r._mutationsBeforeLastSave = null;
       const ctor = this.constructor as typeof Base;
       const primaryKey = ctor.primaryKey;
-      if (ctor.compositePrimaryKey) {
+      if (ctor.isCompositePrimaryKey()) {
         const cols = primaryKey as string[];
         const savedId = restoreState.id as unknown[];
         if (cols.some((col, i) => r._attributes.fetchValue(col) !== savedId[i])) {

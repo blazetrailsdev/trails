@@ -13,8 +13,9 @@
  * For every function/method whose name matches a manifest entry, the rule
  * collects the string-literal event arguments of every `runCallbacks(...)` /
  * `runAllCallbacks(...)` call in its body (the TS equivalents of Rails'
- * `run_callbacks` family). If a required event is not among them, the method is
- * flagged.
+ * `run_callbacks` family), and the event named by every generated
+ * `_run<Event>Callbacks(...)` call. If a required event is not among them, the
+ * method is flagged.
  *
  * Manifest: eslint/rails-callback-invocations.json, built by
  *   pnpm tsx scripts/build-rails-privates-manifest.ts
@@ -37,6 +38,10 @@ const manifestPath = () =>
 // is the trails helper the persistence path uses to fire before/around/after
 // in one shot.
 const RUN_CALLBACK_CALLEES = new Set(["runCallbacks", "runAllCallbacks"]);
+
+// `_run<Event>Callbacks(block)` is the method `define_callbacks` generates
+// (`active_support/callbacks.rb:941-945`), Rails' `_run_<event>_callbacks`.
+const GENERATED_RUN = /^_run([A-Z][A-Za-z]*)Callbacks$/;
 
 function loadJson(p, fallback) {
   if (!fs.existsSync(p)) return fallback;
@@ -93,6 +98,11 @@ function eventsFired(fnNode, sourceCode) {
         const s = stringValue(arg);
         if (s !== null) fired.add(s);
       }
+    }
+    const generated =
+      node.type === "CallExpression" && GENERATED_RUN.exec(calleeName(node.callee) ?? "");
+    if (generated) {
+      fired.add(generated[1].replace(/(?!^)([A-Z])/g, "_$1").toLowerCase());
     }
     for (const key of sourceCode.visitorKeys[node.type] ?? []) {
       const child = node[key];

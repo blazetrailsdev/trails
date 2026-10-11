@@ -107,7 +107,7 @@ export abstract class CollectionAssociation extends Association {
     ids = ids.map((id) => pkType.cast(id));
 
     let indexed: Record<string, Base>;
-    if (klass.compositePrimaryKey) {
+    if (klass.isCompositePrimaryKey()) {
       indexed = indexBy<Base, string>(
         await klass.where(new Map([[primaryKey, ids]])).toArray(),
         (record) =>
@@ -155,7 +155,7 @@ export abstract class CollectionAssociation extends Association {
         throw new RecordNotFound(errorMessage, model.name, String(model.primaryKey), args);
       }
 
-      const result = this.findByScan(args);
+      const result = await this.findByScan(args);
 
       const resultSize = kernelArray(result).length;
       if (!result || resultSize !== argsFlatten.length) {
@@ -411,7 +411,7 @@ export abstract class CollectionAssociation extends Association {
     } else if (this.isLoaded()) {
       return this.target.some((r) => r.equals(record));
     } else {
-      const recordId = klass.compositePrimaryKey
+      const recordId = klass.isCompositePrimaryKey()
         ? Object.fromEntries(
             (klass.primaryKey as string[]).map((key, i) => [key, (record.id as unknown[])[i]]),
           )
@@ -642,7 +642,7 @@ export abstract class CollectionAssociation extends Association {
     return [...merged, ...memory.filter((record) => !record.isPersisted())];
   }
 
-  private findByScan(args: unknown[]): Base | Array<Base | undefined> | undefined {
+  private async findByScan(args: unknown[]): Promise<Base | Array<Base | undefined> | undefined> {
     const expectsArray = Array.isArray(args[0]);
     const ids = [
       ...new Set(
@@ -655,11 +655,11 @@ export abstract class CollectionAssociation extends Association {
 
     if (ids.length === 1) {
       const id = ids[0];
-      const record = this.target.find((r) => id === String((r as any).id));
+      const record = (await this.loadTarget()).find((r) => id === String((r as any).id));
       return expectsArray ? [record] : record;
+    } else {
+      return (await this.loadTarget()).filter((r) => ids.includes(String((r as any).id)));
     }
-
-    return this.target.filter((r) => ids.includes(String((r as any).id)));
   }
 
   /**

@@ -777,7 +777,7 @@ export class AssociationReflection extends MacroReflection {
     ) {
       this._activeRecordPrimaryKeyCache =
         queryConstraintsList.call(this.activeRecord as any) ?? this.activeRecord.primaryKey;
-    } else if ((this.activeRecord as any).compositePrimaryKey) {
+    } else if ((this.activeRecord as any).isCompositePrimaryKey()) {
       const pk = this.primaryKey(this.activeRecord);
       this._activeRecordPrimaryKeyCache = Array.isArray(pk) && pk.includes("id") ? "id" : pk;
     } else {
@@ -802,7 +802,8 @@ export class AssociationReflection extends MacroReflection {
 
     if (
       !this.isPolymorphic() &&
-      ((this.klass as any).compositePrimaryKey || (this.activeRecord as any).compositePrimaryKey)
+      ((this.klass as any).isCompositePrimaryKey() ||
+        (this.activeRecord as any).isCompositePrimaryKey())
     ) {
       const fk = this.foreignKey();
       if (this.hasOne() || this.isCollection()) {
@@ -1030,7 +1031,7 @@ export class BelongsToReflection extends AssociationReflection {
       return compositeQueryConstraintsList.call(targetKlass as any);
     }
 
-    if ((targetKlass as any).compositePrimaryKey) {
+    if ((targetKlass as any).isCompositePrimaryKey()) {
       const primaryKey = targetKlass.primaryKey;
       if (Array.isArray(primaryKey) && primaryKey.includes("id")) return "id";
       return primaryKey;

@@ -453,9 +453,23 @@ describe("AttributeMethods#respond_to_missing? (trails)", () => {
     const topic = new Topic();
 
     await Topic.loadSchema();
+    expect(rbObjRespondTo(topic, "title")).toBe(true);
     expect(basicObjRespondTo(topic, "title", true)).toBe(true);
     expect(basicObjRespondTo(topic, "mumbo", true)).toBe(false);
     expect(rbObjRespondTo(new Topic(), "title")).toBe(true);
+  });
+
+  it("a dup of a record built before its schema loaded takes the columns too", async () => {
+    class Topic extends Base {}
+    Base.connectionPool().schemaCache.clearBang();
+    const topic = new Topic();
+    const dup = topic.dup();
+    expect(rbObjRespondTo(topic, "title")).toBe(false);
+
+    await Topic.loadSchema();
+    expect(rbObjRespondTo(dup, "title")).toBe(true);
+    expect(rbObjRespondTo(topic, "title")).toBe(true);
+    expect((dup as unknown as { title: unknown }).title).toBeNull();
   });
 });
 

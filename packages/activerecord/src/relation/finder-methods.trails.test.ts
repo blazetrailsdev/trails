@@ -14,7 +14,7 @@ import { NoMethodError } from "@blazetrails/ruby-compat";
 import { RecordNotFound } from "../errors.js";
 
 describe("findWithIds — composite primary key", () => {
-  const rel: any = { primaryKey: ["shop_id", "id"], model: { compositePrimaryKey: true } };
+  const rel: any = { primaryKey: ["shop_id", "id"], model: { isCompositePrimaryKey: () => true } };
 
   it("raises NoMethodError from ids.first.first when the first id is not a tuple", async () => {
     await expect(findWithIds.call(rel, 1)).rejects.toThrow(

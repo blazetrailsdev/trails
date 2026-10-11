@@ -146,7 +146,7 @@ describe("createFixtures", () => {
     const Model = {
       tableName: "orders",
       primaryKey: ["shop_id", "id"],
-      compositePrimaryKey: true,
+      isCompositePrimaryKey: () => true,
       loadSchema: async () => {},
       definedEnums: {},
       _reflections: {},

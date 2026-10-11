@@ -807,7 +807,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.primaryKey;
-      const key = this.model.compositePrimaryKey
+      const key = this.model.isCompositePrimaryKey()
         ? (primaryKey as string[]).map((pk) => this.table.get(pk))
         : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileUpdate(values, key, havingClauseAst, groupValuesArelColumns).ast;
@@ -845,7 +845,7 @@ export class Relation<T extends Base, G extends boolean = false> {
       const groupValuesArelColumns = this.arelColumns(uniq(this.groupValues)) as ArelNode[];
       const havingClauseAst = this.havingClause.isEmpty() ? null : this.havingClause.ast;
       const primaryKey = this.model.primaryKey;
-      const key = this.model.compositePrimaryKey
+      const key = this.model.isCompositePrimaryKey()
         ? (primaryKey as string[]).map((pk) => this.table.get(pk))
         : this.table.get((primaryKey as string | null) ?? null);
       const stmt = arel.compileDelete(key, havingClauseAst, groupValuesArelColumns).ast;
@@ -1377,7 +1377,7 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async destroy(id: unknown): Promise<T | T[]> {
-    const multipleIds = this.model.compositePrimaryKey
+    const multipleIds = this.model.isCompositePrimaryKey()
       ? Array.isArray((id as unknown[])[0])
       : Array.isArray(id);
 

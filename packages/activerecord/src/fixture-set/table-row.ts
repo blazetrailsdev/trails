@@ -108,7 +108,7 @@ export class TableRow {
     if (!this.modelClass) return;
     this.fillTimestamps();
     this.interpolateLabel();
-    if (this.modelClass.compositePrimaryKey) {
+    if (this.modelClass.isCompositePrimaryKey()) {
       this.generateCompositePrimaryKey();
     } else {
       this.generatePrimaryKey();

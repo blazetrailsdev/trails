@@ -21,7 +21,8 @@ export const Callbacks = Object.assign(new Module(), {
   [included](base: ModelCtor): void {
     include(base, ValidationsCallbacks);
 
-    base.defineModelCallbacks("initialize", "find", "touch", { only: "after" });
+    base.defineModelCallbacks("initialize", "find", { only: "after", strict: "sync" });
+    base.defineModelCallbacks("touch", { only: "after" });
     base.defineModelCallbacks("save", "create", "update", "destroy");
   },
 });
@@ -168,7 +169,7 @@ export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<
   if (this._destroyCallbackAlreadyCalled) return true;
   this._destroyCallbackAlreadyCalled = true;
   try {
-    return (await this.runCallbacks("destroy", superFn)) as T | boolean;
+    return (await this._runDestroyCallbacks(superFn)) as T | boolean;
   } catch (e) {
     if (!(e instanceof RecordNotDestroyed)) throw e;
     this._associationDestroyException = e;
@@ -179,8 +180,7 @@ export async function destroy<T>(this: any, superFn: () => Promise<T>): Promise<
 }
 
 export function touch(this: Base, ...names: TouchArgs): Promise<boolean> {
-  return this.runCallbacks(
-    "touch",
+  return this._runTouchCallbacks(
     () => Callbacks.superMethod(this, "touch")!(...names) as Promise<boolean>,
   ) as Promise<boolean>;
 }
@@ -192,8 +192,7 @@ export function incrementBang<T>(
   options: { touch?: unknown } = {},
 ): Promise<T> {
   return rtest(options.touch)
-    ? (this.runCallbacks(
-        "touch",
+    ? (this._runTouchCallbacks(
         () => Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>,
       ) as Promise<T>)
     : (Callbacks.superMethod(this, "incrementBang")!(attribute, by, options) as Promise<T>);
@@ -201,7 +200,7 @@ export function incrementBang<T>(
 
 /** @internal */
 export function createOrUpdate(this: any, superFn: () => Promise<boolean>): Promise<boolean> {
-  return this.runCallbacks("save", superFn) as Promise<boolean>;
+  return this._runSaveCallbacks(superFn) as Promise<boolean>;
 }
 
 /** @internal */
@@ -210,8 +209,7 @@ export async function _createRecord(
   attributeNames?: string[],
   block?: (record: any) => void,
 ): Promise<unknown> {
-  const ctor = this.constructor;
-  return await this.runCallbacks("create", () =>
+  return await this._runCreateCallbacks(() =>
     dirtyCreateRecord.call(this, attributeNames, (names: string[]) =>
       encryptableRecordCreateRecord.call(
         this,
@@ -233,7 +231,7 @@ export async function _updateRecord(
   attributeNames?: string[],
   block?: (record: any) => void,
 ): Promise<unknown> {
-  return await this.runCallbacks("update", () =>
+  return await this._runUpdateCallbacks(() =>
     recordUpdateTimestamps.call(this, () =>
       dirtyUpdateRecord.call(this, attributeNames, (names: string[]) =>
         Persistence.instanceMethod("_updateRecord")!.value.call(this, names, block),

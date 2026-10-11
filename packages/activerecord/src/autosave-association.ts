@@ -14,7 +14,6 @@ import { Rollback } from "./errors.js";
 import { NestedError as AssociationsNestedError } from "./associations/nested-error.js";
 import { associationInstanceGet } from "./associations.js";
 import { hasQueryConstraints, queryConstraintsList } from "./persistence.js";
-import { isCompositePrimaryKey } from "./attribute-methods/primary-key.js";
 import { kernelArray, wrap } from "@blazetrails/activesupport";
 
 const VALIDATING_BELONGS_TO_FOR = Symbol.for("blazetrails.validatingBelongsToFor");
@@ -492,7 +491,7 @@ export function computePrimaryKey(reflection: any, record: any): string | string
     return queryConstraints;
   } else if (hasQueryConstraints.call(record.constructor) && !reflection.options.foreignKey) {
     return queryConstraintsList.call(record.constructor) as string[];
-  } else if (isCompositePrimaryKey.call(record.constructor)) {
+  } else if (record.constructor.isCompositePrimaryKey()) {
     const primaryKey = record.constructor.primaryKey;
     return primaryKey.includes("id") ? "id" : primaryKey;
   } else {

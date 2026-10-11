@@ -23,7 +23,7 @@ import {
   block,
   fetch,
   first,
-  type Hash,
+  Hash,
   isEmpty,
   isModuleIncluded,
   rbFPublicSend,
@@ -49,20 +49,21 @@ import { ONE_AS_ONE } from "./finder-methods.js";
 
 export class ColumnAliasTracker {
   private connection: AliasingConnection;
-  private aliases: Map<string, number> = new Map();
+  private aliases: Hash<string, number>;
 
   constructor(connection: AliasingConnection) {
     this.connection = connection;
+    this.aliases = new Hash<string, number>(0);
   }
 
   aliasFor(field: string): string {
     const aliasedName = this.columnAliasFor(field);
 
-    if ((this.aliases.get(aliasedName) ?? 0) === 0) {
+    if (this.aliases.get(aliasedName) === 0) {
       this.aliases.set(aliasedName, 1);
       return aliasedName;
     } else {
-      const count = (this.aliases.get(aliasedName) ?? 0) + 1;
+      const count = this.aliases.get(aliasedName)! + 1;
       this.aliases.set(aliasedName, count);
       return `${this.truncate(aliasedName)}_${count}`;
     }

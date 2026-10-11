@@ -65,11 +65,11 @@ describe("per-instance @primary_key slot", () => {
     }
 
     Keyed.primaryKey = ["author_id", "id"];
-    expect(Keyed.compositePrimaryKey).toBe(true);
+    expect(Keyed.isCompositePrimaryKey()).toBe(true);
     expect(Object.isFrozen(Keyed.primaryKey)).toBe(true);
 
     Keyed.primaryKey = "id";
-    expect(Keyed.compositePrimaryKey).toBe(false);
+    expect(Keyed.isCompositePrimaryKey()).toBe(false);
   });
 
   it("composite_primary_key? answers the ivar, not the shape of the key", () => {
@@ -79,7 +79,7 @@ describe("per-instance @primary_key slot", () => {
 
     Stale.primaryKey = "id";
     (Stale as unknown as { _primaryKey: string[] })._primaryKey = ["author_id", "id"];
-    expect(Stale.compositePrimaryKey).toBe(false);
+    expect(Stale.isCompositePrimaryKey()).toBe(false);
   });
 
   it("a subclass that never assigns primary_key answers its parent's composite_primary_key?", () => {
@@ -90,15 +90,15 @@ describe("per-instance @primary_key slot", () => {
     class Child extends Parent {}
 
     expect(Child.primaryKey).toEqual(["author_id", "id"]);
-    expect(Child.compositePrimaryKey).toBe(true);
+    expect(Child.isCompositePrimaryKey()).toBe(true);
 
     Child.resetPrimaryKey();
     expect(Object.prototype.hasOwnProperty.call(Child, "_compositePrimaryKey")).toBe(true);
-    expect(Child.compositePrimaryKey).toBe(true);
+    expect(Child.isCompositePrimaryKey()).toBe(true);
 
     Child.primaryKey = "id";
-    expect(Child.compositePrimaryKey).toBe(false);
-    expect(Parent.compositePrimaryKey).toBe(true);
+    expect(Child.isCompositePrimaryKey()).toBe(false);
+    expect(Parent.isCompositePrimaryKey()).toBe(true);
   });
 
   it("primary_key= with an Array is the only thing that includes CompositePrimaryKey", () => {

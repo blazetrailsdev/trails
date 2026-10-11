@@ -177,7 +177,7 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     } finally {
       initInternals.mockRestore();
     }
-    expect(changed).toEqual([["_suppressInitializeCallback"]]);
+    expect(changed).toEqual([[]]);
   });
 
   it("a nested new of the class being allocated is an ordinary new", () => {

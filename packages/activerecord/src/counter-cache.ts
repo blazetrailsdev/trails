@@ -46,7 +46,7 @@ export async function updateCounters(
   id: unknown | unknown[],
   counters: CounterCacheCounters,
 ): Promise<number> {
-  if (this.compositePrimaryKey && Array.isArray(id) && !Array.isArray(id[0])) id = [id];
+  if (this.isCompositePrimaryKey() && Array.isArray(id) && !Array.isArray(id[0])) id = [id];
   return this.unscoped()
     .whereBang(new Map([[this.primaryKey, id]]))
     .updateCounters(counters);

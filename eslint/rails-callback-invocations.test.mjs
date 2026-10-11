@@ -65,6 +65,15 @@ tester.run("rails-callback-invocations", rule, {
         `  this.runCallbacks("initialize");\n` +
         `}\n`,
     },
+    // The generated `_run<Event>Callbacks` names its event.
+    {
+      filename: srcFile,
+      code:
+        `export function initWithAttributes(this: any) {\n` +
+        `  this._runFindCallbacks();\n` +
+        `  this._runInitializeCallbacks();\n` +
+        `}\n`,
+    },
     // Method as a class method definition, firing the callback.
     {
       filename: srcFile,
@@ -93,6 +102,12 @@ tester.run("rails-callback-invocations", rule, {
     {
       filename: srcFile,
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
+      errors: [{ messageId: "missingCallback", data: { name: "destroy", event: "destroy" } }],
+    },
+    // A generated runner for another event does not stand in for the required one.
+    {
+      filename: srcFile,
+      code: `export function destroy(this: any) { return this._runBeforeCommitCallbacks(); }\n`,
       errors: [{ messageId: "missingCallback", data: { name: "destroy", event: "destroy" } }],
     },
     // Multi-event method firing only one required event — flags the missing one.

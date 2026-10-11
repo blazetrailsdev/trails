@@ -23,21 +23,21 @@ function inspectValue(value: unknown): string {
 export class CompositePrimaryKey extends PrimaryKey {
   override get id(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey)
+    if ((record.constructor as any).isCompositePrimaryKey())
       return primaryKeyOf(record).map((pk) => record._readAttribute(pk));
     return super.id;
   }
 
   override isPrimaryKeyValuesPresent(): boolean {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey)
+    if ((record.constructor as any).isCompositePrimaryKey())
       return [...(record.id as unknown[])].every((v) => v != null && v !== false);
     return super.isPrimaryKeyValuesPresent();
   }
 
   override set id(value: unknown) {
     const record = this as unknown as PrimaryKeyInstance;
-    if (!(record.constructor as any).compositePrimaryKey) {
+    if (!(record.constructor as any).isCompositePrimaryKey()) {
       super.id = value;
       return;
     }
@@ -56,14 +56,14 @@ export class CompositePrimaryKey extends PrimaryKey {
 
   override get isId(): boolean {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey)
+    if ((record.constructor as any).isCompositePrimaryKey())
       return primaryKeyOf(record).every((col) => record._queryAttribute(col));
     return super.isId;
   }
 
   override get idBeforeTypeCast(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey) {
+    if ((record.constructor as any).isCompositePrimaryKey()) {
       return primaryKeyOf(record).map((col) => record.attributeBeforeTypeCast(col));
     }
     return super.idBeforeTypeCast;
@@ -71,7 +71,7 @@ export class CompositePrimaryKey extends PrimaryKey {
 
   override get idWas(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey) {
+    if ((record.constructor as any).isCompositePrimaryKey()) {
       return primaryKeyOf(record).map((col) => record.attributeWas(col));
     }
     return super.idWas;
@@ -79,7 +79,7 @@ export class CompositePrimaryKey extends PrimaryKey {
 
   override get idInDatabase(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey) {
+    if ((record.constructor as any).isCompositePrimaryKey()) {
       return primaryKeyOf(record).map((col) => record.attributeInDatabase(col));
     }
     return super.idInDatabase;
@@ -87,7 +87,7 @@ export class CompositePrimaryKey extends PrimaryKey {
 
   override get idForDatabase(): unknown {
     const record = this as unknown as PrimaryKeyRecord;
-    if ((record.constructor as any).compositePrimaryKey) {
+    if ((record.constructor as any).isCompositePrimaryKey()) {
       return primaryKeyOf(record).map((col) => columnForDatabase(record, col));
     }
     return super.idForDatabase;

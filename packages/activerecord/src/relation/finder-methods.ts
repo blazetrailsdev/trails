@@ -37,7 +37,7 @@ interface FinderRelation {
   _model: {
     name: string;
     primaryKey: string | string[];
-    compositePrimaryKey: boolean;
+    isCompositePrimaryKey(): boolean;
     implicitOrderColumn?: string | null;
     createBang(attrs: any): Promise<any>;
     withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
@@ -323,7 +323,7 @@ export async function isInclude(this: FinderRelation, record: any): Promise<bool
     return records.some((r) => r.equals(record));
   }
   const recordClass = record.constructor;
-  const id = recordClass.compositePrimaryKey
+  const id = recordClass.isCompositePrimaryKey()
     ? Object.fromEntries(
         (recordClass.primaryKey as string[]).map((column, index) => [column, record.id[index]]),
       )
@@ -515,7 +515,7 @@ export function usingLimitableReflections(
 export async function findWithIds(this: FinderRelation, ...ids: unknown[]): Promise<any> {
   if (this.primaryKey == null) throw new UnknownPrimaryKey(this.model as any);
 
-  const expectsArray = this.model.compositePrimaryKey
+  const expectsArray = this.model.isCompositePrimaryKey()
     ? Array.isArray(aryFirst(aryFirst(ids) as unknown[]))
     : Array.isArray(aryFirst(ids));
 
