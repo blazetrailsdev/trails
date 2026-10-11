@@ -147,6 +147,8 @@ describe("CacheStoreTest", () => {
 
   it("handleInvalidExpiresIn raises when raiseOnInvalidCacheExpirationTime is true", () => {
     Store.raiseOnInvalidCacheExpirationTime = true;
-    expect(() => Store.handleInvalidExpiresIn("bad ttl")).toThrow(ArgumentError);
+    expect(() => store.callMergedOptions({}, { expiresAt: Date.now() - 5000 })).toThrow(
+      ArgumentError,
+    );
   });
 });

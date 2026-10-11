@@ -1,15 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { ArgumentError, StringIO, rbCString, rbObjClass } from "@blazetrails/ruby-compat";
-import {
-  Array as ArrayExt,
-  FalseClass,
-  Float,
-  Hash,
-  Integer,
-  NilClass,
-  String as StringExt,
-  TrueClass,
-} from "./core-ext.js";
+import { ArgumentError, StringIO, rbCString, rbFSend, rbObjClass } from "@blazetrails/ruby-compat";
+import { Array as ArrayExt, Hash } from "./core-ext.js";
 import { ExtensionValue, MessagePack, Packer } from "./index.js";
 
 class ValueOne {
@@ -112,26 +103,26 @@ describe("MessagePack::Packer", () => {
   });
 
   it("to_msgpack returns String", () => {
-    expect(rbObjClass(NilClass.toMsgpack(null))).toBe(rbCString);
-    expect(rbObjClass(TrueClass.toMsgpack(true))).toBe(rbCString);
-    expect(rbObjClass(FalseClass.toMsgpack(false))).toBe(rbCString);
-    expect(rbObjClass(Integer.toMsgpack(1))).toBe(rbCString);
-    expect(rbObjClass(Float.toMsgpack(new Number(1.0)))).toBe(rbCString);
-    expect(rbObjClass(StringExt.toMsgpack(""))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(null, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(true, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(false, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(1, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(new Number(1.0), "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend("", "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(Hash.toMsgpack({}))).toBe(rbCString);
     expect(rbObjClass(ArrayExt.toMsgpack([]))).toBe(rbCString);
   });
 
   it("to_msgpack with packer equals to_msgpack", () => {
     const toStr = (packer: unknown) => (packer as Packer).toStr();
-    expect(toStr(NilClass.toMsgpack(null, new Packer()))).toEqual(NilClass.toMsgpack(null));
-    expect(toStr(TrueClass.toMsgpack(true, new Packer()))).toEqual(TrueClass.toMsgpack(true));
-    expect(toStr(FalseClass.toMsgpack(false, new Packer()))).toEqual(FalseClass.toMsgpack(false));
-    expect(toStr(Integer.toMsgpack(1, new Packer()))).toEqual(Integer.toMsgpack(1));
-    expect(toStr(Float.toMsgpack(new Number(1.0), new Packer()))).toEqual(
-      Float.toMsgpack(new Number(1.0)),
+    expect(toStr(rbFSend(null, "toMsgpack", new Packer()))).toEqual(rbFSend(null, "toMsgpack"));
+    expect(toStr(rbFSend(true, "toMsgpack", new Packer()))).toEqual(rbFSend(true, "toMsgpack"));
+    expect(toStr(rbFSend(false, "toMsgpack", new Packer()))).toEqual(rbFSend(false, "toMsgpack"));
+    expect(toStr(rbFSend(1, "toMsgpack", new Packer()))).toEqual(rbFSend(1, "toMsgpack"));
+    expect(toStr(rbFSend(new Number(1.0), "toMsgpack", new Packer()))).toEqual(
+      rbFSend(new Number(1.0), "toMsgpack"),
     );
-    expect(toStr(StringExt.toMsgpack("", new Packer()))).toEqual(StringExt.toMsgpack(""));
+    expect(toStr(rbFSend("", "toMsgpack", new Packer()))).toEqual(rbFSend("", "toMsgpack"));
     expect(toStr(Hash.toMsgpack({}, new Packer()))).toEqual(Hash.toMsgpack({}));
     expect(toStr(ArrayExt.toMsgpack([], new Packer()))).toEqual(ArrayExt.toMsgpack([]));
   });

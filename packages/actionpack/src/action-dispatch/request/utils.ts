@@ -1,3 +1,4 @@
+import { mattrAccessor } from "@blazetrails/activesupport";
 import { bytes, forceEncoding, isValidEncoding, scrub, toS } from "@blazetrails/ruby-compat";
 import { InvalidParameterError } from "@blazetrails/rack";
 import { MissingController } from "../http/request.js";
@@ -13,7 +14,12 @@ export type ParamValue =
 export type ParamHash = { [key: string]: ParamValue };
 
 export class RequestUtils {
-  static performDeepMunge = true;
+  declare static performDeepMunge: boolean;
+  declare performDeepMunge: boolean;
+
+  static {
+    mattrAccessor.call(this, "performDeepMunge", { default: true });
+  }
 
   static eachParamValue(params: ParamValue, block: (param: string) => string | void): ParamValue {
     if (Array.isArray(params)) {

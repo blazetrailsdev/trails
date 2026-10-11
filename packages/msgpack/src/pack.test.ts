@@ -1,27 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { StringIO, rbCString, rbObjClass } from "@blazetrails/ruby-compat";
-import {
-  Array as ArrayExt,
-  FalseClass,
-  Float,
-  Hash,
-  Integer,
-  NilClass,
-  String as StringExt,
-  TrueClass,
-} from "./core-ext.js";
+import { StringIO, rbCString, rbFSend, rbObjClass } from "@blazetrails/ruby-compat";
+import { Array as ArrayExt, Hash } from "./core-ext.js";
 import { MessagePack, Packer } from "./index.js";
 
 const bytes = (string: string) => Uint8Array.from(string, (c) => c.charCodeAt(0));
 
 describe("MessagePack", () => {
   it("to_msgpack returns String", () => {
-    expect(rbObjClass(NilClass.toMsgpack(null))).toBe(rbCString);
-    expect(rbObjClass(TrueClass.toMsgpack(true))).toBe(rbCString);
-    expect(rbObjClass(FalseClass.toMsgpack(false))).toBe(rbCString);
-    expect(rbObjClass(Integer.toMsgpack(1))).toBe(rbCString);
-    expect(rbObjClass(Float.toMsgpack(new Number(1.0)))).toBe(rbCString);
-    expect(rbObjClass(StringExt.toMsgpack(""))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(null, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(true, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(false, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(1, "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend(new Number(1.0), "toMsgpack"))).toBe(rbCString);
+    expect(rbObjClass(rbFSend("", "toMsgpack"))).toBe(rbCString);
     expect(rbObjClass(Hash.toMsgpack({}))).toBe(rbCString);
     expect(rbObjClass(ArrayExt.toMsgpack([]))).toBe(rbCString);
   });

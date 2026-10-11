@@ -11,7 +11,9 @@ function powerOfTen(precision: number): BigDecimal {
 }
 
 export class NumberToCurrencyConverter extends NumberConverter<NumberToCurrencyOptions> {
-  static override namespace = "currency";
+  static {
+    this.namespace = "currency";
+  }
 
   protected convert(): string {
     const options = this.options;

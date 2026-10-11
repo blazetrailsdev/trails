@@ -429,6 +429,8 @@ export interface ClassInfo {
   file?: string;
   reExportedFrom?: string;
   includes: string[];
+  /** Ruby-side only: the `prepend` edges, in source order. Absent when there are none. */
+  prepends?: string[];
   extends: string[];
   /**
    * TS-side only: for each `include()`/`extend()` edge recorded on `extends` by

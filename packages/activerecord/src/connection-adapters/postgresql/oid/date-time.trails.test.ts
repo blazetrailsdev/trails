@@ -3,6 +3,7 @@ import { DateInfinity, DateNegativeInfinity } from "@blazetrails/activemodel";
 import { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { describe, expect, it } from "vitest";
 
+import "../../postgresql-adapter.js";
 import { DateTime } from "./date-time.js";
 import { Timestamp } from "./timestamp.js";
 import { TimestampWithTimeZone } from "./timestamp-with-time-zone.js";

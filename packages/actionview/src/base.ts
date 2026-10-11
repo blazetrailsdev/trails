@@ -1,5 +1,8 @@
 import {
   attrInternal,
+  cattrAccessor,
+  classAttribute,
+  delegate,
   h,
   htmlEscape,
   htmlEscapeOnce,
@@ -72,26 +75,45 @@ interface TseUtilMethods {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Helpers, Context` (base.rb:158); the class/interface merge is how a mixin surfaces on the type side.
 export class Base {
-  static streamingCompletionOnException = `"><script>window.location = "/500.html"</script></html>`;
+  declare static fieldErrorProc: (this: Base, htmlTag: unknown, instance: unknown) => unknown;
+  declare fieldErrorProc: (this: Base, htmlTag: unknown, instance: unknown) => unknown;
+  declare static streamingCompletionOnException: string;
+  declare streamingCompletionOnException: string;
+  declare static prefixPartialPathWithControllerNamespace: boolean;
+  declare static isPrefixPartialPathWithControllerNamespace: boolean;
+  declare prefixPartialPathWithControllerNamespace: boolean;
+  declare static defaultFormats: readonly string[] | null | undefined;
+  declare defaultFormats: readonly string[] | null | undefined;
+  declare static automaticallyDisableSubmitTag: boolean;
+  declare automaticallyDisableSubmitTag: boolean;
+  declare static annotateRenderedViewWithFilenames: boolean;
+  declare annotateRenderedViewWithFilenames: boolean;
+  declare static _routes: unknown;
+  declare static is_routes: boolean;
+  declare _routes: unknown;
+  declare static logger: unknown;
+  declare static isLogger: boolean;
+  declare logger: unknown;
+  declare static tseTrimMode: string;
 
-  static defaultFormats: readonly string[] | null = null;
-
-  static annotateRenderedViewWithFilenames: boolean = false;
-
-  static prefixPartialPathWithControllerNamespace: boolean = true;
-
-  static automaticallyDisableSubmitTag: boolean = true;
-
-  static fieldErrorProc: (this: Base, htmlTag: unknown, instance: unknown) => unknown = function (
-    this: Base,
-    htmlTag: unknown,
-  ) {
-    return this.contentTag("div", htmlTag, { class: "field_with_errors" });
-  };
-
-  static _routes: unknown = null;
-
-  static logger: unknown = null;
+  static {
+    cattrAccessor.call(this, "fieldErrorProc", {
+      default: () =>
+        function (this: Base, htmlTag: unknown, _instance: unknown) {
+          return this.contentTag("div", htmlTag, { class: "field_with_errors" });
+        },
+    });
+    cattrAccessor.call(this, "streamingCompletionOnException", {
+      default: `"><script>window.location = "/500.html"</script></html>`,
+    });
+    classAttribute.call(this, "prefixPartialPathWithControllerNamespace", { default: true });
+    cattrAccessor.call(this, "defaultFormats");
+    cattrAccessor.call(this, "automaticallyDisableSubmitTag", { default: true });
+    cattrAccessor.call(this, "annotateRenderedViewWithFilenames", { default: false });
+    classAttribute.call(this, "_routes");
+    classAttribute.call(this, "logger");
+    delegate.call(this, "tseTrimMode=", { to: "::ActionView::Template::Handlers::TSE" });
+  }
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();
 
@@ -384,7 +406,7 @@ Object.defineProperty(Base.prototype, "yield", {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface Base extends Context, HelperMethods, TseUtilMethods {
+export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMethods {
   controller: Parameters<typeof assignController>[0];
   request: unknown;
   _backUrl: typeof _backUrl;

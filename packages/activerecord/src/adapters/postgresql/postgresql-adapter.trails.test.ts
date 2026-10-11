@@ -2,7 +2,7 @@ import { StringIO, Thread } from "@blazetrails/ruby-compat";
 import pg from "pg";
 import { Socket } from "net";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Temporal, Time as RubyTime } from "@blazetrails/date";
+import { Time as RubyTime } from "@blazetrails/date";
 import { ValueType } from "@blazetrails/activemodel";
 import {
   describeIfPg,
@@ -787,7 +787,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("date decoding", async () => {
       const rows = await adapter.execute(`SELECT DATE '2023-06-15' AS val`);
-      expect(rows[0].val).toBeInstanceOf(Temporal.PlainDate);
+      expect(rows[0].val).toBe("2023-06-15");
     });
 
     it("time decoding", async () => {

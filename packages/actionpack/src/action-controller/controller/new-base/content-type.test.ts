@@ -125,14 +125,14 @@ describe("ImpliedContentTypeTest", () => {
     assertHeader("Content-Type", "application/xml; charset=utf-8");
   });
 
-  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
   it.skip("sets Content-Type as text/html when rendering *.html.builder", async () => {
     await t.get("/content_type/implied/iAmHtmlBuilder");
 
     assertHeader("Content-Type", "text/html; charset=utf-8");
   });
 
-  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
   it.skip("sets Content-Type as application/xml when rendering *.xml.builder", async () => {
     await t.get("/content_type/implied/iAmXmlBuilder", { params: { format: "xml" } });
 

@@ -378,12 +378,8 @@ export class Request {
     mimeHost(this).variant = value;
   }
 
-  static get ignoreAcceptHeader(): boolean {
-    return _MimeNegotiation.ignoreAcceptHeader;
-  }
-  static set ignoreAcceptHeader(value: boolean) {
-    _MimeNegotiation.ignoreAcceptHeader = value;
-  }
+  declare static ignoreAcceptHeader: boolean;
+  declare ignoreAcceptHeader: boolean;
 
   declare filteredParameters: () => Record<string, unknown>;
   declare filteredEnv: () => Record<string, unknown>;
@@ -935,6 +931,7 @@ Request.prototype.etagMatches = _etagMatches;
 Request.prototype.fresh = _fresh;
 
 include(Request, RequestHelpers);
+include(Request, _MimeNegotiation);
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Request::Helpers` (`action_dispatch/http/request.rb:21`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Request extends Omit<
   RequestHelpers,
@@ -1011,6 +1008,7 @@ function mimeHost(req: Request): MimeHost {
   let h = MIME_HOSTS.get(req);
   if (!h) {
     h = Object.create(_MimeNegotiation.prototype, {
+      constructor: { get: () => req.constructor },
       getHeader: { value: (k: string) => req.env[k] },
       setHeader: {
         value: (k: string, v: unknown) => {

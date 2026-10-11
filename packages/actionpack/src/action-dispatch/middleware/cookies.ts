@@ -11,7 +11,12 @@
  */
 
 import { include, isSymbol, KeyError, rbEqual, symbolToS } from "@blazetrails/ruby-compat";
-import { extractOptionsBang, isPlainObject, isPresent } from "@blazetrails/activesupport";
+import {
+  extractOptionsBang,
+  isPlainObject,
+  isPresent,
+  mattrAccessor,
+} from "@blazetrails/activesupport";
 import { RotationConfiguration } from "@blazetrails/activesupport/messages/rotation-configuration";
 import { InvalidSignature, MessageVerifier } from "@blazetrails/activesupport/message-verifier";
 import {
@@ -361,7 +366,12 @@ export class CookieJar implements Iterable<[string, string]> {
     }
   }
 
-  static alwaysWriteCookie = false;
+  declare static alwaysWriteCookie: boolean;
+  declare alwaysWriteCookie: boolean;
+
+  static {
+    mattrAccessor.call(this, "alwaysWriteCookie", { default: false });
+  }
 
   /** @internal */
   private escape(string: string): string {
@@ -374,7 +384,7 @@ export class CookieJar implements Iterable<[string, string]> {
     return (
       request.ssl === true ||
       !cookie.secure ||
-      CookieJar.alwaysWriteCookie ||
+      this.alwaysWriteCookie ||
       (request.host ?? "").endsWith(".onion")
     );
   }

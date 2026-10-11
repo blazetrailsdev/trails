@@ -163,13 +163,13 @@ describe("MismatchFormatTest", () => {
     t = new MismatchFormatTest(task.name);
   });
 
-  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
   it.skip("if XML is selected, an HTML template is not also selected", async () => {
     await t.get(":index", { params: { format: "xml" } });
     assertResponse(MismatchFormatTest.XML_INSTRUCT);
   });
 
-  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  // PERMANENT-SKIP: renders a `.builder` template; `template/handlers/builder.rb` is unported (scripts/parity/unported-files/actionview.ts), the `builder` gem being a third-party runtime dep.
   it.skip("if XML is implicitly selected, an HTML template is not also selected", async () => {
     await t.get(":implicit");
     assertResponse(MismatchFormatTest.XML_INSTRUCT);
