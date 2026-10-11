@@ -29,6 +29,7 @@ import {
 } from "./testing/query-assertions.js";
 import { quoteTableName } from "./support/quote-regex.js";
 import { regexpEscape } from "@blazetrails/ruby-compat";
+import { Categorization } from "./test-helpers/models/categorization.js";
 import { Reply as CanonicalReply } from "./test-helpers/models/reply.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment, SpecialComment } from "./test-helpers/models/comment.js";
@@ -1238,6 +1239,149 @@ describe("FinderTest", () => {
       });
     });
   });
+
+  it("find with hash parameter", async () => {
+    await expect(Post.find({ foo: "bar" } as never)).rejects.toThrow(RecordNotFound);
+    await expect(Post.find({ foo: "bar", bar: "baz" } as never)).rejects.toThrow(RecordNotFound);
+  });
+
+  // PERMANENT-SKIP: a Ruby Symbol is a JS string, so there is no symbol table to count (CLAUDE.md, "Ruby idioms that do not translate literally").
+  it.skip("symbols table ref", async () => {
+    Post.where({ author_id: null });
+    const x = (Symbol as any).allSymbols().length;
+    Post.where({ title: { xxxqqqq: "bar" } });
+    expect((Symbol as any).allSymbols().length).toBe(x);
+  });
+
+  it("any with scope on hash includes", async () => {
+    const post = await (authors("david") as any).posts.first();
+    const categories = Categorization.includes({ author: "posts" }).where({
+      posts: { id: rid(post) },
+    });
+    expect(await categories.isExists()).toBe(true);
+  });
+
+  it("find an empty array", async () => {
+    const emptyArray: unknown[] = [];
+    const result = await Topic.find(emptyArray as never);
+    expect(result).toEqual([]);
+    expect(result).not.toBe(emptyArray);
+  });
+
+  it("unexisting record exception handling", async () => {
+    await expect((async () => (await Topic.find(1)).parent())()).rejects.toThrow(RecordNotFound);
+
+    await ((await Topic.find(2)) as any).topic;
+  });
+
+  it("find on hash conditions with explicit table name and aggregate", async () => {
+    const david = customers("david") as any;
+    expect(
+      await Customer.where({ "customers.name": david.name, address: david.address }).find(david.id),
+    ).toBeTruthy();
+    await expect(
+      Customer.where({ "customers.name": david.name + "1", address: david.address }).find(david.id),
+    ).rejects.toThrow(RecordNotFound);
+  });
+
+  it("find on hash conditions with open ended range", async () => {
+    expect(
+      (await CanonicalComment.where({ id: new Range(Infinity, 3) })).map(rid).sort((a, b) => a - b),
+    ).toEqual([1, 2, 3]);
+  });
+
+  it("count by sql", async () => {
+    expect(await Entrant.countBySql("SELECT COUNT(*) FROM entrants WHERE id > 3")).toBe(0);
+    expect(await Entrant.countBySql(["SELECT COUNT(*) FROM entrants WHERE id > ?", 2])).toBe(1);
+    expect(await Entrant.countBySql(["SELECT COUNT(*) FROM entrants WHERE id > ?", 1])).toBe(2);
+
+    await assertAsyncEqual(
+      2,
+      Entrant.asyncCountBySql(["SELECT COUNT(*) FROM entrants WHERE id > ?", 1]),
+    );
+  });
+
+  it("dynamic finder on one attribute with conditions returns same results after caching", async () => {
+    delete (Account as any).findByCreditLimit;
+    const a = await (Account.where("firm_id = ?", 6) as any).findByCreditLimit(50);
+    expect(rid(await (Account.where("firm_id = ?", 6) as any).findByCreditLimit(50))).toBe(rid(a));
+  });
+
+  it("find with bad sql", async () => {
+    await expect(Topic.findBySql("select 1 from badtable")).rejects.toThrow(StatementInvalid);
+  });
+
+  it("joins with string array", async () => {
+    const personWithReaderAndPost = Post.joins([
+      "INNER JOIN categorizations ON categorizations.post_id = posts.id",
+      "INNER JOIN categories ON categories.id = categorizations.category_id AND categories.type = 'SpecialCategory'",
+    ]);
+    expect(await personWithReaderAndPost.size()).toBe(1);
+  });
+
+  it("select value", async () => {
+    expect(
+      await (
+        await CanonicalCompany.leaseConnection()
+      ).selectValue("SELECT name FROM companies WHERE id = 1"),
+    ).toBe("37signals");
+    expect(
+      await (
+        await CanonicalCompany.leaseConnection()
+      ).selectValue("SELECT name FROM companies WHERE id = -1"),
+    ).toBeNull();
+    expect(
+      await CanonicalCompany.countBySql(
+        "SELECT COUNT(*) FROM companies WHERE name = 'Halliburton'",
+      ),
+    ).toBe(0);
+    expect(
+      await CanonicalCompany.countBySql("SELECT COUNT(*) FROM companies WHERE name = '37signals'"),
+    ).toBe(1);
+  });
+
+  it("select values", async () => {
+    expect(
+      (
+        await (
+          await CanonicalCompany.leaseConnection()
+        ).selectValues("SELECT id FROM companies ORDER BY id")
+      ).map(String),
+    ).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "15"]);
+    expect(
+      await (
+        await CanonicalCompany.leaseConnection()
+      ).selectValues("SELECT name FROM companies ORDER BY id"),
+    ).toEqual([
+      "37signals",
+      "Summit",
+      "Microsoft",
+      "Flamboyant Software",
+      "Ex Nihilo",
+      "RailsCore",
+      "Leetsoft",
+      "Jadedpixel",
+      "Odegy",
+      "Ex Nihilo Part Deux",
+      "Apex",
+      "RVshare",
+    ]);
+  });
+
+  it("find with nil inside set passed for attribute", async () => {
+    const clientOf = (
+      await CanonicalCompany.where({ client_of: [null] }).order("client_of DESC")
+    ).map((r) => (r as any).client_of);
+
+    expect(clientOf.filter((c) => c != null)).toEqual([]);
+  });
+
+  it("custom select takes precedence over original value", async () => {
+    const posts = Post.select("UPPER(title) AS title");
+    expect((await posts.first())!.title).toBe("WELCOME TO THE WEBLOG");
+    expect((await posts.preload("comments").first())!.title).toBe("WELCOME TO THE WEBLOG");
+    expect((await posts.eagerLoad("comments").first())!.title).toBe("WELCOME TO THE WEBLOG");
+  });
 });
 
 describe("FinderTest", () => {
@@ -1297,6 +1441,15 @@ describe("FinderTest", () => {
     expect((await clients.first(2)).map(rid)).toEqual(expected.map(rid));
     expect((await clients.limit(5).first(2)).map(rid)).toEqual(expected.map(rid));
     expect((await clients.order(null).first(2)).map(rid)).toEqual(expected.map(rid));
+  });
+
+  it("find one message on primary key", async () => {
+    await expect(CanonicalCar.find(0)).rejects.toThrow(RecordNotFound);
+    const e = (await CanonicalCar.find(0).catch((err: unknown) => err)) as RecordNotFound;
+    expect(e.id).toBe(0);
+    expect(e.primaryKey).toBe("id");
+    expect(e.model).toBe("Car");
+    expect(e.message).toBe("Couldn't find Car with 'id'=0");
   });
 
   it("find without primary key", async () => {
