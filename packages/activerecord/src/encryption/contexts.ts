@@ -62,6 +62,7 @@ export class Contexts {
     });
   }
 
+  /** @inventedArm run — PERMANENT */
   static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
     const own: Block = {
       thread: Thread.current(),

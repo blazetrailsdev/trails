@@ -188,6 +188,17 @@ reason `SQLite3Adapter#disconnectBang` closes the handle under `lock`, where
 Rails' `disconnect!` (`sqlite3_adapter.rb:221-226`) closes it after `super`
 releases `@lock`.
 
+The gap reaches every thread-local stack a block pushes and pops.
+`Contexts.with_encryption_context`
+(`activerecord/lib/active_record/encryption/contexts.rb:33-43`) pushes onto the
+thread-local `custom_contexts` and pops in `ensure`, which is strictly LIFO on
+a thread. Two async blocks started under one `Promise.all` would share that
+stack, so `withEncryptionContext` runs Rails' body under a stack of its own,
+seeded with a copy of its opener's: a sibling's push is not visible, a nested
+block still sees the outer context, and each pop removes its own entry. The
+`run` that opens that scope carries `@inventedArm run — PERMANENT` against
+this section.
+
 This is a genuine language shortcoming, ratified repo-wide here. Stories that
 serialize adapter access build on the monitor default; none of them is a story
 to restore `NullLock`.
