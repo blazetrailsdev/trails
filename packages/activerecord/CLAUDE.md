@@ -250,11 +250,17 @@ clobbers what the class body already wrote.
   declares after it was defined, where Rails' snapshot would not.
 
 - **`Migration.inherited`** (`migration.rb:617-626`) is outside `Base`'s chain
-  and resets nothing: it raises `StandardError` for a class whose superclass is
-  `Migration` itself. Its seat is `Migration`'s constructor, which raises at the
-  first `new` of such a class, with Rails' message. `Migration::Current`
-  (`migration.rb:579`) is defined before the hook and so never raises in Rails;
-  the constructor names `Current` and leaves it alone, and every
+  and resets nothing: it raises `StandardError` when a class whose superclass
+  is `Migration` is defined. The repo owner ruled on trails#8789 (2026-10-11)
+  that a direct `extends Migration` raises as Rails does. With no
+  definition-time hook the raise is deferred to `Migration`'s constructor, at
+  the first `new` of such a class, with Rails' message. A direct subclass that
+  is never constructed does not raise, and the port of
+  `test_legacy_migrations_raises_exception_when_inherited`
+  (`migration/compatibility_test.rb:209-214`) constructs the class where Rails'
+  test only defines it. `Migration::Current` (`migration.rb:579`) is defined
+  before the hook and so never raises in Rails; the constructor names `Current`
+  and leaves it alone, an arm Rails gets from definition order, and every
   `Compatibility::V*` descends from it. A migration extends `Migration.Current`
   or `Migration.get(x.y)`.
 

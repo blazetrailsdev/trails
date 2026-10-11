@@ -335,7 +335,7 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
         "Directly inheriting from ActiveRecord::Migration is not supported. " +
           "Please specify the Active Record release the migration was written for:\n" +
           "\n" +
-          `  class ${subclass.name} < ActiveRecord::Migration[${major}.${minor}]`,
+          `  class ${rbInspect(subclass)} < ActiveRecord::Migration[${major}.${minor}]`,
       );
     }
     this._name = name;
@@ -2003,27 +2003,29 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   static readonly VERSION = `${VERSION.MAJOR}.${VERSION.MINOR}`;
 
   override async createTable(
-    tableName: string,
-    options?:
-      | {
-          id?: false | ColumnType | IdHashOptions;
-          primaryKey?: string | string[] | false;
-          force?: boolean | "cascade";
-          ifNotExists?: boolean;
-          default?: unknown;
-          options?: string;
-          comment?: string;
-          charset?: string;
-          collation?: string;
-          as?: string;
-        }
-      | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      tableName: string,
+      options?:
+        | {
+            id?: false | ColumnType | IdHashOptions;
+            primaryKey?: string | string[] | false;
+            force?: boolean | "cascade";
+            ifNotExists?: boolean;
+            default?: unknown;
+            options?: string;
+            comment?: string;
+            charset?: string;
+            collation?: string;
+            as?: string;
+          }
+        | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
+    const [tableName, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      if (options === undefined) await super.createTable(tableName);
-      else await super.createTable(tableName, options);
+      await super.createTable(...args);
     } else if (options === block) {
       await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2032,14 +2034,16 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   }
 
   override async changeTable(
-    tableName: string,
-    options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
-    fn?: (t: TableOf<A>) => void | Promise<void>,
+    ...args: [
+      tableName: string,
+      options?: ((t: TableOf<A>) => void | Promise<void>) | { bulk?: boolean },
+      fn?: (t: TableOf<A>) => void | Promise<void>,
+    ]
   ): Promise<void> {
+    const [tableName, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      if (options === undefined) await super.changeTable(tableName);
-      else await super.changeTable(tableName, options);
+      await super.changeTable(...args);
     } else if (options === block) {
       await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2048,15 +2052,17 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   }
 
   override async createJoinTable(
-    table1: string,
-    table2: string,
-    options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
-    fn?: (t: TableDefinitionOf<A>) => void,
+    ...args: [
+      table1: string,
+      table2: string,
+      options?: JoinTableOptions | ((t: TableDefinitionOf<A>) => void),
+      fn?: (t: TableDefinitionOf<A>) => void,
+    ]
   ): Promise<void> {
+    const [table1, table2, options, fn] = args;
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      if (options === undefined) await super.createJoinTable(table1, table2);
-      else await super.createJoinTable(table1, table2, options);
+      await super.createJoinTable(...args);
     } else if (options === block) {
       await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
     } else {
