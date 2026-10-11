@@ -28,6 +28,7 @@ import {
   rbInspect,
   rtest,
   RuntimeError,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import {
   TransactionIsolationError,
@@ -75,11 +76,7 @@ export function toSqlAndBinds(
   preparable: boolean | null = null,
   allowRetry = false,
 ): [string, unknown[], boolean | null, boolean] {
-  if (
-    arelOrSqlString &&
-    (arelOrSqlString as any).ast != null &&
-    typeof (arelOrSqlString as any).ast === "object"
-  ) {
+  if (rbObjRespondTo(arelOrSqlString, "ast")) {
     arelOrSqlString = (arelOrSqlString as any).ast;
   }
 

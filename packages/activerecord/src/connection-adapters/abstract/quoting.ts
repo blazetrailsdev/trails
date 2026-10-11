@@ -24,13 +24,13 @@ import {
   rbFSend,
   rbObjAsString,
   rbObjClassname,
+  rbObjRespondTo,
   sprintf,
   TypeError,
 } from "@blazetrails/ruby-compat";
 import type { TypeMap } from "../../type/type-map.js";
 import { NotImplementedError } from "../../errors.js";
 import { Value as TimeValue } from "../../type/time.js";
-import { usec as dateTimeUsec } from "@blazetrails/activesupport/core-ext/date-time/conversions";
 
 export interface QuotingClassMethods {
   quoteColumnName(columnName: unknown): string;
@@ -203,8 +203,9 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
   }
 
   const result = rbFSend(value, "toFs", "db") as string;
-  if (!(value instanceof Temporal.PlainDate) && usec(value) > 0) {
-    return result + "." + sprintf("%06d", usec(value));
+  let usec: number;
+  if (rbObjRespondTo(value, "usec") && (usec = rbFSend(value, "usec") as number) > 0) {
+    return result + "." + sprintf("%06d", usec);
   } else {
     return result;
   }
@@ -291,14 +292,6 @@ function getutc(value: TimeLike): Temporal.ZonedDateTime {
 /** Ruby's `Time#getlocal` (`vendor/ruby/v3.3.11/time.c:4374`). */
 function getlocal(value: TimeLike): Temporal.ZonedDateTime {
   return instantOf(value).toZonedDateTimeISO(Temporal.Now.timeZoneId());
-}
-
-/** Ruby's `Time#usec` (`vendor/ruby/v3.3.11/time.c:3861`) and `DateTime#usec` (`activesupport/lib/active_support/core_ext/date_time/conversions.rb:89`). */
-function usec(value: Exclude<TemporalDateLike, Temporal.PlainDate>): number {
-  if (value instanceof Temporal.ZonedDateTime || value instanceof Temporal.PlainDateTime) {
-    return dateTimeUsec(value);
-  }
-  return (value as TimeWithZone | RubyTime).usec;
 }
 
 /** @internal */

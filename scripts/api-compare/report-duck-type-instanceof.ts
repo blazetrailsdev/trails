@@ -13,7 +13,9 @@
  * clause (a `catch`'s `instanceof` is Ruby's `rescue` arm, not a duck test)
  * and not against `Promise` (async plumbing), and whose TS stream — its
  * same-file helpers spliced in, the way the arms report forgives an extracted
- * helper — calls neither `rbObjRespondTo` nor `actsLike`.
+ * helper — calls neither `rbObjRespondTo` nor `actsLike`. `actsLike` takes its
+ * receiver as `this`, and the stream spells `actsLike.call(x, "time")` as a
+ * bare `ref:call`, so that form is read off the source too.
  *
  * The skeleton stream carries no `instanceof` token, so the TS half re-reads
  * the source: every declaration in `tsFile` named `tsName` is searched, which
@@ -84,13 +86,27 @@ function hasGuardInstanceof(body: ts.Node): boolean {
   return found;
 }
 
+function callsActsLike(body: ts.Node): boolean {
+  let found = false;
+  const visit = (n: ts.Node): void => {
+    if (found) return;
+    if (ts.isCallExpression(n) && n.expression.getText() === "actsLike.call") {
+      found = true;
+      return;
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(body);
+  return found;
+}
+
 /** Whether any declaration of `name` in `source` guards with `instanceof`. */
 export function declaresInstanceofGuard(source: string, name: string): boolean {
   const file = ts.createSourceFile("x.ts", source, ts.ScriptTarget.Latest, true);
   let found = false;
   const visit = (n: ts.Node): void => {
     if (found) return;
-    if (declarationName(n) === name && hasGuardInstanceof(n)) {
+    if (declarationName(n) === name && hasGuardInstanceof(n) && !callsActsLike(n)) {
       found = true;
       return;
     }

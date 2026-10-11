@@ -463,7 +463,8 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
  * (`array.c:8619`), whose prototype carries no such member. `each` is bound
  * for a JS array, a `Set`, and a `Map` or plain hash (`array.c:8642`,
- * `lib/set.rb:499`, `hash.c:7219`). `isInfinite` and
+ * `lib/set.rb:499`, `hash.c:7219`), and `eachPair` for a `Map` or plain hash
+ * (`hash.c:7218`). `isInfinite` and
  * `isFinite` are bound for a JS number and bigint, which spell Float
  * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
  * {@link TEMPORAL_METHOD_TABLE} binds on it.
@@ -508,6 +509,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     return true;
   }
+  if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
   if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
   if (
     mid === "get" &&

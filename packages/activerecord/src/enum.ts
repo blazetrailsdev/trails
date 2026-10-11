@@ -20,6 +20,7 @@ import {
   registerConstant,
   toS,
   rbClassSuperclass,
+  rbObjRespondTo,
 } from "@blazetrails/ruby-compat";
 import {
   isDangerousAttributeMethod,
@@ -259,9 +260,9 @@ export function _enum(
     suffix =
       suffix != null && suffix !== false ? (suffix === true ? `_${name}` : `_${suffix}`) : null;
 
-    const pairs: [string, EnumValue][] = !Array.isArray(values)
-      ? Object.entries(values)
-      : values.map((label, value) => [label, value]);
+    const pairs: [string, EnumValue][] = rbObjRespondTo(values, "eachPair")
+      ? Object.entries(values as Record<string, EnumValue>)
+      : (values as string[]).map((label, value) => [label, value]);
     pairs.forEach(([label, value]) => {
       enumValues.set(label, value);
       label = toS(label);

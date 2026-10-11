@@ -59,6 +59,15 @@ describe("report-duck-type-instanceof", () => {
     expect(declaresInstanceofGuard(source, "translate")).toBe(false);
   });
 
+  it("reads actsLike.call as the acts_like? port", () => {
+    const source = `
+      function castValue(time: unknown) {
+        if (time instanceof TimeWithZone || !actsLike.call(time, "time")) return time;
+      }
+    `;
+    expect(declaresInstanceofGuard(source, "castValue")).toBe(false);
+  });
+
   it("reads an arrow-function property as a declaration", () => {
     const source = "const castValue = (v: unknown) => v instanceof BigDecimal;";
     expect(declaresInstanceofGuard(source, "castValue")).toBe(true);
