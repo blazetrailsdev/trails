@@ -243,7 +243,7 @@ type Field = {
   type: string;
   length?: number;
   string: () => string | null;
-  buffer?: () => Uint8Array | null;
+  buffer: () => Uint8Array | null;
 };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
 
@@ -252,7 +252,7 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
   switch (field.type) {
     case "BIT": {
       if (rtest(queryOptions.castBooleans) && field.length === 1) {
-        const raw = field.buffer!();
+        const raw = field.buffer();
         return raw === null ? null : raw[0] === 1;
       }
       return next();

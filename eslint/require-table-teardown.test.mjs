@@ -45,6 +45,8 @@ tester.run("require-table-teardown", rule, {
       '  await a.exec("CREATE TABLE t (id int)");\n  await a.exec("DROP TABLE t");\n});',
     // Rails' `create_table(...) if in_memory_db?` only runs in a `:memory:` database.
     'it("x", async () => {\n  if (inMemoryDb()) await conn.createTable("zines", {});\n});',
+    'async function establish() {\n  await Edge.establishConnection({ database: ":memory:" });\n' +
+      '  await Edge.withConnection((c) => c.createTable("edges", {}));\n}',
     'describe("s", () => {\n  beforeAll(() => { driver = open(":memory:"); });\n' +
       '  it("x", async () => {\n    await driver.exec("CREATE TABLE t (id int)");\n' +
       '    await driver.exec("DROP TABLE t");\n  });\n});',

@@ -1404,7 +1404,7 @@ export class SchemaStatements {
   async indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options: { name?: string; column?: string | string[] },
+    options: { name?: string | null; column?: string | string[] },
   ): Promise<string> {
     if (this.canRemoveIndexByName(columnName, options)) return options.name as string;
 

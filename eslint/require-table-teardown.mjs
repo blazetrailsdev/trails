@@ -1256,6 +1256,7 @@ const rule = {
         const prefixes = sawSweepDrop ? sweptPrefixes : [];
         for (const [name, nodes] of created) {
           if (dropped.has(name)) continue;
+          if (memoryLocal.has(name)) continue;
           if (prefixes.some((p) => p.test(name))) continue;
           for (const node of nodes) {
             context.report({
