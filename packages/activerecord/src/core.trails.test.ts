@@ -760,7 +760,7 @@ describe("Base's inherited chain is deferred to own-property memo guards", () =>
 
     expect(Middle.lockingColumn).toBe("custom_lock_version");
     expect(Leaf.lockingColumn).toBe("lock_version");
-    expect(hasQueryConstraints.call(Middle as never)).toBe(true);
+    expect(hasQueryConstraints.call(Middle as never)).toEqual(["author_name", "id"]);
     expect(hasQueryConstraints.call(Leaf as never)).toBe(false);
   });
 

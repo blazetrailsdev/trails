@@ -1281,17 +1281,19 @@ export class Time extends rbCTime {
     validateVtmRange("hour", hour, 0, 24);
     validateVtmRange("min", min, 0, hour === 24 ? 0 : 59);
     validateVtmRange("sec", wholeSec, 0, hour === 24 ? 0 : 60);
-    const plain = new Temporal.PlainDateTime(
+    const overflowDays = Math.max(day - Time.#monthDays(year, month), 0);
+    const inMonth = new Temporal.PlainDateTime(
       year,
       month,
-      1,
+      day - overflowDays,
       hour === 24 ? 23 : hour,
       min,
       wholeSec === 60 ? 59 : wholeSec,
       Math.floor(nsec / 1_000_000),
       Math.floor(nsec / 1_000) % 1_000,
       nsec % 1_000,
-    ).add({ days: day - 1 });
+    );
+    const plain = overflowDays === 0 ? inMonth : inMonth.add({ days: overflowDays });
     this.#zoned = null;
     this.#plainMemo =
       hour === 24 ? plain.add({ hours: 1 }) : wholeSec === 60 ? plain.add({ seconds: 1 }) : plain;
@@ -1319,13 +1321,15 @@ export class Time extends rbCTime {
         ? utcOffset
         : Number(this.#plain.toZonedDateTime(utcOffset, disambiguation).offsetNanoseconds) /
           1_000_000_000;
-    this.#instant =
-      this.#timeZoneId == null
-        ? this.#plain
-            .toZonedDateTime("UTC")
-            .toInstant()
-            .subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) })
-        : this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+    if (this.#timeZoneId == null) {
+      const instant = this.#plain.toZonedDateTime("UTC").toInstant();
+      this.#instant =
+        this.#utcOffset === 0
+          ? instant
+          : instant.subtract({ nanoseconds: Math.round(this.#utcOffset * 1_000_000_000) });
+    } else {
+      this.#instant = this.#plain.toZonedDateTime(this.#timeZoneId, disambiguation).toInstant();
+    }
   }
 
   get year(): number {
@@ -1609,7 +1613,7 @@ export class Time extends rbCTime {
     }
 
     this.#zoned = this.#instant.toZonedDateTimeISO("UTC");
-    this.#plainMemo = null;
+    if (this.#utcOffsetMemo !== 0) this.#plainMemo = null;
     this.#utcOffsetMemo = null;
     this.#timeZoneId = "UTC";
     this.#localZone = false;
