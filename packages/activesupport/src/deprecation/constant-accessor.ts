@@ -47,7 +47,7 @@ export const DeprecatedConstantAccessor = {
         };
       },
     };
-    prepend(rbObjSingletonClass(base) as unknown as new () => object, extension);
+    prepend(rbObjSingletonClass(base), extension);
     rbConstMissing(base);
   },
 };

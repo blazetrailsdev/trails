@@ -6,13 +6,18 @@ import {
   Table as AbstractTable,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
-import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
+import type {
+  ColumnMethodsBase,
+  ColumnOptions,
+  ColumnType,
+} from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
 import {
   fetch,
   include,
+  included,
   Module,
   rbEqual,
   rbRegMatchP,
@@ -104,9 +109,47 @@ function primaryKey(
   return ColumnMethods.superMethod(this, "primaryKey")!(name, type, options);
 }
 
-export const ColumnMethods = new Module();
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
 
 ColumnMethods.defineMethod("primaryKey", primaryKey);
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "bigserial",
+    "bit",
+    "bit_varying",
+    "cidr",
+    "citext",
+    "daterange",
+    "hstore",
+    "inet",
+    "interval",
+    "int4range",
+    "int8range",
+    "jsonb",
+    "ltree",
+    "macaddr",
+    "money",
+    "numrange",
+    "oid",
+    "point",
+    "line",
+    "lseg",
+    "box",
+    "path",
+    "polygon",
+    "circle",
+    "serial",
+    "tsrange",
+    "tstzrange",
+    "tsvector",
+    "uuid",
+    "xml",
+    "timestamptz",
+    "enum",
+  );
+};
 
 export interface ExclusionConstraintOptions {
   name?: string;
@@ -316,41 +359,6 @@ export interface TableDefinition extends ColumnMethods {}
 
 include(TableDefinition, ColumnMethods);
 
-TableDefinition.defineColumnMethods(
-  "bigserial",
-  "bit",
-  "bit_varying",
-  "cidr",
-  "citext",
-  "daterange",
-  "hstore",
-  "inet",
-  "interval",
-  "int4range",
-  "int8range",
-  "jsonb",
-  "ltree",
-  "macaddr",
-  "money",
-  "numrange",
-  "oid",
-  "point",
-  "line",
-  "lseg",
-  "box",
-  "path",
-  "polygon",
-  "circle",
-  "serial",
-  "tsrange",
-  "tstzrange",
-  "tsvector",
-  "uuid",
-  "xml",
-  "timestamptz",
-  "enum",
-);
-
 export interface SchemaStatementsConstraintLike extends SchemaStatementsLike {
   addExclusionConstraint(
     tableName: string,
@@ -414,41 +422,6 @@ export class Table extends AbstractTable {
 export interface Table extends ColumnMethods {}
 
 include(Table, ColumnMethods);
-
-Table.defineColumnMethods(
-  "bigserial",
-  "bit",
-  "bit_varying",
-  "cidr",
-  "citext",
-  "daterange",
-  "hstore",
-  "inet",
-  "interval",
-  "int4range",
-  "int8range",
-  "jsonb",
-  "ltree",
-  "macaddr",
-  "money",
-  "numrange",
-  "oid",
-  "point",
-  "line",
-  "lseg",
-  "box",
-  "path",
-  "polygon",
-  "circle",
-  "serial",
-  "tsrange",
-  "tstzrange",
-  "tsvector",
-  "uuid",
-  "xml",
-  "timestamptz",
-  "enum",
-);
 
 export class AlterTable extends AbstractAlterTable {
   readonly constraintValidations: (string | undefined)[] = [];

@@ -3,6 +3,7 @@ import {
   except,
   fetch,
   include,
+  included,
   isSymbol,
   keywordSplat,
   merge,
@@ -531,9 +532,37 @@ function primaryKey(
   return this.column(name, type, { ...options, primaryKey: true });
 }
 
-export const ColumnMethods = new Module();
+export type ColumnMethodsBase = {
+  defineColumnMethods(...columnTypes: string[]): void;
+  prototype: Record<string, unknown>;
+};
+
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
 
 ColumnMethods.defineMethod("primaryKey", primaryKey);
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "bigint",
+    "binary",
+    "boolean",
+    "date",
+    "datetime",
+    "decimal",
+    "float",
+    "integer",
+    "json",
+    "string",
+    "text",
+    "time",
+    "timestamp",
+    "virtual",
+  );
+
+  base.prototype.blob = base.prototype.binary;
+  base.prototype.numeric = base.prototype.decimal;
+};
 
 /** @internal */
 export interface ReferenceDefinitionConnection {
@@ -1018,25 +1047,6 @@ export interface TableDefinition extends ColumnMethods {}
 
 include(TableDefinition, ColumnMethods);
 
-TableDefinition.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-TableDefinition.prototype.blob = TableDefinition.prototype.binary;
-TableDefinition.prototype.numeric = TableDefinition.prototype.decimal;
-
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table {
   declare primaryKey: (name: string, type?: ColumnType, options?: ColumnOptions) => Promise<void>;
@@ -1275,24 +1285,5 @@ export class Table {
 export interface Table extends ColumnMethods {}
 
 include(Table, ColumnMethods);
-
-Table.defineColumnMethods(
-  "bigint",
-  "binary",
-  "boolean",
-  "date",
-  "datetime",
-  "decimal",
-  "float",
-  "integer",
-  "json",
-  "string",
-  "text",
-  "time",
-  "timestamp",
-  "virtual",
-);
-Table.prototype.blob = Table.prototype.binary;
-Table.prototype.numeric = Table.prototype.decimal;
 
 registerConstant("ActiveRecord::ConnectionAdapters::IndexDefinition", IndexDefinition);

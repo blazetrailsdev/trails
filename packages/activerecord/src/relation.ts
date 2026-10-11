@@ -1589,12 +1589,7 @@ export class Relation<T extends Base, G extends boolean = false> {
         );
       }
     } else {
-      let collection: Relation<T, G> = this;
-      if (this.isEagerLoading) {
-        await this.applyJoinDependency({}, (relation) => {
-          collection = relation;
-        });
-      }
+      const collection = this.isEagerLoading ? await this.applyJoinDependency() : this;
 
       await this.withConnection(async (c) => {
         const column = c.visitor.compile(this.table.get(timestampColumn));

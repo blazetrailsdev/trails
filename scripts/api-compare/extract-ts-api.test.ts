@@ -7073,6 +7073,46 @@ describe("extractFromProgram — defineColumnMethods() generated column methods"
     expect(blob.bodyless).toBeUndefined();
     expect(blob.aliasOf).toBe("binary");
   });
+
+  it("credits a module's included hook to every class that includes the module", () => {
+    const hooked = SRC.replace(
+      /TableDefinition\.defineColumnMethods[^]*$/,
+      `export const ColumnMethods = new Module();
+       ColumnMethods[included] = function (base) {
+         base.defineColumnMethods("bit_varying", "binary");
+         base.prototype.blob = base.prototype.binary;
+       };
+       export class Table { static defineColumnMethods(...columnTypes: string[]): void {} }
+       export interface Table extends ColumnMethods {}
+       include(TableDefinition, ColumnMethods);
+       include(Table, ColumnMethods);`,
+    );
+    const info = extractFromFiles("/p", { "schema-definitions.ts": hooked });
+    for (const name of ["TableDefinition", "Table"]) {
+      const klass = info.classes[`schema-definitions.ts:${name}`];
+      expect(klass.instanceMethods.find((m) => m.name === "bitVarying")!.bodyless).toBeUndefined();
+      expect(klass.instanceMethods.find((m) => m.name === "blob")!.aliasOf).toBe("binary");
+    }
+  });
+});
+
+describe("extractFromProgram — a Module on a static property", () => {
+  it("credits the included literal's methods under the dotted seat", () => {
+    const info = extractFromFiles("/p", {
+      "compatibility.ts": `export class V7_0 {
+        static TableDefinition = new Module().include({ column(name: string) {} });
+        static {
+          V7_0.TableDefinition.aliasMethod("change", "column");
+        }
+      }`,
+    });
+    const mod = info.modules["compatibility.ts:V7_0.TableDefinition"];
+    expect(mod.name).toBe("TableDefinition");
+    expect(mod.instanceMethods.map((m) => [m.name, m.aliasOf])).toEqual([
+      ["column", undefined],
+      ["change", "column"],
+    ]);
+  });
 });
 
 describe("extractFromProgram — classAttribute() generated accessors", () => {

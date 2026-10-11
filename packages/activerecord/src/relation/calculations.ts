@@ -147,10 +147,14 @@ interface CalculationRelation {
   selectValues: (string | symbol | ArelNode)[];
   withValues: Array<Record<string, unknown>>;
   /** @internal */
+  applyJoinDependency(options?: {
+    eagerLoading?: boolean;
+  }): CalculationRelation | Promise<CalculationRelation>;
+  /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: CalculationRelation, joinDependency: JoinDependency) => R | Promise<R>,
-  ): Promise<R>;
+  ): R | Promise<R>;
   calculate(operation: string, columnName?: string | ArelNode | number | null): Promise<unknown>;
   toArray(): Promise<any[]>;
   loaded: boolean;
@@ -381,26 +385,26 @@ export async function calculate(
   }
 
   if (hasInclude(this, columnName ?? null)) {
-    return this.applyJoinDependency({}, async (relation) => {
-      if (operation === "count") {
-        if (
-          !this.distinctValue &&
-          !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
-        ) {
-          relation.distinctBang();
-          const primaryKey = this.model.primaryKey;
-          relation.selectValues =
-            primaryKey == null
-              ? [new Nodes.SqlLiteral("*")]
-              : Array.isArray(primaryKey)
-                ? [...primaryKey]
-                : [primaryKey];
-        }
-        if (this.groupValues.length === 0) relation.orderValues = [];
-      }
+    const relation = await this.applyJoinDependency();
 
-      return relation.calculate(operation, columnName);
-    });
+    if (operation === "count") {
+      if (
+        !this.distinctValue &&
+        !isDistinctSelect(this, columnName ?? (await selectForCount(this)))
+      ) {
+        relation.distinctBang();
+        const primaryKey = this.model.primaryKey;
+        relation.selectValues =
+          primaryKey == null
+            ? [new Nodes.SqlLiteral("*")]
+            : Array.isArray(primaryKey)
+              ? [...primaryKey]
+              : [primaryKey];
+      }
+      if (this.groupValues.length === 0) relation.orderValues = [];
+    }
+
+    return relation.calculate(operation, columnName);
   } else {
     return performCalculation(this, operation, columnName ?? null);
   }
@@ -429,7 +433,8 @@ export async function pluck(
   }
 
   if (hasInclude(this as any, first(columnNames))) {
-    return this.applyJoinDependency({}, (relation) => relation.pluck(...columnNames));
+    const relation = await this.applyJoinDependency();
+    return relation.pluck(...columnNames);
   }
 
   this._model.disallowRawSqlBang(this.flattenedArgs(columnNames) as (string | symbol | ArelNode)[]);
@@ -509,7 +514,10 @@ export function ids(this: CalculationRelation): Promise<unknown[]> | unknown[] {
   }
 
   if (hasInclude(this as any, primaryKey as string)) {
-    return this.applyJoinDependency({}, (relation) => relation.group(...primaryKeyArray).ids());
+    return (async () => {
+      const relation = (await this.applyJoinDependency()).group(...primaryKeyArray);
+      return relation.ids();
+    })();
   }
 
   const columns = this.arelColumns(primaryKeyArray);
