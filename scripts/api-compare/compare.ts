@@ -189,7 +189,7 @@ import {
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
   inlinedSegments,
-  initializeLessTaggedClasses,
+  isInitializeLessTaggedClass,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
@@ -6479,16 +6479,21 @@ export function main() {
         if (declOnly) declarationOnly.push(missed);
       }
 
-      for (const fqn of initializeLessTaggedClasses(
-        items.map((item) => item.fqn),
-        rubyPkg.classes,
-        rubyFqnsReachingInitialize,
-        tsInlinedFromByFileOwner.get(expectedTs),
-        inlinedTagsCompared,
-        expectedTs,
-        (rubyModule) =>
-          resolveOwner("initialize", "constructor", expectedTs, rubyModule, "instance").tsClass,
-      )) {
+      for (const { fqn } of items) {
+        if (
+          !isInitializeLessTaggedClass(
+            fqn,
+            rubyPkg.classes,
+            rubyFqnsReachingInitialize,
+            tsInlinedFromByFileOwner.get(expectedTs),
+            inlinedTagsCompared,
+            expectedTs,
+            (rubyModule) =>
+              resolveOwner("initialize", "constructor", expectedTs, rubyModule, "instance").tsClass,
+          )
+        ) {
+          continue;
+        }
         checkCalls("initialize", "constructor", expectedTs, fqn, "instance");
         checkCallArgs("initialize", "constructor", expectedTs, fqn, "instance");
       }

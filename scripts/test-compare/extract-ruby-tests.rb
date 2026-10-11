@@ -195,7 +195,7 @@ class TestExtractor
     @in_non_test_class = false
     @non_test_classes = []
     @test_cases = []
-    @interpolated_names = {}
+    @interpolated_names = {}.compare_by_identity
     @source_lines = source.lines
     @quote_styles = build_quote_styles(source)
     @gate_stack = []

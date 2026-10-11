@@ -80,4 +80,26 @@ describe("an RSpec context name with an interpolation the loop does not expand",
       null,
     ]);
   });
+
+  it("gives a literal name equal to a blanked one no pattern", async () => {
+    expect(
+      await extractPaths(
+        `
+        describe 'a' do
+          [1].each do |n|
+            context("with #{n}") do
+              it("x") do
+              end
+            end
+          end
+          context("with ") do
+            it("y") do
+            end
+          end
+        end
+      `,
+        "pattern",
+      ),
+    ).toEqual([["a", "with <expr>", "x"], null]);
+  });
 });

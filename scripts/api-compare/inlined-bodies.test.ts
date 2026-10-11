@@ -13,7 +13,7 @@ import {
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
   inlinedSegments,
-  initializeLessTaggedClasses,
+  isInitializeLessTaggedClass,
   sameFileInitializeModules,
   taggedBodies,
   uncomparedInlinedTags,
@@ -181,27 +181,30 @@ describe("same-file module bodies join by convention", () => {
   });
 
   it("pairs a class whose only initialize comes from a module in another package's manifest", () => {
-    const classes = { "I18n::Config": entity("config.rb", ["ActiveModel::API"]), Plain: {} };
+    const classes = {
+      "I18n::Config": entity("config.rb", ["ActiveModel::API"]),
+      "Other::Config": entity("config.rb", ["ActiveModel::API"]),
+      Plain: {},
+    };
     const tagged = new Map([["Config", [tag("ActiveModel::API")]]]);
-    const ownerOf = (fqn: string) => fqn.split("::").at(-1);
-    const pair = (
-      reaching: string[],
-      compared: string[],
-      byOwner: typeof tagged | undefined = tagged,
-    ) =>
-      initializeLessTaggedClasses(
-        ["I18n::Config", "Plain", "I18n::Backend::Base"],
-        classes,
-        new Set(reaching),
-        byOwner,
-        new Set(compared),
-        "config.ts",
-        ownerOf,
-      );
-    expect(pair([], [])).toEqual(["I18n::Config"]);
-    expect(pair(["I18n::Config"], [])).toEqual([]);
-    expect(pair([], ["config.ts Config"])).toEqual([]);
-    expect(pair([], [], new Map())).toEqual([]);
+    const pair = (reaching: string[], compared: Set<string>, byOwner = tagged) =>
+      ["I18n::Config", "Other::Config", "Plain", "I18n::Backend::Base"].filter((fqn) => {
+        const paired = isInitializeLessTaggedClass(
+          fqn,
+          classes,
+          new Set(reaching),
+          byOwner,
+          compared,
+          "config.ts",
+          (rubyModule) => rubyModule.split("::").at(-1),
+        );
+        if (paired) compared.add("config.ts Config");
+        return paired;
+      });
+    expect(pair([], new Set())).toEqual(["I18n::Config"]);
+    expect(pair(["I18n::Config"], new Set())).toEqual(["Other::Config"]);
+    expect(pair([], new Set(["config.ts Config"]))).toEqual([]);
+    expect(pair([], new Set(), new Map())).toEqual([]);
     const segments = inlinedSegments(
       undefined,
       [],
@@ -214,8 +217,8 @@ describe("same-file module bodies join by convention", () => {
   it("leaves a tag on a constructor with no Rails class to the never-compared throw", () => {
     const byFileOwner = new Map([["config.ts", new Map([["Stray", []]])]]);
     expect(
-      initializeLessTaggedClasses(
-        ["I18n::Config"],
+      isInitializeLessTaggedClass(
+        "I18n::Config",
         { "I18n::Config": {} },
         new Set(),
         byFileOwner.get("config.ts"),
@@ -223,7 +226,7 @@ describe("same-file module bodies join by convention", () => {
         "config.ts",
         (fqn) => fqn.split("::").at(-1),
       ),
-    ).toEqual([]);
+    ).toBe(false);
     expect(uncomparedInlinedTags(byFileOwner, new Set())).toEqual(["config.ts Stray"]);
   });
 

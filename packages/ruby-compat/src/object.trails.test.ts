@@ -4,6 +4,7 @@ import {
   rbCBasicObject,
   rbCInteger,
   rbCString,
+  rbCSymbol,
   rbClassOf,
   rbObjSingletonClass,
   rbCDate,
@@ -1102,5 +1103,21 @@ describe("Kernel#send of +", () => {
 
     expect(rbFSend(recv, "+", 1)).toBe("missing");
     expect(sent).toEqual([["+", 1]]);
+  });
+});
+
+describe("rbFSend on a Symbol receiver", () => {
+  it("finds a method seated on rbCSymbol before String's, and leaves every other name to String", () => {
+    const proto = rbCSymbol.prototype as { seatedOnSymbol?: (this: string) => string };
+    proto.seatedOnSymbol = function () {
+      return `sym ${this}`;
+    };
+    try {
+      expect(rbFSend(":foo", "seatedOnSymbol")).toBe("sym :foo");
+      expect(() => rbFSend("foo", "seatedOnSymbol")).toThrow(NoMethodError);
+      expect(rbFSend(":foo", "length")).toBe(4);
+    } finally {
+      delete proto.seatedOnSymbol;
+    }
   });
 });

@@ -393,8 +393,12 @@ export class Packer<Io = unknown> {
     }
   }
 
+  private writeStringValue(v: string): void {
+    this.buffer.write(encoder.encodeSharedRef(v));
+  }
+
   private writeSymbolStringValue(v: string): void {
-    this.buffer.write(encoder.encodeSharedRef(symbolToS(v)));
+    this.writeStringValue(symbolToS(v));
   }
 
   private writeSymbolValue(v: string): void {
@@ -488,12 +492,6 @@ export class Packer<Io = unknown> {
     return [0, null, 0];
   }
 
-  private writeOtherValue(v: unknown): void {
-    if (!this.tryWriteWithExtTypeLookup(v)) {
-      rbFSend(v, "toMsgpack", this);
-    }
-  }
-
   private tryWriteWithExtTypeLookup(v: unknown): boolean {
     const [extType, proc, extFlags] = this.extRegistryLookup(v);
 
@@ -519,6 +517,12 @@ export class Packer<Io = unknown> {
     }
 
     return true;
+  }
+
+  private writeOtherValue(v: unknown): void {
+    if (!this.tryWriteWithExtTypeLookup(v)) {
+      rbFSend(v, "toMsgpack", this);
+    }
   }
 }
 

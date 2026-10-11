@@ -220,6 +220,16 @@ describe("Float, Symbol and Buffer", () => {
         .feed(Uint8Array.of(0xc7, 0x00, 0x00))
         .read(),
     ).toBe(":");
+
+    const elsewhere = new Factory();
+    elsewhere.registerType(0x01, rbCSymbol, { optimizedSymbolsParsing: true });
+    expect(elsewhere.unpacker().feed(symbol).read()).toBe(":symbol");
+    expect(() =>
+      elsewhere
+        .unpacker()
+        .feed(Uint8Array.of(0xd4, 0x01, 0x61))
+        .read(),
+    ).toThrow("unexpected extension type");
   });
 
   it("answers Buffer#to_s as to_str", () => {
