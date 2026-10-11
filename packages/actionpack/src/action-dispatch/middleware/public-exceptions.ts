@@ -56,7 +56,7 @@ export class PublicExceptions {
   }
 
   private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
-    const charset = Response.defaultCharset;
+    const charset = Response.defaultCharset ?? "";
     const enc = normalizeCharset(charset);
     const effectiveCharset =
       enc === "utf-8" && charset.toLowerCase() !== "utf-8" ? "utf-8" : charset;

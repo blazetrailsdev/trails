@@ -8,14 +8,16 @@ import {
 } from "../../action-dispatch/http/response.js";
 import {
   CachedThreadPool,
+  File,
   Queue,
   RuntimeError,
   SizedQueue,
   Thread,
+  isSymbol,
   merge,
 } from "@blazetrails/ruby-compat";
 import { Module } from "@blazetrails/ruby-compat/include";
-import { Concern, IsolatedExecutionState, extend } from "@blazetrails/activesupport";
+import { Concern, IsolatedExecutionState, Notifications, extend } from "@blazetrails/activesupport";
 import { Base as ActionViewBase } from "@blazetrails/actionview";
 
 export class ClientDisconnected extends RuntimeError {}
@@ -249,40 +251,35 @@ export function responseBody(this: LiveControllerHost, body: unknown): void {
 export interface SendStreamOptions {
   filename: string;
   disposition?: string;
-  type?: string | symbol | null;
+  type?: string | null;
 }
 
 export async function sendStream(
   this: LiveControllerHost,
-  options: SendStreamOptions,
+  { filename, disposition = "attachment", type = null }: SendStreamOptions,
   block: (stream: Buffer) => void | Promise<void>,
 ): Promise<void> {
-  const { filename, type } = options;
-  const disposition = options.disposition ?? "attachment";
-
-  let resolved =
-    typeof type === "string"
-      ? type
-      : typeof type === "symbol"
-        ? (() => {
-            const desc = type.description;
-            return desc ? (Mime.get(desc)?.toString() ?? null) : null;
-          })()
-        : null;
-  if (!resolved) {
-    const dot = filename.lastIndexOf(".");
-    const ext = dot >= 0 ? filename.slice(dot + 1).toLowerCase() : "";
-    resolved = (ext && MimeType.lookupByExtension(ext)?.toString()) || "application/octet-stream";
-  }
-
-  const res = this.response;
-  res.setHeader("content-type", resolved);
-  res.setHeader("content-disposition", ContentDisposition.format({ disposition, filename }));
-
   try {
-    await block(res.stream);
+    const payload = { filename, disposition, type };
+    await Notifications.instrument("send_stream.action_controller", payload, async () => {
+      this.response.headers.set(
+        "Content-Type",
+        (isSymbol(type) ? (Mime.get(type.slice(1))?.toString() ?? "") : type) ??
+          MimeType.lookupByExtension(
+            File.extname(filename).toLowerCase().replaceAll(".", ""),
+          )?.toString() ??
+          "application/octet-stream",
+      );
+
+      this.response.headers.set(
+        "Content-Disposition",
+        ContentDisposition.format({ disposition, filename }),
+      );
+
+      await block(this.response.stream);
+    });
   } finally {
-    res.stream.close();
+    this.response.stream.close();
   }
 }
 
