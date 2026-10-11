@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class ShopCollection extends Base {
   declare products: AssociationProxy<ShopProduct>;
@@ -15,7 +15,7 @@ export class ShopCollection extends Base {
     });
   }
 }
-registerConstant("ShopCollection", ShopCollection);
+registerModel(ShopCollection);
 
 export class ShopProductType extends Base {
   declare products: AssociationProxy<ShopProduct>;
@@ -26,7 +26,7 @@ export class ShopProductType extends Base {
     this.hasMany("products", { className: "ShopProduct", foreignKey: "type_id" });
   }
 }
-registerConstant("ShopProductType", ShopProductType);
+registerModel(ShopProductType);
 
 export class ShopProduct extends Base {
   declare variants: AssociationProxy<ShopVariant>;
@@ -43,11 +43,11 @@ export class ShopProduct extends Base {
     this.belongsTo("type", { className: "ShopProductType" });
   }
 }
-registerConstant("ShopProduct", ShopProduct);
+registerModel(ShopProduct);
 
 export class ShopVariant extends Base {
   static {
     this.tableName = "variants";
   }
 }
-registerConstant("ShopVariant", ShopVariant);
+registerModel(ShopVariant);

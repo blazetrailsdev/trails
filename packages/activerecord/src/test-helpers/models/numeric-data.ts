@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- a generated attribute accessor's reader and writer types differ (CLAUDE.md, "Generated attribute readers are properties"); a class body cannot hold a bodiless accessor, so the pair lives in an interface that merges with the class. */
 export interface NumericData {
@@ -33,4 +33,4 @@ export class NumericData extends Base {
     this.aliasAttribute("new_bank_balance", "bank_balance");
   }
 }
-registerConstant("NumericData", NumericData);
+registerModel(NumericData);

@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { DlKeyedHasOne } from "./dl-keyed-has-one.js";
 import type { Tag } from "./tag.js";
 import type { Tagging } from "./tagging.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class DestroyAsyncParentSoftDelete extends Base {
@@ -33,7 +33,7 @@ export class DestroyAsyncParentSoftDelete extends Base {
     return this;
   }
 }
-registerConstant("DestroyAsyncParentSoftDelete", DestroyAsyncParentSoftDelete);
+registerModel(DestroyAsyncParentSoftDelete);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface DestroyAsyncParentSoftDelete {
   get dlKeyedHasOne(): DlKeyedHasOne | null | Promise<DlKeyedHasOne | null>;

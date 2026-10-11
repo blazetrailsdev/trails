@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Pirate } from "./pirate.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class AbstractDoubloon extends Base {
@@ -9,7 +9,7 @@ export class AbstractDoubloon extends Base {
     this.belongsTo("pirate");
   }
 }
-registerConstant("AbstractDoubloon", AbstractDoubloon);
+registerModel(AbstractDoubloon);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface AbstractDoubloon {
   get pirate(): Pirate | null | Promise<Pirate | null>;
@@ -22,4 +22,4 @@ export class Doubloon extends AbstractDoubloon {
 
   static _tableName = "doubloons";
 }
-registerConstant("Doubloon", Doubloon);
+registerModel(Doubloon);

@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/date";
 import type { Section } from "./section.js";
 import type { Seminar } from "./seminar.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Session extends Base {
   declare sections: AssociationProxy<Section>;
@@ -17,4 +17,4 @@ export class Session extends Base {
     this.hasMany("seminars", { through: "sections" });
   }
 }
-registerConstant("Session", Session);
+registerModel(Session);

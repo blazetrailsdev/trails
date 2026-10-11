@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
 import { ConnectionNotEstablished } from "../../errors.js";
 import { FakeActiveRecordAdapter } from "../../support/fake-adapter.js";
 import type { MergeColumnOptions } from "../../support/fake-adapter.js";
+import { registerModel } from "../../associations.js";
 
 type ContactFakeColumnsHost = typeof Base & { column: typeof column };
 
@@ -55,7 +55,7 @@ export class Contact extends Base {
 
   static column = column;
 }
-registerConstant("Contact", Contact);
+registerModel(Contact);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Contact {
   get alternative(): Contact | null | Promise<Contact | null>;
@@ -72,7 +72,7 @@ export class ContactSti extends Base {
     return "ContactSti";
   }
 }
-registerConstant("ContactSti", ContactSti);
+registerModel(ContactSti);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface ContactSti {
   get alternative(): Contact | null | Promise<Contact | null>;

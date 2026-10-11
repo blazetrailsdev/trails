@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Guitar } from "./guitar.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TuningPeg extends Base {
@@ -12,7 +12,7 @@ export class TuningPeg extends Base {
     this.validatesNumericalityOf("pitch");
   }
 }
-registerConstant("TuningPeg", TuningPeg);
+registerModel(TuningPeg);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TuningPeg {
   get guitar(): Guitar | null | Promise<Guitar | null>;

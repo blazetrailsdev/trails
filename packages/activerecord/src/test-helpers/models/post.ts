@@ -40,7 +40,7 @@ export class CategoryPost extends Base {
     this.belongsTo("post");
   }
 }
-registerConstant("CategoryPost", CategoryPost);
+registerModel(CategoryPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface CategoryPost {
   get group(): Category | null | Promise<Category | null>;
@@ -671,7 +671,7 @@ export class Post extends Base {
     return this._log;
   }
 }
-registerConstant("Post", Post);
+registerModel(Post);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Post {
   get verySpecialCommentWithPost(): VerySpecialComment | null | Promise<VerySpecialComment | null>;
@@ -713,6 +713,7 @@ export interface Post {
 }
 
 export class SpecialPost extends Post {}
+registerModel(SpecialPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class StiPost extends Post {
@@ -720,6 +721,7 @@ export class StiPost extends Post {
     this.hasOne("specialComment", { className: "SpecialComment" });
   }
 }
+registerModel(StiPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface StiPost {
   get specialComment(): SpecialComment | null | Promise<SpecialComment | null>;
@@ -731,18 +733,21 @@ export class AbstractStiPost extends Post {
     this.abstractClass = true;
   }
 }
+registerModel(AbstractStiPost);
 
 export class SubStiPost extends StiPost {
   static {
     this._tableName = "posts";
   }
 }
+registerModel(SubStiPost);
 
 export class SubAbstractStiPost extends AbstractStiPost {
   static {
     this._tableName = "posts";
   }
 }
+registerModel(SubAbstractStiPost);
 
 export class NullPost extends Post {
   static {
@@ -751,6 +756,7 @@ export class NullPost extends Post {
     });
   }
 }
+registerModel(NullPost);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class FirstPost extends Base {
@@ -771,7 +777,7 @@ export class FirstPost extends Base {
     });
   }
 }
-registerConstant("FirstPost", FirstPost);
+registerModel(FirstPost);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface FirstPost {
   get comment(): Comment | null | Promise<Comment | null>;
@@ -788,7 +794,7 @@ export class PostWithDefaultSelect extends Base {
     });
   }
 }
-registerConstant("PostWithDefaultSelect", PostWithDefaultSelect);
+registerModel(PostWithDefaultSelect);
 
 export class TaggedPost extends Post {
   declare taggings: AssociationProxy<Tagging>;
@@ -807,6 +813,7 @@ export class TaggedPost extends Post {
     this.hasMany("tags", { through: "taggings" });
   }
 }
+registerModel(TaggedPost);
 
 export class PostWithDefaultInclude extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -820,7 +827,7 @@ export class PostWithDefaultInclude extends Base {
     this.hasMany("comments", { foreignKey: "post_id" });
   }
 }
-registerConstant("PostWithDefaultInclude", PostWithDefaultInclude);
+registerModel(PostWithDefaultInclude);
 
 export class PostWithSpecialCategorization extends Post {
   declare categorizations: AssociationProxy<Categorization>;
@@ -834,6 +841,7 @@ export class PostWithSpecialCategorization extends Post {
     });
   }
 }
+registerModel(PostWithSpecialCategorization);
 
 export class PostWithDefaultScope extends Base {
   static {
@@ -844,7 +852,7 @@ export class PostWithDefaultScope extends Base {
     });
   }
 }
-registerConstant("PostWithDefaultScope", PostWithDefaultScope);
+registerModel(PostWithDefaultScope);
 
 export class PostWithPreloadDefaultScope extends Base {
   declare readers: AssociationProxy<Reader>;
@@ -857,7 +865,7 @@ export class PostWithPreloadDefaultScope extends Base {
     });
   }
 }
-registerConstant("PostWithPreloadDefaultScope", PostWithPreloadDefaultScope);
+registerModel(PostWithPreloadDefaultScope);
 
 export class PostWithIncludesDefaultScope extends Base {
   declare readers: AssociationProxy<Reader>;
@@ -870,7 +878,7 @@ export class PostWithIncludesDefaultScope extends Base {
     });
   }
 }
-registerConstant("PostWithIncludesDefaultScope", PostWithIncludesDefaultScope);
+registerModel(PostWithIncludesDefaultScope);
 
 export class SpecialPostWithDefaultScope extends Base {
   declare static unscopedAll: () => Relation<SpecialPostWithDefaultScope>;
@@ -890,7 +898,7 @@ export class SpecialPostWithDefaultScope extends Base {
     });
   }
 }
-registerConstant("SpecialPostWithDefaultScope", SpecialPostWithDefaultScope);
+registerModel(SpecialPostWithDefaultScope);
 
 export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
   declare comments: AssociationProxy<CommentThatAutomaticallyAltersPostBody>;
@@ -907,7 +915,7 @@ export class PostThatLoadsCommentsInAnAfterSaveHook extends Base {
     });
   }
 }
-registerConstant("PostThatLoadsCommentsInAnAfterSaveHook", PostThatLoadsCommentsInAnAfterSaveHook);
+registerModel(PostThatLoadsCommentsInAnAfterSaveHook);
 
 export class PostWithAfterCreateCallback extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -924,7 +932,7 @@ export class PostWithAfterCreateCallback extends Base {
     });
   }
 }
-registerConstant("PostWithAfterCreateCallback", PostWithAfterCreateCallback);
+registerModel(PostWithAfterCreateCallback);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
@@ -940,10 +948,7 @@ export class PostWithCommentWithDefaultScopeReferencesAssociation extends Base {
     });
   }
 }
-registerConstant(
-  "PostWithCommentWithDefaultScopeReferencesAssociation",
-  PostWithCommentWithDefaultScopeReferencesAssociation,
-);
+registerModel(PostWithCommentWithDefaultScopeReferencesAssociation);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface PostWithCommentWithDefaultScopeReferencesAssociation {
   get firstComment():
@@ -961,7 +966,7 @@ export class SerializedPost extends Base {
     this.serialize("title");
   }
 }
-registerConstant("SerializedPost", SerializedPost);
+registerModel(SerializedPost);
 
 export class ConditionalStiPost extends Post {
   static {
@@ -970,8 +975,10 @@ export class ConditionalStiPost extends Post {
     });
   }
 }
+registerModel(ConditionalStiPost);
 
 export class SubConditionalStiPost extends ConditionalStiPost {}
+registerModel(SubConditionalStiPost);
 
 export class PostWithDestroyCallback extends Base {
   static {
@@ -982,7 +989,7 @@ export class PostWithDestroyCallback extends Base {
     });
   }
 }
-registerConstant("PostWithDestroyCallback", PostWithDestroyCallback);
+registerModel(PostWithDestroyCallback);
 
 export class FakeKlass {
   static relationDelegateClass = DelegateCache.relationDelegateClass;
@@ -1072,7 +1079,7 @@ export class Postesque extends Base {
     });
   }
 }
-registerConstant("Postesque", Postesque);
+registerModel(Postesque);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Postesque {
   get author(): Author | null | Promise<Author | null>;
@@ -1094,19 +1101,4 @@ export class PostRecord extends Base {
     this.hasMany("comments");
   }
 }
-registerConstant("PostRecord", PostRecord);
-
-for (const klass of [
-  SpecialPost,
-  StiPost,
-  AbstractStiPost,
-  SubStiPost,
-  SubAbstractStiPost,
-  NullPost,
-  TaggedPost,
-  PostWithSpecialCategorization,
-  ConditionalStiPost,
-  SubConditionalStiPost,
-]) {
-  registerModel(klass);
-}
+registerModel(PostRecord);

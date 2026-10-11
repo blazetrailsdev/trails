@@ -1,6 +1,7 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
 import { Module, Range, registerConstant, rbModConstSet } from "@blazetrails/ruby-compat";
+import { registerModel } from "../../associations.js";
 
 registerConstant("MyApplication", new Module());
 const Business = new Module();
@@ -20,7 +21,7 @@ registerConstant("MyApplication::Billing::Nested", BillingNested);
 
 export class MyAppBusinessCompany extends Base {
   static {
-    rbModConstSet(Business, "Company", this);
+    registerModel(rbModConstSet(Business, "Company", this));
   }
 }
 
@@ -32,7 +33,7 @@ export class MyAppBusinessFirm extends MyAppBusinessCompany {
   declare clientsLikeMs: AssociationProxy<MyAppBusinessClient>;
 
   static {
-    rbModConstSet(Business, "Firm", this);
+    registerModel(rbModConstSet(Business, "Firm", this));
   }
 
   static {
@@ -79,7 +80,7 @@ export interface MyAppBusinessFirm {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBusinessClient extends MyAppBusinessCompany {
   static {
-    rbModConstSet(Business, "Client", this);
+    registerModel(rbModConstSet(Business, "Client", this));
   }
 
   static {
@@ -97,7 +98,7 @@ export interface MyAppBusinessClient {
 
 export class MyAppBusinessClientContact extends Base {
   static {
-    rbModConstSet(MyAppBusinessClient, "Contact", this);
+    registerModel(rbModConstSet(MyAppBusinessClient, "Contact", this));
   }
 }
 
@@ -106,7 +107,7 @@ export class MyAppBusinessDeveloper extends Base {
   declare name: string;
 
   static {
-    rbModConstSet(Business, "Developer", this);
+    registerModel(rbModConstSet(Business, "Developer", this));
   }
 
   static {
@@ -119,7 +120,7 @@ export class MyAppBusinessProject extends Base {
   declare developers: AssociationProxy<MyAppBusinessDeveloper>;
 
   static {
-    rbModConstSet(Business, "Project", this);
+    registerModel(rbModConstSet(Business, "Project", this));
   }
 
   static {
@@ -129,13 +130,13 @@ export class MyAppBusinessProject extends Base {
 
 export class MyAppBusinessPrefixedCompany extends Base {
   static {
-    rbModConstSet(Prefixed, "Company", this);
+    registerModel(rbModConstSet(Prefixed, "Company", this));
   }
 }
 
 export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
   static {
-    rbModConstSet(Prefixed, "Firm", this);
+    registerModel(rbModConstSet(Prefixed, "Firm", this));
   }
 
   static {
@@ -145,19 +146,19 @@ export class MyAppBusinessPrefixedFirm extends MyAppBusinessPrefixedCompany {
 
 export class MyAppBusinessPrefixedNestedCompany extends Base {
   static {
-    rbModConstSet(PrefixedNested, "Company", this);
+    registerModel(rbModConstSet(PrefixedNested, "Company", this));
   }
 }
 
 export class MyAppBusinessSuffixedCompany extends Base {
   static {
-    rbModConstSet(Suffixed, "Company", this);
+    registerModel(rbModConstSet(Suffixed, "Company", this));
   }
 }
 
 export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
   static {
-    rbModConstSet(Suffixed, "Firm", this);
+    registerModel(rbModConstSet(Suffixed, "Firm", this));
   }
 
   static {
@@ -167,13 +168,13 @@ export class MyAppBusinessSuffixedFirm extends MyAppBusinessSuffixedCompany {
 
 export class MyAppBusinessSuffixedNestedCompany extends Base {
   static {
-    rbModConstSet(SuffixedNested, "Company", this);
+    registerModel(rbModConstSet(SuffixedNested, "Company", this));
   }
 }
 
 export class MyAppBillingFirm extends Base {
   static {
-    rbModConstSet(Billing, "Firm", this);
+    registerModel(rbModConstSet(Billing, "Firm", this));
   }
 
   static {
@@ -183,7 +184,7 @@ export class MyAppBillingFirm extends Base {
 
 export class MyAppBillingNestedFirm extends Base {
   static {
-    rbModConstSet(BillingNested, "Firm", this);
+    registerModel(rbModConstSet(BillingNested, "Firm", this));
   }
 
   static {
@@ -194,7 +195,7 @@ export class MyAppBillingNestedFirm extends Base {
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class MyAppBillingAccount extends Base {
   static {
-    rbModConstSet(Billing, "Account", this);
+    registerModel(rbModConstSet(Billing, "Account", this));
   }
 
   static {

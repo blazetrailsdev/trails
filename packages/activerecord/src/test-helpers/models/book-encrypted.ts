@@ -1,11 +1,11 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class UnencryptedBook extends Base {
   static _tableName = "encrypted_books";
 }
-registerConstant("UnencryptedBook", UnencryptedBook);
+registerModel(UnencryptedBook);
 
 export class EncryptedBook extends Base {
   declare author_id: number;
@@ -22,7 +22,7 @@ export class EncryptedBook extends Base {
     this.encrypts("name", { deterministic: true });
   }
 }
-registerConstant("EncryptedBook", EncryptedBook);
+registerModel(EncryptedBook);
 
 export class EncryptedBookWithUniquenessValidation extends Base {
   static _tableName = "encrypted_books";
@@ -32,7 +32,7 @@ export class EncryptedBookWithUniquenessValidation extends Base {
     this.encrypts("name", { deterministic: true });
   }
 }
-registerConstant("EncryptedBookWithUniquenessValidation", EncryptedBookWithUniquenessValidation);
+registerModel(EncryptedBookWithUniquenessValidation);
 
 export class EncryptedBookWithDowncaseName extends Base {
   static _tableName = "encrypted_books";
@@ -42,7 +42,7 @@ export class EncryptedBookWithDowncaseName extends Base {
     this.encrypts("name", { deterministic: true, downcase: true });
   }
 }
-registerConstant("EncryptedBookWithDowncaseName", EncryptedBookWithDowncaseName);
+registerModel(EncryptedBookWithDowncaseName);
 
 function _downcaseLikeRails(v: unknown): unknown {
   if (v == null) return v;
@@ -67,7 +67,7 @@ export class EncryptedBookNormalizedFirst extends Base {
     this.encrypts("logo");
   }
 }
-registerConstant("EncryptedBookNormalizedFirst", EncryptedBookNormalizedFirst);
+registerModel(EncryptedBookNormalizedFirst);
 
 export class EncryptedBookNormalizedSecond extends Base {
   static _tableName = "encrypted_books";
@@ -79,7 +79,7 @@ export class EncryptedBookNormalizedSecond extends Base {
     this.normalizes("logo", { with: _downcaseLikeRails });
   }
 }
-registerConstant("EncryptedBookNormalizedSecond", EncryptedBookNormalizedSecond);
+registerModel(EncryptedBookNormalizedSecond);
 
 export class EncryptedBookAttribute extends Base {
   declare name: Temporal.PlainDate;
@@ -91,7 +91,7 @@ export class EncryptedBookAttribute extends Base {
     this.encrypts("name");
   }
 }
-registerConstant("EncryptedBookAttribute", EncryptedBookAttribute);
+registerModel(EncryptedBookAttribute);
 
 export class EncryptedBookThatIgnoresCase extends Base {
   static _tableName = "encrypted_books";
@@ -100,7 +100,7 @@ export class EncryptedBookThatIgnoresCase extends Base {
     this.encrypts("name", { deterministic: true, ignoreCase: true });
   }
 }
-registerConstant("EncryptedBookThatIgnoresCase", EncryptedBookThatIgnoresCase);
+registerModel(EncryptedBookThatIgnoresCase);
 
 export class EncryptedBookWithUnencryptedDataOptedOut extends Base {
   static _tableName = "encrypted_books";
@@ -110,10 +110,7 @@ export class EncryptedBookWithUnencryptedDataOptedOut extends Base {
     this.encrypts("name", { deterministic: true, supportUnencryptedData: false });
   }
 }
-registerConstant(
-  "EncryptedBookWithUnencryptedDataOptedOut",
-  EncryptedBookWithUnencryptedDataOptedOut,
-);
+registerModel(EncryptedBookWithUnencryptedDataOptedOut);
 
 export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
   static _tableName = "encrypted_books";
@@ -123,10 +120,7 @@ export class EncryptedBookWithUnencryptedDataOptedIn extends Base {
     this.encrypts("name", { deterministic: true, supportUnencryptedData: true });
   }
 }
-registerConstant(
-  "EncryptedBookWithUnencryptedDataOptedIn",
-  EncryptedBookWithUnencryptedDataOptedIn,
-);
+registerModel(EncryptedBookWithUnencryptedDataOptedIn);
 
 export class EncryptedBookWithBinary extends Base {
   declare logo: Uint8Array | null;
@@ -136,7 +130,7 @@ export class EncryptedBookWithBinary extends Base {
     this.encrypts("logo");
   }
 }
-registerConstant("EncryptedBookWithBinary", EncryptedBookWithBinary);
+registerModel(EncryptedBookWithBinary);
 
 export class EncryptedBookWithSerializedFirstBinary extends Base {
   static _tableName = "encrypted_books";
@@ -146,7 +140,7 @@ export class EncryptedBookWithSerializedFirstBinary extends Base {
     this.encrypts("logo");
   }
 }
-registerConstant("EncryptedBookWithSerializedFirstBinary", EncryptedBookWithSerializedFirstBinary);
+registerModel(EncryptedBookWithSerializedFirstBinary);
 
 export class EncryptedBookWithSerializedSecondBinary extends Base {
   static _tableName = "encrypted_books";
@@ -156,10 +150,7 @@ export class EncryptedBookWithSerializedSecondBinary extends Base {
     this.serialize("logo", { coder: JSON });
   }
 }
-registerConstant(
-  "EncryptedBookWithSerializedSecondBinary",
-  EncryptedBookWithSerializedSecondBinary,
-);
+registerModel(EncryptedBookWithSerializedSecondBinary);
 
 export class EncryptedBookWithSerializedDeterministicName extends Base {
   declare name: unknown;
@@ -181,10 +172,7 @@ export class EncryptedBookWithSerializedDeterministicName extends Base {
     });
   }
 }
-registerConstant(
-  "EncryptedBookWithSerializedDeterministicName",
-  EncryptedBookWithSerializedDeterministicName,
-);
+registerModel(EncryptedBookWithSerializedDeterministicName);
 
 export class EncryptedBookWithCustomCompressor extends Base {
   static _tableName = "encrypted_books";
@@ -198,4 +186,4 @@ export class EncryptedBookWithCustomCompressor extends Base {
     });
   }
 }
-registerConstant("EncryptedBookWithCustomCompressor", EncryptedBookWithCustomCompressor);
+registerModel(EncryptedBookWithCustomCompressor);

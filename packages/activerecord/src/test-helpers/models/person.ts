@@ -1,4 +1,4 @@
-import { RuntimeError, registerConstant } from "@blazetrails/ruby-compat";
+import { RuntimeError } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -17,6 +17,7 @@ import type { SecureReader } from "./reader.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 import type { CollectionProxy } from "../../associations/collection-proxy.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Person {
@@ -180,7 +181,7 @@ export class PersonWithDependentDestroyJobs extends Base {
     this.hasMany("jobs", { source: "job", through: "references", dependent: "destroy" });
   }
 }
-registerConstant("PersonWithDependentDestroyJobs", PersonWithDependentDestroyJobs);
+registerModel(PersonWithDependentDestroyJobs);
 
 export class PersonWithDependentDeleteAllJobs extends Base {
   declare references: AssociationProxy<Reference>;
@@ -192,7 +193,7 @@ export class PersonWithDependentDeleteAllJobs extends Base {
     this.hasMany("jobs", { source: "job", through: "references", dependent: "deleteAll" });
   }
 }
-registerConstant("PersonWithDependentDeleteAllJobs", PersonWithDependentDeleteAllJobs);
+registerModel(PersonWithDependentDeleteAllJobs);
 
 export class PersonWithDependentNullifyJobs extends Base {
   declare references: AssociationProxy<Reference>;
@@ -204,7 +205,7 @@ export class PersonWithDependentNullifyJobs extends Base {
     this.hasMany("jobs", { source: "job", through: "references", dependent: "nullify" });
   }
 }
-registerConstant("PersonWithDependentNullifyJobs", PersonWithDependentNullifyJobs);
+registerModel(PersonWithDependentNullifyJobs);
 
 export class PersonWithPolymorphicDependentNullifyComments extends Base {
   declare comments: AssociationProxy<Comment>;
@@ -214,10 +215,7 @@ export class PersonWithPolymorphicDependentNullifyComments extends Base {
     this.hasMany("comments", { as: "author", dependent: "nullify" });
   }
 }
-registerConstant(
-  "PersonWithPolymorphicDependentNullifyComments",
-  PersonWithPolymorphicDependentNullifyComments,
-);
+registerModel(PersonWithPolymorphicDependentNullifyComments);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class LoosePerson extends Base {
@@ -233,7 +231,7 @@ export class LoosePerson extends Base {
     this.acceptsNestedAttributesFor("bestFriend", "bestFriendOf", "bestFriends");
   }
 }
-registerConstant("LoosePerson", LoosePerson);
+registerModel(LoosePerson);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface LoosePerson {
   get bestFriend(): LoosePerson | null | Promise<LoosePerson | null>;
@@ -242,7 +240,7 @@ export interface LoosePerson {
   set bestFriendOf(value: LoosePerson | null);
 }
 export class LooseDescendant extends LoosePerson {}
-registerConstant("LooseDescendant", LooseDescendant);
+registerModel(LooseDescendant);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class TightPerson extends Base {
@@ -257,7 +255,7 @@ export class TightPerson extends Base {
     this.acceptsNestedAttributesFor("bestFriend", "bestFriendOf", "bestFriends");
   }
 }
-registerConstant("TightPerson", TightPerson);
+registerModel(TightPerson);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface TightPerson {
   get bestFriend(): TightPerson | null | Promise<TightPerson | null>;
@@ -266,7 +264,7 @@ export interface TightPerson {
   set bestFriendOf(value: TightPerson | null);
 }
 export class TightDescendant extends TightPerson {}
-registerConstant("TightDescendant", TightDescendant);
+registerModel(TightDescendant);
 
 export class RichPerson extends Base {
   declare treasures: AssociationProxy<Treasure>;
@@ -296,7 +294,7 @@ export class RichPerson extends Base {
     );
   }
 }
-registerConstant("RichPerson", RichPerson);
+registerModel(RichPerson);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class NestedPerson extends Base {
@@ -315,7 +313,7 @@ export class NestedPerson extends Base {
     return this.assignAttributes({ bestFriendAttributes: { first_name: newName } });
   }
 }
-registerConstant("NestedPerson", NestedPerson);
+registerModel(NestedPerson);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface NestedPerson {
   get bestFriend(): NestedPerson | null | Promise<NestedPerson | null>;
@@ -342,9 +340,9 @@ export class SerializedPerson extends Base {
     this.serialize("insures", { coder: Insure });
   }
 }
-registerConstant("SerializedPerson", SerializedPerson);
+registerModel(SerializedPerson);
 
-registerConstant("Person", Person);
+registerModel(Person);
 
 export class PersonWithTimestampInCreate extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
@@ -356,7 +354,7 @@ export class PersonWithTimestampInCreate extends Base {
     });
   }
 }
-registerConstant("PersonWithTimestampInCreate", PersonWithTimestampInCreate);
+registerModel(PersonWithTimestampInCreate);
 
 export class PersonWithTimestampInUpdate extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
@@ -368,7 +366,7 @@ export class PersonWithTimestampInUpdate extends Base {
     });
   }
 }
-registerConstant("PersonWithTimestampInUpdate", PersonWithTimestampInUpdate);
+registerModel(PersonWithTimestampInUpdate);
 
 export class PersonWithTimestampInSave extends Base {
   declare born_at: RubyTime | Temporal.PlainDateTime | null;
@@ -380,4 +378,4 @@ export class PersonWithTimestampInSave extends Base {
     });
   }
 }
-registerConstant("PersonWithTimestampInSave", PersonWithTimestampInSave);
+registerModel(PersonWithTimestampInSave);

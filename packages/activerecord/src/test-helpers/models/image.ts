@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Image extends Base {
@@ -14,7 +14,7 @@ export class Image extends Base {
     });
   }
 }
-registerConstant("Image", Image);
+registerModel(Image);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Image {
   get imageable(): Base | null | Promise<Base | null>;

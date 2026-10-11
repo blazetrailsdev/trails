@@ -1,7 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Job } from "./job.js";
 import type { Person } from "./person.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Friendship extends Base {
@@ -27,7 +27,7 @@ export class Friendship extends Base {
     });
   }
 }
-registerConstant("Friendship", Friendship);
+registerModel(Friendship);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Friendship {
   get friend(): Person | null | Promise<Person | null>;

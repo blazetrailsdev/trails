@@ -1,10 +1,10 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class ChatMessage extends Base {}
-registerConstant("ChatMessage", ChatMessage);
+registerModel(ChatMessage);
 
 export class ChatMessageCustomPk extends Base {
   static _tableName = "chat_messages_custom_pk";
 }
-registerConstant("ChatMessageCustomPk", ChatMessageCustomPk);
+registerModel(ChatMessageCustomPk);

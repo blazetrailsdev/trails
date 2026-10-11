@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class DlKeyedHasOne extends Base {
   declare destroy_async_parent_id: number;
@@ -10,4 +10,4 @@ export class DlKeyedHasOne extends Base {
     this.primaryKey = "has_one_key";
   }
 }
-registerConstant("DlKeyedHasOne", DlKeyedHasOne);
+registerModel(DlKeyedHasOne);

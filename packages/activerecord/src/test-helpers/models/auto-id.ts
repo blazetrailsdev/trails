@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class AutoId extends Base {
   static _tableName = "auto_id_tests";
@@ -7,4 +7,4 @@ export class AutoId extends Base {
     this.primaryKey = "auto_id";
   }
 }
-registerConstant("AutoId", AutoId);
+registerModel(AutoId);

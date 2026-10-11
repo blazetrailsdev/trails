@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Boolean extends Base {
   declare has_fun: boolean;
   declare value: boolean;
 }
-registerConstant("Boolean", Boolean);
+registerModel(Boolean);

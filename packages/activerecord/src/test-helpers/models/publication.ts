@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Editor } from "./editor.js";
 import type { Editorship } from "./editorship.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Publication extends Base {
@@ -33,7 +33,7 @@ export class Publication extends Base {
     this.writeAttribute("name", `${this.readAttribute("name")} (touched)`);
   }
 }
-registerConstant("Publication", Publication);
+registerModel(Publication);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export interface Publication {
   get editorInChief(): Editor | null | Promise<Editor | null>;

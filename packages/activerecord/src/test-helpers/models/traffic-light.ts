@@ -1,6 +1,6 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class TrafficLight extends Base {
   declare created_at: RubyTime | Temporal.PlainDateTime;
@@ -14,4 +14,4 @@ export class TrafficLight extends Base {
     this.serialize("long_state", { type: Array });
   }
 }
-registerConstant("TrafficLight", TrafficLight);
+registerModel(TrafficLight);

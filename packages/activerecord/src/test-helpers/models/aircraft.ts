@@ -1,9 +1,9 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
 import type { Engine } from "./engine.js";
 import type { Wheel } from "./wheel.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Aircraft extends Base {
   declare name: string;
@@ -19,4 +19,4 @@ export class Aircraft extends Base {
     this.hasMany("wheels", { as: "wheelable" });
   }
 }
-registerConstant("Aircraft", Aircraft);
+registerModel(Aircraft);

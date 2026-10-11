@@ -1,7 +1,7 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Squeak } from "./squeak.js";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Mouse extends Base {
   declare squeaks: AssociationProxy<Squeak>;
@@ -12,4 +12,4 @@ export class Mouse extends Base {
     this.validates("name", { presence: true });
   }
 }
-registerConstant("Mouse", Mouse);
+registerModel(Mouse);

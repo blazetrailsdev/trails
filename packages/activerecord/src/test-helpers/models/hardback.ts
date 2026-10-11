@@ -1,8 +1,8 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Hardback extends Base {}
-registerConstant("Hardback", Hardback);
+registerModel(Hardback);
 
 export class BestHardback extends Hardback {}
-registerConstant("BestHardback", BestHardback);
+registerModel(BestHardback);

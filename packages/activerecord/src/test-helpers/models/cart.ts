@@ -1,5 +1,5 @@
-import { registerConstant } from "@blazetrails/ruby-compat";
 import { Base } from "../../base.js";
+import { registerModel } from "../../associations.js";
 
 export class Cart extends Base {
   declare shop_id: bigint;
@@ -9,4 +9,4 @@ export class Cart extends Base {
     this.primaryKey = "id";
   }
 }
-registerConstant("Cart", Cart);
+registerModel(Cart);

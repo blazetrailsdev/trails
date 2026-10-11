@@ -1,4 +1,4 @@
-import { kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
+import { kernelThrow } from "@blazetrails/ruby-compat";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import type { Relation } from "../../relation.js";
 import type { Temporal, Time as RubyTime } from "@blazetrails/date";
@@ -6,6 +6,7 @@ import type { Pirate } from "./pirate.js";
 import type { Treasure } from "./treasure.js";
 import { Base } from "../../base.js";
 import "./treasure.js";
+import { registerModel } from "../../associations.js";
 
 export class Parrot extends Base {
   declare pirates: AssociationProxy<Pirate>;
@@ -92,6 +93,6 @@ export interface DeadParrot {
   set killer(value: Pirate | null);
 }
 
-registerConstant("Parrot", Parrot);
-registerConstant("LiveParrot", LiveParrot);
-registerConstant("DeadParrot", DeadParrot);
+registerModel(Parrot);
+registerModel(LiveParrot);
+registerModel(DeadParrot);
