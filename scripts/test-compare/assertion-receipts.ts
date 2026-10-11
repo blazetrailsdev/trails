@@ -92,6 +92,15 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
         'asynchronous_queries_test.rb:107 `assert_kind_of ActiveRecord::FutureResult::Complete, future_result` — on an in-memory database the fallback query is a promise, and a promise resolving to a thenable `FutureResult::Complete` unwraps it to the Result (CLAUDE.md, "`ActiveRecord::Promise` is the native promise")',
     },
   ],
+  "activerecord:base_test.rb › BasicsTest › dup": [
+    {
+      kind: "assert_equal",
+      value: "s:c",
+      as: null,
+      reason:
+        'base_test.rb:991 `assert_equal("c", duped_topic.title)` — reads the `duped_topic.title.replace "c"` of :979 back after save; a JS string cannot be mutated in place (CLAUDE.md, "Ruby Strings are JS string primitives")',
+    },
+  ],
   "activerecord:connection_adapters/standalone_connection_test.rb › StandaloneConnectionTest › async fallback":
     [
       {

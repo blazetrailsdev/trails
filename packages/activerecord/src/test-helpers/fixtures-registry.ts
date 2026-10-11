@@ -367,6 +367,10 @@ export const fixtureRegistry = {
     model: () => import("./models/minivan.js").then((m) => m.Minivan),
     data: FixtureData.minivanFixtureData,
   },
+  mixins: {
+    joinTable: "mixins",
+    data: FixtureData.mixinFixtureData,
+  },
   mixedCaseMonkeys: {
     model: () => import("./models/mixed-case-monkey.js").then((m) => m.MixedCaseMonkey),
     data: FixtureData.mixedCaseMonkeyFixtureData,

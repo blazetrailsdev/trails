@@ -7,6 +7,7 @@ import {
 } from "../index.js";
 import {
   Notifications,
+  assertIncludes,
   assertNothingRaised,
   assertNot,
   assertNotEmpty,
@@ -1762,6 +1763,23 @@ describe("EagerAssociationTest", () => {
       .where("posts.title IS NOT NULL")
       .first()) as Author;
     expect(author.id).toBe(authors("bob").id);
+  });
+
+  it("loading with one association", async () => {
+    let posts = await Post.all().mergeBang({ includes: "comments" });
+    let post = posts.find((p) => p.id === 1)!;
+    expect(await post.comments.size()).toBe(2);
+    assertIncludes(await post.comments, comments("greetings"));
+
+    post = (await Post.all()
+      .mergeBang({ includes: "comments", where: "posts.title = 'Welcome to the weblog'" })
+      .first())!;
+    expect(await post.comments.size()).toBe(2);
+    assertIncludes(await post.comments, comments("greetings"));
+
+    posts = await Post.all().mergeBang({ includes: "lastComment" });
+    post = posts.find((p) => p.id === 1)!;
+    expect(await post.lastComment).toEqual(await (await Post.find(1)).lastComment);
   });
 
   it("loading with one association with non preload", async () => {

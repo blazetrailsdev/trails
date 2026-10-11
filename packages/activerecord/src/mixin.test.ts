@@ -1,38 +1,47 @@
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { freezeTime, travel, travelBack } from "@blazetrails/activesupport";
 import { Duration } from "@blazetrails/activesupport";
+import { Time as RubyTime } from "@blazetrails/date";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 
+class Mixin extends Base {}
+
 describe("TouchTest", () => {
-  fixtures([]);
+  fixtures(["mixins"]);
+
+  beforeEach(() => {
+    freezeTime();
+  });
+
   afterEach(() => {
     travelBack();
     vi.useRealTimers();
   });
 
+  it("update", async () => {
+    const stamped = new Mixin();
+
+    expect(stamped.readAttribute("updated_at")).toBeNull();
+    expect(stamped.readAttribute("created_at")).toBeNull();
+    await stamped.save();
+    expect(stamped.readAttribute("updated_at")).toEqual(RubyTime.now());
+    expect(stamped.readAttribute("created_at")).toEqual(RubyTime.now());
+  });
+
+  it("create", async () => {
+    const obj = await Mixin.create();
+    expect(obj.readAttribute("updated_at")).toEqual(RubyTime.now());
+    expect(obj.readAttribute("created_at")).toEqual(RubyTime.now());
+  });
+
   it("many updates", async () => {
-    class Mixin extends Base {
-      static {
-        this.tableName = "mixins";
-        this.attribute("lft", "integer");
-        this.attribute("updated_at", "datetime");
-        this.attribute("created_at", "datetime");
-      }
-    }
-
-    freezeTime();
-
     const stamped = new Mixin();
     expect(stamped.readAttribute("updated_at")).toBeNull();
     expect(stamped.readAttribute("created_at")).toBeNull();
     await stamped.save();
-    expect(stamped.readAttribute("created_at")).toEqual(
-      await Mixin.currentTimeFromProperTimezone(),
-    );
-    expect(stamped.readAttribute("updated_at")).toEqual(
-      await Mixin.currentTimeFromProperTimezone(),
-    );
+    expect(stamped.readAttribute("created_at")).toEqual(RubyTime.now());
+    expect(stamped.readAttribute("updated_at")).toEqual(RubyTime.now());
 
     const oldUpdatedAt = stamped.readAttribute("updated_at");
 
@@ -41,22 +50,11 @@ describe("TouchTest", () => {
     (stamped as any).attributeWillChangeBang("lft");
     await stamped.save();
 
-    expect(stamped.readAttribute("updated_at")).toEqual(
-      await Mixin.currentTimeFromProperTimezone(),
-    );
+    expect(stamped.readAttribute("updated_at")).toEqual(RubyTime.now());
     expect(stamped.readAttribute("created_at")).toEqual(oldUpdatedAt);
   });
 
   it("create turned off", async () => {
-    class Mixin extends Base {
-      static {
-        this.tableName = "mixins";
-        this.attribute("lft", "integer");
-        this.attribute("updated_at", "datetime");
-        this.attribute("created_at", "datetime");
-      }
-    }
-
     const prevRecordTimestamps = Mixin.recordTimestamps;
     Mixin.recordTimestamps = false;
     try {

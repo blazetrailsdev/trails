@@ -334,6 +334,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await assertCycle("tags", ["NULL", "NULL"]);
     });
 
+    it("contains nils", async () => {
+      await assertCycle("tags", ["1", null, null]);
+    });
+
     it("insert fixture", async () => {
       const tagValues = ["val1", "val2", "val3_with_'_multiple_quote_'_chars"];
       await (adapter as any).insertFixture({ tags: tagValues }, "pg_arrays");

@@ -36,6 +36,7 @@ const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
 import { rbFSend, TypeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import { setDefaultTimezone } from "./active-record.js";
+import { withEnvTz, withTimezoneConfig } from "./test-helper.js";
 
 afterEach(() => {
   setDefaultTimezone("utc");
@@ -157,6 +158,30 @@ describe("QuotingTest", () => {
     );
 
     expect(quotedTime(t)).toBe(expected);
+  });
+  it("quoted time dst utc", async () => {
+    await withEnvTz("America/New_York", async () => {
+      await withTimezoneConfig({ default: "utc" }, () => {
+        const t = RubyTime.new(2000, 7, 1, 0, 0, 0, "+04:30");
+
+        const expected = toFs(t.change({ year: 2000, month: 1, day: 1 }).getutc(), "db").slice(11);
+
+        expect(quotedTime(t)).toBe(expected);
+      });
+    });
+  });
+  it("quoted time dst local", async () => {
+    await withEnvTz("America/New_York", async () => {
+      await withTimezoneConfig({ default: "local" }, () => {
+        const t = RubyTime.new(2000, 7, 1, 0, 0, 0, "+04:30");
+
+        const expected = toFs(t.change({ year: 2000, month: 1, day: 1 }).getlocal(), "db").slice(
+          11,
+        );
+
+        expect(quotedTime(t)).toBe(expected);
+      });
+    });
   });
   it("quoted datetime utc", () => {
     const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
