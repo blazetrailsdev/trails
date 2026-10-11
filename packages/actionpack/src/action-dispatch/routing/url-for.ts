@@ -149,7 +149,7 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 /** @internal */
 function coerceHashOrParameters(value: unknown): Record<string, unknown> | null {
   if (isPlainObject(value)) return value;
-  if (value instanceof Parameters) return value.toH();
+  if (value instanceof Parameters) return Object.fromEntries(value.toH());
   return null;
 }
 

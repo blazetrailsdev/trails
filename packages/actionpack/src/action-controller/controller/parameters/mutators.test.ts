@@ -1,7 +1,8 @@
-import { beforeEach, describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import {
   HashWithIndifferentAccess,
   assertEqual,
+  assertInstanceOf,
   assertNil,
   assertNot,
   assertNotPredicate,
@@ -258,18 +259,17 @@ describe("ParametersMutatorsTest", () => {
     assertNotPredicate(params.compactBlankBang(), (p) => p.isPermitted());
   });
 
-  // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access
-  it.skip("to_h returns a ActiveSupport::HashWithIndifferentAccess", () => {
+  it("to_h returns a ActiveSupport::HashWithIndifferentAccess", () => {
     params.permitBang();
     const paramsHash = params.toH();
-    expect(paramsHash).toBeInstanceOf(HashWithIndifferentAccess);
+    assertInstanceOf(HashWithIndifferentAccess, paramsHash);
   });
 
   it("to_h receives a block and transforms keys", () => {
     const params = new Parameters({ name: "Alex", age: "40", location: "Beijing" });
     params.permitBang();
     const paramsHash = params.toH((key, value) => [`${key}_modified`, value]);
-    assertEqual(["name_modified", "age_modified", "location_modified"], Object.keys(paramsHash));
+    assertEqual(["name_modified", "age_modified", "location_modified"], [...paramsHash.keys()]);
   });
 
   it("to_h receives a block and transforms values", () => {
@@ -279,7 +279,7 @@ describe("ParametersMutatorsTest", () => {
       key,
       typeof value === "string" ? `${value}_modified` : value,
     ]);
-    assertEqual(["Alex_modified", "40_modified", "Beijing_modified"], Object.values(paramsHash));
+    assertEqual(["Alex_modified", "40_modified", "Beijing_modified"], [...paramsHash.values()]);
   });
 
   it("to_h does not include unpermitted params", async () => {

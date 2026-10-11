@@ -1,7 +1,11 @@
 import { describe, it, expect, expectTypeOf } from "vitest";
 import { ArgumentError, NoMethodError, rbObjDup } from "@blazetrails/ruby-compat";
 import { Psych } from "@blazetrails/ruby-compat/psych";
-import { HashWithIndifferentAccess, withIndifferentAccess } from "@blazetrails/activesupport";
+import {
+  HashWithIndifferentAccess,
+  assertEqual,
+  withIndifferentAccess,
+} from "@blazetrails/activesupport";
 import { Parameters, UnpermittedParameters } from "./strong-parameters.js";
 
 describe("Parameters#unpermitted_parameters!", () => {
@@ -159,8 +163,9 @@ describe("Parameters#deep_transform_keys", () => {
   it("transforms a hash pushed onto a stored array", () => {
     const params = new Parameters({ list: [{ a: "1" }] });
     (params.get("list") as unknown[]).push({ b: "2" });
-    expect(params.deepTransformKeys((key) => key.toUpperCase()).toUnsafeH()).toEqual({
-      LIST: [{ A: "1" }, { B: "2" }],
-    });
+    assertEqual(
+      { LIST: [{ A: "1" }, { B: "2" }] },
+      params.deepTransformKeys((key) => key.toUpperCase()).toUnsafeH(),
+    );
   });
 });

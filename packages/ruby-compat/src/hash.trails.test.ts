@@ -281,6 +281,14 @@ describe("Hash#update", () => {
     update(defaults, options);
     expect(defaults).toEqual({ type: "submit", class: "extra" });
   });
+
+  it("converts an argument that answers to_hash, as rb_hash_update_call does", () => {
+    const params = {
+      permitted: true,
+      toHash: () => new Hash<string, number>().set("b", 2),
+    };
+    expect(mergeBang({ a: 1 }, Object.create(params))).toEqual({ a: 1, b: 2 });
+  });
 });
 
 describe("Hash#merge! with a conflict block", () => {
@@ -654,6 +662,15 @@ describe("Hash#default", () => {
     expect(dup(hash)).toBeInstanceOf(Upcased);
     expect([...dup(hash)]).toEqual([["a", 1]]);
     expect(hash.toH().constructor).toBe(Hash);
+  });
+
+  it("builds a bare Hash from the pairs a to_h block returns, as rb_hash_to_h_block does", () => {
+    const hash = new Upcased();
+    Hash.prototype.set.call(hash, "a", 1);
+    const result = hash.toH((key, value) => [`${key}_modified`, value + 1]);
+
+    expect(result.constructor).toBe(Hash);
+    expect([...result]).toEqual([["a_modified", 2]]);
   });
 
   it("replaces the table and the default without going through a subclass's []=, as rb_hash_replace does", () => {

@@ -11,10 +11,12 @@ import {
   chomp,
   except,
   extend,
+  type Hash,
   hasKey,
   include,
   type Included,
   InvalidURIError,
+  keys,
   merge,
   mergeBang,
   Module,
@@ -360,7 +362,7 @@ export class UrlHelper {
     t: UrlHelperContext,
     methodName: string,
     args: unknown[],
-    innerOptions: Record<string, unknown> | undefined,
+    innerOptions: Record<string, unknown> | Hash<string, unknown> | undefined,
     urlStrategy: UrlStrategy,
   ): string {
     const controllerOptions = t.urlOptions();
@@ -377,7 +379,7 @@ export class UrlHelper {
 
   handlePositionalArgs(
     controllerOptions: Record<string, unknown>,
-    innerOptions: Record<string, unknown>,
+    innerOptions: Record<string, unknown> | Hash<string, unknown>,
     args: unknown[],
     result: Record<string, unknown>,
     pathParams: string[],
@@ -397,7 +399,7 @@ export class UrlHelper {
       } else {
         pathParams = [...pathParams];
       }
-      for (const key of Object.keys(innerOptions)) {
+      for (const key of keys(innerOptions)) {
         const at = pathParams.indexOf(key);
         if (at !== -1) pathParams.splice(at, 1);
       }
@@ -427,7 +429,7 @@ export class OptimizedUrlHelper extends UrlHelper {
     t: UrlHelperContext,
     methodName: string,
     args: unknown[],
-    innerOptions: Record<string, unknown> | undefined,
+    innerOptions: Record<string, unknown> | Hash<string, unknown> | undefined,
     urlStrategy: UrlStrategy,
   ): string {
     if (args.length === this.argSize && !innerOptions && this.optimizeRoutesGeneration(t)) {
@@ -644,7 +646,7 @@ export class NamedRouteCollection {
   ): void {
     mod.defineMethod(name, function (this: UrlHelperContext, ...args: unknown[]): string {
       const last = args[args.length - 1];
-      let options: Record<string, unknown> | undefined;
+      let options: Record<string, unknown> | Hash<string, unknown> | undefined;
       if (isPlainObject(last)) {
         options = args.pop() as Record<string, unknown>;
       } else if (last instanceof ActionController.Parameters) {
