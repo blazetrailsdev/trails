@@ -44,7 +44,7 @@ interface PersistenceHost {
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
-  _hasQueryConstraints?: string[] | null;
+  _hasQueryConstraints?: string[] | false;
   isBaseClass(): boolean;
   baseClass: PersistenceHost;
   ensureSchemaLoaded(): Promise<void>;
@@ -251,8 +251,8 @@ export function queryConstraints(this: PersistenceHost, ...columnsList: string[]
   this._hasQueryConstraints = this._queryConstraintsList;
 }
 
-export function hasQueryConstraints(this: PersistenceHost): string[] | null {
-  return Object.getOwnPropertyDescriptor(this, "_hasQueryConstraints")?.value ?? null;
+export function hasQueryConstraints(this: PersistenceHost): string[] | false {
+  return Object.hasOwn(this, "_hasQueryConstraints") ? this._hasQueryConstraints! : false;
 }
 
 export function queryConstraintsList(this: PersistenceHost): string[] | null {
@@ -450,9 +450,9 @@ export async function incrementBang<T extends CounterBangRecord>(
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
   this.increment(attribute, by);
+  const inDatabase = rbFPublicSend(this, `${attribute}InDatabase`);
   const change =
-    (rbFPublicSend(this, attribute) as number) -
-    ((rbFPublicSend(this, `${attribute}InDatabase`) as number | null) ?? 0);
+    (rbFPublicSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
   await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
   rbFPublicSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
   return this;
