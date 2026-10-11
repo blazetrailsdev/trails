@@ -6466,6 +6466,17 @@ describe("callArgs", () => {
     ).toEqual([{ name: "constructor", args: ["const:CIPHER_TYPE"], flags: [] }]);
   });
 
+  it("names an rbFSend argument by the method it sends", () => {
+    const sites = site(
+      `class Foo {
+        create() {
+          return sprintf("%06d", rbFSend(value, "usec"));
+        }
+      }`,
+    );
+    expect(sites?.find((s) => s.name === "sprintf")?.args).toEqual(["str:%2506d", "call:usec"]);
+  });
+
   it("keeps a construction nested inside a thrown expression", () => {
     expect(
       site(

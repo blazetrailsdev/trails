@@ -104,7 +104,9 @@ const OPTION_READER_FUNCTIONS = new Set([
 /**
  * ruby-compat's `Kernel#send` / `Kernel#public_send` (`rb_f_send`,
  * vendor/ruby/v3.3.11/vm_eval.c:1330). Called with a string-literal name, each
- * is a call to that method; a computed name is Ruby's own `send(name)`.
+ * is a call to that method; a computed name is Ruby's own `send(name)`. In
+ * ARGUMENT position the same literal names the descriptor (`call:usec` for
+ * `rbFSend(value, "usec")`), as `dispatchedCallName` does for `X.call`.
  */
 const SEND_CALLEES = new Set(["rbFSend", "rbFPublicSend"]);
 /**
@@ -6591,6 +6593,15 @@ function describeArg(node: ts.Expression, flags: string[]): string {
   if (ts.isCallExpression(expr)) {
     const dispatched = dispatchedCallName(expr);
     if (dispatched !== undefined) return `call:${dispatched}`;
+    const sent = expr.arguments[1];
+    if (
+      ts.isIdentifier(expr.expression) &&
+      SEND_CALLEES.has(currentImportAliases?.get(expr.expression.text) ?? expr.expression.text) &&
+      sent !== undefined &&
+      ts.isStringLiteralLike(sent)
+    ) {
+      return `call:${sent.text}`;
+    }
     const name = callSiteName(expr);
     return name === undefined ? "?" : `call:${name}`;
   }

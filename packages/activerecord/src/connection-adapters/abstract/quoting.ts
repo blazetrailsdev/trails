@@ -203,9 +203,8 @@ export function quotedDate(this: { defaultTimezone: string }, value: TemporalDat
   }
 
   const result = rbFSend(value, "toFs", "db") as string;
-  let usec: number;
-  if (rbObjRespondTo(value, "usec") && (usec = rbFSend(value, "usec") as number) > 0) {
-    return result + "." + sprintf("%06d", usec);
+  if (rbObjRespondTo(value, "usec") && (rbFSend(value, "usec") as number) > 0) {
+    return result + "." + sprintf("%06d", rbFSend(value, "usec"));
   } else {
     return result;
   }
