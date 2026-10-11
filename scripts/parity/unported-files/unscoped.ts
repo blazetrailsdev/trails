@@ -28,12 +28,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "is enrolled in relation/load-async.test.ts.",
   },
   {
-    testFile: "marshal_serialization_test.rb",
-    reason:
-      "Ruby's Marshal binary format (Marshal.dump/load). No JS equivalent; " +
-      "JS cache/session layers use JSON or structured clone.",
-  },
-  {
     pattern: "legacy_yaml_adapter.rb", // no test counterpart
     reason:
       "Migrates Psych::Coder YAML format versions (:nodoc:). Psych is Ruby-only; " +
@@ -251,17 +245,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   // --- Permanently not-portable: Ruby Module namespace / constant-path semantics ---
   {
-    testFile: "reflection_test.rb",
-    tests: [
-      "symbol for class name",
-      "name error from incidental code is not converted to name error for association",
-      "automatic inverse does not suppress name error from incidental code",
-    ],
-    reason:
-      "Ruby Symbol type for class_name and const_missing hook for NameError discrimination " +
-      "have no JavaScript equivalent.",
-  },
-  {
     testFile: "inheritance_test.rb",
     className: "InheritanceTest",
     tests: [
@@ -375,23 +358,21 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // --- Permanently not-portable: residual-skip-tail-sweep (RFC 0030) ---
   {
     testFile: "associations/has_one_associations_test.rb",
-    tests: [
-      "has one proxy should not respond to private methods",
-      "has one proxy should respond to private methods via send",
-    ],
+    tests: ["has one proxy should not respond to private methods"],
     reason:
-      "Ruby private-method visibility / `send` private dispatch on association proxies " +
-      "has no TypeScript runtime equivalent.",
+      "Asserts NoMethodError on a direct call of a private method " +
+      "(has_one_associations_test.rb:492-495). trails carries no method visibility at run " +
+      "time (see CLAUDE.md, 'Method visibility is compile-time only'); the via-send " +
+      "sibling IS ported.",
   },
   {
     testFile: "associations/has_one_through_associations_test.rb",
-    tests: [
-      "has one through proxy should not respond to private methods",
-      "has one through proxy should respond to private methods via send",
-    ],
+    tests: ["has one through proxy should not respond to private methods"],
     reason:
-      "Ruby private-method visibility / `send` private dispatch on association proxies " +
-      "has no TypeScript runtime equivalent.",
+      "Asserts NoMethodError on a direct call of a private method " +
+      "(has_one_through_associations_test.rb:241-244). trails carries no method visibility at run " +
+      "time (see CLAUDE.md, 'Method visibility is compile-time only'); the via-send " +
+      "sibling IS ported.",
   },
   {
     testFile: "scoping/default_scoping_test.rb",
@@ -434,13 +415,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
     reason:
       "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has " +
       "no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts).",
-  },
-  {
-    testFile: "tasks/database_tasks_test.rb",
-    tests: ["raises an error when called with protected environment which name is a symbol"],
-    reason:
-      "Ruby Symbol env names (symbol→string coercion in protected_environments); env " +
-      "names are plain strings in TS.",
   },
   {
     testFile: "scoping/named_scoping_test.rb",
@@ -754,29 +728,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // source-verified against vendor/rails before reclassifying — the portable
   // siblings in the same files stay counted.
 
-  // --- Ruby Marshal of association/extension caches ---
-  {
-    testFile: "associations/extension_test.rb",
-    tests: ["marshalling extensions", "marshalling named extensions"],
-    reason:
-      "Marshal.dump/load round-trip of an AR record carrying an extended " +
-      "association proxy (extension_test.rb:46-65). Ruby Marshal binary " +
-      "serialization has no Node.js equivalent.",
-  },
-  {
-    testFile: "associations/has_many_through_associations_test.rb",
-    tests: ["marshal dump"],
-    reason:
-      "Marshal.load(Marshal.dump(preloaded)) of a loaded has-many-through " +
-      "collection. Ruby Marshal binary serialization has no Node.js equivalent.",
-  },
-  {
-    testFile: "associations/has_one_associations_test.rb",
-    tests: ["can marshal has one association with nil target"],
-    reason:
-      "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one " +
-      "association cache. Ruby Marshal binary serialization has no Node.js equivalent.",
-  },
   // --- globalid: Ruby-Marshal exact-token assertion ---
   {
     testFile: "verifier_test.rb",
@@ -928,17 +879,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   // (SQLite) variant is portable and already implemented+passing
   // (adapter-prevent-writes.test.ts:60); only the PG `assert_raises` variant is
   // skipped, and that is an adapter behavior, not a JS-runtime impossibility.
-  // --- Documented JS-vs-Ruby divergence (workplan Wave 0) ---
-  {
-    testFile: "database_configurations/resolver_test.rb",
-    tests: ["url missing scheme"],
-    reason:
-      "DIVERGES (documented): Rails parses every string config arg as a URL and " +
-      'raises InvalidConfigurationError for a bare `"foo"`; Trails treats ' +
-      "non-URL strings as environment-name lookups (the role Ruby Symbols play " +
-      'in Rails), so `"foo"` is a missing-env lookup, not a malformed URL. ' +
-      "See packages/activerecord/src/database-configurations/resolver.test.ts.",
-  },
   {
     testFile: "i18n_test.rb",
     tests: ["exposes its VERSION constant"],

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { rbFSend } from "@blazetrails/ruby-compat";
 import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import {
@@ -564,11 +565,15 @@ describe("HasOneThroughAssociationsTest", () => {
   });
 
   it.skip("has one through proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility (NoMethodError when a private
+    // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
   });
 
-  it.skip("has one through proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby private-method dispatch via `send` has no TypeScript
+  it("has one through proxy should respond to private methods via send", async () => {
+    const member = members("groucho");
+    rbFSend(clubs("moustache_club"), "privateMethod");
+    await assertNothingRaised(async () => {
+      rbFSend(await member.club, "privateMethod");
+    });
   });
 
   const memberDetailCount = async (member: any): Promise<number> =>

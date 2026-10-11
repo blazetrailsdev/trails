@@ -1,6 +1,7 @@
 import type { CollectionAssociation } from "./collection-association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { Marshal } from "@blazetrails/ruby-compat";
 import { Base, registerModel, RecordInvalid, RecordNotFound, RecordNotSaved } from "../index.js";
 import { fixtures } from "../test-fixtures.js";
 import {
@@ -250,8 +251,10 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(await (book as any).subscribers.createBang({ nick: "bob" })).toBeTruthy();
   });
 
-  it.skip("marshal dump", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
+  it.skip("marshal dump", async () => {
+    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    const preloaded = await Post.includes(":firstBlueTags").first();
+    expect(Marshal.load(Marshal.dump(preloaded))).toEqual(preloaded);
   });
 
   it("through association with joins", async () => {

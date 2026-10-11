@@ -36,6 +36,7 @@ import { ShardedComment } from "./test-helpers/models/sharded/comment.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { HasManyThroughSourceAssociationNotFoundError } from "./associations/errors.js";
+import { rbObjDup } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assert,
@@ -449,7 +450,9 @@ describe("ReflectionTest", () => {
       ).isValidate(),
     ).toBeFalsy();
   });
-  it.skip("symbol for class name", () => {});
+  it("symbol for class name", () => {
+    expect(Firm.reflectOnAssociation("unsortedClientsWithSymbol")!.klass).toBe(Client);
+  });
   it("class for class name", async () => {
     const error = await assertRaises([ArgumentError], {}, () => {
       createReflection(
@@ -574,7 +577,26 @@ describe("ReflectionTest", () => {
       HasManyThroughSourceAssociationNotFoundError,
     );
   });
-  it.skip("name error from incidental code is not converted to name error for association", () => {});
+  it("name error from incidental code is not converted to name error for association", async () => {
+    const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
+    stubbed.constMissing = () => {
+      throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
+    };
+    try {
+      const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
+
+      const error = (await assertRaises([NameError], {}, () => {
+        void reflection.klass;
+      })) as NameError;
+
+      expect(error.constantName).toBe("oops");
+      expect(error.message).toMatch("oops");
+      expect(error.message).not.toMatch("NotAClass");
+      expect(error.message).not.toMatch("not_a_class");
+    } finally {
+      delete stubbed.constMissing;
+    }
+  });
   it("automatic inverse suppresses name error for association", () => {
     const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
     const dup = Object.create(
@@ -583,7 +605,26 @@ describe("ReflectionTest", () => {
     ) as typeof reflection;
     expect(dup.hasInverse()).toBeFalsy();
   });
-  it.skip("automatic inverse does not suppress name error from incidental code", () => {});
+  it("automatic inverse does not suppress name error from incidental code", async () => {
+    const stubbed = UserWithInvalidRelation as unknown as { constMissing?: () => never };
+    stubbed.constMissing = () => {
+      throw new NameError("undefined local variable or method 'oops' for main:Object", "oops");
+    };
+    try {
+      const reflection = UserWithInvalidRelation.reflectOnAssociation("notAClass")!;
+
+      const error = (await assertRaises([NameError], {}, () => {
+        rbObjDup(reflection).hasInverse();
+      })) as NameError;
+
+      expect(error.constantName).toBe("oops");
+      expect(error.message).toMatch("oops");
+      expect(error.message).not.toMatch("NotAClass");
+      expect(error.message).not.toMatch("not_a_class");
+    } finally {
+      delete stubbed.constMissing;
+    }
+  });
 
   it("human name", () => {
     expect(PriceEstimate.modelName.human()).toBe("Price estimate");

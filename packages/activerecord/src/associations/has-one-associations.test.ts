@@ -1,4 +1,4 @@
-import { kernelThrow } from "@blazetrails/ruby-compat";
+import { Marshal, kernelThrow, rbFSend } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./singular-association.js";
@@ -267,8 +267,17 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "accountUsingForeignAndPrimaryKeys")).id).toBe(account.id);
   });
 
-  it.skip("can marshal has one association with nil target", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — marshal
+  it.skip("can marshal has one association with nil target", async () => {
+    // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
+    const firm = new Firm();
+    await assertNothingRaised(() => {
+      expect((Marshal.load(Marshal.dump(firm)) as Firm).attributes).toEqual(firm.attributes);
+    });
+
+    await firm.account;
+    await assertNothingRaised(() => {
+      expect((Marshal.load(Marshal.dump(firm)) as Firm).attributes).toEqual(firm.attributes);
+    });
   });
 
   it("proxy assignment", async () => {
@@ -771,11 +780,14 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("has one proxy should not respond to private methods", () => {
-    // PERMANENT-SKIP: Ruby private-method visibility has no TypeScript equivalent.
+    // PERMANENT-SKIP: asserts NoMethodError on a private call — CLAUDE.md § "Method visibility is compile-time only".
   });
 
-  it.skip("has one proxy should respond to private methods via send", () => {
-    // PERMANENT-SKIP: Ruby `send` private dispatch has no TypeScript equivalent.
+  it("has one proxy should respond to private methods via send", async () => {
+    await assertNothingRaised(async () => {
+      rbFSend(accounts("signals37"), "privateMethod");
+      rbFSend(await companies("first_firm").account, "privateMethod");
+    });
   });
 
   it("save of record with loaded has one", async () => {

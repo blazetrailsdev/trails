@@ -61,6 +61,10 @@ export class Club extends Base {
     });
     this.acceptsNestedAttributesFor("membership");
   }
+
+  private privateMethod() {
+    return "I'm sorry sir, this is a *private* club, not a *pirate* club";
+  }
 }
 registerConstant("Club", Club);
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
