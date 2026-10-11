@@ -1,3 +1,4 @@
+import type { PermittedAttributes } from "@blazetrails/activemodel";
 import { Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection } from "../reflection.js";
@@ -134,7 +135,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    * @missingRailsName class — PERMANENT
    */
   override buildRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | PermittedAttributes,
     block?: (record: Base) => void,
   ): Base | null {
     this.ensureNotNested();

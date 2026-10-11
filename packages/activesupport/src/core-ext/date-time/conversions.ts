@@ -20,7 +20,7 @@ export function toFs(datetime: DateTime, format = "default"): string {
 export const toFormattedS = toFs;
 
 for (const seat of ["Temporal.PlainDateTime", "Temporal.ZonedDateTime"]) {
-  Object.assign(TEMPORAL_METHOD_TABLE[seat], { toFs, toFormattedS });
+  Object.assign(TEMPORAL_METHOD_TABLE[seat], { toFs, toFormattedS, usec });
 }
 
 export function formattedOffset(

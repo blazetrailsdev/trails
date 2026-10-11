@@ -533,13 +533,15 @@ export class PostgreSQLAdapter
   }
 
   override async active(): Promise<boolean> {
-    const rawConnection = this._rawConnection;
-    if (!rawConnection) return false;
     try {
-      await rawConnection.query(";");
-      this.verifiedBang();
-      return true;
-    } catch {
+      return await this.lock.synchronize(async () => {
+        if (!this._rawConnection) return false;
+        await this._rawConnection.query(";");
+        this.verifiedBang();
+        return true;
+      });
+    } catch (error) {
+      if (!(error instanceof PG.Error)) throw error;
       return false;
     }
   }

@@ -267,6 +267,13 @@ describe("Object#respond_to?", () => {
     expect(toS("abc")).toBe("abc");
   });
 
+  it("answers each_pair for a Hash, which an Array does not define", () => {
+    // vendor/ruby/v3.3.11/hash.c:7218 rb_hash_each_pair.
+    expect(basicObjRespondTo({ a: 1 }, "eachPair")).toBe(true);
+    expect(basicObjRespondTo(new Map([["a", 1]]), "eachPair")).toBe(true);
+    expect(basicObjRespondTo(["a"], "eachPair")).toBe(false);
+  });
+
   it("answers to_hash for a Hash with the receiver, which a plain object does not define", () => {
     // vendor/ruby/v3.3.11/hash.c:3497 rb_hash_to_hash.
     const hash = { a: 1 };

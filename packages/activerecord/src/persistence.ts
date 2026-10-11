@@ -8,6 +8,7 @@ import {
   merge,
   Module,
   rbEqual,
+  rbFPublicSend,
   rbObjAsString,
   rbObjSingletonClass,
   rtest,
@@ -39,11 +40,11 @@ import { RecordInvalid } from "./validations.js";
 import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
-  new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
+  new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: any) => void): any;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
-  _hasQueryConstraints?: boolean;
+  _hasQueryConstraints?: string[] | false;
   isBaseClass(): boolean;
   baseClass: PersistenceHost;
   ensureSchemaLoaded(): Promise<void>;
@@ -60,7 +61,7 @@ interface PersistenceHost {
 
 export async function create(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
@@ -84,7 +85,7 @@ export async function create(
 
 export async function createBang(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
@@ -247,11 +248,11 @@ export function queryConstraints(this: PersistenceHost, ...columnsList: string[]
     throw new ArgumentError("You must specify at least one column to be used in querying");
   }
   this._queryConstraintsList = columnsList.map(String);
-  this._hasQueryConstraints = true;
+  this._hasQueryConstraints = this._queryConstraintsList;
 }
 
-export function hasQueryConstraints(this: PersistenceHost): boolean {
-  return Object.hasOwn(this, "_hasQueryConstraints") && this._hasQueryConstraints === true;
+export function hasQueryConstraints(this: PersistenceHost): string[] | false {
+  return Object.hasOwn(this, "_hasQueryConstraints") ? this._hasQueryConstraints! : false;
 }
 
 export function queryConstraintsList(this: PersistenceHost): string[] | null {
@@ -400,6 +401,8 @@ export function isPreviouslyPersisted(this: PersistenceRecordDispatch): boolean 
 }
 
 interface AttributeIO {
+  get(attrName: string): unknown;
+  set(attrName: string, value: unknown): void;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   attributeWriterMissing(name: string, value: unknown): void;
@@ -409,8 +412,6 @@ type TouchOption = boolean | string | string[];
 
 interface CounterBangRecord extends AttributeIO {
   id: unknown;
-  attributeInDatabase(name: string): unknown;
-  clearAttributeChange(name: string): void;
   constructor: {
     updateCounters(id: unknown, counters: CounterCacheCounters): Promise<number>;
   };
@@ -421,16 +422,9 @@ interface ToggleBangRecord extends AttributeIO {
 }
 
 export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
-  const name = resolveAttributeAlias(this, attribute);
-  const current = Number(this.readAttribute(name)) || 0;
-  this.writeAttribute(name, current + by);
+  if (!rtest(this.get(attribute))) this.set(attribute, 0);
+  this.set(attribute, (this.get(attribute) as number) + by);
   return this;
-}
-
-function resolveAttributeAlias(record: object, attribute: string): string {
-  const aliases = (record.constructor as { attributeAliases?: Record<string, string> })
-    .attributeAliases;
-  return aliases?.[attribute] ?? attribute;
 }
 
 export function decrement<T extends AttributeIO & { increment(a: string, b?: number): T }>(
@@ -455,12 +449,12 @@ export async function incrementBang<T extends CounterBangRecord>(
   if (attribute === undefined) {
     throw new ArgumentError("wrong number of arguments (given 0, expected 1..3)");
   }
-  attribute = resolveAttributeAlias(this, attribute);
   this.increment(attribute, by);
+  const inDatabase = rbFPublicSend(this, `${attribute}InDatabase`);
   const change =
-    Number(this.readAttribute(attribute)) - (Number(this.attributeInDatabase(attribute)) || 0);
+    (rbFPublicSend(this, attribute) as number) - (rtest(inDatabase) ? (inDatabase as number) : 0);
   await this.constructor.updateCounters(this.id, { [attribute]: change, touch: options.touch });
-  this.clearAttributeChange(attribute);
+  rbFPublicSend(this, `clear${attribute.charAt(0).toUpperCase()}${attribute.slice(1)}Change`);
   return this;
 }
 
@@ -858,14 +852,15 @@ export function _findRecord(
 export function _inMemoryQueryConstraintsHash(
   this: PersistencePrivateHost,
 ): Record<string, unknown> {
-  const constraintsList = queryConstraintsList.call(this.constructor as any);
-  if (!constraintsList) {
-    const pk = this.constructor.primaryKey as string;
-    return { [pk]: this.id };
+  if (queryConstraintsList.call(this.constructor as any) == null) {
+    return { [this._primaryKey as string]: this.id };
+  } else {
+    return Object.fromEntries(
+      indexWith(queryConstraintsList.call(this.constructor as any)!, (columnName) =>
+        this.attribute(columnName),
+      ),
+    );
   }
-  return Object.fromEntries(
-    constraintsList.map((columnName) => [columnName, this.attribute(columnName)]),
-  );
 }
 
 /** @internal */

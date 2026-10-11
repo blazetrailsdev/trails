@@ -1,6 +1,12 @@
 import { Mutable, ValueType, BinaryData } from "@blazetrails/activemodel";
 import { include } from "@blazetrails/activesupport";
-import { DelegateClass, rbEqual, rbObjInspect, registerConstant } from "@blazetrails/ruby-compat";
+import {
+  DelegateClass,
+  rbEqual,
+  rbObjInspect,
+  rbObjRespondTo,
+  registerConstant,
+} from "@blazetrails/ruby-compat";
 import { IndifferentHashAccessor } from "../store.js";
 import type { ColumnSerializer } from "../coders/column-serializer.js";
 
@@ -59,7 +65,7 @@ export class Serialized extends DelegateClass(ValueType) {
   }
 
   override isForceEquality(value: unknown): boolean {
-    return this.coder.objectClass !== undefined && value instanceof this.coder.objectClass;
+    return rbObjRespondTo(this.coder, "objectClass") && value instanceof this.coder.objectClass!;
   }
 
   override isSerialized(): boolean {

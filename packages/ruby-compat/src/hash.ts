@@ -207,11 +207,16 @@ export function hasKey(hash: object, key: PropertyKey): boolean {
  * @noRailsEquivalent PERMANENT — Ruby core `Hash#keys` (`vendor/ruby/v3.3.11/hash.c:3584`).
  */
 export function keys<K = string>(
-  hash: Record<string, unknown> | Map<K, unknown> | { keys(): K[] },
+  hash: Record<string, unknown> | Map<K, unknown> | { readonly keys: K[] | (() => K[]) },
 ): K[] {
   if (hash instanceof Map) return [...hash.keys()];
   const own = ownMethod(hash, "keys");
   if (own) return own.call(hash) as K[];
+  const proto: unknown = Object.getPrototypeOf(hash);
+  if (proto !== Object.prototype && proto !== null) {
+    const reader = (hash as { keys?: unknown }).keys;
+    if (Array.isArray(reader)) return reader as K[];
+  }
   return Object.keys(hash) as K[];
 }
 

@@ -1,6 +1,7 @@
 import { it, expect, describe, vi } from "vitest";
 import { Temporal, Time } from "@blazetrails/date";
-import { Mysql2, mysql2Client } from "./client.js";
+import mysql from "mysql2/promise";
+import { Mysql2, mysql2Client, parseFlagsArray } from "./client.js";
 
 describe("mysql2Client", () => {
   it("automatic_close = false unrefs and strips listeners, and never closes the socket", () => {
@@ -140,12 +141,12 @@ describe("Mysql2::Client#warning_count", () => {
       buffer: () => Uint8Array.of(value),
     });
     const next = () => "next";
-    expect(castOf(native, 0)(tiny("1"), next)).toBe("next");
+    expect(castOf(native, 0)(tiny("1"), () => 1)).toBe(1);
     expect(castOf(native, 0)(bit(1), next)).toBe("next");
     expect(castOf(native, 1)(tiny("1"), next)).toBe(true);
     expect(castOf(native, 1)(tiny("0"), next)).toBe(false);
     expect(castOf(native, 1)(tiny(null), next)).toBeNull();
-    expect(castOf(native, 1)(tiny("1", 4), next)).toBe("next");
+    expect(castOf(native, 1)(tiny("1", 4), () => 1)).toBe(1);
     expect(castOf(native, 1)(bit(1), next)).toBe(true);
     expect(castOf(native, 1)(bit(0), next)).toBe(false);
     expect(castOf(native, 1)(bit(1, 8), next)).toBe("next");
@@ -192,5 +193,128 @@ describe("Mysql2::Client#warning_count", () => {
     const { queryOptions } = mysql2Client({});
     expect(queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
     expect(queryOptions).not.toBe(Mysql2.Client.defaultQueryOptions());
+  });
+});
+
+describe("Mysql2::Client#initialize", () => {
+  const { connectFlags } = Mysql2.Client.defaultQueryOptions() as { connectFlags: number };
+  const DRIVER_DEFAULTS = [
+    ...["LONG_PASSWORD", "FOUND_ROWS", "LONG_FLAG", "CONNECT_WITH_DB", "ODBC", "LOCAL_FILES"],
+    ...["IGNORE_SPACE", "PROTOCOL_41", "IGNORE_SIGPIPE", "TRANSACTIONS", "RESERVED"],
+    ...["SECURE_CONNECTION", "MULTI_RESULTS", "SESSION_TRACK", "CONNECT_ATTRS", "PLUGIN_AUTH"],
+    "PLUGIN_AUTH_LENENC_CLIENT_DATA",
+  ];
+
+  async function driverConfig(
+    opts: object,
+  ): Promise<{ flags: string[] } & Record<string, unknown>> {
+    const createConnection = vi.spyOn(mysql, "createConnection").mockRejectedValue(new Error("x"));
+    try {
+      await Mysql2.Client.new(opts).catch(() => {});
+      return createConnection.mock.calls[0][0] as never;
+    } finally {
+      createConnection.mockRestore();
+    }
+  }
+
+  it.each([
+    ["an Integer", 0x2 | 0x10000, ["FOUND_ROWS", "MULTI_STATEMENTS", "-IGNORE_SPACE"]],
+    ["an Array", ["FOUND_ROWS", "-LOCAL_FILES"], ["FOUND_ROWS", "-IGNORE_SPACE"]],
+    ["an Array naming IGNORE_SPACE", ["IGNORE_SPACE"], ["IGNORE_SPACE"]],
+    ["a String", "MULTI_STATEMENTS -LONG_FLAG", ["MULTI_STATEMENTS", "-IGNORE_SPACE"]],
+    ["an absent", undefined, ["-IGNORE_SPACE"]],
+  ])(
+    "hands the driver %s flags as names, and the server sees what it saw",
+    async (_n, flags, was) => {
+      const config = await driverConfig({ host: "db", flags });
+      expect(config.flags).toEqual(expect.arrayContaining(was));
+      const added = config.flags.filter((name) => !was.includes(name));
+      expect(added.filter((name) => !DRIVER_DEFAULTS.includes(name))).toEqual([]);
+      expect(config.flags).not.toContain("REMEMBER_OPTIONS");
+      expect(config.flags.includes("LONG_FLAG")).toBe(flags !== "MULTI_STATEMENTS -LONG_FLAG");
+    },
+  );
+
+  it("parse_flags_array adds a named flag, clears a negated one, and warns of an unknown one", () => {
+    expect(parseFlagsArray(["FOUND_ROWS"], connectFlags)).toBe(connectFlags | 0x2);
+    expect(parseFlagsArray(["-LONG_FLAG"], connectFlags)).toBe(connectFlags & ~0x4);
+    expect(parseFlagsArray(["NOPE", "-NOPE"], connectFlags)).toBe(connectFlags);
+    expect(parseFlagsArray(["FOUND_ROWS"])).toBe(0x2);
+  });
+
+  it("reads an absent keyword as no key, and a timeout through Integer()", async () => {
+    const config = await driverConfig({ host: "db", connectTimeout: undefined });
+    expect(config.connectTimeout).toBe(120_000);
+    await expect(Mysql2.Client.new({ host: "db", readTimeout: "abc" })).rejects.toThrow(
+      'invalid value for Integer(): "abc"',
+    );
+    expect(parseFlagsArray(["toString", "-constructor"], 0)).toBe(0);
+  });
+
+  it("raises Mysql2::Error unless the options are a Hash", async () => {
+    await expect(Mysql2.Client.new([] as never)).rejects.toThrow(
+      "Options parameter must be a Hash",
+    );
+    await expect(Mysql2.Client.new([] as never)).rejects.toBeInstanceOf(Mysql2.Error);
+  });
+
+  it("passes the gem's connect arguments and merges the options into query_options", async () => {
+    const config = await driverConfig({
+      username: "rails",
+      user: "driver",
+      password: 1,
+      host: "db",
+      port: "3307",
+      database: "d",
+      socket: "/tmp/s",
+      readTimeout: "5",
+      strict: true,
+    });
+    expect(config).toMatchObject({
+      user: "rails",
+      password: "1",
+      host: "db",
+      port: 3307,
+      database: "d",
+      socketPath: "/tmp/s",
+      connectTimeout: 120_000,
+      supportBigNumbers: true,
+    });
+    expect(config.connectAttributes).toHaveProperty("program_name");
+    expect(config).not.toHaveProperty("strict");
+    expect(config).not.toHaveProperty("readTimeout");
+  });
+});
+
+describe("Mysql2::Error", () => {
+  it("new_with_args builds the class CODES names for the error number, else Error", () => {
+    const denied = Mysql2.Error.newWithArgs("denied", 80000, 1045, "28000");
+    expect(denied).toBeInstanceOf(Mysql2.Error.ConnectionError);
+    expect([denied.errorNumber, denied.errno, denied.sqlState]).toEqual([1045, 1045, "28000"]);
+    expect([denied.message, denied.error]).toEqual(["denied", "denied"]);
+    expect(Mysql2.Error.newWithArgs("lock", null, 1205, null)).toBeInstanceOf(
+      Mysql2.Error.TimeoutError,
+    );
+    const plain = Mysql2.Error.newWithArgs("dup", null, 1062, "23000");
+    expect(plain.constructor).toBe(Mysql2.Error);
+    expect(plain).not.toBeInstanceOf(Mysql2.Error.ConnectionError);
+  });
+
+  it("is what the client raises for an error the server numbered", async () => {
+    const raised = Object.assign(new Error("Table 'x' doesn't exist"), {
+      code: "ER_NO_SUCH_TABLE",
+      errno: 1146,
+      sqlState: "42S02",
+    });
+    const client = mysql2Client({ query: () => Promise.reject(raised) });
+    const error = await client.query("SELECT 1").catch((e: unknown) => e);
+    expect((error as object).constructor).toBe(Mysql2.Error);
+    expect(error).toMatchObject({ errorNumber: 1146, sqlState: "42S02", message: raised.message });
+    expect((error as Error).cause).toBe(raised);
+
+    const connection = { _handshakePacket: { serverVersion: "5.5.5-10.11.6-MariaDB" } };
+    const maria = mysql2Client({ connection, query: () => Promise.reject(raised) });
+    const versioned = await maria.query("SELECT 1").catch((e: unknown) => e);
+    expect((versioned as { serverVersion: number }).serverVersion).toBe(101106);
   });
 });

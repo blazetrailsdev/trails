@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   asksDuckType,
+  declaresActsLikeCall,
   declaresInstanceofGuard,
-  portsDuckType,
   renderReport,
+  unportedDuckTests,
 } from "./report-duck-type-instanceof.js";
 import type { SkeletonRow } from "./report-arms.js";
 
@@ -28,10 +29,13 @@ describe("report-duck-type-instanceof", () => {
   });
 
   it("credits a port that calls rbObjRespondTo or actsLike, through a same-file helper too", () => {
-    expect(portsDuckType(row([], ["ref:rbObjRespondTo"]))).toBe(true);
-    expect(portsDuckType(row([], ["ref:actsLike"]))).toBe(true);
-    expect(portsDuckType(row([], ["ref:helper"], { helper: ["ref:rbObjRespondTo"] }))).toBe(true);
-    expect(portsDuckType(row([], ["ref:helper"]))).toBe(false);
+    const ask = ["ref:respond_to?"];
+    expect(unportedDuckTests(row(ask, ["ref:rbObjRespondTo"]))).toEqual([]);
+    expect(unportedDuckTests(row(["ref:acts_like?"], ["ref:actsLike"]))).toEqual([]);
+    expect(unportedDuckTests(row(ask, ["ref:helper"], { helper: ["ref:rbObjRespondTo"] }))).toEqual(
+      [],
+    );
+    expect(unportedDuckTests(row(ask, ["ref:helper"]))).toEqual(ask);
   });
 
   it("finds an instanceof guard in the named declaration only", () => {
@@ -57,6 +61,30 @@ describe("report-duck-type-instanceof", () => {
       }
     `;
     expect(declaresInstanceofGuard(source, "translate")).toBe(false);
+  });
+
+  it("lists a body that asks both duck tests and ports only one", () => {
+    const both = ["ref:acts_like?", "ref:respond_to?"];
+    expect(unportedDuckTests(row(both, ["ref:rbObjRespondTo"]))).toEqual(["ref:acts_like?"]);
+    expect(unportedDuckTests(row(both, ["ref:actsLike"]))).toEqual(["ref:respond_to?"]);
+    expect(unportedDuckTests(row(both, ["ref:rbObjRespondTo", "ref:actsLike"]))).toEqual([]);
+    expect(unportedDuckTests(row(["ref:is_a?"], []))).toEqual([]);
+  });
+
+  it("reads actsLike.call, .apply and an aliased import as the acts_like? port", () => {
+    const source = `
+      import { actsLike as actsLikeDuck } from "@blazetrails/activesupport";
+      function castValue(time: unknown) {
+        if (time instanceof TimeWithZone || !actsLike.call(time, "time")) return time;
+      }
+      function applied(time: unknown) { return actsLike.apply(time, ["time"]); }
+      function aliased(time: unknown) { return actsLikeDuck.call(time, "time"); }
+      function local(time: unknown) { return actsLikeTime(time); }
+    `;
+    expect(declaresActsLikeCall(source, "castValue")).toBe(true);
+    expect(declaresActsLikeCall(source, "applied")).toBe(true);
+    expect(declaresActsLikeCall(source, "aliased")).toBe(true);
+    expect(declaresActsLikeCall(source, "local")).toBe(false);
   });
 
   it("reads an arrow-function property as a declaration", () => {
