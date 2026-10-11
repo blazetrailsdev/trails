@@ -97,6 +97,96 @@ describe("Mysql2::Client#warning_count", () => {
     expect(time.getutc().hour).toBe(14);
   });
 
+  type Cast = { typeCast(field: object, next: () => unknown): unknown };
+  const castOf = (native: { mock: { calls: object[][] } }, call = 0): Cast["typeCast"] =>
+    (native.mock.calls[call][0] as Cast).typeCast;
+
+  it("_query answers a hash row keyed by field name, symbolize_keys or not", async () => {
+    const native = vi.fn(async (_options: object) => [[{ a: 1 }], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    for (const symbolizeKeys of [false, true]) {
+      const result = (await client.query("SELECT 1 AS a", { symbolizeKeys }))!;
+      expect(result.fields).toEqual(["a"]);
+      expect(result.toA()).toEqual([{ a: 1 }]);
+    }
+    expect(native.mock.calls[0][0]).toMatchObject({ rowsAsArray: false });
+  });
+
+  it("_query answers the raw string for every field when cast is false", async () => {
+    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    await client.query("SELECT 1", { cast: false });
+    const next = vi.fn(() => 1);
+    const field = { type: "LONGLONG", string: () => "1" };
+    expect(castOf(native)(field, next)).toBe("1");
+    expect(castOf(native)({ type: "DATETIME", string: () => null }, next)).toBeNull();
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it("_query casts a TINYINT(1) and a BIT(1) to a boolean only under cast_booleans", async () => {
+    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    await client.query("SELECT 1");
+    await client.query("SELECT 1", { castBooleans: true });
+    const tiny = (value: string | null, length = 1) => ({
+      type: "TINY",
+      length,
+      string: () => value,
+    });
+    const bit = (value: number, length = 1) => ({
+      type: "BIT",
+      length,
+      string: () => null,
+      buffer: () => Uint8Array.of(value),
+    });
+    const next = () => "next";
+    expect(castOf(native, 0)(tiny("1"), next)).toBe("next");
+    expect(castOf(native, 0)(bit(1), next)).toBe("next");
+    expect(castOf(native, 1)(tiny("1"), next)).toBe(true);
+    expect(castOf(native, 1)(tiny("0"), next)).toBe(false);
+    expect(castOf(native, 1)(tiny(null), next)).toBeNull();
+    expect(castOf(native, 1)(tiny("1", 4), next)).toBe("next");
+    expect(castOf(native, 1)(bit(1), next)).toBe(true);
+    expect(castOf(native, 1)(bit(0), next)).toBe(false);
+    expect(castOf(native, 1)(bit(1, 8), next)).toBe("next");
+  });
+
+  it("_query converts a time to application_timezone when one is named", async () => {
+    const native = vi.fn(async (_options: object) => [[], [{ name: "a" }]]);
+    const client = mysql2Client({ query: native });
+    const field = { type: "DATETIME", string: () => "2026-04-27 14:23:55" };
+    await client.query("SELECT 1", { databaseTimezone: "utc" });
+    await client.query("SELECT 1", { databaseTimezone: "utc", applicationTimezone: "local" });
+    await client.query("SELECT 1", { databaseTimezone: "local", applicationTimezone: "utc" });
+    const [unnamed, local, utc] = [0, 1, 2].map((call) => castOf(native, call)(field, () => null));
+    expect((unnamed as Time).isUtc()).toBe(true);
+    expect((local as Time).isUtc()).toBe(false);
+    expect((local as Time).getutc().hour).toBe(14);
+    expect((utc as Time).isUtc()).toBe(true);
+    expect((utc as Time).getlocal().hour).toBe(14);
+  });
+
+  it("Statement#execute merges its keywords over query_options, and always casts", async () => {
+    const execute = vi.fn(async (_options: object, _values: unknown[]) => [[[1]], [{ name: "a" }]]);
+    const client = mysql2Client({ execute });
+    const stmt = client.prepare("SELECT ?");
+    await stmt.execute(1);
+    await stmt.execute(1, "x", { as: "array", cast: false, databaseTimezone: "utc" });
+    expect(execute.mock.calls.map(([options, values]) => [options, values])).toMatchObject([
+      [{ sql: "SELECT ?", rowsAsArray: false }, [1]],
+      [{ sql: "SELECT ?", rowsAsArray: true }, [1, "x"]],
+    ]);
+    const time = castOf(execute, 1)(
+      { type: "DATETIME", string: () => "2026-04-27 14:23:55" },
+      () => null,
+    ) as Time;
+    expect(time.isUtc()).toBe(true);
+    expect(client.queryOptions).toEqual(Mysql2.Client.defaultQueryOptions());
+
+    await stmt.execute(1, Temporal.PlainDate.from("2020-01-02"));
+    expect(execute.mock.calls[2]).toMatchObject([{ rowsAsArray: false }, [1, "2020-01-02"]]);
+  });
+
   it("default_query_options is one shared Hash each client dups", () => {
     expect(Mysql2.Client.defaultQueryOptions()).toBe(Mysql2.Client.defaultQueryOptions());
     const { queryOptions } = mysql2Client({});

@@ -13,6 +13,7 @@ import {
   RuntimeError,
   toI,
   hasKey,
+  toS,
   coreHashMergeKwd,
 } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "../../errors.js";
@@ -1403,28 +1404,25 @@ export class SchemaStatements {
   async indexNameForRemove(
     tableName: string,
     columnName: string | string[] | null | undefined,
-    options: { name?: string; column?: string | string[] },
+    options: { name?: string | null; column?: string | string[] },
   ): Promise<string> {
     if (this.canRemoveIndexByName(columnName, options)) return options.name as string;
 
     const checks: Array<(idx: IndexDefinition) => boolean> = [];
     let columnNames: string[];
 
-    if (!options.name && this.isExpressionColumnName(columnName as string)) {
+    if (!("name" in options) && this.isExpressionColumnName(columnName as string)) {
       options = { ...options, name: this.indexName(tableName, columnName as string) };
       columnNames = [];
     } else {
       columnNames = this.indexColumnNames((columnName ?? options.column) as string | string[]);
     }
 
-    if (options.name) {
-      const n = options.name;
-      checks.push((i) => i.name === n);
-    }
+    if ("name" in options) checks.push((i) => i.name === toS(options.name));
 
     if (
       columnNames.length > 0 &&
-      !(options.name && this.isExpressionColumnName(columnNames as unknown as string))
+      !("name" in options && this.isExpressionColumnName(columnNames as unknown as string))
     ) {
       checks.push(
         (i) => this.indexName(tableName, i.columns) === this.indexName(tableName, columnNames),

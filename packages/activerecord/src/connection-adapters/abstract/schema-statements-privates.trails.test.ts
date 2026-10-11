@@ -5,6 +5,7 @@ import { indexNameLength, maxIdentifierLength, tableNameLength } from "./databas
 import {
   CheckConstraintDefinition,
   ForeignKeyDefinition,
+  Table as SchemaTable,
   TableDefinition,
   type ColumnType,
 } from "./schema-definitions.js";
@@ -178,6 +179,30 @@ describe("SchemaStatements privates (PR 8)", () => {
       indexes: vi.fn().mockResolvedValue([{ name: expected, columns: ["x"], unique: false }]),
     });
     expect(await ss.indexNameForRemove("users", longExpr, {})).toBe(expected);
+  });
+
+  it("indexNameForRemove tests :name by key presence, and compares options[:name].to_s", async () => {
+    const indexes = vi.fn().mockResolvedValue([
+      { name: "index_users_on_email", columns: ["email"], unique: false },
+      { name: "", columns: ["email"], unique: false },
+    ]);
+    const ss = makeStatements({ indexes });
+    expect(await ss.indexNameForRemove("users", "email", { name: undefined })).toBe("");
+    expect(await ss.indexNameForRemove("users", "email", { name: "" })).toBe("");
+    expect(await ss.indexNameForRemove("users", "lower(email)", { name: undefined })).toBe("");
+    expect(indexes).toHaveBeenCalledTimes(3);
+    await expect(ss.indexNameForRemove("users", "email", {})).rejects.toThrow(
+      /Multiple indexes found on users columns/,
+    );
+  });
+
+  it("Table#removeIndex does not forward an absent name as a present key", async () => {
+    const removeIndex = vi.fn().mockResolvedValue(undefined);
+    const table = new SchemaTable("users", { removeIndex } as never);
+    await table.removeIndex("email");
+    expect(removeIndex).toHaveBeenCalledWith("users", "email");
+    await table.removeIndex({ column: "email" });
+    expect("name" in removeIndex.mock.calls[1][2]).toBe(false);
   });
 
   it("stripTableNamePrefixAndSuffix strips prefix/suffix", () => {

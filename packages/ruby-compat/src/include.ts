@@ -1588,7 +1588,9 @@ export function rbObjClone<T>(obj: T): T {
     const table = descriptors[registry];
     if (table) descriptors[registry] = { ...table, value: new Set(table.value as Set<unknown>) };
   }
-  const clone = Object.defineProperties(rbObjAlloc(obj, Object.getPrototypeOf(obj)), descriptors);
+  const alloc = rbObjAlloc(obj, Object.getPrototypeOf(obj));
+  if (isClassConstructor(obj)) copyMethodTable(obj, alloc, descriptors);
+  const clone = Object.defineProperties(alloc, descriptors);
   const defined = extendedOwners.get(obj);
   if (defined) extendedOwners.set(clone, new Map(defined));
   initCopyHook(clone, "initializeClone", obj);
@@ -1614,14 +1616,18 @@ export function rbObjDup<T>(obj: T): T {
   const singletonKeys = Object.prototype.hasOwnProperty.call(obj, extendedKeys)
     ? ((obj as Record<symbol, unknown>)[extendedKeys] as Set<string>)
     : undefined;
-  for (const key of [extendedKeys, includedModulesKey, ...(singletonKeys ?? [])]) {
-    delete descriptors[key];
+  if (!isClassConstructor(obj)) {
+    for (const key of [extendedKeys, includedModulesKey, ...(singletonKeys ?? [])]) {
+      delete descriptors[key];
+    }
   }
   let proto = Object.getPrototypeOf(obj) as object | null;
   if (proto !== null && Object.prototype.hasOwnProperty.call(proto, FL_SINGLETON)) {
     proto = Object.getPrototypeOf(proto) as object | null;
   }
-  const dup = Object.defineProperties(rbObjAlloc(obj, proto), descriptors);
+  const alloc = rbObjAlloc(obj, proto);
+  if (isClassConstructor(obj)) copyMethodTable(obj, alloc, descriptors);
+  const dup = Object.defineProperties(alloc, descriptors);
   initCopyHook(dup, "initializeDup", obj);
   return dup as T;
 }
@@ -1654,7 +1660,49 @@ export function rbGetAllocFunc(klass: unknown): ((klass: never) => object) | und
   }
 }
 
+function classAlloc(orig: AnyClass, superclass: object | null): object {
+  const clone = function (...args: never[]): object {
+    if (new.target === undefined) {
+      throw new TypeError("Class constructor cannot be invoked without 'new'");
+    }
+    return Reflect.construct(orig, args, new.target);
+  };
+  return Object.setPrototypeOf(clone, superclass);
+}
+
+function copyMethodTable(
+  orig: AnyClass,
+  clone: object,
+  descriptors: Record<string | symbol, PropertyDescriptor>,
+): void {
+  const mTbl = Object.getOwnPropertyDescriptors(orig.prototype) as Record<
+    string | symbol,
+    PropertyDescriptor
+  >;
+  Object.defineProperty(mTbl, "constructor", {
+    value: { ...Object.getOwnPropertyDescriptor(orig.prototype, "constructor"), value: clone },
+    enumerable: true,
+  });
+  const table = mTbl[includedModulesKey];
+  if (table) mTbl[includedModulesKey] = { ...table, value: new Set(table.value as Set<unknown>) };
+  descriptors["prototype"] = {
+    value: Object.create(Object.getPrototypeOf(orig.prototype) as object | null, mTbl),
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  };
+  descriptors["name"] = { ...descriptors["name"], value: "" };
+}
+
+function isClassConstructor(obj: object): obj is AnyClass {
+  return (
+    typeof obj === "function" &&
+    Object.getOwnPropertyDescriptor(obj, "prototype")?.writable === false
+  );
+}
+
 function rbObjAlloc(obj: object, proto: object | null): object {
+  if (isClassConstructor(obj)) return classAlloc(obj, proto);
   const klass = (proto as { constructor?: unknown } | null)?.constructor;
   const allocator = rbGetAllocFunc(klass);
   if (allocator) return Object.setPrototypeOf(allocator(klass as never), proto);
@@ -1875,6 +1923,10 @@ export function extend<T extends AnyClass | object>(
  * @noRailsEquivalent PERMANENT
  */
 export const Kernel = new Module((mod) => {
+  /** @noRailsEquivalent PERMANENT */
+  mod.defineMethod("dup", function (this: object): object {
+    return rbObjDup(this);
+  });
   /** @noRailsEquivalent PERMANENT */
   mod.defineMethod("initializeDup", function (this: object, orig: unknown): object {
     const initializeCopy = (this as { initializeCopy?: unknown }).initializeCopy;

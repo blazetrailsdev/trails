@@ -42,8 +42,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
 
   /** @internal */
   protected override isDefaultPrimaryKey(column: MysqlColumn): boolean {
-    const isBigint = super.isDefaultPrimaryKey(column) || /^bigint\b/i.test(column.sqlType ?? "");
-    return isBigint && column.isAutoIncrement() && !column.isUnsigned();
+    return super.isDefaultPrimaryKey(column) && column.isAutoIncrement() && !column.isUnsigned();
   }
 
   /** @internal */
@@ -124,11 +123,5 @@ export class SchemaDumper extends AbstractSchemaDumper {
         ((await this.connection.queryValue(sql, "SCHEMA")) as string).replace(/\\'/g, "'"),
       );
     }
-  }
-
-  /** @internal */
-  protected override schemaScale(column: MysqlColumn): string | undefined {
-    if (column.type !== "decimal") return undefined;
-    return super.schemaScale(column);
   }
 }
