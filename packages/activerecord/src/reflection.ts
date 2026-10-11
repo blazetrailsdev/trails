@@ -514,21 +514,18 @@ export class AssociationReflection extends MacroReflection {
   ) {
     const opts = { ...options };
 
-    if (opts.queryConstraints) {
-      const macro = new.target.name.replace(/Reflection$/, "");
-      const macroName = macro.charAt(0).toLowerCase() + macro.slice(1);
-      throw new ConfigurationError(
-        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name ?? ""}\` ` +
-          `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
-      );
-    }
-
     if (Array.isArray(opts.foreignKey)) {
       opts.queryConstraints = opts.foreignKey;
       delete opts.foreignKey;
     }
 
     super(name, scope, opts, activeRecord);
+    if (options.queryConstraints != null && options.queryConstraints !== false) {
+      throw new ConfigurationError(
+        `Setting \`queryConstraints:\` option on \`${rbModName(activeRecord)}.${this.macro} :${name}\` ` +
+          `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
+      );
+    }
 
     this.ensureOptionNotGivenAsClassBang("className");
   }

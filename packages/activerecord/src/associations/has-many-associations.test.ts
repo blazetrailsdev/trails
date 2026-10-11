@@ -524,6 +524,14 @@ describe("HasManyAssociationsTest", () => {
     expect(loadedSql).toEqual(expectedSql);
   });
 
+  it("delete all on association clears scope", async () => {
+    const author = await HmAuthor.createBang({ name: "Gannon" });
+    const posts = (author as any).posts;
+    await posts.createBang({ title: "test", body: "body" });
+    await posts.deleteAll();
+    expect(await posts.first()).toBeNull();
+  });
+
   it("building the associated object with implicit sti base class", () => {
     class StiCompany extends Base {
       declare name: string | null;
@@ -1513,6 +1521,14 @@ describe("HasManyAssociationsTest", () => {
     expect(Object.keys(comment.attributes)).toEqual(["id", "body"]);
   });
 
+  it("select with block", async () => {
+    expect(
+      (await (posts("welcome") as any).comments.select((c: any) => c.id === 1)).map(
+        (c: any) => c.id,
+      ),
+    ).toEqual([1]);
+  });
+
   it("select with block and dirty target", async () => {
     expect((await (posts("welcome") as any).comments.select(() => true)).length).toBe(2);
     (posts("welcome") as any).comments.build();
@@ -2204,6 +2220,29 @@ describe("HasManyAssociationsTest", () => {
     expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
     await (companies("first_firm") as any).clientsOfFirm.reload();
     expect(await (companies("first_firm") as any).clientsOfFirm.size()).toBe(0);
+  });
+
+  it("delete all", async () => {
+    await forceSignal37ToLoadAllClientsOfFirm();
+
+    expect((companies("first_firm") as any).clientsOfFirm.loaded).toBeTruthy();
+
+    await (companies("first_firm") as any).dependentClientsOfFirm.create({
+      name: "Another Client",
+    });
+    const clients = await (companies("first_firm") as any).dependentClientsOfFirm.toArray();
+    expect(clients.length).toBe(3);
+
+    await assertDifference(
+      () => Client.count(),
+      -clients.length,
+      null,
+      async () => {
+        expect(await (companies("first_firm") as any).dependentClientsOfFirm.deleteAll()).toBe(
+          clients.length,
+        );
+      },
+    );
   });
 
   it("delete all with not yet loaded association collection", async () => {
@@ -3472,6 +3511,13 @@ describe("HasManyAssociationsTest", () => {
     const posts = await author.prot_posts;
     expect(posts.length).toBe(1);
     expect((posts[0] as any).title).toBe("A");
+  });
+
+  it("to a should dup target", async () => {
+    const ary = await (topics("first") as any).replies.toArray();
+    const target = (topics("first") as any).replies.target;
+
+    expect(target).not.toBe(ary);
   });
 
   it("merging with custom attribute writer", async () => {

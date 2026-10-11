@@ -329,6 +329,11 @@ describe("BasicsTest", async () => {
     expect(topicIds).toEqual(((await Topic.pluck("id")) as number[]).sort());
   });
 
+  it("table exists", async () => {
+    assertNot(await NonExistentTable.tableExists());
+    assert(await Topic.tableExists());
+  });
+
   it("preserving date objects", async () => {
     expect(
       ((await Topic.find(1)) as any).last_read,
@@ -1148,6 +1153,32 @@ describe("BasicsTest", async () => {
     expect((await ((await Topic.first()) as any).delete()).isPreviouslyPersisted()).toEqual(true);
   });
 
+  it("dup", async () => {
+    const topic = (await Topic.find(1)) as any;
+    let dupedTopic: any = null;
+    await assertNothingRaised(() => {
+      dupedTopic = topic.dup();
+    });
+    expect(dupedTopic.title).toEqual(topic.title);
+    assertNotPredicate(dupedTopic, (t: any) => t.isPersisted());
+
+    topic.title = "a";
+    dupedTopic.title = "b";
+    expect(topic.title).toEqual("a");
+    expect(dupedTopic.title).toEqual("b");
+
+    dupedTopic = topic.dup();
+    expect(topic.title).toEqual("a");
+
+    expect(dupedTopic.author_email_address).toEqual(topic.author_email_address);
+
+    await dupedTopic.save();
+    assertPredicate(dupedTopic, (t: any) => t.isPersisted());
+    expect(dupedTopic.id).not.toEqual(topic.id);
+
+    await dupedTopic.reload();
+  });
+
   it("dup for a composite primary key model", async () => {
     const book = (await cpkBooks("cpk_great_author_first_book")) as any;
     const newBook = book.dup();
@@ -1497,6 +1528,12 @@ describe("BasicsTest", async () => {
     expect(res7).toEqual(res6);
   });
 
+  it("last", async () => {
+    expect(await Developer.last()).toEqual(
+      await Developer.all().mergeBang({ order: "id desc" }).first(),
+    );
+  });
+
   it("no limit offset", async () => {
     await assertNothingRaised(() => Developer.all().mergeBang({ offset: 2 }).toArray());
   });
@@ -1632,6 +1669,23 @@ describe("BasicsTest", async () => {
     expect(c2.map((column, i) => column.equals(c1[i]))).toEqual(new Array(c1.length).fill(true));
 
     await Post.schemaCache().loadAllBang();
+  });
+
+  it("attribute names", async () => {
+    const expected = [
+      "id",
+      "type",
+      "firm_id",
+      "firm_name",
+      "name",
+      "client_of",
+      "rating",
+      "account_id",
+      "description",
+      "status",
+      "metadata",
+    ];
+    expect(Company.attributeNames()).toEqual(expected);
   });
 
   it("has attribute", async () => {

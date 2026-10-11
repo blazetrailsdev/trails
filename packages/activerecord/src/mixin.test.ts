@@ -4,6 +4,15 @@ import { Duration } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-fixtures.js";
 
+class Mixin extends Base {
+  static {
+    this.tableName = "mixins";
+    this.attribute("lft", "integer");
+    this.attribute("updated_at", "datetime");
+    this.attribute("created_at", "datetime");
+  }
+}
+
 describe("TouchTest", () => {
   fixtures([]);
   afterEach(() => {
@@ -11,16 +20,31 @@ describe("TouchTest", () => {
     vi.useRealTimers();
   });
 
-  it("many updates", async () => {
-    class Mixin extends Base {
-      static {
-        this.tableName = "mixins";
-        this.attribute("lft", "integer");
-        this.attribute("updated_at", "datetime");
-        this.attribute("created_at", "datetime");
-      }
-    }
+  it("update", async () => {
+    freezeTime();
 
+    const stamped = new Mixin();
+
+    expect(stamped.readAttribute("updated_at")).toBeNull();
+    expect(stamped.readAttribute("created_at")).toBeNull();
+    await stamped.save();
+    expect(stamped.readAttribute("updated_at")).toEqual(
+      await Mixin.currentTimeFromProperTimezone(),
+    );
+    expect(stamped.readAttribute("created_at")).toEqual(
+      await Mixin.currentTimeFromProperTimezone(),
+    );
+  });
+
+  it("create", async () => {
+    freezeTime();
+
+    const obj = await Mixin.create();
+    expect(obj.readAttribute("updated_at")).toEqual(await Mixin.currentTimeFromProperTimezone());
+    expect(obj.readAttribute("created_at")).toEqual(await Mixin.currentTimeFromProperTimezone());
+  });
+
+  it("many updates", async () => {
     freezeTime();
 
     const stamped = new Mixin();
@@ -48,15 +72,6 @@ describe("TouchTest", () => {
   });
 
   it("create turned off", async () => {
-    class Mixin extends Base {
-      static {
-        this.tableName = "mixins";
-        this.attribute("lft", "integer");
-        this.attribute("updated_at", "datetime");
-        this.attribute("created_at", "datetime");
-      }
-    }
-
     const prevRecordTimestamps = Mixin.recordTimestamps;
     Mixin.recordTimestamps = false;
     try {

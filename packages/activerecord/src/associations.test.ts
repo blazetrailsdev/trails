@@ -2,7 +2,14 @@ import type { CollectionAssociation } from "./associations/collection-associatio
 import { Time as RubyTime } from "@blazetrails/date";
 import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vitest";
 import { SingularAssociation } from "./associations/singular-association.js";
-import { Base, reflectOnAssociation, registerModel, NameError, Relation } from "./index.js";
+import {
+  Base,
+  ConfigurationError,
+  reflectOnAssociation,
+  registerModel,
+  NameError,
+  Relation,
+} from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import {
   assertEmpty,
@@ -13,6 +20,7 @@ import {
   assertPredicate,
   assertRaises,
   assertSame,
+  squish,
 } from "@blazetrails/activesupport";
 import {
   assertNoQueries,
@@ -2339,6 +2347,32 @@ describe("AssociationsTest", () => {
       }).isExists(),
       (e: boolean) => e,
     );
+  });
+
+  it("using query constraints warns about changing behavior", async () => {
+    const hasManyExpectedMessage = squish(`
+      Setting \`queryConstraints:\` option on \`Sharded::BlogPost.hasMany :qcDeprecatedComments\` is not allowed.
+      To get the same behavior, use the \`foreignKey\` option instead.
+    `);
+
+    await assertRaises([ConfigurationError], { match: hasManyExpectedMessage }, () => {
+      ShardedBlogPost.hasMany("qcDeprecatedComments", {
+        className: "Sharded::Comment",
+        queryConstraints: ["blog_id", "blog_post_id"],
+      });
+    });
+
+    const belongsToExpectedMessage = squish(`
+      Setting \`queryConstraints:\` option on \`Sharded::Comment.belongsTo :qcDeprecatedBlogPost\` is not allowed.
+      To get the same behavior, use the \`foreignKey\` option instead.
+    `);
+
+    await assertRaises([ConfigurationError], { match: belongsToExpectedMessage }, () => {
+      ShardedComment.belongsTo("qcDeprecatedBlogPost", {
+        className: "Sharded::Blog",
+        queryConstraints: ["blog_id", "blog_post_id"],
+      });
+    });
   });
 
   it("has many loads via inline fallback resolving composite owner key from query constraints", async () => {
