@@ -330,11 +330,11 @@ interface ComparableRecord {
 }
 
 export function isPresent(this: CoreRecord): boolean {
-  return this.isPersisted();
+  return true;
 }
 
 export function isBlank(this: CoreRecord): boolean {
-  return !isPresent.call(this);
+  return false;
 }
 
 interface ReadonlyFields {
@@ -778,6 +778,7 @@ export function constructor(
     _attributes: AttributeSet;
     _newRecord: boolean;
     initInternals(): void;
+    initializeInternalsCallback(): void;
   },
   attributes: unknown = null,
   block?: (record: CoreRecord) => void,
@@ -799,6 +800,7 @@ export function constructor(
   }
 
   this.initInternals();
+  if (!allocating) this.initializeInternalsCallback();
 
   SuperMethods.superMethod(this, "initialize")!(attributes);
 
@@ -839,6 +841,7 @@ const SuperMethods = new Module((mod) => {
   mod.defineMethod("initialize", constructor);
   mod.defineMethod("initInternals", initInternals);
   mod.defineMethod("initializeDup", initializeDup);
+  mod.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
 });
 
 export function initializeDup(
@@ -906,7 +909,7 @@ export function inspectWithAttributes(
       }).join(", ")
     : "not initialized";
 
-  return `#<${(this.constructor as { name: string }).name} ${inspection}>`;
+  return `#<${rbModToS(this.constructor as new (...args: never) => unknown)} ${inspection}>`;
 }
 
 export function attributesForInspect(this: CoreRecord): string[] {

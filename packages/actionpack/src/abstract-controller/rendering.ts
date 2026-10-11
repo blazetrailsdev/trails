@@ -1,6 +1,6 @@
 import { ViewPaths } from "@blazetrails/actionview";
-import { Concern, extend, include } from "@blazetrails/activesupport";
-import { ArgumentError, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import { Concern, extend, include, isPlainObject } from "@blazetrails/activesupport";
+import { ArgumentError, Hash, Module, rbObjRespondTo } from "@blazetrails/ruby-compat";
 import { Mime } from "../action-dispatch/http/mime-type.js";
 import { AbstractControllerError } from "./error.js";
 
@@ -96,7 +96,7 @@ export function _normalizeArgs(action?: unknown, options: RenderOptions = {}): R
     }
     throw new ArgumentError("render parameters are not permitted");
   }
-  if (action != null && typeof action === "object" && !Array.isArray(action)) {
+  if (isPlainObject(action) || action instanceof Hash) {
     return action as RenderOptions;
   }
   return options;

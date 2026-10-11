@@ -1,7 +1,12 @@
 import type { Base } from "../../base.js";
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Table, fetchAttribute } from "@blazetrails/arel";
-import type { AbstractReflection, ConcreteReflection } from "../../reflection.js";
+import type {
+  AbstractReflection,
+  AssociationReflection,
+  ConcreteReflection,
+  ThroughReflection,
+} from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
 import type { AliasTracker } from "../alias-tracker.js";
 import { extractBang } from "@blazetrails/activesupport";
@@ -14,13 +19,13 @@ type TableResolver = (
 ) => [Table | Nodes.TableAlias, boolean];
 
 export class JoinAssociation extends JoinPart {
-  readonly reflection: AbstractReflection;
+  readonly reflection: AssociationReflection | ThroughReflection;
   private _table: Table | Nodes.TableAlias | null = null;
   readonly tables: (Table | Nodes.TableAlias)[] | null = null;
   declare private _readonly?: unknown;
   declare private _strictLoading?: unknown;
 
-  constructor(reflection: AbstractReflection, children?: JoinAssociation[]) {
+  constructor(reflection: AssociationReflection | ThroughReflection, children?: JoinAssociation[]) {
     super(reflection.klass, children);
     this.reflection = reflection;
   }

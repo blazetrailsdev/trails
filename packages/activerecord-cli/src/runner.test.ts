@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
-import { DatabaseTasks } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks } from "@blazetrails/activerecord";
 import { arRunner } from "./runner.js";
 
 const DB_CONFIG = `export default { development: { adapter: "sqlite3", database: ":memory:" }, test: { adapter: "sqlite3", database: ":memory:" } };\n`;
@@ -23,6 +23,7 @@ describe("ArRunnerTest", () => {
     vi.restoreAllMocks();
     delete process.env["TRAILS_ENV"];
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
   });
 
   it("returns 1 when no script path is given", async () => {

@@ -60,13 +60,7 @@ export class DatabaseTasks {
   static get name(): string {
     return "primary";
   }
-  static get databaseConfiguration(): DatabaseConfigurations | null {
-    return ActiveRecord.Base.configurations();
-  }
-
-  static set databaseConfiguration(value: DatabaseConfigurations | null) {
-    ActiveRecord.Base.configurations(value ?? new DatabaseConfigurations({}));
-  }
+  static databaseConfiguration: DatabaseConfigurations | null = null;
 
   private static _dbDir: string | null = null;
 

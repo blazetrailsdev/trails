@@ -23,7 +23,6 @@ import {
 } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { RecordNotFound, SoleRecordExceeded, UnknownPrimaryKey } from "../errors.js";
-import { queryConstraintsList as _queryConstraintsListFn } from "../persistence.js";
 import { ActiveRecord } from "../namespaces.js";
 import type { JoinDependency } from "../associations/join-dependency.js";
 import { stripThenable } from "@blazetrails/activesupport";
@@ -39,6 +38,7 @@ interface FinderRelation {
     primaryKey: string | string[];
     isCompositePrimaryKey(): boolean;
     implicitOrderColumn?: string | null;
+    queryConstraintsList(): string[] | null;
     createBang(attrs: any): Promise<any>;
     withConnection<R>(block: (c: DatabaseAdapter) => R | Promise<R>): Promise<R>;
     transaction<R>(
@@ -51,6 +51,10 @@ interface FinderRelation {
   isNullRelation(): boolean;
   limitValue: number | string | null;
   offsetValue: number | string | null;
+  distinctValue: unknown;
+  limitBang(value: unknown): FinderRelation;
+  /** @internal */
+  _selectBang(...fields: unknown[]): FinderRelation;
   orderValues: unknown[];
   createWithValue: Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
@@ -436,11 +440,10 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
   conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
 
   let relation: any;
-  if (rtest((this as any).distinctValue) && (this as any).offsetValue != null) {
-    relation = (this as any).except("order").limitBang(1);
+  if (rtest(this.distinctValue) && this.offsetValue != null) {
+    relation = this.except("order").limitBang(1);
   } else {
-    relation = (this as any)
-      .except("select", "distinct", "order")
+    relation = this.except("select", "distinct", "order")
       ._selectBang(new Nodes.SqlLiteral(ONE_AS_ONE))
       .limitBang(1);
   }
@@ -657,7 +660,7 @@ export function orderedRelation(this: FinderRelation): any {
   if (
     isEmpty(this.orderValues) &&
     (rtest(this.model.implicitOrderColumn) ||
-      _queryConstraintsListFn.call(this.model as any) != null ||
+      this.model.queryConstraintsList() != null ||
       rtest(this.primaryKey))
   ) {
     return this.order(
@@ -670,17 +673,14 @@ export function orderedRelation(this: FinderRelation): any {
 
 /** @internal */
 export function _orderColumns(this: FinderRelation): string[] {
-  const mc = this.model as any;
-  const pk = mc?.primaryKey;
-  const implicitOrder: string | null | undefined = mc?.implicitOrderColumn;
-  const constraintsList: string[] | null = mc ? _queryConstraintsListFn.call(mc) : null;
+  const oc: (string | string[] | null | undefined)[] = [];
 
-  const oc: string[] = [];
-  if (implicitOrder) oc.push(implicitOrder);
-  if (constraintsList) oc.push(...constraintsList);
-  if (pk && constraintsList == null) {
-    const pkCols = Array.isArray(pk) ? pk : [pk];
-    oc.push(...pkCols);
+  if (rtest(this.model.implicitOrderColumn)) oc.push(this.model.implicitOrderColumn);
+  if (rtest(this.model.queryConstraintsList())) oc.push(this.model.queryConstraintsList());
+
+  if (rtest(this.model.primaryKey) && this.model.queryConstraintsList() == null) {
+    oc.push(this.model.primaryKey);
   }
-  return [...new Set(oc.filter(Boolean))];
+
+  return compact(uniq(oc.flat()));
 }

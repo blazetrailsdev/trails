@@ -238,6 +238,8 @@ export class ClassMethods {
       return object;
     }
   }
+
+  static queryConstraintsList = queryConstraintsList;
 }
 
 export function queryConstraints(this: PersistenceHost, ...columnsList: string[]): void {

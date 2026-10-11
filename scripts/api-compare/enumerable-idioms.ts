@@ -306,7 +306,23 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   `h.fetch(:k, d)` does not, and marks nothing.
  *
  * A row drops the Ruby call from significance, so nothing pairs its argument
- * list by name. A row whose argument is a QUANTITY declares `argument`: the TS
+ * list by name. A row whose form names a KEY declares `key`: the extractor
+ * records the form as a call site of its own (`@in`, `@delete`) holding the
+ * key, and `parity:api:calls:args` pairs it with the Ruby site on the same
+ * receiver name and compares it with the Ruby call's first argument where both
+ * are literal, so `options.delete(:public)` ported as `delete options.private`
+ * is a `shape` row (call-args.ts#hashFormKeys). A key is literal when Ruby's
+ * is a Symbol or String literal and the TS one a string literal or a property
+ * name (`delete options.public`); a computed key on either side is not
+ * compared. A Symbol key goes through `normalizeRubyKey` on both sides, the
+ * translation a kwarg key gets, so `:only_path` is `"onlyPath"`, and is also
+ * `":params"`, the spelling a hash holding Symbol and String keys keeps it
+ * under. A String key is compared verbatim: `"only_path"` is not `"onlyPath"`.
+ * A Ruby
+ * site on a local receiver, which the gate otherwise drops as `weak`, is kept
+ * where the body has a form site on that receiver. `@assign`, `@spread` and
+ * `@entries` name no key and are not recorded.
+ * A row whose argument is a QUANTITY declares `argument`: the TS
  * call carrying it, its position on each side, and the unit `factor` the TS
  * value is the Ruby one multiplied by. `Kernel#sleep` takes seconds and
  * `setTimeout` milliseconds, so `sleep 0.1 * counter` is
@@ -321,6 +337,7 @@ export const NATIVE_FORM_ANALOGUES = new Map<
     uncreditedKinds?: ReadonlySet<string>;
     creditedKinds?: ReadonlySet<string>;
     named?: true;
+    key?: true;
     argument?: { tsCall: string; rubyIndex: number; tsIndex: number; factor: number };
   }
 >([
@@ -337,17 +354,38 @@ export const NATIVE_FORM_ANALOGUES = new Map<
       named: true,
     },
   ],
-  ["key?", { form: "in", receivers: "explicit", uncreditedKinds: new Set(["self"]), named: true }],
+  [
+    "key?",
+    {
+      form: "in",
+      receivers: "explicit",
+      uncreditedKinds: new Set(["self"]),
+      named: true,
+      key: true,
+    },
+  ],
   [
     "has_key?",
-    { form: "in", receivers: "explicit", uncreditedKinds: new Set(["self"]), named: true },
+    {
+      form: "in",
+      receivers: "explicit",
+      uncreditedKinds: new Set(["self"]),
+      named: true,
+      key: true,
+    },
   ],
   [
     "include?",
-    { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true },
+    { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true, key: true },
   ],
-  ["member?", { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true }],
-  ["delete", { form: "delete", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
+  [
+    "member?",
+    { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true, key: true },
+  ],
+  [
+    "delete",
+    { form: "delete", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true, key: true },
+  ],
   ["merge!", { form: "assign", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
   ["update", { form: "assign", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
   ["merge", { form: "spread", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],

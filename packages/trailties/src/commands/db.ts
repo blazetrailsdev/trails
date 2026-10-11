@@ -246,9 +246,9 @@ async function withRegisteredConfigurations<T>(
   fn: () => Promise<T>,
 ): Promise<T> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
-  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
+  const previousConfigurations = Base.configurations();
   const previousEnv = DatabaseTasks.env;
-  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations(configs);
+  Base.configurations(new DatabaseConfigurations(configs));
   DatabaseTasks.env = envName;
   if (!Trails.application) {
     DatabaseTasks.root = getFs().cwd();
@@ -257,19 +257,19 @@ async function withRegisteredConfigurations<T>(
   try {
     return await fn();
   } finally {
-    DatabaseTasks.databaseConfiguration = previousTasksConfig;
+    Base.configurations(previousConfigurations);
     DatabaseTasks.env = previousEnv;
   }
 }
 
 async function runProtectedEnvCheck(config: HashConfig, envName: string): Promise<void> {
   const { DatabaseConfigurations } = await import("@blazetrails/activerecord");
-  const previousTasksConfig = DatabaseTasks.databaseConfiguration;
-  DatabaseTasks.databaseConfiguration = new DatabaseConfigurations([config]);
+  const previousConfigurations = Base.configurations();
+  Base.configurations(new DatabaseConfigurations([config]));
   try {
     await DatabaseTasks.checkProtectedEnvironmentsBang(envName);
   } finally {
-    DatabaseTasks.databaseConfiguration = previousTasksConfig;
+    Base.configurations(previousConfigurations);
   }
 }
 

@@ -35,7 +35,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("merges non-aliased columns into the parent record", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
     const rows = [
       {
@@ -69,7 +69,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("does not assign extra columns to child records", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
     const rows = [
       {
@@ -89,7 +89,7 @@ describe("JoinDependency extra columns in instantiate", () => {
   });
 
   it("works with no extra columns (no regression)", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
 
     const rows = [
       aliasedRow(jd, {

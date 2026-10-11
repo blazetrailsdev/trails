@@ -1,5 +1,5 @@
 import { ArgumentError, NameError, rbInspect } from "@blazetrails/ruby-compat";
-import { Concern, classAttribute, dasherize, extend } from "@blazetrails/activesupport";
+import { Concern, classAttribute, dasherize, extend, underscore } from "@blazetrails/activesupport";
 import { include, initialize, Module } from "@blazetrails/ruby-compat/include";
 import type { LookupContext } from "./lookup-context.js";
 import type { PathSet } from "./path-set.js";
@@ -85,7 +85,7 @@ export function _writeLayoutMethod(this: LayoutsClass): void {
   };
 
   const impliedLayoutName = this._impliedLayoutName();
-  const prefixes = /\blayouts/.test(impliedLayoutName) ? [] : ["layouts"];
+  const prefixes = /\blayouts/.test(underscore(impliedLayoutName)) ? [] : ["layouts"];
   const defaultBehavior: LayoutMethod = function (lookupContext, formats, keys) {
     return (
       (lookupContext.findAll(impliedLayoutName, prefixes, false, keys, { formats })[0] as

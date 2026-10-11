@@ -31,17 +31,17 @@ import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
 import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
-let originalConfigurations: DatabaseConfigurations | null = null;
+let originalConfigurations: DatabaseConfigurations;
 const originalTrailsEnv = getEnv("TRAILS_ENV");
 beforeAll(() => {
-  originalConfigurations = DatabaseTasks.databaseConfiguration;
+  originalConfigurations = Base.configurations();
 });
 afterEach(() => {
   setEnv("TRAILS_ENV", originalTrailsEnv);
 });
 
 function configFor(envName: string, name: string): HashConfig | undefined {
-  return DatabaseTasks.databaseConfiguration!.configsFor({ envName, name });
+  return Base.configurations().configsFor({ envName, name });
 }
 
 function sameCall(actual: unknown[], expected: unknown[]): boolean {
@@ -79,7 +79,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       const env = "arunit";
       const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
       const dbFile = path.join(tmp, "primary.sqlite3");
-      DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: dbFile } },
       });
       DatabaseTasks.registerTask(
@@ -132,7 +132,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 
         await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
         await cleanup.disconnectBang();
-        DatabaseTasks.databaseConfiguration = originalConfigurations;
+        Base.configurations(originalConfigurations);
         clearRegisteredTasks();
         fs.rmSync(tmp, { recursive: true, force: true });
       }
@@ -146,7 +146,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error if no migrations have been made", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
     const dbFile = path.join(tmp, "test.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       arunit: { adapter: "sqlite3", database: dbFile },
     });
     DatabaseTasks.registerTask(
@@ -181,7 +181,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       const cleanup = new BetterSQLite3Adapter({ database: dbFile });
       await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.disconnectBang();
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
+      Base.configurations(originalConfigurations);
       clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -194,7 +194,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-multi-db-"));
     const primaryDb = path.join(tmp, "primary.sqlite3");
     const secondaryDb = path.join(tmp, "secondary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: {
         primary: { adapter: "sqlite3", database: primaryDb },
         secondary: { adapter: "sqlite3", database: secondaryDb },
@@ -246,7 +246,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
       );
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
+      Base.configurations(originalConfigurations);
       clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -456,12 +456,12 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
 
   it("ignores configurations without databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract" },
     });
     await DatabaseTasks.createAll();
@@ -469,7 +469,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
 
   it("ignores remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     vi.spyOn(stderr, "write").mockImplementation(() => true);
@@ -477,7 +477,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     expect(createSpy).not.toHaveBeenCalled();
   });
   it("warning for remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     const writes: string[] = [];
@@ -492,7 +492,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
 
   it("creates configurations with local ip", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
     });
     await DatabaseTasks.createAll();
@@ -500,7 +500,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
 
   it("creates configurations with local host", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "localhost" },
     });
     await DatabaseTasks.createAll();
@@ -508,7 +508,7 @@ describe("DatabaseTasksCreateAllTest", () => {
   });
 
   it("creates configurations with blank hosts", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "" },
     });
     await DatabaseTasks.createAll();
@@ -522,7 +522,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   let establishSpy: MockInstance<any>;
   beforeEach(() => {
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { url: "abstract://prod-db-host/prod-db" },
@@ -530,7 +530,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -595,7 +595,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   let establishSpy: MockInstance<any>;
   beforeEach(() => {
     establishSpy = vi.spyOn(Base, "establishConnection").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -612,7 +612,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -687,12 +687,12 @@ describe("DatabaseTasksDropAllTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
 
   it("ignores configurations without databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract" },
     });
     await DatabaseTasks.dropAll();
@@ -700,7 +700,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
 
   it("ignores remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     vi.spyOn(stderr, "write").mockImplementation(() => true);
@@ -708,7 +708,7 @@ describe("DatabaseTasksDropAllTest", () => {
     expect(dropSpy).not.toHaveBeenCalled();
   });
   it("warning for remote databases", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "my.server.tld" },
     });
     const writes: string[] = [];
@@ -723,7 +723,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
 
   it("drops configurations with local ip", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "127.0.0.1" },
     });
     await DatabaseTasks.dropAll();
@@ -731,7 +731,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
 
   it("drops configurations with local host", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "localhost" },
     });
     await DatabaseTasks.dropAll();
@@ -739,7 +739,7 @@ describe("DatabaseTasksDropAllTest", () => {
   });
 
   it("drops configurations with blank hosts", async () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db", host: "" },
     });
     await DatabaseTasks.dropAll();
@@ -751,7 +751,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   captureStdoutAndStderr();
 
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { url: "abstract://prod-db-host/prod-db" },
@@ -759,7 +759,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -805,7 +805,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   captureStdoutAndStderr();
 
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -822,7 +822,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -955,7 +955,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
   afterEach(async () => {
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     clearRegisteredTasks();
     try {
       await Base.removeConnection();
@@ -1166,7 +1166,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
         async create(): Promise<void> {}
       },
     );
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [DatabaseTasks.env.toString()]: { adapter: "sqlite3", database: dbFile },
     });
     const clearSpy = vi.spyOn(SchemaReflection.prototype, "clearBang");
@@ -1180,7 +1180,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
       try {
         await Base.removeConnection();
       } catch {}
-      DatabaseTasks.databaseConfiguration = originalConfigurations;
+      Base.configurations(originalConfigurations);
       clearRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
@@ -1190,7 +1190,7 @@ describe("DatabaseTasksMigrateErrorTest", () => {
 describe("DatabaseTasksPurgeCurrentTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -1200,7 +1200,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
       .spyOn(Base, "establishConnection")
       .mockResolvedValue(undefined as never);
     const purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "dev-db" },
       test: { adapter: "abstract", database: "test-db" },
       production: { adapter: "abstract", database: "prod-db" },
@@ -1217,13 +1217,13 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
 describe("DatabaseTasksPurgeAllTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
 
   it("purge all local configurations", async () => {
     const purgeSpy = vi.spyOn(DatabaseTasks, "purge").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db" },
     });
 
@@ -1236,7 +1236,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
 describe("DatabaseTasksTruncateAllTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
   });
 
@@ -1262,7 +1262,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
 
     clearRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "sqlite3", database: dbPath },
     });
     DatabaseTasks.env = "development";
@@ -1292,7 +1292,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
 
 describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   beforeEach(() => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -1309,7 +1309,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
   });
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
@@ -1359,14 +1359,14 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
 
   it("charset current", async () => {
     const charsetSpy = vi.spyOn(DatabaseTasks, "charset").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       production: { adapter: "abstract", database: "prod-db" },
     });
 
@@ -1379,14 +1379,14 @@ describe("DatabaseTasksCharsetTest", () => {
 describe("DatabaseTasksCollationTest", () => {
   afterEach(() => {
     clearRegisteredTasks();
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
 
   it("collation current", async () => {
     const collationSpy = vi.spyOn(DatabaseTasks, "collation").mockResolvedValue(undefined as never);
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       production: { adapter: "abstract", database: "prod-db" },
     });
 
@@ -1529,7 +1529,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     originalDbDir = DatabaseTasks.dbDir;
     delete process.env.SCHEMA;
     DatabaseTasks.dbDir = "/tmp";
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: { adapter: "abstract", database: "my-db" },
     });
   });
@@ -1537,7 +1537,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     if (originalSchema === undefined) delete process.env.SCHEMA;
     else process.env.SCHEMA = originalSchema;
     DatabaseTasks.dbDir = originalDbDir;
-    DatabaseTasks.databaseConfiguration = originalConfigurations;
+    Base.configurations(originalConfigurations);
   });
 
   it("check dump filename defaults", () => {
@@ -1551,7 +1551,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   });
 
   it("check dump filename defaults for non primary databases", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -1562,7 +1562,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
   });
 
   it("setting schema dump to nil", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db", schemaDump: false },
       },
@@ -1572,7 +1572,7 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
 
   it("check dump filename with schema env with non primary databases", () => {
     process.env.SCHEMA = "schema_path";
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       development: {
         primary: { adapter: "abstract", database: "dev-db" },
         secondary: { adapter: "abstract", database: "secondary-dev-db" },
@@ -1637,8 +1637,8 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
     await Base.establishConnection(config);
     const ambientPool = Base.connectionPool();
     const createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined);
-    const previousConfiguration = DatabaseTasks.databaseConfiguration;
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    const previousConfiguration = Base.configurations();
+    Base.configurations({
       [DatabaseTasks.env.toString()]: { adapter: "sqlite3", database: "db/other.sqlite3" },
     });
     try {
@@ -1647,7 +1647,7 @@ describe("DatabaseTasksWithTemporaryPoolTest", () => {
       expect(Base.connectionPool()).toBe(ambientPool);
     } finally {
       createSpy.mockRestore();
-      DatabaseTasks.databaseConfiguration = previousConfiguration;
+      Base.configurations(previousConfiguration);
     }
   });
 });

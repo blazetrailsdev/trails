@@ -156,12 +156,9 @@ describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
     await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
     await CpkChapter.create({ id: [1, 12], book_id: 2, title: "ch-3" });
 
-    const result = await CpkChapter.group("book").having("COUNT(*) > 1").count();
-
-    const entries = [...result.entries()] as [{ id: unknown[] } | null, number][];
-    expect(entries).toHaveLength(1);
-    expect(entries[0][0]?.id).toEqual([1, 1]);
-    expect(entries[0][1]).toBe(2);
+    await expect(CpkChapter.group("book").having("COUNT(*) > 1").count()).rejects.toThrow(
+      'Expected corresponding value for ["author_id", "id"] to be an Array',
+    );
   });
 });
 

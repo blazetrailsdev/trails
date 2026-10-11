@@ -22,7 +22,7 @@ import { Base as ActionViewBase } from "@blazetrails/actionview";
 
 export class ClientDisconnected extends RuntimeError {}
 
-type ErrorCallback = () => void;
+type ErrorCallback = () => unknown;
 
 export class Buffer extends ResponseBuffer<Queue<string | null>> {
   static queueSize: number | null = 10;
@@ -34,20 +34,20 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   /** @internal */
   protected _aborted: boolean;
 
-  constructor(response: DispatchResponse) {
+  constructor(response: DispatchResponse | null) {
     const klass = new.target;
     super(response, klass.prototype.buildQueue(klass.queueSize));
-    this._errorCallback = () => {};
+    this._errorCallback = () => true;
     this._aborted = false;
     this.ignoreDisconnect = false;
   }
 
   override write(string: string): void {
-    if (!this._response.committed) {
-      if (this._response.headers.get("Cache-Control") === undefined) {
-        this._response.headers.set("Cache-Control", "no-cache");
+    if (!this._response!.committed) {
+      if (this._response!.headers.get("Cache-Control") === undefined) {
+        this._response!.headers.set("Cache-Control", "no-cache");
       }
-      this._response.deleteHeader("Content-Length");
+      this._response!.deleteHeader("Content-Length");
     }
 
     super.write(string);
@@ -96,8 +96,8 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
     this._errorCallback = block;
   }
 
-  callOnError(): void {
-    this._errorCallback();
+  callOnError(): unknown {
+    return this._errorCallback();
   }
 
   /** @internal */
@@ -121,11 +121,11 @@ export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
   private _stream: { write(s: string): void; close(): void };
-  private _options: { retry?: number | string; event?: string; id?: string };
+  private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
     stream: { write(s: string): void; close(): void },
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
     this._options = options;
@@ -137,7 +137,7 @@ export class SSE {
 
   write(
     object: unknown,
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ): void {
     if (typeof object === "string") {
       this.performWrite(object, options);
@@ -149,7 +149,7 @@ export class SSE {
   /** @internal */
   private performWrite(
     json: string,
-    options: { retry?: number | string; event?: string; id?: string },
+    options: { retry?: number | string; event?: string; id?: number | string },
   ): void {
     const currentOptions: Record<string, string | number | undefined> = merge<
       string | number | undefined

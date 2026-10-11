@@ -3,7 +3,6 @@ import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration, setDumpSchemaAfterMigration } from "../active-record.js";
 
@@ -13,7 +12,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -26,7 +25,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-migrate-all-meta-"));
     dirs.push(dir);
     const env = DatabaseTasks.env.toString();
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: {
         primary: {
           adapter: "sqlite3",

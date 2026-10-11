@@ -22,7 +22,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   const env = "storyenv";
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     clearRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
@@ -31,7 +31,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
     const dir = await mkdtemp(join(tmpdir(), "trails-protected-env-"));
     dirs.push(dir);
     const dbFile = join(dir, "primary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
     DatabaseTasks.registerTask(
@@ -114,7 +114,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   const env = "storyenv";
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     clearRegisteredTasks();
     for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true });
   });
@@ -129,7 +129,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     const dir = await mkdtemp(join(tmpdir(), "trails-current-protected-env-"));
     dirs.push(dir);
     const dbFile = join(dir, "primary.sqlite3");
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [env]: { primary: { adapter: "sqlite3", database: dbFile, pool: 1 } },
     });
     DatabaseTasks.registerTask(
@@ -162,7 +162,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
     } finally {
       await adapter.disconnectBang();
     }
-    return DatabaseTasks.databaseConfiguration.configsFor({ envName: env })[0];
+    return Base.configurations().configsFor({ envName: env })[0];
   }
 
   const skipUnlessFileSqlite = adapterType !== "sqlite" || inMemoryDb();

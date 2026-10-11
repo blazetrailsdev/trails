@@ -6245,7 +6245,7 @@ function extractSkeleton(node: ts.Node | undefined): string[] | undefined {
           tokens.push(`ref:${callee.text}`);
         } else if (ts.isPropertyAccessExpression(callee)) {
           visit(callee.expression);
-          tokens.push(`ref:${callee.name.text}`);
+          tokens.push(`ref:${memberNameText(callee.name)}`);
         } else if (callee.kind === ts.SyntaxKind.SuperKeyword) {
           tokens.push("ref:super");
         } else {
@@ -6373,6 +6373,16 @@ function extractCallArgs(node: ts.Node | undefined): CallSite[] | undefined {
 
 function walkForCallArgs(node: ts.Node, sites: CallSite[]): void {
   const visit = (n: ts.Node): void => {
+    for (const [form, receiver, key] of nativeHashForms(n)) {
+      const tail = receiver === undefined ? undefined : receiverTailName(receiver);
+      if (key === undefined || tail === undefined) continue;
+      sites.push({
+        name: `${NATIVE_FORM_PREFIX}${form}`,
+        args: [key],
+        flags: [],
+        recv: `id:${tail}`,
+      });
+    }
     if (ts.isCallExpression(n) || ts.isNewExpression(n)) {
       recordCallSite(n, sites, visit);
       return;
@@ -6465,7 +6475,7 @@ function callSiteName(call: ts.CallExpression | ts.NewExpression): string | unde
   const name = ts.isIdentifier(callee)
     ? callee.text
     : ts.isPropertyAccessExpression(callee)
-      ? callee.name.text
+      ? memberNameText(callee.name)
       : undefined;
   if (name === undefined || name.startsWith("_") || !/^[a-z]/.test(name)) return undefined;
   return name;
@@ -6793,7 +6803,7 @@ function collectCalls(
         }
       } else if (ts.isPropertyAccessExpression(callee)) {
         visit(callee.expression);
-        const prop = callee.name.text;
+        const prop = memberNameText(callee.name);
         called.push(prop);
         negated.push(prop);
         if (!skipHoistedClosures && prop === "unshift") {
@@ -6917,7 +6927,9 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
-function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | undefined][] {
+function nativeHashForms(
+  n: ts.Node,
+): [form: string, receiver: ts.Expression | undefined, key?: string][] {
   if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.InKeyword) {
     let test: ts.Node = n;
     while (ts.isParenthesizedExpression(test.parent) || ts.isPrefixUnaryExpression(test.parent)) {
@@ -6927,12 +6939,15 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
     if (ts.isIfStatement(guard) && guard.expression === test && isArgumentBindingGuard(guard)) {
       return [];
     }
-    return [["in", n.right]];
+    return [["in", n.right, describeArg(n.left, [])]];
   }
   if (ts.isDeleteExpression(n)) {
     const target = n.expression;
-    if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
-      return [["delete", target.expression]];
+    if (ts.isPropertyAccessExpression(target)) {
+      return [["delete", target.expression, `str:${escapeDescriptorText(target.name.text)}`]];
+    }
+    if (ts.isElementAccessExpression(target)) {
+      return [["delete", target.expression, describeArg(target.argumentExpression, [])]];
     }
     return [];
   }
@@ -6951,7 +6966,8 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
   if (!ts.isCallExpression(n)) return [];
   const callee = n.expression.getText();
   if (callee === "Object.hasOwn" || callee === "Object.prototype.hasOwnProperty.call") {
-    return [["in", n.arguments[0]]];
+    const key = n.arguments[1];
+    return [["in", n.arguments[0], key === undefined ? undefined : describeArg(key, [])]];
   }
   if (callee === "Object.assign") return [["assign", n.arguments[0]]];
   return [];
@@ -7580,13 +7596,17 @@ function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return modifiers?.some((m) => m.kind === kind) ?? false;
 }
 
+function memberNameText(name: ts.MemberName): string {
+  return ts.isPrivateIdentifier(name) ? name.text.slice(1) : name.text;
+}
+
 function getMemberName(member: ts.ClassElement): string | undefined {
   if (member.name) {
     if (ts.isIdentifier(member.name)) {
       return member.name.text;
     }
     if (ts.isPrivateIdentifier(member.name)) {
-      return member.name.text;
+      return ts.isPropertyDeclaration(member) ? member.name.text : member.name.text.slice(1);
     }
     if (ts.isStringLiteral(member.name)) {
       return member.name.text;

@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
-import { DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, MigrationContext } from "@blazetrails/activerecord";
 
 const FAKE_CONFIG = `
 const config = {
@@ -49,6 +49,7 @@ describe("DbVersionTest", () => {
     if (priorTrailsEnv === undefined) delete process.env["TRAILS_ENV"];
     else process.env["TRAILS_ENV"] = priorTrailsEnv;
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 

@@ -53,7 +53,7 @@ const BODY_METHODS = ["toAry", "call", "toPath"] as const;
 
 export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<unknown>> {
   /** @internal */
-  protected _response: Response;
+  protected _response: Response | null;
   /** @internal */
   protected _buf: Buf;
   /** @internal */
@@ -61,7 +61,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   /** @internal */
   protected _strBody: string | null = null;
 
-  constructor(response: Response, buf: Buf) {
+  constructor(response: Response | null, buf: Buf) {
     this._response = response;
     this._buf = buf;
   }
@@ -78,7 +78,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     if (this.isClosed) throw new IOError("closed stream");
 
     this._strBody = null;
-    this._response.commitBang();
+    this._response!.commitBang();
     this._buf.push(string);
   }
 
@@ -129,7 +129,7 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
   abort(): void {}
 
   close(): void {
-    this._response.commitBang();
+    this._response!.commitBang();
     this._closed = true;
   }
 

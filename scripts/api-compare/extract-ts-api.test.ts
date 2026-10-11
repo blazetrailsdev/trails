@@ -3185,10 +3185,31 @@ describe("extractClass — internal tagging", () => {
         #field = 1;
       }
     `);
-    const hidden = info.instanceMethods.find((m) => m.name === "#hidden")!;
+    const hidden = info.instanceMethods.find((m) => m.name === "hidden")!;
     expect(hidden.visibility).toBe("private");
     expect(hidden.internal).toBe(true);
     expect(info.instanceMethods.find((m) => m.name === "#field")!.internal).toBe(true);
+  });
+
+  it("credits a `#name` method, and a call to it, under the bare name", () => {
+    const info = extractFromSource(`
+      export class Foo {
+        scope() {
+          return this.#addConstraints();
+        }
+        #addConstraints() {}
+        #block = () => {};
+        run() {
+          return this.#block();
+        }
+      }
+    `);
+    expect(info.instanceMethods.find((m) => m.name === "addConstraints")!.visibility).toBe(
+      "private",
+    );
+    expect(info.instanceMethods.find((m) => m.name === "scope")!.calls).toContain("addConstraints");
+    expect(info.instanceMethods.find((m) => m.name === "#block")).toBeDefined();
+    expect(info.instanceMethods.find((m) => m.name === "run")!.calls).toContain("block");
   });
 
   it("tags static private members and keeps them on classMethods", () => {
@@ -4559,7 +4580,7 @@ describe("extractFromProgram — @noRailsEquivalent beats @internal (RFC 0121)",
       `,
     });
     const cls = info.classes["updater.ts:Updater"];
-    for (const name of ["factory", "priv", "prot", "#hidden"]) {
+    for (const name of ["factory", "priv", "prot", "hidden"]) {
       expect(cls.instanceMethods.find((m) => m.name === name)!.internal).toBe(true);
     }
     expect(cls.instanceMethods.find((m) => m.name === "seam")!.internal).toBeUndefined();
@@ -6351,6 +6372,48 @@ describe("native element access as the port of Hash#[] / Hash#[]=", () => {
 describe("callArgs", () => {
   const site = (source: string, method = "create"): CallSite[] =>
     extractFromSource(source).instanceMethods.find((m) => m.name === method)!.callArgs!;
+
+  it("records a native hash form's key as an @in / @delete site (RFC 0190)", () => {
+    expect(
+      site(
+        `class Foo {
+          create(options: any, key: string) {
+            if ("public" in options) delete options.public;
+            delete this.env["etag"];
+            delete options[key];
+            Object.assign(options, { a: 1 });
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:public"], flags: [], recv: "id:options" },
+      { name: "@delete", args: ["str:etag"], flags: [], recv: "id:env" },
+      { name: "@delete", args: ["id:key"], flags: [], recv: "id:options" },
+    ]);
+    expect(
+      site(`class Foo { create(h: any, k: string) { return Object.hasOwn(h, k); } }`).map((s) => [
+        s.name,
+        s.args,
+      ]),
+    ).toEqual([
+      ["@in", ["id:k"]],
+      ["hasOwn", ["id:h", "id:k"]],
+    ]);
+    expect(
+      site(
+        `class Foo {
+          #priv = 1;
+          create(h: any) {
+            return Object.prototype.hasOwnProperty.call(h, "k") || #priv in h;
+          }
+        }`,
+      ).filter((s) => s.name.startsWith("@")),
+    ).toEqual([
+      { name: "@in", args: ["str:k"], flags: [], recv: "id:h" },
+      { name: "@in", args: ["?"], flags: [], recv: "id:h" },
+    ]);
+  });
 
   it("records a call's own receiver, but not a namespace qualifier", () => {
     expect(

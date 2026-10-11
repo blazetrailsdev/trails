@@ -54,7 +54,6 @@ import {
   primaryAbstractClass,
   stiClassFor,
   polymorphicClassFor,
-  initializeInternalsCallback as inheritanceInitializeInternalsCallback,
   baseClass as _inheritanceBaseClass,
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
@@ -302,7 +301,6 @@ import {
   setCurrentScope as _setCurrentScope,
   globalCurrentScope as _globalCurrentScope,
   setGlobalCurrentScope as _setGlobalCurrentScope,
-  scopeAttributes,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
 } from "./scoping.js";
 import {
@@ -369,10 +367,6 @@ import { DynamicMatchers } from "./dynamic-matchers.js";
 export type PrimaryKeyScalar = string | number | bigint | null | undefined;
 
 export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
-
-function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
-  return ctor.isScopeAttributes();
-}
 
 function beforeOrAroundCallbackSources(
   proto: object,
@@ -441,32 +435,6 @@ function expandCallbackSourcesWithHelpers(
     }
   }
   return result;
-}
-
-function _applyScopeAttributes(
-  ctor: typeof Base,
-  record: InstanceType<typeof Base>,
-  explicitKeys: Set<string>,
-): void {
-  if (!_shouldApplyScopeAttributes(ctor)) return;
-  const attrs = scopeAttributes.call(ctor as any);
-  if (!attrs || Object.keys(attrs).length === 0) return;
-  const toApply: Record<string, unknown> = Object.create(null);
-  const cold = !ModelSchema.isSchemaLoaded.call(ctor as never);
-  for (const [k, v] of Object.entries(attrs)) {
-    if (cold && !ctor.hasAttribute(k)) continue;
-    if (!explicitKeys.has(k)) {
-      toApply[k] = v;
-    }
-  }
-  if (Object.keys(toApply).length > 0) {
-    const assocPending = _extractAssociationAttrs(ctor, toApply);
-    const rest = assocPending ? assocPending.rest : toApply;
-    if (Object.keys(rest).length > 0) {
-      assertAssignedSynchronously((record as any)._assignAttributes(rest), "Model.new");
-    }
-    if (assocPending) _dispatchAssociationAttrs(record as unknown as Base, assocPending.assocs);
-  }
 }
 
 /** @internal */
@@ -725,11 +693,13 @@ export class Base extends Model {
     ) {
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
+    const promise = state._schemaLoadPromise;
     try {
-      await state._schemaLoadPromise;
-    } catch (e) {
-      state._schemaLoadPromise = undefined;
-      throw e;
+      await promise;
+    } finally {
+      if (!ModelSchema.isSchemaLoaded.call(this as never) && state._schemaLoadPromise === promise) {
+        state._schemaLoadPromise = undefined;
+      }
     }
   }
 
@@ -1231,6 +1201,7 @@ export class Base extends Model {
 
   declare static update: typeof _Persistence.ClassMethods.update;
   declare static updateBang: typeof _Persistence.ClassMethods.updateBang;
+  declare static queryConstraintsList: typeof _Persistence.queryConstraintsList;
 
   static createOrFindBy<T extends typeof Base>(
     this: T,
@@ -1490,29 +1461,16 @@ export class Base extends Model {
     }
     attributes ??= {};
     let attrs = isEmpty(attributes) ? {} : sanitizeForMassAssignment(attributes);
-    let assocPending = _extractAssociationAttrs(new.target, attrs);
+    const assocPending = _extractAssociationAttrs(new.target, attrs);
     if (assocPending) attrs = assocPending.rest;
-    const ctor = new.target;
-    if (allocating) _Core._allocation.klass = ctor;
+    if (allocating) _Core._allocation.klass = new.target;
     super(attrs);
-    if (!allocating) {
-      inheritanceInitializeInternalsCallback.call(this as any);
-      if (_shouldApplyScopeAttributes(ctor)) {
-        _applyScopeAttributes(
-          ctor,
-          this as any,
-          new Set(keys(attrs).map((key) => key.split("(")[0])),
-        );
-      }
-      if (assocPending) {
-        _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
-        assocPending = null;
-      }
-      initBlock?.(this as unknown as Base);
-      this._runInitializeCallbacks();
-    }
     if (assocPending) {
       _dispatchAssociationAttrs(this as unknown as Base, assocPending.assocs);
+    }
+    if (!allocating) {
+      initBlock?.(this as unknown as Base);
+      this._runInitializeCallbacks();
     }
   }
 
@@ -2039,6 +1997,7 @@ extend(Base, _Core.ClassMethods);
 include(Base, _Core.Core);
 include(Base, _Persistence.Persistence);
 include(Base, Inheritance.Inheritance);
+include(Base, ActiveRecord.Scoping);
 include(Base, _Integration);
 include(Base, SignedId.SignedId);
 extend(Base, QueryCacheClassMethods.ClassMethods);
@@ -2316,7 +2275,6 @@ include(Base, {
   initWithAttributes: _Core.initWithAttributes,
   encodeWith: _Core.encodeWith,
   fullInspect: _Core.fullInspect,
-  initializeInternalsCallback: _Core.initializeInternalsCallback,
   isCustomInspectMethodDefined: _Core.isCustomInspectMethodDefined,
   inspectionFilter: _Core.inspectionFilter,
   inspectWithAttributes: _Core.inspectWithAttributes,

@@ -7,6 +7,13 @@
  * flagged, and converges by importing the export, not by baselining. It lives in
  * `scripts/parity/` because two tools read it (RFC 0092's shared-home rule).
  *
+ * A Hash row is also satisfied by its marked native form (RFC 0190):
+ * `"k" in h`, `delete h.k`, `Object.assign(h, other)`, `{ ...h, ...other }` and
+ * a `for…of` over `Object.entries(h)` credit `key?`, `delete`, `merge!`,
+ * `merge` and `each_pair` through `NATIVE_FORM_ANALOGUES`
+ * (`scripts/api-compare/enumerable-idioms.ts`), so the reverse reading does not
+ * send such a body to the helper. `Hash#fetch` has no native form.
+ *
  * ── Keyed by the MRI SPELLING, and why that is not enough on its own ────────
  * Rows are keyed `Receiver#method` / `Receiver.method`, because the bare name is
  * ambiguous across receivers: `fetch` is `Hash#fetch` (`vendor/ruby/v3.3.11/hash.c:2176`),

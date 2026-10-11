@@ -4,6 +4,7 @@ import { tmpdir } from "os";
 import { join } from "path";
 import { run } from "./cli.js";
 import {
+  Base,
   DatabaseTasks,
   Migration,
   Migrator,
@@ -52,6 +53,7 @@ describe("PendingMigrationsTest", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     (DatabaseTasks as unknown as { _root: null })._root = null;
   });
 

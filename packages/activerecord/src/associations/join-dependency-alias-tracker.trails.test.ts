@@ -37,7 +37,7 @@ describe("JoinDependency AliasTracker wiring", () => {
   });
 
   it("uses an AliasTracker instance for collision tracking", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
     jd.joinConstraints([], aliasTrackerFor(jd), []);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker).toBeInstanceOf(AliasTracker);
@@ -46,7 +46,7 @@ describe("JoinDependency AliasTracker wiring", () => {
   });
 
   it("adopts an external AliasTracker passed to joinConstraints", () => {
-    const jd = new JoinDependency(Post, null, "comments", Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, "comments", Nodes.OuterJoin);
     const aliases = new Hash<string, number>(0);
     aliases.set("posts", 1);
     aliases.set("comments", 1);
@@ -56,7 +56,7 @@ describe("JoinDependency AliasTracker wiring", () => {
   });
 
   it("tracks multiple associations — each table counted once", () => {
-    const jd = new JoinDependency(Post, null, ["comments", "tags"], Nodes.OuterJoin);
+    const jd = new JoinDependency(Post, Post.arelTable, ["comments", "tags"], Nodes.OuterJoin);
     jd.joinConstraints([], aliasTrackerFor(jd), []);
     const tracker = (jd as any)._aliasTracker as AliasTracker;
     expect(tracker.aliases.get("comments") ?? 0).toBeGreaterThan(0);
