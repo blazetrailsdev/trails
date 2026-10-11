@@ -45,8 +45,8 @@ describe("SSETest", () => {
     sseWithId(): void {
       const sse = new SSE(this.response.stream as Buffer);
       try {
-        sse.write('{"name":"John"}', { id: "1" });
-        sse.write({ name: "Ryan" }, { id: "2" });
+        sse.write('{"name":"John"}', { id: 1 });
+        sse.write({ name: "Ryan" }, { id: 2 });
       } finally {
         sse.close();
       }
