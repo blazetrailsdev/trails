@@ -6,6 +6,6 @@ import "../tasks/sqlite-database-tasks.js";
 const registry = DatabaseTasks as unknown as { _registeredTasks: unknown[] };
 const builtinTasks = [...registry._registeredTasks];
 
-export function clearRegisteredTasks(): void {
+export function resetRegisteredTasks(): void {
   registry._registeredTasks = [...builtinTasks];
 }
