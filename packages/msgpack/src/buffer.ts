@@ -7,11 +7,42 @@ import {
   rbObjClassname,
   rbObjIsKindOf,
   rbObjRespondTo,
+  stringValue,
+  TypeError,
 } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 
+const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT = 512 * 1024;
+const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM = 256;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT = 32 * 1024;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_MINIMUM = 1024;
+
+function CHECK_STRING_TYPE(value: unknown): void {
+  if (typeof value !== "string" && !(value instanceof Uint8Array)) {
+    throw new TypeError("instance of String needed");
+  }
+}
+
+function toBytes(string: string | Uint8Array): Uint8Array {
+  if (typeof string !== "string") {
+    return string;
+  }
+  const bytes = new Uint8Array(string.length);
+  for (let i = 0; i < string.length; i++) {
+    bytes[i] = string.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function concat(string: Uint8Array[]): Uint8Array {
+  const all = new Uint8Array(string.reduce((size, chunk) => size + chunk.length, 0));
+  let offset = 0;
+  for (const chunk of string) {
+    all.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return all;
+}
 
 function getPartialReadMethod(io: unknown): string {
   if (io != null && rbObjRespondTo(io, "readpartial")) {
@@ -37,6 +68,7 @@ export class Buffer {
   private _io: unknown = null;
   private ioPartialReadMethod = "read";
   private ioWriteAllMethod = "write";
+  private writeReferenceThreshold = MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT;
   private ioBufferSize = MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT;
 
   constructor(...argv: unknown[]) {
@@ -72,7 +104,12 @@ export class Buffer {
     this.ioWriteAllMethod = getWriteAllMethod(io);
 
     if (options != null) {
-      const v = (options as { ioBufferSize?: number | null }).ioBufferSize;
+      let v = (options as { writeReferenceThreshold?: number | null }).writeReferenceThreshold;
+      if (v != null) {
+        this.writeReferenceThreshold = Math.max(v, MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM);
+      }
+
+      v = (options as { ioBufferSize?: number | null }).ioBufferSize;
       if (v != null) {
         this.ioBufferSize = Math.max(v, MSGPACK_BUFFER_IO_BUFFER_SIZE_MINIMUM);
       }
@@ -89,22 +126,37 @@ export class Buffer {
   }
 
   isEmpty(): boolean {
-    return this.size() === 0;
+    return this.topReadableSize() === 0;
   }
 
-  write(string: string | Uint8Array): number {
-    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
-    this.chunks.push(bytes);
-    return bytes.length;
+  write(stringOrBuffer: string | Uint8Array): number {
+    let string = stringOrBuffer;
+    if (!(string instanceof Uint8Array)) {
+      string = stringValue(string);
+    }
+
+    const length = this.appendString(string);
+
+    return length;
   }
 
-  append(string: string | Uint8Array): this {
-    this.write(string);
+  append(stringOrBuffer: string | Uint8Array): this {
+    let string = stringOrBuffer;
+    if (!(string instanceof Uint8Array)) {
+      string = stringValue(string);
+    }
+
+    this.appendString(string);
+
     return this;
   }
 
   skip(n: number): number {
-    return this.skipNonblock(n);
+    if (n === 0) {
+      return 0;
+    }
+
+    return this.readUntilEof(null, n);
   }
 
   skipAll(n: number): this {
@@ -119,6 +171,101 @@ export class Buffer {
     this.skipNonblock(n);
 
     return this;
+  }
+
+  readAll(...argv: unknown[]): Uint8Array {
+    let out: unknown = null;
+    let n = 0;
+    let all = false;
+
+    switch (argv.length) {
+      case 2:
+        out = argv[1];
+        n = argv[0] as number;
+        break;
+      case 1:
+        n = argv[0] as number;
+        break;
+      case 0:
+        all = true;
+        break;
+      default:
+        throw new ArgumentError(`wrong number of arguments (${argv.length} for 0..2)`);
+    }
+
+    if (out != null) {
+      CHECK_STRING_TYPE(out);
+    }
+
+    if (all) {
+      return this.bufferReadAll(out);
+    }
+
+    if (n === 0) {
+      return new Uint8Array(0);
+    }
+
+    if (!this.ensureReadable(n)) {
+      throw new EOFError("end of buffer reached");
+    }
+
+    const string: Uint8Array[] = [];
+    this.readToStringNonblock(string, n);
+
+    return concat(string);
+  }
+
+  read(...argv: unknown[]): Uint8Array | null {
+    let out: unknown = null;
+    let n = -1;
+    let all = false;
+
+    switch (argv.length) {
+      case 2:
+        out = argv[1];
+        n = argv[0] as number;
+        break;
+      case 1:
+        n = argv[0] as number;
+        break;
+      case 0:
+        all = true;
+        break;
+      default:
+        throw new ArgumentError(`wrong number of arguments (${argv.length} for 0..2)`);
+    }
+
+    if (out != null) {
+      CHECK_STRING_TYPE(out);
+    }
+
+    if (all) {
+      return this.bufferReadAll(out);
+    }
+
+    if (n === 0) {
+      return new Uint8Array(0);
+    }
+
+    if (this._io == null && out == null && this.size() <= n) {
+      const str = this.toStr();
+      this.clear();
+
+      if (str.length === 0) {
+        return null;
+      } else {
+        return str;
+      }
+    }
+
+    const string: Uint8Array[] = [];
+    this.readUntilEof(string, n);
+
+    if (string.length === 0) {
+      return null;
+    } else {
+      return concat(string);
+    }
   }
 
   get io(): unknown {
@@ -144,14 +291,11 @@ export class Buffer {
   }
 
   toStr(): Uint8Array {
+    if (this.chunks.length === 0) {
+      return new Uint8Array(0);
+    }
     if (this.chunks.length !== 1) {
-      const all = new Uint8Array(this.size());
-      let offset = 0;
-      for (const chunk of this.chunks) {
-        all.set(chunk, offset);
-        offset += chunk.length;
-      }
-      this.chunks = [all];
+      this.chunks = [concat(this.chunks)];
     }
     return this.chunks[0];
   }
@@ -207,9 +351,7 @@ export class Buffer {
     if (ioBuffer == null) {
       throw new EOFError("IO reached end of file");
     }
-    if (typeof ioBuffer === "string") {
-      ioBuffer = Uint8Array.from(ioBuffer, (c) => c.charCodeAt(0));
-    }
+    ioBuffer = toBytes(ioBuffer);
 
     const len = ioBuffer.length;
     if (len === 0) {
@@ -221,10 +363,211 @@ export class Buffer {
     return len;
   }
 
+  private appendString(string: string | Uint8Array): number {
+    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
+    const length = bytes.length;
+
+    if (length > this.writeReferenceThreshold) {
+      this.appendLongString(bytes, typeof string !== "string");
+    } else {
+      this.bufferAppend(bytes);
+    }
+
+    return length;
+  }
+
+  private appendLongString(string: Uint8Array, ascii8bit: boolean): void {
+    if (this._io != null) {
+      this.flush();
+      if (ascii8bit) {
+        rbFSend(this._io, this.ioWriteAllMethod, string);
+      } else {
+        this.bufferAppend(string);
+      }
+    } else {
+      this.chunks.push(string);
+    }
+  }
+
+  private bufferAppend(data: Uint8Array): void {
+    if (data.length === 0) {
+      return;
+    }
+
+    this.chunks.push(data);
+  }
+
+  private readUntilEof(out: Uint8Array[] | null, max: number): number {
+    if (this._io != null) {
+      let sz = 0;
+      try {
+        while (true) {
+          let rl: number;
+          if (max === 0) {
+            if (out == null) {
+              rl = this.bufferSkip(this.ioBufferSize);
+            } else {
+              rl = this.readToString(out, this.ioBufferSize);
+            }
+            if (rl === 0) {
+              break;
+            }
+            sz += rl;
+          } else {
+            if (out == null) {
+              rl = this.bufferSkip(max);
+            } else {
+              rl = this.readToString(out, max);
+            }
+            if (rl === 0) {
+              break;
+            }
+            sz += rl;
+            if (max <= rl) {
+              break;
+            } else {
+              max -= rl;
+            }
+          }
+        }
+      } catch (error) {
+        if (!(error instanceof EOFError)) throw error;
+      }
+      return sz;
+    } else {
+      if (max === 0) {
+        max = Number.MAX_SAFE_INTEGER;
+      }
+      if (out == null) {
+        return this.skipNonblock(max);
+      } else {
+        return this.readToStringNonblock(out, max);
+      }
+    }
+  }
+
+  private bufferReadAll(out: unknown): Uint8Array {
+    if (out == null && this._io == null) {
+      const str = this.toStr();
+      this.clear();
+      return str;
+    }
+
+    const string: Uint8Array[] = [];
+    this.readUntilEof(string, 0);
+    return concat(string);
+  }
+
+  private topReadableSize(): number {
+    return this.chunks.length === 0 ? 0 : this.chunks[0].length;
+  }
+
+  private shiftChunk(): boolean {
+    this.chunks.shift();
+    return this.chunks.length > 0;
+  }
+
+  private consumed(length: number): void {
+    if (this.chunks.length === 0) {
+      return;
+    }
+    this.chunks[0] = this.chunks[0].subarray(length);
+    if (this.chunks[0].length === 0) {
+      this.shiftChunk();
+    }
+  }
+
+  private readToStringNonblock(string: Uint8Array[], length: number): number {
+    let avail = this.topReadableSize();
+    const lengthOrig = length;
+
+    while (true) {
+      if (length <= avail) {
+        if (length > 0) string.push(this.chunks[0].subarray(0, length));
+        this.consumed(length);
+        return lengthOrig;
+      }
+
+      if (avail > 0) string.push(this.chunks[0]);
+      length -= avail;
+
+      if (!this.shiftChunk()) {
+        return lengthOrig - length;
+      }
+
+      avail = this.topReadableSize();
+    }
+  }
+
+  private readToString(string: Uint8Array[], length: number): number {
+    if (length === 0) {
+      return 0;
+    }
+
+    const avail = this.topReadableSize();
+    if (avail > 0) {
+      return this.readToStringNonblock(string, length);
+    } else if (this._io != null) {
+      return this.readFromIoToString(string, length);
+    } else {
+      return 0;
+    }
+  }
+
+  private bufferSkip(length: number): number {
+    if (length === 0) {
+      return 0;
+    }
+
+    const avail = this.topReadableSize();
+    if (avail > 0) {
+      return this.skipNonblock(length);
+    } else if (this._io != null) {
+      return this.skipFromIo(length);
+    } else {
+      return 0;
+    }
+  }
+
+  private readFromIoToString(string: Uint8Array[], length: number): number {
+    const ret = rbFSend(this._io, this.ioPartialReadMethod, Math.min(this.ioBufferSize, length)) as
+      | string
+      | Uint8Array
+      | null;
+    if (ret == null) {
+      return 0;
+    }
+    const rl = ret.length;
+
+    if (rl > 0) string.push(toBytes(ret));
+    return rl;
+  }
+
+  private skipFromIo(length: number): number {
+    const ret = rbFSend(this._io, this.ioPartialReadMethod, length) as string | Uint8Array | null;
+    if (ret == null) {
+      return 0;
+    }
+    return ret.length;
+  }
+
   private skipNonblock(length: number): number {
-    const all = this.toStr();
-    this.chunks = [all.subarray(length)];
-    return Math.min(length, all.length);
+    const lengthOrig = length;
+
+    while (true) {
+      const avail = this.topReadableSize();
+
+      if (length <= avail) {
+        this.consumed(length);
+        return lengthOrig;
+      }
+
+      length -= avail;
+
+      if (!this.shiftChunk()) {
+        return lengthOrig - length;
+      }
+    }
   }
 }
 

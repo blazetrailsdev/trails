@@ -534,6 +534,7 @@ async function connect(
     (name) => !CLIENT_ONLY_FLAGS.includes(name) && (flags & CLIENT_FLAGS[name]) !== 0,
   );
   if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
+  if ((flags & CLIENT_FLAGS.COMPRESS) !== 0) config.compress = true;
 
   const client = mysql2Client(
     await mysql.createConnection(config as mysql.ConnectionOptions).catch(driverError),
@@ -673,6 +674,7 @@ export const Mysql2 = {
       return new Rational(Time.local(2010).utcOffset, 86400);
     },
     defaultQueryOptions,
+    COMPRESS: CLIENT_FLAGS.COMPRESS,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
     OPTION_MULTI_STATEMENTS_ON: 0,
