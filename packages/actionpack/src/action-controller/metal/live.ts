@@ -121,11 +121,11 @@ export class SSE {
   static readonly PERMITTED_OPTIONS = ["retry", "event", "id"] as const;
 
   private _stream: { write(s: string): void; close(): void };
-  private _options: { retry?: number | string; event?: string; id?: string };
+  private _options: { retry?: number | string; event?: string; id?: number | string };
 
   constructor(
     stream: { write(s: string): void; close(): void },
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ) {
     this._stream = stream;
     this._options = options;
@@ -137,7 +137,7 @@ export class SSE {
 
   write(
     object: unknown,
-    options: { retry?: number | string; event?: string; id?: string } = {},
+    options: { retry?: number | string; event?: string; id?: number | string } = {},
   ): void {
     if (typeof object === "string") {
       this.performWrite(object, options);
@@ -149,7 +149,7 @@ export class SSE {
   /** @internal */
   private performWrite(
     json: string,
-    options: { retry?: number | string; event?: string; id?: string },
+    options: { retry?: number | string; event?: string; id?: number | string },
   ): void {
     const currentOptions: Record<string, string | number | undefined> = merge<
       string | number | undefined
