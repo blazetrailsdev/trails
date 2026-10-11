@@ -39,7 +39,7 @@ import { RecordInvalid } from "./validations.js";
 import { ActiveRecord } from "./namespaces.js";
 
 interface PersistenceHost {
-  new (attrs?: Record<string, unknown>, block?: (record: any) => void): any;
+  new (attrs?: Record<string, unknown> | PermittedAttributes, block?: (record: any) => void): any;
   /** @internal */
   primaryKey: string | string[];
   _queryConstraintsList?: string[] | null;
@@ -60,7 +60,7 @@ interface PersistenceHost {
 
 export async function create(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {
@@ -84,7 +84,7 @@ export async function create(
 
 export async function createBang(
   this: PersistenceHost,
-  attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+  attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
   block?: (record: any) => void | Promise<void>,
 ): Promise<any> {
   if (Array.isArray(attributes)) {

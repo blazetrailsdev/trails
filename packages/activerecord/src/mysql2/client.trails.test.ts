@@ -140,12 +140,12 @@ describe("Mysql2::Client#warning_count", () => {
       buffer: () => Uint8Array.of(value),
     });
     const next = () => "next";
-    expect(castOf(native, 0)(tiny("1"), next)).toBe("next");
+    expect(castOf(native, 0)(tiny("1"), () => 1)).toBe(1);
     expect(castOf(native, 0)(bit(1), next)).toBe("next");
     expect(castOf(native, 1)(tiny("1"), next)).toBe(true);
     expect(castOf(native, 1)(tiny("0"), next)).toBe(false);
     expect(castOf(native, 1)(tiny(null), next)).toBeNull();
-    expect(castOf(native, 1)(tiny("1", 4), next)).toBe("next");
+    expect(castOf(native, 1)(tiny("1", 4), () => 1)).toBe(1);
     expect(castOf(native, 1)(bit(1), next)).toBe(true);
     expect(castOf(native, 1)(bit(0), next)).toBe(false);
     expect(castOf(native, 1)(bit(1, 8), next)).toBe("next");

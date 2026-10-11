@@ -8,7 +8,7 @@ import {
   rbModToS,
   zip,
 } from "@blazetrails/ruby-compat";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
 import { ConfigurationError, NameError, UnknownPrimaryKey } from "./errors.js";
 import { cachedFindByStatement } from "./core.js";
@@ -126,7 +126,7 @@ export abstract class AbstractReflection {
   }
 
   buildAssociation(
-    attributes: Record<string, unknown> | Map<string, unknown> = {},
+    attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes = {},
     block?: (record: InstanceType<typeof Base>) => void,
   ): InstanceType<typeof Base> {
     return new (this.klass as any)(attributes, block);

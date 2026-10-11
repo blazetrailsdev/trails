@@ -30,7 +30,7 @@ import type { Base } from "./base.js";
 import { ActiveRecordError, RecordNotUnique } from "./errors.js";
 import { compact, max, min, take } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
-import type { SerializeOptions } from "@blazetrails/activemodel";
+import type { PermittedAttributes, SerializeOptions } from "@blazetrails/activemodel";
 
 import { applyThenable } from "./relation/thenable.js";
 import { QueryAttribute } from "./relation/query-attribute.js";
@@ -510,9 +510,9 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
+  build(attributes?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   build(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     if (Array.isArray(attributes)) {
@@ -530,9 +530,12 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async create(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     if (Array.isArray(attributes)) {
@@ -547,9 +550,12 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async createBang(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     if (Array.isArray(attributes)) {
@@ -1262,9 +1268,9 @@ export class Relation<T extends Base, G extends boolean = false> {
   }
 
   new(attrs: Record<string, unknown>[], block?: (r: T) => void): T[];
-  new(attrs?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(attrs?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   new(
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     if (Array.isArray(attrs)) return this.build(attrs, block);
@@ -1685,16 +1691,22 @@ export class Relation<T extends Base, G extends boolean = false> {
     };
   }
 
-  protected _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+  protected _new(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): T {
     return new (this.model as any)(attributes, block) as T;
   }
 
-  protected _create(attributes: Record<string, unknown>, block?: (record: T) => void): Promise<T> {
+  protected _create(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): Promise<T> {
     return (this.model as any).create(attributes, block);
   }
 
   protected _createBang(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this.model as any).createBang(attributes, block);

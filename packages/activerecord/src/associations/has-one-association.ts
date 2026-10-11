@@ -7,7 +7,7 @@ import { kernelArray } from "@blazetrails/activesupport";
 import { ForeignAssociation } from "./foreign-association.js";
 import { SingularAssociation } from "./singular-association.js";
 import { queryConstraintsList } from "../persistence.js";
-import { assertAssignedSynchronously } from "@blazetrails/activemodel";
+import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 
 export class HasOneAssociation extends SingularAssociation {
   /** @internal */
@@ -173,7 +173,7 @@ export class HasOneAssociation extends SingularAssociation {
    * @inventedArm throw — CONVERGEABLE has-one-replace-sync-arm-skips-load-and-remove-target
    */
   protected override async _createRecord(
-    attributes?: Record<string, unknown>,
+    attributes?: Record<string, unknown> | PermittedAttributes,
     raiseError = false,
     block?: (record: Base) => void,
   ): Promise<Base | null> {

@@ -1239,12 +1239,12 @@ export class Base extends Model {
   ): Promise<InstanceType<T>[]>;
   static async create<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async create<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.create.call(this, attrs, block);
@@ -1257,12 +1257,12 @@ export class Base extends Model {
   ): Promise<InstanceType<T>[]>;
   static async createBang<T extends typeof Base>(
     this: T,
-    attrs?: Record<string, unknown>,
+    attrs?: Record<string, unknown> | PermittedAttributes,
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T>>;
   static async createBang<T extends typeof Base>(
     this: T,
-    attrs: Record<string, unknown> | Record<string, unknown>[] = {},
+    attrs: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (record: InstanceType<T>) => void | Promise<void>,
   ): Promise<InstanceType<T> | InstanceType<T>[]> {
     return _Persistence.createBang.call(this, attrs, block);
@@ -1967,8 +1967,10 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   _updateRecord(attributeNames?: string[], block?: (record: this) => void): Promise<unknown>;
   slice(...keys: string[]): HashWithIndifferentAccess<unknown>;
   valuesAt(...keys: string[]): unknown[];
-  assignAttributes(attrs: Record<string, unknown>): void;
-  setAttributes(attrs: Record<string, unknown> | Map<string, unknown>): Promise<void> | void;
+  assignAttributes(attrs: Record<string, unknown> | PermittedAttributes): void;
+  setAttributes(
+    attrs: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+  ): Promise<void> | void;
   updateAttribute(name: string, value: unknown): Promise<boolean | undefined>;
   updateAttributeBang(name: string, value: unknown): Promise<true | undefined>;
   updateColumn(name: string, value: unknown): Promise<boolean>;

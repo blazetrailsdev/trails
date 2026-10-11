@@ -15,7 +15,7 @@ import {
   pluck,
   valuesAt,
 } from "@blazetrails/activesupport";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import { Association } from "./association.js";
 import type { AssociationProxy } from "./collection-proxy.js";
 import { Associations } from "../namespaces.js";
@@ -174,15 +174,23 @@ export abstract class CollectionAssociation extends Association {
 
   build(attributes: Record<string, unknown>[], block?: (record: Base) => void): Base[];
   build(
-    attributes?: Record<string, unknown> | Map<string, unknown>,
+    attributes?: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
     block?: (record: Base) => void,
   ): Base;
   build(
-    attributes?: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[],
+    attributes?:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[],
     block?: (record: Base) => void,
   ): Base | Base[];
   build(
-    attributes?: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[],
+    attributes?:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[],
     block?: (record: Base) => void,
   ): Base | Base[] {
     if (Array.isArray(attributes)) {
@@ -231,7 +239,7 @@ export abstract class CollectionAssociation extends Association {
 
   /** @internal */
   protected override async _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     raise = false,
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {

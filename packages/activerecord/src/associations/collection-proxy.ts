@@ -1,3 +1,4 @@
+import type { PermittedAttributes } from "@blazetrails/activemodel";
 import { NoMethodError, extend, rbModConstSet } from "@blazetrails/ruby-compat";
 import type { HasManyThroughAssociation } from "./has-many-through-association.js";
 import type { Base } from "../base.js";
@@ -191,18 +192,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   build(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  build(attributes?: Record<string, unknown> | Map<string, unknown>, block?: (r: T) => void): T;
   build(
-    attributes: Record<string, unknown> | Map<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): T;
+  build(
+    attributes:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes
+      | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     return this._association.build(attributes, block as (record: Base) => void) as T | T[];
   }
 
   new(attributes: Record<string, unknown>[], block?: (r: T) => void): T[];
-  new(attributes?: Record<string, unknown>, block?: (r: T) => void): T;
+  new(attributes?: Record<string, unknown> | PermittedAttributes, block?: (r: T) => void): T;
   new(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): T | T[] {
     return Array.isArray(attributes)
@@ -211,9 +219,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   async create(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async create(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async create(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async create(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.create(
@@ -379,9 +390,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T, boolean>
   }
 
   async createBang(attributes: Record<string, unknown>[], block?: (r: T) => void): Promise<T[]>;
-  async createBang(attributes?: Record<string, unknown>, block?: (r: T) => void): Promise<T>;
   async createBang(
-    attributes: Record<string, unknown> | Record<string, unknown>[] = {},
+    attributes?: Record<string, unknown> | PermittedAttributes,
+    block?: (r: T) => void,
+  ): Promise<T>;
+  async createBang(
+    attributes: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[] = {},
     block?: (r: T) => void,
   ): Promise<T | T[]> {
     return (await this._association.createBang(

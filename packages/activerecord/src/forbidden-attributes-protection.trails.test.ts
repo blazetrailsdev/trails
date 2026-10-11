@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { ForbiddenAttributesError, SecurePassword } from "@blazetrails/activemodel";
 import "./index.js";
 import { Person } from "./test-helpers/models/person.js";
+import { Author } from "./test-helpers/models/author.js";
+import { Post } from "./test-helpers/models/post.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import { Pirate } from "./test-helpers/models/pirate.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -139,5 +141,70 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
     } finally {
       SecurePassword.minCost = originalMinCost;
     }
+  });
+});
+
+describe("ForbiddenAttributesProtectionRelationTest", () => {
+  fixtures({
+    people: [Person, {}],
+    pirates: [Pirate, {}],
+    birds: [Bird, {}],
+    authors: [Author, {}],
+    posts: [Post, {}],
+  });
+
+  it("permitted attributes can be used for Relation#new, Relation#create and a collection build", async () => {
+    const relation = Person.where({ gender: "f" });
+    const built = relation.new(new ProtectedParams({ first_name: "Guille" }).permitBang());
+    expect(built.readAttribute("first_name")).toBe("Guille");
+    expect(built.readAttribute("gender")).toBe("f");
+
+    const created = await relation.create(
+      new ProtectedParams({ first_name: "Guille" }).permitBang(),
+    );
+    expect((await created.reload()).readAttribute("first_name")).toBe("Guille");
+
+    const pirate = await Pirate.create({ catchphrase: "Arr" });
+    const bird = pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }).permitBang());
+    expect(bird.name).toBe("Posideons Killer");
+  });
+
+  it("initialize_attributes leaves alone a scope attribute named by a params object's keys reader", async () => {
+    class ReaderParams {
+      get keys(): string[] {
+        return ["title"];
+      }
+      isPermitted(): boolean {
+        return true;
+      }
+      toH(): Record<string, unknown> {
+        return {};
+      }
+    }
+    const author = await Author.create({ name: "David" });
+    const association = author.association("thinkingPosts");
+
+    const named = new Post();
+    association.initializeAttributes(named, new ReaderParams());
+    expect(named.title).toBeNull();
+
+    const unnamed = new Post();
+    association.initializeAttributes(unnamed, {});
+    expect(unnamed.title).toBe("So I was thinking");
+  });
+
+  it("forbidden attributes cannot be used for Relation#new, Relation#create and a collection build", async () => {
+    const relation = Person.where({ gender: "f" });
+    expect(() => relation.new(new ProtectedParams({ first_name: "Guille" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+    await expect(relation.create(new ProtectedParams({ first_name: "Guille" }))).rejects.toThrow(
+      ForbiddenAttributesError,
+    );
+
+    const pirate = await Pirate.create({ catchphrase: "Arr" });
+    expect(() => pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }))).toThrow(
+      ForbiddenAttributesError,
+    );
   });
 });

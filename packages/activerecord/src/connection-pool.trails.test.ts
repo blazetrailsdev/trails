@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjInspect, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
@@ -984,9 +984,8 @@ describe("NullPool member parity", () => {
     for (const probe of ["then", "toJSON", "asymmetricMatch", "nodeType"]) {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
-    expect((pool.inspect as () => string)()).toBe(
-      "#<ActiveRecord::ConnectionAdapters::NullPool @server_version=nil>",
-    );
+    expect(pool.inspect).toBeUndefined();
+    expect(rbObjInspect(pool)).toMatch(/^#<NullPool:0x[0-9a-f]+ .*@server_version=nil/);
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
   });

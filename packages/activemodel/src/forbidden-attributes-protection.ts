@@ -5,6 +5,7 @@ ForbiddenAttributesError.prototype.name = "ForbiddenAttributesError";
 
 export interface PermittedAttributes {
   isPermitted(): boolean;
+  readonly keys: string[] | (() => string[]);
   toH(): Record<string, unknown> | Map<string, unknown>;
 }
 

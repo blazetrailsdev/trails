@@ -1,7 +1,7 @@
 import mysql from "mysql2/promise";
-import { rbScanArgs, rtest } from "@blazetrails/ruby-compat";
+import { Rational, rbScanArgs, rtest } from "@blazetrails/ruby-compat";
 import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
-import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
+import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { quotedDate } from "../connection-adapters/abstract/quoting.js";
 import { defaultTimezone } from "../active-record.js";
@@ -48,7 +48,11 @@ class Result implements Mysql2Result {
   readonly fields: string[];
   private rows: unknown[][];
 
-  constructor(fields: string[], rows: unknown[][]) {
+  constructor(
+    fields: string[],
+    rows: unknown[][],
+    private error?: Error,
+  ) {
     this.fields = fields;
     this.rows = rows;
   }
@@ -58,6 +62,7 @@ class Result implements Mysql2Result {
   }
 
   toA(): unknown[][] {
+    if (this.error) throw this.error;
     return this.rows;
   }
 
@@ -112,6 +117,7 @@ function options(
   sql: string,
   queryOptions: QueryOptions,
 ): Record<string, unknown> {
+  INVALID_DATE.delete(client);
   const typeCast = typeCastFor(client, queryOptions);
   const rowsAsArray = queryOptions.as === "array";
   return client.readTimeout != null
@@ -128,10 +134,13 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
   } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
     result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
   }
+  const error = INVALID_DATE.get(client);
+  INVALID_DATE.delete(client);
   if (Array.isArray(result)) {
     return new Result(
       (fields ?? []).map((field) => field.name),
       result,
+      error,
     );
   }
   client.affectedRows = result.affectedRows ?? 0;
@@ -241,13 +250,22 @@ function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
 
 type Field = {
   type: string;
+  name: string;
   length?: number;
   string: () => string | null;
   buffer: () => Uint8Array | null;
 };
 type TypeCast = (field: Field, next: () => unknown) => unknown;
 
-function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): unknown {
+const MYSQL2_MAX_TIME = 315578267999;
+const MYSQL2_MIN_TIME = 2678400;
+
+function cast(
+  client: object,
+  queryOptions: QueryOptions,
+  field: Field,
+  next: () => unknown,
+): unknown {
   if (!rtest(queryOptions.cast)) return field.string();
   switch (field.type) {
     case "BIT": {
@@ -257,31 +275,96 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       }
       return next();
     }
-    case "TINY": {
+    case "TINY":
       if (rtest(queryOptions.castBooleans) && field.length === 1) {
         const raw = field.string();
         return raw === null ? null : raw !== "0";
       }
-      return next();
+    // eslint-disable-next-line no-fallthrough
+    case "SHORT":
+    case "LONG":
+    case "INT24":
+    case "LONGLONG":
+    case "YEAR": {
+      const raw = next();
+      return typeof raw === "string" ? BigInt(raw) : raw;
+    }
+    case "DECIMAL":
+    case "NEWDECIMAL": {
+      const raw = next();
+      if (typeof raw !== "string") return raw;
+      if (!raw.includes(".")) {
+        return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
+      } else if (Number(raw) === 0) {
+        return new BigDecimal("0.0");
+      } else {
+        return new BigDecimal(raw);
+      }
+    }
+    case "FLOAT":
+    case "DOUBLE": {
+      const columnToDouble = next();
+      if (columnToDouble === 0) {
+        return 0.0;
+      } else {
+        return columnToDouble;
+      }
+    }
+    case "TIME": {
+      const raw = field.string();
+      if (raw === null) return null;
+      const tokens = /^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?/.exec(raw);
+      if (!tokens) return null;
+      const [hour, min, sec] = tokens.slice(1, 4).map(Number);
+      const msec = Number((tokens[4] ?? "").padEnd(6, "0"));
+      let val = Time[queryOptions.databaseTimezone!](2000, 1, 1, hour, min, sec, msec);
+      if (queryOptions.applicationTimezone != null) {
+        if (queryOptions.applicationTimezone === "local") {
+          val = val.getlocal();
+        } else {
+          val = val.getutc();
+        }
+      }
+      return val;
     }
     case "TIMESTAMP":
-    case "TIMESTAMP2":
-    case "DATETIME":
-    case "DATETIME2": {
+    case "DATETIME": {
       const raw = field.string();
       if (raw === null) return null;
       const tokens =
         /^(\d{1,4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?/.exec(raw);
       if (!tokens) return null;
       const [year, month, day, hour, min, sec] = tokens.slice(1, 7).map(Number);
-      if (year + month + day + hour + min + sec === 0) return null;
+      const seconds =
+        year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + min * 60 + sec;
+      if (seconds === 0) return null;
+      if (month < 1 || day < 1) {
+        if (!INVALID_DATE.has(client)) {
+          INVALID_DATE.set(
+            client,
+            new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`),
+          );
+        }
+        return null;
+      }
+      if (seconds < MYSQL2_MIN_TIME || seconds > MYSQL2_MAX_TIME) {
+        let offset: number | Rational = 0;
+        if (queryOptions.databaseTimezone === "local") {
+          offset = Mysql2.Client.localOffset();
+        }
+        let val = new DateTime(year, month, day, hour, min, sec, offset);
+        if (queryOptions.applicationTimezone != null) {
+          if (queryOptions.applicationTimezone === "local") {
+            offset = Mysql2.Client.localOffset();
+            val = val.newOffset(offset);
+          } else {
+            val = val.newOffset(0);
+          }
+        }
+        return val.toDatetime();
+      }
       const msec = Number((tokens[7] ?? "").padEnd(6, "0"));
-      const dbTimezone =
-        field.type.startsWith("TIMESTAMP") || queryOptions.databaseTimezone === "utc"
-          ? "utc"
-          : "local";
-      let val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
-      val = queryOptions.databaseTimezone === "utc" ? val.getutc() : val.getlocal();
+      let val = Time[queryOptions.databaseTimezone!](year, month, day, hour, min, sec, msec);
       if (queryOptions.applicationTimezone != null) {
         if (queryOptions.applicationTimezone === "local") {
           val = val.getlocal();
@@ -299,18 +382,16 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       if (!tokens) return null;
       const [year, month, day] = tokens.slice(1, 4).map(Number);
       if (year + month + day === 0) return null;
+      if (month < 1 || day < 1) {
+        if (!INVALID_DATE.has(client)) {
+          INVALID_DATE.set(
+            client,
+            new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`),
+          );
+        }
+        return null;
+      }
       return new RubyDate(year, month, day).toDate();
-    }
-    case "DECIMAL":
-    case "NEWDECIMAL": {
-      const raw = next();
-      if (typeof raw !== "string") return raw;
-      if (raw.includes(".")) return new BigDecimal(raw);
-      return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
-    }
-    case "LONGLONG": {
-      const raw = next();
-      return typeof raw === "string" ? BigInt(raw) : raw;
     }
     default:
       return next();
@@ -319,9 +400,13 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
 
 const TYPE_CAST = new WeakMap<object, TypeCast>();
 
+/** @noRailsEquivalent PERMANENT */
+const INVALID_DATE = new WeakMap<object, Error>();
+
 function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {
   const typeCast = TYPE_CAST.get(client);
-  return (field, next) => cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
+  return (field, next) =>
+    cast(client, queryOptions, field, typeCast ? () => typeCast(field, next) : next);
 }
 
 type Execute = (sql: unknown, values?: unknown[]) => unknown;
@@ -478,13 +563,22 @@ async function newClient(
 }
 
 export const Mysql2 = {
-  Error: class {
+  Error: class extends Error {
+    constructor(message?: string) {
+      super(message);
+      ERRORS.add(this);
+    }
+
     static [Symbol.hasInstance](e: unknown): boolean {
       return typeof e === "object" && e !== null && ERRORS.has(e);
     }
   },
   Client: {
     new: newClient,
+    /** @internal */
+    localOffset(): Rational {
+      return new Rational(Time.local(2010).utcOffset, 86400);
+    },
     defaultQueryOptions,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
