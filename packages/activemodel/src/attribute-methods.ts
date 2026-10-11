@@ -6,7 +6,6 @@ import {
   excSetBacktrace,
   fetch,
   Hash,
-  hasKey,
   isInclude,
   rbFCaller,
   rbFSend,
@@ -253,7 +252,7 @@ export const ClassMethods = {
   },
 
   isAttributeAlias(this: ClassMethodsHost, newName: string): boolean {
-    return hasKey(this.attributeAliases, newName);
+    return Object.hasOwn(this.attributeAliases, newName);
   },
 
   attributeAlias(this: ClassMethodsHost, name: string): string | undefined {

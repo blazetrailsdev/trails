@@ -1,6 +1,6 @@
 import { Encryption } from "../namespaces.js";
 import { isPlainObject } from "@blazetrails/activesupport";
-import { JSON, hasKey, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
+import { JSON, transformValues, type Bytes, type Hash } from "@blazetrails/ruby-compat";
 import { Message } from "./message.js";
 import { Properties } from "./properties.js";
 import { Decryption, Encoding, ForbiddenClass } from "./errors.js";
@@ -52,7 +52,7 @@ export class MessageSerializer implements MessageSerializerLike {
       throw new Decryption("More than one level of hash nesting in headers is not supported");
     }
 
-    if (!(isPlainObject(data) && hasKey(data, "p"))) {
+    if (!(isPlainObject(data) && "p" in data)) {
       throw new Decryption("Invalid data format: hash without payload");
     }
   }

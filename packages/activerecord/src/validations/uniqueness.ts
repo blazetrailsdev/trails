@@ -2,7 +2,6 @@ import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { kernelArray } from "@blazetrails/activesupport";
 import {
   except,
-  hasKey,
   rbClassSuperclass,
   rbModSingletonP,
   rbObjAsString,
@@ -113,7 +112,7 @@ export class UniquenessValidator extends EachValidator {
           return null;
         }
 
-        if (!hasKey(this.options, "caseSensitive") || bind.isNil()) {
+        if (!("caseSensitive" in this.options) || bind.isNil()) {
           return connection.defaultUniquenessComparison(attr, bind);
         } else if (this.options.caseSensitive) {
           return connection.caseSensitiveComparison(attr, bind);

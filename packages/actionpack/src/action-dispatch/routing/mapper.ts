@@ -46,7 +46,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import {
   dup,
   fetch,
-  hasKey,
   hashDelete,
   isSymbol,
   keepIf,
@@ -416,7 +415,7 @@ export class Mapping {
     this._conditions = Object.fromEntries(conditions);
     this.defaults = { ...formats.defaults, ...defaults, ...this.normalizeDefaults(options) };
 
-    if (this.ast.pathParams.includes("action") && !hasKey(this.requirements, "action")) {
+    if (this.ast.pathParams.includes("action") && !("action" in this.requirements)) {
       if (this.defaults.action == null || this.defaults.action === false) {
         this.defaults.action = "index";
       }
@@ -572,7 +571,7 @@ export class Mapping {
       }
 
       if (regex.dotAll) {
-        if (hasKey(wildcardOptions, requirement)) continue;
+        if (Object.hasOwn(wildcardOptions, requirement)) continue;
 
         throw new ArgumentError(
           `Regexp multiline option is not allowed in routing requirements: ${rbInspect(regex)}`,
@@ -596,12 +595,12 @@ export class Mapping {
       return new Constraints(this.to, blocks, Constraints.CALL);
     } else if (blocks.length > 0) {
       return new Constraints(
-        this.dispatcher(hasKey(this.defaults, "controller")),
+        this.dispatcher("controller" in this.defaults),
         blocks,
         Constraints.SERVE,
       );
     } else {
-      return this.dispatcher(hasKey(this.defaults, "controller"));
+      return this.dispatcher("controller" in this.defaults);
     }
   }
 
@@ -1598,7 +1597,7 @@ export class Mapper {
         mod.defineMethod(
           "findScriptName",
           function (this: RouteSet, options: Record<string, unknown>): string {
-            if (hasKey(options, "scriptName") && isPresent(options.scriptName)) {
+            if ("scriptName" in options && isPresent(options.scriptName)) {
               return mod.superMethod(this, "findScriptName")!(options) as string;
             } else {
               return scriptNamer(options);

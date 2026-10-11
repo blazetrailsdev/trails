@@ -1,4 +1,3 @@
-import { hasKey } from "@blazetrails/ruby-compat";
 import type { DurationParts } from "../duration.js";
 import { rbInspect as inspect } from "@blazetrails/ruby-compat";
 import { isEmpty } from "@blazetrails/ruby-compat";
@@ -143,10 +142,7 @@ export class ISO8601Parser {
   private validateBang(): boolean {
     if (isEmpty(this.parts)) this.raiseParsingError("is empty duration");
 
-    if (
-      hasKey(this.parts, "weeks") &&
-      DATE_COMPONENTS.some((component) => component in this.parts)
-    ) {
+    if ("weeks" in this.parts && DATE_COMPONENTS.some((component) => component in this.parts)) {
       this.raiseParsingError("mixing weeks with other date parts not allowed");
     }
 

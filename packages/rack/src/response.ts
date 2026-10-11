@@ -379,7 +379,7 @@ export class Response {
 
   hasHeader(key: string | null): boolean {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");
-    return hasKey(this.headers, downcaseKey(key));
+    return Object.hasOwn(this.headers, downcaseKey(key));
   }
   getHeader(key: string | null): any {
     if (key === null || key === undefined) throw new Error("ArgumentError: key cannot be nil");

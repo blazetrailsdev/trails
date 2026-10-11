@@ -3,7 +3,6 @@ import {
   File,
   getFs,
   hashDelete,
-  hasKey,
   last,
   merge,
   rbEqual,
@@ -34,7 +33,7 @@ export function insertIntoFile(
   const data = block ? block : args.shift();
 
   const config = (args.shift() || {}) as Record<string, unknown>;
-  if (!(hasKey(config, "before") || hasKey(config, "after"))) config["after"] = /$/;
+  if (!("before" in config || "after" in config)) config["after"] = /$/;
 
   return this.action(new InjectIntoFile(this, destination, data, config));
 }
@@ -56,7 +55,7 @@ export class InjectIntoFile extends EmptyDirectory {
     super(base, destination, merge({ verbose: true }, config));
 
     [this.behavior, this.flag] = (
-      hasKey(this.config, "after")
+      "after" in this.config
         ? ["after", hashDelete(this.config, "after")]
         : ["before", hashDelete(this.config, "before")]
     ) as [string, RegExp | string];

@@ -1,4 +1,4 @@
-import { Dir, File, hasKey } from "@blazetrails/ruby-compat";
+import { Dir, File } from "@blazetrails/ruby-compat";
 import { CACHE_CONTROL, CONTENT_TYPE } from "./constants.js";
 import { Files } from "./files.js";
 import { mimeType } from "./mime.js";
@@ -42,7 +42,9 @@ export class Static {
   }
 
   overwriteFilePath(path: string): boolean {
-    return (!Array.isArray(this.urls) && hasKey(this.urls, path)) || this.isAddIndexRoot(path);
+    return (
+      (!Array.isArray(this.urls) && Object.hasOwn(this.urls, path)) || this.isAddIndexRoot(path)
+    );
   }
 
   routeFile(path: string): boolean {

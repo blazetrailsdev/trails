@@ -102,7 +102,7 @@ export class Deflater {
     if (
       this.compressibleTypes &&
       !(
-        hasKey(headers, CONTENT_TYPE) &&
+        Object.hasOwn(headers, CONTENT_TYPE) &&
         this.compressibleTypes.includes(/[^;]*/.exec(headers[CONTENT_TYPE])![0])
       )
     ) {

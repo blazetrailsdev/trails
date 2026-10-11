@@ -220,7 +220,7 @@ export class ExceptionWrapper {
   }
 
   rescueTemplate(): string {
-    return hasKey(this.rescueTemplates, this.exceptionClassName)
+    return Object.hasOwn(this.rescueTemplates, this.exceptionClassName)
       ? this.rescueTemplates[this.exceptionClassName]
       : "diagnostics";
   }
@@ -295,7 +295,7 @@ export class ExceptionWrapper {
   }
 
   static statusCodeForException(className: string): number {
-    const status = hasKey(this.rescueResponses, className)
+    const status = Object.hasOwn(this.rescueResponses, className)
       ? this.rescueResponses[className]
       : ":internal_server_error";
     return statusCode(status.slice(1));

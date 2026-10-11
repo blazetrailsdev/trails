@@ -15,7 +15,6 @@ import {
   FileUtils,
   getFs,
   include,
-  hasKey,
   hashDelete,
   rbInspect,
   regexpEscape,
@@ -219,7 +218,7 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     const asHook = hashDelete(options as Record<string, unknown>, "as") ?? this.generatorName();
 
     for (const name of names as string[]) {
-      if (!hasKey(this.classOptions(), name)) {
+      if (!Object.hasOwn(this.classOptions(), name)) {
         let defaults: ClassOptionConfig;
         if (options.type === "boolean") {
           defaults = {};
@@ -481,11 +480,10 @@ export abstract class GeneratorBase implements GeneratorActionsState {
   }
 
   private static invokeFromOption(name: string, options: HookForOptions, block?: HookBlock): void {
-    const verbose = hasKey(options, "verbose")
-      ? (options as { verbose?: string | boolean }).verbose!
-      : "white";
+    const verbose =
+      "verbose" in options ? (options as { verbose?: string | boolean }).verbose! : "white";
 
-    if (!hasKey(this.classOptions(), name)) {
+    if (!Object.hasOwn(this.classOptions(), name)) {
       throw new ArgumentError(
         `You have to define the option ${rbInspect(name)} before setting invoke_from_option.`,
       );
@@ -752,11 +750,11 @@ export abstract class GeneratorBase implements GeneratorActionsState {
     let c: Record<string, unknown> | undefined;
     const generatorName = this.generatorName();
     const baseName = this.baseName();
-    if (generatorName && (c = config[generatorName]) && hasKey(c, name)) {
+    if (generatorName && (c = config[generatorName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (baseName && (c = config[baseName]) && hasKey(c, name)) {
+    } else if (baseName && (c = config[baseName]) && Object.hasOwn(c, name)) {
       return c[name];
-    } else if (hasKey(config["rails"], name)) {
+    } else if (Object.hasOwn(config["rails"], name)) {
       return config["rails"][name];
     } else {
       return defaultValue;

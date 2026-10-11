@@ -2,7 +2,6 @@ import {
   first,
   type Hash,
   hashDelete,
-  hasKey,
   type Module,
   rbObjRespondTo,
   rtest,
@@ -142,7 +141,7 @@ export class BelongsTo extends SingularAssociation {
   }
 
   static override defineValidations(model: any, reflection: any): void {
-    if (hasKey(reflection.options, "required")) {
+    if ("required" in reflection.options) {
       reflection.options.optional = !hashDelete(reflection.options, "required");
     }
 

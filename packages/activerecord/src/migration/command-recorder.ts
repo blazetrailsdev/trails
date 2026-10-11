@@ -1,7 +1,6 @@
 import {
   Module,
   compact,
-  hasKey,
   hashDelete,
   include,
   isEmpty,
@@ -306,7 +305,7 @@ export class CommandRecorder {
     const options = last(args);
     if (isPlainObject(options)) {
       hashDelete(options, "validate");
-      if (hasKey(options, "ifNotExists")) options["ifExists"] = hashDelete(options, "ifNotExists");
+      if ("ifNotExists" in options) options["ifExists"] = hashDelete(options, "ifNotExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod(
       "invertAddCheckConstraint",
@@ -323,7 +322,7 @@ export class CommandRecorder {
 
     const options = last(args);
     if (isPlainObject(options)) {
-      if (hasKey(options, "ifExists")) options["ifNotExists"] = hashDelete(options, "ifExists");
+      if ("ifExists" in options) options["ifNotExists"] = hashDelete(options, "ifExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod(
       "invertRemoveCheckConstraint",
@@ -402,13 +401,7 @@ export class CommandRecorder {
   /** @internal */
   invertRemoveColumns(args: unknown[]): [string, unknown[]] {
     const last = args[args.length - 1];
-    if (
-      !(
-        typeof last === "object" &&
-        last !== null &&
-        hasKey(last as Record<string, unknown>, "type")
-      )
-    ) {
+    if (!(isPlainObject(last) && "type" in last)) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_columns is only reversible if given a type.",
       );
@@ -517,7 +510,7 @@ export class CommandRecorder {
   /** @internal */
   invertRenameEnumValue(args: unknown[]): [string, unknown[]] {
     const [typeName, options] = args;
-    if (!(isPlainObject(options) && hasKey(options, "from") && hasKey(options, "to"))) {
+    if (!(isPlainObject(options) && "from" in options && "to" in options)) {
       throw new ActiveRecord.IrreversibleMigration(
         "rename_enum_value is only reversible if given a :from and :to option.",
       );

@@ -13,7 +13,6 @@ import {
   except,
   extend,
   type Hash,
-  hasKey,
   include,
   type Included,
   InvalidURIError,
@@ -162,7 +161,7 @@ export class Generator {
     if (
       this.recall[key] != null &&
       this.recall[key] !== false &&
-      (!hasKey(this.options, key) || this.options[key] === this.recall[key])
+      (!Object.hasOwn(this.options, key) || this.options[key] === this.recall[key])
     ) {
       if (!this.isNamedRouteExists() || this.segmentKeys().includes(key)) {
         return (this.options[key] = this.recall[key]);
@@ -179,7 +178,7 @@ export class Generator {
       this.options["controller"] = toS(this.options["controller"]);
     }
 
-    if (hasKey(this.options, "action")) {
+    if ("action" in this.options) {
       const action = this.options["action"];
       this.options["action"] = toS(action != null && action !== false ? action : "index");
     }

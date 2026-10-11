@@ -6,7 +6,7 @@ import {
   kernelArray as array,
   type Extended,
 } from "@blazetrails/activesupport";
-import { hasKey, isIntersect, Module } from "@blazetrails/ruby-compat";
+import { isIntersect, Module } from "@blazetrails/ruby-compat";
 import type { CallbackConditions, CallbackObject } from "../callbacks.js";
 
 export const ClassMethods = {
@@ -102,7 +102,7 @@ const SuperMethods = new Module((mod) =>
 
 /** @internal */
 export function setOptionsForCallback(options: CallbackOptions): void {
-  if (hasKey(options, "on")) {
+  if ("on" in options) {
     options.on = array(options.on);
     options.if = [
       (o: unknown) =>

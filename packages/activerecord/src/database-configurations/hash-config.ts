@@ -1,4 +1,4 @@
-import { fetch, File, hasKey, merge, rtest } from "@blazetrails/ruby-compat";
+import { fetch, File, merge, rtest } from "@blazetrails/ruby-compat";
 import { ActiveRecord } from "../namespaces.js";
 import { DatabaseConfig, type DatabaseConfigOptions } from "./database-config.js";
 import { schemaFormat } from "../active-record.js";
@@ -114,7 +114,7 @@ export class HashConfig extends DatabaseConfig {
   }
 
   schemaDump(format: SchemaFormat = schemaFormat()): string | null {
-    if (hasKey(this.configurationHash, "schemaDump")) {
+    if ("schemaDump" in this.configurationHash) {
       const config = this.configurationHash.schemaDump;
       if (rtest(config)) {
         return config;
