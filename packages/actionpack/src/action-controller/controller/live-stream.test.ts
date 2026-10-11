@@ -345,12 +345,6 @@ describe("LiveStreamTest", () => {
       this.tests(TestController);
     }
 
-    assertStreamClosed(): void {
-      assertPredicate(this.response.stream, (s) => s.isClosed, "stream should be closed");
-      assertPredicate(this.response, (r) => r.committed, "response should be committed");
-      assertPredicate(this.response, (r) => r.isSent, "response should be sent");
-    }
-
     waitForStreamClose(): Promise<boolean> {
       return vi.waitUntil(() => this.response.stream.isClosed, { timeout: 10_000 });
     }
@@ -384,6 +378,11 @@ describe("LiveStreamTest", () => {
   }
 
   let tc: LiveStreamTest;
+  const assertStreamClosed = (): void => {
+    assertPredicate(tc.response.stream, (s) => s.isClosed, "stream should be closed");
+    assertPredicate(tc.response, (r) => r.committed, "response should be committed");
+    assertPredicate(tc.response, (r) => r.isSent, "response should be sent");
+  };
 
   beforeEach(async ({ task }) => {
     tc = new LiveStreamTest(task.name);
@@ -492,7 +491,7 @@ describe("LiveStreamTest", () => {
 
     await tc.get("isolatedState");
     assertEqual(rbInspect("isolated_state"), tc.response.body);
-    tc.assertStreamClosed();
+    assertStreamClosed();
   });
 
   it("thread locals get reset", async () => {
@@ -514,13 +513,13 @@ describe("LiveStreamTest", () => {
 
     await tc.get("rawIsolatedState");
     assertEqual(rbInspect("buffy"), tc.response.body);
-    tc.assertStreamClosed();
+    assertStreamClosed();
 
     IsolatedExecutionState.clear();
 
     await tc.get("isolatedState");
     assertEqual(rbInspect(null), tc.response.body);
-    tc.assertStreamClosed();
+    assertStreamClosed();
   });
 
   it("live stream default header", async () => {
@@ -531,7 +530,7 @@ describe("LiveStreamTest", () => {
   it("render text", async () => {
     await tc.get("renderText");
     assertEqual("zomg", tc.response.body);
-    tc.assertStreamClosed();
+    assertStreamClosed();
   });
 
   it("exception handling html", async () => {
@@ -545,10 +544,10 @@ describe("LiveStreamTest", () => {
       assertMatch(/(window\.location = "\/500\.html"<\/script><\/html>)$/, tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
-      tc.assertStreamClosed();
+      assertStreamClosed();
     });
     assert(tc.response.body);
-    tc.assertStreamClosed();
+    assertStreamClosed();
   });
 
   it("exception handling plain text", async () => {
@@ -562,7 +561,7 @@ describe("LiveStreamTest", () => {
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
-      tc.assertStreamClosed();
+      assertStreamClosed();
     });
   });
 
@@ -574,7 +573,7 @@ describe("LiveStreamTest", () => {
       assertEqual('data: "500 Internal Server Error"\n\n', tc.response.body);
       output.rewind();
       assertMatch("An exception occurred...", output.read());
-      tc.assertStreamClosed();
+      assertStreamClosed();
     });
   });
 
@@ -597,7 +596,7 @@ describe("LiveStreamTest", () => {
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("We need to go deeper", output.read());
-      tc.assertStreamClosed();
+      assertStreamClosed();
     });
   });
 
@@ -703,11 +702,17 @@ describe("LiveStreamRouterTest", () => {
     }
   }
 
-  it("streaming served through the router", async ({ task }) => {
-    const t = new LiveStreamRouterTest(task.name);
+  let t: LiveStreamRouterTest;
+  const assertResponse = (type: string): void => t.assertResponse(type);
+
+  beforeEach(({ task }) => {
+    t = new LiveStreamRouterTest(task.name);
+  });
+
+  it("streaming served through the router", async () => {
     await t.get("/test");
 
-    t.assertResponse("ok");
+    assertResponse("ok");
     assertMatch(/data: {"name":"John"}/, t.response.body);
     assertMatch(/data: {"name":"Ryan"}/, t.response.body);
   });

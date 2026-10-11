@@ -66,6 +66,8 @@ class RenderLayoutTest extends Rack.TestCase {}
 
 describe("RenderLayoutTest", () => {
   let t: RenderLayoutTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertStatus = (code: number): void => t.assertStatus(code);
 
   beforeEach(({ task }) => {
     t = new RenderLayoutTest(task.name);
@@ -74,34 +76,34 @@ describe("RenderLayoutTest", () => {
   it("rendering a normal template, but using the implicit layout", async () => {
     await t.get("/controller_layouts/implicit/index");
 
-    t.assertBody("Main Hello world! Layout");
-    t.assertStatus(200);
+    assertBody("Main Hello world! Layout");
+    assertStatus(200);
   });
 
   it("rendering a normal template, but using an implicit NAMED layout", async () => {
     await t.get("/controller_layouts/implicit_name/index");
 
-    t.assertBody("Implicit Hello world! Layout");
-    t.assertStatus(200);
+    assertBody("Implicit Hello world! Layout");
+    assertStatus(200);
   });
 
   it("rendering a renderable object, using the implicit layout", async () => {
     await t.get("/controller_layouts/implicit_name/renderable");
 
-    t.assertBody("Implicit Hello, World! Layout");
-    t.assertStatus(200);
+    assertBody("Implicit Hello, World! Layout");
+    assertStatus(200);
   });
 
   it("rendering a renderable object, using the override layout", async () => {
     await t.get("/controller_layouts/implicit/overrideRenderable");
 
-    t.assertBody("Override! Hello, World!");
-    t.assertStatus(200);
+    assertBody("Override! Hello, World!");
+    assertStatus(200);
   });
 
   it("overriding an implicit layout with render :layout option", async () => {
     await t.get("/controller_layouts/implicit/override");
-    t.assertBody("Override! Hello world!");
+    assertBody("Override! Hello world!");
   });
 });
 
@@ -113,6 +115,7 @@ class LayoutOptionsTest extends Rack.TestCase {
 
 describe("LayoutOptionsTest", () => {
   let t: LayoutOptionsTest;
+  const assertResponse = (body: string): void => t.assertResponse(body);
 
   beforeEach(({ task }) => {
     t = new LayoutOptionsTest(task.name);
@@ -120,7 +123,7 @@ describe("LayoutOptionsTest", () => {
 
   it("rendering with :layout => false leaves out the implicit layout", async () => {
     await t.get(":layoutFalse");
-    t.assertResponse("hi(layout_false.html.erb)");
+    assertResponse("hi(layout_false.html.erb)");
   });
 });
 
@@ -154,6 +157,7 @@ class MismatchFormatTest extends Rack.TestCase {
 
 describe("MismatchFormatTest", () => {
   let t: MismatchFormatTest;
+  const assertResponse = (body: string): void => t.assertResponse(body);
 
   beforeEach(({ task }) => {
     t = new MismatchFormatTest(task.name);
@@ -162,18 +166,18 @@ describe("MismatchFormatTest", () => {
   // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
   it.skip("if XML is selected, an HTML template is not also selected", async () => {
     await t.get(":index", { params: { format: "xml" } });
-    t.assertResponse(MismatchFormatTest.XML_INSTRUCT);
+    assertResponse(MismatchFormatTest.XML_INSTRUCT);
   });
 
   // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
   it.skip("if XML is implicitly selected, an HTML template is not also selected", async () => {
     await t.get(":implicit");
-    t.assertResponse(MismatchFormatTest.XML_INSTRUCT);
+    assertResponse(MismatchFormatTest.XML_INSTRUCT);
   });
 
   it("a layout for JS is ignored even if explicitly provided for HTML", async () => {
     await t.get(":explicit", { params: { format: "js" } });
-    t.assertResponse("alert('foo');");
+    assertResponse("alert('foo');");
   });
 });
 
@@ -208,6 +212,7 @@ class FalseLayoutMethodTest extends Rack.TestCase {
 
 describe("FalseLayoutMethodTest", () => {
   let t: FalseLayoutMethodTest;
+  const assertResponse = (body: string): void => t.assertResponse(body);
 
   beforeEach(({ task }) => {
     t = new FalseLayoutMethodTest(task.name);
@@ -215,6 +220,6 @@ describe("FalseLayoutMethodTest", () => {
 
   it("access false layout returned by a method/proc", async () => {
     await t.get(":index", { params: { format: "js" } });
-    t.assertResponse("alert('foo');");
+    assertResponse("alert('foo');");
   });
 });
