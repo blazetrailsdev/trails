@@ -534,7 +534,6 @@ export abstract class Store {
     return entries.filter((key) => this.deleteEntry(key, options)).length;
   }
 
-  /** @missingRailsCall merge — PERMANENT */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 

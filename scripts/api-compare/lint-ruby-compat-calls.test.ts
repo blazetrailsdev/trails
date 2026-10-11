@@ -50,6 +50,28 @@ describe("ruby-compat call ratchet", () => {
     expect(stale).toEqual([]);
   });
 
+  it("names the native form beside the export for a Hash call one ports", () => {
+    const hash: Artifact = {
+      packages: [],
+      mismatches: [
+        {
+          ...row("rack", "utils.ts", "build", "key? → key|isKey"),
+          receivers: { "key?": ["local"] },
+        },
+        { ...row("rack", "utils.ts", "merge", "delete → delete"), receivers: { delete: ["hash"] } },
+        row("rack", "utils.ts", "each", "each_pair → eachPair"),
+        row("rack", "utils.ts", "prune", "delete_if → deleteIf"),
+      ],
+    };
+    expect(reverseRows(hash).map(renderKey)).toEqual([
+      "rack  utils.ts  build  key? → hasKey (or `k in h` on the same receiver)",
+      "rack  utils.ts  merge  delete → hashDelete (or `delete h[k]` on the same receiver)",
+      "rack  utils.ts  each  each_pair → eachPair " +
+        "(or `for (const [k, v] of Object.entries(h))` on the same receiver)",
+      "rack  utils.ts  prune  delete_if → deleteIf",
+    ]);
+  });
+
   it("leaves a package outside the compare population to the report", () => {
     const outside = {
       ...artifact,

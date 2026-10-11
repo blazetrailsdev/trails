@@ -152,7 +152,6 @@ export class ErrorReporter {
     ExecutionContext.set(attrs);
   }
 
-  /** @missingRailsCall merge — PERMANENT */
   report(
     error: Error,
     {

@@ -2863,6 +2863,8 @@ class ApiExtractor
     outer_receiver_names = @call_receiver_names
     outer_string_evals = @string_eval_calls
     outer_hash_locals = @hash_locals
+    outer_void_statements = @void_statements
+    @void_statements = void_statements(body_node)
     @call_receivers = {}
     @call_receiver_names = {}
     @string_eval_calls = Set.new
@@ -2873,6 +2875,7 @@ class ApiExtractor
     @call_receiver_names = outer_receiver_names
     @string_eval_calls = outer_string_evals
     @hash_locals = outer_hash_locals
+    @void_statements = outer_void_statements
   end
 
   # call name => its sites' receiver kinds, SORTED. A name whose every
@@ -2921,8 +2924,53 @@ class ApiExtractor
 
   # The calls whose non-`array` receivers `callReceiverNames` records, read by
   # compare.ts's native-form credits: the `.length` read for `size` / `length`,
-  # and the direct invocation of a Proc-valued receiver for `call`.
-  RECEIVER_NAMED_CALLS = %w[size length call].freeze
+  # the direct invocation of a Proc-valued receiver for `call`, and the native
+  # Hash forms (`in`, `delete`, `Object.assign`, a spread, an `Object.entries`
+  # loop) for the Hash calls each one ports.
+  RECEIVER_NAMED_CALLS = %w[
+    size length call key? has_key? include? member? delete merge! update merge each_pair
+  ].freeze
+
+  # The Hash calls whose block arm no native form ports: the miss block of
+  # `delete` and the conflict block of `merge` / `merge!` / `update`. A site
+  # passing one, literal or `&blk`, records its receiver as unnamed, so no form
+  # credits it. Neither does a `delete` whose removed value is used: JS
+  # `delete` answers a boolean.
+  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
+
+  def block_pass?(args)
+    args.any? do |arg|
+      arg = arg[1] if arg.is_a?(Array) && arg[0] == :arg_paren
+      arg.is_a?(Array) && arg[0] == :args_add_block && arg[2]
+    end
+  end
+
+  # Ripper node kind => the slot holding its statement list.
+  STATEMENT_SLOTS = {
+    bodystmt: 1, if: 2, elsif: 2, unless: 2, else: 1, while: 2, until: 2,
+    when: 2, ensure: 1, rescue: 3, brace_block: 2, for: 3
+  }.freeze
+
+  # Modifier node kind => the slot holding the one statement it wraps.
+  MODIFIER_SLOTS = { if_mod: 2, unless_mod: 2, while_mod: 2, until_mod: 2, rescue_mod: 1 }.freeze
+
+  # The statements whose value nothing reads: every statement of a list but
+  # its last, which may be the value of the method, block or branch, and the
+  # statement a void modifier wraps (`options.delete(:k) if cond`).
+  def void_statements(node, found = Set.new.compare_by_identity)
+    return found unless node.is_a?(Array)
+
+    slot = node[0].is_a?(Symbol) && STATEMENT_SLOTS[node[0]]
+    stmts = slot && node[slot]
+    if stmts.is_a?(Array) && stmts[0].is_a?(Array)
+      stmts[0...-1].each do |stmt|
+        found << stmt
+        found << stmt while stmt.is_a?(Array) && (stmt = stmt[MODIFIER_SLOTS[stmt[0]] || stmt.length])
+      end
+    end
+    node.each { |child| void_statements(child, found) }
+    found
+  end
 
   # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
   # relation/delegation.rb:79-83): Ripper never parses the string, so the calls
@@ -4060,7 +4108,8 @@ class ApiExtractor
     case node[0]
     when :method_add_arg, :fcall, :vcall, :call, :command, :command_call
       callee, args = split_call_node(node)
-      walk_call_in_order(callee, args, calls, weak, node.equal?(@block_call))
+      walk_call_in_order(callee, args, calls, weak, node.equal?(@block_call),
+                         value_used: !@void_statements&.include?(node))
       return
     when :super, :zsuper
       # super(args) is [:super, ...]; bare super is [:zsuper]. Both chain to
@@ -4114,7 +4163,7 @@ class ApiExtractor
   # That is the port's order too — Rails' `xs.each do … end` is normally a
   # `for` loop, whose body follows the iterated expression — and the TS side
   # defers function-expression arguments for exactly this reason.
-  def walk_call_in_order(callee, args, calls, weak, has_block = false)
+  def walk_call_in_order(callee, args, calls, weak, has_block = false, value_used: true)
     name = nil
     recv = nil
     case callee[0]
@@ -4149,7 +4198,9 @@ class ApiExtractor
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
-        (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")
+        formless = ((has_block || block_pass?(args)) && BLOCK_ARM_HASH_CALLS.include?(name)) ||
+                   (value_used && name == "delete")
+        (@call_receiver_names[name] ||= Set.new) << ((!formless && receiver_tail_name(recv)) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
       if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)

@@ -6913,7 +6913,7 @@ function collectCalls(
       }
     }
   }
-  if (names.size === 0) return undefined;
+  if (names.size === 0 && hashForms.size === 0) return undefined;
   return [...names, ...hashForms];
 }
 
@@ -6937,7 +6937,9 @@ function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | u
     return [];
   }
   if (ts.isObjectLiteralExpression(n)) {
-    return n.properties.filter(ts.isSpreadAssignment).map((p) => ["spread", p.expression]);
+    const first = n.properties[0];
+    if (n.properties.length < 2 || !ts.isSpreadAssignment(first)) return [];
+    return [["spread", first.expression]];
   }
   if (ts.isForOfStatement(n)) {
     const iterated = n.expression;

@@ -201,6 +201,25 @@ export const NATIVE_FORM_PREFIX = "@";
  */
 export const EVAL_CALLBACK_PREFIX = "%";
 
+const NOT_A_HASH: ReadonlySet<string> = new Set([
+  "self",
+  "const",
+  "array",
+  "string",
+  "symbol",
+  "regexp",
+  "numeric",
+]);
+
+/** How a port writes each native Hash form, for a gate message to name. */
+export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
+  ["in", "k in h"],
+  ["delete", "delete h[k]"],
+  ["assign", "Object.assign(h, other)"],
+  ["spread", "{ ...h, ...other }"],
+  ["entries", "for (const [k, v] of Object.entries(h))"],
+]);
+
 /**
  * Ruby call → the {@link NATIVE_FORM_PREFIX}-marked TS form that is its whole
  * port, and the Ruby receivers it is admitted for. Read by
@@ -250,6 +269,41 @@ export const EVAL_CALLBACK_PREFIX = "%";
  *   implicit-self receiver, the one shape `Kernel#sleep` takes
  *   (`rb_define_global_function`, `process.c:9125`), so an `x.sleep` site
  *   still flags.
+ * - The Hash rows (RFC 0190). A Rails option hash is a plain JS object, and JS
+ *   has a callee-less form for each of these: `k in h` / `Object.hasOwn(h, k)`
+ *   for `key?` / `has_key?` / `include?` / `member?` (all four are
+ *   `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:7255-7259`), `delete h[k]`
+ *   for `delete` (`hash.c:2441`), `Object.assign(h, other)` for `merge!` /
+ *   `update` (`hash.c:4028`), `{ ...h, ...other }` for `merge` (`hash.c:4144`)
+ *   and `for (const [k, v] of Object.entries(h))` for `each_pair`
+ *   (`hash.c:3149`). Every row is `named`: the form credits only when each Ruby
+ *   site's receiver is named and the body carries the form on that name, so
+ *   `@options.key?(:x)` is `"x" in this.options` and not `"x" in this.other`,
+ *   and a feature probe (`"then" in value`) credits nothing. That name match is
+ *   also what admits an `ivar` receiver here where `.length` refuses one: no
+ *   port spells `relation.merge(other)` as a spread of `relation`. A bare
+ *   `merge(other)` is `Relation#merge` and never credits.
+ *   `include?` / `member?` are a different method on an Array or a Relation
+ *   (`scripts/parity/ruby-compat.ts`'s `Array#include?` row), so they credit
+ *   only where every site is a proven `hash`. `delete`, `merge!`, `update` and
+ *   `merge` credit where no site's kind disproves a Hash, the rule
+ *   `rubyCompatAliases` applies to their helpers. That is weaker than a
+ *   proven `hash`: a `local`, `ivar` or `expr` receiver is admitted on its
+ *   name alone, so an Array local a port wrongly deletes from by index would
+ *   credit too. A site of one of those four that passes a block, literal or
+ *   `&blk`, never credits: the miss block of `delete` (`hash.c:2441`) and the
+ *   conflict block of `merge!` / `merge` (`hash.c:4028`, `:4144`) have no
+ *   native form. Nor does a `delete` whose removed value is used, since JS
+ *   `delete` answers a boolean. The Ruby extractor leaves each such site's
+ *   receiver unnamed. A spread is marked only where it LEADS a literal that
+ *   holds something more (`{ ...h, ...other }`, `{ ...h, k: v }`): a lone
+ *   `{ ...h }` is a copy, and `{ ...other, ...h }` lets `h` win a conflict
+ *   that `merge` gives to its argument. What follows the leading spread is not
+ *   paired with the Ruby argument.
+ *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
+ *   drops it for every receiver. `fetch` has none either, because JS has no
+ *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which
+ *   `h.fetch(:k, d)` does not, and marks nothing.
  *
  * A row drops the Ruby call from significance, so nothing pairs its argument
  * list by name. A row whose argument is a QUANTITY declares `argument`: the TS
@@ -265,6 +319,8 @@ export const NATIVE_FORM_ANALOGUES = new Map<
     form: string;
     receivers: "implicit-self" | "explicit";
     uncreditedKinds?: ReadonlySet<string>;
+    creditedKinds?: ReadonlySet<string>;
+    named?: true;
     argument?: { tsCall: string; rubyIndex: number; tsIndex: number; factor: number };
   }
 >([
@@ -272,7 +328,38 @@ export const NATIVE_FORM_ANALOGUES = new Map<
   ["length", { form: "length", receivers: "explicit" }],
   ["prepend", { form: "unshift", receivers: "explicit" }],
   ["load", { form: "import", receivers: "implicit-self" }],
-  ["call", { form: "invoke", receivers: "explicit", uncreditedKinds: new Set(["self", "array"]) }],
+  [
+    "call",
+    {
+      form: "invoke",
+      receivers: "explicit",
+      uncreditedKinds: new Set(["self", "array"]),
+      named: true,
+    },
+  ],
+  ["key?", { form: "in", receivers: "explicit", uncreditedKinds: new Set(["self"]), named: true }],
+  [
+    "has_key?",
+    { form: "in", receivers: "explicit", uncreditedKinds: new Set(["self"]), named: true },
+  ],
+  [
+    "include?",
+    { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true },
+  ],
+  ["member?", { form: "in", receivers: "explicit", creditedKinds: new Set(["hash"]), named: true }],
+  ["delete", { form: "delete", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
+  ["merge!", { form: "assign", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
+  ["update", { form: "assign", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
+  ["merge", { form: "spread", receivers: "explicit", uncreditedKinds: NOT_A_HASH, named: true }],
+  [
+    "each_pair",
+    {
+      form: "entries",
+      receivers: "explicit",
+      uncreditedKinds: new Set(["self", "const"]),
+      named: true,
+    },
+  ],
   [
     "sleep",
     {
@@ -351,6 +438,10 @@ export function partitionNegatedCalls(raw: Iterable<string>): {
  * credits at most the construct the port is actually showing, so it can never
  * manufacture a missing arm, only cancel an invented one.
  *
+ * `keep_if` is `delete_if` with the block's answer inverted
+ * (`vendor/ruby/v3.3.11/hash.c:2844`, beside `rb_hash_delete_if` at `:2564`),
+ * so it carries `delete_if`'s lowering.
+ *
  * A name whose port KEEPS a call is deliberately absent: `map`, `select`,
  * `sum` and friends all have a JS method a faithful port names, so folding them
  * would let a real dropped iteration read as a construct. And the fold is
@@ -405,6 +496,7 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // an in-place removal, so the port loops and splices under a guard.
   // Part of audit row 35.
   ["delete_if", [[], ["loop", "if"]]],
+  ["keep_if", [[], ["loop", "if"]]],
   ["reject!", [[], ["loop", "if"]]],
   // `@records.concat @lazy_enrollment_records.values`
   // (activerecord/lib/active_record/connection_adapters/abstract/transaction.rb:221) —

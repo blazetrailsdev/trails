@@ -58,7 +58,6 @@ export abstract class CurrentAttributes {
   static attribute(...names: [...string[], AttributeDefinition]): void;
   /**
    * @missingRailsCall generate — PERMANENT
-   * @missingRailsCall merge — PERMANENT
    * @missingRailsName generatedAttributeMethods — PERMANENT
    */
   static attribute(...args: unknown[]): void {

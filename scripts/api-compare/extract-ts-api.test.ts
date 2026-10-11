@@ -29,6 +29,7 @@ import {
   tsLiteralValue,
 } from "./extract-ts-api.js";
 import { collectTsFileNames } from "./extra-surface.js";
+import { partitionNegatedCalls, significantCallsForReceivers } from "./compare.js";
 import { CALL_ARG_DESCRIPTOR_VOCABULARY } from "./extractor-skew.js";
 import { overlappingSubDirs, packageSrcDir } from "./config.js";
 import { COMPARED_TS_FILES, walkTsFilesSync } from "./ts-file-walk.js";
@@ -2124,7 +2125,7 @@ describe("body call capture", () => {
           Object.assign(options, other);
         }
         merge(options: Record<string, unknown>, opts: Record<string, object>, name: string) {
-          return { a: 1, ...this.options, ...options, ...opts[name] };
+          return [{ ...this.options, a: 1 }, { ...options, ...opts[name] }];
         }
         eachPair(options: Record<string, unknown>) {
           for (const [k, v] of Object.entries(this.options)) use(k, v);
@@ -2174,7 +2175,7 @@ describe("body call capture", () => {
     }
   });
 
-  it("records no call set for a body whose only names are native hash forms", () => {
+  it("records a call set for a body whose only names are native hash forms", () => {
     const cls = extractFromSource(
       `class Foo {
         key(options: Record<string, unknown>) {
@@ -2182,7 +2183,27 @@ describe("body call capture", () => {
         }
       }`,
     );
-    expect(cls.instanceMethods.find((m) => m.name === "key")!.calls).toBeUndefined();
+    expect(cls.instanceMethods.find((m) => m.name === "key")!.calls).toEqual([
+      "@in",
+      "@in:options",
+    ]);
+  });
+
+  it("marks no native hash form for a defaulted read, which is not Hash#fetch", () => {
+    const cls = extractFromSource(
+      `class Foo {
+        fetch(h: Record<string, unknown>, d: unknown) {
+          return use(h.k ?? d, h["k"] ?? d);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "fetch")!;
+    expect(m.calls!.filter((c) => /^@(in|delete|assign|spread|entries)\b/.test(c))).toEqual([]);
+    expect(
+      significantCallsForReceivers({ fetch: ["local"] }, undefined, nativeForms(m), {
+        fetch: ["h"],
+      }).has("fetch"),
+    ).toBe(true);
   });
 
   it("keeps the native hash forms out of the ORDER stream", () => {
@@ -6155,6 +6176,175 @@ describe("@missingRailsCall extraction", () => {
     });
     const fns = fileFunctionsOf(info, "registry.ts");
     expect(fns.find((f) => f.name === "registerModel")!.missingRailsCalls).toEqual(["first"]);
+  });
+});
+
+const nativeForms = (m: MethodInfo): Set<string> =>
+  partitionNegatedCalls(m.calls ?? []).nativeForms;
+
+describe("a native hash form credits the Hash call it ports", () => {
+  const credited = (
+    rubyCall: string,
+    body: string,
+    kinds: string[],
+    names: string[] | undefined,
+  ): boolean => {
+    const cls = extractFromSource(
+      `class Foo {
+        options: Record<string, unknown> = {};
+        other: Record<string, unknown> = {};
+        m(options: Record<string, unknown>, other: Record<string, unknown>) { ${body} }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "m")!;
+    return !significantCallsForReceivers(
+      { [rubyCall]: kinds },
+      undefined,
+      nativeForms(m),
+      names === undefined ? undefined : { [rubyCall]: names },
+    ).has(rubyCall);
+  };
+
+  it("credits options.key?(:x) from a membership test on options only", () => {
+    for (const call of ["key?", "has_key?"]) {
+      expect(credited(call, `return "x" in options;`, ["local"], ["options"])).toBe(true);
+      expect(credited(call, `return Object.hasOwn(options, "x");`, ["hash"], ["options"])).toBe(
+        true,
+      );
+      expect(credited(call, `return options.x !== undefined;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in other;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["self"], undefined)).toBe(false);
+    }
+  });
+
+  it("credits @options.key?(:x) from a membership test on this.options only", () => {
+    expect(credited("key?", `return "x" in this.options;`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("key?", `return "x" in this.other;`, ["ivar"], ["@options"])).toBe(false);
+  });
+
+  it("credits no key? for a feature probe on another value", () => {
+    expect(credited("key?", `return "then" in other;`, ["local"], ["options"])).toBe(false);
+    expect(credited("key?", `return "x" in options;`, ["expr"], ["?"])).toBe(false);
+  });
+
+  it("credits include? / member? only where every site is a proven hash", () => {
+    for (const call of ["include?", "member?"]) {
+      expect(credited(call, `return "x" in options;`, ["hash"], ["options"])).toBe(true);
+      expect(credited(call, `return "x" in options;`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["hash", "ivar"], ["options"])).toBe(false);
+      expect(credited(call, `return "x" in options;`, ["array"], undefined)).toBe(false);
+      expect(credited(call, `return "x" in other;`, ["hash"], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits options.delete(:x) from a delete on options only", () => {
+    expect(credited("delete", `delete options.x;`, ["local"], ["options"])).toBe(true);
+    expect(credited("delete", `delete this.options[other.k];`, ["ivar"], ["@options"])).toBe(true);
+    expect(credited("delete", `options.x = undefined;`, ["local"], ["options"])).toBe(false);
+    expect(credited("delete", `delete other.x;`, ["local"], ["options"])).toBe(false);
+    for (const kind of ["self", "const", "array", "string"]) {
+      expect(credited("delete", `delete options.x;`, ["local", kind], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits merge! / update from an Object.assign onto the receiver only", () => {
+    for (const call of ["merge!", "update"]) {
+      expect(credited(call, `Object.assign(options, other);`, ["local"], ["options"])).toBe(true);
+      expect(credited(call, `Object.assign(this.options, other);`, ["ivar"], ["@options"])).toBe(
+        true,
+      );
+      expect(credited(call, `Object.assign(other, options);`, ["local"], ["options"])).toBe(false);
+      expect(credited(call, `return { ...options, ...other };`, ["local"], ["options"])).toBe(
+        false,
+      );
+      expect(credited(call, `Object.assign(options, other);`, ["self"], undefined)).toBe(false);
+      expect(credited(call, `Object.assign(options, other);`, ["const"], ["options"])).toBe(false);
+    }
+  });
+
+  it("credits options.merge(other) from a spread of options only", () => {
+    expect(credited("merge", `return { ...options, ...other };`, ["local"], ["options"])).toBe(
+      true,
+    );
+    expect(credited("merge", `return { ...other };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { ...options, a: 1 };`, ["local"], ["options"])).toBe(true);
+    expect(credited("merge", `return { ...other, ...options };`, ["local"], ["options"])).toBe(
+      false,
+    );
+    expect(credited("merge", `return { a: 1, ...options };`, ["local"], ["options"])).toBe(false);
+    expect(credited("merge", `return { a: 1, b: options };`, ["local"], ["options"])).toBe(false);
+  });
+
+  it("flags a bare merge(other) beside a spread", () => {
+    expect(credited("merge", `return { ...options, ...other };`, ["self"], undefined)).toBe(false);
+    expect(
+      credited("merge", `return { ...options, ...other };`, ["local", "self"], ["options"]),
+    ).toBe(false);
+  });
+
+  it("flags relation.merge(other) on an ivar or expr receiver beside a spread", () => {
+    const body = `return { ...options, ...other };`;
+    expect(credited("merge", body, ["ivar"], ["@relation"])).toBe(false);
+    expect(credited("merge", body, ["expr"], ["relation"])).toBe(false);
+    expect(credited("merge", body, ["expr"], ["?"])).toBe(false);
+    expect(credited("merge", body, ["const"], ["options"])).toBe(false);
+  });
+
+  it("credits options.each_pair from a loop over Object.entries(options) only", () => {
+    const loop = (over: string): string => `for (const [k, v] of ${over}) use(k, v);`;
+    expect(credited("each_pair", loop("Object.entries(options)"), ["local"], ["options"])).toBe(
+      true,
+    );
+    expect(
+      credited("each_pair", loop("Object.entries(this.options)"), ["ivar"], ["@options"]),
+    ).toBe(true);
+    expect(
+      credited(
+        "each_pair",
+        `for (const k of Object.keys(options)) use(k);`,
+        ["local"],
+        ["options"],
+      ),
+    ).toBe(false);
+    expect(credited("each_pair", loop("Object.entries(other)"), ["local"], ["options"])).toBe(
+      false,
+    );
+    expect(credited("each_pair", loop("Object.entries(options)"), ["self"], undefined)).toBe(false);
+    expect(credited("each_pair", loop("Object.entries(options)"), ["const"], ["options"])).toBe(
+      false,
+    );
+  });
+});
+
+describe("native element access as the port of Hash#[] / Hash#[]=", () => {
+  const method = (body: string): MethodInfo =>
+    extractFromSource(
+      `class Foo { m(h: Record<string, unknown>, k: string, v: unknown) { ${body} } }`,
+    ).instanceMethods.find((m) => m.name === "m")!;
+
+  it("records a read as the ref:get token Ruby records for h[k], and no call", () => {
+    expect(method(`return use(h[k]);`).skeleton).toEqual(["ref:use", "ref:get"]);
+    expect(method(`return use(h[k]);`).calls).toEqual(["@invoked:use", "use"]);
+    expect(method(`return use(hashAref(h, k));`).skeleton).toEqual(["ref:use", "ref:hashAref"]);
+    expect(method(`return use(h.k);`).skeleton).toEqual(["ref:use", "ref:k"]);
+  });
+
+  it("records a write as assign:computed, and no call", () => {
+    expect(method(`h[k] = v;`).skeleton).toEqual(["assign:computed"]);
+    expect(method(`h[k] = v;`).calls).toBeUndefined();
+    expect(method(`hashAset(h, k, v);`).skeleton).toEqual(["ref:hashAset"]);
+    expect(method(`h.k = v;`).skeleton).toBeUndefined();
+  });
+
+  it("leaves no ref:get in a body that drops the read", () => {
+    expect(method(`return use(k);`).skeleton).toEqual(["ref:use"]);
+  });
+
+  it("describes an element read argument as opaque, as Ruby describes h[k]", () => {
+    expect(method(`use(h[k]);`).callArgs![0].args).toEqual(["?"]);
+    expect(method(`use(hashAref(h, k));`).callArgs![0].args).toEqual(["call:hashAref"]);
+    expect(method(`use(h.k);`).callArgs![0].args).toEqual(["call:k"]);
   });
 });
 
