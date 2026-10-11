@@ -6182,8 +6182,6 @@ describe("@missingRailsCall extraction", () => {
 const nativeForms = (m: MethodInfo): Set<string> =>
   partitionNegatedCalls(m.calls ?? []).nativeForms;
 
-// RFC 0190. The Ruby half of each pair — the receiver kinds and names — is what
-// extract-ruby-api.test.ts shows the Ruby extractor recording for the call.
 describe("a native hash form credits the Hash call it ports", () => {
   const credited = (
     rubyCall: string,
@@ -6313,9 +6311,6 @@ describe("a native hash form credits the Hash call it ports", () => {
   });
 });
 
-// RFC 0190: native element access is the default port of Hash#[] / Hash#[]=.
-// Neither extractor records a call for it, so no gate tells it from a
-// hashAref / hashAset call; the skeleton token is the only trace of the read.
 describe("native element access as the port of Hash#[] / Hash#[]=", () => {
   const method = (body: string): MethodInfo =>
     extractFromSource(

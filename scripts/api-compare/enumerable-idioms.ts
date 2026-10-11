@@ -480,8 +480,6 @@ export const SKELETON_IDIOM_LOWERINGS = new Map<string, readonly (readonly strin
   // an in-place removal, so the port loops and splices under a guard.
   // Part of audit row 35.
   ["delete_if", [[], ["loop", "if"]]],
-  // `keep_if` is `delete_if` with the block's answer inverted
-  // (`vendor/ruby/v3.3.11/hash.c:2844`), so it lowers the same way.
   ["keep_if", [[], ["loop", "if"]]],
   ["reject!", [[], ["loop", "if"]]],
   // `@records.concat @lazy_enrollment_records.values`
