@@ -201,6 +201,13 @@ export function constantize(camelCasedWord: string): unknown {
         ? (receiver as Record<string, unknown>)[segments[i - 1]]
         : undefined;
     if (value === undefined) {
+      const { constMissing } = (receiver ?? {}) as {
+        constMissing?: (name: string) => unknown;
+      };
+      if (constMissing !== undefined) {
+        receiver = constMissing.call(receiver, segments[i - 1]);
+        continue;
+      }
       throw new NameError(`uninitialized constant ${key}`, segments[i - 1], { receiver });
     }
     receiver = value;

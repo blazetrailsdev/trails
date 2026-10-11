@@ -102,22 +102,6 @@
     "reason": "Rails wraps the AR object in Class.new(SimpleDelegator) and where() unwraps it via the delegator protocol (relations_test.rb:835-847). No idiomatic JS analog: a Proxy could forward method_missing, but the bespoke query-builder unwrapping isn't warranted for this niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched by a plain-object trails test, so it stays counted — its delegation behavior is untested.)"
   },
   {
-    "testFile": "associations/has_one_associations_test.rb",
-    "tests": [
-      "has one proxy should not respond to private methods",
-      "has one proxy should respond to private methods via send"
-    ],
-    "reason": "Ruby private-method visibility / `send` private dispatch on association proxies has no TypeScript runtime equivalent."
-  },
-  {
-    "testFile": "associations/has_one_through_associations_test.rb",
-    "tests": [
-      "has one through proxy should not respond to private methods",
-      "has one through proxy should respond to private methods via send"
-    ],
-    "reason": "Ruby private-method visibility / `send` private dispatch on association proxies has no TypeScript runtime equivalent."
-  },
-  {
     "testFile": "scoping/default_scoping_test.rb",
     "tests": ["default scoping with threads", "default scope is threadsafe"],
     "reason": "Real OS threads (Thread.new / Concurrent::CyclicBarrier); no single-threaded Node.js equivalent."
@@ -146,11 +130,6 @@
     "testFile": "inherited_test.rb",
     "tests": ["super before filter attributes", "super after filter attributes"],
     "reason": "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts)."
-  },
-  {
-    "testFile": "tasks/database_tasks_test.rb",
-    "tests": ["raises an error when called with protected environment which name is a symbol"],
-    "reason": "Ruby Symbol env names (symbol→string coercion in protected_environments); env names are plain strings in TS."
   },
   {
     "testFile": "scoping/named_scoping_test.rb",
@@ -341,21 +320,6 @@
     "reason": "Decrypts a ciphertext minted before message metadata existed (message_encryptor_test.rb:147-154). The plaintext is the Ruby Marshal payload `\\x04\\x08I\"\\x12Ruby on Rails\\x06:\\x06ET` — an ivar-wrapped Ruby String — so passing it requires a real Ruby Marshal wire reader. trails has no Ruby Marshal runtime: the `:marshal` serializer in messages/serializer-with-fallback.ts is a trails-native codec behind Rails' `\\x04\\x08` signature, matching the project-wide Marshal exclusion above (marshalling.rb / marshal_serialization_test.rb). Ruby-only wire format."
   },
   {
-    "testFile": "associations/extension_test.rb",
-    "tests": ["marshalling extensions", "marshalling named extensions"],
-    "reason": "Marshal.dump/load round-trip of an AR record carrying an extended association proxy (extension_test.rb:46-65). Ruby Marshal binary serialization has no Node.js equivalent."
-  },
-  {
-    "testFile": "associations/has_many_through_associations_test.rb",
-    "tests": ["marshal dump"],
-    "reason": "Marshal.load(Marshal.dump(preloaded)) of a loaded has-many-through collection. Ruby Marshal binary serialization has no Node.js equivalent."
-  },
-  {
-    "testFile": "associations/has_one_associations_test.rb",
-    "tests": ["can marshal has one association with nil target"],
-    "reason": "Marshal.load(Marshal.dump(firm)) of an AR record with a loaded has-one association cache. Ruby Marshal binary serialization has no Node.js equivalent."
-  },
-  {
     "testFile": "associations_test.rb",
     "tests": ["pretty print does not reload a not yet loaded target"],
     "reason": "Uses Ruby's PP.pp / pretty_print over a not-yet-loaded collection proxy (associations_test.rb). Ruby's pretty-printer has no Node.js equivalent; the inspect-without-reload behavior is covered by the inspect test."
@@ -428,11 +392,6 @@
     "testFile": "adapters/postgresql/statement_pool_test.rb",
     "tests": ["cache is per pid"],
     "reason": "Forks a child process and asserts the statement cache is keyed per pid (statement_pool_test.rb:27-40, guarded by Process.respond_to?(:fork)). Process forking has no Node.js equivalent."
-  },
-  {
-    "testFile": "database_configurations/resolver_test.rb",
-    "tests": ["url missing scheme"],
-    "reason": "DIVERGES (documented): Rails parses every string config arg as a URL and raises InvalidConfigurationError for a bare `\"foo\"`; Trails treats non-URL strings as environment-name lookups (the role Ruby Symbols play in Rails), so `\"foo\"` is a missing-env lookup, not a malformed URL. See packages/activerecord/src/database-configurations/resolver.test.ts."
   },
   {
     "pattern": "tools.rb",
@@ -639,15 +598,6 @@
     "className": "AdapterConnectionTest",
     "tests": ["transaction restores after remote disconnection"],
     "reason": "These tests call the `remote_disconnect` helper, which only supports PostgreSQL and Mysql2/Trilogy — its `else` branch is `skip(\"remote_disconnect unsupported\")`, so Rails never runs them on SQLite. A genuine remote disconnect cannot be simulated against in-memory SQLite (closing the handle discards the database), which is also why the surrounding suite is gated `unless in_memory_db?`. Trails always uses :memory: SQLite."
-  },
-  {
-    "testFile": "reflection_test.rb",
-    "tests": [
-      "symbol for class name",
-      "name error from incidental code is not converted to name error for association",
-      "automatic inverse does not suppress name error from incidental code"
-    ],
-    "reason": "Ruby Symbol type for class_name and const_missing hook for NameError discrimination have no JavaScript equivalent."
   },
   {
     "testFile": "serialized_attribute_test.rb",

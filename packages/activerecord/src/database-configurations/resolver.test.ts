@@ -1,7 +1,7 @@
 import { assertRaises } from "@blazetrails/activesupport";
 import { describe, it, expect } from "vitest";
 import { TypeError } from "@blazetrails/ruby-compat";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { DatabaseConfigurations, InvalidConfigurationError } from "../database-configurations.js";
 import type { RawConfigurations } from "../database-configurations.js";
 import { AdapterNotFound } from "../errors.js";
 import "../connection-handling.js";
@@ -84,7 +84,11 @@ describe("PoolConfig", () => {
       });
     });
 
-    it.skip("url missing scheme", () => {});
+    it("url missing scheme", async () => {
+      await assertRaises([InvalidConfigurationError], {}, () => {
+        resolveDbConfig("foo");
+      });
+    });
 
     it("url host db", () => {
       const poolConfig = resolveDbConfig("abstract://foo/bar?encoding=utf8");

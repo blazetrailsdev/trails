@@ -162,9 +162,73 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
     },
   );
 
-  it.skip("raises an error when called with protected environment which name is a symbol", () => {
-    // PERMANENT-SKIP: Ruby-only (Symbol env names) — protected_environments
-  });
+  it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
+    "raises an error when called with protected environment which name is a symbol",
+    async () => {
+      const protectedEnvironments = Base.protectedEnvironments;
+      const currentEnv = DatabaseTasks.env.toString();
+      const env = "arunit";
+      const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-protected-env-"));
+      const dbFile = path.join(tmp, "primary.sqlite3");
+      Base.configurations({
+        [env]: { primary: { adapter: "sqlite3", database: dbFile } },
+      });
+      DatabaseTasks.registerTask(
+        "sqlite",
+        class {
+          async create(): Promise<void> {}
+        },
+      );
+
+      const { BetterSQLite3Adapter } =
+        await import("../connection-adapters/better-sqlite3-adapter.js");
+      const adapter = new BetterSQLite3Adapter({ database: dbFile });
+      try {
+        await adapter.execute(
+          "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
+        );
+        await adapter.execute("INSERT INTO schema_migrations (version) VALUES ('1')");
+        await adapter.execute(
+          "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
+        );
+        await adapter.execute(
+          `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${currentEnv}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        );
+      } finally {
+        await adapter.disconnectBang();
+      }
+
+      try {
+        await assertCalledOnInstanceOf(
+          MigrationContext,
+          "currentVersion",
+          null,
+          { times: 6, returns: 1 },
+          async () => {
+            expect(protectedEnvironments).not.toContain(currentEnv);
+            await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+
+            Base.protectedEnvironments = [currentEnv];
+
+            await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
+              ProtectedEnvironmentError,
+            );
+          },
+        );
+      } finally {
+        Base.protectedEnvironments = protectedEnvironments;
+        const cleanup = new BetterSQLite3Adapter({ database: dbFile });
+
+        await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
+
+        await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
+        await cleanup.disconnectBang();
+        Base.configurations(originalConfigurations);
+        resetRegisteredTasks();
+        fs.rmSync(tmp, { recursive: true, force: true });
+      }
+    },
+  );
 
   it("raises an error if no migrations have been made", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-no-env-"));
