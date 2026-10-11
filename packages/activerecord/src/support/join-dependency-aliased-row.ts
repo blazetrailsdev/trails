@@ -5,6 +5,7 @@ import type { JoinPart } from "../associations/join-dependency/join-part.js";
 interface AliasReadableJoinDependency {
   aliases(): { columnAlias(node: JoinPart | null, column: string): string | undefined };
   joinRoot: JoinPart;
+  _joinRootAlias?: boolean;
 }
 
 function findNodeByPath(root: JoinPart, path: string | null): JoinPart | null {
@@ -25,6 +26,7 @@ export function aliasedRow(
   spec: Record<string, Record<string, unknown>>,
 ): Record<string, unknown> {
   const inner = jd as unknown as AliasReadableJoinDependency;
+  if (inner._joinRootAlias === undefined) jd.applyColumnAliases(jd.baseKlass.all());
   const aliases = inner.aliases();
   const row: Record<string, unknown> = {};
   for (const [path, columns] of Object.entries(spec)) {

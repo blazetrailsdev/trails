@@ -1,14 +1,14 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
+import { Base } from "../base.js";
 
 describe("DatabaseTasksRaiseForMultiDbTest", () => {
   afterEach(() => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
   });
 
   it("lists every namespaced task as a sentence", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       storyenv: {
         primary: { adapter: "sqlite3", database: "primary.sqlite3" },
         animals: { adapter: "sqlite3", database: "animals.sqlite3" },
@@ -22,7 +22,7 @@ describe("DatabaseTasksRaiseForMultiDbTest", () => {
   });
 
   it("does not raise for a single database", () => {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       storyenv: { primary: { adapter: "sqlite3", database: "primary.sqlite3" } },
     });
 

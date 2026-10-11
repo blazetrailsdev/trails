@@ -693,11 +693,13 @@ export class Base extends Model {
     ) {
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
+    const promise = state._schemaLoadPromise;
     try {
-      await state._schemaLoadPromise;
-    } catch (e) {
-      state._schemaLoadPromise = undefined;
-      throw e;
+      await promise;
+    } finally {
+      if (!ModelSchema.isSchemaLoaded.call(this as never) && state._schemaLoadPromise === promise) {
+        state._schemaLoadPromise = undefined;
+      }
     }
   }
 
@@ -1199,6 +1201,7 @@ export class Base extends Model {
 
   declare static update: typeof _Persistence.ClassMethods.update;
   declare static updateBang: typeof _Persistence.ClassMethods.updateBang;
+  declare static queryConstraintsList: typeof _Persistence.queryConstraintsList;
 
   static createOrFindBy<T extends typeof Base>(
     this: T,

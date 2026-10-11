@@ -5,9 +5,11 @@ import {
   fetch,
   first,
   type Hash,
+  hashAref,
   KeyError,
   last,
   rbEqual,
+  rbInspect,
   transformValues,
 } from "@blazetrails/ruby-compat";
 import { FutureResult, type Complete } from "./future-result.js";
@@ -47,17 +49,23 @@ export class IndexedRow {
     return Object.prototype.hasOwnProperty.call(this.columnIndexes, column);
   }
 
-  get(column: string): unknown {
-    const i = this.columnIndexes[column];
-    return i === undefined ? undefined : this.row[i];
+  fetch(column: string, block?: () => unknown): unknown {
+    let index;
+    if ((index = hashAref(this.columnIndexes, column) as number | null) != null) {
+      return this.row[index];
+    } else if (block) {
+      return block();
+    } else {
+      throw new KeyError(`key not found: ${rbInspect(column)}`);
+    }
   }
 
-  fetch(column: string, fallback?: () => unknown): unknown {
-    if (Object.prototype.hasOwnProperty.call(this.columnIndexes, column)) {
-      return this.row[this.columnIndexes[column]];
+  get(column: string): unknown {
+    let index;
+    if ((index = hashAref(this.columnIndexes, column) as number | null) != null) {
+      return this.row[index];
     }
-    if (fallback) return fallback();
-    throw new KeyError(`key not found: "${column}"`);
+    return null;
   }
 
   toH(): Record<string, unknown> {

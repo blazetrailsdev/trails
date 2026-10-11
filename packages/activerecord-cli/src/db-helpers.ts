@@ -1,7 +1,7 @@
 import { join, resolve } from "path";
 import { File } from "@blazetrails/ruby-compat";
 import { getEnv, presence } from "@blazetrails/activesupport";
-import { DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
+import { Base, DatabaseTasks, DatabaseConfigurations, Migrator } from "@blazetrails/activerecord";
 import { establishEnvironmentConnection, normalizeSqlitePaths } from "./environment.js";
 
 export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigurations> {
@@ -14,6 +14,9 @@ export async function loadDatabaseConfig(cwd: string): Promise<DatabaseConfigura
   const raw = mod.default ?? mod;
   const configs = normalizeSqlitePaths(new DatabaseConfigurations(raw), cwd);
   DatabaseTasks.databaseConfiguration = configs;
+  if (Base.configurations().empty) {
+    Base.configurations(DatabaseTasks.databaseConfiguration);
+  }
   DatabaseTasks.root = cwd;
   DatabaseTasks.dbDir = resolve(join(cwd, "db"));
   Migrator.migrationsPaths = DatabaseTasks.migrationsPaths.map((p) => resolve(join(cwd, p)));

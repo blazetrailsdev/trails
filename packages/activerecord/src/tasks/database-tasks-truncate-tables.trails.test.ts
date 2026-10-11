@@ -13,7 +13,7 @@ describe("DatabaseTasksTruncateTablesTest", () => {
   const created: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {

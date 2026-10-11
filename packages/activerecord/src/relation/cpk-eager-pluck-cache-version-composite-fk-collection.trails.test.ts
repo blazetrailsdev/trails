@@ -28,7 +28,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("eagerLoad('chapters') builds a composite FK↔PK tuple JOIN node", () => {
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       "chapters",
       Nodes.OuterJoin,
     );
@@ -38,7 +38,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("eagerLoad('order') builds a composite-FK belongsTo JOIN node", () => {
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       "order",
       Nodes.OuterJoin,
     );
@@ -100,7 +100,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     await seedBooks();
     const jd = new JoinDependency(
       CpkBook as unknown as typeof Base,
-      null,
+      CpkBook.arelTable,
       { chapters: "book" },
       Nodes.OuterJoin,
     );

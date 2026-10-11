@@ -4,7 +4,6 @@ import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
-import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import { schemaFormat, setSchemaFormat } from "../active-record.js";
 
@@ -14,7 +13,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
-    DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     try {
       await Base.removeConnection();
     } catch {
@@ -24,7 +23,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   });
 
   async function connectTo(database: string): Promise<void> {
-    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+    Base.configurations({
       [DatabaseTasks.env.toString()]: {
         primary: {
           adapter: "sqlite3",

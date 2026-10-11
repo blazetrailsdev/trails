@@ -33,6 +33,7 @@ describe("ArEnvironmentTest", () => {
       /** @empty */
     }
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
   });
 
   it("returns null when the environment has no configuration", () => {

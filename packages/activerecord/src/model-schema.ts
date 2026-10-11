@@ -637,7 +637,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (!Object.prototype.hasOwnProperty.call(this, "_primaryKey")) {
     (this as unknown as typeof Base).resetPrimaryKey();
   }
-  this.loadSchemaBang();
+  loadSchema.call(this);
 }
 
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {

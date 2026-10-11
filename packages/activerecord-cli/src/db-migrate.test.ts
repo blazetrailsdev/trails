@@ -62,6 +62,7 @@ describe("DbMigrateTest", () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
     DatabaseTasks.databaseConfiguration = null;
+    Base.configurations({});
     (DatabaseTasks as unknown as { _root: null })._root = null;
     DatabaseTasks.seedLoader = null;
   });
