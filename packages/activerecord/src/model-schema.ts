@@ -594,6 +594,7 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  *
  * @internal
  * @noRailsEquivalent CONVERGEABLE the async half of ModelSchema#load_schema! (model_schema.rb:587), which Ruby reaches synchronously through the schema cache.
+ * @inventedArm try — CONVERGEABLE load-schema-from-adapter-swallows-every-error-on-its-checkout-arm
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
