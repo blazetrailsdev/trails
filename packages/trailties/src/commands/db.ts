@@ -23,6 +23,7 @@ import {
   InternalMetadata,
   MigrationContext,
   Migrator,
+  NoDatabaseError,
   SchemaMigration,
   UrlConfig,
   dumpSchemaAfterMigration,
@@ -294,7 +295,7 @@ function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): Migratio
 
 interface MigrateStateBefore {
   schemaFileToLoad: string | null;
-  pendingBefore: number;
+  upToDate: boolean;
 }
 
 async function captureMigrateState(
@@ -311,15 +312,16 @@ async function captureMigrateState(
       const migrationContext = migrationContextFor(adapter, dirs);
       if (await new SchemaMigration(adapter.pool).tableExists()) {
         const pending = await migrationContext.open().pendingMigrations();
-        return { schemaFileToLoad: null, pendingBefore: pending.length };
+        return { schemaFileToLoad: null, upToDate: pending.length === 0 };
       }
       return {
         schemaFileToLoad: schemaFile,
-        pendingBefore: schemaFile != null ? 0 : migrationContext.migrations.length,
+        upToDate: schemaFile == null && migrationContext.migrations.length === 0,
       };
     });
-  } catch {
-    return { schemaFileToLoad: schemaFile, pendingBefore: 0 };
+  } catch (error) {
+    if (!(error instanceof NoDatabaseError)) throw error;
+    return { schemaFileToLoad: schemaFile, upToDate: false };
   }
 }
 
@@ -332,7 +334,7 @@ function reportMigrateOutcome(
     console.log(`${prefix}Loaded schema from ${before.schemaFileToLoad}`);
     return;
   }
-  if (before.pendingBefore === 0 && pendingAfter === 0) {
+  if (before.upToDate && pendingAfter === 0) {
     console.log(`${prefix}All migrations are up to date.`);
   }
 }
@@ -378,6 +380,7 @@ async function structureLoadReachesDatabase(
 
 let _seedImportCounter = 0;
 async function runSeed(prefix = ""): Promise<void> {
+  await bootApplicationBang();
   const fs = getFs();
   const path = getPath();
   const cwd = fs.cwd();
@@ -395,7 +398,6 @@ async function runSeed(prefix = ""): Promise<void> {
   }
 
   console.log(`${prefix}Running seeds...`);
-  await bootApplicationBang();
   const pathToFileURL = path.pathToFileURL;
   if (!pathToFileURL) {
     throw new Error("Seed loading requires a path adapter with pathToFileURL support.");
@@ -996,9 +998,8 @@ export function dbCommand(): Command {
     .action(async () => {
       const envName = DatabaseTasks.env.toString();
       const named = await loadAllDatabaseConfigs(envName);
-      const configs = named.map(
-        ({ name, config }) =>
-          buildHashConfig(envName, name, normalizeRawConfig(config)),
+      const configs = named.map(({ name, config }) =>
+        buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
@@ -1021,9 +1022,8 @@ export function dbCommand(): Command {
       const fs = getFs();
       const envName = DatabaseTasks.env.toString();
       const named = await loadAllDatabaseConfigs(envName);
-      const configs = named.map(
-        ({ name, config }) =>
-          buildHashConfig(envName, name, normalizeRawConfig(config)),
+      const configs = named.map(({ name, config }) =>
+        buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
