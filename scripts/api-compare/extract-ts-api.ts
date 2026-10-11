@@ -6825,7 +6825,7 @@ function collectCalls(
       }
     }
   }
-  if (names.size === 0) return undefined;
+  if (names.size === 0 && hashForms.size === 0) return undefined;
   return [...names, ...hashForms];
 }
 

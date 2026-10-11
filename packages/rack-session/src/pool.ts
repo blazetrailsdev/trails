@@ -19,10 +19,7 @@ export class Pool extends PersistedSecure {
 
   protected allowFallback: unknown;
 
-  /**
-   * @missingRailsCall new — PERMANENT
-   * @missingRailsCall delete — PERMANENT
-   */
+  /** @missingRailsCall new — PERMANENT */
   constructor(app?: RackApp, options: Record<string, unknown> = {}) {
     super(app, options);
     this.pool = {};
@@ -30,10 +27,7 @@ export class Pool extends PersistedSecure {
     delete this.defaultOptions["allowFallback"];
   }
 
-  /**
-   * @missingRailsCall key? — PERMANENT
-   * @missingRailsArgs super(*args) — PERMANENT
-   */
+  /** @missingRailsArgs super(*args) — PERMANENT */
   override generateSid({ useMutex: _useMutex = true }: { useMutex?: boolean } = {}): SessionId {
     for (;;) {
       const sid = super.generateSid();
@@ -66,7 +60,6 @@ export class Pool extends PersistedSecure {
     return sessionId;
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   override deleteSession(
     _req: PersistedRequest,
     sessionId: SessionId,

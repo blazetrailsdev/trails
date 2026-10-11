@@ -299,6 +299,8 @@ describe("sameFileHelperSkeletons", () => {
     expect(
       foldSkeletonTokens(["ref:each", "ref:save", "ref:delete_if"], "ruby", ["loop", "if"]),
     ).toEqual(["loop", "ref:save"]);
+    expect(foldSkeletonTokens(["ref:keep_if"], "ruby", ["loop", "if"])).toEqual(["loop", "if"]);
+    expect(foldSkeletonTokens(["ref:keep_if"], "ruby", [])).toEqual([]);
   });
 
   it("credits one of two identical idioms when the counterpart shows one surplus arm", () => {

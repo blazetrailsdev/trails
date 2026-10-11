@@ -299,12 +299,14 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // justified by the non-call construct it becomes.
 //
 // A name qualifies ONLY because no JS call form exists at all. There is no
-// second group any more: `key?` / `has_key?` sat here because the only JS call
-// form was `Map#has` and a ported options hash is an object literal, whose
-// membership test was the `in` operator or `x.k !== undefined` — a shape the
-// gate cannot tell from a dropped guard. `@blazetrails/ruby-compat`'s `hasKey`
-// (the port of `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:3671`) is that missing
-// call form, so RFC 0129 discharged both entries and the ports call it.
+// second group any more: `key?` / `has_key?` sat here until RFC 0129 discharged
+// them, and they stay in the comparison. Two things satisfy one now: a call of
+// `@blazetrails/ruby-compat`'s `hasKey` (the port of `rb_hash_has_key`,
+// `vendor/ruby/v3.3.11/hash.c:3671`), or the `in` operator / `Object.hasOwn` on
+// the receiver the Ruby site names, which the extractor marks and
+// `NATIVE_FORM_ANALOGUES` (enumerable-idioms.ts) credits for that one body
+// (RFC 0190). A membership test on any other receiver, or none at all, is the
+// dropped guard and still flags.
 //
 // `catch` left the same way: `kernelCatch` (`ruby-compat/src/kernel-catch.ts`)
 // is the call form Ruby's `Kernel#catch` ports onto.
@@ -327,8 +329,11 @@ function idiomSurplus(skeleton: readonly string[], counterpart: readonly string[
 // distinction, so suppressing them would make a TS port that rewrites a relation
 // `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
 // permanently invisible to the gate — exactly the fidelity gap it exists to
-// catch. Same reason `delete` (Map#delete), `merge`, `fetch` — all real JS call
-// forms — stay in.
+// catch. `delete`, `merge`, `merge!` and `fetch` stay in the comparison too.
+// `fetch` is satisfied by a call only. The other three are also satisfied by a
+// marked native form on the receiver the Ruby site names (`delete h[k]`,
+// `{ ...h, ...other }`, `Object.assign(h, other)`; RFC 0190): unlike `.length`
+// and `[0]`, none of those forms is a spelling anyone gives a Relation call.
 //
 // MEASURED, 2026-08-08 (RFC 0092 `positional-idiom-analogues`): the question
 // "can the comparator tell an Array/Hash receiver from a Relation/association
@@ -857,8 +862,10 @@ function hasNativeFormAnalogue(
   if (analogue.receivers === "implicit-self") return kinds === undefined;
   const uncredited = analogue.uncreditedKinds ?? LENGTH_READ_UNCREDITED_RECEIVER_KINDS;
   if (kinds === undefined || kinds.some((k) => uncredited.has(k))) return false;
+  const credited = analogue.creditedKinds;
+  if (credited !== undefined && !kinds.every((k) => credited.has(k))) return false;
   const names = receiverNames?.[value] ?? [];
-  if (analogue.form === "invoke" && names.length === 0) return false;
+  if (analogue.named === true && names.length === 0) return false;
   return names.every((name) =>
     name.split("|").some((operand) => {
       const bare = operand.replace(/^@+/, "");

@@ -2921,8 +2921,12 @@ class ApiExtractor
 
   # The calls whose non-`array` receivers `callReceiverNames` records, read by
   # compare.ts's native-form credits: the `.length` read for `size` / `length`,
-  # and the direct invocation of a Proc-valued receiver for `call`.
-  RECEIVER_NAMED_CALLS = %w[size length call].freeze
+  # the direct invocation of a Proc-valued receiver for `call`, and the native
+  # Hash forms (`in`, `delete`, `Object.assign`, a spread, an `Object.entries`
+  # loop) for the Hash calls each one ports.
+  RECEIVER_NAMED_CALLS = %w[
+    size length call key? has_key? include? member? delete merge! update merge each_pair
+  ].freeze
 
   # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
   # relation/delegation.rb:79-83): Ripper never parses the string, so the calls

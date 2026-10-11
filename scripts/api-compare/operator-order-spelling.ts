@@ -77,9 +77,13 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
   // attribute_set/builder.rb:110 `def [](key)` → builder.ts
-  // `LazyAttributeHash#get`, and :114 `def []=(key, value)` → `set`, the names
-  // ruby-compat's `hashAref` / `hashAset` send a non-Hash receiver's `[]` /
-  // `[]=` to. The class is declared at
+  // `LazyAttributeHash#get`, and :114 `def []=(key, value)` → `set`. Native
+  // element access (`h[k]`, `h.k`, `h[k] = v`) is the default port of a Hash
+  // `[]` / `[]=` (RFC 0190): both extractors record it as `ref:get` /
+  // `assign:computed`, and no gate tells it from a `hashAref` / `hashAset`
+  // call. Those two helpers are the DISPATCHING form, for a receiver that may
+  // be this class or another non-Hash one, whose `[]` / `[]=` they send to
+  // `get` / `set`. The class is declared at
   // builder.rb:94 directly under `module ActiveModel`, so its fqn is NOT nested
   // under `AttributeSet`. :134 `def ==(other)` → `equals`.
   "ActiveModel::LazyAttributeHash": {

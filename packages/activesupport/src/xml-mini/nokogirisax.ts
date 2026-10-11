@@ -92,7 +92,6 @@ export class HashBuilder {
     this._hashStack.push(newHash);
   }
 
-  /** @missingRailsCall delete — PERMANENT */
   endElement(_name: string): void {
     const currentHash = this.currentHash;
     const length = Object.keys(currentHash).length;

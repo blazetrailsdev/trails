@@ -3750,6 +3750,63 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     });
   });
 
+  it("names the receiver of each Hash call a native form ports", () => {
+    const fixture = {
+      "lib/active_record/hashes.rb": `
+        class Hashes
+          def call(options, other)
+            options.key?(:a)
+            @options.has_key?(:a)
+            options[:html].include?(:a)
+            { a: 1 }.member?(:a)
+            options.delete(:a)
+            @options.merge!(other)
+            options.update(other)
+            DEFAULTS.merge(options)
+            merge(other)
+            @options.each_pair { |k, v| k }
+            options.fetch(:a, 1)
+          end
+        end
+      `,
+    };
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#call"]).toEqual({
+      "key?": ["options"],
+      "has_key?": ["@options"],
+      "include?": ["html"],
+      "member?": ["?"],
+      delete: ["options"],
+      "merge!": ["@options"],
+      update: ["options"],
+      merge: ["DEFAULTS"],
+      each_pair: ["@options"],
+    });
+    expect(rubyCallReceivers(fixture)["Hashes#call"]).toMatchObject({
+      "member?": ["hash"],
+      merge: ["const", "self"],
+      each_pair: ["ivar"],
+    });
+  });
+
+  it("records Hash#[] and Hash#[]= as no call, a ref:get token and an opaque argument", () => {
+    const fixture = {
+      "lib/active_record/arefs.rb": `
+        class Arefs
+          def call(h, k, v)
+            use(h[k])
+            h[k] = v
+          end
+        end
+      `,
+    };
+    expect(rubyCallReceivers(fixture, "calls")["Arefs#call"]).toEqual(["use"]);
+    expect(rubyCallReceivers(fixture, "skeleton")["Arefs#call"]).toEqual(["ref:use", "ref:get"]);
+    expect(
+      (rubyCallReceivers(fixture, "callArgs")["Arefs#call"] as unknown as { args: string[] }[])[0]
+        .args,
+    ).toEqual(["?"]);
+  });
+
   it("names a Proc#call receiver that is a constant path, an || of names or a Symbol-keyed read", () => {
     const c = rubyCallReceivers(
       {

@@ -137,7 +137,6 @@ export abstract class Store {
   protected coder: CacheCoder;
   protected coderSupportsCompression: boolean;
 
-  /** @missingRailsCall delete — PERMANENT */
   constructor(options?: StoreOptions) {
     this.options = options ? this.validateOptions(Store.normalizeOptions({ ...options })) : {};
 
@@ -534,7 +533,6 @@ export abstract class Store {
     return entries.filter((key) => this.deleteEntry(key, options)).length;
   }
 
-  /** @missingRailsCall merge — PERMANENT */
   protected mergedOptions(callOptions?: StoreOptions): StoreOptions {
     if (!callOptions) return this.options;
 

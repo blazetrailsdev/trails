@@ -43,6 +43,7 @@ import {
 import { listJsonFiles } from "./baseline-json.js";
 import { BASELINE_DIR } from "./lint-call-mismatches.js";
 import { type RubyCompatKey, reverseRows } from "./report-ruby-compat.js";
+import { NATIVE_FORM_ANALOGUES, NATIVE_HASH_FORM_SPELLINGS } from "./enumerable-idioms.js";
 import {
   NO_REGEN_FLAG,
   artifactIsStale,
@@ -106,9 +107,12 @@ export const ENROLLED_PACKAGES: readonly string[] = [
 
 /** One row as the gate prints it — the shard key plus the export the body
  *  should have called, which is not part of the identity since one Ruby call
- *  resolves to one export. */
+ *  resolves to one export. A Hash call a native form also ports (RFC 0190)
+ *  names that form beside the export: either converges the row. */
 export function renderKey(k: RubyCompatKey): string {
-  return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call} → ${k.tsExport}`;
+  const form = NATIVE_HASH_FORM_SPELLINGS.get(NATIVE_FORM_ANALOGUES.get(k.call)?.form ?? "");
+  const native = form === undefined ? "" : ` (or \`${form}\` on the same receiver)`;
+  return `${k.package}  ${k.tsFile}  ${k.rubyName}  ${k.call} → ${k.tsExport}${native}`;
 }
 
 const enrolled = <T extends { package: string }>(rows: T[]): T[] =>
@@ -167,7 +171,8 @@ export async function main(scope: string | null = null): Promise<number> {
     console.error(`\nruby-compat call ratchet: ${added.length} NEW unconverged row(s).`);
     console.error(
       "A ported TS body hand-rolls a Ruby primitive `@blazetrails/ruby-compat` already " +
-        "exports. Import the export — or, if the deviation is justified, add the row " +
+        "exports. Import the export, or write the native form a row names — or, if the " +
+        "deviation is justified, add the row " +
         '(with a one-line reason, `kind: "rubyCompat"`) to its per-source baseline file ' +
         `under\n  ${path.relative(ROOT_DIR, BASELINE_DIR)}/  (<package>/<tsFile .ts→.json>).\n`,
     );
