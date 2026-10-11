@@ -603,6 +603,7 @@ export {
   assertEqual,
   assertNotEqual,
   message,
+  assertInstanceOf,
   assertKindOf,
   assertMatch,
   assertNoMatch,

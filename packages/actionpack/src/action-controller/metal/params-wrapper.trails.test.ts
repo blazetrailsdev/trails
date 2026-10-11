@@ -65,3 +65,20 @@ describe("ParamsWrapper.inherited", () => {
     expect(AdminsController._wrapperOptions.name).toBe("admin");
   });
 });
+
+describe("ParamsWrapper::Options", () => {
+  it("wrap_parameters computes the default model over a false model slot", () => {
+    class UsersController extends Base {}
+    UsersController.wrapParameters({ format: [":json"] });
+    UsersController._wrapperOptions.model = false;
+
+    expect(UsersController._wrapperOptions.model).toBeNull();
+  });
+
+  it("wrap_parameters computes the name over a false name", () => {
+    class UsersController extends Base {}
+    UsersController.wrapParameters({ format: [":json"], name: false });
+
+    expect(UsersController._wrapperOptions.name).toBe("user");
+  });
+});

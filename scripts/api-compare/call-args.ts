@@ -848,7 +848,19 @@ function argKeysEqual(rubyKey: string, tsKey: string): boolean {
   if (rubyKey.startsWith("kwargs{") && tsKey.startsWith("kwargs{")) {
     return kwargsKeysEqual(rubyKey, tsKey);
   }
-  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey);
+  return rubyKey === tsKey || keptSymbolColon(rubyKey, tsKey) || markedMethodName(rubyKey, tsKey);
+}
+
+/**
+ * A Symbol naming a `?` / `!` / `=` method against the TS spelling of that
+ * method: `to_enum(:transform_keys!)` (strong_parameters.rb:911) is
+ * `toEnum(this, "transformKeysBang")`, by the table {@link refKeysEqual} asks.
+ */
+function markedMethodName(rubyKey: string, tsKey: string): boolean {
+  if (!rubyKey.startsWith("str:") || !tsKey.startsWith("str:")) return false;
+  const rubyName = rubyKey.slice("str:".length);
+  if (!/^[a-z_][a-z0-9_]*[?!=]$/.test(rubyName)) return false;
+  return (rubyMethodToTsIgnoringSkip(rubyName) ?? []).includes(tsKey.slice("str:".length));
 }
 
 /**

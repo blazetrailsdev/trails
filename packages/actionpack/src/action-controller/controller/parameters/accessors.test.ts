@@ -332,24 +332,18 @@ describe("ParametersAccessorsTest", () => {
     );
   });
 
-  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
-  it.skip("transform_keys without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("transform_keys without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.transformKeys());
     assertKindOf(
       Parameters,
-      // @ts-expect-error -- the block-less arm is unported
       params.transformKeys().each((k) => k),
     );
   });
 
-  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
-  it.skip("transform_keys! without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("transform_keys! without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.transformKeysBang());
     assertKindOf(
       Parameters,
-      // @ts-expect-error -- the block-less arm is unported
       params.transformKeysBang().each((k) => k),
     );
   });
@@ -391,13 +385,10 @@ describe("ParametersAccessorsTest", () => {
     });
   });
 
-  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
-  it.skip("transform_values without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("transform_values without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.transformValues());
     assertKindOf(
       Parameters,
-      // @ts-expect-error -- the block-less arm is unported
       params.transformValues().each((v) => v),
     );
   });
@@ -406,13 +397,10 @@ describe("ParametersAccessorsTest", () => {
     params.transformValuesBang((value) => assertKindOf(Parameters, value));
   });
 
-  // BLOCKED: parameters-transform-keys-and-values-have-no-enumerator-arm
-  it.skip("transform_values! without a block returns an enumerator", () => {
-    // @ts-expect-error -- the block-less arm is unported
+  it("transform_values! without a block returns an enumerator", () => {
     assertKindOf(Enumerator, params.transformValuesBang());
     assertKindOf(
       Parameters,
-      // @ts-expect-error -- the block-less arm is unported
       params.transformValuesBang().each((v) => v),
     );
   });
