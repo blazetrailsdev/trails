@@ -268,6 +268,13 @@ export const rbCString = rbDefineClass("String");
  */
 export const rbCSymbol = rbDefineClass("Symbol");
 
+Object.assign(rbCSymbol.prototype, {
+  /** `rb_sym_to_s` (`vendor/ruby/v3.3.11/string.c:11734`). */
+  toS(this: string): string {
+    return symbolToS(this);
+  },
+});
+
 /**
  * `rb_cTime` (`vendor/ruby/v3.3.11/time.c:5832`).
  * @noRailsEquivalent PERMANENT
@@ -925,6 +932,10 @@ function sendInternal(argc: number, argv: [unknown, ...unknown[]], recv: unknown
   }
   const bound = temporalMethod(recv, mid);
   if (bound !== undefined) return bound(recv, ...args);
+  if (isSymbol(recv)) {
+    const method = Object.getOwnPropertyDescriptor(rbCSymbol.prototype, mid)?.value;
+    if (typeof method === "function") return (method as AnyFunction).apply(recv, args);
+  }
   if (typeof recv === "string" && Object.hasOwn(STRING_METHOD_TABLE, mid)) {
     return rbStrSend(recv, mid, ...args)[0];
   }

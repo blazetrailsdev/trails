@@ -12,6 +12,7 @@ import {
   rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
+  rbCSymbol,
   rbClassInheritedP,
   rbClassOf,
   rbFSend,
@@ -46,6 +47,8 @@ export class Packer<Io = unknown> {
   private readonly extRegistryCache: PackerExtRegistry = new Map();
   /** @internal */
   hasBigintExtType = false;
+  /** @internal */
+  hasSymbolExtType = false;
   readonly buffer: Buffer;
 
   constructor(io: unknown = null, options: object | null = null) {
@@ -122,8 +125,8 @@ export class Packer<Io = unknown> {
       this.buffer.write(floatEncoder.encodeSharedRef(v.valueOf()));
     } else if (typeof v === "bigint") {
       this.writeBignumValue(v);
-    } else if (!this.tryWriteWithExtTypeLookup(v)) {
-      rbFSend(v, "toMsgpack", this);
+    } else {
+      this.writeOtherValue(v);
     }
     return this;
   }
@@ -201,7 +204,7 @@ export class Packer<Io = unknown> {
     if (!isSymbol(obj)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Symbol)`);
     }
-    this.buffer.write(encoder.encodeSharedRef(symbolToS(obj)));
+    this.writeSymbolValue(obj);
     return this;
   }
 
@@ -367,6 +370,11 @@ export class Packer<Io = unknown> {
 
     this.extRegistryCache.clear();
     this.extRegistry.set(klass, [type, proc, 0]);
+
+    if (klass === rbCSymbol) {
+      this.hasSymbolExtType = true;
+    }
+
     return null;
   }
 
@@ -382,6 +390,18 @@ export class Packer<Io = unknown> {
     for (const [key, value] of pairs) {
       this.write(key);
       this.write(value);
+    }
+  }
+
+  private writeSymbolStringValue(v: string): void {
+    this.buffer.write(encoder.encodeSharedRef(symbolToS(v)));
+  }
+
+  private writeSymbolValue(v: string): void {
+    if (this.hasSymbolExtType) {
+      this.writeOtherValue(v);
+    } else {
+      this.writeSymbolStringValue(v);
     }
   }
 
@@ -444,13 +464,13 @@ export class Packer<Io = unknown> {
   }
 
   private extRegistryLookup(instance: unknown): PackerExtType {
-    const lookupClass = rbClassOf(instance);
+    const lookupClass = isSymbol(instance) ? rbCSymbol : rbClassOf(instance);
     let type = this.extRegistryFetch(lookupClass);
     if (type?.[1] != null) {
       return type;
     }
 
-    const realClass = rbObjClass(instance);
+    const realClass = isSymbol(instance) ? rbCSymbol : rbObjClass(instance);
     if (lookupClass !== realClass) {
       type = this.extRegistryFetch(realClass);
       if (type?.[1] != null) {
@@ -466,6 +486,12 @@ export class Packer<Io = unknown> {
     }
 
     return [0, null, 0];
+  }
+
+  private writeOtherValue(v: unknown): void {
+    if (!this.tryWriteWithExtTypeLookup(v)) {
+      rbFSend(v, "toMsgpack", this);
+    }
   }
 
   private tryWriteWithExtTypeLookup(v: unknown): boolean {

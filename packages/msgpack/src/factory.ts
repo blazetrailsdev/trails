@@ -9,6 +9,7 @@ import {
   rbEnsure,
   rbFSend,
   rbCInteger,
+  rbCSymbol,
   rbClassInheritedP,
   rbInspect,
   rbModConstSet,
@@ -45,6 +46,9 @@ export class Factory {
   private pkrg: PackerExtRegistry = new Map();
   private ukrg: UnpackerExtRegistry = new Map();
   private hasBigintExtType = false;
+  private hasSymbolExtType = false;
+  private optimizedSymbolExtType = false;
+  private readonly symbolExtType = 0;
 
   registerType(
     type: number,
@@ -203,6 +207,7 @@ export class Factory {
   dup(): Factory {
     const clone = new (rbObjClass(this) as typeof Factory)();
 
+    clone.hasSymbolExtType = this.hasSymbolExtType;
     clone.ukrg = new Map(this.ukrg);
     clone.pkrg = new Map(this.pkrg);
 
@@ -223,6 +228,7 @@ export class Factory {
     packer.extRegistry.clear();
     for (const [klass, entry] of this.pkrg) packer.extRegistry.set(klass, entry);
     packer.hasBigintExtType = this.hasBigintExtType;
+    packer.hasSymbolExtType = this.hasSymbolExtType;
 
     return packer;
   }
@@ -231,6 +237,8 @@ export class Factory {
     const unpacker = new Unpacker(...argv);
 
     for (const [type, entry] of this.ukrg) unpacker.extRegistry.set(type, entry);
+    unpacker.optimizedSymbolExtType = this.optimizedSymbolExtType;
+    unpacker.symbolExtType = this.symbolExtType;
 
     return unpacker;
   }
@@ -270,6 +278,19 @@ export class Factory {
 
     if (extType < -128 || extType > 127) {
       throw new RangeError(`integer ${extType} too big to convert to \`signed char'`);
+    }
+
+    if (extModule === rbCSymbol) {
+      if (options == null || (options.packer != null && options.packer !== false)) {
+        this.hasSymbolExtType = true;
+      }
+      if (
+        options != null &&
+        options.optimizedSymbolsParsing != null &&
+        options.optimizedSymbolsParsing !== false
+      ) {
+        this.optimizedSymbolExtType = true;
+      }
     }
 
     if (options != null) {

@@ -17,6 +17,7 @@ import {
 import { Buffer } from "./buffer.js";
 import { ExtensionValue } from "./extension-value.js";
 import { MessagePack } from "./namespaces.js";
+import { fromMsgpackExt } from "./symbol.js";
 import { MSGPACK_EXT_RECURSIVE } from "./packer.js";
 
 export class UnpackError extends StandardError {}
@@ -76,6 +77,10 @@ function objectComplete(obj: unknown, freeze: boolean): unknown {
 export class Unpacker {
   /** @internal */
   readonly extRegistry: UnpackerExtRegistry = new Map();
+  /** @internal */
+  optimizedSymbolExtType = false;
+  /** @internal */
+  symbolExtType = 0;
   readonly buffer: Buffer;
   private readonly decoder: Decoder;
   /** @missingRailsCall rb_str_intern — CONVERGEABLE msgpack-unpacker-read-loop-the-engine-hides */
@@ -110,6 +115,10 @@ export class Unpacker {
       extensionCodec: {
         tryToEncode: () => null,
         decode: (data, type) => {
+          if (this.optimizedSymbolExtType && type === this.symbolExtType) {
+            return new ExtObject(fromMsgpackExt(data));
+          }
+
           const [, proc, extFlags] = this.extRegistry.get(type) ?? [null, null, 0];
           if (proc != null) {
             try {
