@@ -458,21 +458,20 @@ async function newClient(
   if (rtest(username)) connOptions.user = username;
   if (rtest(socket)) connOptions.socketPath = socket;
 
+  const names = Array.isArray(flags)
+    ? flags
+    : Object.keys(CLIENT_FLAGS).filter((name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0);
   const client = mysql2Client(
     await mysql
       .createConnection({
         supportBigNumbers: true,
         ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(
-          Array.isArray(flags)
-            ? flags
-            : Object.keys(CLIENT_FLAGS).filter(
-                (name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0,
-              ),
-        ),
+        compress: names.some((f) => f.toUpperCase() === "COMPRESS"),
+        flags: withoutDefaultIgnoreSpace(names),
       })
       .catch(driverError),
   );
+  Object.assign(client.queryOptions, config);
   client.readTimeout = readTimeout;
   return client;
 }
@@ -486,6 +485,7 @@ export const Mysql2 = {
   Client: {
     new: newClient,
     defaultQueryOptions,
+    COMPRESS: CLIENT_FLAGS.COMPRESS,
     FOUND_ROWS: CLIENT_FLAGS.FOUND_ROWS,
     MULTI_STATEMENTS: CLIENT_FLAGS.MULTI_STATEMENTS,
     OPTION_MULTI_STATEMENTS_ON: 0,

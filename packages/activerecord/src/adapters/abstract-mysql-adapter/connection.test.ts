@@ -23,7 +23,9 @@ import {
   ConnectionNotEstablished,
 } from "../../errors.js";
 import mysql from "mysql2/promise";
-import type { Mysql2Result } from "../../mysql2/client.js";
+import { Mysql2, type Mysql2Result } from "../../mysql2/client.js";
+import { Base } from "../../base.js";
+import { runWithoutConnection } from "../../support/connection-helper.js";
 import { ConnectionUrlResolver } from "../../database-configurations/connection-url-resolver.js";
 
 function clearVersionCache(adapter: Mysql2Adapter): void {
@@ -237,28 +239,23 @@ describeIfMysqlAdapter("Mysql2Adapter", () => {
       }
     });
     it("passing arbitrary flags to adapter", async () => {
-      const testAdapter = new Mysql2Adapter({ uri: MYSQL_TEST_URL, flags: 0x20 });
-      try {
-        expect((testAdapter as unknown as { _config: { flags: unknown } })._config.flags).toBe(
-          0x20 | 0x02,
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: Mysql2.Client.COMPRESS });
+        const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+        expect((await connection.rawConnection())!.queryOptions.flags).toBe(
+          Mysql2.Client.COMPRESS | Mysql2.Client.FOUND_ROWS,
         );
-      } finally {
-        await testAdapter.disconnectBang();
-      }
+      });
     });
     it("passing flags by array to adapter", async () => {
-      const testAdapter = new Mysql2Adapter({
-        uri: MYSQL_TEST_URL,
-        flags: ["COMPRESS"],
-      });
-      try {
-        expect((testAdapter as unknown as { _config: { flags: unknown } })._config.flags).toEqual([
+      await runWithoutConnection(async (origConnection) => {
+        await Base.establishConnection({ ...origConnection, flags: ["COMPRESS"] });
+        const connection = (await Base.leaseConnection()) as unknown as Mysql2Adapter;
+        expect((await connection.rawConnection())!.queryOptions.flags).toEqual([
           "COMPRESS",
           "FOUND_ROWS",
         ]);
-      } finally {
-        await testAdapter.disconnectBang();
-      }
+      });
     });
     it("mysql set session variable", async () => {
       const testAdapter = new Mysql2Adapter({
