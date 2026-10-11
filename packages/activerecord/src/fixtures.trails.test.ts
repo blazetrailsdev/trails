@@ -85,6 +85,7 @@ function makeModel(tableName: string, rows: Map<unknown, Record<string, unknown>
   return {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     loadSchema: async () => {},
     definedEnums: {},
     _reflections: {},
