@@ -532,7 +532,7 @@ function primaryKey(
   return this.column(name, type, { ...options, primaryKey: true });
 }
 
-type ColumnMethodsBase = {
+export type ColumnMethodsBase = {
   defineColumnMethods(...columnTypes: string[]): void;
   prototype: Record<string, unknown>;
 };

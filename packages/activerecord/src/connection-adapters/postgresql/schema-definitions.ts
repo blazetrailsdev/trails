@@ -6,7 +6,11 @@ import {
   Table as AbstractTable,
   AlterTable as AbstractAlterTable,
 } from "../abstract/schema-definitions.js";
-import type { ColumnOptions, ColumnType } from "../abstract/schema-definitions.js";
+import type {
+  ColumnMethodsBase,
+  ColumnOptions,
+  ColumnType,
+} from "../abstract/schema-definitions.js";
 import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js";
 import type { TableDefinitionConn } from "../abstract/schema-definitions.js";
 import { wrap } from "@blazetrails/activesupport";
@@ -104,11 +108,6 @@ function primaryKey(
 
   return ColumnMethods.superMethod(this, "primaryKey")!(name, type, options);
 }
-
-type ColumnMethodsBase = {
-  defineColumnMethods(...columnTypes: string[]): void;
-  prototype: Record<string, unknown>;
-};
 
 export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
   new Module();

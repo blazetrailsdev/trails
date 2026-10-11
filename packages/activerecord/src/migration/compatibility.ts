@@ -225,7 +225,7 @@ export class V7_0 extends V7_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V7_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V7_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -298,7 +298,7 @@ export class V6_1 extends V7_0 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V6_1.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -327,6 +327,10 @@ export class V6_0 extends V6_1 {
     raiseOnIfExistOptions(_options: Options): void {},
   });
 
+  static {
+    V6_0.TableDefinition.aliasMethod("belongsTo", "references");
+  }
+
   override async addReference(
     tableName: string,
     refName: string,
@@ -350,12 +354,10 @@ export class V6_0 extends V6_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V6_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V6_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
-
-V6_0.TableDefinition.aliasMethod("belongsTo", "references");
 
 export class V5_2 extends V6_0 {
   static override TableDefinition: Module = new Module().include({
@@ -400,14 +402,14 @@ export class V5_2 extends V6_0 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V5_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V5_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
   /** @internal */
   override async commandRecorder(): Promise<MigrationCommandRecorder> {
     const recorder = await super.commandRecorder();
-    prepend(rbObjSingletonClass(recorder) as unknown as new () => object, V5_2.CommandRecorder);
+    prepend(rbObjSingletonClass(recorder), V5_2.CommandRecorder);
     return recorder;
   }
 }
@@ -479,6 +481,10 @@ export class V5_0 extends V5_1 {
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
   });
+
+  static {
+    V5_0.TableDefinition.aliasMethod("belongsTo", "references");
+  }
 
   override async createTable(
     tableName: string,
@@ -558,12 +564,10 @@ export class V5_0 extends V5_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V5_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V5_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
-
-V5_0.TableDefinition.aliasMethod("belongsTo", "references");
 
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
@@ -586,6 +590,10 @@ export class V4_2 extends V5_0 {
     /** @internal */
     raiseOnIfExistOptions(_options: Options): void {},
   });
+
+  static {
+    V4_2.TableDefinition.aliasMethod("belongsTo", "references");
+  }
 
   override async addReference(
     tableName: string,
@@ -640,7 +648,7 @@ export class V4_2 extends V5_0 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V4_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object), V4_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
@@ -669,7 +677,5 @@ export class V4_2 extends V5_0 {
     return indexName;
   }
 }
-
-V4_2.TableDefinition.aliasMethod("belongsTo", "references");
 
 Migration.Compatibility = Compatibility;

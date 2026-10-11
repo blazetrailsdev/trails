@@ -1730,7 +1730,11 @@ function initCopyHook(
  * @noRailsEquivalent PERMANENT — a Ruby core-language primitive, which Rails
  * uses but does not define.
  */
-export function prepend(klass: AnyClass, mod: ModuleObject | AnyClass | Module): void {
+export function prepend(
+  target: AnyClass | (abstract new (...args: never) => object),
+  mod: ModuleObject | AnyClass | Module,
+): void {
+  const klass = target as AnyClass;
   const prependFeatures = featureHook(mod, "prependFeatures");
   if (prependFeatures) return prependFeatures(klass);
   if (isModuleMethodTablePresent(klass, mod)) return;

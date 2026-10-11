@@ -1134,7 +1134,11 @@ export function extractFromProgram(
       }
     });
 
-    for (const statement of sourceFile.statements) {
+    const staticBlockStatements = sourceFile.statements
+      .filter(ts.isClassDeclaration)
+      .flatMap((klass) => klass.members.filter(ts.isClassStaticBlockDeclaration))
+      .flatMap((staticBlock) => [...staticBlock.body.statements]);
+    for (const statement of [...sourceFile.statements, ...staticBlockStatements]) {
       const call = ts.isExpressionStatement(statement) ? statement.expression : undefined;
       if (!call || !ts.isCallExpression(call) || !ts.isPropertyAccessExpression(call.expression)) {
         continue;

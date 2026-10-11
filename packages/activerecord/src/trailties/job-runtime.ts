@@ -2,7 +2,7 @@ import { Module } from "@blazetrails/ruby-compat";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 /** @internal */
-export function instrument(
+function instrument(
   this: object,
   operation: string,
   payload: Record<string, unknown> = {},

@@ -4,6 +4,7 @@ import {
   Table as AbstractTable,
 } from "../abstract/schema-definitions.js";
 import type {
+  ColumnMethodsBase,
   ColumnOptions,
   ColumnType,
   IdHashOptions,
@@ -43,11 +44,6 @@ export interface ColumnMethods {
   /** @deprecated */
   unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
-
-type ColumnMethodsBase = {
-  defineColumnMethods(...columnTypes: string[]): void;
-  prototype: Record<string, unknown>;
-};
 
 export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
   new Module();
