@@ -1291,7 +1291,7 @@ type FutureResultClass = new (
 /** @internal */
 function singleValueFromRows(rows: unknown[][]): unknown {
   const row = rows[0];
-  return row ? row[0] : undefined;
+  return row == null ? null : (row[0] ?? null);
 }
 
 /** @internal */
