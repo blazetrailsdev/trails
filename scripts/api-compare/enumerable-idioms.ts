@@ -272,11 +272,11 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  * - The Hash rows (RFC 0190). A Rails option hash is a plain JS object, and JS
  *   has a callee-less form for each of these: `k in h` / `Object.hasOwn(h, k)`
  *   for `key?` / `has_key?` / `include?` / `member?` (all four are
- *   `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:7254-7258`), `delete h[k]`
- *   for `delete` (`hash.c:2372`), `Object.assign(h, other)` for `merge!` /
- *   `update` (`hash.c:3967`), `{ ...h, ...other }` for `merge` (`hash.c:4099`)
+ *   `rb_hash_has_key`, `vendor/ruby/v3.3.11/hash.c:7255-7259`), `delete h[k]`
+ *   for `delete` (`hash.c:2441`), `Object.assign(h, other)` for `merge!` /
+ *   `update` (`hash.c:4028`), `{ ...h, ...other }` for `merge` (`hash.c:4144`)
  *   and `for (const [k, v] of Object.entries(h))` for `each_pair`
- *   (`hash.c:3145`). Every row is `named`: the form credits only when each Ruby
+ *   (`hash.c:3149`). Every row is `named`: the form credits only when each Ruby
  *   site's receiver is named and the body carries the form on that name, so
  *   `@options.key?(:x)` is `"x" in this.options` and not `"x" in this.other`,
  *   and a feature probe (`"then" in value`) credits nothing. That name match is
@@ -287,7 +287,11 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  *   (`scripts/parity/ruby-compat.ts`'s `Array#include?` row), so they credit
  *   only where every site is a proven `hash`. `delete`, `merge!`, `update` and
  *   `merge` credit where no site's kind disproves a Hash, the rule
- *   `rubyCompatAliases` applies to their helpers.
+ *   `rubyCompatAliases` applies to their helpers. A site of one of those four
+ *   that passes a block never credits: the miss block of `delete`
+ *   (`hash.c:2441`) and the conflict block of `merge!` / `merge`
+ *   (`hash.c:4028`, `:4144`) have no native form, so the Ruby extractor leaves
+ *   that site's receiver unnamed.
  *   `each` on a hash has no row: {@link NO_JS_CALL_FORM} (compare.ts) already
  *   drops it for every receiver. `fetch` has none either, because JS has no
  *   form for it: `h.k ?? d` substitutes the default for a stored `nil`, which
@@ -425,6 +429,10 @@ export function partitionNegatedCalls(raw: Iterable<string>): {
  * expression, not an arm). That is what keeps the fold one-directional: it
  * credits at most the construct the port is actually showing, so it can never
  * manufacture a missing arm, only cancel an invented one.
+ *
+ * `keep_if` is `delete_if` with the block's answer inverted
+ * (`vendor/ruby/v3.3.11/hash.c:2844`, beside `rb_hash_delete_if` at `:2564`),
+ * so it carries `delete_if`'s lowering.
  *
  * A name whose port KEEPS a call is deliberately absent: `map`, `select`,
  * `sum` and friends all have a JS method a faithful port names, so folding them

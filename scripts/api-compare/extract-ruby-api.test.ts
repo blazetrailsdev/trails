@@ -3767,9 +3767,22 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             @options.each_pair { |k, v| k }
             options.fetch(:a, 1)
           end
+
+          def blocks(options, other)
+            options.delete(:a) { 1 }
+            options.merge(other) { |_k, a, _b| a }
+            options.merge!(other) do |_k, a, _b| a end
+            options.update(other) { |_k, a, _b| a }
+          end
         end
       `,
     };
+    expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#blocks"]).toEqual({
+      delete: ["?"],
+      merge: ["?"],
+      "merge!": ["?"],
+      update: ["?"],
+    });
     expect(rubyCallReceivers(fixture, "callReceiverNames")["Hashes#call"]).toEqual({
       "key?": ["options"],
       "has_key?": ["@options"],

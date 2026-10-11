@@ -2928,6 +2928,11 @@ class ApiExtractor
     size length call key? has_key? include? member? delete merge! update merge each_pair
   ].freeze
 
+  # The Hash calls whose block arm no native form ports: the miss block of
+  # `delete` and the conflict block of `merge` / `merge!` / `update`. A site
+  # passing one records its receiver as unnamed, so no form credits it.
+  BLOCK_ARM_HASH_CALLS = %w[delete merge merge! update].freeze
+
   # `module_eval` / `class_eval` given a String (`module_eval <<-RUBY … RUBY`,
   # relation/delegation.rb:79-83): Ripper never parses the string, so the calls
   # in it have no position in this body's stream. Recorded as `stringEvalCalls`
@@ -4153,7 +4158,8 @@ class ApiExtractor
       kind = (name == "new" && core_new_kind(recv, args, has_block)) || receiver_kind(recv)
       (@call_receivers[name] ||= Set.new) << kind
       if RECEIVER_NAMED_CALLS.include?(name) && recv && kind != "array"
-        (@call_receiver_names[name] ||= Set.new) << (receiver_tail_name(recv) || "?")
+        blocked = has_block && BLOCK_ARM_HASH_CALLS.include?(name)
+        (@call_receiver_names[name] ||= Set.new) << ((!blocked && receiver_tail_name(recv)) || "?")
       end
       weak << name if (recv && inert_receiver?(recv)) || core_receiver_call?(name, recv)
       if STRING_EVAL_CALLS.include?(name) && string_literal_arg?(args)
