@@ -13,6 +13,7 @@ import railsErrorParity from "./eslint/rails-error-parity.mjs";
 import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
+import inlinedFromOnlyOnConstructors from "./eslint/inlined-from-only-on-constructors.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
 import noConditionalInTest from "./eslint/no-conditional-in-test.mjs";
@@ -287,6 +288,7 @@ export default defineConfig(
           "rails-callback-invocations": railsCallbackInvocations,
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
+          "inlined-from-only-on-constructors": inlinedFromOnlyOnConstructors,
           "no-native-date": noNativeDate,
           "no-conditional-in-test": noConditionalInTest,
           "no-getter-called-as-method": noGetterCalledAsMethod,
@@ -545,6 +547,13 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-arel-tosql": "error",
+    },
+  },
+
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/inlined-from-only-on-constructors": "error",
     },
   },
 

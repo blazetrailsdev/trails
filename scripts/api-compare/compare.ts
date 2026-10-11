@@ -118,6 +118,7 @@ import {
   rubyCallToTs,
   rubyMethodToTs,
   snakeToCamel,
+  OWN_NEW_TS_CANDIDATES,
 } from "@blazetrails/parity/conventions";
 import {
   arityParams,
@@ -185,6 +186,9 @@ import {
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
 import {
+  blockRidesZsuper,
+  inlinedHookCreditedBy,
+  inlinedHookTags,
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
@@ -3438,7 +3442,11 @@ export function buildModuleIncluderFqns(
 ): Map<string, Set<string>> {
   const moduleIncluderFqns = new Map<string, Set<string>>();
   for (const { fqn, info } of entities) {
-    for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
+    for (const inc of [
+      ...(info.includes || []),
+      ...(info.extends || []),
+      ...(info.prepends || []),
+    ]) {
       const modFqn = resolveModuleName(inc, fqn, moduleFqnByShort);
       const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
       includers.add(fqn);
@@ -4574,6 +4582,7 @@ export function main() {
   const appliedInheritanceExcludes = new Set<string>();
 
   const results: PackageResult[] = [];
+  const tsInlinedHookTags = inlinedHookTags(ts, ruby);
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
@@ -5317,7 +5326,10 @@ export function main() {
             ...(rubyParamListsByName.get(rm.name) ?? []),
             rm.params,
           ]);
-          if (rm.takesBlock) {
+          if (
+            rm.takesBlock &&
+            !(rm.name === "new" && klassMethods.has(rm) && blockRidesZsuper(rm))
+          ) {
             const blockKey = `${rmLevel}|${rm.name}`;
             rubyBlockOwners.set(blockKey, [...(rubyBlockOwners.get(blockKey) ?? []), item.fqn]);
           }
@@ -5569,6 +5581,7 @@ export function main() {
             sameFile,
             `${pkg}/${tsFile} ${tsClass}#constructor`,
           ),
+          klass.classMethods.find((m) => m.name === "new"),
         );
       };
 
@@ -6197,14 +6210,39 @@ export function main() {
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
+        const ownerIsModule = Object.hasOwn(rubyPkg.modules, rubyModule);
+        const classMethodsNew =
+          rubyName === "new" &&
+          level === "class" &&
+          (
+            rubyPkg.modules[`${rubyModule}::ClassMethods`] as unknown as ClassInfo | undefined
+          )?.instanceMethods.some((m) => m.name === "new") === true;
+        const extendedInFile =
+          classMethodsNew &&
+          items.some(
+            (item) =>
+              Object.hasOwn(rubyPkg.classes, item.fqn) &&
+              [rubyModule, `${rubyModule}::ClassMethods`].some((fqn) =>
+                moduleIncluderFqns.get(fqn)?.has(item.fqn),
+              ),
+          );
+        const ownNew =
+          rubyName === "new" && level === "class" && (!ownerIsModule || extendedInFile);
         const mirrorCandidates =
-          tsMirrorNames === undefined
-            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
-            : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
+          tsMirrorNames !== undefined
+            ? scopedSkipMirrorCandidates(tsMirrorNames, tsMethods)
+            : ownNew
+              ? [...(tsMethods.has("new") ? ["new"] : []), ...OWN_NEW_TS_CANDIDATES]
+              : rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg);
         if (mirrorCandidates === null) continue;
+        const besideInitialize =
+          ownNew &&
+          (rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined)?.instanceMethods.some(
+            (m) => m.name === "initialize",
+          ) === true;
         const tsCandidates = moduleInitializeCandidates(
           rubyName,
-          Object.hasOwn(rubyPkg.modules, rubyModule),
+          ownerIsModule,
           tsMethods,
           mirrorCandidates,
         );
@@ -6263,6 +6301,7 @@ export function main() {
         if (directMatch !== undefined && COPY_HOOKS.has(rubyName)) copyHookClaims.add(directMatch);
         if (directMatch && !declOnly) {
           fileMatched++;
+          if (besideInitialize && directMatch === "constructor") continue;
           notePredicateKind(expectedTs, directMatch);
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;
           const self = `${rubyFile}#${rubyName}`;
@@ -6318,6 +6357,22 @@ export function main() {
               checkOptionKeys(rubyName, directMatch, expectedTs, other, otherLevel);
             }
           }
+          continue;
+        }
+
+        if (
+          ownerIsModule &&
+          mixinFile === undefined &&
+          (rubyName === "initialize" || classMethodsNew) &&
+          inlinedHookCreditedBy(
+            classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
+            classMethodsNew ? "new" : "initialize",
+            pkg,
+            moduleIncluderFiles.get(rubyModule) ?? new Set(),
+            tsInlinedHookTags,
+          ) !== undefined
+        ) {
+          fileMatched++;
           continue;
         }
 
