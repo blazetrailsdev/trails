@@ -310,5 +310,6 @@ Putting the names in `NO_JS_CALL_FORM` was rejected for that reason. A native
 form for `fetch` was rejected because `h.k ?? d` replaces a stored `nil`.
 `in` for every key was rejected because it walks the prototype chain, which is
 why a computed key is `Object.hasOwn`. By the same count, 76 of the 94
-`hashDelete` call lines use the removed value and 18 are a bare statement, so the helper stays there, and the RFC reports that residual
-instead of promising zero helper calls.
+`hashDelete` call lines use the removed value and 18 are a bare statement, so
+the helper stays there, and the RFC reports that residual instead of promising
+zero helper calls.
