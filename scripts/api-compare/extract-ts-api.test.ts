@@ -3198,12 +3198,18 @@ describe("extractClass — internal tagging", () => {
           return this.#addConstraints();
         }
         #addConstraints() {}
+        #block = () => {};
+        run() {
+          return this.#block();
+        }
       }
     `);
     expect(info.instanceMethods.find((m) => m.name === "addConstraints")!.visibility).toBe(
       "private",
     );
     expect(info.instanceMethods.find((m) => m.name === "scope")!.calls).toContain("addConstraints");
+    expect(info.instanceMethods.find((m) => m.name === "#block")).toBeDefined();
+    expect(info.instanceMethods.find((m) => m.name === "run")!.calls).toContain("block");
   });
 
   it("tags static private members and keeps them on classMethods", () => {
