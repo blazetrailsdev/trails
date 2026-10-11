@@ -11,6 +11,8 @@ import {
 } from "@blazetrails/ruby-compat";
 import { MessagePack } from "./namespaces.js";
 
+const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT = 512 * 1024;
+const MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM = 256;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT = 32 * 1024;
 const MSGPACK_BUFFER_IO_BUFFER_SIZE_MINIMUM = 1024;
 
@@ -65,6 +67,7 @@ export class Buffer {
   private _io: unknown = null;
   private ioPartialReadMethod = "read";
   private ioWriteAllMethod = "write";
+  private writeReferenceThreshold = MSGPACK_BUFFER_STRING_WRITE_REFERENCE_DEFAULT;
   private ioBufferSize = MSGPACK_BUFFER_IO_BUFFER_SIZE_DEFAULT;
 
   constructor(...argv: unknown[]) {
@@ -100,7 +103,12 @@ export class Buffer {
     this.ioWriteAllMethod = getWriteAllMethod(io);
 
     if (options != null) {
-      const v = (options as { ioBufferSize?: number | null }).ioBufferSize;
+      let v = (options as { writeReferenceThreshold?: number | null }).writeReferenceThreshold;
+      if (v != null) {
+        this.writeReferenceThreshold = Math.max(v, MSGPACK_BUFFER_STRING_WRITE_REFERENCE_MINIMUM);
+      }
+
+      v = (options as { ioBufferSize?: number | null }).ioBufferSize;
       if (v != null) {
         this.ioBufferSize = Math.max(v, MSGPACK_BUFFER_IO_BUFFER_SIZE_MINIMUM);
       }
@@ -121,16 +129,13 @@ export class Buffer {
   }
 
   write(string: string | Uint8Array): number {
-    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
-    if (bytes.length === 0) {
-      return 0;
-    }
-    this.chunks.push(bytes);
-    return bytes.length;
+    const length = this.appendString(string);
+
+    return length;
   }
 
   append(string: string | Uint8Array): this {
-    this.write(string);
+    this.appendString(string);
     return this;
   }
 
@@ -344,6 +349,40 @@ export class Buffer {
     this.chunks.push(ioBuffer.slice());
 
     return len;
+  }
+
+  private appendString(string: string | Uint8Array): number {
+    const bytes = typeof string === "string" ? new TextEncoder().encode(string) : string.slice();
+    const length = bytes.length;
+
+    if (length > this.writeReferenceThreshold) {
+      this.appendLongString(bytes, typeof string !== "string");
+    } else {
+      this._append(bytes);
+    }
+
+    return length;
+  }
+
+  private appendLongString(string: Uint8Array, ascii8bit: boolean): void {
+    if (this._io != null) {
+      this.flush();
+      if (ascii8bit) {
+        rbFSend(this._io, this.ioWriteAllMethod, string);
+      } else {
+        this._append(string);
+      }
+    } else {
+      this.chunks.push(string);
+    }
+  }
+
+  private _append(data: Uint8Array): void {
+    if (data.length === 0) {
+      return;
+    }
+
+    this.chunks.push(data);
   }
 
   private readUntilEof(out: Uint8Array[] | null, max: number): number {
