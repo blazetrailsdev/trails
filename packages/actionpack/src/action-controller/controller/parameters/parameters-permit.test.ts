@@ -19,7 +19,7 @@ import {
   assert,
   assertEmpty,
   assertEqual,
-  assertKindOf,
+  assertInstanceOf,
   assertMatch,
   assertNil,
   assertNot,
@@ -534,7 +534,7 @@ describe("ParametersPermitTest", () => {
   it.skip("to_h returns converted hash on permitted params", () => {
     params.permitBang();
 
-    assertKindOf(HashWithIndifferentAccess, params.toH());
+    assertInstanceOf(HashWithIndifferentAccess, params.toH());
     expect(params.toH()).not.toBeInstanceOf(Parameters);
   });
 
@@ -544,7 +544,7 @@ describe("ParametersPermitTest", () => {
       Parameters.permitAllParameters = true;
       const params = new Parameters({ crab: "Senjougahara Hitagi" });
 
-      assertKindOf(HashWithIndifferentAccess, params.toH());
+      assertInstanceOf(HashWithIndifferentAccess, params.toH());
       expect(params.toH()).not.toBeInstanceOf(Parameters);
       assertEqual({ crab: "Senjougahara Hitagi" }, params.toH());
     } finally {
@@ -561,7 +561,7 @@ describe("ParametersPermitTest", () => {
   it("to_hash returns converted hash on permitted params", () => {
     params.permitBang();
 
-    assertKindOf(Object, params.toHash());
+    assertInstanceOf(Hash, params.toHash());
     expect(params.toHash()).not.toBeInstanceOf(Parameters);
   });
 
@@ -578,7 +578,7 @@ describe("ParametersPermitTest", () => {
       Parameters.permitAllParameters = true;
       const params = new Parameters({ crab: "Senjougahara Hitagi" });
 
-      assertKindOf(Object, params.toHash());
+      assertInstanceOf(Hash, params.toHash());
       expect(params.toHash()).not.toBeInstanceOf(Parameters);
       assertEqual({ crab: "Senjougahara Hitagi" }, params.toHash());
     } finally {
@@ -588,7 +588,7 @@ describe("ParametersPermitTest", () => {
 
   // BLOCKED: parameters-to-h-returns-a-plain-object-not-hash-with-indifferent-access
   it.skip("to_unsafe_h returns unfiltered params", () => {
-    assertKindOf(HashWithIndifferentAccess, params.toUnsafeH());
+    assertInstanceOf(HashWithIndifferentAccess, params.toUnsafeH());
     expect(params.toUnsafeH()).not.toBeInstanceOf(Parameters);
   });
 
@@ -596,7 +596,7 @@ describe("ParametersPermitTest", () => {
     const params = new Parameters({ f: { language_facet: ["Tibetan"] } });
     const expected = { f: { language_facet: ["Tibetan"] } };
 
-    assertKindOf(Parameters, params.get("f"));
+    assertInstanceOf(Parameters, params.get("f"));
     assertEqual(expected, params.toUnsafeH());
   });
 

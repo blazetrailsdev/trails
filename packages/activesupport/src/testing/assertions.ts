@@ -13,6 +13,7 @@ import {
   rbAnyToS,
   rbEqual,
   rbModToS,
+  rbObjClass,
   rbObjClassname,
   rbStrRespondTo,
   regexpEscape,
@@ -790,6 +791,21 @@ function refuteNil(obj: unknown, msg: string | (() => string) | null = null): tr
 
 export function assertNotNil(obj: unknown, msg: string | (() => string) | null = null): true {
   return refuteNil(obj, msg);
+}
+
+export function assertInstanceOf(
+  cls: abstract new (...args: never) => unknown,
+  obj: unknown,
+  msg: string | (() => string) | null = null,
+): true {
+  msg = message(
+    msg,
+    null,
+    () =>
+      `Expected ${inspect(obj)} to be an instance of ${rbModToS(cls)}, not ${rbObjClassname(obj)}`,
+  );
+
+  return assert(rbObjClass(obj) === cls, msg);
 }
 
 export function assertKindOf(

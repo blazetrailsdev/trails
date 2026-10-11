@@ -10,6 +10,7 @@ import {
   rbObjDup,
   rbObjRespondTo,
   rbStrSend,
+  rtest,
   slice,
   Struct,
   toS,
@@ -66,12 +67,12 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
   ) {
     super(name, format, include, exclude, klass, model);
     this.includeSet = include != null;
-    this.nameSet = name != null && name !== false;
+    this.nameSet = rtest(name);
   }
 
   get model(): unknown {
     const model = super.model;
-    return model != null && model !== false ? model : (this.model = this._defaultWrapModel());
+    return rtest(model) ? model : (this.model = this._defaultWrapModel());
   }
 
   set model(model: unknown) {
@@ -126,7 +127,7 @@ export class Options extends Struct.new("name", "format", "include", "exclude", 
     const m = this.model as WrapModel | null;
     this.nameSet = true;
 
-    if (!((super.name != null && super.name !== false) || isAnonymous(this.klass!))) {
+    if (!(rtest(super.name) || isAnonymous(this.klass!))) {
       return (this.name =
         m != null ? underscore(demodulize(toS(m))) : singularize(this.klass!.controllerName()!));
     }
