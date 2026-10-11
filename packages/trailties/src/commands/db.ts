@@ -223,11 +223,9 @@ function inferAdapterFromUrl(url: string): string | undefined {
 }
 
 function buildHashConfig(envName: string, name: string, raw: RawConfig): HashConfig {
-  const { url, ...rest } = raw as Record<string, unknown>;
-  if (typeof url === "string" && url.length > 0 && !/^(jdbc|https?):/.test(url)) {
-    return new UrlConfig(envName, name, url, rest);
-  }
-  return new HashConfig(envName, name, raw as Record<string, unknown>);
+  const { url, ...configWithoutUrl } = raw as Record<string, unknown>;
+  if (url) return new UrlConfig(envName, name, url as string, configWithoutUrl);
+  return new HashConfig(envName, name, configWithoutUrl);
 }
 
 function toDbConfig(raw: RawConfig, envName: string = DatabaseTasks.env.toString()): HashConfig {
@@ -1000,7 +998,7 @@ export function dbCommand(): Command {
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
         ({ name, config }) =>
-          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+          buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
@@ -1025,7 +1023,7 @@ export function dbCommand(): Command {
       const named = await loadAllDatabaseConfigs(envName);
       const configs = named.map(
         ({ name, config }) =>
-          new HashConfig(envName, name, normalizeRawConfig(config) as Record<string, unknown>),
+          buildHashConfig(envName, name, normalizeRawConfig(config)),
       );
       await withRegisteredConfigurations(configs, envName, async () => {
         for (const config of DatabaseTasks.configsFor({ envName })) {
