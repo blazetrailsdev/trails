@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { FixtureResolver } from "@blazetrails/actionview";
 import { include } from "@blazetrails/activesupport";
 import { Rendering as AbstractControllerRendering } from "../../../abstract-controller/rendering.js";
@@ -48,43 +48,43 @@ class WithLayoutController extends ApplicationController {
     await this.render({ plain: "hello david" });
   }
 
-  async custom_code(): Promise<void> {
+  async customCode(): Promise<void> {
     await this.render({ plain: "hello world", status: 404 });
   }
 
-  async with_custom_code_as_string(): Promise<void> {
+  async with_customCode_as_string(): Promise<void> {
     await this.render({ plain: "hello world", status: "404 Not Found" });
   }
 
-  async with_nil(): Promise<void> {
+  async withNil(): Promise<void> {
     await this.render({ plain: null });
   }
 
-  async with_nil_and_status(): Promise<void> {
+  async withNilAndStatus(): Promise<void> {
     await this.render({ plain: null, status: 403 });
   }
 
-  async with_false(): Promise<void> {
+  async withFalse(): Promise<void> {
     await this.render({ plain: false });
   }
 
-  async with_layout_true(): Promise<void> {
+  async withLayoutTrue(): Promise<void> {
     await this.render({ plain: "hello world", layout: true });
   }
 
-  async with_layout_false(): Promise<void> {
+  async withLayoutFalse(): Promise<void> {
     await this.render({ plain: "hello world", layout: false });
   }
 
-  async with_layout_nil(): Promise<void> {
+  async withLayoutNil(): Promise<void> {
     await this.render({ plain: "hello world", layout: null });
   }
 
-  async with_custom_layout(): Promise<void> {
+  async withCustomLayout(): Promise<void> {
     await this.render({ plain: "hello world", layout: "greetings" });
   }
 
-  async with_ivar_in_layout(): Promise<void> {
+  async withIvarInLayout(): Promise<void> {
     (this as unknown as { ivar: string }).ivar = "hello world";
     await this.render({ plain: "hello world", layout: "ivar" });
   }
@@ -97,17 +97,25 @@ controllerConstants.set("render_plain/with_layout", WithLayoutController);
 class RenderPlainTest extends Rack.TestCase {}
 
 describe("RenderPlainTest", () => {
-  it("rendering text from a minimal controller", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/minimal/index");
-    t.assertBody("Hello World!");
-    t.assertStatus(200);
+  let t: RenderPlainTest;
+
+  const assertBody = (body: string): void => t.assertBody(body);
+
+  const assertStatus = (code: number): void => t.assertStatus(code);
+
+  const assertContentType = (type: string): void => t.assertContentType(type);
+
+  beforeEach(({ task }) => {
+    t = new RenderPlainTest(task.name);
   });
 
-  it("rendering text from an action with default options renders the text with the layout", async ({
-    task,
-  }) => {
-    const t = new RenderPlainTest(task.name);
+  it("rendering text from a minimal controller", async () => {
+    await t.get("/render_plain/minimal/index");
+    assertBody("Hello World!");
+    assertStatus(200);
+  });
+
+  it("rendering text from an action with default options renders the text with the layout", async () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
@@ -116,15 +124,12 @@ describe("RenderPlainTest", () => {
       });
 
       await t.get("/render_plain/simple");
-      t.assertBody("hello david");
-      t.assertStatus(200);
+      assertBody("hello david");
+      assertStatus(200);
     });
   });
 
-  it("rendering text from an action with default options renders the text without the layout", async ({
-    task,
-  }) => {
-    const t = new RenderPlainTest(task.name);
+  it("rendering text from an action with default options renders the text without the layout", async () => {
     await t.withRouting(async (set: RouteSet) => {
       set.draw(function () {
         deprecator().silence(() => {
@@ -134,90 +139,74 @@ describe("RenderPlainTest", () => {
 
       await t.get("/render_plain/with_layout");
 
-      t.assertBody("hello david");
-      t.assertStatus(200);
+      assertBody("hello david");
+      assertStatus(200);
     });
   });
 
-  it("rendering text, while also providing a custom status code", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/custom_code");
+  it("rendering text, while also providing a custom status code", async () => {
+    await t.get("/render_plain/with_layout/customCode");
 
-    t.assertBody("hello world");
-    t.assertStatus(404);
+    assertBody("hello world");
+    assertStatus(404);
   });
 
-  it("rendering text with nil returns an empty body", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_nil");
+  it("rendering text with nil returns an empty body", async () => {
+    await t.get("/render_plain/with_layout/withNil");
 
-    t.assertBody("");
-    t.assertStatus(200);
+    assertBody("");
+    assertStatus(200);
   });
 
-  it("Rendering text with nil and custom status code returns an empty body and the status", async ({
-    task,
-  }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_nil_and_status");
+  it("Rendering text with nil and custom status code returns an empty body and the status", async () => {
+    await t.get("/render_plain/with_layout/withNilAndStatus");
 
-    t.assertBody("");
-    t.assertStatus(403);
+    assertBody("");
+    assertStatus(403);
   });
 
-  it("rendering text with false returns the string 'false'", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_false");
+  it("rendering text with false returns the string 'false'", async () => {
+    await t.get("/render_plain/with_layout/withFalse");
 
-    t.assertBody("false");
-    t.assertStatus(200);
+    assertBody("false");
+    assertStatus(200);
   });
 
-  it("rendering text with layout: true", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_layout_true");
+  it("rendering text with layout: true", async () => {
+    await t.get("/render_plain/with_layout/withLayoutTrue");
 
-    t.assertBody("hello world, I'm here!");
-    t.assertStatus(200);
+    assertBody("hello world, I'm here!");
+    assertStatus(200);
   });
 
-  it("rendering text with layout: 'greetings'", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_custom_layout");
+  it("rendering text with layout: 'greetings'", async () => {
+    await t.get("/render_plain/with_layout/withCustomLayout");
 
-    t.assertBody("hello world, I wish thee well.");
-    t.assertStatus(200);
+    assertBody("hello world, I wish thee well.");
+    assertStatus(200);
   });
 
-  it("rendering text with layout: false", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_layout_false");
+  it("rendering text with layout: false", async () => {
+    await t.get("/render_plain/with_layout/withLayoutFalse");
 
-    t.assertBody("hello world");
-    t.assertStatus(200);
+    assertBody("hello world");
+    assertStatus(200);
   });
 
-  it("rendering text with layout: nil", async ({ task }) => {
-    const t = new RenderPlainTest(task.name);
-    await t.get("/render_plain/with_layout/with_layout_nil");
+  it("rendering text with layout: nil", async () => {
+    await t.get("/render_plain/with_layout/withLayoutNil");
 
-    t.assertBody("hello world");
-    t.assertStatus(200);
+    assertBody("hello world");
+    assertStatus(200);
   });
 
-  it("rendering from minimal controller returns response with text/plain content type", async ({
-    task,
-  }) => {
-    const t = new RenderPlainTest(task.name);
+  it("rendering from minimal controller returns response with text/plain content type", async () => {
     await t.get("/render_plain/minimal/index");
-    t.assertContentType("text/plain; charset=utf-8");
+    assertContentType("text/plain; charset=utf-8");
   });
 
-  it("rendering from normal controller returns response with text/plain content type", async ({
-    task,
-  }) => {
-    const t = new RenderPlainTest(task.name);
+  it("rendering from normal controller returns response with text/plain content type", async () => {
     await t.get("/render_plain/simple/index");
-    t.assertContentType("text/plain; charset=utf-8");
+    assertContentType("text/plain; charset=utf-8");
   });
 });

@@ -82,7 +82,8 @@ export function installControllerDelegates(prototype: object): void {
       get(this: ControllerHelperHost): unknown {
         const controller = this._controller;
         if (controller == null) throw DelegationError.nilTarget(name, "controller");
-        return controller[name];
+        const value = controller[name];
+        return typeof value === "function" ? value.bind(controller) : value;
       },
       configurable: true,
     });
