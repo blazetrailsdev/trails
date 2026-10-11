@@ -217,11 +217,11 @@ export interface RenderOptions {
   js?: unknown;
   xml?: unknown;
   plain?: string | number | boolean | null;
-  html?: string | SafeBuffer;
-  body?: string | Buffer;
+  html?: string | SafeBuffer | boolean | null;
+  body?: string | Buffer | boolean | null;
   action?: string;
   template?: string;
-  file?: string;
+  file?: string | { toPath(): string };
   inline?: string;
   type?: string;
   renderable?: { renderIn(...args: never[]): unknown };

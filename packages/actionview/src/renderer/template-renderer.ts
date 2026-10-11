@@ -43,10 +43,10 @@ export class TemplateRenderer<Rendered = RenderedTemplate> extends AbstractRende
       return new HTML(options.html, this.formats[0]);
     }
     if (Object.prototype.hasOwnProperty.call(options, "file")) {
-      if (File.isExist(options.file as string)) {
+      if (File.isExist(options.file!)) {
         return new RawFile(options.file);
       } else {
-        if (File.isAbsolutePath(options.file as string)) {
+        if (File.isAbsolutePath(options.file!)) {
           throw new ArgumentError(`File ${options.file} does not exist`);
         } else {
           throw new ArgumentError(

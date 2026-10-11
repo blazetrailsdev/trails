@@ -11,6 +11,7 @@ import {
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { File } from "./file.js";
+import { Pathname } from "./pathname.js";
 import {
   fsAdapterConfig,
   registerFsAdapter,
@@ -52,6 +53,7 @@ describe("File", () => {
     const root = fixture();
     expect(File.isExist(join(root, "a.rb"))).toBe(true);
     expect(File.isExist(join(root, "broken"))).toBe(false);
+    expect(File.isExist(new Pathname(join(root, "a.rb")))).toBe(true);
   });
 
   it("join squeezes one separator at the boundary and does not normalize", () => {
@@ -99,6 +101,11 @@ describe("File", () => {
     expect(File.expandPath("b", "/a")).toBe("/a/b");
     expect(File.isAbsolutePath("a")).toBe(false);
     expect(File.isAbsolutePath("/a")).toBe(true);
+    expect(File.isAbsolutePath(new Pathname("/a"))).toBe(true);
+    expect(File.isAbsolutePath(new Pathname("a"))).toBe(false);
+    expect(() => File.isAbsolutePath(1 as never)).toThrow(
+      "no implicit conversion of Integer into String",
+    );
   });
 
   it("read, binread, write and delete round-trip a file", () => {

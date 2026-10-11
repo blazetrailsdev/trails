@@ -49,7 +49,7 @@ export interface RenderOptions {
   body?: string;
   plain?: string;
   html?: unknown;
-  file?: string;
+  file?: string | { toPath(): string };
   renderable?: { renderIn(context: ViewContext): string };
   layout?:
     | string

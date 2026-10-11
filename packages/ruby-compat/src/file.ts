@@ -4,9 +4,23 @@ import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { stringValue } from "./string/support.js";
 
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
+
+/**
+ * `rb_get_path` (`vendor/ruby/v3.3.11/file.c:246`), the `FilePathValue` conversion:
+ * a String is the path, anything else is asked for `to_path`, and the answer (the
+ * object itself where it has no `to_path`) goes through `StringValue`
+ * (`rb_get_path_check_to_string`, `file.c:212-224`).
+ */
+function rbGetPath(obj: unknown): string {
+  if (typeof obj === "string") return obj;
+  const toPath = (obj as { toPath?: unknown } | null)?.toPath;
+  const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
+  return stringValue(tmp);
+}
 
 /**
  * `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`), which `fstat`s an open stream and
@@ -221,8 +235,8 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.exist?`
    * (`vendor/ruby/v3.3.11/file.c:1806`).
    */
-  static isExist(fileName: string): boolean {
-    return getFs().existsSync(fileName);
+  static isExist(fileName: string | { toPath(): string }): boolean {
+    return getFs().existsSync(rbGetPath(fileName));
   }
 
   /**
@@ -819,8 +833,9 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.absolute_path?`
    * (`vendor/ruby/v3.3.11/file.c:4210`).
    */
-  static isAbsolutePath(fileName: string): boolean {
-    return getPath().isAbsolute?.(fileName) ?? fileName.startsWith(File.SEPARATOR);
+  static isAbsolutePath(fileName: string | { toPath(): string }): boolean {
+    const path = rbGetPath(fileName);
+    return getPath().isAbsolute?.(path) ?? path.startsWith(File.SEPARATOR);
   }
 
   /**
