@@ -25,12 +25,12 @@ class BasicController extends Base {
 Object.defineProperty(BasicController, "name", { value: "ContentNegotiation::BasicController" });
 controllerConstants.set("content_negotiation/basic", BasicController);
 
-let t: InstanceType<typeof Rack.TestCase>;
-const assertBody = (body: string): void => t.assertBody(body);
-
 class TestContentNegotiation extends Rack.TestCase {}
 
 describe("TestContentNegotiation", () => {
+  let t: TestContentNegotiation;
+  const assertBody = (body: string): void => t.assertBody(body);
+
   beforeEach(({ task }) => {
     t = new TestContentNegotiation(task.name);
   });

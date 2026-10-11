@@ -61,13 +61,13 @@ controllerConstants.set("content_type/base", BaseController);
 controllerConstants.set("content_type/implied", ImpliedController);
 controllerConstants.set("content_type/charset", CharsetController);
 
-let t: InstanceType<typeof Rack.TestCase>;
-const assertBody = (body: string): void => t.assertBody(body);
-const assertHeader = (name: string, value: string): void => t.assertHeader(name, value);
-
 class ExplicitContentTypeTest extends Rack.TestCase {}
 
 describe("ExplicitContentTypeTest", () => {
+  let t: ExplicitContentTypeTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertHeader = (name: string, value: string): void => t.assertHeader(name, value);
+
   beforeEach(({ task }) => {
     t = new ExplicitContentTypeTest(task.name);
   });
@@ -105,6 +105,10 @@ describe("ExplicitContentTypeTest", () => {
 class ImpliedContentTypeTest extends Rack.TestCase {}
 
 describe("ImpliedContentTypeTest", () => {
+  let t: ImpliedContentTypeTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertHeader = (name: string, value: string): void => t.assertHeader(name, value);
+
   beforeEach(({ task }) => {
     t = new ImpliedContentTypeTest(task.name);
   });
@@ -139,6 +143,10 @@ describe("ImpliedContentTypeTest", () => {
 class ExplicitCharsetTest extends Rack.TestCase {}
 
 describe("ExplicitCharsetTest", () => {
+  let t: ExplicitCharsetTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertHeader = (name: string, value: string): void => t.assertHeader(name, value);
+
   beforeEach(({ task }) => {
     t = new ExplicitCharsetTest(task.name);
   });

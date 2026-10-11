@@ -56,17 +56,17 @@ class BasicController extends Base {
 
 controllerConstants.set("render_streaming/basic", BasicController);
 
-let t: InstanceType<typeof Rack.TestCase>;
-const assertBody = (body: string): void => t.assertBody(body);
-const assertStatus = (code: number): void => t.assertStatus(code);
-const assertStreamingBang = (cache: string = "no-cache"): void => {
-  assertStatus(200);
-  assertEqual(cache, t.headers!.get("cache-control"));
-};
-
 class StreamingTest extends Rack.TestCase {}
 
 describe("StreamingTest", () => {
+  let t: StreamingTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertStatus = (code: number): void => t.assertStatus(code);
+  const assertStreamingBang = (cache: string = "no-cache"): void => {
+    assertStatus(200);
+    assertEqual(cache, t.headers!.get("cache-control"));
+  };
+
   beforeEach(({ task }) => {
     t = new StreamingTest(task.name);
   });

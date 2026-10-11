@@ -29,13 +29,13 @@ Object.defineProperty(SimpleController, "name", {
 });
 controllerConstants.set("render_implicit_action/simple", SimpleController);
 
-let t: InstanceType<typeof Rack.TestCase>;
-const assertBody = (body: string): void => t.assertBody(body);
-const assertStatus = (code: number): void => t.assertStatus(code);
-
 class RenderImplicitActionTest extends Rack.TestCase {}
 
 describe("RenderImplicitActionTest", () => {
+  let t: RenderImplicitActionTest;
+  const assertBody = (body: string): void => t.assertBody(body);
+  const assertStatus = (code: number): void => t.assertStatus(code);
+
   beforeEach(({ task }) => {
     t = new RenderImplicitActionTest(task.name);
   });
