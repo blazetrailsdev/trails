@@ -2,6 +2,7 @@ import {
   block,
   fetch,
   first,
+  hashDelete,
   rbEqual,
   rbInspect,
   rbModName,
@@ -462,21 +463,23 @@ export class MacroReflection extends AbstractReflection {
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
-    const counterCache = options.counterCache;
-    if (counterCache) {
+    const counterCache = hashDelete(options, "counterCache");
+
+    if (counterCache != null && counterCache !== false) {
       let active = true;
       let column: string | null = null;
 
       if (typeof counterCache === "string") {
         column = counterCache;
-      } else if (typeof counterCache === "object" && counterCache !== null) {
+      } else if (typeof counterCache === "object") {
         const cc = counterCache as Record<string, unknown>;
         active = fetch(cc, "active", true);
         column = cc.column != null ? String(cc.column) : null;
       }
 
-      options = { ...options, counterCache: { active, column } };
+      options.counterCache = { active, column };
     }
+
     return options;
   }
 }
@@ -520,9 +523,8 @@ export class AssociationReflection extends MacroReflection {
       );
     }
 
-    if (Array.isArray(this.options.foreignKey)) {
-      this.options.queryConstraints = this.options.foreignKey;
-      delete this.options.foreignKey;
+    if (Array.isArray(options.foreignKey)) {
+      options.queryConstraints = hashDelete(options, "foreignKey");
     }
 
     this.ensureOptionNotGivenAsClassBang("className");
