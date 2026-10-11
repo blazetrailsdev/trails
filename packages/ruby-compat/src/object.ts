@@ -424,7 +424,11 @@ export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) 
  * (`date_to_date` and `datetime_to_date`,
  * `vendor/ruby/v3.3.11/ext/date/date_core.c:10054,10058`). A package that
  * reopens one of those classes, as ActiveSupport's `core_ext/date_time` does,
- * assigns an entry, as it does on `STRING_METHOD_TABLE`.
+ * assigns an entry, as it does on `STRING_METHOD_TABLE`. A JS `Date`, which
+ * spells a Ruby Time at the boundary and has no such tag, is keyed `"Date"`:
+ * the date package seats `Time#utc?`, `#getutc` and `#getlocal`
+ * (`vendor/ruby/v3.3.11/time.c:4340,4425,4374`) there and on
+ * `Temporal.Instant`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -438,7 +442,10 @@ export const TEMPORAL_METHOD_TABLE: Record<
 };
 
 function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
-  const table = obj == null ? undefined : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? ""];
+  const table =
+    obj == null
+      ? undefined
+      : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? (obj instanceof Date ? "Date" : "")];
   return table !== undefined && Object.hasOwn(table, mid)
     ? (table[mid] as (...args: unknown[]) => unknown)
     : undefined;
@@ -463,7 +470,8 @@ function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unk
  * (`":name"`); Symbol answers `to_sym` too (`symbol.rb:8`). `toAry` is bound for a JS array
  * (`array.c:8619`), whose prototype carries no such member. `each` is bound
  * for a JS array, a `Set`, and a `Map` or plain hash (`array.c:8642`,
- * `lib/set.rb:499`, `hash.c:7219`). `isInfinite` and
+ * `lib/set.rb:499`, `hash.c:7219`), and `eachPair` for a `Map` or plain hash
+ * (`hash.c:7218`). `isInfinite` and
  * `isFinite` are bound for a JS number and bigint, which spell Float
  * (`numeric.c:6376-6377`) and Integer (`numeric.rb:39-48`). A Temporal seat answers for the methods
  * {@link TEMPORAL_METHOD_TABLE} binds on it.
@@ -508,6 +516,7 @@ export function basicObjRespondTo(obj: unknown, mid: string, pub: boolean = true
   ) {
     return true;
   }
+  if (mid === "eachPair" && (obj instanceof Map || isPlainHash(obj))) return true;
   if (mid === "toHash" && (obj instanceof Map || isPlainHash(obj))) return true;
   if (
     mid === "get" &&

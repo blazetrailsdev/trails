@@ -33,7 +33,7 @@ const quotedTime = (value: Parameters<typeof quotedTimeFn>[0]): string =>
   quotedTimeFn.call(HOST, value);
 const quotedDate = (value: Parameters<typeof quotedDateFn>[0]): string =>
   quotedDateFn.call(HOST, value);
-import { TypeError } from "@blazetrails/ruby-compat";
+import { rbFSend, TypeError } from "@blazetrails/ruby-compat";
 import { NotImplementedError } from "./errors.js";
 import { setDefaultTimezone } from "./active-record.js";
 
@@ -164,8 +164,8 @@ describe("QuotingTest", () => {
   });
   it("quoted datetime local", () => {
     setDefaultTimezone("local");
-    const t = Temporal.PlainDateTime.from("2026-04-07T15:30:00");
-    expect(quotedDate(t)).toBe("2026-04-07 15:30:00");
+    const t = RubyTime.now().change({ usec: 0 }).toDatetime();
+    expect(quotedDate(t)).toBe(rbFSend(t, "toFs", "db"));
   });
   it("quote bigdecimal", () => {
     const bigdec = new BigDecimal((1n << 100n).toString());
