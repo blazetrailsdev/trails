@@ -9,6 +9,8 @@ import type {
 import { dropWeakCalls, significantMissingCalls } from "./compare.js";
 import { compareArms, type SkeletonRow } from "./report-arms.js";
 import {
+  inlinedHookCreditedBy,
+  inlinedHookTags,
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
@@ -299,6 +301,16 @@ describe("same-file module bodies join by convention", () => {
     expect(inlinedRubyBody(segments).calls.filter((c) => c === "super")).toHaveLength(1);
   });
 
+  it("opens the chain with the class's own self.new, its super consumed by initialize", () => {
+    const ownNew = { ...body(["lookup", "super"]), name: "new" };
+    const klassNew = { ...body(["subclass_from_attributes", "super"]), name: "new" };
+    const NEW = of("ActiveRecord::Inheritance::ClassMethods", klassNew);
+    expect(inlinedSegments(own, none, [], [NEW], ownNew)).toEqual([ownNew, klassNew, own]);
+    const segments = inlinedSegments(own, none, [], [], ownNew);
+    expect(inlinedRubyBody(segments).calls).toEqual(["lookup", "build_reflection", "super"]);
+    expect(inlinedSegments(own, none, [], [])).toEqual([]);
+  });
+
   it("orders a class with both: own, same-file, then a tag naming no ancestor", () => {
     const segments = inlinedSegments(own, ancestors, [IMPLEMENTATION], [API]);
     expect(inlinedRubyBody(segments).calls).toEqual([
@@ -397,5 +409,77 @@ describe("the chain follows the class's ancestor order", () => {
     const pool = entity("pool.rb", ["ActiveModel::API", "Lock", "ActiveRecord::Core"]);
     const { ancestors, sameFile } = sameFileBodies(pool);
     expect(inlinedSegments(own, ancestors, sameFile, [API, CORE])).toEqual([own, core, lock, api]);
+  });
+});
+
+describe("a module hook is credited through the tag on an includer's constructor", () => {
+  const tagOf = (module: string, hook: InlinedFrom["hook"] = "initialize"): InlinedFrom => ({
+    module,
+    hook,
+    source: "rails",
+    version: "v8.0.2",
+    file: "x.rb",
+    firstLine: 1,
+    lastLine: 2,
+  });
+  const tsClass = (file: string, inlinedFrom?: InlinedFrom[]): ClassInfo => ({
+    ...entity(file, [], [{ ...body([]), name: "constructor", file, inlinedFrom }]),
+  });
+  const ts = {
+    packages: {
+      activemodel: { classes: { Model: tsClass("model.ts", [tagOf("ActiveModel::API")]) } },
+      activerecord: {
+        classes: {
+          Base: tsClass("base.ts", [
+            tagOf("ActiveRecord::Inheritance::ClassMethods", "new"),
+            tagOf("ActiveModel::API"),
+          ]),
+          Relation: tsClass("relation.ts"),
+        },
+      },
+    },
+  } as unknown as ApiManifest;
+  const tags = inlinedHookTags(ts);
+
+  it("credits the module when the tagged constructor's file mirrors an includer", () => {
+    expect(
+      inlinedHookCreditedBy(
+        "ActiveModel::API",
+        "initialize",
+        "activemodel",
+        new Set(["model.ts"]),
+        tags,
+      ),
+    ).toEqual({ package: "activemodel", tsFile: "model.ts" });
+  });
+
+  it("leaves it uncredited when the tagged file in its package includes no such module", () => {
+    const only = inlinedHookTags({
+      packages: { activemodel: ts.packages.activemodel },
+    } as unknown as ApiManifest);
+    expect(
+      inlinedHookCreditedBy(
+        "ActiveModel::API",
+        "initialize",
+        "activemodel",
+        new Set(["validations.ts"]),
+        only,
+      ),
+    ).toBeUndefined();
+  });
+
+  it("credits a tag on a constructor in another package", () => {
+    expect(
+      inlinedHookCreditedBy("ActiveModel::API", "initialize", "activemodel", new Set(), tags),
+    ).toEqual({ package: "activerecord", tsFile: "base.ts" });
+  });
+
+  it("keys a ClassMethods#new apart from the module's initialize, and an untagged hook from both", () => {
+    const includers = new Set(["base.ts"]);
+    const credited = (module: string, hook: InlinedFrom["hook"]) =>
+      inlinedHookCreditedBy(module, hook, "activerecord", includers, tags)?.tsFile;
+    expect(credited("ActiveRecord::Inheritance::ClassMethods", "new")).toBe("base.ts");
+    expect(credited("ActiveRecord::Inheritance::ClassMethods", "initialize")).toBeUndefined();
+    expect(credited("ActiveRecord::Core", "initialize")).toBeUndefined();
   });
 });

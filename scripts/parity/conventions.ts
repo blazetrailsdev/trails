@@ -1615,10 +1615,19 @@ export const COPY_HOOKS: ReadonlyMap<string, readonly string[]> = new Map([
  * entry point answers it; the SKIP gate stays in place for compare.ts, so a
  * skipped method still never counts as a missing port.
  */
+/**
+ * What a caller asks for when the `new` it holds is a class's own `self.new`,
+ * or a `ClassMethods#new` in the class's own Ruby file (RFC 0188). Ruby's
+ * `Klass.new` and JS's `new Klass` are one operation, so it is the constructor
+ * whether or not an `initialize` sits beside it.
+ */
+export const OWN_NEW = "self.new";
+
 /** Ruby names whose TS counterpart is a fixed JS spelling, not a portable identifier. */
 const FIXED_TS_SPELLINGS = new Set([
   "initialize",
   "new",
+  OWN_NEW,
   "to_s",
   "to_str",
   "to_json",
@@ -1652,9 +1661,11 @@ function rubyMethodToTsWithoutUnderscore(
   siblingRubyNames?: ReadonlySet<string>,
 ): string[] | null {
   if (OPERATORS.has(name)) return null;
-  // A same-file `new` beside `initialize` (`ActionController::Renderer.new`,
-  // `renderer.rb:72`, next to `#initialize` at `:111`) WRAPS the constructor;
-  // it is a second Ruby member, not a second spelling of the same one.
+  if (name === OWN_NEW) return ["constructor"];
+  // An instance-level or module-level `new` beside `initialize`
+  // (`ActionController::Renderer#new`, `renderer.rb:72`, next to `#initialize`
+  // at `:111`) WRAPS the constructor; it is a second Ruby member, not a second
+  // spelling of the same one.
   if (name === "new" && siblingRubyNames?.has("initialize") === true) return null;
   if (name === "initialize" || name === "new") return ["constructor"];
   if (name === "to_s" || name === "to_str") return ["toString"];
@@ -1858,11 +1869,21 @@ matches the first candidate present in the target file), not a call expression.
 | \`-@\` (unary minus) | \`negate\` | \`-@\` → ${example("-@")} |
 | everything else | \`snake_case\` → \`camelCase\` | \`has_many\` → ${example("has_many")} |
 
-Constructor details: \`new\` maps to \`constructor\` only when its Ruby file does
-NOT also define \`initialize\`. A same-file \`new\` beside \`initialize\`
-(\`ActionController::Renderer.new\`, \`renderer.rb:72\`, next to \`#initialize\`
-at \`:111\`) is an ordinary singleton method that WRAPS the constructor, so it
-is a second Ruby member, not a second spelling of the same one.
+Constructor details: a class's own \`self.new\` is the constructor, as
+\`initialize\` is: Ruby's \`Klass.new\` and JS's \`new Klass\` are one operation
+(\`ActiveSupport::TimeZone.new\`, \`values/time_zone.rb:216\`, beside
+\`#initialize\` at \`:301\`). Where a class defines both, the call gates compare
+the constructor against \`new\` then \`initialize\`, with \`new\`'s \`super\` spent
+on \`initialize\`. A \`ClassMethods#new\` in the class's own Ruby file pairs the
+same way. A module's \`initialize\`, or a \`ClassMethods#new\`, defined in another
+Ruby file is matched through the \`@inlinedFrom\` tag on the constructor it is
+inlined into (RFC 0188).
+
+Any other \`new\`, an instance method or a module's own \`self.new\`, maps to
+\`constructor\` only when its Ruby file does NOT also define \`initialize\`.
+Beside \`initialize\` (\`ActionController::Renderer#new\`, \`renderer.rb:72\`,
+next to \`#initialize\` at \`:111\`) it WRAPS the constructor, so it is a second
+Ruby member, not a second spelling of the same one.
 
 Predicate-form details: a predicate whose Ruby file ALSO defines the bare name
 (\`Logger#debug\` next to \`Logger#debug?\`) offers the QUOTED LITERAL spelling

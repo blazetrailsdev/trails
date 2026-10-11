@@ -118,6 +118,7 @@ import {
   rubyCallToTs,
   rubyMethodToTs,
   snakeToCamel,
+  OWN_NEW,
 } from "@blazetrails/parity/conventions";
 import {
   arityParams,
@@ -185,6 +186,8 @@ import {
 } from "./enumerable-idioms.js";
 import { isSetterDispatchPortedAsDirectWrite } from "./setter-dispatch.js";
 import {
+  inlinedHookCreditedBy,
+  inlinedHookTags,
   inlinedRubyBody,
   inlinedRubyCallArgs,
   inlinedRubySkeleton,
@@ -3438,7 +3441,11 @@ export function buildModuleIncluderFqns(
 ): Map<string, Set<string>> {
   const moduleIncluderFqns = new Map<string, Set<string>>();
   for (const { fqn, info } of entities) {
-    for (const inc of [...(info.includes || []), ...(info.extends || [])]) {
+    for (const inc of [
+      ...(info.includes || []),
+      ...(info.extends || []),
+      ...(info.prepends || []),
+    ]) {
       const modFqn = resolveModuleName(inc, fqn, moduleFqnByShort);
       const includers = moduleIncluderFqns.get(modFqn) || new Set<string>();
       includers.add(fqn);
@@ -4574,6 +4581,7 @@ export function main() {
   const appliedInheritanceExcludes = new Set<string>();
 
   const results: PackageResult[] = [];
+  const tsInlinedHookTags = inlinedHookTags(ts);
 
   for (const [pkg, rubyPkg] of Object.entries(ruby.packages)) {
     if (filterPkg && pkg !== filterPkg) continue;
@@ -5569,6 +5577,7 @@ export function main() {
             sameFile,
             `${pkg}/${tsFile} ${tsClass}#constructor`,
           ),
+          klass.classMethods.find((m) => m.name === "new"),
         );
       };
 
@@ -6197,14 +6206,28 @@ export function main() {
       ] of seen) {
         // Null once the sibling set is known (`new` beside `initialize`), so it
         // is dropped the way `seen`'s own no-candidate gate drops one.
+        const ownerIsModule = Object.hasOwn(rubyPkg.modules, rubyModule);
+        const classMethodsNew =
+          rubyName === "new" &&
+          level === "class" &&
+          (
+            rubyPkg.modules[`${rubyModule}::ClassMethods`] as unknown as ClassInfo | undefined
+          )?.instanceMethods.some((m) => m.name === "new") === true;
+        const ownNew =
+          rubyName === "new" && level === "class" && (!ownerIsModule || classMethodsNew);
         const mirrorCandidates =
           tsMirrorNames === undefined
-            ? rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg)
+            ? rubyMethodToTsForFqn(rubyModule, ownNew ? OWN_NEW : rubyName, siblingRubyNames, pkg)
             : scopedSkipMirrorCandidates(tsMirrorNames, tsMethods);
         if (mirrorCandidates === null) continue;
+        const besideInitialize =
+          ownNew &&
+          (rubyPkg.classes[rubyModule] as unknown as ClassInfo | undefined)?.instanceMethods.some(
+            (m) => m.name === "initialize",
+          ) === true;
         const tsCandidates = moduleInitializeCandidates(
           rubyName,
-          Object.hasOwn(rubyPkg.modules, rubyModule),
+          ownerIsModule,
           tsMethods,
           mirrorCandidates,
         );
@@ -6263,6 +6286,8 @@ export function main() {
         if (directMatch !== undefined && COPY_HOOKS.has(rubyName)) copyHookClaims.add(directMatch);
         if (directMatch && !declOnly) {
           fileMatched++;
+          // Compared through the `initialize` row, whose chain opens with it.
+          if (besideInitialize) continue;
           notePredicateKind(expectedTs, directMatch);
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;
           const self = `${rubyFile}#${rubyName}`;
@@ -6318,6 +6343,22 @@ export function main() {
               checkOptionKeys(rubyName, directMatch, expectedTs, other, otherLevel);
             }
           }
+          continue;
+        }
+
+        if (
+          ownerIsModule &&
+          mixinFile === undefined &&
+          (rubyName === "initialize" || classMethodsNew) &&
+          inlinedHookCreditedBy(
+            classMethodsNew ? `${rubyModule}::ClassMethods` : rubyModule,
+            classMethodsNew ? "new" : "initialize",
+            pkg,
+            moduleIncluderFiles.get(rubyModule) ?? new Set(),
+            tsInlinedHookTags,
+          ) !== undefined
+        ) {
+          fileMatched++;
           continue;
         }
 

@@ -141,30 +141,79 @@ export function uncomparedInlinedTags(
 
 /**
  * The Rails chain a constructor that inlines module bodies answers to
- * (RFC 0188), in the order Ruby runs it: a tagged `ClassMethods#new`, which
- * `Class#new` enters before any `initialize`, then each prepended module's
- * `initialize`, the class's own, each included module's, and any tagged module
- * outside `ancestors` in tag order. Empty when the class has neither a
- * same-file module nor a tag, which leaves the pair to the ordinary gate.
+ * (RFC 0188), in the order Ruby runs it: the class's own `self.new`, then a
+ * tagged `ClassMethods#new`, both of which `Class#new` is entered through
+ * before any `initialize`, then each prepended module's `initialize`, the
+ * class's own, each included module's, and any tagged module outside
+ * `ancestors` in tag order. Empty when the class has no `self.new`, no
+ * same-file module and no tag, which leaves the pair to the ordinary gate.
  */
 export function inlinedSegments(
   own: MethodInfo | undefined,
   ancestors: ModuleAncestors,
   sameFile: readonly ModuleBody[],
   tagged: readonly ModuleBody[],
+  ownNew?: MethodInfo,
 ): MethodInfo[] {
-  if (sameFile.length + tagged.length === 0) return [];
+  if (sameFile.length + tagged.length === 0 && ownNew === undefined) return [];
   const initializes = [...sameFile, ...tagged.filter((m) => m.body.name !== "new")];
   const at = (fqns: readonly string[]) =>
     fqns.flatMap((fqn) => initializes.filter((m) => m.module === fqn).map((m) => m.body));
   const placed = new Set([...ancestors.prepended, ...ancestors.included]);
   return [
+    ...(ownNew === undefined ? [] : [ownNew]),
     ...tagged.filter((m) => m.body.name === "new").map((m) => m.body),
     ...at(ancestors.prepended),
     ...(own === undefined ? [] : [own]),
     ...at(ancestors.included),
     ...initializes.filter((m) => !placed.has(m.module)).map((m) => m.body),
   ];
+}
+
+/** Where a constructor carrying a tag sits. */
+export interface TaggedConstructor {
+  package: string;
+  tsFile: string;
+}
+
+/** Every tagged constructor in the TS manifest, keyed by the `Module#hook` it cites. */
+export function inlinedHookTags(ts: ApiManifest): Map<string, TaggedConstructor[]> {
+  const byHook = new Map<string, TaggedConstructor[]>();
+  for (const [name, pkg] of Object.entries(ts.packages)) {
+    for (const klass of Object.values(pkg.classes) as unknown as ClassInfo[]) {
+      for (const member of klass.instanceMethods) {
+        if (member.name !== "constructor") continue;
+        for (const tag of member.inlinedFrom ?? []) {
+          const key = `${tag.module}#${tag.hook}`;
+          const tsFile = member.file ?? klass.file;
+          if (tsFile === undefined) continue;
+          byHook.set(key, [...(byHook.get(key) ?? []), { package: name, tsFile }]);
+        }
+      }
+    }
+  }
+  return byHook;
+}
+
+/**
+ * The crediting rule for a module's hook (RFC 0188): a module `initialize`, or
+ * a `ClassMethods#new`, has no TS member of its own to pair with, and is
+ * matched when a constructor carrying its tag sits in the mirror of a Rails
+ * file that includes, prepends or extends the module. `includerFiles` are
+ * those mirrors within the module's own package. The include graph is built
+ * per package, so a constructor in another package is credited on its tag,
+ * and {@link inlinedHookBody} is what holds that tag to a real `def`.
+ */
+export function inlinedHookCreditedBy(
+  module: string,
+  hook: InlinedFrom["hook"],
+  pkg: string,
+  includerFiles: ReadonlySet<string>,
+  tags: ReadonlyMap<string, readonly TaggedConstructor[]>,
+): TaggedConstructor | undefined {
+  return tags
+    .get(`${module}#${hook}`)
+    ?.find((tagged) => tagged.package !== pkg || includerFiles.has(tagged.tsFile));
 }
 
 const consumesSuper = (segments: readonly MethodInfo[], index: number): boolean =>

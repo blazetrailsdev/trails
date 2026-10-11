@@ -61,12 +61,14 @@ function compare({
   rubyInitialize = true,
   sameFileModule = false,
   rubyClass = true,
+  moduleFile = "api.rb",
 }: {
   tsCalls?: string[];
   inlinedFrom?: InlinedFrom[];
   rubyInitialize?: boolean;
   sameFileModule?: boolean;
   rubyClass?: boolean;
+  moduleFile?: string;
 } = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
@@ -91,7 +93,7 @@ function compare({
       classes: rubyClass ? thing : {},
       modules: {
         ...(rubyClass ? {} : thing),
-        "ActiveModel::API": entity("ActiveModel::API", "api.rb", [
+        "ActiveModel::API": entity("ActiveModel::API", moduleFile, [
           method("initialize", ["assign_attributes", "super"], cited(80, 84)),
         ]),
         ...(sameFileModule ? { "ActiveModel::Thing::Local": local } : {}),
@@ -112,6 +114,18 @@ function compare({
       .split("\n")
       .filter((line) => line.includes("thing.ts") || line.includes("→"));
   return { calls: rows("call-mismatches.json"), args: rows("call-arg-mismatches.json") };
+}
+
+/**
+ * The module's own row of the comparison, with the module in a file no
+ * `SCOPED_SKIP_GROUPS` entry names (`api.rb` is one of the three).
+ */
+function moduleRow(fixture: Parameters<typeof compare>[0] = {}) {
+  compare({ ...fixture, moduleFile: "validations.rb" });
+  const report = JSON.parse(fs.readFileSync(path.join(output.dir, "api-comparison.json"), "utf-8"));
+  return report.results[0].files.find(
+    (file: { rubyFile: string }) => file.rubyFile === "validations.rb",
+  );
 }
 
 describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
@@ -143,6 +157,17 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     const { calls } = compare({ rubyInitialize: false, tsCalls: ["buildReflection", "super"] });
     expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
     expect(compare({ rubyInitialize: false })).toEqual({ calls: [], args: [] });
+  });
+
+  it("scores the module's initialize as matched through the tag, with nothing to relocate", () => {
+    expect(moduleRow()).toMatchObject({ matched: 1, missing: 0, moves: [] });
+  });
+
+  it("still reports an untagged includer's constructor as a method to relocate", () => {
+    expect(moduleRow({ inlinedFrom: [] })).toMatchObject({
+      matched: 1,
+      moves: [{ rubyName: "initialize", actualFile: "thing.ts" }],
+    });
   });
 
   const local = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });
