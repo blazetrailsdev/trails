@@ -1,12 +1,23 @@
 import mysql from "mysql2/promise";
-import { Rational, rbScanArgs, rtest } from "@blazetrails/ruby-compat";
-import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
+import {
+  hasKey,
+  kernelInteger,
+  Rational,
+  rbProgname,
+  rtest,
+  toI,
+  toS,
+  warn,
+} from "@blazetrails/ruby-compat";
 import { Date as RubyDate, DateTime, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
 import { quotedDate } from "../connection-adapters/abstract/quoting.js";
 import { defaultTimezone } from "../active-record.js";
+import { DRIVER_ERRORS, Error as Mysql2Error } from "./error.js";
+import { Result } from "./result.js";
+import { Statement } from "./statement.js";
 
-interface QueryOptions {
+export interface QueryOptions {
   as?: "hash" | "array";
   databaseTimezone?: "utc" | "local";
   applicationTimezone?: "utc" | "local" | null;
@@ -31,70 +42,41 @@ export interface Mysql2Statement {
   close(): void;
 }
 
-const ERRORS = new WeakSet<object>();
+type Handshake = { _handshakePacket?: { serverVersion?: string } };
 
-function driverError(e: unknown): never {
-  const { code, errno, fatal } = (e ?? {}) as { code?: unknown; errno?: unknown; fatal?: unknown };
-  if (
-    e instanceof Error &&
-    (typeof code === "string" || typeof errno === "number" || fatal === true)
-  ) {
-    ERRORS.add(e);
-  }
-  throw e;
+function serverVersion(client: object | undefined): number {
+  const conn = client as (Handshake & { connection?: Handshake }) | undefined;
+  const version = ((conn?.connection ?? conn)?._handshakePacket?.serverVersion ?? "").replace(
+    /^5\.5\.5-/,
+    "",
+  );
+  const [major, minor, patch] = (/(\d+)\.(\d+)\.(\d+)/.exec(version) ?? [0, 0, 0, 0])
+    .slice(1)
+    .map(Number);
+  return major * 10000 + minor * 100 + patch;
 }
 
-class Result implements Mysql2Result {
-  readonly fields: string[];
-  private rows: unknown[][];
-
-  constructor(
-    fields: string[],
-    rows: unknown[][],
-    private error?: Error,
-  ) {
-    this.fields = fields;
-    this.rows = rows;
-  }
-
-  get size(): number {
-    return this.rows.length;
-  }
-
-  toA(): unknown[][] {
-    if (this.error) throw this.error;
-    return this.rows;
-  }
-
-  free(): void {
-    this.rows = [];
-  }
-}
-
-class Statement implements Mysql2Statement {
-  affectedRows = 0;
-
-  constructor(
-    private client: Mysql2Client,
-    private sql: string,
-  ) {}
-
-  async execute(...argv: unknown[]): Promise<Mysql2Result | null> {
-    const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
-    const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
-    const result = storeResult(
-      this.client,
-      (await this.client
-        .execute(options(this.client, this.sql, currentQueryOptions) as never, args as never)
-        .catch(driverError)) as Native,
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+export function driverError(e: unknown, client?: object): never {
+  const { code, errno, fatal, sqlState } = (e ?? {}) as {
+    code?: unknown;
+    errno?: unknown;
+    fatal?: unknown;
+    sqlState?: string;
+  };
+  if (!(e instanceof globalThis.Error)) throw e;
+  if (typeof errno === "number" && errno > 0) {
+    const error = Mysql2Error.newWithArgs(
+      e.message,
+      serverVersion(client),
+      errno,
+      sqlState ?? null,
     );
-    this.affectedRows = result?.size ?? this.client.affectedRows;
-    return result;
+    error.cause = e;
+    throw error;
   }
-
-  close(): void {
-    this.client.unprepare(options(this.client, this.sql, this.client.queryOptions) as never);
-  }
+  if (typeof code === "string" || fatal === true) DRIVER_ERRORS.add(e);
+  throw e;
 }
 
 export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"> {
@@ -112,7 +94,8 @@ export interface Mysql2Client extends Omit<mysql.Connection, "query" | "prepare"
   setServerOption(value: number): Promise<true>;
 }
 
-function options(
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+export function options(
   client: Mysql2Client,
   sql: string,
   queryOptions: QueryOptions,
@@ -125,7 +108,11 @@ function options(
     : { sql, rowsAsArray, typeCast };
 }
 
-function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysql2Result | null {
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+export function storeResult(
+  client: Mysql2Client,
+  [rawResult, rawFields]: Native,
+): Mysql2Result | null {
   let result = rawResult as unknown[][] | mysql.ResultSetHeader;
   let fields = rawFields;
   if (Array.isArray(rawFields) && Array.isArray(rawFields[0])) {
@@ -209,7 +196,7 @@ function setServerOption(this: Mysql2Client, value: number): Promise<true> {
         return true;
       },
     });
-  }).catch(driverError);
+  }).catch((e: unknown) => driverError(e, this));
 }
 
 let DEFAULT_QUERY_OPTIONS: QueryOptions | undefined;
@@ -469,7 +456,9 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
     const _query = async function (this: Mysql2Client, sql: string, opts: QueryOptions) {
       return storeResult(
         this,
-        await native!.call(this, options(this, sql, opts)).catch(driverError),
+        await native!
+          .call(this, options(this, sql, opts))
+          .catch((e: unknown) => driverError(e, this)),
       );
     };
     for (const [name, value] of Object.entries({
@@ -506,75 +495,179 @@ export function mysql2Client<T extends object>(client: T): T & Mysql2Client {
   return Object.defineProperty(client, "automaticClose", automaticClose) as T & Mysql2Client;
 }
 
-function withoutDefaultIgnoreSpace(list: string[]): string[] {
-  return list.some((f) => f.toUpperCase() === "IGNORE_SPACE") ? list : [...list, "-IGNORE_SPACE"];
-}
+type Options = Record<string, unknown>;
+type Wrapper = {
+  queryOptions: QueryOptions;
+  readTimeout: number | null;
+  connectTimeout?: number;
+  automaticClose?: boolean;
+} & Options;
 
-async function newClient(
-  config: Omit<mysql.PoolOptions, "flags"> & MysqlAdapterOptions,
+const NOT_DRIVER_OPTIONS =
+  "adapter statementLimit preparedStatements advisoryLocks strict waitTimeout encoding collation variables connectionLimit queueLimit waitForConnections username user pass password host hostname port database dbname db socket sock flags connectAttrs reconnect connectTimeout localInfile readTimeout writeTimeout secureAuth initCommand automaticClose enableCleartextPlugin defaultAuth".split(
+    " ",
+  );
+
+const CLIENT_ONLY_FLAGS = ["SSL_VERIFY_SERVER_CERT", "REMEMBER_OPTIONS"];
+
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+async function connect(
+  this: Wrapper,
+  user: string | null,
+  pass: string | null,
+  host: string | null,
+  port: number | null,
+  database: string | null,
+  socket: string | null,
+  flags: number,
+  connAttrs: Record<string, string>,
 ): Promise<Mysql2Client> {
-  const {
-    adapter: _adapter,
-    statementLimit: _statementLimit,
-    preparedStatements: _preparedStatements,
-    advisoryLocks: _advisoryLocks,
-    strict: _strict,
-    waitTimeout: _wt,
-    readTimeout,
-    encoding: _encoding,
-    collation: _collation,
-    variables: _vars,
-    connectionLimit: _connLimit,
-    queueLimit: _queueLimit,
-    waitForConnections: _waitFor,
-    username,
-    socket,
-    flags,
-    ...connOptions
-  } = config as mysql.PoolOptions &
-    MysqlAdapterOptions & {
-      adapter?: string;
-      connectionLimit?: number;
-      queueLimit?: number;
-      waitForConnections?: boolean;
-      username?: string;
-      socket?: string;
-    };
-  if (rtest(username)) connOptions.user = username;
-  if (rtest(socket)) connOptions.socketPath = socket;
+  const config: Options = { supportBigNumbers: true, ...this.queryOptions };
+  for (const key of [...NOT_DRIVER_OPTIONS, ...Object.keys(defaultQueryOptions())]) {
+    delete config[key];
+  }
+  const args = { user, password: pass, host, port, database, socketPath: socket };
+  for (const [key, value] of Object.entries(args)) if (value != null) config[key] = value;
+  if (this.connectTimeout != null) config.connectTimeout = this.connectTimeout * 1000;
+  config.connectAttributes = connAttrs;
+  config.flags = Object.keys(CLIENT_FLAGS).filter(
+    (name) => !CLIENT_ONLY_FLAGS.includes(name) && (flags & CLIENT_FLAGS[name]) !== 0,
+  );
+  if ((flags & CLIENT_FLAGS.IGNORE_SPACE) === 0) (config.flags as string[]).push("-IGNORE_SPACE");
 
   const client = mysql2Client(
-    await mysql
-      .createConnection({
-        supportBigNumbers: true,
-        ...(connOptions as mysql.ConnectionOptions),
-        flags: withoutDefaultIgnoreSpace(
-          Array.isArray(flags)
-            ? flags
-            : Object.keys(CLIENT_FLAGS).filter(
-                (name) => (Number(flags) & CLIENT_FLAGS[name]) !== 0,
-              ),
-        ),
-      })
-      .catch(driverError),
+    await mysql.createConnection(config as mysql.ConnectionOptions).catch(driverError),
   );
-  client.readTimeout = readTimeout;
+  client.queryOptions = this.queryOptions;
+  client.readTimeout = this.readTimeout;
+  if (this.automaticClose != null) client.automaticClose = this.automaticClose;
   return client;
 }
 
-export const Mysql2 = {
-  Error: class extends Error {
-    constructor(message?: string) {
-      super(message);
-      ERRORS.add(this);
-    }
+/** @noRailsEquivalent CONVERGEABLE mysql2-client-is-a-class-over-the-npm-connection */
+export async function initialize(this: Wrapper, opts: Options = {}): Promise<Mysql2Client> {
+  if (opts === null || typeof opts !== "object" || Array.isArray(opts)) {
+    throw new Mysql2Error("Options parameter must be a Hash");
+  }
 
-    static [Symbol.hasInstance](e: unknown): boolean {
-      return typeof e === "object" && e !== null && ERRORS.has(e);
+  opts = { ...opts };
+  this.readTimeout = null;
+  this.queryOptions = { ...defaultQueryOptions() };
+  Object.assign(this.queryOptions, opts);
+
+  if (!hasKey(opts, "connectTimeout")) opts.connectTimeout = 120;
+
+  for (const key of [
+    ...["reconnect", "connectTimeout", "localInfile", "readTimeout", "writeTimeout"],
+    ...["defaultFile", "defaultGroup", "secureAuth", "initCommand", "automaticClose"],
+    ...["enableCleartextPlugin", "defaultAuth"],
+  ]) {
+    if (!hasKey(opts, key)) continue;
+
+    switch (key) {
+      case "reconnect":
+      case "localInfile":
+      case "secureAuth":
+      case "automaticClose":
+      case "enableCleartextPlugin":
+        this[key] = rtest(opts[key]);
+        break;
+      case "connectTimeout":
+      case "readTimeout":
+      case "writeTimeout":
+        if (opts[key] != null) this[key] = kernelInteger(opts[key]);
+        break;
+      default:
+        this[key] = opts[key];
     }
-  },
+  }
+
+  let flags: number;
+  if (Array.isArray(opts.flags)) {
+    flags = parseFlagsArray(opts.flags, this.queryOptions.connectFlags as number);
+  } else if (typeof opts.flags === "string") {
+    flags = parseFlagsArray(opts.flags.split(" "), this.queryOptions.connectFlags as number);
+  } else if (typeof opts.flags === "number") {
+    flags = (this.queryOptions.connectFlags as number) | opts.flags;
+  } else {
+    flags = this.queryOptions.connectFlags as number;
+  }
+
+  if (rtest(opts.sslverify)) flags |= CLIENT_FLAGS.SSL_VERIFY_SERVER_CERT;
+
+  if (
+    ["user", "pass", "hostname", "dbname", "db", "sock"].some((k) => hasKey(this.queryOptions, k))
+  ) {
+    warn("============= WARNING FROM mysql2 =============");
+    warn(
+      "The options :user, :pass, :hostname, :dbname, :db, and :sock are deprecated and will be removed at some point in the future.",
+    );
+    warn(
+      "Instead, please use :username, :password, :host, :port, :database, :socket, :flags for the options.",
+    );
+    warn("============= END WARNING FROM mysql2 =========");
+  }
+
+  let user = (rtest(opts.username) ? opts.username : opts.user) as string | null | undefined;
+  let pass = (rtest(opts.password) ? opts.password : opts.pass) as string | null | undefined;
+  let host = (rtest(opts.host) ? opts.host : opts.hostname) as string | null | undefined;
+  let port = opts.port as number | null | undefined;
+  let database = (
+    rtest(opts.database) ? opts.database : rtest(opts.dbname) ? opts.dbname : opts.db
+  ) as string | null | undefined;
+  let socket = (rtest(opts.socket) ? opts.socket : opts.sock) as string | null | undefined;
+
+  if (user != null) user = String(user);
+  if (pass != null) pass = String(pass);
+  if (host != null) host = String(host);
+  if (port != null) port = Number(toI(port));
+  if (database != null) database = String(database);
+  if (socket != null) socket = String(socket);
+  const connAttrs = parseConnectAttrs(opts.connectAttrs as Options | null | undefined);
+
+  return connect.call(
+    this,
+    user ?? null,
+    pass ?? null,
+    host ?? null,
+    port ?? null,
+    database ?? null,
+    socket ?? null,
+    flags,
+    connAttrs,
+  );
+}
+
+export function parseFlagsArray(flags: string[], initial = 0): number {
+  return flags.reduce((memo, f) => {
+    const fneg = f.startsWith("-") ? f.slice(1) : null;
+    if (fneg != null && /^\w+$/.test(fneg) && Object.hasOwn(CLIENT_FLAGS, fneg)) {
+      return memo & ~CLIENT_FLAGS[fneg];
+    } else if (f != null && /^\w+$/.test(f) && Object.hasOwn(CLIENT_FLAGS, f)) {
+      return memo | CLIENT_FLAGS[f];
+    } else {
+      warn(`Unknown MySQL connection flag: '${f}'`);
+      return memo;
+    }
+  }, initial);
+}
+
+export function parseConnectAttrs(connAttrs: Options | null | undefined): Record<string, string> {
+  if (CLIENT_FLAGS.CONNECT_ATTRS === 0) return {};
+
+  connAttrs ||= {};
+  if (!rtest(connAttrs.program_name)) connAttrs.program_name = rbProgname();
+  const hash: Record<string, string> = {};
+  for (const [key, value] of Object.entries(connAttrs)) {
+    hash[toS(key)] = toS(value);
+  }
+  return hash;
+}
+
+export const Mysql2 = {
+  Error: Mysql2Error,
   Client: {
-    new: newClient,
+    new: (opts?: object) => initialize.call({} as Wrapper, opts as Options | undefined),
     /** @internal */
     localOffset(): Rational {
       return new Rational(Time.local(2010).utcOffset, 86400);

@@ -4,6 +4,8 @@ import { IO } from "@blazetrails/ruby-compat";
 import { escapeBytea, pgConnection, unescapeBytea } from "./connection.js";
 import { PG } from "./pg.js";
 import { cancelAnyRunningQuery } from "../connection-adapters/postgresql/database-statements.js";
+import { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
+import { ConnectionNotEstablished } from "../errors.js";
 
 describe("pgConnection socket_io", () => {
   it("reopen unrefs and strips listeners, and never closes the socket", () => {
@@ -221,6 +223,36 @@ describe("PG::Error", () => {
       .catch((e: unknown) => e);
     expect(error).toBeInstanceOf(PG.ConnectionBad);
     expect(error).toBeInstanceOf(PG.Error);
+  });
+});
+
+describe("PG.connect", () => {
+  it.each(["timeout expired", "SASL: SCRAM-SERVER-FINAL-MESSAGE: server signature does not match"])(
+    "raises PG::ConnectionBad for node-pg's bare %s, which new_client translates",
+    async (message) => {
+      const raised = new Error(message);
+      const connect = vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(raised);
+      try {
+        const error = await PG.connect({ host: "db" }).catch((e: unknown) => e);
+        expect(error).toBeInstanceOf(PG.ConnectionBad);
+        expect((error as Error).cause).toBe(raised);
+        await expect(PostgreSQLAdapter.newClient({ host: "db" })).rejects.toBeInstanceOf(
+          ConnectionNotEstablished,
+        );
+      } finally {
+        connect.mockRestore();
+      }
+    },
+  );
+
+  it("lets an error node-pg did not raise propagate", async () => {
+    const raised = new TypeError("this.connection.connect is not a function");
+    const connect = vi.spyOn(pg.Client.prototype, "connect").mockRejectedValue(raised);
+    try {
+      await expect(PostgreSQLAdapter.newClient({ host: "db" })).rejects.toBe(raised);
+    } finally {
+      connect.mockRestore();
+    }
   });
 });
 
