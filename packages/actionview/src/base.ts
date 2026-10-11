@@ -2,6 +2,7 @@ import {
   attrInternal,
   cattrAccessor,
   classAttribute,
+  delegate,
   h,
   htmlEscape,
   htmlEscapeOnce,
@@ -89,8 +90,11 @@ export class Base {
   declare annotateRenderedViewWithFilenames: boolean;
   declare static _routes: unknown;
   declare static is_routes: boolean;
+  declare _routes: unknown;
   declare static logger: unknown;
   declare static isLogger: boolean;
+  declare logger: unknown;
+  declare static tseTrimMode: string;
 
   static {
     cattrAccessor.call(this, "fieldErrorProc", {
@@ -108,6 +112,7 @@ export class Base {
     cattrAccessor.call(this, "annotateRenderedViewWithFilenames", { default: false });
     classAttribute.call(this, "_routes");
     classAttribute.call(this, "logger");
+    delegate.call(this, "tseTrimMode=", { to: "::ActionView::Template::Handlers::TSE" });
   }
 
   static _compiledMethods: Map<string, CompiledMethod> = new Map();
@@ -401,7 +406,7 @@ Object.defineProperty(Base.prototype, "yield", {
 });
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the class above.
-export interface Base extends Context, HelperMethods, TseUtilMethods {
+export interface Base extends Context, Omit<HelperMethods, "logger">, TseUtilMethods {
   controller: Parameters<typeof assignController>[0];
   request: unknown;
   _backUrl: typeof _backUrl;

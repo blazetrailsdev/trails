@@ -566,7 +566,7 @@ export abstract class Store {
     if (call.expiresIn != null && (call.expiresIn as number) < 0) {
       const expiresIn = call.expiresIn;
       delete call.expiresIn;
-      Store.handleInvalidExpiresIn(
+      this.handleInvalidExpiresIn(
         `Cache expiration time is invalid, cannot be negative: ${expiresIn}`,
       );
     }
@@ -609,13 +609,14 @@ export abstract class Store {
     return options;
   }
 
-  static handleInvalidExpiresIn(message: string): void {
+  /** @internal */
+  private handleInvalidExpiresIn(message: string): void {
     const error = new ArgumentError(message);
     if (Store.raiseOnInvalidCacheExpirationTime) {
       throw error;
     } else {
       currentErrorReporter.report(error, { handled: true, severity: "warning" });
-      Store.logger?.error?.(`${error.name}: ${error.message}`);
+      this.logger?.error?.(`${error.name}: ${error.message}`);
     }
   }
 

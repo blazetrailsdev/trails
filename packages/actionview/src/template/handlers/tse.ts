@@ -1,5 +1,5 @@
 import { chomp, classAttribute } from "@blazetrails/activesupport";
-import { rbEqual } from "@blazetrails/ruby-compat";
+import { rbEqual, registerConstant } from "@blazetrails/ruby-compat";
 import { compileJs, type EmitJsOptions, type EmitResult } from "@blazetrails/tse-compiler";
 import { ActionView } from "../../namespaces.js";
 import type { TemplateHandler } from "../handlers.js";
@@ -85,3 +85,5 @@ export class Tse implements TemplateHandler {
       .replace(/\}\n$/u, "");
   }
 }
+
+registerConstant("ActionView::Template::Handlers::TSE", Tse);

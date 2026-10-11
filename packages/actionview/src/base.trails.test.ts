@@ -111,3 +111,21 @@ describe("ActionView::Base#render returns the renderer body unwrapped", () => {
     expect(renderTse('<%= render({ partial: "test/bold" }) %>')).toBe("<b>bold</b>");
   });
 });
+
+describe("ActionView::Base class-hosted accessors", () => {
+  afterEach(() => {
+    Tse.tseTrimMode = "-";
+  });
+
+  it("stores the field_error_proc default as the proc itself", () => {
+    const view = new (Base.withEmptyTemplateCache())(null, {}, null);
+    expect(typeof Base.fieldErrorProc).toBe("function");
+    expect(String(Base.fieldErrorProc.call(view, "<input>", null))).toContain("field_with_errors");
+    expect(view.fieldErrorProc).toBe(Base.fieldErrorProc);
+  });
+
+  it("delegates erb_trim_mode= to the handler", () => {
+    Base.tseTrimMode = ">";
+    expect(Tse.tseTrimMode).toBe(">");
+  });
+});
