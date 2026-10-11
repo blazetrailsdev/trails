@@ -2,7 +2,28 @@ import { Temporal } from "@js-temporal/polyfill";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "./date.js";
 import { Time, Timezone, resetLocalTimeZoneId } from "./time.js";
-import { Rational } from "@blazetrails/ruby-compat";
+import { Rational, rbFSend, rbObjRespondTo } from "@blazetrails/ruby-compat";
+
+describe("Time#utc?, #getutc and #getlocal on an Instant and a JS Date", () => {
+  afterEach(() => {
+    resetLocalTimeZoneId();
+  });
+
+  it("answers a zoned time at the same instant", () => {
+    resetLocalTimeZoneId("America/New_York");
+    const instant = Temporal.Instant.from("2020-01-02T03:04:05.123456Z");
+    const date = new globalThis.Date(globalThis.Date.UTC(2020, 0, 2, 3, 4, 5));
+
+    for (const time of [instant, date]) {
+      expect(rbObjRespondTo(time, "getutc")).toBe(true);
+      expect(rbFSend(time, "isUtc")).toBe(false);
+    }
+    expect(String(rbFSend(instant, "getutc"))).toBe("2020-01-02T03:04:05.123456+00:00[UTC]");
+    expect(String(rbFSend(date, "getutc"))).toBe("2020-01-02T03:04:05+00:00[UTC]");
+    expect(String(rbFSend(date, "getlocal"))).toBe("2020-01-01T22:04:05-05:00[America/New_York]");
+    expect(rbObjRespondTo(Temporal.PlainDate.from("2020-01-02"), "getutc")).toBe(false);
+  });
+});
 
 describe("Time", () => {
   afterEach(() => {

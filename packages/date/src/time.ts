@@ -18,6 +18,7 @@ import {
 } from "./date.js";
 import {
   Rational,
+  TEMPORAL_METHOD_TABLE,
   kernelInteger,
   rbCTime,
   rbDefineAllocFunc,
@@ -1696,5 +1697,21 @@ rbDefineAllocFunc(Time, (klass) => {
   };
   return new klass(0);
 });
+
+for (const seat of ["Temporal.Instant", "Date"]) {
+  Object.assign((TEMPORAL_METHOD_TABLE[seat] ??= {}), {
+    isUtc: () => false,
+    getutc: (self: Temporal.Instant | globalThis.Date) =>
+      (self instanceof Temporal.Instant
+        ? self
+        : Temporal.Instant.fromEpochMilliseconds(self.getTime())
+      ).toZonedDateTimeISO("UTC"),
+    getlocal: (self: Temporal.Instant | globalThis.Date) =>
+      (self instanceof Temporal.Instant
+        ? self
+        : Temporal.Instant.fromEpochMilliseconds(self.getTime())
+      ).toZonedDateTimeISO(nowTimeZoneId()),
+  });
+}
 
 registerConstant("Time", Time);

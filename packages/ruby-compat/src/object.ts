@@ -424,7 +424,11 @@ export const CLASS_METHOD_TABLE: Record<string, (self: never, ...args: never[]) 
  * (`date_to_date` and `datetime_to_date`,
  * `vendor/ruby/v3.3.11/ext/date/date_core.c:10054,10058`). A package that
  * reopens one of those classes, as ActiveSupport's `core_ext/date_time` does,
- * assigns an entry, as it does on `STRING_METHOD_TABLE`.
+ * assigns an entry, as it does on `STRING_METHOD_TABLE`. A JS `Date`, which
+ * spells a Ruby Time at the boundary and has no such tag, is keyed `"Date"`:
+ * the date package seats `Time#utc?`, `#getutc` and `#getlocal`
+ * (`vendor/ruby/v3.3.11/time.c:4340,4425,4374`) there and on
+ * `Temporal.Instant`.
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -438,7 +442,10 @@ export const TEMPORAL_METHOD_TABLE: Record<
 };
 
 function temporalMethod(obj: unknown, mid: string): ((...args: unknown[]) => unknown) | undefined {
-  const table = obj == null ? undefined : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? ""];
+  const table =
+    obj == null
+      ? undefined
+      : TEMPORAL_METHOD_TABLE[temporalTag(obj) ?? (obj instanceof Date ? "Date" : "")];
   return table !== undefined && Object.hasOwn(table, mid)
     ? (table[mid] as (...args: unknown[]) => unknown)
     : undefined;
