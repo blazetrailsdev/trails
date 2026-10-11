@@ -103,6 +103,9 @@ describe("File", () => {
     expect(File.isAbsolutePath("/a")).toBe(true);
     expect(File.isAbsolutePath(new Pathname("/a"))).toBe(true);
     expect(File.isAbsolutePath(new Pathname("a"))).toBe(false);
+    expect(() => File.isAbsolutePath(1 as never)).toThrow(
+      "no implicit conversion of Integer into String",
+    );
   });
 
   it("read, binread, write and delete round-trip a file", () => {

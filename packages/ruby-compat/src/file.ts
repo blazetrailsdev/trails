@@ -4,18 +4,22 @@ import { getFs, getPath } from "./fs-adapter.js";
 import type { FsStatResult } from "./fs-adapter.js";
 import { IO } from "./io.js";
 import { NotImplementedError } from "./not-implemented-error.js";
+import { stringValue } from "./string/support.js";
 
 /** `FMODE_SETENC_BY_BOM` (`vendor/ruby/v3.3.11/include/ruby/io.h:368`). */
 const FMODE_SETENC_BY_BOM = 0x00100000;
 
 /**
  * `rb_get_path` (`vendor/ruby/v3.3.11/file.c:246`), the `FilePathValue` conversion:
- * a String is the path, and anything else is asked for `to_path`
- * (`rb_get_path_check_to_string`, `file.c:212`).
+ * a String is the path, anything else is asked for `to_path`, and the answer (the
+ * object itself where it has no `to_path`) goes through `StringValue`
+ * (`rb_get_path_check_to_string`, `file.c:212-224`).
  */
-function rbGetPath(obj: string | { toPath(): string }): string {
+function rbGetPath(obj: unknown): string {
   if (typeof obj === "string") return obj;
-  return obj.toPath();
+  const toPath = (obj as { toPath?: unknown } | null)?.toPath;
+  const tmp = typeof toPath === "function" ? toPath.call(obj) : obj;
+  return stringValue(tmp);
 }
 
 /**
