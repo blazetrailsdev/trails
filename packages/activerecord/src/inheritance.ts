@@ -232,8 +232,11 @@ Inheritance.defineMethod("initializeDup", initializeDup);
 
 /** @internal */
 export function initializeInternalsCallback(this: Base): void {
+  Inheritance.superMethod(this, "initializeInternalsCallback")!();
   ensureProperType.call(this);
 }
+
+Inheritance.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
 
 /** @internal */
 export function ensureProperType(this: Base): void {
