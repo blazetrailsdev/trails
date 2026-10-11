@@ -9,6 +9,16 @@ import { NotImplementedError } from "./not-implemented-error.js";
 const FMODE_SETENC_BY_BOM = 0x00100000;
 
 /**
+ * `rb_get_path` (`vendor/ruby/v3.3.11/file.c:246`), the `FilePathValue` conversion:
+ * a String is the path, and anything else is asked for `to_path`
+ * (`rb_get_path_check_to_string`, `file.c:212`).
+ */
+function rbGetPath(obj: string | { toPath(): string }): string {
+  if (typeof obj === "string") return obj;
+  return obj.toPath();
+}
+
+/**
  * `rb_stat` (`vendor/ruby/v3.3.11/file.c:1296`), which `fstat`s an open stream and
  * `stat`s a name, answering `< 0` — `null` here — where the call fails.
  */
@@ -221,8 +231,8 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.exist?`
    * (`vendor/ruby/v3.3.11/file.c:1806`).
    */
-  static isExist(fileName: string): boolean {
-    return getFs().existsSync(fileName);
+  static isExist(fileName: string | { toPath(): string }): boolean {
+    return getFs().existsSync(rbGetPath(fileName));
   }
 
   /**
@@ -819,8 +829,9 @@ export class File extends IO {
    * @noRailsEquivalent PERMANENT — Ruby core `File.absolute_path?`
    * (`vendor/ruby/v3.3.11/file.c:4210`).
    */
-  static isAbsolutePath(fileName: string): boolean {
-    return getPath().isAbsolute?.(fileName) ?? fileName.startsWith(File.SEPARATOR);
+  static isAbsolutePath(fileName: string | { toPath(): string }): boolean {
+    const path = rbGetPath(fileName);
+    return getPath().isAbsolute?.(path) ?? path.startsWith(File.SEPARATOR);
   }
 
   /**

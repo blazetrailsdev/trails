@@ -52,7 +52,7 @@ class WithLayoutController extends ApplicationController {
     await this.render({ html: "hello world", status: 404 });
   }
 
-  async with_customCode_as_string(): Promise<void> {
+  async withCustomCodeAsString(): Promise<void> {
     await this.render({ html: "hello world", status: "404 Not Found" });
   }
 

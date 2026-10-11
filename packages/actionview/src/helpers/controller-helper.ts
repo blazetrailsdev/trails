@@ -76,6 +76,7 @@ export function isRespondTo(
   return basicObjRespondTo(this, methodName, !includePrivate);
 }
 
+/** @inventedArm if — CONVERGEABLE controller-delegates-mix-properties-and-methods */
 export function installControllerDelegates(prototype: object): void {
   for (const name of CONTROLLER_DELEGATES) {
     Object.defineProperty(prototype, name, {

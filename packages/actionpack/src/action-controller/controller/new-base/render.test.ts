@@ -150,7 +150,7 @@ describe("TestOnlyRenderPublicActions", () => {
     });
   });
 
-  // BLOCKED: ts-private-controller-method-is-an-action-method
+  // PERMANENT-SKIP: Ruby method visibility is not carried at run time (CLAUDE.md, "Method visibility is compile-time only").
   it.skip("raises an exception when a private method is called", async () => {
     await assertRaises([ActionNotFound], {}, async () => {
       await t.get("/render/blank_render/secretz", {

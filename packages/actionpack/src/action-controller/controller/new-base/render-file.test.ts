@@ -55,8 +55,7 @@ describe("TestBasic", () => {
     assertResponse("Hello world!");
   });
 
-  // BLOCKED: file-exist-takes-a-to-path-argument
-  it.skip("rendering a Pathname", async () => {
+  it("rendering a Pathname", async () => {
     await t.get(":pathname");
     assertResponse("The secret is <%= this.secret %>\n");
   });
