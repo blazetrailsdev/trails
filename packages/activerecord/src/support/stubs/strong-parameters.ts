@@ -4,45 +4,52 @@ import { type Hash, eachPair, isEmpty, keys } from "@blazetrails/ruby-compat";
 export class ProtectedParams {
   [key: string]: unknown;
 
+  static #targets = new WeakMap<ProtectedParams, ProtectedParams>();
+
   #parameters: HashWithIndifferentAccess;
   #permitted = false;
   #self: this;
 
   constructor(parameters: Record<string, unknown> = {}) {
     this.#parameters = withIndifferentAccess(parameters);
-    const params = this.#parameters;
     const target = this;
     const isParameter = (key: string | symbol): key is string =>
       typeof key === "string" &&
-      params.isKey(key) &&
+      target.#parameters.isKey(key) &&
       !Object.hasOwn(ProtectedParams.prototype, key);
 
     this.#self = new Proxy(this, {
       get(_t, key) {
-        if (isParameter(key)) return params.get(key);
+        if (isParameter(key)) return target.#parameters.get(key);
         const value = Reflect.get(target, key);
         return typeof value === "function" ? value.bind(target) : value;
       },
       set(_t, key, value) {
-        if (typeof key === "string") params.set(key, value);
+        if (typeof key === "string") target.#parameters.set(key, value);
         return true;
       },
       has(_t, key) {
         return isParameter(key) || Reflect.has(target, key);
       },
       ownKeys() {
-        return [...params.keys()];
+        return keys(target.#parameters);
       },
       getOwnPropertyDescriptor(_t, key) {
         if (!isParameter(key)) return undefined;
-        return { value: params.get(key), writable: true, enumerable: true, configurable: true };
+        return {
+          value: target.#parameters.get(key),
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        };
       },
       deleteProperty(_t, key) {
-        if (typeof key === "string") params.delete(key);
+        if (typeof key === "string") target.#parameters.delete(key);
         return true;
       },
     });
 
+    ProtectedParams.#targets.set(this.#self, this);
     return this.#self;
   }
 
@@ -85,8 +92,10 @@ export class ProtectedParams {
   }
 
   dup(): this {
-    const duplicate = new ProtectedParams(Object.fromEntries(this.#parameters));
-    if (this.#permitted) duplicate.permitBang();
+    const duplicate = new ProtectedParams();
+    const target = ProtectedParams.#targets.get(duplicate)!;
+    target.#parameters = this.#parameters;
+    target.#permitted = this.#permitted;
     return duplicate as this;
   }
 }

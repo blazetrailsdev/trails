@@ -70,7 +70,7 @@ describe("ProtectedParams", () => {
     ]);
   });
 
-  it("dup preserves permitted? and gives the copy its own parameters", () => {
+  it("dup preserves permitted? and shares the parameters, as Object#dup does", () => {
     const params = new ProtectedParams({ first_name: "Guille" });
     params.permitBang();
 
@@ -81,7 +81,7 @@ describe("ProtectedParams", () => {
     expect(Object.fromEntries(duplicate.toH())).toEqual({ first_name: "Guille" });
 
     duplicate["gender"] = "m";
-    expect(Object.fromEntries(params.toH())).toEqual({ first_name: "Guille" });
+    expect(Object.fromEntries(params.toH())).toEqual({ first_name: "Guille", gender: "m" });
     expect(Object.fromEntries(duplicate.toH())).toEqual({ first_name: "Guille", gender: "m" });
   });
 
