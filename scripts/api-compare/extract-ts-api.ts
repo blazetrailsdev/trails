@@ -6643,7 +6643,15 @@ function collectCalls(
     map.set(name, (map.get(name) ?? 0) + 1);
   };
   const promiseSettlers: string[] = [];
+  const hashForms = new Set<string>();
+  const addHashForm = (form: string, receiver: ts.Expression | undefined): void => {
+    if (skipHoistedClosures || receiver === undefined) return;
+    hashForms.add(`${NATIVE_FORM_PREFIX}${form}`);
+    const tail = receiverTailName(receiver);
+    if (tail !== undefined) hashForms.add(`${NATIVE_FORM_PREFIX}${form}:${tail}`);
+  };
   const visit = (n: ts.Node): void => {
+    for (const [form, receiver] of nativeHashForms(n)) addHashForm(form, receiver);
     if (ts.isNewExpression(n)) {
       // `new Foo(...)` is Ruby's `Foo.new(...)`. The Ruby extractor records the
       // call as `new`, which conventions.ts maps to the TS `constructor`; record
@@ -6818,7 +6826,45 @@ function collectCalls(
     }
   }
   if (names.size === 0) return undefined;
-  return [...names];
+  return [...names, ...hashForms];
+}
+
+function nativeHashForms(n: ts.Node): [form: string, receiver: ts.Expression | undefined][] {
+  if (ts.isBinaryExpression(n) && n.operatorToken.kind === ts.SyntaxKind.InKeyword) {
+    let test: ts.Node = n;
+    while (ts.isParenthesizedExpression(test.parent) || ts.isPrefixUnaryExpression(test.parent)) {
+      test = test.parent;
+    }
+    const guard = test.parent;
+    if (ts.isIfStatement(guard) && guard.expression === test && isArgumentBindingGuard(guard)) {
+      return [];
+    }
+    return [["in", n.right]];
+  }
+  if (ts.isDeleteExpression(n)) {
+    const target = n.expression;
+    if (ts.isPropertyAccessExpression(target) || ts.isElementAccessExpression(target)) {
+      return [["delete", target.expression]];
+    }
+    return [];
+  }
+  if (ts.isObjectLiteralExpression(n)) {
+    return n.properties.filter(ts.isSpreadAssignment).map((p) => ["spread", p.expression]);
+  }
+  if (ts.isForOfStatement(n)) {
+    const iterated = n.expression;
+    if (ts.isCallExpression(iterated) && iterated.expression.getText() === "Object.entries") {
+      return [["entries", iterated.arguments[0]]];
+    }
+    return [];
+  }
+  if (!ts.isCallExpression(n)) return [];
+  const callee = n.expression.getText();
+  if (callee === "Object.hasOwn" || callee === "Object.prototype.hasOwnProperty.call") {
+    return [["in", n.arguments[0]]];
+  }
+  if (callee === "Object.assign") return [["assign", n.arguments[0]]];
+  return [];
 }
 
 /**
