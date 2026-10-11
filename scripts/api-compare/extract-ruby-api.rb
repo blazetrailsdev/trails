@@ -1026,7 +1026,7 @@ class ApiExtractor
     when "include"
       process_include(args)
     when "prepend"
-      process_prepend(args)
+      process_prepend(extract_const_args(args, keep_absolute: true))
     when "extend"
       process_extend(args)
     when "attr_reader"
@@ -1123,7 +1123,7 @@ class ApiExtractor
       when "include"
         process_include_from_arg_paren(node[2])
       when "prepend"
-        process_prepend_from_arg_paren(node[2])
+        process_prepend(extract_const_args_from_paren(node[2], keep_absolute: true))
       when "extend"
         process_extend_from_arg_paren(node[2])
       when "scope"
@@ -1283,20 +1283,10 @@ class ApiExtractor
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
 
-  def process_prepend(args)
+  def process_prepend(names)
     return if @in_on_load.positive?
     target = @classes[current_fqn] || @modules[current_fqn]
-    return unless target
-
-    target[:prepends].concat(extract_const_args(args, keep_absolute: true))
-  end
-
-  def process_prepend_from_arg_paren(args)
-    return if @in_on_load.positive?
-    target = @classes[current_fqn] || @modules[current_fqn]
-    return unless target
-
-    target[:prepends].concat(extract_const_args_from_paren(args, keep_absolute: true))
+    target[:prepends].concat(names) if target
   end
 
   def process_extend(args)

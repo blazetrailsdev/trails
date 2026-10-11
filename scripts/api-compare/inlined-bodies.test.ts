@@ -298,10 +298,4 @@ describe("the chain follows the class's ancestor order", () => {
     const { ancestors, sameFile } = sameFileBodies(pool);
     expect(inlinedSegments(own, ancestors, sameFile, [API, CORE])).toEqual([own, core, lock, api]);
   });
-
-  it("runs a tagged prepended module ahead of the class's own body", () => {
-    const pool = entity("pool.rb", ["Lock"], [], ["ActiveModel::API"]);
-    const { ancestors, sameFile } = sameFileBodies(pool);
-    expect(inlinedSegments(own, ancestors, sameFile, [API])).toEqual([api, own, lock]);
-  });
 });

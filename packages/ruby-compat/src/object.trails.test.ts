@@ -2,8 +2,13 @@ import { describe, it, expect } from "vitest";
 import { rbAbsintSize } from "./numeric.js";
 import {
   rbCBasicObject,
+  rbCFalseClass,
+  rbCFloat,
   rbCInteger,
+  rbCNilClass,
   rbCString,
+  rbCSymbol,
+  rbCTrueClass,
   rbClassOf,
   rbObjSingletonClass,
   rbCDate,
@@ -50,6 +55,7 @@ import {
   rbObjIsKindOf,
 } from "./include.js";
 import { BigDecimal } from "./big-decimal.js";
+import { Hash } from "./hash.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
@@ -1102,5 +1108,51 @@ describe("Kernel#send of +", () => {
 
     expect(rbFSend(recv, "+", 1)).toBe("missing");
     expect(sent).toEqual([["+", 1]]);
+  });
+});
+
+describe("Kernel#send to a method on a core class seat", () => {
+  const seated = (klass: { prototype: object }, body: (...args: never[]) => unknown) =>
+    Object.defineProperty(klass.prototype, "seatedSelf", { value: body, configurable: true });
+  const unseat = (klass: { prototype: object }) =>
+    delete (klass.prototype as Record<string, unknown>).seatedSelf;
+
+  it.each([
+    [rbCNilClass, null],
+    [rbCTrueClass, true],
+    [rbCFalseClass, false],
+    [rbCInteger, 128],
+    [rbCInteger, 2n ** 64n],
+    [rbCFloat, 1.5],
+    [rbCString, "s"],
+    [rbCSymbol, ":s"],
+  ])("finds a method defined on %o for %o", (klass, recv) => {
+    seated(klass, function (this: unknown) {
+      return this;
+    });
+    expect(rbFSend(recv, "seatedSelf")).toBe(recv);
+    expect(basicObjRespondTo(recv, "seatedSelf")).toBe(true);
+    unseat(klass);
+    expect(basicObjRespondTo(recv, "seatedSelf")).toBe(false);
+    expect(() => rbFSend(recv, "seatedSelf")).toThrow(NoMethodError);
+  });
+
+  it("answers Integer#integer? for an Integer and Numeric#integer? for a Float", () => {
+    expect(rbFSend(5, "isInteger")).toBe(true);
+    expect(rbFSend(5n, "isInteger")).toBe(true);
+    expect(rbFSend(5.5, "isInteger")).toBe(false);
+  });
+
+  it("reaches a Symbol's seat, not String's, and no seat for a plain record or an array", () => {
+    seated(rbCString, () => "String");
+    seated(Hash, () => "Hash");
+    expect(rbFSend("s", "seatedSelf")).toBe("String");
+    expect(rbFSend(new Hash(), "seatedSelf")).toBe("Hash");
+    for (const recv of [":s", {}, []]) {
+      expect(basicObjRespondTo(recv, "seatedSelf")).toBe(false);
+      expect(() => rbFSend(recv, "seatedSelf")).toThrow(NoMethodError);
+    }
+    unseat(rbCString);
+    unseat(Hash);
   });
 });

@@ -28,10 +28,20 @@ function method(name: string, calls: string[], extra: Partial<MethodInfo> = {}):
   } as MethodInfo;
 }
 
-const PARAMS = [{ name: "attributes", kind: "req" }] as MethodInfo["params"];
+const PARAMS: MethodInfo["params"] = [{ name: "attributes", kind: "required" }];
 
-function entity(name: string, file: string, instanceMethods: MethodInfo[], includes: string[]) {
-  return { name, file, superclass: null, includes, extends: [], instanceMethods, classMethods: [] };
+function entity(fqn: string, file: string, instanceMethods: MethodInfo[], includes: string[] = []) {
+  const name = fqn.split("::").pop();
+  return {
+    name,
+    fqn,
+    file,
+    superclass: null,
+    includes,
+    extends: [],
+    instanceMethods,
+    classMethods: [],
+  };
 }
 
 const tag = (overrides: Partial<InlinedFrom> = {}): InlinedFrom => ({
@@ -61,72 +71,39 @@ function compare({
 }: Fixture = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
+  const helpers = (names: string[]) => names.map((name) => method(name, [], { params: PARAMS }));
+  const cited = (line: number, endLine: number) => ({ vendorFile: API_RB, line, endLine });
+  const local = entity("ActiveModel::Thing::Local", "thing.rb", [
+    method("initialize", ["super"], cited(1, 2)),
+  ]);
   write("rails-api.json", {
     [PKG]: {
       classes: {
-        "ActiveModel::Thing": {
-          ...entity(
-            "Thing",
-            "thing.rb",
-            [
-              method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
-              method("assign_attributes", [], { params: PARAMS }),
-              method("build_reflection", [], { params: PARAMS }),
-            ],
-            rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
-          ),
-          fqn: "ActiveModel::Thing",
-        },
+        "ActiveModel::Thing": entity(
+          "ActiveModel::Thing",
+          "thing.rb",
+          [
+            method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
+            ...helpers(["assign_attributes", "build_reflection"]),
+          ],
+          rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
+        ),
       },
       modules: {
-        "ActiveModel::API": {
-          ...entity(
-            "API",
-            "api.rb",
-            [
-              method("initialize", ["assign_attributes", "super"], {
-                vendorFile: API_RB,
-                line: 80,
-                endLine: 84,
-              }),
-            ],
-            [],
-          ),
-          fqn: "ActiveModel::API",
-        },
-        ...(sameFileModule
-          ? {
-              "ActiveModel::Thing::Local": {
-                ...entity(
-                  "Local",
-                  "thing.rb",
-                  [method("initialize", ["super"], { vendorFile: API_RB, line: 1, endLine: 2 })],
-                  [],
-                ),
-                fqn: "ActiveModel::Thing::Local",
-              },
-            }
-          : {}),
+        "ActiveModel::API": entity("ActiveModel::API", "api.rb", [
+          method("initialize", ["assign_attributes", "super"], cited(80, 84)),
+        ]),
+        ...(sameFileModule ? { "ActiveModel::Thing::Local": local } : {}),
       },
     },
   });
+  const tsMethods = [
+    ...(rubyInitialize ? [] : [method("reflect", tsCalls)]),
+    method("constructor", tsCalls, { inlinedFrom }),
+    ...helpers(["assignAttributes", "buildReflection"]),
+  ].map((m, index) => ({ ...m, file: "thing.ts", line: 3 + index * 5 }));
   write("ts-api.json", {
-    [PKG]: {
-      classes: {
-        Thing: entity(
-          "Thing",
-          "thing.ts",
-          [
-            method(rubyInitialize ? "constructor" : "reflect", tsCalls, { inlinedFrom }),
-            ...(rubyInitialize ? [] : [method("constructor", tsCalls, { inlinedFrom })]),
-            method("assignAttributes", [], { params: PARAMS }),
-            method("buildReflection", [], { params: PARAMS }),
-          ].map((m, index) => ({ ...m, file: "thing.ts", line: 3 + index * 5 })),
-          [],
-        ),
-      },
-      modules: {},
-    },
+    [PKG]: { classes: { Thing: entity("Thing", "thing.ts", tsMethods) }, modules: {} },
   });
   main();
   const rows = (name: string): string[] =>
@@ -157,11 +134,8 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(calls.join("\n")).not.toContain("build_reflection");
   });
 
-  it("flags nothing when the constructor makes the union's calls", () => {
+  it("flags nothing when the constructor makes the union's calls, the consumed super included", () => {
     expect(compare().calls).toEqual([]);
-  });
-
-  it("does not flag the super the inlining consumed", () => {
     const { calls, args } = compare({ tsCalls: ["buildReflection", "assignAttributes"] });
     expect([...calls, ...args].join("\n")).not.toContain("super");
   });

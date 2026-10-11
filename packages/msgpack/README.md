@@ -21,12 +21,18 @@ files do (CLAUDE.md, "Call-time constant resolution").
 ## `to_msgpack` on a core class
 
 `core_ext.rb` reopens `NilClass`, `Integer`, `String` and the rest to include
-`MessagePack::CoreExt`. A JS primitive has no class to reopen, so `core-ext.ts`
-exports one class per Ruby class, each carrying `CoreExt`'s `toMsgpack` and
-taking the receiver first, as ActiveSupport's `core_ext` ports do:
-`128.to_msgpack` is `Integer.toMsgpack(128)`. They are imported from
-`@blazetrails/msgpack/core-ext`, since their names are Ruby's top-level ones;
-the package index exports `CoreExt` alone.
+`MessagePack::CoreExt`. `core-ext.ts` includes `CoreExt` into the class seat
+ruby-compat keeps for each (`rbCNilClass`, `rbCTrueClass`, `rbCFalseClass`,
+`rbCInteger`, `rbCFloat`, `rbCString`, `rbCSymbol`) and defines
+`toMsgpackWithPacker` there, and `rbFSend` looks a method up on that seat:
+`128.to_msgpack` is `rbFSend(128, "toMsgpack")`. A `Hash` instance answers
+`toMsgpack` itself.
+
+`rbObjClass([])` is the global `Array` and a plain record has no class in its
+prototype chain, and trails patches neither `Array.prototype` nor
+`Object.prototype`. `core-ext.ts` exports an `Array` and a `Hash` class for
+those two, each taking the receiver first: `[].to_msgpack` is
+`Array.toMsgpack([])`.
 
 ## Where a JS value differs from the Ruby one
 
