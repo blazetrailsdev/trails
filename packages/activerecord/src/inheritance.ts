@@ -216,6 +216,14 @@ export function polymorphicClassFor(modelClass: typeof Base, name: string): type
   return modelClass.computeType(name);
 }
 
+export function dup(this: typeof Base): typeof Base {
+  const other = ClassMethods.superMethod(this, "dup")!() as typeof Base;
+  setBaseClass(other);
+  return other;
+}
+
+ClassMethods.defineMethod("dup", dup);
+
 export function initializeClone(this: typeof Base, other: unknown): void {
   ClassMethods.superMethod(this, "initializeClone")!(other);
   setBaseClass(this);

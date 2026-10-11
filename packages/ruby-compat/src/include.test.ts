@@ -1381,6 +1381,49 @@ describe("Module.new", () => {
 });
 
 describe("rbObjClone", () => {
+  it("copies a class into a constructible class (rb_mod_init_copy)", () => {
+    class Parent {
+      greet(): string {
+        return "parent";
+      }
+    }
+    class Orig extends Parent {
+      static label = "orig";
+      #secret = 7;
+      field = [1];
+      static initializeClone(this: { cloned?: unknown }, orig: unknown): void {
+        this.cloned = orig;
+      }
+      override greet(): string {
+        return `orig ${super.greet()} ${this.#secret}`;
+      }
+    }
+
+    for (const copy of [rbObjClone(Orig), rbObjDup(Orig)]) {
+      const instance = new copy();
+      expect(copy).not.toBe(Orig);
+      expect(copy.name).toBe("");
+      expect(Object.getPrototypeOf(copy)).toBe(Parent);
+      expect(copy.label).toBe("orig");
+      expect(instance).toBeInstanceOf(copy);
+      expect(instance).toBeInstanceOf(Parent);
+      expect(instance).not.toBeInstanceOf(Orig);
+      expect(instance.field).toEqual([1]);
+      expect(instance.greet()).toBe("orig parent 7");
+      expect(copy.prototype.constructor).toBe(copy);
+      expect(() => (copy as unknown as () => void)()).toThrow(/without 'new'/);
+      class Sub extends copy {}
+      expect(new Sub().greet()).toBe("orig parent 7");
+    }
+    expect((rbObjClone(Orig) as { cloned?: unknown }).cloned).toBe(Orig);
+    expect(Object.prototype.hasOwnProperty.call(rbObjDup(Orig), "cloned")).toBe(false);
+
+    const proc = function (): number {
+      return 1;
+    };
+    expect(typeof rbObjClone(proc)).toBe("object");
+  });
+
   it("copies class, ivars, singleton methods and frozen state", () => {
     const a = () => "a";
     const obj = Object.assign(new (class Host {})(), { ivar: 1 });

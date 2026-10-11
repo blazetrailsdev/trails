@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Client, Company } from "./test-helpers/models/company.js";
 import { ProtectedParams } from "./support/stubs/strong-parameters.js";
-import { initializeClone, isFinderNeedsTypeCondition } from "./inheritance.js";
+import { isFinderNeedsTypeCondition } from "./inheritance.js";
+import { rbClassSuperclass, rbObjClone } from "@blazetrails/ruby-compat";
 import { Author } from "./test-helpers/models/author.js";
 
 describe("_instantiate STI dispatch", () => {
@@ -106,27 +107,41 @@ describe("becomes! inheritance column writer", () => {
 describe("Inheritance::ClassMethods#initialize_clone", () => {
   fixtures([]);
 
-  it("runs the inherited hook, then recomputes the base class on the copy", () => {
-    const copy = Object.create(Client) as typeof Client & {
-      _computedBaseClass?: unknown;
-      initializeClone(other: unknown): void;
-    };
+  it("recomputes the base class on a cloned model class", () => {
+    expect(Company.baseClass).toBe(Company);
+    const copy = rbObjClone(Company);
 
-    copy.initializeClone(Client);
-
+    expect(copy).not.toBe(Company);
     expect(Object.prototype.hasOwnProperty.call(copy, "_computedBaseClass")).toBe(true);
-    expect(copy._computedBaseClass).toBe(Client.baseClass);
+    expect(copy.baseClass).toBe(copy);
+    expect(rbObjClone(Client).baseClass).toBe(Company);
   });
 
-  it("calls super with the original before set_base_class", () => {
-    const calls: unknown[] = [];
-    const copy = Object.assign(Object.create(Client) as typeof Client, {
-      initializeCopy: (other: unknown) => calls.push(other),
-    });
+  it("returns a constructible class carrying the original's statics and methods", () => {
+    const copy = rbObjClone(Client);
+    const record = new copy({ name: "Acme" });
 
-    initializeClone.call(copy, Client);
+    expect(record).toBeInstanceOf(copy);
+    expect(record).toBeInstanceOf(Company);
+    expect(record).not.toBeInstanceOf(Client);
+    expect(record.name).toBe("Acme");
+    expect(copy.tableName).toBe(Client.tableName);
+    expect(rbClassSuperclass(copy)).toBe(rbClassSuperclass(Client));
+    expect(Object.getOwnPropertyNames(copy.prototype)).toEqual(
+      Object.getOwnPropertyNames(Client.prototype),
+    );
+  });
+});
 
-    expect(calls).toEqual([Client]);
+describe("Inheritance::ClassMethods#dup", () => {
+  fixtures([]);
+
+  it("recomputes the base class on a duped model class", () => {
+    const other = (Company as typeof Company & { dup(): typeof Company }).dup();
+
+    expect(other).not.toBe(Company);
+    expect(other.baseClass).toBe(other);
+    expect(new other({ name: "Acme" })).toBeInstanceOf(other);
   });
 });
 

@@ -212,7 +212,6 @@ export {
 export { REJECT_ALL_BLANK_PROC, TooManyRecords } from "./nested-attributes.js";
 export { composedOf } from "./aggregations.js";
 export { ColumnNotSerializableError } from "./attribute-methods/serialization.js";
-export { delegatedType } from "./delegated-type.js";
 export { DatabaseConfig } from "./database-configurations/database-config.js";
 export type { DatabaseConfigOptions } from "./database-configurations/database-config.js";
 export { HashConfig } from "./database-configurations/hash-config.js";

@@ -1,5 +1,5 @@
 import mysql from "mysql2/promise";
-import { rtest } from "@blazetrails/ruby-compat";
+import { rbScanArgs, rtest } from "@blazetrails/ruby-compat";
 import type { MysqlAdapterOptions } from "../connection-adapters/pool-config.js";
 import { Date as RubyDate, Temporal, Time } from "@blazetrails/date";
 import { BigDecimal, TimeWithZone } from "@blazetrails/activesupport";
@@ -9,6 +9,10 @@ import { defaultTimezone } from "../active-record.js";
 interface QueryOptions {
   as?: "hash" | "array";
   databaseTimezone?: "utc" | "local";
+  applicationTimezone?: "utc" | "local" | null;
+  cast?: boolean;
+  castBooleans?: boolean;
+  symbolizeKeys?: boolean;
   [key: string]: unknown;
 }
 
@@ -70,11 +74,13 @@ class Statement implements Mysql2Statement {
     private sql: string,
   ) {}
 
-  async execute(...args: unknown[]): Promise<Mysql2Result | null> {
+  async execute(...argv: unknown[]): Promise<Mysql2Result | null> {
+    const [args, kwargs] = rbScanArgs<QueryOptions>(argv);
+    const currentQueryOptions = { ...this.client.queryOptions, ...kwargs, cast: true };
     const result = storeResult(
       this.client,
       (await this.client
-        .execute(options(this.client, this.sql, this.client.queryOptions) as never, args as never)
+        .execute(options(this.client, this.sql, currentQueryOptions) as never, args as never)
         .catch(driverError)) as Native,
     );
     this.affectedRows = result?.size ?? this.client.affectedRows;
@@ -234,11 +240,31 @@ function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
   return new Statement(this, sql);
 }
 
-type Field = { type: string; string: () => string | null };
+type Field = {
+  type: string;
+  length?: number;
+  string: () => string | null;
+  buffer?: () => Uint8Array | null;
+};
 type TypeCast = (field: Field, next: () => unknown) => unknown;
 
 function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): unknown {
+  if (!rtest(queryOptions.cast)) return field.string();
   switch (field.type) {
+    case "BIT": {
+      if (rtest(queryOptions.castBooleans) && field.length === 1) {
+        const raw = field.buffer!();
+        return raw === null ? null : raw[0] === 1;
+      }
+      return next();
+    }
+    case "TINY": {
+      if (rtest(queryOptions.castBooleans) && field.length === 1) {
+        const raw = field.string();
+        return raw === null ? null : raw !== "0";
+      }
+      return next();
+    }
     case "TIMESTAMP":
     case "TIMESTAMP2":
     case "DATETIME":
@@ -255,8 +281,16 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
         field.type.startsWith("TIMESTAMP") || queryOptions.databaseTimezone === "utc"
           ? "utc"
           : "local";
-      const val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
-      return queryOptions.databaseTimezone === "utc" ? val.getutc() : val.getlocal();
+      let val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
+      val = queryOptions.databaseTimezone === "utc" ? val.getutc() : val.getlocal();
+      if (queryOptions.applicationTimezone != null) {
+        if (queryOptions.applicationTimezone === "local") {
+          val = val.getlocal();
+        } else {
+          val = val.getutc();
+        }
+      }
+      return val;
     }
     case "DATE":
     case "NEWDATE": {

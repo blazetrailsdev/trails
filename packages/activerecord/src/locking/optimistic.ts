@@ -2,7 +2,7 @@ import { DelegateClass, type Hash, merge, Module, rtest, union } from "@blazetra
 import { classAttribute, included } from "@blazetrails/activesupport";
 import type { Base } from "../base.js";
 import { StaleObjectError } from "../errors.js";
-import { ValueType } from "@blazetrails/activemodel";
+import { type AttributeSet, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute } from "../attribute-methods/dirty.js";
 import type { incrementBang as persistenceIncrementBang } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
@@ -119,16 +119,7 @@ export async function updateCounters(
 
 type InstanceLockingHost = {
   constructor: typeof Base & LockingHost;
-  _attributes: {
-    getAttribute(name: string): {
-      value: unknown;
-      valueBeforeTypeCast: unknown;
-      type: unknown;
-      valueForDatabase: unknown;
-      originalValueForDatabase(): unknown;
-    };
-    set(name: string, attribute: unknown): void;
-  };
+  _attributes: AttributeSet;
   readAttribute(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
   clearAttributeChange(name: string): void;
