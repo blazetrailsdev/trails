@@ -1,5 +1,5 @@
 import { mkdtemp, writeFile, readFile, rm } from "fs/promises";
-import { rbInspect, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
+import { rbObjInspect, Thread, ThreadPoolExecutor } from "@blazetrails/ruby-compat";
 import { tmpdir } from "os";
 import { join } from "path";
 import { describe, it, expect, vi } from "vitest";
@@ -985,7 +985,7 @@ describe("NullPool member parity", () => {
       expect(() => pool[probe]).toThrow(NoMethodError);
     }
     expect(pool.inspect).toBeUndefined();
-    expect(() => rbInspect(pool)).not.toThrow();
+    expect(rbObjInspect(pool)).toMatch(/^#<NullPool:0x[0-9a-f]+ .*@server_version=nil/);
     expect(pool.toString).toBe(Object.prototype.toString);
     expect(pool[Symbol.toStringTag as unknown as string]).toBeUndefined();
   });
