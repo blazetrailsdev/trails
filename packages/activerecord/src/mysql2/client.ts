@@ -48,7 +48,11 @@ class Result implements Mysql2Result {
   readonly fields: string[];
   private rows: unknown[][];
 
-  constructor(fields: string[], rows: unknown[][]) {
+  constructor(
+    fields: string[],
+    rows: unknown[][],
+    private error?: Error,
+  ) {
     this.fields = fields;
     this.rows = rows;
   }
@@ -58,6 +62,7 @@ class Result implements Mysql2Result {
   }
 
   toA(): unknown[][] {
+    if (this.error) throw this.error;
     return this.rows;
   }
 
@@ -128,10 +133,13 @@ function storeResult(client: Mysql2Client, [rawResult, rawFields]: Native): Mysq
   } else if (Array.isArray(rawFields) && rawFields[0] === undefined && Array.isArray(rawResult)) {
     result = (rawResult as unknown[])[0] as mysql.ResultSetHeader;
   }
+  const error = INVALID_DATE.get(client);
+  INVALID_DATE.delete(client);
   if (Array.isArray(result)) {
     return new Result(
       (fields ?? []).map((field) => field.name),
       result,
+      error,
     );
   }
   client.affectedRows = result.affectedRows ?? 0;
@@ -241,6 +249,7 @@ function prepare(this: Mysql2Client, sql: string): Mysql2Statement {
 
 type Field = {
   type: string;
+  name: string;
   length?: number;
   string: () => string | null;
   buffer: () => Uint8Array | null;
@@ -264,24 +273,57 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       }
       return next();
     }
+    case "SHORT":
+    case "LONG":
+    case "INT24":
+    case "LONGLONG":
+    case "YEAR": {
+      const raw = next();
+      return typeof raw === "string" ? BigInt(raw) : raw;
+    }
+    case "DECIMAL":
+    case "NEWDECIMAL": {
+      const raw = next();
+      if (typeof raw !== "string") return raw;
+      if (raw.includes(".")) return new BigDecimal(raw);
+      return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
+    }
+    case "FLOAT":
+    case "DOUBLE":
+      return next();
+    case "TIME": {
+      const raw = field.string();
+      if (raw === null) return null;
+      const tokens = /^(\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?/.exec(raw);
+      if (!tokens) return null;
+      const [hour, min, sec] = tokens.slice(1, 4).map(Number);
+      const msec = Number((tokens[4] ?? "").padEnd(6, "0"));
+      let val = Time[queryOptions.databaseTimezone!](2000, 1, 1, hour, min, sec, msec);
+      if (queryOptions.applicationTimezone != null) {
+        if (queryOptions.applicationTimezone === "local") {
+          val = val.getlocal();
+        } else {
+          val = val.getutc();
+        }
+      }
+      return val;
+    }
     case "TIMESTAMP":
-    case "TIMESTAMP2":
-    case "DATETIME":
-    case "DATETIME2": {
+    case "DATETIME": {
       const raw = field.string();
       if (raw === null) return null;
       const tokens =
         /^(\d{1,4})-(\d{1,2})-(\d{1,2}) (\d{1,2}):(\d{1,2}):(\d{1,2})(?:\.(\d{1,6}))?/.exec(raw);
       if (!tokens) return null;
       const [year, month, day, hour, min, sec] = tokens.slice(1, 7).map(Number);
-      if (year + month + day + hour + min + sec === 0) return null;
+      const seconds =
+        year * 31557600 + month * 2592000 + day * 86400 + hour * 3600 + min * 60 + sec;
+      if (seconds === 0) return null;
+      if (month < 1 || day < 1) {
+        throw new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
+      }
       const msec = Number((tokens[7] ?? "").padEnd(6, "0"));
-      const dbTimezone =
-        field.type.startsWith("TIMESTAMP") || queryOptions.databaseTimezone === "utc"
-          ? "utc"
-          : "local";
-      let val = Time[dbTimezone](year, month, day, hour, min, sec, msec);
-      val = queryOptions.databaseTimezone === "utc" ? val.getutc() : val.getlocal();
+      let val = Time[queryOptions.databaseTimezone!](year, month, day, hour, min, sec, msec);
       if (queryOptions.applicationTimezone != null) {
         if (queryOptions.applicationTimezone === "local") {
           val = val.getlocal();
@@ -299,18 +341,10 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
       if (!tokens) return null;
       const [year, month, day] = tokens.slice(1, 4).map(Number);
       if (year + month + day === 0) return null;
+      if (month < 1 || day < 1) {
+        throw new Mysql2.Error(`Invalid date in field '${field.name}': ${raw}`);
+      }
       return new RubyDate(year, month, day).toDate();
-    }
-    case "DECIMAL":
-    case "NEWDECIMAL": {
-      const raw = next();
-      if (typeof raw !== "string") return raw;
-      if (raw.includes(".")) return new BigDecimal(raw);
-      return Number.isSafeInteger(Number(raw)) ? Number(raw) : BigInt(raw);
-    }
-    case "LONGLONG": {
-      const raw = next();
-      return typeof raw === "string" ? BigInt(raw) : raw;
     }
     default:
       return next();
@@ -319,9 +353,19 @@ function cast(queryOptions: QueryOptions, field: Field, next: () => unknown): un
 
 const TYPE_CAST = new WeakMap<object, TypeCast>();
 
+const INVALID_DATE = new WeakMap<object, Error>();
+
 function typeCastFor(client: object, queryOptions: QueryOptions): TypeCast {
   const typeCast = TYPE_CAST.get(client);
-  return (field, next) => cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
+  return (field, next) => {
+    try {
+      return cast(queryOptions, field, typeCast ? () => typeCast(field, next) : next);
+    } catch (e) {
+      if (!(e instanceof Mysql2.Error)) throw e;
+      if (!INVALID_DATE.has(client)) INVALID_DATE.set(client, e as Error);
+      return null;
+    }
+  };
 }
 
 type Execute = (sql: unknown, values?: unknown[]) => unknown;
@@ -478,7 +522,12 @@ async function newClient(
 }
 
 export const Mysql2 = {
-  Error: class {
+  Error: class extends Error {
+    constructor(message?: string) {
+      super(message);
+      ERRORS.add(this);
+    }
+
     static [Symbol.hasInstance](e: unknown): boolean {
       return typeof e === "object" && e !== null && ERRORS.has(e);
     }

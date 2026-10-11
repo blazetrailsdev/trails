@@ -141,3 +141,38 @@ describe("ForbiddenAttributesProtectionHashReadersTest", () => {
     }
   });
 });
+
+describe("ForbiddenAttributesProtectionRelationTest", () => {
+  fixtures({ people: [Person, {}], pirates: [Pirate, {}], birds: [Bird, {}] });
+
+  it("permitted attributes can be used for Relation#new, Relation#create and a collection build", async () => {
+    const relation = Person.where({ gender: "f" });
+    const built = relation.new(new ProtectedParams({ first_name: "Guille" }).permitBang());
+    expect(built.readAttribute("first_name")).toBe("Guille");
+    expect(built.readAttribute("gender")).toBe("f");
+
+    const created = await relation.create(
+      new ProtectedParams({ first_name: "Guille" }).permitBang(),
+    );
+    expect((await created.reload()).readAttribute("first_name")).toBe("Guille");
+
+    const pirate = await Pirate.create({ catchphrase: "Arr" });
+    const bird = pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }).permitBang());
+    expect(bird.name).toBe("Posideons Killer");
+  });
+
+  it("forbidden attributes cannot be used for Relation#new, Relation#create and a collection build", async () => {
+    const relation = Person.where({ gender: "f" });
+    expect(() => relation.new(new ProtectedParams({ first_name: "Guille" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+    await expect(relation.create(new ProtectedParams({ first_name: "Guille" }))).rejects.toThrow(
+      ForbiddenAttributesError,
+    );
+
+    const pirate = await Pirate.create({ catchphrase: "Arr" });
+    expect(() => pirate.birds.build(new ProtectedParams({ name: "Posideons Killer" }))).toThrow(
+      ForbiddenAttributesError,
+    );
+  });
+});

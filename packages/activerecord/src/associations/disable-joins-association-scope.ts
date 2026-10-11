@@ -51,7 +51,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       const key = reflection.joinPrimaryKey();
       const records = this.#addConstraints(reflection, key, joinIds, owner, ordered);
       const foreignKey = nextReflection.joinForeignKey;
-      const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey].flat());
+      const recordIds = new DeferredPluck(records as Relation<Base>, [foreignKey as string]);
       const recordsOrdered = records != null && any(records.orderValues);
 
       return [nextReflection, recordsOrdered, recordIds];

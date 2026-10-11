@@ -42,10 +42,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T,
     await super.load(block);
     let records: (T | undefined)[] = this._records;
 
-    const { key } = this;
-    const recordsById = groupBy(records as T[], (record) =>
-      Array.isArray(key) ? key.map((column) => record.get(column)) : record.get(key),
-    );
+    const recordsById = groupBy(records as T[], (record) => record.get(this.key as string));
 
     records = (await this.ids()).flatMap((id) => recordsById.get(id));
     records = compact(records);

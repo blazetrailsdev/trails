@@ -19,7 +19,7 @@ import {
   rbObjIvarSet,
 } from "@blazetrails/ruby-compat";
 import { AssociationTypeMismatch, RecordNotFound } from "../errors.js";
-import { assertAssignedSynchronously } from "@blazetrails/activemodel";
+import { assertAssignedSynchronously, type PermittedAttributes } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
 import type { StatementCache } from "../statement-cache.js";
 
@@ -289,7 +289,10 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
 
   initializeAttributes(
     record: Base,
-    exceptFromScopeAttributes?: Record<string, unknown> | Map<string, unknown>,
+    exceptFromScopeAttributes?:
+      | Record<string, unknown>
+      | Map<string, unknown>
+      | PermittedAttributes,
   ): void {
     exceptFromScopeAttributes ??= {};
     const skipAssign: (string | string[])[] = [
@@ -297,7 +300,9 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
       this.reflection.type,
     ].filter((key) => key != null);
     let assignedKeys = record.changedAttributeNamesToSave;
-    assignedKeys = assignedKeys.concat(keys(exceptFromScopeAttributes).map(String));
+    assignedKeys = assignedKeys.concat(
+      keys(exceptFromScopeAttributes as Record<string, unknown>).map(String),
+    );
     const attributes = except(
       this.scopeForCreate(),
       ...assignedKeys.filter((key) => !skipAssign.includes(key)),
@@ -312,14 +317,14 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   async create(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null> {
     return this._createRecord(attributes, false, block);
   }
 
   async createBang(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[]> {
     return this._createRecord(attributes, true, block) as Promise<Base | Base[]>;
@@ -338,14 +343,14 @@ export abstract class Association<Target extends Base | Base[] = Base | Base[]> 
   }
 
   protected abstract _createRecord(
-    attributes?: Record<string, unknown> | Record<string, unknown>[],
+    attributes?: Record<string, unknown> | PermittedAttributes | Record<string, unknown>[],
     raise?: boolean,
     block?: (record: Base) => void | Promise<void>,
   ): Promise<Base | Base[] | null>;
 
   /** @internal */
   buildRecord(
-    attributes?: Record<string, unknown> | Map<string, unknown>,
+    attributes?: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
     block?: (record: Base) => void,
   ): Base | null {
     return this.reflection.buildAssociation(attributes, (record: Base) => {

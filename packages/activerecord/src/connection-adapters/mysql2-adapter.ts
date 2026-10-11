@@ -301,12 +301,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       }
       throw translated;
     }
-    try {
-      await conn.query("SET time_zone = '+00:00'");
-    } catch (err) {
-      conn.end().catch(() => {});
-      throw err;
-    }
     this._rawConnection = conn;
     return conn;
   }

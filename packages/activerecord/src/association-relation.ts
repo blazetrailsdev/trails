@@ -3,7 +3,7 @@ import { Relation } from "./relation.js";
 import type { CollectionProxy } from "./associations/collection-proxy.js";
 import type { Association } from "./associations/association.js";
 import { ActiveRecord } from "./namespaces.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import { rbEqual, rbModConstSet } from "@blazetrails/ruby-compat";
 
 export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
@@ -22,19 +22,22 @@ export class AssociationRelation<T extends Base> extends Relation<T, boolean> {
     return association.proxyAssociation ?? (this._association as Association);
   }
 
-  protected override _new(attributes: Record<string, unknown>, block?: (record: T) => void): T {
+  protected override _new(
+    attributes: Record<string, unknown> | PermittedAttributes,
+    block?: (record: T) => void,
+  ): T {
     return (this._association as CollectionProxy<T>).build(attributes, block);
   }
 
   protected override _create(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this._association as CollectionProxy<T>).create(attributes, block);
   }
 
   protected override _createBang(
-    attributes: Record<string, unknown>,
+    attributes: Record<string, unknown> | PermittedAttributes,
     block?: (record: T) => void,
   ): Promise<T> {
     return (this._association as CollectionProxy<T>).createBang(attributes, block);

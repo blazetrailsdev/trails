@@ -2,7 +2,6 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
-import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
 import { fixtures } from "../test-fixtures.js";
 
 describe("DJAS — composite key support", () => {
@@ -125,51 +124,6 @@ describe("DJAS — composite key support", () => {
     expect(observed.some((s) => /\bJOIN\b/i.test(s))).toBe(false);
   });
 
-  it("composite-key + ordered upstream: skips DJAR wrap (records load via composite-key WHERE, no in-list reorder)", async () => {
-    Associations.hasMany.call(
-      CkShop,
-      "ckOrdersOrdered",
-      function (this: any) {
-        return this.order("name");
-      },
-      {
-        className: "CkOrder",
-        foreignKey: "shop_id",
-      },
-    );
-    Associations.hasMany.call(CkShop, "ckLineItemsOrdered", {
-      className: "CkLineItem",
-      through: "ckOrdersOrdered",
-      source: "ckLineItems",
-      disableJoins: true,
-    });
-    const shop = await CkShop.create({ name: "S" });
-    const orderB = (await CkOrder.create({
-      shop_id: shop.id,
-      order_number: 200,
-      name: "b",
-    })) as any;
-    const orderA = (await CkOrder.create({
-      shop_id: shop.id,
-      order_number: 100,
-      name: "a",
-    })) as any;
-    await CkLineItem.create({
-      ck_order_shop_id: orderB.shop_id,
-      ck_order_number: orderB.order_number,
-      sku: "from-b",
-    });
-    await CkLineItem.create({
-      ck_order_shop_id: orderA.shop_id,
-      ck_order_number: orderA.order_number,
-      sku: "from-a",
-    });
-
-    const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsOrdered");
-    const items = (await shop.association("ckLineItemsOrdered").loadTarget()) as Base[];
-    expect(items.map((i: any) => i.sku)).toEqual(["from-a", "from-b"]);
-  });
-
   it("skips tuples containing null/undefined (matches SQL tuple-equality semantics, not Arel IS NULL)", async () => {
     const shop = await CkShop.create({ name: "S" });
     const order = (await CkOrder.create({
@@ -191,70 +145,5 @@ describe("DJAS — composite key support", () => {
     const reflection = (CkShop as any)._reflectOnAssociation("ckLineItemsThroughOrders");
     const items = (await shop.association("ckLineItemsThroughOrders").loadTarget()) as Base[];
     expect(items.map((i: any) => i.sku)).toEqual(["valid"]);
-  });
-
-  it("DisableJoinsAssociationRelation composite-key load: dedupes tuples and reorders by ids on load", async () => {
-    const shop = await CkShop.create({ name: "S" });
-    const orderA = (await CkOrder.create({
-      shop_id: shop.id,
-      order_number: 100,
-      name: "a",
-    })) as any;
-    const orderB = (await CkOrder.create({
-      shop_id: shop.id,
-      order_number: 200,
-      name: "b",
-    })) as any;
-    await CkLineItem.create({
-      ck_order_shop_id: orderA.shop_id,
-      ck_order_number: orderA.order_number,
-      sku: "la",
-    });
-    await CkLineItem.create({
-      ck_order_shop_id: orderB.shop_id,
-      ck_order_number: orderB.order_number,
-      sku: "lb",
-    });
-
-    const djar = (
-      new DisableJoinsAssociationRelation(
-        CkLineItem,
-        ["ck_order_shop_id", "ck_order_number"],
-        [
-          [shop.id, 200],
-          [shop.id, 100],
-          [shop.id, 200],
-        ],
-      ) as any
-    ).where(
-      new Map([
-        [
-          ["ck_order_shop_id", "ck_order_number"],
-          [
-            [shop.id, 100],
-            [shop.id, 200],
-          ],
-        ],
-      ]),
-    );
-    const loaded = await djar.toArray();
-    expect(loaded.map((r: any) => r.sku)).toEqual(["lb", "la"]);
-    expect(await djar.ids()).toEqual([
-      [shop.id, 200],
-      [shop.id, 100],
-    ]);
-  });
-
-  it("DisableJoinsAssociationRelation composite-key load: bigint tuple components don't crash serialization", async () => {
-    const djar = new DisableJoinsAssociationRelation(
-      CkLineItem,
-      ["ck_order_shop_id", "ck_order_number"],
-      [
-        [1n, 100n],
-        [1n, 100n],
-      ],
-    );
-    expect(await djar.ids()).toEqual([[1n, 100n]]);
-    await expect(djar.toArray()).resolves.toEqual([]);
   });
 });
