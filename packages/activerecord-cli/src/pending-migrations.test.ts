@@ -29,9 +29,9 @@ async function makeFakeProject(): Promise<string> {
 }
 
 const PROXY_A = new MigrationProxy("CreateUsers", 20240101000001, "", "");
-PROXY_A.migration = async () => new (class extends Migration {})();
+PROXY_A.migration = async () => new (class extends Migration.Current {})();
 const PROXY_B = new MigrationProxy("AddIndex", 20240101000002, "", "");
-PROXY_B.migration = async () => new (class extends Migration {})();
+PROXY_B.migration = async () => new (class extends Migration.Current {})();
 
 describe("PendingMigrationsTest", () => {
   let err: string[];

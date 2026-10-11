@@ -148,7 +148,7 @@ describe("ModelGeneratorTest", () => {
     await makeGen().run("Account", ["name:string", "age:integer"]);
     await assertMigration(
       "db/migrate/create_accounts.ts",
-      /class CreateAccounts extends Migration/,
+      /class CreateAccounts extends Migration\.get\(8\.0\)/,
     );
   });
 

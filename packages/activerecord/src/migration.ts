@@ -327,6 +327,17 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
   private static _disableDdlTransaction = false;
 
   constructor(name: string | null = new.target.name || null, version?: number) {
+    const subclass = new.target;
+    if (subclass !== Current && Object.getPrototypeOf(subclass) === Migration) {
+      const major = VERSION.MAJOR;
+      const minor = VERSION.MINOR;
+      throw new StandardError(
+        "Directly inheriting from ActiveRecord::Migration is not supported. " +
+          "Please specify the Active Record release the migration was written for:\n" +
+          "\n" +
+          `  class ${subclass.name} < ActiveRecord::Migration[${major}.${minor}]`,
+      );
+    }
     this._name = name;
     this._version = version;
   }
@@ -1365,6 +1376,7 @@ export declare namespace Migration {
   let ExecutionStrategy: typeof import("./migration/execution-strategy.js").ExecutionStrategy;
   let DefaultStrategy: typeof import("./migration/default-strategy.js").DefaultStrategy;
   let CheckPending: typeof import("./migration.js").CheckPending;
+  let Current: typeof import("./migration.js").Current;
   const autoload: Extended<typeof Autoload>["autoload"];
 }
 Object.assign(Migration, {
@@ -2010,7 +2022,8 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   ): Promise<void> {
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.createTable(tableName, options);
+      if (options === undefined) await super.createTable(tableName);
+      else await super.createTable(tableName, options);
     } else if (options === block) {
       await super.createTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2025,7 +2038,8 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   ): Promise<void> {
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.changeTable(tableName, options);
+      if (options === undefined) await super.changeTable(tableName);
+      else await super.changeTable(tableName, options);
     } else if (options === block) {
       await super.changeTable(tableName, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2041,7 +2055,8 @@ export class Current<A extends DatabaseAdapter = DatabaseAdapter> extends Migrat
   ): Promise<void> {
     const block = typeof options === "function" ? options : fn;
     if (block === undefined) {
-      await super.createJoinTable(table1, table2, options);
+      if (options === undefined) await super.createJoinTable(table1, table2);
+      else await super.createJoinTable(table1, table2, options);
     } else if (options === block) {
       await super.createJoinTable(table1, table2, (t) => block(this.compatibleTableDefinition(t)));
     } else {
@@ -2133,6 +2148,7 @@ export class CheckPending {
   }
 }
 
+Migration.Current = Current;
 Migration.CheckPending = CheckPending;
 Migration.delegate = new Migration();
 ActiveRecord.Migration = Migration;

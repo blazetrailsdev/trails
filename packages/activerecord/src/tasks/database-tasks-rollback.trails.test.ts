@@ -17,7 +17,7 @@ async function writeMigration(dir: string, version: number, name: string): Promi
   await writeFile(
     join(dir, `${version}_${fileName}.ts`),
     `import { Migration } from "${new URL("../migration.js", import.meta.url).pathname}";
-export class ${name} extends Migration {
+export class ${name} extends Migration.Current {
   async up() {}
   async down() {
     (globalThis.${REVERT_LOG} ??= []).push("${name}");

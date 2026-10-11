@@ -249,6 +249,15 @@ clobbers what the class body already wrote.
   declares no enum reads its parent's hash, so it also sees an enum the parent
   declares after it was defined, where Rails' snapshot would not.
 
+- **`Migration.inherited`** (`migration.rb:617-626`) is outside `Base`'s chain
+  and resets nothing: it raises `StandardError` for a class whose superclass is
+  `Migration` itself. Its seat is `Migration`'s constructor, which raises at the
+  first `new` of such a class, with Rails' message. `Migration::Current`
+  (`migration.rb:579`) is defined before the hook and so never raises in Rails;
+  the constructor names `Current` and leaves it alone, and every
+  `Compatibility::V*` descends from it. A migration extends `Migration.Current`
+  or `Migration.get(x.y)`.
+
 One thing Rails does at definition time has no counterpart: `Core`'s loop that
 re-initializes every ancestor's find-by cache up to the base class
 (`core.rb:417-423`) never runs, so a parent keeps its cached statements when a

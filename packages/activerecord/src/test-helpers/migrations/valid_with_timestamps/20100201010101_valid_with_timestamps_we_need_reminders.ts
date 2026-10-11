@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class ValidWithTimestampsWeNeedReminders extends Migration {
+export class ValidWithTimestampsWeNeedReminders extends Migration.Current {
   async up(): Promise<void> {
     await this.createTable("reminders", (t) => {
       t.text("content");

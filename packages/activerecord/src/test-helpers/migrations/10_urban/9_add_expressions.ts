@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class AddExpressions extends Migration {
+export class AddExpressions extends Migration.Current {
   async up(): Promise<void> {
     await this.createTable("expressions", (t) => {
       t.string("expression");

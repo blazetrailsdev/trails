@@ -48,7 +48,7 @@ describe("MigrationGeneratorTest", () => {
     await makeGen().run(migration, []);
     await assertMigration(
       `db/migrate/${migration}.ts`,
-      /class ChangeTitleBodyFromPosts extends Migration/,
+      /class ChangeTitleBodyFromPosts extends Migration\.get\(8\.0\)/,
     );
   });
 
@@ -66,7 +66,7 @@ describe("MigrationGeneratorTest", () => {
     await makeGen().run(migration, []);
     await assertMigration(
       "db/migrate/change_title_body_from_posts.ts",
-      new RegExp(`class ${migration} extends Migration`),
+      new RegExp(`class ${migration} extends Migration\\.get\\(8\\.0\\)`),
     );
   });
 

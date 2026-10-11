@@ -54,6 +54,7 @@ export interface Method {
 export interface ClassOpts {
   name: string;
   extends?: Ref;
+  extendsArguments?: string;
   implements?: Ref[];
   exported?: boolean;
   staticBlock?: Body;

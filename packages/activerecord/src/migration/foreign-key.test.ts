@@ -35,7 +35,7 @@ function validating(conn: AbstractAdapter): PostgreSQLAdapter {
   return conn as PostgreSQLAdapter;
 }
 
-class SilentMigration extends Migration {
+class SilentMigration extends Migration.Current {
   write(): void {}
 }
 
@@ -85,12 +85,10 @@ registerModel([Rocket, Astronaut]);
 
 class CreateRocketsMigration extends SilentMigration {
   async change(): Promise<void> {
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("rockets", (t) => {
       t.string("name");
     });
 
-    // eslint-disable-next-line blazetrails/require-table-teardown
     await this.createTable("astronauts", (t) => {
       t.string("name");
       t.references("rocket", { foreignKey: true });
@@ -680,12 +678,10 @@ describeIfSupports("foreign_keys", "Migration", () => {
       const connection = await pool.checkout();
 
       try {
-        // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: pool, disconnected in the finally
         await connection.createTable("rockets", { force: true }, (t) => {
           t.string("name");
         });
 
-        // eslint-disable-next-line blazetrails/require-table-teardown -- throwaway :memory: pool, disconnected in the finally
         await connection.createTable("astronauts", { force: true }, (t) => {
           t.string("name");
           t.references("rocket");

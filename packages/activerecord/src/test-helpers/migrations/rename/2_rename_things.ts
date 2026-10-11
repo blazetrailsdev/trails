@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class RenameThings extends Migration {
+export class RenameThings extends Migration.Current {
   async up(): Promise<void> {
     await this.renameTable("things", "awesome_things");
   }

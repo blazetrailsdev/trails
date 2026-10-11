@@ -7,7 +7,7 @@ import { vi } from "vitest";
 export const MIGRATION_BODY = `\
 import { Migration } from "@blazetrails/activerecord";
 
-export class AddUsersTable extends Migration {
+export class AddUsersTable extends Migration.Current {
   async up() {
     await this.connection.createTable("users", (t) => {
       t.string("name");

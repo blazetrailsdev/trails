@@ -23,7 +23,7 @@ describe("MigrationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   it("migrate runs a change-only migration in both directions", async () => {
-    class ChangeOnly extends Migration {
+    class ChangeOnly extends Migration.Current {
       directions: string[] = [];
       override write(): void {}
       async change(): Promise<void> {
@@ -37,7 +37,7 @@ describe("MigrationTest", () => {
   });
 
   it("reversible runs a dir.up / dir.down block in line, before the statements after it", async () => {
-    class InLine extends Migration {
+    class InLine extends Migration.Current {
       ran: string[] = [];
       override write(): void {}
       async change(): Promise<void> {
@@ -62,7 +62,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration.connection checks a connection out when none is leased, as migration_connection does", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -79,7 +79,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration.connection makes the threaded lease permanent, as migration_connection does", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -97,7 +97,7 @@ describe("MigrationTest", () => {
   });
 
   it("migration.connection returns _connectionOverride when set", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       async up() {}
       async down() {}
     }
@@ -199,8 +199,8 @@ describe("MigrationTest", () => {
   it("verbose is shared between the class and its instances", async () => {
     const verboseWas = Migration.verbose;
     try {
-      class Quiet extends Migration {}
-      const instance = new (class extends Migration {})();
+      class Quiet extends Migration.Current {}
+      const instance = new (class extends Migration.Current {})();
 
       Migration.verbose = false;
       expect(instance.verbose).toBe(false);
@@ -222,7 +222,7 @@ describe("MigrationTest", () => {
   it("changeTable yields the adapter's updateTableDefinition result", async () => {
     class AdapterTable extends Table {}
     const seen: unknown[] = [];
-    class M extends Migration {}
+    class M extends Migration.Current {}
     const m = new M();
     const connection = {
       quoteColumnName: (n: string) => n,
@@ -270,7 +270,7 @@ describe("Migration#createTable id option type", () => {
   });
 
   describe("execution strategy", () => {
-    class StrategyMigration extends Migration {
+    class StrategyMigration extends Migration.Current {
       override get connection(): DatabaseAdapter {
         return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
       }
@@ -323,7 +323,7 @@ describe("Migration#createTable id option type", () => {
       }
     });
 
-    class RecordingMigration extends Migration {
+    class RecordingMigration extends Migration.Current {
       calls: [string, unknown[]][] = [];
       lines: string[] = [];
       revertable = false;
@@ -518,7 +518,7 @@ describe("Migration#removeColumns forwards to the connection", () => {
         t.integer("col_two");
       });
 
-      const mig = new (class extends Migration {
+      const mig = new (class extends Migration.Current {
         override write(): void {}
       })();
 
@@ -536,19 +536,19 @@ describe("Migration#removeColumns forwards to the connection", () => {
 
   it("run constructs each migration class in order and revert reverses them", async () => {
     const order: string[] = [];
-    class RunOrderA extends Migration {
+    class RunOrderA extends Migration.Current {
       override write(): void {}
       async change(): Promise<void> {
         order.push(`A:${this.isReverting() ? "down" : "up"}`);
       }
     }
-    class RunOrderB extends Migration {
+    class RunOrderB extends Migration.Current {
       override write(): void {}
       async change(): Promise<void> {
         order.push(`B:${this.isReverting() ? "down" : "up"}`);
       }
     }
-    const host = new (class extends Migration {
+    const host = new (class extends Migration.Current {
       override write(): void {}
     })();
 
@@ -636,7 +636,7 @@ describe("Migration#formatArguments", () => {
   });
 
   it("say_with_time reports rows for an Integer result only", async () => {
-    class Recording extends Migration {
+    class Recording extends Migration.Current {
       lines: string[] = [];
       override write(text = ""): void {
         this.lines.push(text);

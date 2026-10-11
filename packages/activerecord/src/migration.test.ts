@@ -97,7 +97,7 @@ function migrateProxy(version: number, body: (m: Migration) => Promise<void>): M
     version,
     name: `Migration${version}`,
     migration: () =>
-      new (class extends Migration {
+      new (class extends Migration.Current {
         override async up(): Promise<void> {
           await body(this);
         }
@@ -418,7 +418,7 @@ describe("MigrationTest", () => {
     }
   });
 
-  class MockMigration extends Migration {
+  class MockMigration extends Migration.Current {
     wentUp = false;
     wentDown = false;
     override async up(): Promise<void> {
@@ -862,7 +862,7 @@ describe("MigrationTest", () => {
   });
 
   it("method missing delegates to connection", async () => {
-    class M extends Migration {
+    class M extends Migration.Current {
       override get connection(): DatabaseAdapter {
         return { createTable: () => "hi mom!" } as unknown as DatabaseAdapter;
       }
@@ -965,7 +965,7 @@ describe("MigrationTest", () => {
     const adapter = await freshAdapter();
     await assertNoColumn(Person, "last_name");
 
-    class MigWithoutTx extends Migration {
+    class MigWithoutTx extends Migration.Current {
       static {
         this.disableDdlTransactionBang();
       }
@@ -1551,7 +1551,7 @@ AND query LIKE '%${lockId}%'`;
 
     it("test_remove_index_which_does_not_exist_doesnt_raise_with_option", async () => {
       await withTestings(async () => {
-        const mig = new (class extends Migration {})();
+        const mig = new (class extends Migration.Current {})();
         await mig.addIndex("testings", "foo");
         await mig.removeIndex("testings", "foo");
 
@@ -1563,7 +1563,7 @@ AND query LIKE '%${lockId}%'`;
 
     it("test_remove_index_with_name_which_does_not_exist_doesnt_raise_with_option", async () => {
       await withTestings(async () => {
-        const mig = new (class extends Migration {})();
+        const mig = new (class extends Migration.Current {})();
         await mig.addIndex("testings", ["foo"], { name: "foo" });
 
         expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
@@ -1576,7 +1576,7 @@ AND query LIKE '%${lockId}%'`;
 
     it("test_remove_index_with_column_array_which_does_not_exist_doesnt_raise_with_option", async () => {
       await withTestings(async () => {
-        const mig = new (class extends Migration {})();
+        const mig = new (class extends Migration.Current {})();
         await mig.addIndex("testings", ["foo"], { name: "foo" });
 
         expect(await mig.indexExists("testings", "foo", { name: "foo" })).toBe(true);
@@ -1598,7 +1598,7 @@ AND query LIKE '%${lockId}%'`;
       });
       try {
         await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
-        const mig = new (class extends Migration {})();
+        const mig = new (class extends Migration.Current {})();
 
         let error: unknown;
         try {
@@ -1884,7 +1884,7 @@ AND query LIKE '%${lockId}%'`;
       await assertColumn(Person, "column1");
       await assertColumn(Person, "column2");
 
-      class BulkRevert extends Migration {
+      class BulkRevert extends Migration.Current {
         static {
           this.disableDdlTransactionBang();
         }
@@ -2066,7 +2066,7 @@ AND query LIKE '%${lockId}%'`;
       Dir.mkdir(magicPath);
       File.write(
         `${magicPath}/1_currencies_have_symbols.ts`,
-        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration {}\n',
+        '// @ts-nocheck\n// @ts-check\n\nimport { Migration } from "../../../migration.js";\n\nexport class CurrenciesHaveSymbols extends Migration.Current {}\n',
       );
 
       try {
@@ -2241,7 +2241,7 @@ AND query LIKE '%${lockId}%'`;
 
             File.write(
               path,
-              `import { Migration } from "../../../migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration {\n  async change() {}\n}\n`,
+              `import { Migration } from "../../../migration.js";\n\nexport class ${migrationClassName(filename)} extends Migration.Current {\n  async change() {}\n}\n`,
             );
           }
 
@@ -2517,7 +2517,7 @@ describeIfMysqlAdapter("BulkAlterTableMigrationsTest", () => {
 
 function mockMigration(): { migration: Migration; sql: string[] } {
   const sql: string[] = [];
-  const migration = new (class extends Migration {
+  const migration = new (class extends Migration.Current {
     async change() {}
   })(undefined, 20240101000000);
   (migration as any).adapter = adapterDouble({
@@ -2542,7 +2542,7 @@ describe("MigrationTest", () => {
   fixtures(["people"], { useTransactionalTests: false });
 
   it("migration instance has connection", async () => {
-    const migration = new (class extends Migration {})();
+    const migration = new (class extends Migration.Current {})();
     expect(await migration.connection).toBe(await Base.leaseConnection());
   });
 });
