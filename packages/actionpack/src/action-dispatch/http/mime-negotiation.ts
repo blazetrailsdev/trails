@@ -172,7 +172,8 @@ export function validAcceptHeader(this: MimeNegotiationHost): boolean {
 
 /** @internal */
 export function useAcceptHeader(this: MimeNegotiationHost): boolean {
-  return !(this.constructor as unknown as { ignoreAcceptHeader: boolean }).ignoreAcceptHeader;
+  return !(this.constructor as typeof MimeNegotiation & { ignoreAcceptHeader: boolean })
+    .ignoreAcceptHeader;
 }
 
 /** @internal */
