@@ -107,11 +107,13 @@ export class Packer<Io = unknown> {
   }
 
   write(v: unknown): this {
-    if (v == null || typeof v === "boolean" || typeof v === "number" || typeof v === "string") {
+    if (v == null || typeof v === "boolean" || typeof v === "number") {
       this.buffer.write(encoder.encodeSharedRef(v));
+    } else if (typeof v === "string") {
+      this.writeStringValue(v);
     } else if (v instanceof Uint8Array) {
       if (rbClassOf(v) === rbCString || !this.tryWriteWithExtTypeLookup(v)) {
-        this.buffer.write(encoder.encodeSharedRef(v));
+        this.writeStringValue(v);
       }
     } else if (Array.isArray(v)) {
       if (rbClassOf(v) === Array || !this.tryWriteWithExtTypeLookup(v)) {
@@ -169,7 +171,7 @@ export class Packer<Io = unknown> {
     if (typeof obj !== "string" && !(obj instanceof Uint8Array)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected String)`);
     }
-    this.buffer.write(encoder.encodeSharedRef(obj));
+    this.writeStringValue(obj);
     return this;
   }
 
@@ -393,7 +395,7 @@ export class Packer<Io = unknown> {
     }
   }
 
-  private writeStringValue(v: string): void {
+  private writeStringValue(v: string | Uint8Array): void {
     this.buffer.write(encoder.encodeSharedRef(v));
   }
 
