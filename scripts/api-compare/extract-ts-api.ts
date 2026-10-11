@@ -7580,7 +7580,6 @@ function hasModifier(node: ts.Node, kind: ts.SyntaxKind): boolean {
   return modifiers?.some((m) => m.kind === kind) ?? false;
 }
 
-/** A `#name` call is credited as a call to `name`, as its declaration is. */
 function memberNameText(name: ts.MemberName): string {
   return ts.isPrivateIdentifier(name) ? name.text.slice(1) : name.text;
 }
