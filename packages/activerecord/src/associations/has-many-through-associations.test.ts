@@ -254,7 +254,7 @@ describe("HasManyThroughAssociationsTest", () => {
   it.skip("marshal dump", async () => {
     // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
     const preloaded = await Post.includes(":firstBlueTags").first();
-    expect(Marshal.load(Marshal.dump(preloaded))).toEqual(preloaded);
+    expect((Marshal.load(Marshal.dump(preloaded)) as Post).equals(preloaded)).toBe(true);
   });
 
   it("through association with joins", async () => {

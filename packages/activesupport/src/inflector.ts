@@ -201,7 +201,7 @@ export function constantize(camelCasedWord: string): unknown {
         ? (receiver as Record<string, unknown>)[segments[i - 1]]
         : undefined;
     if (value === undefined) {
-      const { constMissing } = ((i > 1 ? receiver : null) ?? {}) as {
+      const { constMissing } = (receiver ?? {}) as {
         constMissing?: (name: string) => unknown;
       };
       if (constMissing !== undefined) {

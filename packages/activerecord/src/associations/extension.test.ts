@@ -107,34 +107,42 @@ describe("AssociationsExtensionsTest", () => {
     // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     const david = developers("david");
-    expect(await (david.projects as unknown as Extended).findMostRecent()).toEqual(
-      projects("action_controller"),
-    );
+    expect(
+      projects("action_controller").equals(
+        await (david.projects as unknown as Extended).findMostRecent(),
+      ),
+    ).toBe(true);
 
     const marshalled = Marshal.dump(david);
 
     expect(david.association("projects").reflection).not.toBeNull();
 
     const davidToo = Marshal.load(marshalled) as Developer;
-    expect(await (davidToo.projects as unknown as Extended).findMostRecent()).toEqual(
-      projects("action_controller"),
-    );
+    expect(
+      projects("action_controller").equals(
+        await (davidToo.projects as unknown as Extended).findMostRecent(),
+      ),
+    ).toBe(true);
   });
 
   it.skip("marshalling named extensions", async () => {
     // BLOCKED: activerecord-record-round-trips-marshal-6-1-format
     type Extended = CollectionProxy & { findMostRecent: () => Promise<Base | null> };
     let david = developers("david");
-    expect(await (david.projectsExtendedByName as unknown as Extended).findMostRecent()).toEqual(
-      projects("action_controller"),
-    );
+    expect(
+      projects("action_controller").equals(
+        await (david.projectsExtendedByName as unknown as Extended).findMostRecent(),
+      ),
+    ).toBe(true);
 
     const marshalled = Marshal.dump(david);
     david = Marshal.load(marshalled) as Developer;
 
-    expect(await (david.projectsExtendedByName as unknown as Extended).findMostRecent()).toEqual(
-      projects("action_controller"),
-    );
+    expect(
+      projects("action_controller").equals(
+        await (david.projectsExtendedByName as unknown as Extended).findMostRecent(),
+      ),
+    ).toBe(true);
   });
 
   it("extension name", () => {
