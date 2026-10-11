@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { ArgumentError } from "@blazetrails/activesupport";
-import { UnknownAttributeError } from "@blazetrails/activemodel";
+import { MissingAttributeError, UnknownAttributeError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
 import { Company } from "./test-helpers/models/company.js";
 import { Lion } from "./test-helpers/models/cat.js";
+import { Post } from "./test-helpers/models/post.js";
+import { Author } from "./test-helpers/models/author.js";
 
 describe("constructing a model whose table has not reflected", () => {
   it("alias_attribute does not raise, and the alias resolves once the schema lands", async () => {
@@ -27,6 +29,18 @@ describe("constructing a model whose table has not reflected", () => {
     await Lion.loadSchema();
 
     expect(new Lion().is_vegetarian).toBe(false);
+  });
+
+  it("a scope attribute naming an association does not raise, and applies once the schema lands", async () => {
+    expect(Post.columnsHash()["author_id"]).toBeUndefined();
+    const author = new Author();
+    expect(() => new Post({ author } as never)).toThrow(MissingAttributeError);
+    const relation = Post.createWith({ author } as never);
+    expect(() => relation.new()).not.toThrow();
+
+    await Post.loadSchema();
+
+    expect(relation.new().association("author").target).toBe(author);
   });
 
   it("alias_attribute still raises for an absent column on a reflected model", async () => {

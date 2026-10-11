@@ -1,6 +1,8 @@
 import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import { assertAssignedSynchronously } from "@blazetrails/activemodel";
+import { isEmpty, rbModConstSet } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Scoping } from "./namespaces.js";
+import { isSchemaLoaded } from "./model-schema.js";
 
 const SCOPE_REGISTRY_KEY = "active_record_scope_registry";
 
@@ -94,24 +96,34 @@ function setValueFor(scopeType: WeakMap<object, any>, model: object, value: any)
 interface ScopingHost {
   constructor: { isScopeAttributes(): boolean };
   /** @internal */
-  _assignAttributes?(attrs: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(attrs: Record<string, unknown>): Promise<void> | void;
 }
 
+/** @inventedArm if — PERMANENT */
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
   if (!klass.isScopeAttributes()) return;
-  const attrs = scopeAttributes.call(klass);
-  if (attrs && Object.keys(attrs).length > 0 && this._assignAttributes) {
+
+  let attributes = scopeAttributes.call(klass);
+  if (!isSchemaLoaded.call(klass)) {
+    attributes = Object.fromEntries(
+      Object.entries(attributes).filter(([name]) => klass.hasAttribute(name)),
+    );
+  }
+  if (!isEmpty(attributes)) {
     assertAssignedSynchronously(
-      this._assignAttributes(attrs),
+      this._assignAttributes(attributes),
       "populateWithCurrentScopeAttributes",
     );
   }
 }
 
 export function initializeInternalsCallback(this: ScopingHost): void {
+  Scoping.superMethod(this, "initializeInternalsCallback")!();
   populateWithCurrentScopeAttributes.call(this);
 }
+
+Scoping.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
 
 interface ScopingClassHost {
   currentScope?(skipInheritedScope?: boolean): any;
@@ -143,4 +155,4 @@ export function scopeRegistry(): ScopeRegistry {
   return ScopeRegistry.instance();
 }
 
-ActiveRecord.Scoping = Scoping;
+rbModConstSet(ActiveRecord, "Scoping", Scoping);
