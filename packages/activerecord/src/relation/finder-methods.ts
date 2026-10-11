@@ -51,6 +51,10 @@ interface FinderRelation {
   isNullRelation(): boolean;
   limitValue: number | string | null;
   offsetValue: number | string | null;
+  distinctValue: unknown;
+  limitBang(value: unknown): FinderRelation;
+  /** @internal */
+  _selectBang(...fields: unknown[]): FinderRelation;
   orderValues: unknown[];
   createWithValue: Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
@@ -436,11 +440,10 @@ export function constructRelationForExists(this: FinderRelation, conditions: unk
   conditions = sanitizeForbiddenAttributes(conditions as Record<string, unknown>);
 
   let relation: any;
-  if (rtest((this as any).distinctValue) && (this as any).offsetValue != null) {
-    relation = (this as any).except("order").limitBang(1);
+  if (rtest(this.distinctValue) && this.offsetValue != null) {
+    relation = this.except("order").limitBang(1);
   } else {
-    relation = (this as any)
-      .except("select", "distinct", "order")
+    relation = this.except("select", "distinct", "order")
       ._selectBang(new Nodes.SqlLiteral(ONE_AS_ONE))
       .limitBang(1);
   }

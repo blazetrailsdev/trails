@@ -110,8 +110,11 @@ export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
 }
 
 export function initializeInternalsCallback(this: ScopingHost): void {
+  Scoping.superMethod(this, "initializeInternalsCallback")!();
   populateWithCurrentScopeAttributes.call(this);
 }
+
+Scoping.defineMethod("initializeInternalsCallback", initializeInternalsCallback);
 
 interface ScopingClassHost {
   currentScope?(skipInheritedScope?: boolean): any;

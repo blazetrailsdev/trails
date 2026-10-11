@@ -297,10 +297,11 @@ Locking.eagerAutoload(() => {
 });
 ActiveRecord.Locking = Locking;
 
-export const Scoping = { name: "ActiveRecord::Scoping", loadPath } as AutoloadModule & {
-  Default: typeof Default;
-  Named: typeof Named;
-};
+export const Scoping = Object.assign(new Module(), { loadPath }) as Module &
+  AutoloadModule & {
+    Default: typeof Default;
+    Named: typeof Named;
+  };
 extend(Scoping, Autoload);
 Scoping.eagerAutoload(() => {
   Scoping.autoload("Default");

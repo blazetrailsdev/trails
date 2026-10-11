@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
+import { NamespacedCompany } from "./test-helpers/models/company.js";
 import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -177,7 +178,7 @@ describe("instantiating a loaded record (core.rb init_with_attributes)", () => {
     } finally {
       initInternals.mockRestore();
     }
-    expect(changed).toEqual([["_suppressInitializeCallback"]]);
+    expect(changed).toEqual([[]]);
   });
 
   it("a nested new of the class being allocated is an ordinary new", () => {
@@ -450,6 +451,47 @@ describe("init_internals / initialize_dup super chain", () => {
 
     expect(duped.isNewRecord()).toBe(true);
     expect(duped.id).toBe(null);
+  });
+});
+
+describe("initialize_internals_callback runs before assign_attributes (core.rb:475-477)", () => {
+  fixtures(["topics"]);
+
+  it("the chain reaches Scoping's and Inheritance's bodies before the attributes are assigned", async () => {
+    type Callback = { initializeInternalsCallback(): void };
+    const seen: unknown[] = [];
+    const original = (Reply.prototype as unknown as Callback).initializeInternalsCallback;
+    const callback = vi
+      .spyOn(Reply.prototype as unknown as Callback, "initializeInternalsCallback")
+      .mockImplementation(function (this: Reply) {
+        seen.push(this.title);
+        original.call(this);
+        seen.push(this.title, this.readAttribute("type"));
+      });
+    try {
+      await Reply.where({ title: "scoped" }).scoping(async () => {
+        const reply = new Reply({ content: "assigned" });
+        expect(reply.title).toBe("scoped");
+        expect(reply.content).toBe("assigned");
+        expect(new Reply({ title: "assigned" }).title).toBe("assigned");
+      });
+    } finally {
+      callback.mockRestore();
+    }
+    expect(seen).toEqual([null, "scoped", "Reply", null, "scoped", "Reply"]);
+  });
+});
+
+describe("inspect interpolates Module#to_s (core.rb:881)", () => {
+  fixtures(["topics"]);
+
+  it("an anonymous model class inspects as #<Class:0x...>", () => {
+    const klass = (() => class extends Topic {})();
+    expect(new klass({}).inspect()).toMatch(/^#<#<Class:0x[0-9a-f]+> id: nil, /);
+  });
+
+  it("a class seated under a namespace inspects with its path", () => {
+    expect(new NamespacedCompany({}).inspect()).toMatch(/^#<Namespaced::Company id: nil, /);
   });
 });
 
