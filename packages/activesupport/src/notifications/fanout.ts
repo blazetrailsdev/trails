@@ -305,7 +305,7 @@ export class Fanout {
     return subscriber;
   }
 
-  unsubscribe(subscriberOrName: Evented | string): void {
+  unsubscribe(subscriberOrName: Evented | string | null): void {
     if (typeof subscriberOrName === "string") {
       const list = this.stringSubscribers.get(subscriberOrName);
       if (list) list.length = 0;
@@ -314,16 +314,16 @@ export class Fanout {
         sub.unsubscribeBang(subscriberOrName);
       }
     } else {
-      const pattern = subscriberOrName.pattern;
+      const pattern = subscriberOrName?.pattern;
       if (pattern instanceof StringMatcher) {
         const list = this.stringSubscribers.get(pattern.pattern);
         if (list) {
-          const idx = list.indexOf(subscriberOrName);
+          const idx = list.findIndex((sub) => sub === subscriberOrName);
           if (idx !== -1) list.splice(idx, 1);
         }
         this.clearCache(pattern.pattern);
       } else {
-        const idx = this.otherSubscribers.indexOf(subscriberOrName);
+        const idx = this.otherSubscribers.findIndex((sub) => sub === subscriberOrName);
         if (idx !== -1) this.otherSubscribers.splice(idx, 1);
         this.clearCache();
       }

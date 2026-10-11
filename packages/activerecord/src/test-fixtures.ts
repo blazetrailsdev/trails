@@ -177,6 +177,8 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
 const alreadyLoadedFixtures = new Map<unknown[], Record<string, FixtureSet>>();
 
 export interface TestFixtures {
+  fixtureTableNames: string[];
+  fixtureClassNames: Record<string, BaseClass | string | null>;
   fixtureSets: Record<string, string>;
   useTransactionalTests: boolean;
   useInstantiatedFixtures: boolean | string;

@@ -6,6 +6,7 @@
     "rootDir": "src"
   },
   "include": ["src"],
+  "exclude": ["src/test-helpers/fixtures/all/admin/**"],
   "references": [
     { "path": "../ruby-compat" },
     { "path": "../arel" },
