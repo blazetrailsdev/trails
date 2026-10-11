@@ -11,9 +11,19 @@ import {
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
-import { assertEmpty, assertNothingRaised, assertRaises, getEnv } from "@blazetrails/activesupport";
+import {
+  assertCalled,
+  assertCalledWith as assertCalledWithArgs,
+  assertEmpty,
+  assertNothingRaised,
+  assertRaises,
+  getEnv,
+} from "@blazetrails/activesupport";
 import { stdout, stderr, setEnv, getProcessAdapter, RuntimeError } from "@blazetrails/ruby-compat";
 import { DatabaseTasks, DatabaseNotSupported } from "./database-tasks.js";
+import { MySQLDatabaseTasks } from "./mysql-database-tasks.js";
+import { PostgreSQLDatabaseTasks } from "./postgresql-database-tasks.js";
+import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import {
@@ -29,7 +39,7 @@ import { assertCalledOnInstanceOf } from "@blazetrails/activesupport";
 import { adapterType, ambientPoolConfiguration } from "../test-adapter.js";
 import { inMemoryDb } from "../support/adapter-helper.js";
 import { fixtures } from "../test-fixtures.js";
-import { clearRegisteredTasks } from "../test-helpers/registered-tasks.js";
+import { resetRegisteredTasks } from "../test-helpers/registered-tasks.js";
 
 let originalConfigurations: DatabaseConfigurations;
 const originalTrailsEnv = getEnv("TRAILS_ENV");
@@ -69,6 +79,19 @@ async function assertCalledForConfigs(
     calls!.length === configs.length && configs.every((call, i) => sameCall(calls[i], call)),
   ).toBeTruthy();
 }
+
+const tasks = {
+  mysqlTasks: MySQLDatabaseTasks.prototype,
+  postgresqlTasks: PostgreSQLDatabaseTasks.prototype,
+  sqliteTasks: SQLiteDatabaseTasks.prototype,
+} as unknown as Record<string, Record<string, unknown>>;
+
+const ADAPTERS_TASKS = {
+  mysql2: "mysqlTasks",
+  trilogy: "mysqlTasks",
+  postgresql: "postgresqlTasks",
+  sqlite3: "sqliteTasks",
+};
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
@@ -133,7 +156,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
         await cleanup.execute("DROP TABLE IF EXISTS ar_internal_metadata");
         await cleanup.disconnectBang();
         Base.configurations(originalConfigurations);
-        clearRegisteredTasks();
+        resetRegisteredTasks();
         fs.rmSync(tmp, { recursive: true, force: true });
       }
     },
@@ -182,7 +205,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
       await cleanup.execute("DROP TABLE IF EXISTS schema_migrations");
       await cleanup.disconnectBang();
       Base.configurations(originalConfigurations);
-      clearRegisteredTasks();
+      resetRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -247,7 +270,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
     } finally {
       Base.protectedEnvironments = protectedEnvironments;
       Base.configurations(originalConfigurations);
-      clearRegisteredTasks();
+      resetRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
@@ -255,7 +278,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
 
 describe("DatabaseTasksRegisterTask", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
   });
 
   it("register task", async () => {
@@ -445,6 +468,18 @@ function captureStdoutAndStderr(): void {
   });
 }
 
+describe("DatabaseTasksCreateTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} create`, async () => {
+      await assertCalled(tasks[v], "create", null, {}, async () => {
+        await DatabaseTasks.create({ adapter: k });
+      });
+    });
+  }
+});
+
 describe("DatabaseTasksCreateAllTest", () => {
   captureStdoutAndStderr();
 
@@ -455,7 +490,7 @@ describe("DatabaseTasksCreateAllTest", () => {
     createSpy = vi.spyOn(DatabaseTasks, "create").mockResolvedValue(undefined as never);
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
@@ -529,7 +564,7 @@ describe("DatabaseTasksCreateCurrentTest", () => {
     });
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -611,7 +646,7 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -678,6 +713,18 @@ describe("DatabaseTasksCreateCurrentThreeTierTest", () => {
   });
 });
 
+describe("DatabaseTasksDropTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} drop`, async () => {
+      await assertCalled(tasks[v], "drop", null, {}, async () => {
+        await DatabaseTasks.drop({ adapter: k });
+      });
+    });
+  }
+});
+
 describe("DatabaseTasksDropAllTest", () => {
   captureStdoutAndStderr();
 
@@ -686,7 +733,7 @@ describe("DatabaseTasksDropAllTest", () => {
     dropSpy = vi.spyOn(DatabaseTasks, "drop").mockResolvedValue(undefined as never);
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
@@ -758,7 +805,7 @@ describe("DatabaseTasksDropCurrentTest", () => {
     });
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -821,7 +868,7 @@ describe("DatabaseTasksDropCurrentThreeTierTest", () => {
     });
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -956,7 +1003,7 @@ function databaseTasksMigrationTestCase(folderName = "valid"): MigrationTestCase
     stdoutSpy?.mockRestore();
     stdoutSpy = undefined;
     Base.configurations(originalConfigurations);
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     try {
       await Base.removeConnection();
     } catch {}
@@ -1181,15 +1228,27 @@ describe("DatabaseTasksMigrateErrorTest", () => {
         await Base.removeConnection();
       } catch {}
       Base.configurations(originalConfigurations);
-      clearRegisteredTasks();
+      resetRegisteredTasks();
       fs.rmSync(tmp, { recursive: true, force: true });
     }
   });
 });
 
+describe("DatabaseTasksPurgeTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} purge`, async () => {
+      await assertCalled(tasks[v], "purge", null, {}, async () => {
+        await DatabaseTasks.purge({ adapter: k });
+      });
+    });
+  }
+});
+
 describe("DatabaseTasksPurgeCurrentTest", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1216,7 +1275,7 @@ describe("DatabaseTasksPurgeCurrentTest", () => {
 
 describe("DatabaseTasksPurgeAllTest", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     vi.restoreAllMocks();
   });
@@ -1235,7 +1294,7 @@ describe("DatabaseTasksPurgeAllTest", () => {
 
 describe("DatabaseTasksTruncateAllTest", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
   });
@@ -1260,7 +1319,7 @@ describe("DatabaseTasksTruncateAllTest", () => {
     expect((await seed.execute("SELECT * FROM colleges"))!.length).toBeGreaterThan(0);
     await seed.disconnectBang();
 
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     DatabaseTasks.registerTask(/sqlite/, class {});
     Base.configurations({
       development: { adapter: "sqlite3", database: dbPath },
@@ -1308,7 +1367,7 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
     });
   });
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
@@ -1358,11 +1417,19 @@ describe("DatabaseTasksTruncateAllWithMultipleDatabasesTest", () => {
 
 describe("DatabaseTasksCharsetTest", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} charset`, async () => {
+      await assertCalled(tasks[v], "charset", null, {}, async () => {
+        await DatabaseTasks.charset({ adapter: k });
+      });
+    });
+  }
 
   it("charset current", async () => {
     const charsetSpy = vi.spyOn(DatabaseTasks, "charset").mockResolvedValue(undefined as never);
@@ -1378,11 +1445,19 @@ describe("DatabaseTasksCharsetTest", () => {
 
 describe("DatabaseTasksCollationTest", () => {
   afterEach(() => {
-    clearRegisteredTasks();
+    resetRegisteredTasks();
     Base.configurations(originalConfigurations);
     DatabaseTasks.env = "development";
     vi.restoreAllMocks();
   });
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} collation`, async () => {
+      await assertCalled(tasks[v], "collation", null, {}, async () => {
+        await DatabaseTasks.collation({ adapter: k });
+      });
+    });
+  }
 
   it("collation current", async () => {
     const collationSpy = vi.spyOn(DatabaseTasks, "collation").mockResolvedValue(undefined as never);
@@ -1394,6 +1469,42 @@ describe("DatabaseTasksCollationTest", () => {
 
     assertCalledWith(collationSpy, [configFor("production", "primary")]);
   });
+});
+
+describe("DatabaseTasksStructureDumpTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure dump`, async () => {
+      await assertCalledWithArgs(
+        tasks[v],
+        "structureDump",
+        ["awesome-file.sql", null],
+        {},
+        async () => {
+          await DatabaseTasks.structureDump({ adapter: k }, "awesome-file.sql");
+        },
+      );
+    });
+  }
+});
+
+describe("DatabaseTasksStructureLoadTest", () => {
+  captureStdoutAndStderr();
+
+  for (const [k, v] of Object.entries(ADAPTERS_TASKS)) {
+    it(`${k} structure load`, async () => {
+      await assertCalledWithArgs(
+        tasks[v],
+        "structureLoad",
+        ["awesome-file.sql", null],
+        {},
+        async () => {
+          await DatabaseTasks.structureLoad({ adapter: k }, "awesome-file.sql");
+        },
+      );
+    });
+  }
 });
 
 describe("DatabaseTaskTargetVersionTest", () => {
@@ -1522,6 +1633,10 @@ describe("DatabaseTasksCheckSchemaFileTest", () => {
 });
 
 describe("DatabaseTasksCheckSchemaFileMethods", () => {
+  const FORMATS: Record<string, ["ts" | "sql", string]> = {
+    ruby: ["ts", "schema.ts"],
+    sql: ["sql", "structure.sql"],
+  };
   let originalSchema: string | undefined;
   let originalDbDir: string;
   beforeEach(() => {
@@ -1549,6 +1664,14 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
     process.env.SCHEMA = "schema_path";
     expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!)).toBe("schema_path");
   });
+
+  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
+    it(`check dump filename for ${fmt} format`, () => {
+      expect(DatabaseTasks.schemaDumpPath(configFor("development", "primary")!, format)).toBe(
+        `/tmp/${filename}`,
+      );
+    });
+  }
 
   it("check dump filename defaults for non primary databases", () => {
     Base.configurations({
@@ -1582,6 +1705,20 @@ describe("DatabaseTasksCheckSchemaFileMethods", () => {
       "schema_path",
     );
   });
+
+  for (const [fmt, [format, filename]] of Object.entries(FORMATS)) {
+    it(`check dump filename for ${fmt} format with non primary databases`, () => {
+      Base.configurations({
+        development: {
+          primary: { adapter: "abstract", database: "dev-db" },
+          secondary: { adapter: "abstract", database: "secondary-dev-db" },
+        },
+      });
+      expect(DatabaseTasks.schemaDumpPath(configFor("development", "secondary")!, format)).toBe(
+        `/tmp/secondary_${filename}`,
+      );
+    });
+  }
 });
 
 describe("DatabaseTasksWithTemporaryPoolTest", () => {
