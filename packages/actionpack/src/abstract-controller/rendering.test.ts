@@ -9,6 +9,10 @@ import {
   _normalizeOptions,
   _normalizeRender,
   _processVariant,
+  _setHtmlContentType,
+  _setRenderedContentType,
+  _setVaryHeader,
+  renderedFormat,
   type RenderOptions,
   type RenderingHost,
 } from "./rendering.js";
@@ -22,6 +26,10 @@ function makeHost(opts: Partial<RenderingHost> = {}): RenderingHost {
     _normalizeArgs,
     _processVariant,
     _normalizeOptions,
+    _setHtmlContentType,
+    _setRenderedContentType,
+    _setVaryHeader,
+    renderedFormat,
     ...opts,
   };
 }

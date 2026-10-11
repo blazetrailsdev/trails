@@ -56,15 +56,11 @@ export class PublicExceptions {
   }
 
   private renderFormat(status: number, contentType: MimeType, body: string): RackResponse {
-    const charset = Response.defaultCharset;
-    const enc = normalizeCharset(charset);
-    const effectiveCharset =
-      enc === "utf-8" && charset.toLowerCase() !== "utf-8" ? "utf-8" : charset;
-    const encoded = Buffer.from(body, enc);
+    const encoded = Buffer.from(body, "utf-8");
     return [
       status,
       {
-        "content-type": `${contentType}; charset=${effectiveCharset}`,
+        "content-type": `${contentType}; charset=${Response.defaultCharset ?? ""}`,
         "content-length": String(encoded.byteLength),
       },
       bodyFromBytes(encoded),
@@ -90,29 +86,6 @@ export class PublicExceptions {
       return this.renderFormat(status, htmlType, html);
     }
     return [404, { [X_CASCADE]: "pass" }, emptyBody()];
-  }
-}
-
-function normalizeCharset(charset: string): BufferEncoding {
-  switch (charset.toLowerCase()) {
-    case "utf-8":
-    case "utf8":
-      return "utf-8";
-    case "utf-16le":
-    case "utf16le":
-    case "ucs-2":
-    case "ucs2":
-      return "utf16le";
-    case "iso-8859-1":
-    case "iso8859-1":
-    case "latin1":
-    case "latin-1":
-      return "latin1";
-    case "us-ascii":
-    case "ascii":
-      return "ascii";
-    default:
-      return "utf-8";
   }
 }
 

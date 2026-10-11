@@ -15,7 +15,7 @@ import {
 } from "./live.js";
 import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetrails/ruby-compat";
 import { include } from "@blazetrails/ruby-compat/include";
-import { IsolatedExecutionState } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../../action-dispatch/http/request.js";
 
 function makeResponse() {
@@ -428,6 +428,23 @@ describe("ActionController::Live#send_stream", () => {
     const host = makeHost();
     await sendStream.call(host, { filename: "data.bin", type: "application/x-foo" }, () => {});
     expect(host.response.headers.get("content-type")).toBe("application/x-foo");
+  });
+
+  it("instruments send_stream.action_controller with the payload", async () => {
+    const payloads: unknown[] = [];
+    const subscriber = Notifications.subscribe("send_stream.action_controller", (event) => {
+      payloads.push(event.payload);
+    });
+    try {
+      const host = makeHost();
+      await sendStream.call(host, { filename: "export.csv", type: ":csv" }, () => {});
+      expect(host.response.headers.get("content-type")).toBe("text/csv");
+      expect(payloads).toEqual([
+        { filename: "export.csv", disposition: "attachment", type: ":csv" },
+      ]);
+    } finally {
+      Notifications.unsubscribe(subscriber);
+    }
   });
 
   it("closes the stream even when the block throws", async () => {

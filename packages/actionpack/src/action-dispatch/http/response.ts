@@ -206,7 +206,7 @@ export class FileBody {
 
 /* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include Rack::Response::Helpers` (`action_dispatch/http/response.rb:91`); the class/interface merge is how a mixin surfaces on the type side. */
 export class Response {
-  static defaultCharset = "utf-8";
+  static defaultCharset: string | null = "utf-8";
 
   private _status: number;
   private _headers: Headers;
@@ -286,19 +286,19 @@ export class Response {
     if (value == null) return;
     const newHeaderInfo = this.parseContentType(String(value));
     const prevHeaderInfo = this.parsedContentTypeHeader();
-    let charset = newHeaderInfo.charset || prevHeaderInfo.charset;
+    let charset: string | null | undefined = newHeaderInfo.charset || prevHeaderInfo.charset;
     if (!charset && !prevHeaderInfo.mimeType) {
       charset = (this.constructor as typeof Response).defaultCharset;
     }
     this.setContentType(newHeaderInfo.mimeType, charset);
   }
 
-  get charset(): string | undefined {
+  get charset(): string | null | undefined {
     const headerInfo = this.parsedContentTypeHeader();
     return headerInfo.charset || (this.constructor as typeof Response).defaultCharset;
   }
 
-  set charset(charset: string | false | undefined) {
+  set charset(charset: string | false | null | undefined) {
     const contentType = this.parsedContentTypeHeader().mimeType;
     if (charset === false) {
       this.setContentType(contentType, undefined);
@@ -549,7 +549,7 @@ export class Response {
   }
 
   /** @internal */
-  setContentType(contentType: string | undefined, charset: string | undefined): void {
+  setContentType(contentType: string | undefined, charset: string | null | undefined): void {
     const type = contentType ?? "";
     const value = charset ? `${type}; charset=${String(charset).toLowerCase()}` : type;
     this.setHeader(CONTENT_TYPE, value);

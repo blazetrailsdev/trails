@@ -27,10 +27,10 @@ export interface InterlockLike {
 export class DebugLocks {
   static interlock: InterlockLike | null = null;
 
-  static get defaultCharset(): string {
+  static get defaultCharset(): string | null {
     return Response.defaultCharset;
   }
-  static set defaultCharset(value: string) {
+  static set defaultCharset(value: string | null) {
     Response.defaultCharset = value;
   }
 

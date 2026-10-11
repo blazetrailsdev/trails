@@ -21,7 +21,7 @@ describe("ActionDispatch::Trailtie", () => {
   let savedStrictQuery: boolean | null;
   let savedPerformDeepMunge: boolean;
   let savedStrictFreshness: boolean;
-  let savedDefaultCharset: string;
+  let savedDefaultCharset: string | null;
   let app: { deprecators: Deprecators };
 
   beforeEach(() => {

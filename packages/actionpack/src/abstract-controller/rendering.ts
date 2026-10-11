@@ -34,12 +34,12 @@ export interface RenderingHost {
   responseBody: unknown;
   renderToBody(options: RenderOptions): unknown;
   /** @internal */
-  _setHtmlContentType?(): void;
+  _setHtmlContentType(): void;
   /** @internal */
-  _setRenderedContentType?(format: unknown): void;
+  _setRenderedContentType(format: unknown): void;
   /** @internal */
-  _setVaryHeader?(): void;
-  renderedFormat?(): unknown;
+  _setVaryHeader(): void;
+  renderedFormat(): unknown;
   /** @internal */
   _normalizeRender(...args: unknown[]): RenderOptions;
   /** @internal */
@@ -55,11 +55,11 @@ export function render<T extends RenderingHost>(this: T, ...args: unknown[]): vo
   const renderedBody = this.renderToBody(options);
   const set = (renderedBody: unknown): void => {
     if (options.html != null && options.html !== false) {
-      this._setHtmlContentType?.();
+      this._setHtmlContentType();
     } else {
-      this._setRenderedContentType?.(this.renderedFormat?.());
+      this._setRenderedContentType(this.renderedFormat());
     }
-    this._setVaryHeader?.();
+    this._setVaryHeader();
     this.responseBody = renderedBody;
   };
   if (typeof (renderedBody as PromiseLike<unknown> | null)?.then === "function") {
@@ -128,6 +128,15 @@ export function _processVariant(_options: RenderOptions): void {}
 export function _processFormat(_format: unknown): void {}
 
 /** @internal */
+export function _setHtmlContentType(): void {}
+
+/** @internal */
+export function _setVaryHeader(): void {}
+
+/** @internal */
+export function _setRenderedContentType(_format: unknown): void {}
+
+/** @internal */
 export function _protectedIvars(): readonly string[] {
   return DEFAULT_PROTECTED_INSTANCE_VARIABLES;
 }
@@ -146,6 +155,9 @@ export const Rendering = new Module((mod) => {
   mod.defineMethod("_processOptions", _processOptions);
   mod.defineMethod("_processFormat", _processFormat);
   mod.defineMethod("_processVariant", _processVariant);
+  mod.defineMethod("_setHtmlContentType", _setHtmlContentType);
+  mod.defineMethod("_setVaryHeader", _setVaryHeader);
+  mod.defineMethod("_setRenderedContentType", _setRenderedContentType);
   mod.defineMethod("_normalizeRender", _normalizeRender);
   mod.defineMethod("_protectedIvars", _protectedIvars);
 });

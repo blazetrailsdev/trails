@@ -1,130 +1,201 @@
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { assertEqual, assertNil, Logger } from "@blazetrails/activesupport";
+import { rbInspect } from "@blazetrails/ruby-compat";
+import "../../test-helpers/abstract-unit.js";
 import { Base } from "../base.js";
-import { Request } from "../../action-dispatch/request.js";
-import { Response } from "../../action-dispatch/response.js";
+import { TestCase } from "../test-case.js";
 import { Mime } from "../../action-dispatch/http/mime-type.js";
+import { Response } from "../../action-dispatch/http/response.js";
 
-function makeRequest(opts: Record<string, unknown> = {}): Request {
-  return new Request({
-    REQUEST_METHOD: "GET",
-    PATH_INFO: "/",
-    HTTP_HOST: "localhost",
-    ...opts,
-  });
-}
+class OldContentTypeController extends Base {
+  declare logger: Logger;
 
-function makeResponse(): Response {
-  return new Response();
+  async renderContentTypeFromBody() {
+    this.response.contentType = Mime.get("rss");
+    await this.render({ body: "hello world!" });
+  }
+
+  async renderDefaults() {
+    await this.render({ body: "hello world!" });
+  }
+
+  async renderContentTypeFromRender() {
+    await this.render({ body: "hello world!", contentType: Mime.get("rss") });
+  }
+
+  async renderCharsetFromBody() {
+    this.response.charset = "utf-16";
+    await this.render({ body: "hello world!" });
+  }
+
+  async renderNilCharsetFromBody() {
+    this.response.charset = null;
+    await this.render({ body: "hello world!" });
+  }
+
+  renderDefaultForTse() {}
+
+  renderDefaultForBuilder() {}
+
+  async renderChangeForBuilder() {
+    this.response.contentType = Mime.get("html");
+    await this.render({ action: "renderDefaultForBuilder" });
+  }
+
+  async renderDefaultContentTypesForRespondTo() {
+    await this.respondTo((format) => {
+      format.html(() => this.render({ body: "hello world!" }));
+      format.xml(() => this.render({ action: "renderDefaultContentTypesForRespondTo" }));
+      format.js(() => this.render({ body: "hello world!" }));
+      format.rss(() => this.render({ body: "hello world!", contentType: Mime.get("xml") }));
+    });
+  }
+
+  async renderContentTypeWithCharset() {
+    this.response.contentType = "text/html; fragment; charset=utf-16";
+    await this.render({ body: "hello world!" });
+  }
 }
 
 describe("ContentTypeTest", () => {
-  it("test render defaults", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ body: "hello world!" });
+  class ContentTypeTest extends TestCase {
+    declare controller: OldContentTypeController;
+
+    static {
+      this.tests(OldContentTypeController);
+    }
+
+    override setup() {
+      super.setup();
+      this.controller.logger = new Logger(null);
+    }
+
+    async withDefaultCharset(charset: string | null, block: () => Promise<void>) {
+      const oldDefaultCharset = Response.defaultCharset;
+      Response.defaultCharset = charset;
+      try {
+        await block();
+      } finally {
+        Response.defaultCharset = oldDefaultCharset;
       }
     }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.charset).toBe("utf-8");
-    expect(c.response.mediaType).toBe("text/plain");
+  }
+
+  let tc: ContentTypeTest;
+
+  beforeEach(async ({ task }) => {
+    tc = new ContentTypeTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
   });
 
-  it("test render changed charset default", async () => {
-    const oldCharset = Response.defaultCharset;
-    try {
-      Response.defaultCharset = "utf-16";
-      class C extends Base {
-        async action() {
-          await this.render({ body: "hello world!" });
-        }
-      }
-      const c = new C();
-      await c.dispatch("action", makeRequest(), makeResponse());
-      expect(c.response.charset).toBe("utf-16");
-      expect(c.response.mediaType).toBe("text/plain");
-    } finally {
-      Response.defaultCharset = oldCharset;
-    }
+  it("render defaults", async () => {
+    await tc.get("renderDefaults");
+    assertEqual("utf-8", tc.response.charset);
+    assertEqual(Mime.get("text"), tc.response.mediaType);
   });
 
-  it("test content type from body", async () => {
-    class C extends Base {
-      async action() {
-        this.response.contentType = Mime.fetch("rss").toString();
-        await this.render({ body: "hello world!" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.mediaType).toBe("application/rss+xml");
-    expect(c.response.charset).toBe("utf-8");
+  it("render changed charset default", async () => {
+    await tc.withDefaultCharset("utf-16", async () => {
+      await tc.get("renderDefaults");
+      assertEqual("utf-16", tc.response.charset);
+      assertEqual(Mime.get("text"), tc.response.mediaType);
+    });
   });
 
-  it("test content type from render", async () => {
-    class C extends Base {
-      async action() {
-        await this.render({ body: "hello world!", contentType: Mime.fetch("rss").toString() });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.mediaType).toBe("application/rss+xml");
-    expect(c.response.charset).toBe("utf-8");
+  it("content type from body", async () => {
+    await tc.get("renderContentTypeFromBody");
+    assertEqual(Mime.get("rss"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset);
   });
 
-  it("test charset from body", async () => {
-    class C extends Base {
-      async action() {
-        this.response.charset = "utf-16";
-        await this.render({ body: "hello world!" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.mediaType).toBe("text/plain");
-    expect(c.response.charset).toBe("utf-16");
+  it("content type from render", async () => {
+    await tc.get("renderContentTypeFromRender");
+    assertEqual(Mime.get("rss"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset);
   });
 
-  it("test nil charset from body", async () => {
-    class C extends Base {
-      async action() {
-        this.response.charset = undefined;
-        await this.render({ body: "hello world!" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.mediaType).toBe("text/plain");
-    expect(c.response.charset).toBe("utf-8");
+  it("charset from body", async () => {
+    await tc.get("renderCharsetFromBody");
+    assertEqual(Mime.get("text"), tc.response.mediaType);
+    assertEqual("utf-16", tc.response.charset);
   });
 
-  it.skip("test nil default for tse", () => {});
+  it("nil charset from body", async () => {
+    await tc.get("renderNilCharsetFromBody");
+    assertEqual(Mime.get("text"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset, rbInspect(tc.response.headers));
+  });
 
-  it.skip("test default for tse", () => {});
+  it("nil default for tse", async () => {
+    await tc.withDefaultCharset(null, async () => {
+      await tc.get("renderDefaultForTse");
+      assertEqual(Mime.get("html"), tc.response.mediaType);
+      assertNil(tc.response.charset, rbInspect(tc.response.headers));
+    });
+  });
 
-  it.skip("test default for builder", () => {});
+  it("default for tse", async () => {
+    await tc.get("renderDefaultForTse");
+    assertEqual(Mime.get("html"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset);
+  });
 
-  it.skip("test change for builder", () => {});
+  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  it.skip("default for builder", async () => {
+    await tc.get("renderDefaultForBuilder");
+    assertEqual(Mime.get("xml"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset);
+  });
 
-  it("test content type with charset", async () => {
-    class C extends Base {
-      async action() {
-        this.response.contentType = "text/html; fragment; charset=utf-16";
-        await this.render({ body: "hello world!" });
-      }
-    }
-    const c = new C();
-    await c.dispatch("action", makeRequest(), makeResponse());
-    expect(c.response.mediaType).toBe("text/html; fragment");
-    expect(c.response.charset).toBe("utf-16");
+  // BLOCKED: builder-template-handler-and-actionpack-builder-fixtures
+  it.skip("change for builder", async () => {
+    await tc.get("renderChangeForBuilder");
+    assertEqual(Mime.get("html"), tc.response.mediaType);
+    assertEqual("utf-8", tc.response.charset);
+  });
+
+  it("content type with charset", async () => {
+    await tc.get("renderContentTypeWithCharset");
+    assertEqual("text/html; fragment", tc.response.mediaType);
+    assertEqual("utf-16", tc.response.charset);
   });
 });
 
 describe("AcceptBasedContentTypeTest", () => {
-  it.skip("test render default content types for respond to", () => {});
+  class AcceptBasedContentTypeTest extends TestCase {
+    static {
+      this.tests(OldContentTypeController);
+    }
+  }
 
-  it.skip("test render default content types for respond to with template", () => {});
+  let tc: AcceptBasedContentTypeTest;
 
-  it.skip("test render default content types for respond to with overwrite", () => {});
+  beforeEach(async ({ task }) => {
+    tc = new AcceptBasedContentTypeTest(task.name);
+    await tc.beforeSetup();
+    tc.setup();
+  });
+
+  it("render default content types for respond to", async () => {
+    tc.request.accept = Mime.get("html")!.toString();
+    await tc.get("renderDefaultContentTypesForRespondTo");
+    assertEqual(Mime.get("html"), tc.response.mediaType);
+
+    tc.request.accept = Mime.get("js")!.toString();
+    await tc.get("renderDefaultContentTypesForRespondTo");
+    assertEqual(Mime.get("js"), tc.response.mediaType);
+  });
+
+  it("render default content types for respond to with template", async () => {
+    tc.request.accept = Mime.get("xml")!.toString();
+    await tc.get("renderDefaultContentTypesForRespondTo");
+    assertEqual(Mime.get("xml"), tc.response.mediaType);
+  });
+
+  it("render default content types for respond to with overwrite", async () => {
+    tc.request.accept = Mime.get("rss")!.toString();
+    await tc.get("renderDefaultContentTypesForRespondTo");
+    assertEqual(Mime.get("xml"), tc.response.mediaType);
+  });
 });

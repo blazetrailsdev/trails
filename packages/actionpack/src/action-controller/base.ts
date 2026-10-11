@@ -23,6 +23,7 @@ import {
   type skipForgeryProtection,
   type RequestForgeryProtectionHost,
 } from "./metal/request-forgery-protection.js";
+import type { MimeType } from "../action-dispatch/http/mime-type.js";
 import { respondTo } from "./metal/mime-responds.js";
 import type { head } from "./metal/head.js";
 import {
@@ -233,7 +234,7 @@ export interface RenderOptions {
   cached?: boolean | ((...args: never[]) => unknown);
   callback?: string;
   status?: number | StatusSymbol | `:${StatusSymbol}` | `${number}` | `${number} ${string}`;
-  contentType?: string;
+  contentType?: string | MimeType;
   location?: UrlForOptions;
   layout?: boolean | string | null | ((...args: never[]) => unknown);
   prefixes?: string[];
