@@ -81,10 +81,12 @@ describe("MessagePack::Buffer", () => {
 
   it("long feed and read mixed", () => {
     setSource(" ".repeat(1024 * 1024));
-    for (let i = 0; i < 3; i++) {
-      expect(str(buffer.read(10))).toEqual(source.slice(0, 10));
-      source = source.slice(10);
-    }
+    expect(str(buffer.read(10))).toEqual(source.slice(0, 10));
+    source = source.slice(10);
+    expect(str(buffer.read(10))).toEqual(source.slice(0, 10));
+    source = source.slice(10);
+    expect(str(buffer.read(10))).toEqual(source.slice(0, 10));
+    source = source.slice(10);
     const s = buffer.read()!;
     expect(s.length).toEqual(source.length);
     expect(str(s)).toEqual(source);
