@@ -26,7 +26,6 @@ tester.run("inlined-from-only-on-constructors", rule, {
       filename: BASE,
     },
     { code: `/** Reads what @inlinedFrom names. */\nfunction inlinedFromTags() {}\n` },
-    // The cited file has a twin of the same name in another package.
     {
       code: onConstructor(
         "ActiveRecord::Core#initialize rails/v8.0.2/activerecord/lib/active_record/core.rb:471-482",

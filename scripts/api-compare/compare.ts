@@ -6286,7 +6286,6 @@ export function main() {
         if (directMatch !== undefined && COPY_HOOKS.has(rubyName)) copyHookClaims.add(directMatch);
         if (directMatch && !declOnly) {
           fileMatched++;
-          // Compared through the `initialize` row, whose chain opens with it.
           if (besideInitialize) continue;
           notePredicateKind(expectedTs, directMatch);
           const claimKey = `${expectedTs}#${directMatch}#${rubyName.endsWith("=") ? "w" : "r"}`;

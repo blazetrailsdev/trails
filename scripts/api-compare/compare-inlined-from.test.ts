@@ -62,6 +62,7 @@ function compare({
   sameFileModule = false,
   rubyClass = true,
   moduleFile = "api.rb",
+  rubyNew = false,
 }: {
   tsCalls?: string[];
   inlinedFrom?: InlinedFrom[];
@@ -69,6 +70,7 @@ function compare({
   sameFileModule?: boolean;
   rubyClass?: boolean;
   moduleFile?: string;
+  rubyNew?: boolean;
 } = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
@@ -78,15 +80,18 @@ function compare({
     method("initialize", ["super"], cited(1, 2)),
   ]);
   const thing = {
-    "ActiveModel::Thing": entity(
-      "ActiveModel::Thing",
-      "thing.rb",
-      [
-        method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
-        ...helpers(["assign_attributes", "build_reflection"]),
-      ],
-      rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
-    ),
+    "ActiveModel::Thing": {
+      ...entity(
+        "ActiveModel::Thing",
+        "thing.rb",
+        [
+          method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
+          ...helpers(["assign_attributes", "build_reflection", "lookup_reflection"]),
+        ],
+        rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
+      ),
+      classMethods: rubyNew ? [method("new", ["lookup_reflection", "super"])] : [],
+    },
   };
   write("rails-api.json", {
     [PKG]: {
@@ -103,7 +108,7 @@ function compare({
   const tsMethods = [
     ...(rubyInitialize ? [] : [method("reflect", tsCalls)]),
     method("constructor", tsCalls, { inlinedFrom }),
-    ...helpers(["assignAttributes", "buildReflection"]),
+    ...helpers(["assignAttributes", "buildReflection", "lookupReflection"]),
   ].map((m, index) => ({ ...m, file: "thing.ts", line: 3 + index * 5 }));
   write("ts-api.json", {
     [PKG]: { classes: { Thing: entity("Thing", "thing.ts", tsMethods) }, modules: {} },
@@ -168,6 +173,17 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
       matched: 1,
       moves: [{ rubyName: "initialize", actualFile: "thing.ts" }],
     });
+  });
+
+  it("compares the constructor against the class's own self.new, then initialize", () => {
+    const { calls } = compare({ rubyNew: true });
+    expect(calls.join("\n")).toContain("lookup_reflection → lookupReflection");
+    expect(
+      compare({
+        rubyNew: true,
+        tsCalls: ["lookupReflection", "buildReflection", "assignAttributes", "super"],
+      }),
+    ).toEqual({ calls: [], args: [] });
   });
 
   const local = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });

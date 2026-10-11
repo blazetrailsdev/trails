@@ -550,9 +550,6 @@ export default defineConfig(
     },
   },
 
-  // ── inlined-from-only-on-constructors (RFC 0188): `@inlinedFrom` sits on a
-  //    class constructor and cites a hook on the rule's closed list. It reads no
-  //    manifest, so it needs no twin in eslint/rails-private-jsdoc.config.mjs.
   {
     files: ["packages/*/src/**/*.ts"],
     rules: {
