@@ -528,7 +528,10 @@ jobs:
           elif [ -z "$PRETTIER_FILES" ]; then
             echo "No changed files to check with Prettier."
           else
+            # A symlink is not a file prettier formats, and naming one
+            # explicitly is an error rather than an --ignore-unknown skip.
             printf '%s\n' "$PRETTIER_FILES" \
+              | while IFS= read -r f; do [ -L "$f" ] || printf '%s\n' "$f"; done \
               | xargs -r -d '\n' npx --yes prettier@3.8.1 --check --ignore-unknown
           fi
 
