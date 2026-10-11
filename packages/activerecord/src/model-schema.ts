@@ -30,7 +30,7 @@ import { isBaseClass, baseClass } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { TableNotSpecified } from "./errors.js";
 import { NullColumn, type Column } from "./connection-adapters/column.js";
-import { withConnection, isConnected } from "./connection-handling.js";
+import { isConnected } from "./connection-handling.js";
 
 function reflectionAdapter(klass: any): any {
   const pool = klass.connectionPool();
@@ -597,26 +597,26 @@ function applyColumnsHash(host: SchemaHost, hash: Record<string, Column>): void 
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if ((this as any).abstractClass) return;
-  let startingAdapter: SchemaHost["connection"] | undefined;
+  let pool: ReturnType<typeof Base.connectionPool>;
   try {
-    startingAdapter =
-      (this as unknown as typeof Base).connectionPool().activeConnection ?? undefined;
+    pool = (this as unknown as typeof Base).connectionPool();
   } catch {
-    startingAdapter = undefined;
+    return;
   }
+  const startingAdapter: SchemaHost["connection"] | undefined = pool.activeConnection ?? undefined;
   if (!startingAdapter) {
-    let leased: SchemaHost["connection"] | undefined;
+    let verifying = false;
     try {
-      return await withConnection.call<
-        typeof Base,
-        [(connection: SchemaHost["connection"]) => Promise<void>],
-        Promise<void>
-      >(this as unknown as typeof Base, (connection) => {
-        leased = connection;
+      return await pool.withConnection(async (connection: SchemaHost["connection"]) => {
+        if (connection.typeMap === null) {
+          verifying = true;
+          await connection.verifyBang();
+          verifying = false;
+        }
         return loadSchemaFromAdapter.call(this);
       });
     } catch (error) {
-      if (leased?.typeMap === null) throw error;
+      if (verifying) throw error;
       return;
     }
   }

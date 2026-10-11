@@ -15,6 +15,7 @@ import { Context } from "./context.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import { EncryptingOnlyEncryptor } from "./encrypting-only-encryptor.js";
 
+/** @noRailsEquivalent CONVERGEABLE thread-local-block-stacks-fork-per-async-block-at-the-root */
 interface Block {
   thread: Thread;
   customContexts: Context[] | null;
@@ -23,6 +24,7 @@ interface Block {
 let _adapter: AsyncContextAdapter | null = null;
 let _blocks: AsyncContext<Block> | null = null;
 
+/** @noRailsEquivalent CONVERGEABLE thread-local-block-stacks-fork-per-async-block-at-the-root */
 function blocks(): AsyncContext<Block> {
   const adapter = getAsyncContext();
   if (!_blocks || _adapter !== adapter) {
@@ -32,6 +34,7 @@ function blocks(): AsyncContext<Block> {
   return _blocks;
 }
 
+/** @noRailsEquivalent CONVERGEABLE thread-local-block-stacks-fork-per-async-block-at-the-root */
 function openBlock(): Block | null {
   const block = blocks().getStore();
   return block && block.thread === Thread.current() ? block : null;
@@ -62,7 +65,7 @@ export class Contexts {
     });
   }
 
-  /** @inventedArm run — PERMANENT */
+  /** @inventedArm run — CONVERGEABLE thread-local-block-stacks-fork-per-async-block-at-the-root */
   static withEncryptionContext<T>(properties: Partial<Context>, block: () => T): T {
     const own: Block = {
       thread: Thread.current(),
