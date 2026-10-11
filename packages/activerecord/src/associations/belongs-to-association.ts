@@ -1,7 +1,7 @@
 import { fetch, rbEqual, rbFCaller, rbFPublicSend } from "@blazetrails/ruby-compat";
 import { ActiveRecord, Associations } from "../namespaces.js";
 import type { Base } from "../base.js";
-import { kernelArray, underscore } from "@blazetrails/activesupport";
+import { kernelArray } from "@blazetrails/activesupport";
 import { SingularAssociation } from "./singular-association.js";
 import { Rollback } from "../errors.js";
 
@@ -108,22 +108,18 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   isTargetChanged(): boolean | undefined {
-    const changed = this.foreignKeyNames().some((foreignKey) =>
-      this.owner.attributeChanged(foreignKey),
+    return (
+      this.owner.attributeChanged(this.reflection.foreignKey()) ||
+      (!this.foreignKeyPresent() && this.target?.isNewRecord())
     );
-    return changed || (!this.foreignKeyPresent() && this.target?.isNewRecord());
   }
 
   isTargetPreviouslyChanged(): boolean | undefined {
-    return this.foreignKeyNames().some((foreignKey) =>
-      this.owner.attributePreviouslyChanged(foreignKey),
-    );
+    return this.owner.attributePreviouslyChanged(this.reflection.foreignKey());
   }
 
-  isSavedChangeToTarget(): boolean {
-    return this.foreignKeyNames().some((foreignKey) =>
-      this.owner.isSavedChangeToAttribute(foreignKey),
-    );
+  isSavedChangeToTarget(): boolean | undefined {
+    return this.owner.isSavedChangeToAttribute(this.reflection.foreignKey());
   }
 
   protected override replace(record: Base | null): Base | null {
@@ -165,16 +161,6 @@ export class BelongsToAssociation extends SingularAssociation {
     return kernelArray(this.reflection.foreignKey()).every(
       (fk) => this.owner._readAttribute(fk) != null,
     );
-  }
-
-  private foreignKeyName(): string {
-    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
-    return Array.isArray(fk) ? fk[0] : fk;
-  }
-
-  protected foreignKeyNames(): string[] {
-    const fk = this.reflection.foreignKey() ?? `${underscore(this.reflection.name)}_id`;
-    return Array.isArray(fk) ? fk : [fk];
   }
 
   /** @internal */

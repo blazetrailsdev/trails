@@ -23,7 +23,7 @@ import type { VerySpecialComment } from "./comment.js";
 import { ModelName, type ModelLike } from "@blazetrails/activemodel";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
-import type { ColumnLike } from "../../model-schema.js";
+import type { Column } from "../../connection-adapters/column.js";
 import { ScopeRegistry } from "../../scoping.js";
 import { DelegateCache } from "../../relation/delegation.js";
 import { registerModel } from "../../associations.js";
@@ -1021,8 +1021,8 @@ export class FakeKlass {
 
   static disallowRawSqlBang(..._args: unknown[]): void {}
 
-  static columnsHash(): Record<string, ColumnLike> {
-    return { name: null as unknown as ColumnLike };
+  static columnsHash(): Record<string, Column> {
+    return { name: null as unknown as Column };
   }
 
   static get arelTable(): unknown {

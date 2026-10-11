@@ -239,7 +239,6 @@ export class ConnectionPool implements ReapablePool {
   private _nowConnecting = 0;
   private _threadsBlockingNewConnections = 0;
   private _available: ConnectionLeasingQueue | null;
-  private _checkedOut = new Set<DatabaseAdapter>();
   private _leases: LeaseRegistry | null = new LeaseRegistry();
   private _idleTimeout: number | null;
   private _pendingCloseDrains = new Set<Promise<void>>();
@@ -316,7 +315,10 @@ export class ConnectionPool implements ReapablePool {
     return this.connectionLease().sticky === null;
   }
 
-  /** @inventedArm if — PERMANENT */
+  /**
+   * @inventedArm if — PERMANENT
+   * @inventedArm synchronize — CONVERGEABLE pin-connection-runs-verify-and-begin-under-an-invented-adapter-lock
+   */
   async pinConnectionBang(lockThread = false): Promise<void> {
     const connection =
       this._pinnedConnection || this.connectionLease()?.connection || (await this.checkout());
@@ -331,8 +333,11 @@ export class ConnectionPool implements ReapablePool {
     }
 
     if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
-    await this._pinnedConnection.verifyBang();
-    await this._pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
+    const pinnedConnection = this._pinnedConnection;
+    await pinnedConnection.lock.synchronize(async () => {
+      await pinnedConnection.verifyBang();
+      await pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
+    });
   }
 
   async unpinConnectionBang(): Promise<boolean> {
@@ -430,7 +435,6 @@ export class ConnectionPool implements ReapablePool {
         this._connections = [];
         this._leases!.clear();
         this._available!.clear();
-        this._checkedOut.clear();
       }),
     );
   }
@@ -449,7 +453,6 @@ export class ConnectionPool implements ReapablePool {
       this._available?.clear();
       this._available = null;
       this._leases = null;
-      this._checkedOut.clear();
     });
   }
 
@@ -502,7 +505,6 @@ export class ConnectionPool implements ReapablePool {
     if (this._pinnedConnection === conn) return;
 
     this.connectionLease().clear(conn);
-    this._checkedOut.delete(conn);
 
     conn._runCheckinCallbacks(() => {
       conn.expire();
@@ -515,7 +517,6 @@ export class ConnectionPool implements ReapablePool {
     let needsNewConnection = false;
 
     removeConnectionFromThreadCache(this, conn);
-    this._checkedOut.delete(conn);
 
     aryDelete(this._connections!, conn);
     this._available!.delete(conn);
@@ -719,7 +720,6 @@ export class ConnectionPool implements ReapablePool {
         const conn = this.checkoutNewConnection();
         conn.pool = this;
         this._connections!.push(conn);
-        this._checkedOut.add(conn);
         conn.lease();
         return conn;
       } finally {
@@ -739,7 +739,6 @@ export class ConnectionPool implements ReapablePool {
         { connectionPool: this },
       );
     }
-    this._checkedOut.add(conn);
     try {
       conn._runCheckoutCallbacks(() => {
         conn.cleanBang();
@@ -900,10 +899,10 @@ async function withNewConnectionsBlocked<R>(this: Pool, block: () => Promise<R>)
       let need = waiters;
       this._available?.clear?.();
       for (const conn of this._connections ?? []) {
-        if (!this._checkedOut.has(conn)) {
-          this._available?.add(conn);
-          need -= 1;
-        }
+        if (conn.isInUse()) continue;
+
+        this._available?.add(conn);
+        need -= 1;
       }
       if (need > 0) await this.bulkMakeNewConnections(need);
     }
@@ -923,20 +922,16 @@ async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<D
       });
     }
   };
-  const accept = (c: DatabaseAdapter): DatabaseAdapter => {
-    this._checkedOut.add(c);
-    return c;
-  };
   try {
     ensureLive();
     let conn = this._available?.poll() as DatabaseAdapter | undefined;
-    if (conn) return accept(conn);
+    if (conn) return conn;
     conn = (await this.tryToCheckoutNewConnection()) ?? undefined;
     if (conn) return conn;
     await this.reap();
     ensureLive();
     conn = this._available?.poll() as DatabaseAdapter | undefined;
-    if (conn) return accept(conn);
+    if (conn) return conn;
     conn = (await this.tryToCheckoutNewConnection()) ?? undefined;
     if (conn) return conn;
     const polled = this._available?.poll(checkoutTimeout);
@@ -949,7 +944,7 @@ async function acquireConnection(this: Pool, checkoutTimeout: number): Promise<D
       );
     }
     if (waited) ensureLive();
-    return accept(result);
+    return result;
   } catch (err) {
     throw tagPool(err);
   }
@@ -989,7 +984,6 @@ async function tryToCheckoutNewConnection(this: Pool): Promise<DatabaseAdapter |
     await synchronize.call(this, async () => {
       if (conn) {
         await this.adoptConnection(conn);
-        this._checkedOut.add(conn);
         (conn as unknown as PoolManagedConnection).lease?.();
       }
       this._nowConnecting -= 1;

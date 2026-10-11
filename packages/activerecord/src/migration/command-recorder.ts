@@ -8,6 +8,7 @@ import {
   last,
   rbFSend,
   rbObjDup,
+  rtest,
   uniq,
 } from "@blazetrails/ruby-compat";
 import {
@@ -208,7 +209,7 @@ export class CommandRecorder {
       );
     }
 
-    if (Object.keys(options).length > 0) args = [...args, options];
+    if (!isEmpty(options)) args.push(options);
 
     return CommandRecorder.StraightReversions.instanceMethod("invertDropTable")!.value.call(
       this,
@@ -219,7 +220,7 @@ export class CommandRecorder {
 
   /** @internal */
   invertRemoveColumn(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    if (typeof args[2] !== "string") {
+    if (args.length <= 2) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_column is only reversible if given a type.",
       );
@@ -236,16 +237,20 @@ export class CommandRecorder {
     const options = extractOptionsBang(args);
     const table = args[0];
     let columns = args[1];
-    columns ??= hashDelete(options, "column");
-    if (columns == null) {
+
+    if (!rtest(columns)) columns = hashDelete(options, "column");
+
+    if (!rtest(columns)) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_index is only reversible if given a :column option.",
       );
     }
 
-    delete options["ifExists"];
+    hashDelete(options, "ifExists");
+
     args = [table, columns];
     if (!isEmpty(options)) args.push(options);
+
     return ["addIndex", args];
   }
 
@@ -282,7 +287,9 @@ export class CommandRecorder {
     const options = extractOptionsBang(args);
     const fromTable = args[0];
     let toTable = args[1];
-    toTable ??= hashDelete(options, "toTable");
+
+    if (!rtest(toTable)) toTable = hashDelete(options, "toTable");
+
     if (toTable == null) {
       throw new ActiveRecord.IrreversibleMigration(
         "remove_foreign_key is only reversible if given a second table",
@@ -296,19 +303,14 @@ export class CommandRecorder {
 
   /** @internal */
   invertAddCheckConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
-    const a = args.slice();
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
-      const opts = { ...(a[a.length - 1] as Record<string, unknown>) };
-      delete opts["validate"];
-      if ("ifNotExists" in opts) {
-        opts["ifExists"] = opts["ifNotExists"];
-        delete opts["ifNotExists"];
-      }
-      a[a.length - 1] = opts;
+    const options = last(args);
+    if (isPlainObject(options)) {
+      hashDelete(options, "validate");
+      if (hasKey(options, "ifNotExists")) options["ifExists"] = hashDelete(options, "ifNotExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod(
       "invertAddCheckConstraint",
-    )!.value.call(this, a, block);
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -318,18 +320,14 @@ export class CommandRecorder {
         "remove_check_constraint is only reversible if given an expression.",
       );
     }
-    const a = args.slice();
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
-      const opts = { ...(a[a.length - 1] as Record<string, unknown>) };
-      if ("ifExists" in opts) {
-        opts["ifNotExists"] = opts["ifExists"];
-        delete opts["ifExists"];
-      }
-      a[a.length - 1] = opts;
+
+    const options = last(args);
+    if (isPlainObject(options)) {
+      if (hasKey(options, "ifExists")) options["ifNotExists"] = hashDelete(options, "ifExists");
     }
     return CommandRecorder.StraightReversions.instanceMethod(
       "invertRemoveCheckConstraint",
-    )!.value.call(this, a, block);
+    )!.value.call(this, args, block);
   }
 
   /** @internal */
@@ -347,7 +345,8 @@ export class CommandRecorder {
   /** @internal */
   invertAddUniqueConstraint(args: unknown[], block?: MigrationBlock): MigrationCommand {
     const options = extractOptionsBang(rbObjDup(args));
-    if (options["usingIndex"]) {
+
+    if (rtest(options["usingIndex"])) {
       throw new ActiveRecord.IrreversibleMigration(
         "add_unique_constraint is not reversible if given an using_index.",
       );
@@ -374,16 +373,16 @@ export class CommandRecorder {
 
   /** @internal */
   invertRenameTable(args: unknown[]): [string, unknown[]] {
-    const [oldName, newName, ...rest] = args;
-    const result: unknown[] = [newName, oldName];
-    if (rest.length > 0) result.push(...rest);
-    return ["renameTable", result];
+    const [oldName, newName, options] = args;
+    args = [newName, oldName];
+    if (rtest(options)) args.push(options);
+    return ["renameTable", args];
   }
 
   /** @internal */
   invertRenameColumn(args: unknown[]): [string, unknown[]] {
-    const [table, oldName, newName, ...rest] = args;
-    return ["renameColumn", [table, newName, oldName, ...rest]];
+    const [tableName, oldName, newName] = args;
+    return ["renameColumn", [tableName, newName, oldName]];
   }
 
   /** @internal */
@@ -444,9 +443,8 @@ export class CommandRecorder {
 
   /** @internal */
   invertChangeColumnNull(args: unknown[]): [string, unknown[]] {
-    const a = args.slice();
-    a[2] = !(a[2] as boolean);
-    return ["changeColumnNull", a];
+    args[2] = !rtest(args[2]);
+    return ["changeColumnNull", args];
   }
 
   /** @internal */
@@ -492,7 +490,7 @@ export class CommandRecorder {
     const dup = rbObjDup(args);
     extractOptionsBang(dup);
     const [_enum, values] = dup;
-    if (values == null) {
+    if (!rtest(values)) {
       throw new ActiveRecord.IrreversibleMigration(
         "drop_enum is only reversible if given a list of enum values.",
       );
@@ -519,20 +517,14 @@ export class CommandRecorder {
   /** @internal */
   invertRenameEnumValue(args: unknown[]): [string, unknown[]] {
     const [typeName, options] = args;
-    if (
-      !(
-        typeof options === "object" &&
-        options !== null &&
-        "from" in (options as Record<string, unknown>) &&
-        "to" in (options as Record<string, unknown>)
-      )
-    ) {
+    if (!(isPlainObject(options) && hasKey(options, "from") && hasKey(options, "to"))) {
       throw new ActiveRecord.IrreversibleMigration(
         "rename_enum_value is only reversible if given a :from and :to option.",
       );
     }
-    const opts = options as Record<string, unknown>;
-    return ["renameEnumValue", [typeName, { from: opts["to"], to: opts["from"] }]];
+
+    [options["to"], options["from"]] = [options["from"], options["to"]];
+    return ["renameEnumValue", [typeName, options]];
   }
 
   /** @internal */
@@ -540,7 +532,7 @@ export class CommandRecorder {
     const dup = rbObjDup(args);
     extractOptionsBang(dup);
     const [_enum, values] = dup;
-    if (values == null) {
+    if (!rtest(values)) {
       throw new ActiveRecord.IrreversibleMigration(
         "drop_virtual_table is only reversible if given options.",
       );
