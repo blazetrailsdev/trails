@@ -4,7 +4,9 @@ import {
   aryDeleteIf,
   Fiber,
   isMonOwned,
+  KERNEL_METHODS,
   Mutex,
+  PROTOCOL_PROBES,
   rbDefineInspectCustom,
   rbObjDup,
   rtest,
@@ -79,7 +81,11 @@ export class NullPool implements AbstractPool {
   constructor() {
     return new Proxy(this, {
       get(target, prop, receiver) {
-        if (typeof prop === "symbol" || prop in target) {
+        if (
+          typeof prop === "symbol" ||
+          prop in target ||
+          (KERNEL_METHODS.has(prop) && !PROTOCOL_PROBES.has(prop))
+        ) {
           return Reflect.get(target, prop, receiver);
         }
         throw new NoMethodError(
