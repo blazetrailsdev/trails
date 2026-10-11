@@ -1,5 +1,5 @@
 import { HashWithIndifferentAccess, included, kernelArray } from "@blazetrails/activesupport";
-import { include, Module } from "@blazetrails/ruby-compat";
+import { include, Module, rbObjAsString } from "@blazetrails/ruby-compat";
 import type { Hash } from "@blazetrails/ruby-compat";
 
 import { AttributeSet } from "./attribute-set.js";
@@ -57,16 +57,19 @@ export class Dirty {
     return this.mutationsFromDatabase.changedAttributeNames();
   }
 
-  attributeChanged(attrName: string, options?: DirtyOptions): boolean | undefined {
-    return this.mutationsFromDatabase.isChanged(attrName, options);
+  attributeChanged(attrName: string | string[], options?: DirtyOptions): boolean | undefined {
+    return this.mutationsFromDatabase.isChanged(rbObjAsString(attrName), options);
   }
 
   attributeWas(attrName: string): unknown {
     return this.mutationsFromDatabase.originalValue(attrName);
   }
 
-  attributePreviouslyChanged(attrName: string, options?: DirtyOptions): boolean | undefined {
-    return this.mutationsBeforeLastSave.isChanged(attrName, options);
+  attributePreviouslyChanged(
+    attrName: string | string[],
+    options?: DirtyOptions,
+  ): boolean | undefined {
+    return this.mutationsBeforeLastSave.isChanged(rbObjAsString(attrName), options);
   }
 
   attributePreviouslyWas(attrName: string): unknown {

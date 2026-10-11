@@ -317,7 +317,7 @@ export class ConnectionPool implements ReapablePool {
 
   /**
    * @inventedArm if — PERMANENT
-   * @inventedArm synchronize — PERMANENT
+   * @inventedArm synchronize — CONVERGEABLE pin-connection-runs-verify-and-begin-under-an-invented-adapter-lock
    */
   async pinConnectionBang(lockThread = false): Promise<void> {
     const connection =
@@ -333,9 +333,10 @@ export class ConnectionPool implements ReapablePool {
     }
 
     if (lockThread) this._pinnedConnection.setLockThread(IsolatedExecutionState.context());
-    await this._pinnedConnection.lock.synchronize(async () => {
-      await this._pinnedConnection!.verifyBang();
-      await this._pinnedConnection!.beginTransaction({ joinable: false, _lazy: false });
+    const pinnedConnection = this._pinnedConnection;
+    await pinnedConnection.lock.synchronize(async () => {
+      await pinnedConnection.verifyBang();
+      await pinnedConnection.beginTransaction({ joinable: false, _lazy: false });
     });
   }
 

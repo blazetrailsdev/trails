@@ -48,6 +48,26 @@ describe("the async schema load warms the shared cache and replaces a synthesize
     expect(Post.columnNames()).toContain("tags_count");
   });
 
+  it("a warm-cache load invalidates a columnDefaults memo taken off the synthesized fallback", async () => {
+    class Post extends Base {
+      declare title: string;
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "text");
+        this.attribute("declared_field", "string", { default: "v" });
+      }
+    }
+    const conn = await Post.leaseConnection();
+    await conn.schemaCache.clearDataSourceCacheBang("posts");
+
+    const cold = Post.columnDefaults;
+    expect(Object.keys(cold)).not.toContain("tags_count");
+
+    await Post.loadSchema();
+    expect(Object.keys(Post.columnDefaults)).toContain("tags_count");
+  });
+
   it("a second save on a cold-cache declared-attribute model issues no schema-introspection query", async () => {
     class Post extends Base {
       declare title: string;

@@ -1,4 +1,4 @@
-import { Module, RuntimeError, type Hash } from "@blazetrails/ruby-compat";
+import { Module, RuntimeError, rbObjAsString, type Hash } from "@blazetrails/ruby-compat";
 import {
   classAttribute,
   type HashWithIndifferentAccess,
@@ -20,10 +20,10 @@ interface DirtyRecord {
 
 export function isSavedChangeToAttribute(
   record: DirtyRecord,
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
 ): boolean | undefined {
-  return record.mutationsBeforeLastSave.isChanged(attrName, options);
+  return record.mutationsBeforeLastSave.isChanged(rbObjAsString(attrName), options);
 }
 
 export function savedChangeToAttribute(

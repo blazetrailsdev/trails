@@ -1946,7 +1946,7 @@ export interface Base extends AutosaveAssociation, JSONSerializer, AMDirty {
   readonly attributesInDatabase: HashWithIndifferentAccess<unknown>;
   readonly idInDatabase: unknown;
   isSavedChanges(): boolean;
-  isSavedChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
+  isSavedChangeToAttribute(attr: string | string[], options?: DirtyOptions): boolean;
   attributeBeforeLastSave(attr: string): unknown;
   isWillSaveChangeToAttribute(attr: string, options?: DirtyOptions): boolean;
   attributeChangeToBeSaved(attr: string): [unknown, unknown] | null;

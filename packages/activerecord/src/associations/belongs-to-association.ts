@@ -109,17 +109,17 @@ export class BelongsToAssociation extends SingularAssociation {
 
   isTargetChanged(): boolean | undefined {
     return (
-      this.owner.attributeChanged(this.reflection.foreignKey() as string) ||
+      this.owner.attributeChanged(this.reflection.foreignKey()) ||
       (!this.foreignKeyPresent() && this.target?.isNewRecord())
     );
   }
 
   isTargetPreviouslyChanged(): boolean | undefined {
-    return this.owner.attributePreviouslyChanged(this.reflection.foreignKey() as string);
+    return this.owner.attributePreviouslyChanged(this.reflection.foreignKey());
   }
 
   isSavedChangeToTarget(): boolean | undefined {
-    return this.owner.isSavedChangeToAttribute(this.reflection.foreignKey() as string);
+    return this.owner.isSavedChangeToAttribute(this.reflection.foreignKey());
   }
 
   protected override replace(record: Base | null): Base | null {

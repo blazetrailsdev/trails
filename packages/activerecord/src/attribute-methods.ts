@@ -738,7 +738,7 @@ export function queryCastAttribute(
 }
 export function isSavedChangeToAttribute(
   this: InstanceMethodHost,
-  attrName: string,
+  attrName: string | string[],
   options?: DirtyOptions,
 ): boolean | undefined {
   return _isSavedChangeToAttribute(this as any, attrName, options);
