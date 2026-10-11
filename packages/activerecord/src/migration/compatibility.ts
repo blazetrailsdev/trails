@@ -1,14 +1,15 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { isPresent, reverseMergeBang } from "@blazetrails/activesupport";
 import {
+  Module,
   except,
   include,
-  prepend,
   rbInspect,
+  rbObjSingletonClass,
   rtest,
   stringDelete,
-  type ClassModule,
 } from "@blazetrails/ruby-compat";
+import { prepend } from "@blazetrails/ruby-compat/include";
 import { Current, Migration } from "../migration.js";
 import * as Compatibility from "./compatibility.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
@@ -45,7 +46,6 @@ export class V7_2 extends V8_0 {}
 export class V7_1 extends V7_2 {}
 
 type Options = Record<string, unknown>;
-type Super = (...args: unknown[]) => unknown;
 
 export class V7_0 extends V7_1 {
   static LegacyIndexName = class LegacyIndexName {
@@ -79,39 +79,41 @@ export class V7_0 extends V7_1 {
     }
   };
 
-  static TableDefinition: ClassModule = class TableDefinition extends V7_0.LegacyIndexName {
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+  static TableDefinition: Module = new Module().include(V7_0.LegacyIndexName).include({
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return super_(name, type, options);
-    }
+      return V7_0.TableDefinition.superMethod(this, "column")!(name, type, options);
+    },
 
-    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    change(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, _skipValidateOptions: true };
-      return super_(name, type, options);
-    }
+      return V7_0.TableDefinition.superMethod(this, "change")!(name, type, options);
+    },
 
     index(
-      this: TableDefinition & { name: string },
-      super_: Super,
+      this: {
+        name: string;
+        legacyIndexName(tableName: string, options: string | string[]): string;
+      },
       columnName: string | string[],
       options: AddIndexOptions = {},
     ) {
       if (options.name == null) {
         options = { ...options, name: this.legacyIndexName(this.name, columnName) };
       }
-      return super_(columnName, options);
-    }
+      return V7_0.TableDefinition.superMethod(this, "index")!(columnName, options);
+    },
 
-    references(super_: Super, ...args: unknown[]) {
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _skipValidateOptions: true };
-      return super_(...args, options);
-    }
+      return V7_0.TableDefinition.superMethod(this, "references")!(...args, options);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
-  };
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   /** @internal */
   declare legacyIndexName: (tableName: string, options: Options | string | string[]) => string;
@@ -223,7 +225,7 @@ export class V7_0 extends V7_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V7_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V7_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -269,35 +271,34 @@ export class V6_1 extends V7_0 {
     await super.changeColumn(tableName, columnName, type, options);
   }
 
-  static override TableDefinition: ClassModule = class TableDefinition {
+  static override TableDefinition: Module = new Module().include({
     newColumnDefinition(
       this: { conn: AbstractAdapter },
-      super_: Super,
       name: string,
       type: ColumnType,
       options: Options = {},
     ) {
       type = V6_1.PostgreSQLCompat.compatibleTimestampType(type, this.conn);
-      return super_(name, type, options);
-    }
+      return V6_1.TableDefinition.superMethod(this, "newColumnDefinition")!(name, type, options);
+    },
 
-    change(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    change(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return super_(name, type, options);
-    }
+      return V6_1.TableDefinition.superMethod(this, "change")!(name, type, options);
+    },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return super_(name, type, options);
-    }
+      return V6_1.TableDefinition.superMethod(this, "column")!(name, type, options);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
-  };
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V6_1.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V6_1.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -309,26 +310,26 @@ export class V6_0 extends V6_1 {
     }
   };
 
-  static override TableDefinition: ClassModule = class TableDefinition {
-    references(super_: Super, ...args: unknown[]) {
+  static override TableDefinition: Module = new Module().include({
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       let options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
       options = { ...options, _usesLegacyReferenceIndexName: true };
-      return super_(...args, options);
-    }
+      return V6_0.TableDefinition.superMethod(this, "references")!(...args, options);
+    },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return TableDefinition.prototype.references.call(this, super_, ...args);
-    }
+    belongsTo(this: object, ...args: unknown[]) {
+      return V6_0.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
+    },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return super_(name, type, options);
-    }
+      return V6_0.TableDefinition.superMethod(this, "column")!(name, type, options);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
-  };
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   override async addReference(
     tableName: string,
@@ -353,43 +354,43 @@ export class V6_0 extends V6_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V6_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V6_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
 
 export class V5_2 extends V6_0 {
-  static override TableDefinition: ClassModule = class TableDefinition {
-    timestamps(super_: Super, options: Options = {}) {
+  static override TableDefinition: Module = new Module().include({
+    timestamps(this: object, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return super_(options);
-    }
+      return V5_2.TableDefinition.superMethod(this, "timestamps")!(options);
+    },
 
-    column(super_: Super, name: string, type: ColumnType, options: Options = {}) {
+    column(this: object, name: string, type: ColumnType, options: Options = {}) {
       options = { ...options, precision: rtest(options.precision) ? options.precision : null };
-      return super_(name, type, options);
-    }
+      return V5_2.TableDefinition.superMethod(this, "column")!(name, type, options);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
+    raiseOnIfExistOptions(_options: Options): void {},
 
     /** @internal */
-    raiseOnDuplicateColumn(_super: unknown, _name: string): void {}
-  };
+    raiseOnDuplicateColumn(_name: string): void {},
+  });
 
-  static override CommandRecorder: ClassModule = class CommandRecorder {
-    invertTransaction(_super: unknown, args: unknown[], block?: (...args: unknown[]) => unknown) {
+  static override CommandRecorder: Module = new Module().include({
+    invertTransaction(args: unknown[], block?: (...args: unknown[]) => unknown) {
       return ["transaction", args, block];
-    }
+    },
 
-    invertChangeColumnComment(_super: unknown, args: unknown[]) {
+    invertChangeColumnComment(args: unknown[]) {
       return ["changeColumnComment", args];
-    }
+    },
 
-    invertChangeTableComment(_super: unknown, args: unknown[]) {
+    invertChangeTableComment(args: unknown[]) {
       return ["changeTableComment", args];
-    }
-  };
+    },
+  });
 
   override async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
     options = {
@@ -401,14 +402,14 @@ export class V5_2 extends V6_0 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V5_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V5_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 
   /** @internal */
   override async commandRecorder(): Promise<MigrationCommandRecorder> {
     const recorder = await super.commandRecorder();
-    prepend(recorder, V5_2.CommandRecorder);
+    prepend(rbObjSingletonClass(recorder) as unknown as new () => object, V5_2.CommandRecorder);
     return recorder;
   }
 }
@@ -462,30 +463,28 @@ export class V5_1 extends V5_2 {
 }
 
 export class V5_0 extends V5_1 {
-  static override TableDefinition: ClassModule = class TableDefinition {
-    primaryKey(
-      super_: Super,
-      name: string,
-      type: ColumnType = "primary_key",
-      options: Options = {},
-    ) {
+  static override TableDefinition: Module = new Module().include({
+    primaryKey(name: string, type: ColumnType = "primary_key", options: Options = {}) {
       if (type === "primary_key") type = "integer";
-      return super_(name, type, options);
-    }
+      return V5_0.TableDefinition.superMethod(this, "primaryKey")!(name, type, options);
+    },
 
-    references(super_: Super, ...args: unknown[]) {
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { type: "integer", ...options });
-    }
+      return V5_0.TableDefinition.superMethod(this, "references")!(...args, {
+        type: "integer",
+        ...options,
+      });
+    },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return TableDefinition.prototype.references.call(this, super_, ...args);
-    }
+    belongsTo(this: object, ...args: unknown[]) {
+      return V5_0.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
-  };
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   override async createTable(
     tableName: string,
@@ -565,7 +564,7 @@ export class V5_0 extends V5_1 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V5_0.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V5_0.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 }
@@ -573,25 +572,28 @@ export class V5_0 extends V5_1 {
 type RemoveIndexOptions = { column?: string | string[]; name?: string; ifExists?: boolean };
 
 export class V4_2 extends V5_0 {
-  static override TableDefinition: ClassModule = class TableDefinition {
-    references(super_: Super, ...args: unknown[]) {
+  static override TableDefinition: Module = new Module().include({
+    references(this: object, ...args: unknown[]) {
       const last = args[args.length - 1];
       const options = (typeof last === "object" && last !== null ? args.pop() : {}) as Options;
-      return super_(...args, { ...options, index: options.index ?? false });
-    }
+      return V4_2.TableDefinition.superMethod(this, "references")!(...args, {
+        ...options,
+        index: options.index ?? false,
+      });
+    },
 
-    belongsTo(super_: Super, ...args: unknown[]) {
-      return TableDefinition.prototype.references.call(this, super_, ...args);
-    }
+    belongsTo(this: object, ...args: unknown[]) {
+      return V4_2.TableDefinition.instanceMethod("references")!.value.call(this, ...args);
+    },
 
-    timestamps(super_: Super, options: Options = {}) {
+    timestamps(this: object, options: Options = {}) {
       if (options.null == null) options = { ...options, null: true };
-      return super_(options);
-    }
+      return V4_2.TableDefinition.superMethod(this, "timestamps")!(options);
+    },
 
     /** @internal */
-    raiseOnIfExistOptions(_super: unknown, _options: Options): void {}
-  };
+    raiseOnIfExistOptions(_options: Options): void {},
+  });
 
   override async addReference(
     tableName: string,
@@ -646,7 +648,7 @@ export class V4_2 extends V5_0 {
 
   /** @internal */
   override compatibleTableDefinition<T>(t: T): T {
-    prepend(t as object, V4_2.TableDefinition);
+    prepend(rbObjSingletonClass(t as object) as unknown as new () => object, V4_2.TableDefinition);
     return super.compatibleTableDefinition(t);
   }
 

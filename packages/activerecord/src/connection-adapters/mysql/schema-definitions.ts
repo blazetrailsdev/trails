@@ -13,7 +13,7 @@ import type { SchemaStatementsLike } from "../abstract/schema-statements-like.js
 import { type VisitorHostAdapter } from "./schema-creation.js";
 import { deprecator } from "../../deprecator.js";
 import { deprecate } from "@blazetrails/activesupport";
-import { rtest } from "@blazetrails/ruby-compat";
+import { include, included, Module, rtest } from "@blazetrails/ruby-compat";
 
 export interface ColumnMethods {
   blob(...names: string[]): unknown;
@@ -43,6 +43,32 @@ export interface ColumnMethods {
   /** @deprecated */
   unsignedDecimal(...args: [...names: string[], options: ColumnOptions]): unknown;
 }
+
+type ColumnMethodsBase = {
+  defineColumnMethods(...columnTypes: string[]): void;
+  prototype: Record<string, unknown>;
+};
+
+export const ColumnMethods: Module & { [included]?: (base: ColumnMethodsBase) => void } =
+  new Module();
+
+ColumnMethods[included] = function (base: ColumnMethodsBase): void {
+  base.defineColumnMethods(
+    "blob",
+    "tinyblob",
+    "mediumblob",
+    "longblob",
+    "tinytext",
+    "mediumtext",
+    "longtext",
+    "unsigned_integer",
+    "unsigned_bigint",
+    "unsigned_float",
+    "unsigned_decimal",
+  );
+
+  deprecate.call(base, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+};
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class TableDefinition extends AbstractTableDefinition {
@@ -128,21 +154,7 @@ export class TableDefinition extends AbstractTableDefinition {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:56`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface TableDefinition extends ColumnMethods {}
 
-TableDefinition.defineColumnMethods(
-  "blob",
-  "tinyblob",
-  "mediumblob",
-  "longblob",
-  "tinytext",
-  "mediumtext",
-  "longtext",
-  "unsigned_integer",
-  "unsigned_bigint",
-  "unsigned_float",
-  "unsigned_decimal",
-);
-
-deprecate.call(TableDefinition, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+include(TableDefinition, ColumnMethods);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- see the interface below.
 export class Table extends AbstractTable {
@@ -154,18 +166,4 @@ export class Table extends AbstractTable {
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unsafe-declaration-merging -- Ruby `include ColumnMethods` (`mysql/schema_definitions.rb:102`); the class/interface merge is how a mixin surfaces on the type side. */
 export interface Table extends ColumnMethods {}
 
-Table.defineColumnMethods(
-  "blob",
-  "tinyblob",
-  "mediumblob",
-  "longblob",
-  "tinytext",
-  "mediumtext",
-  "longtext",
-  "unsigned_integer",
-  "unsigned_bigint",
-  "unsigned_float",
-  "unsigned_decimal",
-);
-
-deprecate.call(Table, "unsignedFloat", "unsignedDecimal", { deprecator: deprecator() });
+include(Table, ColumnMethods);

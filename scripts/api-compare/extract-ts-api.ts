@@ -716,6 +716,18 @@ export function extractFromProgram(
             const nestedInfo = extractClass(nested.cls, checker, relPath, srcDir, nested.name);
             if (nestedInfo) info.classes[`${relPath}:${nested.seat}`] = nestedInfo;
           }
+          for (const nested of staticModuleInstances(node, classInfo.name)) {
+            const instanceMethods = harvestModuleInstanceMethods(nested.init, checker, relPath);
+            if (instanceMethods.length === 0) continue;
+            info.modules[`${relPath}:${nested.seat}`] = {
+              name: nested.name,
+              file: relPath,
+              includes: [],
+              extends: [],
+              instanceMethods,
+              classMethods: [],
+            };
+          }
         }
       } else if (ts.isExpressionStatement(node)) {
         const seated = seatedClassExpression(node);
@@ -3170,6 +3182,10 @@ export function isConstantCaseName(name: string): boolean {
  * with `aliasOf`, so the compare's alias arm pairs it.
  *
  * Only literal column types on an identifier receiver are credited.
+ *
+ * Inside a module's `X[included] = function (base) { … }` hook (Ruby's
+ * `included do`, `:323-329`) the same two statements on `base` are credited to
+ * every class the file hands to `include(Klass, X)`.
  */
 interface DefineColumnMethodsMember {
   receiver: string;
@@ -3178,7 +3194,10 @@ interface DefineColumnMethodsMember {
   line: number;
 }
 
-function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineColumnMethodsMember[] {
+function collectDefineColumnMethodsMembers(
+  sourceFile: ts.SourceFile,
+  statements: Iterable<ts.Statement> = sourceFile.statements,
+): DefineColumnMethodsMember[] {
   const out: DefineColumnMethodsMember[] = [];
   const lineOf = (node: ts.Node): number =>
     sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile)).line + 1;
@@ -3189,7 +3208,7 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
     ts.isIdentifier(expr.expression.expression)
       ? { receiver: expr.expression.expression.text, name: expr.name.text }
       : null;
-  for (const statement of sourceFile.statements) {
+  for (const statement of statements) {
     if (!ts.isExpressionStatement(statement)) continue;
     const expr = statement.expression;
     if (
@@ -3220,6 +3239,33 @@ function collectDefineColumnMethodsMembers(sourceFile: ts.SourceFile): DefineCol
         line: lineOf(expr),
       });
     }
+  }
+  if (statements !== sourceFile.statements) return out;
+
+  const hooks = new Map<string, DefineColumnMethodsMember[]>();
+  for (const statement of statements) {
+    if (!ts.isExpressionStatement(statement)) continue;
+    const expr = statement.expression;
+    const owner = includedHookOwner(expr);
+    if (owner === undefined || !ts.isBinaryExpression(expr)) continue;
+    const hook = expr.right;
+    const base = ts.isFunctionExpression(hook) ? hook.parameters[0]?.name : undefined;
+    if (!ts.isFunctionExpression(hook) || !base || !ts.isIdentifier(base)) continue;
+    hooks.set(
+      owner,
+      collectDefineColumnMethodsMembers(sourceFile, hook.body.statements).filter(
+        (member) => member.receiver === base.text,
+      ),
+    );
+  }
+  for (const statement of statements) {
+    if (!ts.isExpressionStatement(statement) || !ts.isCallExpression(statement.expression))
+      continue;
+    const { expression: callee, arguments: args } = statement.expression;
+    if (!ts.isIdentifier(callee) || callee.text !== "include") continue;
+    const [klass, mod] = args;
+    if (!klass || !mod || !ts.isIdentifier(klass) || !ts.isIdentifier(mod)) continue;
+    for (const member of hooks.get(mod.text) ?? []) out.push({ ...member, receiver: klass.text });
   }
   return out;
 }
@@ -4016,6 +4062,30 @@ export function seatedClassExpression(
   if (!ts.isPropertyAccessExpression(expr.left)) return undefined;
   if (!ts.isClassExpression(expr.right) || !expr.right.name) return undefined;
   return { seat: expr.left.getText(), cls: expr.right };
+}
+
+/**
+ * A nested Ruby module ported as a live `Module` on a static property
+ * (`class V7_0 { static TableDefinition = new Module().include({ ... }) }`,
+ * `migration/compatibility.rb:70-96`). Keyed by the dotted seat, as a nested
+ * class expression is.
+ */
+export function staticModuleInstances(
+  node: ts.ClassDeclaration | ts.ClassExpression,
+  seat: string,
+): { seat: string; name: string; init: ts.Expression }[] {
+  const found: { seat: string; name: string; init: ts.Expression }[] = [];
+  for (const member of node.members) {
+    if (!ts.isPropertyDeclaration(member) || !ts.isIdentifier(member.name)) continue;
+    if (!member.modifiers?.some((m) => m.kind === ts.SyntaxKind.StaticKeyword)) continue;
+    if (!member.initializer) continue;
+    found.push({
+      seat: `${seat}.${member.name.text}`,
+      name: member.name.text,
+      init: member.initializer,
+    });
+  }
+  return found;
 }
 
 /**

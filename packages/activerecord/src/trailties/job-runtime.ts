@@ -1,23 +1,24 @@
+import { Module } from "@blazetrails/ruby-compat";
 import * as RuntimeRegistry from "../runtime-registry.js";
 
 /** @internal */
 export function instrument(
-  this: unknown,
-  super_: (operation: string, payload: Record<string, unknown>, block?: () => unknown) => unknown,
+  this: object,
   operation: string,
   payload: Record<string, unknown> = {},
   block?: () => unknown,
 ): unknown {
   if (operation === "perform" && block) {
-    return super_(operation, payload, () => {
+    return JobRuntime.superMethod(this, "instrument")!(operation, payload, () => {
       const dbRuntimeBeforePerform = RuntimeRegistry.sqlRuntime();
       const result = block();
       payload["dbRuntime"] = RuntimeRegistry.sqlRuntime() - dbRuntimeBeforePerform;
       return result;
     });
   } else {
-    return super_(operation, payload, block);
+    return JobRuntime.superMethod(this, "instrument")!(operation, payload, block);
   }
 }
 
-export const JobRuntime = { instrument };
+export const JobRuntime = new Module();
+JobRuntime.defineMethod("instrument", instrument);

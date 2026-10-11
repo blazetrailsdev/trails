@@ -89,10 +89,12 @@ interface FinderRelation {
   /** @internal */
   readonly isEagerLoading: boolean;
   /** @internal */
+  applyJoinDependency(options?: { eagerLoading?: boolean }): any;
+  /** @internal */
   applyJoinDependency<R>(
     options: { eagerLoading?: boolean },
     block: (relation: any) => R | Promise<R>,
-  ): Promise<R>;
+  ): R | Promise<R>;
   /** @internal */
   usingLimitableReflections(reflections: Array<{ isCollection(): boolean }>): boolean;
   readonly hasLimitOrOffset: boolean;
@@ -297,9 +299,8 @@ export async function isExists(
   }
   if (conditions === false || conditions === null || this.limitValue === 0) return false;
   if (this.isEagerLoading) {
-    return this.applyJoinDependency({ eagerLoading: false }, (relation) =>
-      relation.isExists(conditions),
-    );
+    const relation = await this.applyJoinDependency({ eagerLoading: false });
+    return relation.isExists(conditions);
   }
   const relation = this.constructRelationForExists(conditions);
   await relation._materializeDeferredDistinctPkPredicates();
