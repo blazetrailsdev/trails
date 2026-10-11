@@ -101,6 +101,13 @@ export interface TestCaseInfo {
    */
   dynamic?: boolean;
   /**
+   * `ancestors` then `description`, each `#{...}` the extractor could not
+   * expand standing as `<expr>` where those two record it dropped
+   * (`context("with #{ctx}")` → `"with <expr>"`). Present only when a segment
+   * carries one. Ruby extractor only.
+   */
+  pattern?: string[];
+  /**
    * Adapter/feature gating condition, if the test runs conditionally. Absent
    * means unconditional. See {@link TestGate}.
    */

@@ -10,6 +10,7 @@ import {
   compareFileResults,
   isAssertionCountMismatch,
   main,
+  matchesInterpolatedPath,
   PKG_SRC_DIRS,
   misplacedLocation,
   normalize,
@@ -530,5 +531,48 @@ describe("main cross-package and parked-stub credit", () => {
       "activerecord",
     );
     expect([result.rubyTestCount, result.matched, result.extra]).toEqual([0, 0, 1]);
+  });
+});
+
+describe("matchesInterpolatedPath", () => {
+  const pattern = ["#write_float32", "with <expr>", "encodes <expr> as float32"];
+
+  it("matches a statically expanded describe and it under an extra outer describe", () => {
+    expect(
+      matchesInterpolatedPath(
+        pattern,
+        "messagepack::packer > #write_float32 > with small floats > encodes 3.14 as float32",
+      ),
+    ).toBe(true);
+  });
+
+  it("matches a dynamic TS title compared with its interpolation dropped", () => {
+    expect(
+      matchesInterpolatedPath(pattern, "#write_float32 > with big floats > encodes as float32"),
+    ).toBe(true);
+  });
+
+  it("refuses a sibling context, a shorter path and a different description", () => {
+    expect(
+      matchesInterpolatedPath(pattern, "#write_float32 > with non numeric > raises argument error"),
+    ).toBe(false);
+    expect(matchesInterpolatedPath(pattern, "with small floats > encodes 3.14 as float32")).toBe(
+      false,
+    );
+    expect(
+      matchesInterpolatedPath(
+        pattern,
+        "#write_float64 > with small floats > encodes 3.14 as float32",
+      ),
+    ).toBe(false);
+  });
+
+  it("matches nothing through a segment that is only an interpolation", () => {
+    expect(matchesInterpolatedPath(["FooTest", "<expr>"], "footest > anything")).toBe(false);
+  });
+
+  it("reads regex metacharacters in a name literally", () => {
+    expect(matchesInterpolatedPath(["a.b (<expr>)"], "a.b (1)")).toBe(true);
+    expect(matchesInterpolatedPath(["a.b (<expr>)"], "axb (1)")).toBe(false);
   });
 });

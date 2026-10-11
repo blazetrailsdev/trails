@@ -12,6 +12,7 @@ import {
   rbAbsintSize,
   rbBuiltinClassName,
   rbCString,
+  rbCSymbol,
   rbClassInheritedP,
   rbClassOf,
   rbFSend,
@@ -46,6 +47,8 @@ export class Packer<Io = unknown> {
   private readonly extRegistryCache: PackerExtRegistry = new Map();
   /** @internal */
   hasBigintExtType = false;
+  /** @internal */
+  hasSymbolExtType = false;
   readonly buffer: Buffer;
 
   constructor(io: unknown = null, options: object | null = null) {
@@ -104,11 +107,13 @@ export class Packer<Io = unknown> {
   }
 
   write(v: unknown): this {
-    if (v == null || typeof v === "boolean" || typeof v === "number" || typeof v === "string") {
+    if (v == null || typeof v === "boolean" || typeof v === "number") {
       this.buffer.write(encoder.encodeSharedRef(v));
+    } else if (typeof v === "string") {
+      this.writeStringValue(v);
     } else if (v instanceof Uint8Array) {
       if (rbClassOf(v) === rbCString || !this.tryWriteWithExtTypeLookup(v)) {
-        this.buffer.write(encoder.encodeSharedRef(v));
+        this.writeStringValue(v);
       }
     } else if (Array.isArray(v)) {
       if (rbClassOf(v) === Array || !this.tryWriteWithExtTypeLookup(v)) {
@@ -122,8 +127,8 @@ export class Packer<Io = unknown> {
       this.buffer.write(floatEncoder.encodeSharedRef(v.valueOf()));
     } else if (typeof v === "bigint") {
       this.writeBignumValue(v);
-    } else if (!this.tryWriteWithExtTypeLookup(v)) {
-      rbFSend(v, "toMsgpack", this);
+    } else {
+      this.writeOtherValue(v);
     }
     return this;
   }
@@ -166,7 +171,7 @@ export class Packer<Io = unknown> {
     if (typeof obj !== "string" && !(obj instanceof Uint8Array)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected String)`);
     }
-    this.buffer.write(encoder.encodeSharedRef(obj));
+    this.writeStringValue(obj);
     return this;
   }
 
@@ -201,7 +206,7 @@ export class Packer<Io = unknown> {
     if (!isSymbol(obj)) {
       throw new TypeError(`wrong argument type ${rbBuiltinClassName(obj)} (expected Symbol)`);
     }
-    this.buffer.write(encoder.encodeSharedRef(symbolToS(obj)));
+    this.writeSymbolValue(obj);
     return this;
   }
 
@@ -367,6 +372,11 @@ export class Packer<Io = unknown> {
 
     this.extRegistryCache.clear();
     this.extRegistry.set(klass, [type, proc, 0]);
+
+    if (klass === rbCSymbol) {
+      this.hasSymbolExtType = true;
+    }
+
     return null;
   }
 
@@ -382,6 +392,22 @@ export class Packer<Io = unknown> {
     for (const [key, value] of pairs) {
       this.write(key);
       this.write(value);
+    }
+  }
+
+  private writeStringValue(v: string | Uint8Array): void {
+    this.buffer.write(encoder.encodeSharedRef(v));
+  }
+
+  private writeSymbolStringValue(v: string): void {
+    this.writeStringValue(symbolToS(v));
+  }
+
+  private writeSymbolValue(v: string): void {
+    if (this.hasSymbolExtType) {
+      this.writeOtherValue(v);
+    } else {
+      this.writeSymbolStringValue(v);
     }
   }
 
@@ -444,13 +470,13 @@ export class Packer<Io = unknown> {
   }
 
   private extRegistryLookup(instance: unknown): PackerExtType {
-    const lookupClass = rbClassOf(instance);
+    const lookupClass = isSymbol(instance) ? rbCSymbol : rbClassOf(instance);
     let type = this.extRegistryFetch(lookupClass);
     if (type?.[1] != null) {
       return type;
     }
 
-    const realClass = rbObjClass(instance);
+    const realClass = isSymbol(instance) ? rbCSymbol : rbObjClass(instance);
     if (lookupClass !== realClass) {
       type = this.extRegistryFetch(realClass);
       if (type?.[1] != null) {
@@ -493,6 +519,12 @@ export class Packer<Io = unknown> {
     }
 
     return true;
+  }
+
+  private writeOtherValue(v: unknown): void {
+    if (!this.tryWriteWithExtTypeLookup(v)) {
+      rbFSend(v, "toMsgpack", this);
+    }
   }
 }
 

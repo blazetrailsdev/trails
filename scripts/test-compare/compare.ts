@@ -330,6 +330,25 @@ export function misplacedLocation(
   return undefined;
 }
 
+/**
+ * Whether a TS path is one expansion of a Ruby case's `pattern`: its trailing
+ * segments answer the pattern's one for one, an `<expr>` standing for whatever
+ * the loop bound. The space either side of an `<expr>` is optional, since a
+ * dynamic TS title is compared with its own interpolations dropped. A segment
+ * that is nothing but interpolation names no case and matches none.
+ */
+export function matchesInterpolatedPath(pattern: readonly string[], tsPath: string): boolean {
+  const tsParts = tsPath.split(" > ").slice(-pattern.length);
+  if (tsParts.length < pattern.length) return false;
+  return pattern.every((segment, i) => {
+    const literals = normalizeErb(segment)
+      .split(DYNAMIC_TITLE_PLACEHOLDER)
+      .map((piece) => piece.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+    if (literals.every((piece) => piece === "")) return false;
+    return new RegExp(`^${literals.join("\\s*.*\\s*")}$`).test(tsParts[i]);
+  });
+}
+
 function normPath(ancestors: string[], description: string): string {
   return [...ancestors, description].map(normalizeErb).join(" > ");
 }
@@ -1015,6 +1034,34 @@ export function main(args: string[] = process.argv.slice(2), outputDir: string =
             }
           }
         }
+      }
+
+      for (let ri = 0; ri < file.testCases.length; ri++) {
+        if (matchedRuby.has(ri)) continue;
+        const tc = file.testCases[ri];
+        if (tc.pattern === undefined) continue;
+        if (isTestCaseUnported(file.file, tc.description, tc.ancestors[0])) continue;
+        const expansions = tsTests
+          .map((t, idx) => idx)
+          .filter(
+            (idx) =>
+              !consumedTs.has(idx) && matchesInterpolatedPath(tc.pattern!, tsTests[idx].path),
+          );
+        if (expansions.length === 0) continue;
+        for (const idx of expansions) consumedTs.add(idx);
+        const first = tsTests[expansions.find((idx) => !tsTests[idx].pending) ?? expansions[0]];
+        matchedRuby.add(ri);
+        matched++;
+        totalMatched++;
+        totalRuby++;
+        if (first.pending) {
+          matchedSkipped++;
+          totalMatchedSkipped++;
+        }
+        recordGate(tc, first);
+        recordAssertion(tc, first);
+        recordKind(tc, first);
+        recordValue(tc, first);
       }
 
       // Pass 2: Description-only matches on remaining Ruby tests.

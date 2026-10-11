@@ -7,10 +7,13 @@ import type {
   MethodInfo,
 } from "@blazetrails/parity/types";
 import { dropWeakCalls, significantMissingCalls } from "./compare.js";
+import { compareArms, type SkeletonRow } from "./report-arms.js";
 import {
   inlinedRubyBody,
   inlinedRubyCallArgs,
+  inlinedRubySkeleton,
   inlinedSegments,
+  isInitializeLessTaggedClass,
   moduleAncestors,
   type ModuleBody,
   sameFileInitializeModules,
@@ -191,6 +194,57 @@ describe("same-file module bodies join by convention", () => {
     expect(inlinedSegments(undefined, none, [], tagged)).toEqual(tagged.map((m) => m.body));
   });
 
+  it("pairs a class whose only initialize comes from a module in another package's manifest", () => {
+    const classes = {
+      "I18n::Config": entity("config.rb", ["ActiveModel::API"]),
+      "Other::Config": entity("config.rb", ["ActiveModel::API"]),
+      Plain: {},
+    };
+    const tagged = new Map([["Config", [tag("ActiveModel::API")]]]);
+    const pair = (reaching: string[], compared: Set<string>, byOwner = tagged) =>
+      ["I18n::Config", "Other::Config", "Plain", "I18n::Backend::Base"].filter((fqn) => {
+        const paired = isInitializeLessTaggedClass(
+          fqn,
+          classes,
+          new Set(reaching),
+          byOwner,
+          compared,
+          "config.ts",
+          (rubyModule) => rubyModule.split("::").at(-1),
+        );
+        if (paired) compared.add("config.ts Config");
+        return paired;
+      });
+    expect(pair([], new Set())).toEqual(["I18n::Config"]);
+    expect(pair(["I18n::Config"], new Set())).toEqual(["Other::Config"]);
+    expect(pair([], new Set(["config.ts Config"]))).toEqual([]);
+    expect(pair([], new Set(), new Map())).toEqual([]);
+    const segments = inlinedSegments(
+      undefined,
+      none,
+      [],
+      taggedBodies(ruby, tagged.get("Config")!, [], at),
+    );
+    expect(flagged(segments, ["super"])).toEqual(["assign_attributes → assignAttributes"]);
+    expect(inlinedRubyCallArgs(segments).map((s) => s.name)).toEqual(api.calls);
+  });
+
+  it("leaves a tag on a constructor with no Rails class to the never-compared throw", () => {
+    const byFileOwner = new Map([["config.ts", new Map([["Stray", []]])]]);
+    expect(
+      isInitializeLessTaggedClass(
+        "I18n::Config",
+        { "I18n::Config": {} },
+        new Set(),
+        byFileOwner.get("config.ts"),
+        new Set(),
+        "config.ts",
+        (fqn) => fqn.split("::").at(-1),
+      ),
+    ).toBe(false);
+    expect(uncomparedInlinedTags(byFileOwner, new Set())).toEqual(["config.ts Stray"]);
+  });
+
   it("reds on a tag that resolves to no Ruby body", () => {
     expect(() => taggedBodies(ruby, [tag("ActiveModel::Missing")], [], at)).toThrow(
       /@inlinedFrom names no Ruby body: activemodel\/model\.ts Model#constructor/,
@@ -253,6 +307,52 @@ describe("same-file module bodies join by convention", () => {
       "assign_attributes",
       "super",
     ]);
+  });
+});
+
+describe("a tagged constructor's Rails skeleton", () => {
+  const apiArms = body([], { skeleton: ["if", "ref:assign_attributes", "ref:super"] });
+  const ownArms = body([], {
+    skeleton: ["ref:build_reflection", "throw:ArgumentError", "ref:super"],
+  });
+  const row = (segments: MethodInfo[], ts: string[]): SkeletonRow => ({
+    package: "activemodel",
+    rubyFile: "active_model/model.rb",
+    rubyName: "initialize",
+    tsFile: "model.ts",
+    tsName: "constructor",
+    ruby: inlinedRubySkeleton(segments),
+    ts,
+  });
+
+  it("files no invented arm for a control token one module contributes", () => {
+    const segments = inlinedSegments(undefined, none, [], [of("ActiveModel::API", apiArms)]);
+    expect(inlinedRubySkeleton(segments)).toEqual(apiArms.skeleton);
+    expect(compareArms(row(segments, ["if", "ref:assignAttributes", "ref:super"]))).toBeUndefined();
+  });
+
+  it("concatenates a class initialize and a module in chain order, the consumed super dropped", () => {
+    const segments = inlinedSegments(ownArms, none, [], [of("ActiveModel::API", apiArms)]);
+    expect(inlinedRubySkeleton(segments)).toEqual([
+      "ref:build_reflection",
+      "throw:ArgumentError",
+      "if",
+      "ref:assign_attributes",
+      "ref:super",
+    ]);
+    expect(
+      compareArms(row(segments, ["ref:buildReflection", "throw:ArgumentError", "if", "ref:super"])),
+    ).toBeUndefined();
+  });
+
+  it("reports an arm a tagged body brings and the constructor drops as missing", () => {
+    const verdict = compareArms(
+      row(inlinedSegments(ownArms, none, [], [of("ActiveModel::API", apiArms)]), [
+        "throw:ArgumentError",
+      ]),
+    )!;
+    expect(verdict.missing).toEqual(["if"]);
+    expect(verdict.invented).toEqual([]);
   });
 });
 

@@ -193,6 +193,45 @@ describe("Float, Symbol and Buffer", () => {
     expect(unpacker.feed(Uint8Array.of(0xd4, 0, 0xff)).read()).toBe(":\u00ff");
   });
 
+  it("write_symbol writes the name as a str until a Symbol ext type is registered", () => {
+    const symbol = Uint8Array.of(0xc7, 0x06, 0x00, ...new TextEncoder().encode("symbol"));
+    const packer = new Packer();
+    expect(packer.writeSymbol(":symbol").fullPack()).toEqual(
+      Uint8Array.of(0xa6, ...new TextEncoder().encode("symbol")),
+    );
+    packer.registerType(0x00, rbCSymbol, "toMsgpackExt");
+    expect(packer.writeSymbol(":symbol").fullPack()).toEqual(symbol);
+
+    const factory = new Factory();
+    factory.registerType(0x00, rbCSymbol);
+    expect(factory.packer().writeSymbol(":symbol").fullPack()).toEqual(symbol);
+    expect(factory.dup().packer().writeSymbol(":symbol").fullPack()).toEqual(symbol);
+    expect(factory.unpacker().feed(symbol).read()).toBe(":symbol");
+
+    const unpacked = new Factory();
+    unpacked.registerType(0x00, rbCSymbol, { packer: null, optimizedSymbolsParsing: true });
+    expect(unpacked.packer().writeSymbol(":symbol").fullPack()).toEqual(
+      Uint8Array.of(0xa6, ...new TextEncoder().encode("symbol")),
+    );
+    expect(unpacked.unpacker().feed(symbol).read()).toBe(":symbol");
+    expect(
+      unpacked
+        .unpacker()
+        .feed(Uint8Array.of(0xc7, 0x00, 0x00))
+        .read(),
+    ).toBe(":");
+
+    const elsewhere = new Factory();
+    elsewhere.registerType(0x01, rbCSymbol, { optimizedSymbolsParsing: true });
+    expect(elsewhere.unpacker().feed(symbol).read()).toBe(":symbol");
+    expect(() =>
+      elsewhere
+        .unpacker()
+        .feed(Uint8Array.of(0xd4, 0x01, 0x61))
+        .read(),
+    ).toThrow("unexpected extension type");
+  });
+
   it("answers Buffer#to_s as to_str", () => {
     const buffer = new Buffer();
     buffer.write("ab");

@@ -60,11 +60,13 @@ function compare({
   inlinedFrom = [tag()],
   rubyInitialize = true,
   sameFileModule = false,
+  rubyClass = true,
 }: {
   tsCalls?: string[];
   inlinedFrom?: InlinedFrom[];
   rubyInitialize?: boolean;
   sameFileModule?: boolean;
+  rubyClass?: boolean;
 } = {}): { calls: string[]; args: string[] } {
   const write = (name: string, packages: unknown) =>
     fs.writeFileSync(path.join(output.dir, name), JSON.stringify({ packages }));
@@ -73,20 +75,22 @@ function compare({
   const local = entity("ActiveModel::Thing::Local", "thing.rb", [
     method("initialize", ["super"], cited(1, 2)),
   ]);
+  const thing = {
+    "ActiveModel::Thing": entity(
+      "ActiveModel::Thing",
+      "thing.rb",
+      [
+        method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
+        ...helpers(["assign_attributes", "build_reflection"]),
+      ],
+      rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
+    ),
+  };
   write("rails-api.json", {
     [PKG]: {
-      classes: {
-        "ActiveModel::Thing": entity(
-          "ActiveModel::Thing",
-          "thing.rb",
-          [
-            method(rubyInitialize ? "initialize" : "reflect", ["build_reflection", "super"]),
-            ...helpers(["assign_attributes", "build_reflection"]),
-          ],
-          rubyInitialize ? ["ActiveModel::API", ...(sameFileModule ? ["Local"] : [])] : [],
-        ),
-      },
+      classes: rubyClass ? thing : {},
       modules: {
+        ...(rubyClass ? {} : thing),
         "ActiveModel::API": entity("ActiveModel::API", "api.rb", [
           method("initialize", ["assign_attributes", "super"], cited(80, 84)),
         ]),
@@ -135,6 +139,12 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
     expect(compare()).toEqual({ calls: [], args: [] });
   });
 
+  it("compares a class with no Rails initialize of its own against the tagged chain alone", () => {
+    const { calls } = compare({ rubyInitialize: false, tsCalls: ["buildReflection", "super"] });
+    expect(calls.join("\n")).toContain("assign_attributes → assignAttributes");
+    expect(compare({ rubyInitialize: false })).toEqual({ calls: [], args: [] });
+  });
+
   const local = tag({ module: "ActiveModel::Thing::Local", firstLine: 1, lastLine: 2 });
   it.each([
     ["a stale citation", "citation is stale", { inlinedFrom: [tag({ firstLine: 81 })] }],
@@ -145,6 +155,7 @@ describe("compare.ts --calls over a constructor carrying @inlinedFrom", () => {
       "was never compared, no Rails `initialize` paired",
       {
         rubyInitialize: false,
+        rubyClass: false,
       },
     ],
   ])("throws its own message on %s", (_what, message, fixture) => {
