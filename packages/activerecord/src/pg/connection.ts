@@ -365,9 +365,9 @@ const HANDLER: ProxyHandler<Connection> = {
     if (typeof value !== "function") return value;
     return (...args: unknown[]): unknown => {
       try {
-        const pending: unknown = value.apply(client, args);
-        if (!(pending instanceof Promise)) return pending;
-        return pending.catch((error: unknown) => raise(conn, error));
+        const pending = value.apply(client, args) as { catch?: unknown } | null | undefined;
+        if (typeof pending?.catch !== "function") return pending;
+        return (pending as Promise<unknown>).catch((error: unknown) => raise(conn, error));
       } catch (error) {
         raise(conn, error);
       }

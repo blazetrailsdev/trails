@@ -29,7 +29,7 @@ import type { load, register, resolve } from "./connection-adapters.js";
 import type * as ConnectionHandling from "./connection-handling.js";
 import type { DisableJoinsAssociationRelation } from "./disable-joins-association-relation.js";
 import type { Cipher } from "./encryption/cipher.js";
-import type { Configurable } from "./encryption/configurable.js";
+import type { Configurable, DeclarationListener } from "./encryption/configurable.js";
 import type { Contexts } from "./encryption/contexts.js";
 import type { AutoFilteredParameters } from "./encryption/auto-filtered-parameters.js";
 import type { Config } from "./encryption/config.js";
@@ -363,6 +363,8 @@ export const Encryption = { name: "ActiveRecord::Encryption", loadPath } as Auto
   Properties: typeof Properties;
   ReadOnlyNullEncryptor: typeof ReadOnlyNullEncryptor;
   Scheme: typeof Scheme;
+  config: Config;
+  encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
 } & Omit<typeof Configurable, "prototype"> &
   Omit<typeof Contexts, "prototype">;
 extend(Encryption, Autoload);

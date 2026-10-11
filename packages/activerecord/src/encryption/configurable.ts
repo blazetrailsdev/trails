@@ -8,14 +8,9 @@ import type { EncryptorLike } from "./encryptor.js";
 import type { MessageSerializerLike } from "./message-serializer.js";
 import type { SchemeOptions } from "./scheme.js";
 
-type DeclarationListener = (klass: any, name: string) => void;
+export type DeclarationListener = (klass: any, name: string) => void;
 
 export class Configurable {
-  declare static config: Config;
-  declare static encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
-  declare config: Config;
-  declare encryptedAttributeDeclarationListeners: DeclarationListener[] | undefined;
-
   static [included](base: object): void {
     mattrReader.call(base, "config", { default: new Config() });
     mattrAccessor.call(base, "encryptedAttributeDeclarationListeners");
@@ -45,18 +40,21 @@ export class Configurable {
     return Encryption.context.frozenEncryption;
   }
 
-  static configure({
-    primaryKey,
-    deterministicKey,
-    keyDerivationSalt,
-    ...properties
-  }: {
-    primaryKey?: string | string[];
-    deterministicKey?: string;
-    keyDerivationSalt?: string;
-    previous?: SchemeOptions[];
-    [key: string]: unknown;
-  }): void {
+  static configure(
+    this: typeof Encryption,
+    {
+      primaryKey,
+      deterministicKey,
+      keyDerivationSalt,
+      ...properties
+    }: {
+      primaryKey?: string | string[];
+      deterministicKey?: string;
+      keyDerivationSalt?: string;
+      previous?: SchemeOptions[];
+      [key: string]: unknown;
+    },
+  ): void {
     this.config.primaryKey = primaryKey;
     this.config.deterministicKey = deterministicKey;
     this.config.keyDerivationSalt = keyDerivationSalt;
@@ -80,13 +78,16 @@ export class Configurable {
     }
   }
 
-  static onEncryptedAttributeDeclared(block: DeclarationListener): DeclarationListener[] {
+  static onEncryptedAttributeDeclared(
+    this: typeof Encryption,
+    block: DeclarationListener,
+  ): DeclarationListener[] {
     this.encryptedAttributeDeclarationListeners ||= [];
     this.encryptedAttributeDeclarationListeners.push(block);
     return this.encryptedAttributeDeclarationListeners;
   }
 
-  static encryptedAttributeWasDeclared(klass: any, name: string): void {
+  static encryptedAttributeWasDeclared(this: typeof Encryption, klass: any, name: string): void {
     this.encryptedAttributeDeclarationListeners?.forEach((block) => {
       block(klass, name);
     });

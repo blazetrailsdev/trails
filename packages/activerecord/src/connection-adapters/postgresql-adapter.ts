@@ -1021,20 +1021,18 @@ export class PostgreSQLAdapter
   }
   /** @internal */
   translateException(
-    exception: unknown,
+    exception: PG.Error,
     { message, sql, binds }: { message: string; sql: string; binds: unknown[] },
   ): unknown {
     if (!rbObjRespondTo(exception, "result")) return exception;
-    switch (
-      tryCall((exception as PG.Error).result, "errorField", PG.PG_DIAG_SQLSTATE) ??
-      undefined
-    ) {
+
+    switch (tryCall(exception.result, "errorField", PG.PG_DIAG_SQLSTATE) ?? undefined) {
       case undefined:
         if (
-          /connection is closed/i.test((exception as PG.Error).message) ||
-          /no connection to the server/i.test((exception as PG.Error).message)
+          rbRegMatchP(/connection is closed/i, exception.message) ||
+          rbRegMatchP(/no connection to the server/i, exception.message)
         ) {
-          return new ConnectionNotEstablished(exception as PG.Error, { connectionPool: this.pool });
+          return new ConnectionNotEstablished(exception, { connectionPool: this.pool });
         } else if (exception instanceof PG.ConnectionBad) {
           if (exception.message.endsWith("\n")) {
             return new ConnectionFailed(exception, { connectionPool: this.pool });
