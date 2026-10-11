@@ -1,3 +1,3 @@
 import { Migration } from "../../../migration.js";
 
-export class AddEmailToUsers extends Migration {}
+export class AddEmailToUsers extends Migration.Current {}

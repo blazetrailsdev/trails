@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class PeopleHaveHobbies extends Migration {
+export class PeopleHaveHobbies extends Migration.Current {
   async up(): Promise<void> {
     await this.addColumn("people", "hobbies", "text");
   }

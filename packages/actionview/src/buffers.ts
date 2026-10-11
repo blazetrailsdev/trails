@@ -1,4 +1,5 @@
 import { SafeBuffer, htmlEscape, htmlSafe, isHtmlSafe } from "@blazetrails/activesupport";
+import { rbObjAsString } from "@blazetrails/ruby-compat";
 
 export class OutputBuffer {
   private _raw: string;
@@ -71,7 +72,7 @@ export class OutputBuffer {
   safeExprAppend(value: unknown): this {
     if (value === null || value === undefined) return this;
     rejectThenable(value);
-    this._raw += value instanceof SafeBuffer ? value.toString() : String(value);
+    this._raw += value instanceof SafeBuffer ? value.toString() : rbObjAsString(value);
     return this;
   }
 

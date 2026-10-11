@@ -1,6 +1,11 @@
 import { block as rbBlock } from "@blazetrails/ruby-compat";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertDifference, assertNothingRaised, assertRaises } from "@blazetrails/activesupport";
+import {
+  assertDifference,
+  assertMatch,
+  assertNothingRaised,
+  assertRaises,
+} from "@blazetrails/activesupport";
 import { rbInspect, StandardError } from "@blazetrails/ruby-compat";
 import { Time as RubyTime } from "@blazetrails/date";
 import { Base, Migration, Migrator, NotNullViolation } from "../index.js";
@@ -194,6 +199,14 @@ describe("Migration", () => {
         await connection.columnExists("testings", "updated_at", null, { null: true }),
       ).toBeTruthy();
     });
+    it("legacy migrations raises exception when inherited", async () => {
+      const e = await assertRaises([StandardError], {}, () => {
+        class LegacyMigration extends Migration {}
+        new LegacyMigration();
+      });
+      assertMatch(/LegacyMigration < ActiveRecord::Migration\[\d\.\d\]/, e.message);
+    });
+
     it("legacy migrations not raise exception on reverting transaction", async () => {
       const migration = new (class extends Migration.get(5.2) {
         async change(): Promise<void> {

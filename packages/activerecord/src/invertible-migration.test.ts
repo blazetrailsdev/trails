@@ -17,7 +17,7 @@ class Horse extends Base {
   }
 }
 
-class SilentMigration extends Migration {
+class SilentMigration extends Migration.Current {
   write(): void {}
 }
 
@@ -179,7 +179,7 @@ class DropTableMigration extends SilentMigration {
   }
 }
 
-class LegacyMigration extends Migration {
+class LegacyMigration extends Migration.Current {
   static async up(): Promise<void> {
     const m = Migration.delegate ?? new LegacyMigration();
     await m.createTable("horses", (t) => {

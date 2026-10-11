@@ -12,7 +12,7 @@ import { describeIfSupports } from "../support/supports.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { Column } from "../connection-adapters/column.js";
 
-class SilentMigration extends Migration {
+class SilentMigration extends Migration.Current {
   write(): void {}
 }
 

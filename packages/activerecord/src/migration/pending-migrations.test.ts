@@ -47,7 +47,7 @@ describe.skipIf(skip)("Migration", () => {
       fs.writeFileSync(
         path.join(migrationDir, `${number}_${name}.ts`),
         `import { Migration } from ${JSON.stringify(MIGRATION_MODULE)};\n` +
-          `export class ${camelize(name)} extends Migration {}\n`,
+          `export class ${camelize(name)} extends Migration.Current {}\n`,
       );
     };
 

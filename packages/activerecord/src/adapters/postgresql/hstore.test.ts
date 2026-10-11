@@ -137,7 +137,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("hstore migration", async () => {
-      class HstoreMigration extends Migration<PostgreSQLAdapter> {
+      class HstoreMigration extends Migration.Current<PostgreSQLAdapter> {
         async change() {
           await this.changeTable("hstores", {}, async (t) => {
             await t.hstore("keys");

@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
 
-  class SilentMigration extends Migration<PostgreSQLAdapter> {
+  class SilentMigration extends Migration.Current<PostgreSQLAdapter> {
     override write(..._args: unknown[]): void {}
   }
 

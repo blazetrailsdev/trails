@@ -18,7 +18,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgresqlExtensionMigrationTest", () => {
     it("enable extension", async () => {
-      class EnableCitext extends Migration {
+      class EnableCitext extends Migration.Current {
         async change() {
           await this.enableExtension("citext");
         }
@@ -28,7 +28,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("disable extension", async () => {
       await adapter.enableExtension("citext");
-      class DisableCitext extends Migration {
+      class DisableCitext extends Migration.Current {
         async change() {
           await this.disableExtension("citext", { force: "cascade" });
         }
@@ -37,7 +37,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("enable extension idempotent", async () => {
-      class EnableCitext extends Migration {
+      class EnableCitext extends Migration.Current {
         async change() {
           await this.enableExtension("citext");
         }
@@ -48,7 +48,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(true);
     });
     it("disable extension idempotent", async () => {
-      class DisableCitext extends Migration {
+      class DisableCitext extends Migration.Current {
         async change() {
           await this.disableExtension("citext", { force: "cascade" });
         }
@@ -59,7 +59,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(false);
     });
     it("extension schema dump", async () => {
-      class EnableCitext extends Migration {
+      class EnableCitext extends Migration.Current {
         async change() {
           await this.enableExtension("citext");
         }
@@ -70,7 +70,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
     }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {
-      class EnableCitext extends Migration {
+      class EnableCitext extends Migration.Current {
         async change() {
           await this.enableExtension("citext");
         }
@@ -79,7 +79,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBeTruthy();
     });
     it("enable extension migration with schema", async () => {
-      class EnableCitext extends Migration {
+      class EnableCitext extends Migration.Current {
         async change() {
           await this.enableExtension("public.citext");
         }
@@ -89,7 +89,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("disable extension migration ignores prefix and suffix", async () => {
       await adapter.enableExtension("citext");
-      class DisableCitext extends Migration {
+      class DisableCitext extends Migration.Current {
         async change() {
           await this.disableExtension("citext", { force: "cascade" });
         }

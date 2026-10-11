@@ -1,6 +1,6 @@
 import { Migration } from "../../../migration.js";
 
-export class InnocentJointable extends Migration {
+export class InnocentJointable extends Migration.Current {
   async up(): Promise<void> {
     await this.createTable("people_reminders", { id: false }, (t) => {
       t.integer("reminder_id");

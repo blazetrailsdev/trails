@@ -82,7 +82,7 @@ describe("generator fixtures", () => {
       const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
-      expect(content).toContain("class CreateUsers extends Migration");
+      expect(content).toContain("class CreateUsers extends Migration.get(8.0)");
       expect(content).toContain('t.string("name")');
       expect(content).toContain('t.string("email")');
       expect(content).toContain("t.timestamps()");
@@ -115,7 +115,7 @@ describe("generator fixtures", () => {
       const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
-      expect(content).toContain("class CreateFolders extends Migration");
+      expect(content).toContain("class CreateFolders extends Migration.get(8.0)");
       expect(content).toContain('t.string("name")');
       expect(content).toContain('t.integer("user_id")');
       expect(content).toContain('t.integer("parent_id")');
@@ -150,7 +150,7 @@ describe("generator fixtures", () => {
       const migFile = files.find((f) => f.startsWith("db/migrate/"));
       expect(migFile).toBeDefined();
       const content = readFile(migFile!);
-      expect(content).toContain("class CreateDocuments extends Migration");
+      expect(content).toContain("class CreateDocuments extends Migration.get(8.0)");
       expect(content).toContain('t.string("title")');
       expect(content).toContain('t.text("body")');
       expect(content).toContain('t.integer("user_id")');

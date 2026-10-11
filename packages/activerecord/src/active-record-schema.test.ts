@@ -277,7 +277,7 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("addTimestamps forwards options to addColumn", async () => {
-    class TsOptMig extends Migration {
+    class TsOptMig extends Migration.Current {
       async up() {
         await this.createTable("ts_opts", (t) => {
           t.string("name");

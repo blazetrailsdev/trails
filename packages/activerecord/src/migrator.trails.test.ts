@@ -579,21 +579,21 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("Migration#name and #version report the constructor arguments", () => {
-    class Chunky extends Migration {}
+    class Chunky extends Migration.Current {}
     const migration = new Chunky("Bacon", 20240101000000);
     expect(migration.name).toBe("Bacon");
     expect(migration.version).toBe(20240101000000);
   });
 
   it("Migration#name defaults to the class and #version stays unset", () => {
-    class Chunky extends Migration {}
+    class Chunky extends Migration.Current {}
     const migration = new Chunky();
     expect(migration.name).toBe("Chunky");
     expect(migration.version).toBeUndefined();
   });
 
   it("announces the identity the proxy constructed the migration with", async () => {
-    class SomeOtherClassName extends Migration {
+    class SomeOtherClassName extends Migration.Current {
       async change(): Promise<void> {}
     }
     const migrator = new Migrator(
@@ -615,7 +615,7 @@ describe("Migrator drives migrations through Migration#migrate", () => {
   });
 
   it("honours a Migration subclass override of announce", async () => {
-    class Shouty extends Migration {
+    class Shouty extends Migration.Current {
       override announce(message: string): void {
         this.write(`!! ${message} !!`);
       }

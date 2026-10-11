@@ -9,7 +9,7 @@ import { assertQueriesCount } from "../testing/query-assertions.js";
 import { Base } from "../base.js";
 import { Migration } from "../migration.js";
 
-class CreateDogsMigration extends Migration {
+class CreateDogsMigration extends Migration.Current {
   write(): void {}
 
   async change(): Promise<void> {
