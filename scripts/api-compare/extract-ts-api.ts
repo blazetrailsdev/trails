@@ -6927,14 +6927,6 @@ function collectCalls(
   return [...names, ...hashForms];
 }
 
-/**
- * The native hash forms (RFC 0190) a node is, each with the receiver it is on.
- * `in` and `delete` also answer the KEY, in {@link describeArg}'s spelling: a
- * `delete options.public` names it as the string `delete options["public"]`
- * does. {@link walkForCallArgs} records the pair as an `@in` / `@delete` site,
- * so `parity:api:calls:args` compares the key the call-set gate cannot see
- * (call-args.ts#hashFormKeys).
- */
 function nativeHashForms(
   n: ts.Node,
 ): [form: string, receiver: ts.Expression | undefined, key?: string][] {

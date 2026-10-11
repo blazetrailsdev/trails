@@ -311,7 +311,14 @@ export const NATIVE_HASH_FORM_SPELLINGS: ReadonlyMap<string, string> = new Map([
  * key, and `parity:api:calls:args` pairs it with the Ruby site on the same
  * receiver name and compares it with the Ruby call's first argument where both
  * are literal, so `options.delete(:public)` ported as `delete options.private`
- * is a `shape` row (call-args.ts#hashFormKeys). `@assign`, `@spread` and
+ * is a `shape` row (call-args.ts#hashFormKeys). A key is literal when Ruby's
+ * is a Symbol or String literal and the TS one a string literal or a property
+ * name (`delete options.public`); a computed key on either side is not
+ * compared. Both go through `normalizeRubyKey`, the translation a kwarg key
+ * gets, so `:only_path` is `"onlyPath"`, and a Symbol key is also `":params"`,
+ * the spelling a hash holding Symbol and String keys keeps it under. A Ruby
+ * site on a local receiver, which the gate otherwise drops as `weak`, is kept
+ * where the body has a form site on that receiver. `@assign`, `@spread` and
  * `@entries` name no key and are not recorded.
  * A row whose argument is a QUANTITY declares `argument`: the TS
  * call carrying it, its position on each side, and the unit `factor` the TS

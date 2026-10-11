@@ -1004,31 +1004,16 @@ function tsCallNameKeys(rubyName: string): string[] {
   return [snakeToCamel(rubyName), ...forms];
 }
 
-/** The site name the TS extractor records for the native form of a Ruby hash
- *  call whose row declares `key` (`@in` for `key?`, `@delete` for `delete`;
- *  extract-ts-api.ts#nativeHashForms). */
 function keyedFormName(rubyName: string): string | undefined {
   const analogue = NATIVE_FORM_ANALOGUES.get(rubyName);
   return analogue?.key === true ? `${NATIVE_FORM_PREFIX}${analogue.form}` : undefined;
 }
 
-/** Whether a native-form site is on the receiver the Ruby site names, the
- *  name match `hasNativeFormAnalogue` (compare.ts) credits the call by:
- *  `@options.key?(:x)` is `"x" in this.options`, never `"x" in this.other`. */
 function onSameHash(ruby: CallSite, ts: CallSite): boolean {
   const tail = ruby.recv?.match(/^(?:id|call):@*(\w+)$/)?.[1];
   return tail !== undefined && ts.recv === `id:${snakeToCamel(tail)}`;
 }
 
-/**
- * The key a Ruby hash call and its native form each name, or the side that
- * names none. Ruby's is a Symbol or String literal in argument 1, the TS one a
- * string literal or a property name; a computed key on either side is not
- * compared. Both go through {@link normalizeRubyKey}, the translation a kwarg
- * key gets, so `:only_path` is `"onlyPath"`. A Symbol key is also `":params"`,
- * the spelling a hash holding Symbol and String keys keeps it under
- * (CLAUDE.md, "Symbols vs strings").
- */
 function hashFormKeys(ruby: CallSite, ts: CallSite): [string, string] | CallArgSkipReason {
   const [, kind, rubyKey] = ruby.args[0]?.match(/^(sym|str):(.*)$/s) ?? [];
   if (rubyKey === undefined) return "opaqueRubyArg";
