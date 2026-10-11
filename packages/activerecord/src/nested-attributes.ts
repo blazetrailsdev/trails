@@ -12,7 +12,10 @@ import {
   kernelArray,
 } from "@blazetrails/activesupport";
 import {
+  eachPair,
   except,
+  hashAref,
+  keys as hashKeys,
   rbEqual,
   rbFSend,
   rbObjMethod,
@@ -31,8 +34,13 @@ export function _destroy(this: Base): boolean {
   return this.markedForDestruction();
 }
 
-export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean =>
-  Object.entries(attributes).every(([key, value]) => key === "_destroy" || isBlank(value));
+export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean => {
+  let all = true;
+  eachPair(attributes, (key, value) => {
+    if (!(key === "_destroy" || isBlank(value))) all = false;
+  });
+  return all;
+};
 
 export interface NestedAttributeOptions {
   allowDestroy?: boolean;
@@ -83,7 +91,7 @@ const _booleanType = new BooleanType();
 
 /** @internal */
 export function hasDestroyFlag(hash: Record<string, unknown>): boolean {
-  return _booleanType.cast(hash["_destroy"]) === true;
+  return _booleanType.cast(hashAref(hash, "_destroy")) === true;
 }
 
 /** @internal */
@@ -277,7 +285,7 @@ export function assignNestedAttributesForOneToOneAssociation(
 
   const assoc = this.association(associationName) as unknown as OneToOneAssociation;
   if (
-    (options.updateOnly || !isBlank(attributes["id"])) &&
+    (options.updateOnly || !isBlank(hashAref(attributes, "id"))) &&
     assoc.isLoaded() === false &&
     "reader" in assoc
   ) {
@@ -291,15 +299,15 @@ export function assignNestedAttributesForOneToOneAssociation(
   const existingRecord = assoc.target ?? null;
 
   if (
-    (options.updateOnly || !isBlank(attributes["id"])) &&
+    (options.updateOnly || !isBlank(hashAref(attributes, "id"))) &&
     existingRecord &&
-    (options.updateOnly || String(existingRecord.id) === String(attributes["id"]))
+    (options.updateOnly || String(existingRecord.id) === String(hashAref(attributes, "id")))
   ) {
     if (!callRejectIf.call(this, associationName, attributes)) {
       return assignToOrMarkForDestruction(existingRecord, attributes, options.allowDestroy!);
     }
-  } else if (isPresent(attributes["id"])) {
-    raiseNestedAttributesRecordNotFoundBang.call(this, associationName, attributes["id"]);
+  } else if (isPresent(hashAref(attributes, "id"))) {
+    raiseNestedAttributesRecordNotFoundBang.call(this, associationName, hashAref(attributes, "id"));
   } else if (!isRejectNewRecord.call(this, associationName, attributes)) {
     const assignableAttributes = except(attributes, ...UNASSIGNABLE_KEYS);
 
@@ -350,11 +358,11 @@ export function assignNestedAttributesForCollectionAssociation(
   if (Array.isArray(attributesCollection)) {
     attrs = attributesCollection;
   } else {
-    const keys = Object.keys(attributesCollection);
+    const keys = hashKeys(attributesCollection as Record<string, unknown>);
     if (keys.includes("id")) {
       attrs = [attributesCollection as unknown as Record<string, unknown>];
     } else {
-      attrs = keys.map((k) => (attributesCollection as any)[k]);
+      attrs = keys.map((k) => hashAref(attributesCollection, k) as Record<string, unknown>);
     }
   }
 
@@ -368,20 +376,20 @@ export function assignNestedAttributesForCollectionAssociation(
         a = (a as unknown as { toH(): Record<string, unknown> }).toH();
       }
 
-      if (isBlank(a["id"])) {
+      if (isBlank(hashAref(a, "id"))) {
         if (!isRejectNewRecord.call(this, associationName, a)) {
           nestedTarget.push(association.reader.build(except(a, ...UNASSIGNABLE_KEYS)));
         } else {
           nestedTarget.push(null);
         }
       } else {
-        let existingRecord = findRecordById(association.klass, existingRecords, (a as any).id);
+        let existingRecord = findRecordById(association.klass, existingRecords, hashAref(a, "id"));
         if (existingRecord) {
           if (!callRejectIf.call(this, associationName, a)) {
             const targetRecord = findRecordById(
               association.klass,
               association.target,
-              (a as any).id,
+              hashAref(a, "id"),
             );
             if (targetRecord) {
               existingRecord = targetRecord;
@@ -400,7 +408,7 @@ export function assignNestedAttributesForCollectionAssociation(
             nestedTarget.push(null);
           }
         } else {
-          raiseNestedAttributesRecordNotFoundBang.call(this, associationName, a["id"]);
+          raiseNestedAttributesRecordNotFoundBang.call(this, associationName, hashAref(a, "id"));
         }
       }
     }
@@ -410,9 +418,11 @@ export function assignNestedAttributesForCollectionAssociation(
 
   if (association.isLoaded()) return assignRecords(association.target);
 
-  const attributeIds = attrs.map((a) => a["id"]).filter((id) => id != null && id !== false);
+  const attributeIds = attrs
+    .map((a) => hashAref(a, "id"))
+    .filter((id) => id != null && id !== false);
   if (attributeIds.length === 0) return assignRecords([]);
-  if (attrs.every((a) => isBlank(a["id"]))) return assignRecords([]);
+  if (attrs.every((a) => isBlank(hashAref(a, "id")))) return assignRecords([]);
 
   const primaryKey = association.klass.primaryKey;
   const scope = association.scope();

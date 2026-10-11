@@ -1,6 +1,7 @@
 import { ArgumentError, Mutable, ValueType } from "@blazetrails/activemodel";
 import { include, isPlainObject } from "@blazetrails/activesupport";
 import {
+  eachPair,
   rbEqual,
   rbObjRespondTo,
   registerConstant,
@@ -74,10 +75,12 @@ export class Hstore extends ValueType {
   }
 
   override serialize(value: unknown): unknown {
-    if (isPlainObject(value)) {
-      return Object.entries(value)
-        .map(([k, v]) => `${escapeHstore(k)}=>${escapeHstore(v as string | null)}`)
-        .join(", ");
+    if (isPlainObject(value) || value instanceof Map) {
+      const pairs: string[] = [];
+      eachPair(value as Record<string, unknown>, (k, v) => {
+        pairs.push(`${escapeHstore(k)}=>${escapeHstore(v as string | null)}`);
+      });
+      return pairs.join(", ");
     } else if (rbObjRespondTo(value, "toUnsafeH")) {
       return this.serialize((value as { toUnsafeH(): unknown }).toUnsafeH());
     } else {

@@ -1,5 +1,12 @@
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
-import { eachValue, isEmpty, rbInspect, rbStrToF, rbStrToI } from "@blazetrails/ruby-compat";
+import {
+  eachPair,
+  eachValue,
+  isEmpty,
+  rbInspect,
+  rbStrToF,
+  rbStrToI,
+} from "@blazetrails/ruby-compat";
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
@@ -16,7 +23,7 @@ interface AttributeAssignmentHost {
 function isNestedParameterHash(value: unknown): boolean {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
+  return proto === Object.prototype || proto === null || value instanceof Map;
 }
 
 /**
@@ -25,13 +32,13 @@ function isNestedParameterHash(value: unknown): boolean {
  */
 export function _assignAttributes(
   this: AttributeAssignmentHost,
-  attributes: Record<string, unknown>,
+  attributes: Record<string, unknown> | Map<string, unknown>,
 ): Promise<void> | void {
   let multiParameterAttributes: Record<string, unknown> | null = null;
   let nestedParameterAttributes: Record<string, unknown> | null = null;
   let pending: Promise<void> | undefined;
 
-  for (const [k, v] of Object.entries(attributes)) {
+  eachPair(attributes, (k, v) => {
     const key = String(k);
     if (key.includes("(")) {
       (multiParameterAttributes ??= {})[key] = v;
@@ -45,7 +52,7 @@ export function _assignAttributes(
       const assigned = this._assignAttribute(key, v);
       if (assigned instanceof Promise) pending = assigned;
     }
-  }
+  });
 
   const assignDeferred = (): Promise<void> | void => {
     const nested = (

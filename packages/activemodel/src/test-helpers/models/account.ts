@@ -3,8 +3,8 @@ import { ForbiddenAttributesProtection } from "../../forbidden-attributes-protec
 
 export class Account {
   declare sanitizeForMassAssignment: (
-    attributes: Record<string, unknown>,
-  ) => Record<string, unknown>;
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ) => Record<string, unknown> | Map<string, unknown>;
 
   static {
     include(this, ForbiddenAttributesProtection);

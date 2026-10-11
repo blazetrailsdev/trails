@@ -9,6 +9,7 @@ import {
   isEmpty,
   isModuleIncluded,
   isSymbol,
+  merge,
   partition,
   rbFPublicSend,
   rbFSend,
@@ -674,7 +675,7 @@ function whereBang(this: QueryMethodsHost, opts: any, ...rest: unknown[]): any {
 
 function rewhere(this: QueryMethodsHost, conditions: Record<string, unknown> | null): any {
   if (conditions == null) return unscope.call(this, ":where");
-  conditions = sanitizeForbiddenAttributes(conditions);
+  conditions = sanitizeForbiddenAttributes(conditions) as Record<string, unknown>;
   const rel = this.spawn();
   const newClause = buildWhereClause.call(rel, conditions);
   rel.whereClause = rel.whereClause.except(...newClause.extractAttributes());
@@ -954,8 +955,8 @@ function createWith(this: QueryMethodsHost, value: Record<string, unknown> | nul
 
 function createWithBang(this: QueryMethodsHost, value: Record<string, unknown> | null): any {
   if (value) {
-    value = sanitizeForbiddenAttributes(value);
-    this.createWithValue = { ...this.createWithValue, ...value };
+    value = sanitizeForbiddenAttributes(value) as Record<string, unknown>;
+    this.createWithValue = merge(this.createWithValue, value);
   } else {
     this.createWithValue = {};
   }

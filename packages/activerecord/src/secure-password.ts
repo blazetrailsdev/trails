@@ -1,16 +1,18 @@
 import { camelize } from "@blazetrails/activesupport";
 import { ArgumentError, hasSecurePassword } from "@blazetrails/activemodel";
-import { partition, toH } from "@blazetrails/ruby-compat";
+import { eachPair, partition, toH } from "@blazetrails/ruby-compat";
 import type { Base } from "./base.js";
 
 export { hasSecurePassword };
 
 export async function authenticateBy(
   this: typeof Base,
-  attributes: Record<string, unknown> | { toH(): Record<string, unknown> },
+  attributes: Record<string, unknown> | { toH(): Record<string, unknown> | Map<string, unknown> },
 ): Promise<Base | null> {
+  const pairs: [string, unknown][] = [];
+  eachPair(toH(attributes) as Record<string, unknown>, (name, value) => pairs.push([name, value]));
   const [passwords, identifiers] = partition(
-    Object.entries(toH(attributes)),
+    pairs,
     ([name]) => !this.hasAttribute(name) && this.hasAttribute(`${name}_digest`),
   ).map((pairs) => Object.fromEntries(pairs));
 

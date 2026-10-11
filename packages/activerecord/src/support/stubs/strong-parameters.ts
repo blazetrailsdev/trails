@@ -1,3 +1,6 @@
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
+import type { Hash } from "@blazetrails/ruby-compat";
+
 export class ProtectedParams {
   [key: string]: unknown;
 
@@ -68,11 +71,11 @@ export class ProtectedParams {
     return this.#self;
   }
 
-  toH(): Record<string, unknown> {
-    return { ...this.#parameters };
+  toH(): Hash<string, unknown> {
+    return new HashWithIndifferentAccess(this.#parameters).toH();
   }
 
-  toUnsafeH(): Record<string, unknown> {
+  toUnsafeH(): Hash<string, unknown> {
     return this.toH();
   }
 

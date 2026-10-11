@@ -5,13 +5,13 @@ ForbiddenAttributesError.prototype.name = "ForbiddenAttributesError";
 
 export interface PermittedAttributes {
   isPermitted(): boolean;
-  toH(): Record<string, unknown>;
+  toH(): Record<string, unknown> | Map<string, unknown>;
 }
 
 /** @internal */
 export function sanitizeForMassAssignment(
-  attributes: Record<string, unknown> | PermittedAttributes,
-): Record<string, unknown> {
+  attributes: Record<string, unknown> | Map<string, unknown> | PermittedAttributes,
+): Record<string, unknown> | Map<string, unknown> {
   const attrs = attributes as Record<string, unknown> & Partial<PermittedAttributes>;
   if (rbObjRespondTo(attrs, "isPermitted")) {
     if (!attrs.isPermitted!()) {

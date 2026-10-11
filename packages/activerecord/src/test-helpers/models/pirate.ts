@@ -1,4 +1,4 @@
-import { hashDelete, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
+import { hashDelete, isEmpty, kernelThrow, registerConstant } from "@blazetrails/ruby-compat";
 import { isPresent } from "@blazetrails/activesupport";
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { CollectionProxy } from "../../associations/collection-proxy.js";
@@ -122,11 +122,11 @@ export class Pirate extends Base {
     this.hasOne("attackerMatey", { foreignKey: "target_id", className: "Matey" });
     this.acceptsNestedAttributesFor("parrots", "birds", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("ship", {
       allowDestroy: true,
-      rejectIf: (attrs) => Object.keys(attrs).length === 0,
+      rejectIf: isEmpty,
     });
     this.acceptsNestedAttributesFor("updateOnlyShip", { updateOnly: true });
     this.acceptsNestedAttributesFor(

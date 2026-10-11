@@ -62,13 +62,19 @@ export interface API extends Conversion {
   setAttributes(newAttributes: unknown): Promise<void> | void;
   attributeWriterMissing(name: string, value: unknown): void;
   /** @internal */
-  _assignAttributes(attributes: Record<string, unknown>): Promise<void> | void;
+  _assignAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Promise<void> | void;
   /** @internal */
   _assignAttribute(k: string, v: unknown): unknown;
   /** @internal */
-  sanitizeForMassAssignment(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForMassAssignment(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
   /** @internal */
-  sanitizeForbiddenAttributes(attributes: Record<string, unknown>): Record<string, unknown>;
+  sanitizeForbiddenAttributes(
+    attributes: Record<string, unknown> | Map<string, unknown>,
+  ): Record<string, unknown> | Map<string, unknown>;
 
   /** @internal */
   contextForValidation(): ValidationContext;

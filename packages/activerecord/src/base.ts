@@ -3,8 +3,10 @@ import {
   block as rbBlock,
   fetch,
   hasKey,
+  eachPair,
   hashAref,
   isEmpty,
+  keys,
   rbDeclareIvar,
   rbModConstSet,
   rbModName,
@@ -495,7 +497,7 @@ function _collectionIdsKeyOwner(
 /** @internal */
 function _extractAssociationAttrs(
   ctor: typeof Base,
-  attrs: Record<string, unknown>,
+  attrs: Record<string, unknown> | Map<string, unknown>,
 ): {
   rest: Record<string, unknown>;
   assocs: _PendingAssociationAttr[];
@@ -503,23 +505,23 @@ function _extractAssociationAttrs(
   const defs = Object.values(ctor._reflections);
   if (defs.length === 0) return null;
   let assocs: _PendingAssociationAttr[] | null = null;
-  for (const k of Object.keys(attrs)) {
+  for (const k of keys(attrs)) {
     const named = defs.find((a) => a.name === k);
     if (named) {
-      (assocs ??= []).push({ name: k, value: attrs[k], assoc: named, idsKey: false });
+      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: named, idsKey: false });
       continue;
     }
     const idsOwner = _collectionIdsKeyOwner(defs, k);
     if (idsOwner) {
-      (assocs ??= []).push({ name: k, value: attrs[k], assoc: idsOwner, idsKey: true });
+      (assocs ??= []).push({ name: k, value: hashAref(attrs, k), assoc: idsOwner, idsKey: true });
     }
   }
   if (!assocs) return null;
   const rest = Object.create(null) as Record<string, unknown>;
   const assocNames = new Set(assocs.map((a) => a.name));
-  for (const [k, v] of Object.entries(attrs)) {
+  eachPair(attrs, (k, v) => {
     if (!assocNames.has(k)) rest[k] = v;
-  }
+  });
   return { rest, assocs };
 }
 
@@ -1502,7 +1504,7 @@ export class Base extends Model {
     suppressor._suppressInitializeCallback = true;
     try {
       if (allocating) _Core._allocation.klass = ctor;
-      super(attrs);
+      super(attrs as Record<string, unknown>);
     } finally {
       if (hadOwn) {
         suppressor._suppressInitializeCallback = previouslySuppressed;
@@ -1517,7 +1519,7 @@ export class Base extends Model {
         _applyScopeAttributes(
           ctor,
           this as any,
-          new Set(Object.keys(attrs).map((key) => key.split("(")[0])),
+          new Set(keys(attrs).map((key) => key.split("(")[0])),
         );
       }
       if (assocPending) {
