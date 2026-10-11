@@ -309,7 +309,6 @@ export const rbCFalseClass = rbDefineClass("FalseClass");
  * @noRailsEquivalent PERMANENT
  */
 export const rbCInteger = rbDefineClass("Integer", rbCNumeric);
-/** `Integer#integer?` (`vendor/ruby/v3.3.11/numeric.rb:178`). */
 rbModDefineMethod(rbCInteger, "isInteger", () => true);
 
 /**
@@ -328,12 +327,6 @@ const SPECIAL_CONST_CLASSES: ReadonlySet<unknown> = new Set([
   rbCString,
 ]);
 
-/**
- * The method table of the class `rb_class_of`
- * (`vendor/ruby/v3.3.11/include/ruby/internal/globals.h:172`) answers for a
- * value whose JS prototype chain does not reach it. A plain record's `Hash`
- * and an array's global `Array` are not seated here.
- */
 function classSeatMethodTable(recv: unknown): object | null {
   if (typeof recv === "function") return null;
   if (recv && typeof recv === "object" && !(recv instanceof Number || recv instanceof Uint8Array)) {

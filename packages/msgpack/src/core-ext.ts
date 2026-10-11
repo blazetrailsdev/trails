@@ -72,7 +72,7 @@ export class Array {
   static toMsgpack(self: unknown[], packerOrIo: unknown = null): Uint8Array | Packer | null {
     if (packerOrIo != null && packerOrIo !== false) {
       if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
-        return this.toMsgpackWithPacker(self, packerOrIo as Packer);
+        return Array.toMsgpackWithPacker(self, packerOrIo as Packer);
       } else {
         return MessagePack.pack(self, packerOrIo);
       }
@@ -95,10 +95,17 @@ rbModDefineMethod(RubyHash, "toMsgpackWithPacker", function (this: object, packe
 });
 
 export class Hash {
-  static toMsgpack = Array.toMsgpack as (
-    self: object,
-    packerOrIo?: unknown,
-  ) => Uint8Array | Packer | null;
+  static toMsgpack(self: object, packerOrIo: unknown = null): Uint8Array | Packer | null {
+    if (packerOrIo != null && packerOrIo !== false) {
+      if (rbObjIsKindOf(packerOrIo, MessagePack.Packer)) {
+        return Hash.toMsgpackWithPacker(self, packerOrIo as Packer);
+      } else {
+        return MessagePack.pack(self, packerOrIo);
+      }
+    } else {
+      return MessagePack.pack(self);
+    }
+  }
 
   /** @internal */
   static toMsgpackWithPacker(self: object, packer: Packer): Packer {
