@@ -71,13 +71,18 @@ describe("retained config", () => {
 });
 
 describe("Mysql2Adapter.newClient flags", () => {
+  const WITH_CONNECT_FLAGS = [
+    ...["LONG_PASSWORD", "FOUND_ROWS", "LONG_FLAG", "COMPRESS", "PROTOCOL_41", "TRANSACTIONS"],
+    ...["SECURE_CONNECTION", "CONNECT_ATTRS", "-IGNORE_SPACE"],
+  ];
+
   it("hands the driver every bit of an Integer flags value by name", async () => {
     const driverConfig = await mysqlPoolConfig({ ...BASE, flags: 0x20 | 0x02 });
-    expect(driverConfig.flags).toEqual(["FOUND_ROWS", "COMPRESS", "-IGNORE_SPACE"]);
+    expect(driverConfig.flags).toEqual(WITH_CONNECT_FLAGS);
   });
 
   it("hands the driver an Array flags value as given", async () => {
     const driverConfig = await mysqlPoolConfig({ ...BASE, flags: ["COMPRESS", "FOUND_ROWS"] });
-    expect(driverConfig.flags).toEqual(["COMPRESS", "FOUND_ROWS", "-IGNORE_SPACE"]);
+    expect(driverConfig.flags).toEqual(WITH_CONNECT_FLAGS);
   });
 });
