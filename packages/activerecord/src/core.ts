@@ -485,7 +485,6 @@ interface CoreHost {
   name: string;
   tableName?: string | null;
   primaryKey?: string | string[];
-  isCompositePrimaryKey?(): boolean;
   filterAttributes: FilterAttributes;
   _filterAttributes?: FilterAttributes;
   _inspectionFilter?: any;
@@ -744,14 +743,11 @@ const ACTIVE_RECORD_CONNECTION_HANDLER_KEY = "active_record_connection_handler";
 /** @internal */
 export const _allocation: { klass: unknown } = { klass: null };
 
-function completeAttributesOnSchemaLoad(
-  record: object,
-  attributes: import("@blazetrails/activemodel").AttributeSet,
-): void {
+function completeAttributesOnSchemaLoad(record: object, attributes: AttributeSet): void {
   Object.defineProperty(record, "_attributes", {
     get(this: object) {
       const klass = record.constructor as unknown as {
-        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+        _defaultAttributes(): AttributeSet;
       };
       if (this === record && isSchemaLoaded.call(klass as never)) {
         attributes.reverseMergeBang(klass._defaultAttributes().deepDup());
@@ -764,7 +760,7 @@ function completeAttributesOnSchemaLoad(
       }
       return attributes;
     },
-    set(this: object, value: import("@blazetrails/activemodel").AttributeSet) {
+    set(this: object, value: AttributeSet) {
       if (this === record) attributes = value;
       else completeAttributesOnSchemaLoad(this, value);
     },
@@ -779,7 +775,7 @@ function completeAttributesOnSchemaLoad(
  */
 export function constructor(
   this: CoreRecord & {
-    _attributes: import("@blazetrails/activemodel").AttributeSet;
+    _attributes: AttributeSet;
     _newRecord: boolean;
     initInternals(): void;
   },
@@ -792,7 +788,7 @@ export function constructor(
     this._newRecord = true;
     this._attributes = (
       this.constructor as unknown as {
-        _defaultAttributes(): import("@blazetrails/activemodel").AttributeSet;
+        _defaultAttributes(): AttributeSet;
       }
     )
       ._defaultAttributes()

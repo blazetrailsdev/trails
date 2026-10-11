@@ -86,6 +86,7 @@ function makeModel(tableName: string, pk = "id") {
   const Model = {
     tableName,
     primaryKey: pk,
+    isCompositePrimaryKey: () => false,
     loadSchema: async () => {},
     definedEnums: {},
     _reflections: {},
