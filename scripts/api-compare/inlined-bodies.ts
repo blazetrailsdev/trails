@@ -47,38 +47,65 @@ export function inlinedHookBody(ruby: ApiManifest, tag: InlinedFrom, where: stri
   throw new Error(`${TAG} names no Ruby body: ${where} — the manifest has no \`${name}\`.`);
 }
 
+/** One module's body in a chain, under the module's FQN. */
+export interface ModuleBody {
+  module: string;
+  body: MethodInfo;
+}
+
 /**
- * The modules a class includes that define `initialize` in the class's own
- * Ruby file, as FQNs in ancestor order: the last `include` first, each
- * followed by the modules it includes itself.
+ * The modules among a class's ancestors, as FQNs in the order Ruby looks them
+ * up: `prepended` sit ahead of the class and `included` behind it. The last
+ * `prepend` / `include` comes first, and each module stands between the
+ * modules it prepends and the ones it includes.
  */
-export function sameFileInitializeModules(
+export interface ModuleAncestors {
+  prepended: string[];
+  included: string[];
+}
+
+export function moduleAncestors(
   klass: ClassInfo,
   klassFqn: string,
   modules: Record<string, unknown>,
   resolve: (incName: string, contextFqn: string) => string,
-): string[] {
-  const found: string[] = [];
+): ModuleAncestors {
   const visited = new Set<string>();
-  const walk = (includes: readonly string[] | undefined, contextFqn: string): void => {
-    for (const inc of [...(includes ?? [])].reverse()) {
-      const fqn = resolve(inc, contextFqn);
+  const walk = (names: readonly string[] | undefined, contextFqn: string, into: string[]): void => {
+    for (const name of [...(names ?? [])].reverse()) {
+      const fqn = resolve(name, contextFqn);
       if (visited.has(fqn)) continue;
       visited.add(fqn);
       const mod = modules[fqn] as ClassInfo | undefined;
-      if (!mod) continue;
-      if (
-        klass.file !== undefined &&
-        mod.file === klass.file &&
-        mod.instanceMethods.some((m) => m.name === "initialize")
-      ) {
-        found.push(fqn);
-      }
-      walk(mod.includes, fqn);
+      walk(mod?.prepends, fqn, into);
+      into.push(fqn);
+      walk(mod?.includes, fqn, into);
     }
   };
-  walk(klass.includes, klassFqn);
-  return found;
+  const ancestors: ModuleAncestors = { prepended: [], included: [] };
+  walk(klass.prepends, klassFqn, ancestors.prepended);
+  walk(klass.includes, klassFqn, ancestors.included);
+  return ancestors;
+}
+
+/**
+ * The ancestors of a class that define `initialize` in the class's own Ruby
+ * file, in ancestor order.
+ */
+export function sameFileInitializeModules(
+  klass: ClassInfo,
+  ancestors: ModuleAncestors,
+  modules: Record<string, unknown>,
+): string[] {
+  return [...ancestors.prepended, ...ancestors.included].filter((fqn) => {
+    const mod = modules[fqn] as ClassInfo | undefined;
+    return (
+      mod !== undefined &&
+      klass.file !== undefined &&
+      mod.file === klass.file &&
+      mod.instanceMethods.some((m) => m.name === "initialize")
+    );
+  });
 }
 
 /**
@@ -91,7 +118,7 @@ export function taggedBodies(
   tags: readonly InlinedFrom[],
   sameFile: readonly string[],
   where: string,
-): MethodInfo[] {
+): ModuleBody[] {
   return tags.map((tag) => {
     if (sameFile.includes(tag.module)) {
       throw new Error(
@@ -99,7 +126,7 @@ export function taggedBodies(
           "constructor's file mirrors, and a same-file body is inlined untagged.",
       );
     }
-    return inlinedHookBody(ruby, tag, where);
+    return { module: tag.module, body: inlinedHookBody(ruby, tag, where) };
   });
 }
 
@@ -121,22 +148,29 @@ export function uncomparedInlinedTags(
 /**
  * The Rails chain a constructor that inlines module bodies answers to
  * (RFC 0188), in the order Ruby runs it: a tagged `ClassMethods#new`, which
- * `Class#new` enters before any `initialize`, then the class's own
- * `initialize`, its same-file modules', and the tagged `initialize` bodies in
- * tag order. Empty when the class has neither a same-file module nor a tag,
- * which leaves the pair to the ordinary gate.
+ * `Class#new` enters before any `initialize`, then the `initialize` of each
+ * prepended module, the class's own, and each included module's. A tagged
+ * module that is not among `ancestors` follows them in tag order. Empty when
+ * the class has neither a same-file module nor a tag, which leaves the pair to
+ * the ordinary gate.
  */
 export function inlinedSegments(
   own: MethodInfo | undefined,
-  sameFile: readonly MethodInfo[],
-  tagged: readonly MethodInfo[],
+  ancestors: ModuleAncestors,
+  sameFile: readonly ModuleBody[],
+  tagged: readonly ModuleBody[],
 ): MethodInfo[] {
   if (sameFile.length + tagged.length === 0) return [];
+  const initializes = [...sameFile, ...tagged.filter((m) => m.body.name !== "new")];
+  const at = (fqns: readonly string[]) =>
+    fqns.flatMap((fqn) => initializes.filter((m) => m.module === fqn).map((m) => m.body));
+  const placed = new Set([...ancestors.prepended, ...ancestors.included]);
   return [
-    ...tagged.filter((m) => m.name === "new"),
+    ...tagged.filter((m) => m.body.name === "new").map((m) => m.body),
+    ...at(ancestors.prepended),
     ...(own === undefined ? [] : [own]),
-    ...sameFile,
-    ...tagged.filter((m) => m.name !== "new"),
+    ...at(ancestors.included),
+    ...initializes.filter((m) => !placed.has(m.module)).map((m) => m.body),
   ];
 }
 

@@ -1025,6 +1025,8 @@ class ApiExtractor
       end
     when "include"
       process_include(args)
+    when "prepend"
+      process_prepend(args)
     when "extend"
       process_extend(args)
     when "attr_reader"
@@ -1120,6 +1122,8 @@ class ApiExtractor
         process_attr_from_arg_paren(node[2], cmd_name)
       when "include"
         process_include_from_arg_paren(node[2])
+      when "prepend"
+        process_prepend_from_arg_paren(node[2])
       when "extend"
         process_extend_from_arg_paren(node[2])
       when "scope"
@@ -1277,6 +1281,22 @@ class ApiExtractor
     names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
+  end
+
+  def process_prepend(args)
+    return if @in_on_load.positive?
+    target = @classes[current_fqn] || @modules[current_fqn]
+    return unless target
+
+    target[:prepends].concat(extract_const_args(args, keep_absolute: true))
+  end
+
+  def process_prepend_from_arg_paren(args)
+    return if @in_on_load.positive?
+    target = @classes[current_fqn] || @modules[current_fqn]
+    return unless target
+
+    target[:prepends].concat(extract_const_args_from_paren(args, keep_absolute: true))
   end
 
   def process_extend(args)
@@ -4670,6 +4690,7 @@ class ApiExtractor
       file: @current_file,
       includes: [],
       extends: [],
+      prepends: [],
       instanceMethods: [],
       classMethods: [],
     }
@@ -4983,7 +5004,10 @@ def normalize_class_info(info)
     extends: info[:extends].uniq,
     instanceMethods: tag_internal(info[:instanceMethods]),
     classMethods: tag_internal(info[:classMethods]),
-  }.tap { |out| out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods] }
+  }.tap do |out|
+    out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
+    out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
+  end
 end
 
 run if __FILE__ == $PROGRAM_NAME

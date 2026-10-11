@@ -1,14 +1,16 @@
-import { describe, it, expect, afterAll, beforeEach, vi } from "vitest";
-import { Base } from "../index.js";
+import { describe, it, expect, beforeEach } from "vitest";
 import { I18n } from "@blazetrails/activemodel";
 import { RecordInvalid } from "../validations.js";
 import { fixtures } from "../test-fixtures.js";
+import "../support/canonical-model-index.js";
+import { Topic } from "../test-helpers/models/topic.js";
 import "../i18n.js";
 
-vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
-fixtures({});
+fixtures([]);
 
 describe("I18nGenerateMessageValidationTest", () => {
+  let topic: Topic;
+
   class Backend extends I18n.Fallbacks(I18n.Simple) {}
 
   function resetI18nLoadPath(fn: () => void): void {
@@ -25,33 +27,17 @@ describe("I18nGenerateMessageValidationTest", () => {
   }
 
   beforeEach(() => {
+    Topic.clearValidatorsBang();
+    topic = new Topic();
     I18n.setBackend(new Backend());
   });
-  afterAll(() => {
-    vi.unstubAllEnvs();
-  });
-
-  function makeTopic() {
-    class Topic extends Base {
-      static {
-        this._tableName = "topics";
-        this.attribute("id", "integer");
-        this.attribute("title", "string");
-        this.aliasAttribute("heading", "title");
-      }
-    }
-    return new Topic();
-  }
-
   it("generate message invalid with default message", () => {
-    const topic = makeTopic();
     expect(topic.errors.generateMessage("title", ":invalid", { value: "title" })).toBe(
       "is invalid",
     );
   });
 
   it("generate message invalid with custom message", () => {
-    const topic = makeTopic();
     expect(
       topic.errors.generateMessage("title", ":invalid", {
         message: "custom message %{value}",
@@ -61,14 +47,12 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("generate message taken with default message", () => {
-    const topic = makeTopic();
     expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
       "has already been taken",
     );
   });
 
   it("generate message taken with custom message", () => {
-    const topic = makeTopic();
     expect(
       topic.errors.generateMessage("title", ":taken", {
         message: "custom message %{value}",
@@ -78,7 +62,7 @@ describe("I18nGenerateMessageValidationTest", () => {
   });
 
   it("RecordInvalid exception can be localized", () => {
-    const topic = makeTopic();
+    const topic = new Topic();
     topic.errors.add("title", ":invalid");
     topic.errors.add("title", ":blank");
     expect(new RecordInvalid(topic).message).toBe(
@@ -91,7 +75,7 @@ describe("I18nGenerateMessageValidationTest", () => {
       I18n.backend().storeTranslations("en", {
         errors: { messages: { record_invalid: "fallback message" } },
       });
-      const topic = makeTopic();
+      const topic = new Topic();
       topic.errors.add("title", ":blank");
       expect(new RecordInvalid(topic).message).toBe("fallback message");
     });
@@ -102,7 +86,6 @@ describe("I18nGenerateMessageValidationTest", () => {
       I18n.backend().storeTranslations("en", {
         errors: { attributes: { title: { taken: "Custom taken message" } } },
       });
-      const topic = makeTopic();
       expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
         "Custom taken message",
       );
@@ -114,7 +97,6 @@ describe("I18nGenerateMessageValidationTest", () => {
       I18n.backend().storeTranslations("en", {
         activerecord: { errors: { messages: { taken: "Custom taken message" } } },
       });
-      const topic = makeTopic();
       expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
         "Custom taken message",
       );
@@ -126,7 +108,6 @@ describe("I18nGenerateMessageValidationTest", () => {
       I18n.backend().storeTranslations("en", {
         activerecord: { errors: { models: { topic: { taken: "Custom taken message" } } } },
       });
-      const topic = makeTopic();
       expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
         "Custom taken message",
       );
@@ -142,7 +123,6 @@ describe("I18nGenerateMessageValidationTest", () => {
           },
         },
       });
-      const topic = makeTopic();
       expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
         "Custom taken message",
       );
@@ -160,7 +140,6 @@ describe("I18nGenerateMessageValidationTest", () => {
         errors: { messages: { taken: "generic en-US fallback" } },
       });
 
-      const topic = makeTopic();
       I18n.withLocale("en-US", () => {
         expect(topic.errors.generateMessage("title", ":taken", { value: "title" })).toBe(
           "custom en message",
