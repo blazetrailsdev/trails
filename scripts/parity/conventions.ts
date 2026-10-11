@@ -1615,17 +1615,6 @@ export const COPY_HOOKS: ReadonlyMap<string, readonly string[]> = new Map([
  * entry point answers it; the SKIP gate stays in place for compare.ts, so a
  * skipped method still never counts as a missing port.
  */
-/**
- * The TS candidates for a class's own `self.new`, or for a `ClassMethods#new`
- * a class in the same Ruby file extends (RFC 0188). Ruby's `Klass.new` and
- * JS's `new Klass` are one operation, so it is the constructor whether or not
- * an `initialize` sits beside it. `rubyMethodToTs("new", …)` is the rule for
- * every other `new`.
- */
-export function rubyOwnNewToTs(): string[] {
-  return ["constructor"];
-}
-
 /** Ruby names whose TS counterpart is a fixed JS spelling, not a portable identifier. */
 const FIXED_TS_SPELLINGS = new Set([
   "initialize",
@@ -1657,6 +1646,15 @@ export function rubyMethodToTsIgnoringSkip(
     .map((c) => "_" + c);
   return [...new Set([...candidates, ...underscored])];
 }
+
+/**
+ * The TS candidates for a class's own `self.new`, or for a `ClassMethods#new`
+ * a class in the same Ruby file extends (RFC 0188). Ruby's `Klass.new` and
+ * JS's `new Klass` are one operation, so it is the constructor whether or not
+ * an `initialize` sits beside it. `rubyMethodToTs("new", …)` is the rule for
+ * every other `new`.
+ */
+export const OWN_NEW_TS_CANDIDATES: readonly string[] = ["constructor"];
 
 function rubyMethodToTsWithoutUnderscore(
   name: string,

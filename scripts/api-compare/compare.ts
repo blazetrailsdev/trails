@@ -118,7 +118,7 @@ import {
   rubyCallToTs,
   rubyMethodToTs,
   snakeToCamel,
-  rubyOwnNewToTs,
+  OWN_NEW_TS_CANDIDATES,
 } from "@blazetrails/parity/conventions";
 import {
   arityParams,
@@ -6232,7 +6232,7 @@ export function main() {
           tsMirrorNames !== undefined
             ? scopedSkipMirrorCandidates(tsMirrorNames, tsMethods)
             : ownNew
-              ? [...(tsMethods.has("new") ? ["new"] : []), ...rubyOwnNewToTs()]
+              ? [...(tsMethods.has("new") ? ["new"] : []), ...OWN_NEW_TS_CANDIDATES]
               : rubyMethodToTsForFqn(rubyModule, rubyName, siblingRubyNames, pkg);
         if (mirrorCandidates === null) continue;
         const besideInitialize =

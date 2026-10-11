@@ -4,7 +4,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   snakeToCamel,
-  rubyOwnNewToTs,
   rubyMethodToTs,
   rubyMethodToTsIgnoringSkip,
   SKIP_TS_MIRROR_IS_DRIFT,
@@ -291,9 +290,8 @@ describe("SKIP_TS_MIRROR_IS_DRIFT", () => {
 });
 
 describe("rubyMethodToTs", () => {
-  it("maps a class's own self.new to the constructor, beside initialize or not", () => {
+  it("maps any new that is not a class's own to the constructor only away from initialize", () => {
     const beside = new Set(["new", "initialize"]);
-    expect(rubyOwnNewToTs()).toEqual(["constructor"]);
     expect(rubyMethodToTs("new", beside)).toBeNull();
     expect(rubyMethodToTs("new")).toEqual(["constructor"]);
   });
