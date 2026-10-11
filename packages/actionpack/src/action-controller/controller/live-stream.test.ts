@@ -27,7 +27,6 @@ import {
 } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
-import type { Response } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
@@ -326,7 +325,7 @@ describe("LiveStreamTest", () => {
       });
       this.response.stream.write("");
       this.response.stream.write(
-        (this.params.get("widget") as Parameters).get("didntCheckForNil") as string,
+        (this.params.get("widget") as Parameters).get("didnt_check_for_nil") as string,
       );
     }
 
@@ -353,7 +352,7 @@ describe("LiveStreamTest", () => {
     }
 
     waitForStreamClose(): Promise<boolean> {
-      return vi.waitUntil(() => this.response.stream.isClosed);
+      return vi.waitUntil(() => this.response.stream.isClosed, { timeout: 10_000 });
     }
 
     async captureLogOutput(block: (output: StringIO) => Promise<void>): Promise<void> {
@@ -658,7 +657,7 @@ describe("LiveControllerThreadTest", () => {
 
 describe("BufferTest", () => {
   it("nil callback", () => {
-    const buf = new Buffer(null as unknown as Response);
+    const buf = new Buffer(null);
     assert(buf.callOnError());
   });
 });

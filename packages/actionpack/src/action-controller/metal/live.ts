@@ -34,9 +34,9 @@ export class Buffer extends ResponseBuffer<Queue<string | null>> {
   /** @internal */
   protected _aborted: boolean;
 
-  constructor(response: DispatchResponse) {
+  constructor(response: DispatchResponse | null) {
     const klass = new.target;
-    super(response, klass.prototype.buildQueue(klass.queueSize));
+    super(response as DispatchResponse, klass.prototype.buildQueue(klass.queueSize));
     this._errorCallback = () => true;
     this._aborted = false;
     this.ignoreDisconnect = false;

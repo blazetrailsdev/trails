@@ -79,9 +79,9 @@ does not compare that declaration and fails a tag on it as stale. This paragraph
 is its record until story
 `invented-arm-receipt-is-rejected-on-declarations-the-comparison-omits` makes
 the pair comparable. Because the implied name is dasherized,
-`_writeLayoutMethod` tests it with `/(?<![\w-])layouts/` where Rails has
-`/\blayouts/` (`layouts.rb:286`): a `-` ends a word where the `_` it stands for
-does not, so `\b` would read `render-action-with-both-layouts/basic` as already
+`_writeLayoutMethod` tests Rails' `/\blayouts/` (`layouts.rb:286`) against the
+name underscored again: a `-` ends a word where the `_` it stands for does not,
+so the dasherized `render-action-with-both-layouts/basic` would read as already
 under `layouts` and drop the prefix. A layout the application names itself is
 looked up as written.
 
