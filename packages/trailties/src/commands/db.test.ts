@@ -8,6 +8,7 @@ import {
   StringIO,
 } from "@blazetrails/ruby-compat";
 import { createProgram } from "../cli.js";
+import { setAppPath, setEnginePath } from "../app-path.js";
 import {
   loadDatabaseConfig,
   loadAllDatabaseConfigs,
@@ -2595,5 +2596,257 @@ export class CreatePosts extends Migration {
     expect(process.exitCode).toBe(1);
     expect(errs.some((e) => e.includes("not meaningful for an in-memory database"))).toBe(true);
     expect(logs.some((l) => l.includes("Schema loaded."))).toBe(false);
+  });
+});
+
+describe("db command multi-database parity", { timeout: 30_000 }, () => {
+  let tmpDir: string;
+  let originalCwd: string;
+  let logs: string[];
+  let stdout: string;
+  let previousProcessAdapter: ReturnType<typeof getProcessAdapter>;
+  const origNodeEnv = env.NODE_ENV;
+  const primaryDb = () => path.join(tmpDir, "primary.sqlite3");
+  const animalsDb = () => path.join(tmpDir, "animals.sqlite3");
+
+  function writeTwoDatabaseConfig(): void {
+    fs.writeFileSync(
+      path.join(tmpDir, "config", "database.ts"),
+      `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb())} },
+    animals: { adapter: "sqlite3", database: ${JSON.stringify(animalsDb())}, migrationsPaths: "db/migrate_animals" },
+  },
+};`,
+    );
+  }
+
+  function writeMigrations(): void {
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate_animals"), { recursive: true });
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrate", "20260101000000_create_users.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateUsers extends Migration {
+  async up() { await this.createTable("users", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("users"); }
+}`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "migrate_animals", "20260101000001_create_dogs.ts"),
+      `import { Migration } from "@blazetrails/activerecord";
+export class CreateDogs extends Migration {
+  async up() { await this.createTable("dogs", (t) => { t.string("name"); }); }
+  async down() { await this.dropTable("dogs"); }
+}`,
+    );
+  }
+
+  function writeCountingSeedFile(): string {
+    const marker = path.join(tmpDir, "seed-loads.txt");
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+fs.appendFileSync(${JSON.stringify(marker)}, "loaded\\n");`,
+    );
+    return marker;
+  }
+
+  function seedLoadCount(marker: string): number {
+    if (!fs.existsSync(marker)) return 0;
+    return fs.readFileSync(marker, "utf8").trim().split("\n").filter(Boolean).length;
+  }
+
+  beforeEach(() => {
+    setEnv("NODE_ENV", undefined);
+    setEnv("TRAILS_ENV", "development");
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "trails-db-multi-"));
+    originalCwd = process.cwd();
+    fs.mkdirSync(path.join(tmpDir, "config"), { recursive: true });
+    fs.mkdirSync(path.join(tmpDir, "db", "migrate"), { recursive: true });
+    process.chdir(tmpDir);
+    logs = [];
+    vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map((a) => String(a)).join(" "));
+    });
+    stdout = "";
+    previousProcessAdapter = getProcessAdapter();
+    registerProcessAdapter({
+      ...previousProcessAdapter,
+      stdout: {
+        ...previousProcessAdapter.stdout,
+        write: (chunk: string) => {
+          stdout += chunk;
+          return true;
+        },
+      },
+    });
+  });
+
+  afterEach(async () => {
+    registerProcessAdapter(previousProcessAdapter);
+    setEnv("NODE_ENV", origNodeEnv);
+    setEnv("TRAILS_ENV", undefined);
+    setAppPath(undefined);
+    setEnginePath(undefined);
+    process.chdir(originalCwd);
+    vi.restoreAllMocks();
+    const { Base } = await import("@blazetrails/activerecord");
+    await Base.connectionHandler.clearAllConnectionsBang();
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  async function runDb(args: string[]): Promise<void> {
+    const program = createProgram();
+    program.exitOverride();
+    await program.parseAsync(["node", "trails", "db", ...args]);
+  }
+
+  it("db seed loads db/seeds.ts once with two databases configured", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+    const marker = writeCountingSeedFile();
+    await runDb(["migrate"]);
+
+    await runDb(["seed"]);
+
+    expect(seedLoadCount(marker)).toBe(1);
+    expect(logs.filter((l) => l.includes("Running seeds..."))).toHaveLength(1);
+  });
+
+  it("db seed loads the application before the seed file, so initializers have run", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+    const bootMarker = path.join(tmpDir, "booted.txt");
+    fs.writeFileSync(
+      path.join(tmpDir, "boot.ts"),
+      `import * as fs from "node:fs";
+fs.writeFileSync(${JSON.stringify(bootMarker)}, "booted");`,
+    );
+    fs.writeFileSync(
+      path.join(tmpDir, "db", "seeds.ts"),
+      `import * as fs from "node:fs";
+if (!fs.existsSync(${JSON.stringify(bootMarker)})) {
+  throw new Error("seeds.ts ran before the application was loaded");
+}`,
+    );
+    setEnginePath(path.join(tmpDir, "boot.ts"));
+    await runDb(["migrate"]);
+
+    await runDb(["seed"]);
+
+    expect(fs.existsSync(bootMarker)).toBe(true);
+    expect(logs).toContain("Seeds completed.");
+  });
+
+  it("db migrate names each migration it runs and does not claim to be up to date", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+
+    await runDb(["migrate"]);
+
+    expect(stdout).toMatch(/\[primary\] == 20260101000000 CreateUsers: migrating/);
+    expect(stdout).toMatch(/\[animals\] == 20260101000001 CreateDogs: migrating/);
+    expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
+  });
+
+  it("db migrate reports loading the schema into an empty database, naming the file", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+    await runDb(["migrate"]);
+    fs.rmSync(primaryDb());
+    fs.rmSync(animalsDb());
+    logs.length = 0;
+
+    await runDb(["migrate"]);
+
+    expect(logs).toContain("[primary] Loaded schema from db/schema.ts");
+    expect(logs).toContain("[animals] Loaded schema from db/animals_schema.ts");
+    expect(logs.some((l) => l.includes("All migrations are up to date."))).toBe(false);
+    expect(await tableIn(primaryDb(), "users")).toBe(true);
+    expect(await tableIn(animalsDb(), "dogs")).toBe(true);
+  });
+
+  it("db migrate still reports up to date when there is genuinely nothing to do", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+    await runDb(["migrate"]);
+    logs.length = 0;
+
+    await runDb(["migrate"]);
+
+    expect(logs).toContain("[primary] All migrations are up to date.");
+    expect(logs).toContain("[animals] All migrations are up to date.");
+    expect(logs.some((l) => l.includes("Loaded schema from"))).toBe(false);
+  });
+
+  async function tableIn(dbFile: string, table: string): Promise<boolean> {
+    const { BetterSQLite3Adapter } =
+      await import("@blazetrails/activerecord/connection-adapters/better-sqlite3-adapter.js");
+    const adapter = new BetterSQLite3Adapter({ database: dbFile });
+    try {
+      const rows = (await adapter.execute(
+        `SELECT name FROM sqlite_master WHERE type='table' AND name='${table}'`,
+      ))!;
+      return rows.length === 1;
+    } finally {
+      await adapter.disconnectBang();
+    }
+  }
+
+  const pgLane = process.env.ARCONN === "postgresql";
+  const pgUrl = (database: string): string => {
+    const host = process.env.PGHOST ?? "localhost";
+    const port = process.env.PGPORT ?? "5432";
+    const user = process.env.PGUSER ?? "postgres";
+    return `postgres://${user}@${host}:${port}/${database}`;
+  };
+
+  it.skipIf(!pgLane)(
+    "db drop drops a Postgres database configured by url, and create follows it in one process",
+    async () => {
+      const dbName = `trails_db_drop_${process.pid}`;
+      fs.writeFileSync(
+        path.join(tmpDir, "config", "database.ts"),
+        `export default {
+  development: {
+    primary: { adapter: "sqlite3", database: ${JSON.stringify(primaryDb())} },
+    hub: { url: ${JSON.stringify(pgUrl(dbName))}, migrationsPaths: "db/migrate_hub" },
+  },
+};`,
+      );
+      fs.mkdirSync(path.join(tmpDir, "db", "migrate_hub"), { recursive: true });
+      fs.writeFileSync(
+        path.join(tmpDir, "db", "migrate_hub", "20260101000002_create_owners.ts"),
+        `import { Migration } from "@blazetrails/activerecord";
+export class CreateOwners extends Migration {
+  async up() { await this.createTable("owners", (t) => { t.string("login"); }); }
+  async down() { await this.dropTable("owners"); }
+}`,
+      );
+
+      await runDb(["create"]);
+      await runDb(["drop"]);
+      await runDb(["create"]);
+      await runDb(["migrate"]);
+
+      expect(stdout).toContain(`Dropped database '${dbName}'`);
+      expect(stdout).toContain(`Created database '${dbName}'`);
+      expect(stdout).toMatch(/== 20260101000002 CreateOwners: migrated/);
+      await runDb(["drop"]);
+      await runDb(["drop"]);
+      expect(process.exitCode ?? 0).toBe(0);
+    },
+  );
+
+  it("db drop drops a SQLite database, which has no maintenance connection", async () => {
+    writeTwoDatabaseConfig();
+    writeMigrations();
+    await runDb(["migrate"]);
+    expect(fs.existsSync(primaryDb())).toBe(true);
+
+    await runDb(["drop"]);
+
+    expect(fs.existsSync(primaryDb())).toBe(false);
+    expect(fs.existsSync(animalsDb())).toBe(false);
   });
 });

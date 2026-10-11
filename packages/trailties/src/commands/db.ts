@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { setEnv } from "@blazetrails/ruby-compat";
 import { getFs, getPath } from "@blazetrails/ruby-compat";
 import { Trails } from "../rails.js";
+import { bootApplicationBang } from "../command/actions.js";
 import {
   env,
   setExitCode,
@@ -23,6 +24,7 @@ import {
   MigrationContext,
   Migrator,
   SchemaMigration,
+  UrlConfig,
   dumpSchemaAfterMigration,
   eachCurrentEnvironment,
   schemaFormat,
@@ -112,7 +114,7 @@ async function taskableDatabaseEntries(
       return {
         name,
         raw,
-        hashConfig: new HashConfig(envName, name, raw as Record<string, unknown>),
+        hashConfig: buildHashConfig(envName, name, raw),
       };
     }),
   );
@@ -220,9 +222,16 @@ function inferAdapterFromUrl(url: string): string | undefined {
   }
 }
 
+function buildHashConfig(envName: string, name: string, raw: RawConfig): HashConfig {
+  const { url, ...rest } = raw as Record<string, unknown>;
+  if (typeof url === "string" && url.length > 0 && !/^(jdbc|https?):/.test(url)) {
+    return new UrlConfig(envName, name, url, rest);
+  }
+  return new HashConfig(envName, name, raw as Record<string, unknown>);
+}
+
 function toDbConfig(raw: RawConfig, envName: string = DatabaseTasks.env.toString()): HashConfig {
-  const normalized = normalizeRawConfig(raw);
-  return new HashConfig(envName, "primary", normalized as Record<string, unknown>);
+  return buildHashConfig(envName, "primary", normalizeRawConfig(raw));
 }
 
 async function withRegisteredConfiguration<T>(
@@ -277,10 +286,6 @@ async function dumpSchemaAfterMigrate(raw: RawConfig, hashConfig?: HashConfig): 
   }
 }
 
-interface RunOptions {
-  skipDump?: boolean;
-}
-
 function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): MigrationContext {
   return new MigrationContext(
     dirs,
@@ -289,19 +294,49 @@ function migrationContextFor(adapter: DatabaseAdapter, dirs: string[]): Migratio
   );
 }
 
-async function runMigrate(
-  adapter: DatabaseAdapter,
-  raw: RawConfig,
-  targetVersion?: string,
-  options: RunOptions = {},
-): Promise<void> {
-  const migrationContext = migrationContextFor(adapter, await migrationsDirsForConfig(raw));
-  await migrationContext.migrate(targetVersion ?? null);
+interface MigrateStateBefore {
+  schemaFileToLoad: string | null;
+  pendingBefore: number;
+}
 
-  const pending = await migrationContext.open().pendingMigrations();
-  if (pending.length === 0) console.log("All migrations are up to date.");
+async function captureMigrateState(
+  hashConfig: HashConfig,
+  dirs: string[],
+): Promise<MigrateStateBefore> {
+  const schemaDumpPath = DatabaseTasks.schemaDumpPath(hashConfig);
+  const schemaFile =
+    schemaDumpPath != null && (await getFs().exists(schemaDumpPath)) ? schemaDumpPath : null;
+  try {
+    return await DatabaseTasks.withTemporaryPool(hashConfig, async (pool) => {
+      const adapter = await pool.leaseConnection();
+      await adapter.execute("SELECT 1");
+      const migrationContext = migrationContextFor(adapter, dirs);
+      if (await new SchemaMigration(adapter.pool).tableExists()) {
+        const pending = await migrationContext.open().pendingMigrations();
+        return { schemaFileToLoad: null, pendingBefore: pending.length };
+      }
+      return {
+        schemaFileToLoad: schemaFile,
+        pendingBefore: schemaFile != null ? 0 : migrationContext.migrations.length,
+      };
+    });
+  } catch {
+    return { schemaFileToLoad: schemaFile, pendingBefore: 0 };
+  }
+}
 
-  if (!options.skipDump) await dumpSchemaAfterMigrate(raw);
+function reportMigrateOutcome(
+  prefix: string,
+  before: MigrateStateBefore,
+  pendingAfter: number,
+): void {
+  if (before.schemaFileToLoad != null) {
+    console.log(`${prefix}Loaded schema from ${before.schemaFileToLoad}`);
+    return;
+  }
+  if (before.pendingBefore === 0 && pendingAfter === 0) {
+    console.log(`${prefix}All migrations are up to date.`);
+  }
 }
 
 async function runTestLoadSchema(options: {
@@ -362,6 +397,7 @@ async function runSeed(prefix = ""): Promise<void> {
   }
 
   console.log(`${prefix}Running seeds...`);
+  await bootApplicationBang();
   const pathToFileURL = path.pathToFileURL;
   if (!pathToFileURL) {
     throw new Error("Seed loading requires a path adapter with pathToFileURL support.");
@@ -446,14 +482,25 @@ async function withMigrationTasksForDb(
     config: HashConfig;
   },
   operation: () => Promise<void>,
-  opts?: { afterPending?: (pending: number) => void },
+  opts?: { report?: boolean },
 ): Promise<void> {
+  let before: MigrateStateBefore | null = null;
+  if (opts?.report) {
+    const dirs = await migrationsDirsForConfig(ctx.raw);
+    before = await withRegisteredConfiguration(ctx.config, () =>
+      captureMigrateState(ctx.config, dirs),
+    );
+  }
   await withPrefixedStdout(ctx.prefix, async () => {
     await withRegisteredConfiguration(ctx.config, operation);
   });
-  if (opts?.afterPending) {
+  if (before) {
     const migrationContext = DatabaseTasks.migrationConnectionPool().migrationContext;
-    opts.afterPending((await migrationContext.pendingMigrationVersions()).length);
+    reportMigrateOutcome(
+      ctx.prefix,
+      before,
+      (await migrationContext.pendingMigrationVersions()).length,
+    );
   }
   await dumpSchemaAfterMigrate(ctx.raw, ctx.config);
 }
@@ -496,6 +543,13 @@ async function runMigrateAll(): Promise<void> {
 
   await withRegisteredConfigurations(configs, envName, () =>
     DatabaseTasks.withTemporaryPool(primary.hashConfig, async () => {
+      const stateBefore = new Map<string, MigrateStateBefore>();
+      for (const { name, hashConfig } of entries) {
+        stateBefore.set(
+          name,
+          await captureMigrateState(hashConfig, migrationsDirsFor.get(name) ?? []),
+        );
+      }
       await withPrefixedStdout(currentDbPrefix, () => DatabaseTasks.migrateAll());
       for (const { name, raw, hashConfig } of entries) {
         const prefix = multiDb ? `[${name}] ` : "";
@@ -503,7 +557,7 @@ async function runMigrateAll(): Promise<void> {
           const adapter = await pool.leaseConnection();
           const migrationContext = migrationContextFor(adapter, migrationsDirsFor.get(name) ?? []);
           const pending = await migrationContext.open().pendingMigrations();
-          if (pending.length === 0) console.log(`${prefix}All migrations are up to date.`);
+          reportMigrateOutcome(prefix, stateBefore.get(name)!, pending.length);
           await dumpSchemaAfterMigrate(raw, hashConfig);
         });
       }
@@ -545,13 +599,7 @@ export function dbCommand(): Command {
           return;
         }
         await forEachDatabase(opts, async (ctx) => {
-          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), {
-            afterPending: (pending) => {
-              if (pending === 0) {
-                console.log(`${ctx.prefix}All migrations are up to date.`);
-              }
-            },
-          });
+          await withMigrationTasksForDb(ctx, () => DatabaseTasks.migrate(), { report: true });
         });
       });
     });
@@ -707,9 +755,15 @@ export function dbCommand(): Command {
     .description("Run database seeds")
     .option("--database <name>", "Target a specific named database")
     .action(async (opts: DatabaseOpts) => {
-      await forEachDatabase(opts, async ({ prefix }) => {
-        await runSeed(prefix);
-      });
+      const entries = await taskableDatabaseEntries(opts);
+      if (entries.length === 0) return;
+      const seedTarget =
+        entries.find((entry) => entry.hashConfig.isPrimary())?.hashConfig ?? entries[0].hashConfig;
+      await withRegisteredConfigurations(
+        entries.map((entry) => entry.hashConfig),
+        entries[0].hashConfig.envName,
+        () => DatabaseTasks.withTemporaryPool(seedTarget, () => runSeed()),
+      );
     });
 
   cmd
@@ -837,13 +891,7 @@ export function dbCommand(): Command {
             await DatabaseTasks.migrationConnectionPool().migrationContext.rollback(step);
             await DatabaseTasks.migrate();
           },
-          {
-            afterPending: (pending) => {
-              if (pending === 0) {
-                console.log(`${ctx.prefix}All migrations are up to date.`);
-              }
-            },
-          },
+          { report: true },
         );
       });
     });
