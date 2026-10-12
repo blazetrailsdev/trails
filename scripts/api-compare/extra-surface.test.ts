@@ -1524,18 +1524,28 @@ describe("buildReport — novel vs moved classification", () => {
       packages: {
         activemodel: {
           classes: {
-            "ActiveModel::Type::Value": rubyClass({
-              name: "Value",
-              file: "type/value.rb",
-              instance: [method("cast"), method("type"), method("cast_value", true)],
-              includes: ["SerializeCastValue"],
+            "ActiveModel::Type::Value": {
+              ...rubyClass({
+                name: "Value",
+                file: "type/value.rb",
+                instance: [method("cast"), method("type"), method("cast_value", true)],
+                includes: ["SerializeCastValue"],
+              }),
+              superclass: "Root",
+            },
+            "ActiveModel::Type::Root": rubyClass({
+              name: "Root",
+              file: "type/root.rb",
+              instance: [method("inherited_reader"), method("inherited_private", true)],
+              klass: [method("root_class_method")],
             }),
           },
           modules: {
             "ActiveModel::Type::SerializeCastValue": rubyClass({
               name: "SerializeCastValue",
               file: "type/serialize_cast_value.rb",
-              instance: [method("serialize_cast_value")],
+              instance: [method("serialize_cast_value"), method("mixin_private", true)],
+              klass: [method("serialize_cast_value_compatible?")],
             }),
           },
         },
@@ -1577,7 +1587,12 @@ describe("buildReport — novel vs moved classification", () => {
                 method("cast"),
                 method("type"),
                 method("serializeCastValue"),
+                method("inheritedReader"),
                 method("castValue"),
+                method("mixinPrivate"),
+                method("isSerializeCastValueCompatible"),
+                method("inheritedPrivate"),
+                method("rootClassMethod"),
                 method("unrelated"),
               ],
               classMethods: [],
@@ -1594,7 +1609,14 @@ describe("buildReport — novel vs moved classification", () => {
       topN: 50,
     });
     const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
-    expect(f!.extras.map((e) => e.name)).toEqual(["castValue", "unrelated"]);
+    expect(f!.extras.map((e) => e.name)).toEqual([
+      "castValue",
+      "inheritedPrivate",
+      "isSerializeCastValueCompatible",
+      "mixinPrivate",
+      "rootClassMethod",
+      "unrelated",
+    ]);
   });
 
   it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {
