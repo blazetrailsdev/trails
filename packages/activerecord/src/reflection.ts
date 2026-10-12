@@ -8,6 +8,7 @@ import {
   rbModName,
   rbModToS,
   zip,
+  merge,
 } from "@blazetrails/ruby-compat";
 import { ArgumentError, type PermittedAttributes } from "@blazetrails/activemodel";
 import type { Base } from "./base.js";
@@ -1638,7 +1639,7 @@ export function addAggregateReflection(
   name: string,
   reflection: AggregateReflection,
 ): void {
-  ar.aggregateReflections = { ...ar.aggregateReflections, [name]: reflection };
+  ar.aggregateReflections = merge(ar.aggregateReflections, { [name]: reflection });
 }
 
 export function reflections(
