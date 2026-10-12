@@ -3633,7 +3633,7 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
     expect(c["Reassigned#call"]).toEqual({ fetch: ["local"] });
   });
 
-  it("proves a Hash ivar only when every assignment in the file is a plain to_hash assignment", () => {
+  it("proves a Hash ivar only when every assignment in the file is a plain Hash-literal or to_hash assignment", () => {
     const c = rubyCallReceivers({
       "lib/active_record/row.rb": `
         class Row
@@ -3642,9 +3642,11 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
             @seen = fixture.to_hash
             @items = compute
             @cache ||= {}
+            @cascade_for = {}
           end
 
           def call(name)
+            @cascade_for.key?(name)
             @cache.fetch(name)
             @row.delete(name)
             @seen.include?(name)
@@ -3657,7 +3659,12 @@ describe("Ruby extractor call receiver kinds", { timeout: RUBY_SUBPROCESS_TIMEOU
         end
       `,
     });
-    expect(c["Row#call"]).toEqual({ fetch: ["ivar"], delete: ["hash"], "include?": ["ivar"] });
+    expect(c["Row#call"]).toEqual({
+      "key?": ["hash"],
+      fetch: ["ivar"],
+      delete: ["hash"],
+      "include?": ["ivar"],
+    });
   });
 
   it("proves an Array ivar only when every assignment in the class is an Array literal", () => {
