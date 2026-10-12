@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
+import { SchemaDumper as BaseSchemaDumper } from "./schema-dumper.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-fixtures.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -333,19 +334,29 @@ describe("SchemaDumper types its dump against the connected adapter", () => {
     },
   );
 
-  it("the dump's own schemaFormat decides the type syntax, over the global one", async () => {
-    const asJs = (
-      await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "js" })
-    ).string();
-    expect(asJs).not.toContain("import type");
-    expect(asJs).toMatch(/\.define\((?:\{ version: [0-9_]+ \}, )?async \(ctx\) => \{/);
+  it(
+    "the dump's own schemaFormat decides the type syntax, over the global one",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      const ignoreTablesWas = BaseSchemaDumper.ignoreTables;
+      BaseSchemaDumper.ignoreTables = [/./];
+      try {
+        const asJs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "js" })
+        ).string();
+        expect(asJs).not.toContain("import type");
+        expect(asJs).toMatch(/\.define\((?:\{ version: [0-9_]+ \}, )?async \(ctx\) => \{/);
 
-    const asTs = (
-      await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "ts" })
-    ).string();
-    expect(asTs).toMatch(/^import type \{ \w+Adapter \} from /m);
-    expect(asTs).toMatch(/\.define<\w+Adapter>\(/);
-  });
+        const asTs = (
+          await SchemaDumper.dump(Base.connectionPool(), new StringIO(), { schemaFormat: "ts" })
+        ).string();
+        expect(asTs).toMatch(/^import type \{ \w+Adapter \} from /m);
+        expect(asTs).toMatch(/\.define<\w+Adapter>\(/);
+      } finally {
+        BaseSchemaDumper.ignoreTables = ignoreTablesWas;
+      }
+    },
+  );
 
   it("an adapter-less dumper names no adapter", async () => {
     const output = (
