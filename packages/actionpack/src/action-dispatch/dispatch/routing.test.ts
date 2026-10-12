@@ -933,9 +933,9 @@ describe("TestRoutingMapper", () => {
     expect(routes.recognizePath("/transport/taxis/1").action).toBe("show");
     expect(routes.pathFor({ id: 1 }, "transport_taxi")).toBe("/transport/taxis/1");
     expect(routes.recognizePath("/transport/taxis/new").action).toBe("new");
-    expect(routes.pathFor({}, "transport_new_taxi")).toBe("/transport/taxis/new");
+    expect(routes.pathFor({}, "new_transport_taxi")).toBe("/transport/taxis/new");
     expect(routes.recognizePath("/transport/taxis/1/edit").action).toBe("edit");
-    expect(routes.pathFor({ id: 1 }, "transport_edit_taxi")).toBe("/transport/taxis/1/edit");
+    expect(routes.pathFor({ id: 1 }, "edit_transport_taxi")).toBe("/transport/taxis/1/edit");
   });
 
   it("singleton resources are not singularized", () => {
@@ -1883,7 +1883,19 @@ describe("TestRoutingMapper", () => {
   it.skip("root in deeply nested scope", () => {});
   it.skip("multiple positional args with the same name", () => {});
   it.skip("resource where as is empty", () => {});
-  it.skip("resources where as is empty", () => {});
+  it("resources where as is empty", () => {
+    const routes = new RouteSet();
+    routes.draw(function () {
+      this.resources("posts", { as: "" });
+
+      this.scope("posts", { as: "posts" }, () => {
+        this.resources("comments", { as: "" });
+      });
+    });
+
+    expect(routes.pathFor({}, "new")).toBe("/posts/new");
+    expect(routes.pathFor({}, "new_posts")).toBe("/posts/comments/new");
+  });
   it.skip("scope where as is empty", () => {});
   it.skip("multiple named roots", () => {});
   it.skip("nested routes under format resource", () => {});
