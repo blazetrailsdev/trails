@@ -25,7 +25,7 @@ Status of each wall after re-verification:
 | 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                          |
 | 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                 |
 | 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship. |
-| 3c — init-time hang at 362 modules | Live, new, and the current frontier.                                                                            |
+| 3c — init-time hang at 362 modules | Live; **minimized to 2 files** — a module namespace's `[[Prototype]]` is not `null`.                            |
 
 The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
 rows are that build's behaviour; each wall's own section says what changed.
