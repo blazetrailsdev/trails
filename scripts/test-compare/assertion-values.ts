@@ -141,8 +141,7 @@ function foldSymbolToken(token: string): string {
  * so `-> { @object.num }` reads `` `@object.num` `` where the ported
  * `() => this.object.num` reads `` `this.object.num` ``
  * (`activesupport/test/test_case_test.rb:51-58`). An `@` after a word
- * character (an email address) or another `@` (a diff hunk header) is not an
- * ivar. Applied to BOTH sides, so it can only merge tokens, never split them.
+ * character or another `@` is not an ivar. Applied to BOTH sides.
  */
 const IVAR_RE = /(?<![\w@])@(?=[a-z_])/g;
 

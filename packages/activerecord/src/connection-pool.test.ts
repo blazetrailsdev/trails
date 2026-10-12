@@ -1,4 +1,4 @@
-import { it, expect, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   Concurrent,
   Enumerator,
@@ -1127,18 +1127,20 @@ it("inspect does not show secrets", async () => {
   );
 });
 
-it("lock thread allow fiber reentrency", async () => {
-  const pool = makePool();
-  const connection = await pool.checkout();
-  connection.setLockThread(IsolatedExecutionState.context());
-  await connection.transaction(async () => {
-    const enumerator = new Enumerator(
-      block(async (yielder: { yield(value: number): unknown }) => {
-        await connection.transaction(async () => {
-          await yielder.yield(1);
-        });
-      }),
-    );
-    expect(await enumerator.next()).toEqual(1);
+describe("ConnectionPoolThreadTest", () => {
+  it("lock thread allow fiber reentrency", async () => {
+    const pool = makePool();
+    const connection = await pool.checkout();
+    connection.setLockThread(IsolatedExecutionState.context());
+    await connection.transaction(async () => {
+      const enumerator = new Enumerator(
+        block(async (yielder: { yield(value: number): unknown }) => {
+          await connection.transaction(async () => {
+            await yielder.yield(1);
+          });
+        }),
+      );
+      expect(await enumerator.next()).toEqual(1);
+    });
   });
 });
