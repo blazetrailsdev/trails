@@ -1638,7 +1638,6 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
   });
 
   it("resolves a DelegateClass(X) superclass to X", () => {
-    // activerecord/lib/active_record/type/serialized.rb:5
     const r = aliasParams({
       "delegate_sup.rb": `
         module ActiveModel

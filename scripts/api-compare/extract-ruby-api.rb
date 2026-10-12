@@ -4731,12 +4731,6 @@ class ApiExtractor
     end
   end
 
-  # The `X` of a `DelegateClass(X)` superclass expression
-  # (`class Serialized < DelegateClass(ActiveModel::Type::Value)`,
-  # activerecord/lib/active_record/type/serialized.rb:5). `DelegateClass`
-  # answers an anonymous class forwarding every public method of `X`
-  # (vendor/ruby/v3.3.11/lib/delegate.rb:394-436), so `X` is the parent the
-  # class is read against.
   def delegate_class_target(node)
     return nil unless node.is_a?(Array) && node[0] == :method_add_arg
     fcall = node[1]

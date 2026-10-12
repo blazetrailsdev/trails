@@ -3128,9 +3128,6 @@ function shortName(fqn: string | undefined | null): string | null {
   // Ruby uses `::` as the namespace separator; TS extractor stores the
   // raw superclass expression, so `extends globalThis.Error` ends up as
   // `globalThis.Error` — strip either separator to reach the leaf name.
-  // `extends DelegateClass(ValueType)` is ruby-compat's port of Ruby's
-  // `< DelegateClass(Type::Value)`, which the Ruby extractor records as the
-  // delegated class (`delegate_class_target`); read the TS side the same way.
   const delegated = /^DelegateClass\((.+)\)$/s.exec(fqn.trim());
   if (delegated) return shortName(delegated[1]);
   const parts = fqn.split(/::|\./);
