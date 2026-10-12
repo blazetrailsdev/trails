@@ -1410,7 +1410,10 @@ export function isNil(obj: unknown): boolean {
  * defining `toS` answers it, and an answer that is not a String falls back to
  * {@link rbAnyToS}. A ported `String` subclass that is not a JS string
  * (`ActiveSupport::SafeBuffer`) is an instance of {@link rbCString}, which is
- * the `T_STRING` test on a `toS` answer; `to_str` is never called.
+ * the `T_STRING` test on a `toS` answer, as it is for any class built on
+ * `rbCString`; `to_str` is never called. MRI returns that String itself, and
+ * the port returns its contents, since a Ruby String is a JS string primitive
+ * (CLAUDE.md, "Ruby Strings are JS string primitives").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since

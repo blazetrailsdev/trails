@@ -145,6 +145,16 @@ describe("Object#to_s", () => {
       }
     }
     expect(toS(new Str("seat"))).toBe("seat");
+    class Sub extends (rbCString as unknown as new () => object) {
+      toS(): this {
+        return this;
+      }
+
+      toString(): string {
+        return "sub";
+      }
+    }
+    expect(toS(new Sub())).toBe("sub");
     class Convertible {
       toStr(): string {
         return "converted";

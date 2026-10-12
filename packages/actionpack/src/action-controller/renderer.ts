@@ -27,7 +27,6 @@ export class Renderer {
     input: "",
   });
 
-  /** @internal */
   static normalizeEnv(env: Env): Env {
     const newEnv: Env = {};
 
@@ -106,7 +105,6 @@ export class Renderer {
     return instance.renderToString(...args);
   }
 
-  /** @internal */
   declare renderToString: Renderer["render"];
 
   private static RACK_KEY_TRANSLATION: Record<string, string> = {
@@ -117,7 +115,6 @@ export class Renderer {
     input: "rack.input",
   };
 
-  /** @internal */
   private static DEFAULT_ENV: Env = Object.freeze(Renderer.normalizeEnv(Renderer.DEFAULTS));
 
   private normalizeEnv(env: Env): Env {
