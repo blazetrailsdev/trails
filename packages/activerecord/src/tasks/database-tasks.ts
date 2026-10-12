@@ -35,7 +35,7 @@ import {
   RuntimeError,
 } from "@blazetrails/ruby-compat";
 import type { Base } from "../base.js";
-import { dumpSchemaAfterMigration, schemaFormat } from "../active-record.js";
+import { dumpSchemaAfterMigration, schemaFormat, setSchemaFormat } from "../active-record.js";
 import { ActiveRecord } from "../namespaces.js";
 
 export class DatabaseNotSupported extends StandardError {}
@@ -491,6 +491,10 @@ export class DatabaseTasks {
     return File.join(this.dbDir, filename);
   }
 
+  /**
+   * @inventedArm try — PERMANENT
+   * @inventedArm setSchemaFormat — PERMANENT
+   */
   static async dumpSchema(
     dbConfig: HashConfig,
     format: SchemaFormat = schemaFormat(),
@@ -506,9 +510,15 @@ export class DatabaseTasks {
       case "js": {
         const { SchemaDumper } = await import("../connection-adapters/abstract/schema-dumper.js");
         const migrationConnectionPool = this.migrationConnectionPool();
-        await File.open(filename, "w:utf-8", async (file) => {
-          await SchemaDumper.dump(migrationConnectionPool, file);
-        });
+        const schemaFormatWas = schemaFormat();
+        setSchemaFormat(format);
+        try {
+          await File.open(filename, "w:utf-8", async (file) => {
+            await SchemaDumper.dump(migrationConnectionPool, file);
+          });
+        } finally {
+          setSchemaFormat(schemaFormatWas);
+        }
         break;
       }
       case "sql":

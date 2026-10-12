@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import { Schema } from "@blazetrails/activerecord";
 import type { PostgreSQLAdapter } from "@blazetrails/activerecord/connection-adapters/postgresql-adapter.js";
-import type { AbstractMysqlAdapter } from "@blazetrails/activerecord/connection-adapters/abstract-mysql-adapter.js";
+import type { Mysql2Adapter } from "@blazetrails/activerecord/connection-adapters/mysql2-adapter.js";
 import type { SQLite3Adapter } from "@blazetrails/activerecord/connection-adapters/sqlite3-adapter.js";
 
 describe("a dumped schema typechecks against the adapter it was dumped from", () => {
@@ -33,7 +33,7 @@ describe("a dumped schema typechecks against the adapter it was dumped from", ()
 
   it("a MySQL dump reaches the MySQL column helpers", () => {
     void (async () => {
-      await Schema.get(8).define<AbstractMysqlAdapter>(async (ctx) => {
+      await Schema.get(8).define<Mysql2Adapter>(async (ctx) => {
         await ctx.createTable("binary_fields", { force: "cascade" }, (t) => {
           t.tinyblob("tiny_blob");
           t.mediumtext("medium_text");

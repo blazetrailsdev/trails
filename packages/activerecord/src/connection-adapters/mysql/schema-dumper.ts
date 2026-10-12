@@ -126,6 +126,6 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   protected override adapterType(): [name: string, path: string] {
-    return ["AbstractMysqlAdapter", "abstract-mysql-adapter"];
+    return ["Mysql2Adapter", "mysql2-adapter"];
   }
 }
