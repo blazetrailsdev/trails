@@ -1,4 +1,10 @@
-import { IndexError, NoMethodError, Range, rbObjClassname } from "@blazetrails/ruby-compat";
+import {
+  IndexError,
+  NoMethodError,
+  Range,
+  rbObjClassname,
+  stringSuperclass,
+} from "@blazetrails/ruby-compat";
 
 const HTML_ESCAPE: Record<string, string> = {
   "&": "&amp;",
@@ -93,7 +99,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   return [start, second === undefined ? 1 : second];
 }
 
-export class SafeBuffer {
+export class SafeBuffer extends stringSuperclass("eql", "hash") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
     "chomp",
@@ -125,6 +131,7 @@ export class SafeBuffer {
   private _htmlSafe: boolean;
 
   constructor(str: string = "", htmlSafe: boolean = true) {
+    super(str);
     this._htmlSafe = htmlSafe;
     this._value = str;
   }

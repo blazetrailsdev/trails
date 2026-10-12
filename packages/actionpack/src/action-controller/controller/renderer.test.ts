@@ -24,7 +24,7 @@ describe("RendererTest", () => {
 
   it("creating with a controller", () => {
     const controller = CommentsController;
-    const renderer = Renderer.for(controller as never);
+    const renderer = Renderer.for(controller);
 
     assertEqual(controller, renderer.controller);
   });
@@ -43,27 +43,27 @@ describe("RendererTest", () => {
     const newRenderer = renderer.withDefaults(newDefaults).new();
     const content = await newRenderer.render({ inline: "<%= request.ssl %>" });
 
-    assertEqual("true", String(content));
+    assertEqual("true", content);
   });
 
   it("rendering with a class renderer", async () => {
     const renderer = ApplicationController.renderer;
     const content = await renderer.render({ template: "ruby-template" });
 
-    assertEqual("Hello from Ruby code", String(content));
+    assertEqual("Hello from Ruby code", content);
   });
 
   it("rendering with an instance renderer", async () => {
     const renderer = ApplicationController.renderer.new();
     const content = await renderer.render({ template: "test/hello-world" });
 
-    assertEqual("Hello world!", String(content));
+    assertEqual("Hello world!", content);
   });
 
   it("rendering with a controller class", async () => {
     assertEqual(
       "Hello world!",
-      String(await (ApplicationController as unknown as Renderer).render("test/hello-world")),
+      await (ApplicationController as unknown as Renderer).render("test/hello-world"),
     );
   });
 
@@ -74,7 +74,7 @@ describe("RendererTest", () => {
       locals: { secret: "bar" },
     });
 
-    assertEqual("The secret is bar\n", String(content));
+    assertEqual("The secret is bar\n", content);
   });
 
   it("rendering with assigns", async () => {
@@ -84,24 +84,21 @@ describe("RendererTest", () => {
       assigns: { secret: "foo" },
     });
 
-    assertEqual("The secret is foo\n", String(content));
+    assertEqual("The secret is foo\n", content);
   });
 
   it("render a renderable object", async () => {
     const renderer = ApplicationController.renderer;
 
-    assertEqual("Hello, World!", String(await renderer.render(new TestRenderable())));
-    assertEqual(
-      "Hello, World!",
-      String(await renderer.render({ renderable: new TestRenderable() })),
-    );
+    assertEqual("Hello, World!", await renderer.render(new TestRenderable()));
+    assertEqual("Hello, World!", await renderer.render({ renderable: new TestRenderable() }));
   });
 
   it("rendering with custom env", async () => {
     const renderer = ApplicationController.renderer.new({ method: "post" });
     const content = await renderer.render({ inline: "<%= request.isPost() %>" });
 
-    assertEqual("true", String(content));
+    assertEqual("true", content);
   });
 
   it("rendering with custom env using a key that is not in RACK_KEY_TRANSLATION", async () => {
@@ -109,14 +106,14 @@ describe("RendererTest", () => {
     const renderer = ApplicationController.renderer.new({ warden: value });
     const content = await renderer.render({ inline: "<%= request.env['warden'] %>" });
 
-    assertEqual(value, String(content));
+    assertEqual(value, content);
   });
 
   it("rendering with defaults", async () => {
     const renderer = ApplicationController.renderer.new({ https: true });
     const content = await renderer.render({ inline: "<%= request.ssl %>" });
 
-    assertEqual("true", String(content));
+    assertEqual("true", content);
   });
 
   it("same defaults from the same controller", () => {
@@ -130,36 +127,33 @@ describe("RendererTest", () => {
     const html = "Hello world!";
     const xml = "<p>Hello world!</p>\n";
 
-    assertEqual(html, String(await render("respond-to/using-defaults")));
-    assertEqual(xml, String(await render("respond-to/using-defaults", { formats: ":xml" })));
+    assertEqual(html, await render("respond-to/using-defaults"));
+    assertEqual(xml, await render("respond-to/using-defaults", { formats: ":xml" }));
   });
 
   it("rendering with helpers", async () => {
-    assertEqual(
-      "<p>1\n<br />2</p>",
-      String(await render({ inline: '<%= simpleFormat("1\\n2") %>' })),
-    );
+    assertEqual("<p>1\n<br />2</p>", await render({ inline: '<%= simpleFormat("1\\n2") %>' }));
   });
 
   it("rendering with user specified defaults", async () => {
     Object.assign(renderer().defaults, { hello: "hello", https: true });
     const content = await renderer().new().render({ inline: "<%= request.ssl %>" });
 
-    assertEqual("true", String(content));
+    assertEqual("true", content);
   });
 
   it("return valid asset URL with defaults", async () => {
     const renderer = ApplicationController.renderer;
     const content = await renderer.render({ inline: "<%= assetUrl('asset.jpg') %>" });
 
-    assertEqual("http://example.org/asset.jpg", String(content));
+    assertEqual("http://example.org/asset.jpg", content);
   });
 
   it("return valid asset URL when https is true", async () => {
     const renderer = ApplicationController.renderer.new({ https: true });
     const content = await renderer.render({ inline: "<%= assetUrl('asset.jpg') %>" });
 
-    assertEqual("https://example.org/asset.jpg", String(content));
+    assertEqual("https://example.org/asset.jpg", content);
   });
 
   it("uses default_url_options from the controller's routes when env[:http_host] not specified", async () => {
@@ -168,7 +162,7 @@ describe("RendererTest", () => {
       async () => {
         assertEqual(
           "https://foo.example.com:9001/bar/posts",
-          String(await renderUrlFor({ controller: "posts" })),
+          await renderUrlFor({ controller: "posts" }),
         );
       },
     );
@@ -177,10 +171,7 @@ describe("RendererTest", () => {
   it("uses config.force_ssl when env[:http_host] not specified", async () => {
     await withDefaultUrlOptions({ host: "foo.example.com" }, async () => {
       await withForceSsl(undefined, async () => {
-        assertEqual(
-          "https://foo.example.com/posts",
-          String(await renderUrlFor({ controller: "posts" })),
-        );
+        assertEqual("https://foo.example.com/posts", await renderUrlFor({ controller: "posts" }));
       });
     });
   });
@@ -188,40 +179,28 @@ describe("RendererTest", () => {
   it("can specify env[:https] when using default_url_options", async () => {
     await withDefaultUrlOptions({ host: "foo.example.com" }, async () => {
       _renderer = renderer().new({ https: true });
-      assertEqual(
-        "https://foo.example.com/posts",
-        String(await renderUrlFor({ controller: "posts" })),
-      );
+      assertEqual("https://foo.example.com/posts", await renderUrlFor({ controller: "posts" }));
     });
   });
 
   it("env[:https] overrides default_url_options[:protocol]", async () => {
     await withDefaultUrlOptions({ host: "foo.example.com", protocol: "https" }, async () => {
       _renderer = renderer().new({ https: false });
-      assertEqual(
-        "http://foo.example.com/posts",
-        String(await renderUrlFor({ controller: "posts" })),
-      );
+      assertEqual("http://foo.example.com/posts", await renderUrlFor({ controller: "posts" }));
     });
   });
 
   it("can specify env[:script_name] when using default_url_options", async () => {
     await withDefaultUrlOptions({ host: "foo.example.com" }, async () => {
       _renderer = renderer().new({ scriptName: "/bar" });
-      assertEqual(
-        "http://foo.example.com/bar/posts",
-        String(await renderUrlFor({ controller: "posts" })),
-      );
+      assertEqual("http://foo.example.com/bar/posts", await renderUrlFor({ controller: "posts" }));
     });
   });
 
   it("env[:script_name] overrides default_url_options[:script_name]", async () => {
     await withDefaultUrlOptions({ host: "foo.example.com", scriptName: "/bar" }, async () => {
       _renderer = renderer().new({ scriptName: "" });
-      assertEqual(
-        "http://foo.example.com/posts",
-        String(await renderUrlFor({ controller: "posts" })),
-      );
+      assertEqual("http://foo.example.com/posts", await renderUrlFor({ controller: "posts" }));
     });
   });
 

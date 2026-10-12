@@ -7,7 +7,7 @@ import type { Response } from "../action-dispatch/http/response.js";
 
 type Env = Record<string, unknown>;
 
-interface RendererController {
+export interface RendererController {
   new (): {
     setRequestBang(request: Request): void;
     setResponseBang(response: Response): void;
@@ -65,7 +65,7 @@ export class Renderer {
     env: Env | null = null,
     defaults: Env = Renderer.DEFAULTS,
   ): Renderer {
-    return new Renderer(controller, env, defaults);
+    return new this(controller, env, defaults);
   }
 
   new(env: Env | null = null): Renderer {
@@ -107,9 +107,7 @@ export class Renderer {
   }
 
   /** @internal */
-  renderToString(...args: unknown[]): unknown {
-    return this.render(...args);
-  }
+  declare renderToString: Renderer["render"];
 
   private static RACK_KEY_TRANSLATION: Record<string, string> = {
     httpHost: "HTTP_HOST",
@@ -134,3 +132,4 @@ export class Renderer {
     }
   }
 }
+Renderer.prototype.renderToString = Renderer.prototype.render;
