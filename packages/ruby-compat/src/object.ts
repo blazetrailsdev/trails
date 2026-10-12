@@ -1409,8 +1409,11 @@ export function isNil(obj: unknown): boolean {
  * it is a send (`rb_funcall(obj, idTo_s, 0)`, `string.c:1661`): a ported class
  * defining `toS` answers it, and an answer that is not a String falls back to
  * {@link rbAnyToS}. A ported `String` subclass that is not a JS string
- * (`ActiveSupport::SafeBuffer`) marks itself one by `toStr`, so that is the
- * `T_STRING` test on a `toS` answer.
+ * (`ActiveSupport::SafeBuffer`) is an instance of {@link rbCString}, which is
+ * the `T_STRING` test on a `toS` answer, as it is for any class built on
+ * `rbCString`; `to_str` is never called. MRI returns that String itself, and
+ * the port returns its contents, since a Ruby String is a JS string primitive
+ * (CLAUDE.md, "Ruby Strings are JS string primitives").
  *
  * @noRailsEquivalent PERMANENT — Ruby core `rb_obj_as_string`
  * (`vendor/ruby/v3.3.11/string.c:1653`); JS `String(x)` is not the same function, since
@@ -1432,7 +1435,8 @@ export function rbObjAsString(value: unknown): string | Uint8Array {
   if (rbObjRespondTo(value, "toS")) {
     const str = (value as { toS(): unknown }).toS();
     if (str instanceof Uint8Array) return str;
-    return rbCheckStringType(str) ?? rbAnyToS(value as object);
+    if (typeof str === "string") return str;
+    return str instanceof rbCString ? String(str) : rbAnyToS(value as object);
   }
   if (
     typeof value === "function" &&

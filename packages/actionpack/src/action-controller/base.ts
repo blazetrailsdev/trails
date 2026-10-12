@@ -175,7 +175,7 @@ import {
   Rendering,
   renderToString,
 } from "./metal/rendering.js";
-import type { Renderer } from "./renderer.js";
+import type { Renderer, RendererController } from "./renderer.js";
 import { Renderers, _renderToBodyWithRenderer } from "./metal/renderers.js";
 import { UrlFor, type urlOptions } from "./metal/url-for.js";
 import type { UrlForOptions } from "../action-dispatch/routing/url-for.js";
@@ -421,7 +421,7 @@ export class Base extends Metal {
   declare static _layoutConditions: Record<string, string[]>;
   declare static _flashTypes: string[];
 
-  static _routes: ViewContextRoutes | null = null;
+  static _routes: (ViewContextRoutes & NonNullable<RendererController["_routes"]>) | null = null;
 
   declare static etaggers: Etagger[];
   declare static isEtaggers: boolean;

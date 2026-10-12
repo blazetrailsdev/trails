@@ -3,7 +3,7 @@ import {
   DoubleRenderError,
   type RenderingHost as AbstractRenderHost,
 } from "../../abstract-controller/rendering.js";
-import { Renderer } from "../renderer.js";
+import { Renderer, type RendererController } from "../renderer.js";
 import { statusCode } from "@blazetrails/rack";
 
 export const RENDER_FORMATS_IN_PRIORITY = ["body", "plain", "html"] as const;
@@ -160,7 +160,7 @@ export function processAction(
   return Rendering.superMethod(this, "processAction")!(...args);
 }
 
-export interface RenderingClassHost {
+export interface RenderingClassHost extends RendererController {
   _renderer?: Renderer;
   readonly renderer: Renderer;
   setupRendererBang(): void;
@@ -178,7 +178,7 @@ export function setupRendererBang(this: RenderingClassHost): void {
 
 export const ClassMethods: Module = new Module((mod) => {
   mod.defineMethod("render", function (this: RenderingClassHost, ...args: unknown[]) {
-    return this.renderer.render(...(args as [Record<string, unknown>?]));
+    return this.renderer.render(...args);
   });
 
   mod.moduleEval((m) => {

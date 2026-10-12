@@ -44,7 +44,7 @@ describe("AbstractController::UrlFor", () => {
     it("ignores a defaultEnv on the route set when filtering", () => {
       const routes: RouteSetLike = {
         namedRoutes: { helperNames: () => ["posts_path", "show"] },
-        defaultEnv: { HTTP_HOST: "example.com" },
+        defaultEnv: () => ({ HTTP_HOST: "example.com" }),
       };
       expect(actionMethods(["show", "index"], routes)).toEqual(["index"]);
     });
