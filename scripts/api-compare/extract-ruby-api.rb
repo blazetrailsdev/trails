@@ -745,7 +745,8 @@ class ApiExtractor
     name = const_name(node[1])
     return unless name
 
-    superclass = qualified_const_name(node[2]) if node[2]
+    delegated = delegate_class_target(node[2])
+    superclass = qualified_const_name(delegated || node[2]) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -754,6 +755,7 @@ class ApiExtractor
     fqn = current_fqn
     @classes[fqn] ||= new_class_info(name, fqn)
     @classes[fqn][:superclass] = superclass if superclass
+    @classes[fqn][:delegateClass] = true if delegated && superclass
     synthesize_struct_members(fqn, node[2]) if superclass == "Struct"
 
     body = node[3] || node[2]
@@ -4731,6 +4733,17 @@ class ApiExtractor
     end
   end
 
+  def delegate_class_target(node)
+    return nil unless node.is_a?(Array) && node[0] == :method_add_arg
+    fcall = node[1]
+    return nil unless fcall.is_a?(Array) && fcall[0] == :fcall && fcall[1].is_a?(Array) &&
+                      fcall[1][1] == "DelegateClass"
+    args = node[2]
+    args = args[1] if args.is_a?(Array) && args[0] == :arg_paren
+    args = args[1] if args.is_a?(Array) && args[0] == :args_add_block
+    args.is_a?(Array) ? args[0] : nil
+  end
+
   def find_params(def_node)
     # def node: [:def, name, params_or_paren, body]
     params = def_node[2]
@@ -5002,6 +5015,7 @@ def normalize_class_info(info)
     instanceMethods: tag_internal(info[:instanceMethods]),
     classMethods: tag_internal(info[:classMethods]),
   }.tap do |out|
+    out[:delegateClass] = true if info[:delegateClass]
     out[:forwardedMethods] = info[:forwardedMethods] if info[:forwardedMethods]
     out[:prepends] = info[:prepends].uniq if info[:prepends]&.any?
     out[:mixinOrder] = info[:mixinOrder] if info[:mixinOrder]&.any?

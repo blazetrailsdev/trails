@@ -1636,6 +1636,7 @@ function collectAllowedNames(
   moduleFqnByShort: Map<string, string[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  crossPackageClasses: Record<string, ClassInfo>,
   fileConstantNames: string[],
   rubyFile: string,
   fileHashKeyNames: string[] = [],
@@ -1791,6 +1792,36 @@ function collectAllowedNames(
     for (const inc of mod.includes ?? []) walkMixin(inc, fqn, target, methodFile);
   };
 
+  const addDelegated = (
+    ownerFqn: string,
+    owner: ClassInfo,
+    target: Set<string>,
+    seen: Set<string>,
+  ): void => {
+    if (seen.has(ownerFqn)) return;
+    seen.add(ownerFqn);
+    addMethods(
+      owner.instanceMethods.filter((m) => m.visibility !== "private"),
+      ownerFqn,
+      undefined,
+      target,
+    );
+    const mixins = [
+      ...(owner.includes ?? []),
+      ...(owner.prepends ?? []),
+      ...(AMBIENT_RAILTIE_MIXINS[ownerFqn]?.includes ?? []),
+      ...(HOOK_INJECTED_MIXINS[ownerFqn]?.includes ?? []),
+      ...(LEXICAL_PREPENDS[ownerFqn]?.includes ?? []),
+    ];
+    for (const inc of mixins) {
+      const mod = resolveDelegatedClass(inc, ownerFqn, crossPackageModules);
+      if (mod !== undefined) addDelegated(mod, crossPackageModules[mod], target, seen);
+    }
+    if (!owner.superclass) return;
+    const sup = resolveDelegatedClass(owner.superclass, ownerFqn, crossPackageClasses);
+    if (sup !== undefined) addDelegated(sup, crossPackageClasses[sup], target, seen);
+  };
+
   for (const { fqn, info, nameOnly, methodFile, nestedIn } of entities) {
     // The entity's own short name: since declaration names are TS surface
     // (`collectTsFileNames`), the Ruby constant they port has to be allowed
@@ -1838,8 +1869,46 @@ function collectAllowedNames(
     for (const name of PORTED_METHODS_FROM_UNPORTED_MIXINS[fqn] ?? []) addRubyName(name, target);
 
     for (const name of info.forwardedMethods ?? []) addRubyName(name, target);
+
+    if (info.delegateClass === true && info.superclass) {
+      const delegated = resolveDelegatedClass(info.superclass, fqn, crossPackageClasses);
+      if (delegated !== undefined)
+        addDelegated(delegated, crossPackageClasses[delegated], target, new Set<string>());
+    }
   }
   return allowed;
+}
+
+/**
+ * The class a `DelegateClass(X)` superclass names, resolved the way Ruby binds
+ * `X` from inside `contextFqn`: each enclosing namespace outward, then the top
+ * level. A name that reaches its class through a constant alias Ruby follows
+ * and the manifest does not record (`Type::Value` inside `ActiveRecord::Locking`
+ * is `ActiveRecord::Type::Value = ActiveModel::Type::Value`,
+ * `activerecord/lib/active_record/type.rb`) resolves to the one class whose FQN
+ * ends in the written name; an ambiguous or unknown name resolves to nothing.
+ * The delegated class's mixins and superclass chain are resolved the same way:
+ * `DelegateClass` forwards `superclass.public_instance_methods` and
+ * `protected_instance_methods`, inherited ones included
+ * (`vendor/ruby/v3.3.11/lib/delegate.rb:397-400`), and never a class method.
+ */
+function resolveDelegatedClass(
+  name: string,
+  contextFqn: string,
+  classes: Record<string, ClassInfo>,
+): string | undefined {
+  const written = name.replace(/^::/, "");
+  if (!name.startsWith("::")) {
+    const parts = contextFqn.split("::");
+    for (let i = parts.length; i > 0; i--) {
+      const candidate = `${parts.slice(0, i).join("::")}::${written}`;
+      if (candidate in classes) return candidate;
+    }
+  }
+  if (written in classes) return written;
+  if (name.startsWith("::")) return undefined;
+  const aliased = Object.keys(classes).filter((fqn) => fqn.endsWith(`::${written}`));
+  return aliased.length === 1 ? aliased[0] : undefined;
 }
 
 /**
@@ -1940,16 +2009,19 @@ export function buildGlobalRubyCandidates(ruby: ApiManifest): Map<string, RubyOw
 export function buildCrossPackageModules(ruby: ApiManifest): {
   modules: Record<string, ClassInfo>;
   pkgByFqn: Record<string, string>;
+  classes: Record<string, ClassInfo>;
 } {
   const modules: Record<string, ClassInfo> = {};
   const pkgByFqn: Record<string, string> = {};
+  const classes: Record<string, ClassInfo> = {};
   for (const [pkgName, pkg] of Object.entries(ruby.packages)) {
+    Object.assign(classes, pkg.classes);
     for (const [fqn, info] of Object.entries(pkg.modules)) {
       modules[fqn] = info;
       pkgByFqn[fqn] = pkgName;
     }
   }
-  return { modules, pkgByFqn };
+  return { modules, pkgByFqn, classes };
 }
 
 /**
@@ -2151,6 +2223,7 @@ function buildPackageReport(
   globalRubyCandidates: Map<string, RubyOwner[]>,
   crossPackageModules: Record<string, ClassInfo>,
   crossPackagePkgByFqn: Record<string, string>,
+  crossPackageClasses: Record<string, ClassInfo>,
   novelOnly: boolean,
   tagKeys: Set<string>,
   matchedTagKeys: Set<string>,
@@ -2409,6 +2482,7 @@ function buildPackageReport(
       moduleFqnByShort,
       crossPackageModules,
       crossPackagePkgByFqn,
+      crossPackageClasses,
       Object.keys(rubyPkg.fileConstants?.[sourceRuby] ?? {}),
       sourceRuby,
       rubyPkg.fileHashKeys?.[sourceRuby] ?? [],
@@ -2480,6 +2554,7 @@ function buildPackageReport(
             moduleFqnByShort,
             crossPackageModules,
             crossPackagePkgByFqn,
+            crossPackageClasses,
             Object.keys(rubyPkg.fileConstants?.[rubyFile] ?? {}),
             rubyFile,
             rubyPkg.fileHashKeys?.[rubyFile] ?? [],
@@ -2897,8 +2972,11 @@ export function buildReport(
   const matchedTagKeys = new Set<string>();
   const redundantTagKeys = new Set<string>();
   const globalRubyCandidates = buildGlobalRubyCandidates(ruby);
-  const { modules: crossPackageModules, pkgByFqn: crossPackagePkgByFqn } =
-    buildCrossPackageModules(ruby);
+  const {
+    modules: crossPackageModules,
+    pkgByFqn: crossPackagePkgByFqn,
+    classes: crossPackageClasses,
+  } = buildCrossPackageModules(ruby);
 
   const packages: PackageTotals[] = [];
   const fileTagRejections: FileTagRejection[] = [];
@@ -2916,6 +2994,7 @@ export function buildReport(
         globalRubyCandidates,
         crossPackageModules,
         crossPackagePkgByFqn,
+        crossPackageClasses,
         opts.novelOnly,
         tagKeys,
         matchedTagKeys,

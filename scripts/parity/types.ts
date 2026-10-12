@@ -465,6 +465,13 @@ export interface ClassInfo {
    * Extra-surface allowed names only — not methods of this class.
    */
   forwardedMethods?: string[];
+  /**
+   * Ruby-side only: `superclass` was written `DelegateClass(X)`
+   * (`activerecord/lib/active_record/type/serialized.rb:5`), so the class
+   * answers every public instance method of `X` by forwarding
+   * (`vendor/ruby/v3.3.11/lib/delegate.rb:394-436`).
+   */
+  delegateClass?: boolean;
   instanceMethods: MethodInfo[];
   classMethods: MethodInfo[];
   /**

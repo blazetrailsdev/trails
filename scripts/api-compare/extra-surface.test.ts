@@ -1517,6 +1517,108 @@ describe("buildReport — novel vs moved classification", () => {
     ]);
   });
 
+  it("credits a DelegateClass(X) superclass's public instance methods to the delegating class", () => {
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activemodel: {
+          classes: {
+            "ActiveModel::Type::Value": {
+              ...rubyClass({
+                name: "Value",
+                file: "type/value.rb",
+                instance: [method("cast"), method("type"), method("cast_value", true)],
+                includes: ["SerializeCastValue"],
+              }),
+              superclass: "Root",
+            },
+            "ActiveModel::Type::Root": rubyClass({
+              name: "Root",
+              file: "type/root.rb",
+              instance: [method("inherited_reader"), method("inherited_private", true)],
+              klass: [method("root_class_method")],
+            }),
+          },
+          modules: {
+            "ActiveModel::Type::SerializeCastValue": rubyClass({
+              name: "SerializeCastValue",
+              file: "type/serialize_cast_value.rb",
+              instance: [method("serialize_cast_value"), method("mixin_private", true)],
+              klass: [method("serialize_cast_value_compatible?")],
+            }),
+          },
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::Locking::LockingType": {
+              ...rubyClass({
+                name: "LockingType",
+                file: "locking/optimistic.rb",
+                instance: [method("deserialize")],
+              }),
+              superclass: "Type::Value",
+              delegateClass: true,
+            },
+            "ActiveRecord::Type::Time::Value": rubyClass({
+              name: "Value",
+              file: "type/time.rb",
+              instance: [method("unrelated")],
+            }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activemodel: { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            LockingType: {
+              name: "LockingType",
+              file: "locking/optimistic.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [
+                method("deserialize"),
+                method("cast"),
+                method("type"),
+                method("serializeCastValue"),
+                method("inheritedReader"),
+                method("castValue"),
+                method("mixinPrivate"),
+                method("isSerializeCastValueCompatible"),
+                method("inheritedPrivate"),
+                method("rootClassMethod"),
+                method("unrelated"),
+              ],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "locking/optimistic.ts");
+    expect(f!.extras.map((e) => e.name)).toEqual([
+      "castValue",
+      "inheritedPrivate",
+      "isSerializeCastValueCompatible",
+      "mixinPrivate",
+      "rootClassMethod",
+      "unrelated",
+    ]);
+  });
+
   it("cross-package fallback does NOT let a bare short-name include pollute across gems", () => {
     // A bare `Helper` include in package `a` must resolve ONLY against a's own
     // module map — package `b`'s same-short-name `B::Helper` must not leak in

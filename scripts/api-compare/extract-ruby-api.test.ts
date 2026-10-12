@@ -1637,6 +1637,29 @@ describe("Ruby extractor alias arity resolution", { timeout: RUBY_SUBPROCESS_TIM
     expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
   });
 
+  it("resolves a DelegateClass(X) superclass to X", () => {
+    const r = aliasParams({
+      "delegate_sup.rb": `
+        module ActiveModel
+          module Type
+            class Value
+              def target(value); end
+            end
+          end
+        end
+
+        module ActiveRecord
+          module Type
+            class Serialized < DelegateClass(ActiveModel::Type::Value)
+              alias :aka :target
+            end
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Type::Serialized#aka"].params).toEqual(["value"]);
+  });
+
   it("prefers a same-bucket definition over an inherited one", () => {
     const r = aliasParams({
       "shadow.rb": `
