@@ -944,17 +944,11 @@ export class Mapper {
     const plural =
       options.as != null && (options.as as unknown) !== false ? String(options.as) : name;
     const singular = singularize(plural);
-    const namePrefix = this._scope.get("as") as string | undefined;
 
     const shallowPath = shallow
       ? `${(this._scope.get("shallowPath") as string | undefined) ?? ""}/${path}`
       : basePath;
-    const outerNamePrefix = shallow
-      ? (this._scope.get("shallowPrefix") as string | undefined)
-      : undefined;
-    const memberPrefix = shallow ? outerNamePrefix : namePrefix;
-    const candidate = (...actionName: Array<string | undefined>) =>
-      actionName.filter((part) => isPresent(part)).join("_") || undefined;
+    const names: Record<string, string | undefined> = {};
 
     const allowed = allowedActions(options, [
       "index",
@@ -993,11 +987,24 @@ export class Mapper {
         if (cb) cb.call(this);
 
         if (options.concerns) this.concerns(options.concerns);
+
+        this.collection(() => {
+          names.index = this.nameForAction(undefined, "index");
+        });
+
+        this.new(() => {
+          names.new = this.nameForAction(undefined, "new");
+        });
+
+        this.member(() => {
+          names.edit = this.nameForAction(undefined, "edit");
+          names.show = this.nameForAction(undefined, "show");
+        });
       }),
     );
 
     if (allowed.has("index")) {
-      const as = candidate(namePrefix, resource.collectionName);
+      const as = names.index;
       this.addRouteToSet("GET", basePath, controller, "index", as, constraints);
     }
 
@@ -1006,12 +1013,12 @@ export class Mapper {
     }
 
     if (allowed.has("new")) {
-      const as = candidate("new", namePrefix, singular);
+      const as = names.new;
       this.addRouteToSet("GET", `${basePath}/${newPath}`, controller, "new", as, constraints);
     }
 
     if (allowed.has("edit")) {
-      const as = candidate("edit", memberPrefix, singular);
+      const as = names.edit;
       this.addRouteToSet(
         "GET",
         `${shallowPath}/:id/${editPath}`,
@@ -1023,7 +1030,7 @@ export class Mapper {
     }
 
     if (allowed.has("show")) {
-      const as = candidate(memberPrefix, singular);
+      const as = names.show;
       this.addRouteToSet("GET", `${shallowPath}/:id`, controller, "show", as, constraints);
     }
 
