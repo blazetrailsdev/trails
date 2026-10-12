@@ -29,7 +29,6 @@ interface HashRelop {
  * @noRailsEquivalent PERMANENT
  */
 export class Set<T> extends JsSet<T> {
-  /** @noRailsEquivalent PERMANENT */
   _hash = new Hash<T, boolean>(false);
 
   /**
@@ -77,7 +76,6 @@ export class Set<T> extends JsSet<T> {
   /**
    * `Set#do_with_enum` (`vendor/ruby/v3.3.11/lib/set.rb:272`). A JS iterable
    * answers `each` through its iterator.
-   * @noRailsEquivalent PERMANENT
    */
   private doWithEnum<E>(enumerable: Iterable<E>, block: (o: E) => void): void {
     if (typeof (enumerable as Partial<EachEntry<E>> | null)?.eachEntry === "function") {
