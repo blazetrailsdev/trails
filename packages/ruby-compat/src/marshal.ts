@@ -28,7 +28,7 @@ import { RuntimeError } from "./runtime-error.js";
 import { Set } from "./set.js";
 import { forceEncoding, isValidEncoding } from "./string/force-encoding.js";
 import { rbCheckStringType, stringValue } from "./string/support.js";
-import { type StructInstance, isStruct, rbStructInitialize } from "./struct.js";
+import { type StructInstance, isStruct, rbStructInitialize, rstructGet } from "./struct.js";
 import { isSymbol, symbolToS } from "./symbol.js";
 import { temporalTag } from "./temporal-tag.js";
 import { TypeError } from "./type-error.js";
@@ -648,7 +648,7 @@ function wObject(obj: unknown, arg: DumpArg, limit: number): void {
         wLong(len, arg);
         for (let i = 0; i < len; i++) {
           wSymbol(`:${mem[i]}`, arg);
-          wObject((obj as unknown as Record<string, unknown>)[mem[i]], arg, limit);
+          wObject(rstructGet(obj, i), arg, limit);
         }
       }
     } else if (tObjectP(obj)) {

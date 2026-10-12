@@ -43,6 +43,16 @@ function structValues(s: StructInstance): unknown[] {
 }
 
 /**
+ * `RSTRUCT_GET` (`vendor/ruby/v3.3.11/internal/struct.h:115`): the value in
+ * slot `k`, read past any reader the class overrides.
+ *
+ * @noRailsEquivalent PERMANENT
+ */
+export function rstructGet(st: StructInstance, k: number): unknown {
+  return (st as unknown as { [RSTRUCT]: unknown[] })[RSTRUCT][k];
+}
+
+/**
  * `rb_struct_initialize` (`vendor/ruby/v3.3.11/struct.c:795`), over
  * `rb_struct_initialize_m` (`struct.c:742`).
  *

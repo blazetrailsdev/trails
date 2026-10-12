@@ -42,6 +42,12 @@ rbSetClassPathString(Shape, Geo, "Shape");
 const Kind = rbModConstSet(Geo, "Kind", new Module());
 class Pair extends Struct.new("a", "b") {}
 rbModConstSet(Geo, "Pair", Pair);
+class Shadow extends Struct.new("a") {
+  override get a(): unknown {
+    return 99;
+  }
+}
+rbModConstSet(Geo, "Shadow", Shadow);
 const STRUCT = "0408533a0e47656f3a3a50616972073a066169063a06625b063a0678";
 const EXTENDED =
   "0408653a0e47656f3a3a4b696e646f3a0f47656f3a3a5368617065063a0a406b696e643a0b636972636c65";
@@ -251,6 +257,7 @@ describe("Marshal.dump", () => {
 
   it("dumps a Struct under TYPE_STRUCT, member by member", () => {
     expect(hex(Marshal.dump(new Pair(1, [":x"])))).toBe(STRUCT);
+    expect(hex(Marshal.dump(new Shadow(1)))).toBe("0408533a1047656f3a3a536861646f77063a06616906");
   });
 
   it("dumps a core class under its path", () => {
