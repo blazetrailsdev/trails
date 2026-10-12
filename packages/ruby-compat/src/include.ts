@@ -1101,7 +1101,8 @@ export function rbModAncestors(mod: { prototype: object }): object[] {
 /**
  * `rb_obj_is_kind_of` (`vendor/ruby/v3.3.11/object.c:889`), `Object#kind_of?`
  * and `Module#===`: whether `c` is in the ancestry of `obj`'s class. A plain
- * object is a module's seat, as `include()` takes one.
+ * object is a module's seat, as `include()` takes one, and JS's own `Set` is
+ * the seat of the `Set` that reopens it (`class Set extends JsSet`).
  *
  * @noRailsEquivalent PERMANENT
  */
@@ -1180,6 +1181,7 @@ function classSearchAncestor(cl: { prototype: object }, c: object): boolean {
       if (((p as Record<symbol, unknown>)[includedModulesKey] as Set<object>).has(c)) return true;
     }
     if (p === Uint8Array.prototype) return c === rbCString || classSearchAncestor(rbCString, c);
+    if (p === globalThis.Set.prototype && c === registeredConstant("Set")) return true;
     if (p === Object.prototype && (c === Kernel || c === rbCBasicObject)) return true;
   }
   return false;

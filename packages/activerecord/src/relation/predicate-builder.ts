@@ -9,6 +9,7 @@ import {
   rbObjRespondTo,
   rtest,
   Range,
+  Set,
   toH,
   zip,
 } from "@blazetrails/ruby-compat";

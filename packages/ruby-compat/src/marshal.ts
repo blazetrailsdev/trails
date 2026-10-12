@@ -143,14 +143,8 @@ function mustNotBeAnonymous(type: string, path: string): string {
 /**
  * `class2path` (`vendor/ruby/v3.3.11/marshal.c:273`). Every caller hands it
  * a class that is not a singleton, which `rb_class_real` answers unchanged.
- * JS's own `Set` is the seat of the core class ruby-compat's `Set` reopens
- * (`class Set extends JsSet`), and the path names that constant, as it does
- * for a Temporal value in {@link wClass}.
- *
- * @inventedArm if — PERMANENT
  */
 function class2path(klass: AnyClass | Module): string {
-  if (klass === globalThis.Set) klass = Set;
   const path = rbModName(klass as AnyClass) ?? rbModToS(klass as AnyClass);
 
   mustNotBeAnonymous(typeof klass === "function" ? "class" : "module", path);

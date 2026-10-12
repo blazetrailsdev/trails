@@ -253,8 +253,8 @@ describe("Marshal.dump", () => {
     expect(hex(Marshal.dump(new Pair(1, [":x"])))).toBe(STRUCT);
   });
 
-  it("dumps a core class under its path, and JS's Set under the one that reopens it", () => {
-    expect(hex(Marshal.dump([Set, Array, rbCBasicObject, Hash]))).toBe(
+  it("dumps a core class under its path", () => {
+    expect(hex(Marshal.dump([RbSet, Array, rbCBasicObject, Hash]))).toBe(
       "04085b096308536574630a4172726179631042617369634f626a656374630948617368",
     );
   });

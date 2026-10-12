@@ -56,6 +56,7 @@ import {
 } from "./include.js";
 import { BigDecimal } from "./big-decimal.js";
 import { Hash } from "./hash.js";
+import { Set as RbSet } from "./set.js";
 import { Complex } from "./complex.js";
 import { Rational } from "./rational.js";
 import { TypeError } from "./type-error.js";
@@ -772,6 +773,14 @@ describe("rbObjIsKindOf", () => {
     expect(rbObjIsKindOf(new K(), m1)).toBe(true);
     expect(rbObjIsKindOf(new K(), m2)).toBe(true);
     expect(rbModAncestors(K)).toContain(m2);
+  });
+
+  it("answers Set for JS's own Set, the class ruby-compat's Set reopens", () => {
+    const native = new globalThis.Set([1]);
+    expect(rbObjIsKindOf(native, RbSet)).toBe(true);
+    expect(rbObjIsKindOf(new RbSet([1]), RbSet)).toBe(true);
+    expect(rbObjIsKindOf(native, rbCBasicObject)).toBe(true);
+    expect(rbObjIsKindOf(native, Hash)).toBe(false);
   });
 
   it("raises TypeError for an argument that is no class or module", () => {
