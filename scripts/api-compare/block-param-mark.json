@@ -12,12 +12,11 @@
     }
   },
   "actiondispatch": {
-    "total": 42,
+    "total": 41,
     "byFile": {
       "http/headers.rb": 1,
       "http/query_parser.rb": 1,
       "http/response.rb": 5,
-      "http/url.rb": 1,
       "journey/formatter.rb": 1,
       "journey/router.rb": 1,
       "middleware/cookies.rb": 1,

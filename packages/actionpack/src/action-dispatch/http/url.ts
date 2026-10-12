@@ -1,7 +1,7 @@
 import { isBlank, toParam, toQuery } from "@blazetrails/activesupport";
 import { escapeFragment } from "../journey/router/utils.js";
 import { Utils as RackUtils } from "@blazetrails/rack";
-import { rbInspect } from "@blazetrails/ruby-compat";
+import { fetch, rbInspect, toI } from "@blazetrails/ruby-compat";
 
 const IP_HOST_REGEXP = /\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
 const HOST_REGEXP = /(^[^:]+:\/\/)?(\[[^\]]+\]|[^:]+)(?::(\d+$))?/;
@@ -11,7 +11,7 @@ const PROTOCOL_REGEXP = /^([^:]+)(:)?(\/\/)?$/;
 export interface UrlOptions {
   host?: string;
   protocol?: string | false | null;
-  port?: number | string | null;
+  port?: number | string | false | null;
   scriptName?: string;
   path?: string;
   trailingSlash?: boolean;
@@ -21,7 +21,7 @@ export interface UrlOptions {
   password?: string;
   onlyPath?: boolean;
   tldLength?: number;
-  subdomain?: string | boolean | { toParam(): string };
+  subdomain?: string | boolean | null | { toParam(): string };
   domain?: string;
 }
 
@@ -83,14 +83,18 @@ function normalizeHost(_host: string, options: UrlOptions): string {
   if (!namedHost(_host)) return _host;
 
   const tldLength = options.tldLength ?? URL.tldLength;
-  const subdomain = options.subdomain ?? true;
+  const subdomain = fetch<UrlOptions["subdomain"]>(
+    options as Record<string, unknown>,
+    "subdomain",
+    true,
+  );
   const domain = options.domain;
 
   let host = "";
   if (subdomain === true) {
     if (domain === null || domain === undefined) return _host;
     host += extractSubdomainsFrom(_host, tldLength).join(".");
-  } else if (subdomain) {
+  } else if (subdomain != null && subdomain !== false) {
     host += String(toParam(subdomain) ?? "");
   }
   if (host.length > 0) host += ".";
@@ -100,20 +104,28 @@ function normalizeHost(_host: string, options: UrlOptions): string {
 
 /** @internal */
 function normalizePort(
-  port: number | string | null | undefined,
+  port: number | string | false | null | undefined,
   protocol: string,
-): number | string | null {
-  if (port === null || port === undefined || port === "") return null;
-  const n = typeof port === "string" ? parseInt(port, 10) : port;
-  if (protocol === "//") return port;
-  if (protocol === "https://") return n === 443 ? null : port;
-  return n === 80 ? null : port;
+  block: (normalizedPort: number | string) => void,
+): void {
+  if (port == null || port === false) return;
+
+  switch (protocol) {
+    case "//":
+      block(port);
+      break;
+    case "https://":
+      if (toI(port) !== 443) block(port);
+      break;
+    default:
+      if (toI(port) !== 80) block(port);
+  }
 }
 
 /** @internal */
 function buildHostUrl(
   host: string,
-  port: number | string | null | undefined,
+  port: number | string | false | null | undefined,
   protocol: string | false | null | undefined,
   options: UrlOptions,
   path: string,
@@ -135,8 +147,9 @@ function buildHostUrl(
     result += `${RackUtils.escape(options.user)}:${RackUtils.escape(options.password)}@`;
   }
   result += host;
-  const normalized = normalizePort(port, protocolStr);
-  if (normalized !== null) result += `:${normalized}`;
+  normalizePort(port, protocolStr, (normalizedPort) => {
+    result += `:${normalizedPort}`;
+  });
   result += path;
   return result;
 }

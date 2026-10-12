@@ -1,224 +1,323 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { beforeEach, describe, it } from "vitest";
+import { assertEqual } from "@blazetrails/activesupport";
+import { include } from "@blazetrails/ruby-compat";
+import { Base } from "../../action-controller/base.js";
+import { URL } from "../http/url.js";
+import { controllerConstants } from "../http/request.js";
 import { RouteSet } from "../routing/route-set.js";
-import { URL as DispatchURL, type UrlOptions } from "../http/url.js";
+import type { UrlForRoutes } from "../routing/url-for.js";
+import { IntegrationTest } from "../testing/integration.js";
+import "../../test-helpers/abstract-unit.js";
 
-describe("TestUrlGeneration::WithMountPoint", () => {
-  let routes: RouteSet;
+type Helper = (...args: unknown[]) => string;
 
-  beforeEach(() => {
-    routes = new RouteSet();
-    routes.draw(function () {
-      this.get("/foo", { to: "my_route_generating#index", as: "foo" });
-      this.get("(/optional/:optional_id)/baz", {
-        to: "my_route_generating#index",
-        as: "baz",
+describe("WithMountPoint", () => {
+  const Routes = new RouteSet();
+
+  class MyRouteGeneratingController extends Base {
+    declare fooPath: Helper;
+    declare trailingSlashDefaultUrl: Helper;
+    declare trailingSlashDefaultPath: Helper;
+
+    async index(): Promise<void> {
+      await this.render({ plain: this.fooPath() });
+    }
+
+    async addTrailingSlash(): Promise<void> {
+      await this.render({
+        plain: this.urlFor({
+          trailingSlash: true,
+          params: this.request.queryParameters,
+          format: this.params.get("format"),
+        }),
       });
-      this.get("/add_trailing_slash", {
-        to: "my_route_generating#addTrailingSlash",
-        as: "add_trailing_slash",
-      });
-      this.get("/trailing_slash_default", {
-        to: "my_route_generating#trailingSlashDefault",
-        as: "trailing_slash_default",
-      });
-      this.resources("bars");
-    });
-    routes.setDefaultUrlOptions({ host: "www.example.com" });
-  });
+    }
 
-  function fooPath(options: Record<string, unknown> = {}): string {
-    return DispatchURL.pathFor({
-      path: routes.pathFor({}, "foo"),
-      scriptName: options.scriptName as string | undefined,
-    });
-  }
-
-  function fooUrl(options: Record<string, unknown> = {}): string {
-    const path = routes.pathFor({}, "foo");
-    const urlOpts: Record<string, unknown> = {
-      host: (options.host as string) ?? "www.example.com",
-      path,
-    };
-    if ("protocol" in options) urlOpts.protocol = options.protocol;
-    if ("port" in options) urlOpts.port = options.port;
-    if ("subdomain" in options) urlOpts.subdomain = options.subdomain;
-    return DispatchURL.fullUrlFor(urlOpts as UrlOptions);
-  }
-
-  function bazUrl(
-    paramsOrPositional?: Record<string, unknown> | string | number | boolean,
-  ): string {
-    let params: Record<string, string | number> = {};
-    if (
-      typeof paramsOrPositional === "string" ||
-      typeof paramsOrPositional === "number" ||
-      typeof paramsOrPositional === "boolean"
-    ) {
-      if (paramsOrPositional !== "") {
-        params = { optional_id: String(paramsOrPositional) };
-      }
-    } else if (paramsOrPositional) {
-      if (paramsOrPositional.optional_id !== undefined && paramsOrPositional.optional_id !== "") {
-        params = { optional_id: String(paramsOrPositional.optional_id) };
+    async trailingSlashDefault(): Promise<void> {
+      if (this.params.get("url") != null) {
+        await this.render({
+          plain: this.trailingSlashDefaultUrl({ format: this.params.get("url_format") }),
+        });
+      } else {
+        await this.render({
+          plain: this.trailingSlashDefaultPath({ format: this.params.get("url_format") }),
+        });
       }
     }
-    const path = routes.pathFor(params, "baz");
-    return DispatchURL.fullUrlFor({ host: "www.example.com", path });
   }
+  include(MyRouteGeneratingController, Routes.urlHelpers());
+  controllerConstants.set("my_route_generating", MyRouteGeneratingController);
+
+  Routes.draw(function () {
+    this.get("/foo", { to: "my_route_generating#index", as: "foo" });
+    this.get("(/optional/:optional_id)/baz", { to: "my_route_generating#index", as: "baz" });
+    this.get("/add_trailing_slash", {
+      to: "my_route_generating#addTrailingSlash",
+      as: "add_trailing_slash",
+    });
+    this.get("/trailing_slash_default", {
+      to: "my_route_generating#trailingSlashDefault",
+      as: "trailing_slash_default",
+      trailingSlash: true,
+    });
+
+    this.resources("bars");
+
+    this.mount(MyRouteGeneratingController.action("index"), { at: "/bar" });
+  });
+
+  const APP = IntegrationTest.buildApp(Routes);
+
+  class WithMountPoint extends IntegrationTest {
+    declare fooPath: Helper;
+    declare fooUrl: Helper;
+    declare bazUrl: Helper;
+    declare barsPath: Helper;
+    declare barPath: Helper;
+
+    override get _routes(): UrlForRoutes {
+      return Routes;
+    }
+
+    override get app(): unknown {
+      return APP;
+    }
+  }
+  include(WithMountPoint, Routes.urlHelpers());
+
+  let t: WithMountPoint;
+  beforeEach(({ task }) => {
+    t = new WithMountPoint(task.name);
+  });
 
   it("generating URLS normally", () => {
-    expect(fooPath()).toBe("/foo");
+    assertEqual("/foo", t.fooPath());
   });
 
   it("accepting a :script_name option", () => {
-    expect(fooPath({ scriptName: "/bar" })).toBe("/bar/foo");
+    assertEqual("/bar/foo", t.fooPath({ scriptName: "/bar" }));
   });
 
-  it.skip("the request's SCRIPT_NAME takes precedence over the route", () => {});
+  it("the request's SCRIPT_NAME takes precedence over the route", async () => {
+    await t.get("/foo", { headers: { SCRIPT_NAME: "/new", "action_dispatch.routes": Routes } });
+    assertEqual("/new/foo", t.response.body);
+  });
 
-  it.skip("the request's SCRIPT_NAME wraps the mounted app's", () => {});
+  it("the request's SCRIPT_NAME wraps the mounted app's", async () => {
+    await t.get("/new/bar/foo", {
+      headers: { SCRIPT_NAME: "/new", PATH_INFO: "/bar/foo", "action_dispatch.routes": Routes },
+    });
+    assertEqual("/new/bar/foo", t.response.body);
+  });
 
   it("handling http protocol with https set", () => {
-    expect(fooUrl({ protocol: "http" })).toBe("http://www.example.com/foo");
+    t.httpsBang();
+    assertEqual("http://www.example.com/foo", t.fooUrl({ protocol: "http" }));
   });
 
   it("respects secure_protocol configuration when protocol not present", () => {
-    const old = DispatchURL.secureProtocol;
+    const oldSecureProtocol = URL.secureProtocol;
+
     try {
-      DispatchURL.secureProtocol = true;
-      expect(fooUrl({ protocol: null })).toBe("https://www.example.com/foo");
+      URL.secureProtocol = true;
+      assertEqual("https://www.example.com/foo", t.fooUrl({ protocol: null }));
     } finally {
-      DispatchURL.secureProtocol = old;
+      URL.secureProtocol = oldSecureProtocol;
     }
   });
 
   it("extracting protocol from host when protocol not present", () => {
-    expect(fooUrl({ host: "httpz://www.example.com", protocol: null })).toBe(
+    assertEqual(
       "httpz://www.example.com/foo",
+      t.fooUrl({ host: "httpz://www.example.com", protocol: null }),
     );
   });
 
   it("formatting host when protocol is present", () => {
-    expect(fooUrl({ host: "httpz://www.example.com", protocol: "http://" })).toBe(
+    assertEqual(
       "http://www.example.com/foo",
+      t.fooUrl({ host: "httpz://www.example.com", protocol: "http://" }),
     );
   });
 
   it("default ports are removed from the host", () => {
-    expect(fooUrl({ host: "www.example.com:80", protocol: "http://" })).toBe(
+    assertEqual(
       "http://www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:80", protocol: "http://" }),
     );
-    expect(fooUrl({ host: "www.example.com:443", protocol: "https://" })).toBe(
+    assertEqual(
       "https://www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:443", protocol: "https://" }),
     );
   });
 
   it("port is extracted from the host", () => {
-    expect(fooUrl({ host: "www.example.com:8080", protocol: "http://" })).toBe(
+    assertEqual(
       "http://www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com:8080", protocol: "http://" }),
     );
-    expect(fooUrl({ host: "www.example.com:8080", protocol: "//" })).toBe(
+    assertEqual(
       "//www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com:8080", protocol: "//" }),
     );
-    expect(fooUrl({ host: "www.example.com:80", protocol: "//" })).toBe("//www.example.com:80/foo");
+    assertEqual(
+      "//www.example.com:80/foo",
+      t.fooUrl({ host: "www.example.com:80", protocol: "//" }),
+    );
   });
 
   it("port option is used", () => {
-    expect(fooUrl({ host: "www.example.com", protocol: "http://", port: 8080 })).toBe(
+    assertEqual(
       "http://www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com", protocol: "http://", port: 8080 }),
     );
-    expect(fooUrl({ host: "www.example.com", protocol: "//", port: 8080 })).toBe(
+    assertEqual(
       "//www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com", protocol: "//", port: 8080 }),
     );
-    expect(fooUrl({ host: "www.example.com", protocol: "//", port: 80 })).toBe(
+    assertEqual(
       "//www.example.com:80/foo",
+      t.fooUrl({ host: "www.example.com", protocol: "//", port: 80 }),
     );
   });
 
   it("port option overrides the host", () => {
-    expect(fooUrl({ host: "www.example.com:8443", protocol: "http://", port: 8080 })).toBe(
+    assertEqual(
       "http://www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "http://", port: 8080 }),
     );
-    expect(fooUrl({ host: "www.example.com:8443", protocol: "//", port: 8080 })).toBe(
+    assertEqual(
       "//www.example.com:8080/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "//", port: 8080 }),
     );
-    expect(fooUrl({ host: "www.example.com:443", protocol: "//", port: 80 })).toBe(
+    assertEqual(
       "//www.example.com:80/foo",
+      t.fooUrl({ host: "www.example.com:443", protocol: "//", port: 80 }),
     );
   });
 
   it("port option disables the host when set to nil", () => {
-    expect(fooUrl({ host: "www.example.com:8443", protocol: "http://", port: null })).toBe(
+    assertEqual(
       "http://www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "http://", port: null }),
     );
-    expect(fooUrl({ host: "www.example.com:8443", protocol: "//", port: null })).toBe(
+    assertEqual(
       "//www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "//", port: null }),
     );
   });
 
-  it.skip("port option disables the host when set to false", () => {});
+  it("port option disables the host when set to false", () => {
+    assertEqual(
+      "http://www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "http://", port: false }),
+    );
+    assertEqual(
+      "//www.example.com/foo",
+      t.fooUrl({ host: "www.example.com:8443", protocol: "//", port: false }),
+    );
+  });
 
   it("keep subdomain when key is true", () => {
-    expect(fooUrl({ subdomain: true })).toBe("http://www.example.com/foo");
+    assertEqual("http://www.example.com/foo", t.fooUrl({ subdomain: true }));
   });
 
   it("keep subdomain when key is missing", () => {
-    expect(fooUrl()).toBe("http://www.example.com/foo");
+    assertEqual("http://www.example.com/foo", t.fooUrl());
   });
 
-  it.skip("omit subdomain when key is nil", () => {});
+  it("omit subdomain when key is nil", () => {
+    assertEqual("http://example.com/foo", t.fooUrl({ subdomain: null }));
+  });
 
-  it.skip("omit subdomain when key is false", () => {});
+  it("omit subdomain when key is false", () => {
+    assertEqual("http://example.com/foo", t.fooUrl({ subdomain: false }));
+  });
 
-  it.skip("omit subdomain when key is blank", () => {});
+  it("omit subdomain when key is blank", () => {
+    assertEqual("http://example.com/foo", t.fooUrl({ subdomain: "" }));
+  });
 
   it("keep optional path parameter when given", () => {
-    expect(bazUrl({ optional_id: 123 })).toBe("http://www.example.com/optional/123/baz");
+    assertEqual("http://www.example.com/optional/123/baz", t.bazUrl({ optional_id: 123 }));
   });
 
   it("keep optional path parameter when true", () => {
-    expect(bazUrl({ optional_id: true })).toBe("http://www.example.com/optional/true/baz");
+    assertEqual("http://www.example.com/optional/true/baz", t.bazUrl({ optional_id: true }));
   });
 
   it("omit optional path parameter when false", () => {
-    expect(bazUrl({ optional_id: false })).toBe("http://www.example.com/optional/false/baz");
+    assertEqual("http://www.example.com/optional/false/baz", t.bazUrl({ optional_id: false }));
   });
 
   it("omit optional path parameter when blank", () => {
-    expect(bazUrl({ optional_id: "" })).toBe("http://www.example.com/baz");
+    assertEqual("http://www.example.com/baz", t.bazUrl({ optional_id: "" }));
   });
 
   it("keep positional path parameter when true", () => {
-    expect(bazUrl(true)).toBe("http://www.example.com/optional/true/baz");
+    assertEqual("http://www.example.com/optional/true/baz", t.bazUrl(true));
   });
 
   it("omit positional path parameter when false", () => {
-    expect(bazUrl(false)).toBe("http://www.example.com/optional/false/baz");
+    assertEqual("http://www.example.com/optional/false/baz", t.bazUrl(false));
   });
 
   it("omit positional path parameter when blank", () => {
-    expect(bazUrl("")).toBe("http://www.example.com/baz");
+    assertEqual("http://www.example.com/baz", t.bazUrl(""));
   });
 
-  it.skip("generating the current URL with a trailing slashes", () => {});
+  it("generating the current URL with a trailing slashes", async () => {
+    await t.get("/add_trailing_slash");
+    assertEqual("http://www.example.com/add_trailing_slash/", t.response.body);
+  });
 
-  it.skip("generating the current URL with a trailing slashes and query string", () => {});
+  it("generating the current URL with a trailing slashes and query string", async () => {
+    await t.get("/add_trailing_slash?a=b");
+    assertEqual("http://www.example.com/add_trailing_slash/?a=b", t.response.body);
+  });
 
-  it.skip("generating the current URL with a trailing slashes and format indicator", () => {});
+  it("generating the current URL with a trailing slashes and format indicator", async () => {
+    await t.get("/add_trailing_slash.json");
+    assertEqual("http://www.example.com/add_trailing_slash.json", t.response.body);
+  });
 
-  it.skip("generating the path with `trailing_slashes: true` default options", () => {});
+  it("generating the path with `trailing_slashes: true` default options", async () => {
+    await t.get("/trailing_slash_default");
+    assertEqual("/trailing_slash_default/", t.response.body);
 
-  it.skip("generating the path with `trailing_slashes: true` default options and format", () => {});
+    await t.get("/trailing_slash_default?url=1");
+    assertEqual("http://www.example.com/trailing_slash_default/", t.response.body);
+  });
 
-  it.skip("generating URLs with trailing slashes", () => {});
+  it("generating the path with `trailing_slashes: true` default options and format", async () => {
+    await t.get("/trailing_slash_default?url_format=json");
+    assertEqual("/trailing_slash_default.json", t.response.body);
 
-  it.skip("generating URLs with trailing slashes and dot including param", () => {});
+    await t.get("/trailing_slash_default?url=1&url_format=json");
+    assertEqual("http://www.example.com/trailing_slash_default.json", t.response.body);
+  });
 
-  it.skip("generating URLs with trailing slashes and query string", () => {});
+  it("generating URLs with trailing slashes", () => {
+    assertEqual("/bars/", t.barsPath({ trailingSlash: true }));
+  });
 
-  it.skip("generating URLs with trailing slashes and format", () => {});
+  it("generating URLs with trailing slashes and dot including param", () => {
+    assertEqual("/bars/hax0r.json/", t.barPath("hax0r.json", { trailingSlash: true }));
+  });
 
-  it.skip("generating URLS with querystring and trailing slashes", () => {});
+  it("generating URLs with trailing slashes and query string", () => {
+    assertEqual("/bars/?a=b", t.barsPath({ trailingSlash: true, a: "b" }));
+  });
 
-  it.skip("generating URLS with empty querystring", () => {});
+  it("generating URLs with trailing slashes and format", () => {
+    assertEqual("/bars.json", t.barsPath({ trailingSlash: true, format: "json" }));
+  });
+
+  it("generating URLS with querystring and trailing slashes", () => {
+    assertEqual("/bars.json?a=b", t.barsPath({ trailingSlash: true, a: "b", format: "json" }));
+  });
+
+  it("generating URLS with empty querystring", () => {
+    assertEqual("/bars.json", t.barsPath({ a: {}, format: "json" }));
+  });
 });

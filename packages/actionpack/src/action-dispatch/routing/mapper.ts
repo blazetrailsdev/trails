@@ -34,6 +34,7 @@ import {
   Module,
   RFC2396_PARSER,
   rbInspect,
+  RuntimeError,
   rbFPublicSend,
   rbFSend,
   slice,
@@ -146,6 +147,8 @@ interface RouteSetLike {
   drawPaths: string[];
   defaultUrlOptions: Record<string, unknown>;
   requestClass(): { prototype: object };
+  addUrlHelper: RouteSet["addUrlHelper"];
+  addPolymorphicMapping: RouteSet["addPolymorphicMapping"];
 }
 
 /** @internal */
@@ -1767,52 +1770,31 @@ export class Mapper {
 
   direct(
     name: string,
-    options: Record<string, unknown> | ((...a: unknown[]) => unknown) = {},
-    block?: (...args: unknown[]) => unknown,
+    options: Record<string, unknown> = {},
+    block: Parameters<RouteSet["addUrlHelper"]>[2],
   ): void {
     if (!this._scope.isRoot()) {
-      throw new Error("The direct method can't be used inside a routes scope block");
+      throw new RuntimeError("The direct method can't be used inside a routes scope block");
     }
-    if (typeof options === "function") {
-      block = options;
-      options = {};
-    }
-    this._directHelpers.set(name, { options, block });
+
+    this._set.addUrlHelper(name, options, block);
   }
 
   resolve(...args: unknown[]): void {
     if (!this._scope.isRoot()) {
-      throw new Error("The resolve method can't be used inside a routes scope block");
+      throw new RuntimeError("The resolve method can't be used inside a routes scope block");
     }
-    let block: ((...args: unknown[]) => unknown) | undefined;
-    if (typeof args[args.length - 1] === "function") {
-      block = args.pop() as (...a: unknown[]) => unknown;
-    }
-    let options: Record<string, unknown> = {};
-    const tail = args[args.length - 1];
-    if (tail && typeof tail === "object" && !Array.isArray(tail)) {
-      options = args.pop() as Record<string, unknown>;
-    }
-    for (const klass of args.flat()) {
-      const typed = klass as { modelName?: { name?: string }; name?: string };
-      const key =
-        klass != null && (typeof klass === "object" || typeof klass === "function")
-          ? typed.modelName?.name || typed.name || String(klass)
-          : String(klass);
-      this._polymorphicMappings.set(key, { options, block });
+
+    const block = (typeof args.at(-1) === "function" ? args.pop() : undefined) as Parameters<
+      RouteSet["addPolymorphicMapping"]
+    >[2];
+    const options = extractOptionsBang(args);
+    args = args.flat(1);
+
+    for (const klass of args as string[]) {
+      this._set.addPolymorphicMapping(klass, options, block);
     }
   }
-
-  /** @internal */
-  _directHelpers: Map<
-    string,
-    { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
-  > = new Map();
-  /** @internal */
-  _polymorphicMappings: Map<
-    string,
-    { options: Record<string, unknown>; block?: (...args: unknown[]) => unknown }
-  > = new Map();
 
   private addRoute(
     action: string | undefined,

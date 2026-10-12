@@ -34,7 +34,7 @@ import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
   params?: Record<string, unknown> | string | StringIO;
-  headers?: Record<string, string>;
+  headers?: Record<string, unknown>;
   xhr?: boolean;
   env?: Record<string, unknown>;
   as?: string;
@@ -168,7 +168,7 @@ export class IntegrationTest extends TestCase {
     options: IntegrationRequestOptions = {},
   ): Promise<number> {
     const requestEncoder = RequestEncoder.encoder(options.as);
-    const headers: Record<string, string> = { ...(options.headers ?? {}) };
+    const headers: Record<string, unknown> = { ...(options.headers ?? {}) };
     const params = options.params;
 
     if (method === "GET" && options.as === "json" && params != null) {
