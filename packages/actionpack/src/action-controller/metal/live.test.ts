@@ -17,6 +17,7 @@ import { IOError, RuntimeError, SizedQueue, Thread, ThreadError } from "@blazetr
 import { include } from "@blazetrails/ruby-compat/include";
 import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import { Request } from "../../action-dispatch/http/request.js";
+import { Base } from "../base.js";
 
 function makeResponse() {
   const response = new Response();
@@ -491,18 +492,49 @@ describe("ActionController::Live private helpers", () => {
     expect(liveThreadPoolExecutor()).toBe(liveThreadPoolExecutor());
   });
 
-  it("logError writes via the controller logger at fatal", () => {
+  it("a body read before the stream closes keeps the chunks it popped", () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    buf.write("b");
+    expect(() => buf.body).toThrow(ThreadError);
+    buf.close();
+    expect(buf.body).toBe("ab");
+  });
+
+  it("awaitBody waits for the stream to close", async () => {
+    const buf = new Buffer(makeResponse());
+    buf.write("a");
+    const body = buf.awaitBody();
+    buf.write("b");
+    buf.close();
+    expect(await body).toBe("ab");
+    expect(buf.body).toBe("ab");
+  });
+
+  it("logError writes the class, the annotated source and the joined backtrace to Base.logger", () => {
     const fatal = vi.fn();
-    logError.call({ logger: { fatal } }, new Error("oops"));
+    const oldLogger = Base.logger;
+    Base.logger = { fatal } as unknown as typeof Base.logger;
+    try {
+      const exception = Object.assign(new Error("oops"), { annotatedSourceCode: () => "source\n" });
+      logError.call(makeHost(), exception);
+    } finally {
+      Base.logger = oldLogger;
+    }
     expect(fatal).toHaveBeenCalledOnce();
-    const arg = fatal.mock.calls[0][0];
-    const rendered = typeof arg === "function" ? (arg as () => string)() : arg;
-    expect(rendered).toContain("Error");
-    expect(rendered).toContain("oops");
+    const rendered = (fatal.mock.calls[0][0] as () => string)();
+    expect(rendered).toMatch(/^\nError \(oops\):\nsource\n {2}at .*\n {2}at /);
+    expect(rendered.endsWith("\n\n")).toBe(true);
   });
 
   it("logError silently no-ops when no logger is configured", () => {
-    expect(() => logError.call({}, new Error("oops"))).not.toThrow();
+    const oldLogger = Base.logger;
+    Base.logger = null;
+    try {
+      expect(() => logError.call(makeHost(), new Error("oops"))).not.toThrow();
+    } finally {
+      Base.logger = oldLogger;
+    }
   });
 });
 

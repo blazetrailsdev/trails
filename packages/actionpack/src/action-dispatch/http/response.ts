@@ -74,6 +74,15 @@ export class ResponseBuffer<Buf extends { push(obj: unknown): unknown } = Array<
     return this._strBody;
   }
 
+  /** @noRailsEquivalent PERMANENT */
+  async awaitBody(): Promise<string> {
+    if (this._strBody !== null) return this._strBody;
+    let buf = "";
+    for await (const chunk of this) buf += String(chunk);
+    this._strBody = buf;
+    return this._strBody;
+  }
+
   write(string: string): void {
     if (this.isClosed) throw new IOError("closed stream");
 

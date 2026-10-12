@@ -1,4 +1,4 @@
-import { beforeEach, describe, it, vi } from "vitest";
+import { beforeEach, describe, it } from "vitest";
 import { MissingTemplate } from "@blazetrails/actionview";
 import {
   assert,
@@ -17,6 +17,8 @@ import {
 import { Digest } from "@blazetrails/activesupport/digest";
 import type { RackEnv, RackResponse } from "@blazetrails/rack";
 import {
+  Concurrent,
+  STDOUT,
   rbInspect,
   rbObjId,
   rbObjRespondTo,
@@ -24,9 +26,11 @@ import {
   StandardError,
   StringIO,
   Thread,
+  Timeout,
 } from "@blazetrails/ruby-compat";
 import "../../test-helpers/abstract-unit.js";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
+import type { RackBody } from "../../action-dispatch/http/response.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { IntegrationTest } from "../../action-dispatch/testing/integration.js";
 import { Base } from "../base.js";
@@ -175,7 +179,10 @@ describe("LiveStreamTest", () => {
       include(this, Live);
     }
 
+    declare latch: InstanceType<typeof Concurrent.CountDownLatch>;
     declare tc: LiveStreamTest;
+    declare logger: Logger;
+    declare errorLatch: InstanceType<typeof Concurrent.CountDownLatch>;
 
     override get response(): LiveTestResponse {
       return super.response as LiveTestResponse;
@@ -255,6 +262,15 @@ describe("LiveStreamTest", () => {
       });
     }
 
+    async blockingStream(): Promise<void> {
+      this.response.headers.set("Content-Type", "text/event-stream");
+      for (const word of ["hello", "world"]) {
+        this.response.stream.write(word);
+        await this.latch.wait();
+      }
+      this.response.stream.close();
+    }
+
     threadLocals(): void {
       assertEqual("aaron", Thread.current().get("setting"));
 
@@ -329,11 +345,45 @@ describe("LiveStreamTest", () => {
       );
     }
 
+    overfillBufferAndDie(): void {
+      const logger = Base.logger || new Logger(STDOUT);
+      this.response.stream.onError(() => {
+        logger.warn("Error while streaming.");
+        this.errorLatch.countDown();
+      });
+
+      for (let i = 0; i < 10; i++) {
+        this.response.stream.write(".");
+      }
+      this.response.stream.write(".");
+
+      this.latch.countDown();
+
+      this.response.stream.write("x");
+
+      for (let i = 0; i < 20; i++) {
+        this.response.stream.write(".");
+      }
+    }
+
     overfillDefaultBuffer(): void {
       for (const char of "abcdefghijklmnopqrstuvwxyz") {
         this.response.stream.write(char);
       }
       this.response.stream.close();
+    }
+
+    ignoreClientDisconnect(): void {
+      this.response.stream.ignoreDisconnect = true;
+
+      this.response.stream.write("");
+
+      for (let i = 0; i < 15; i++) {
+        this.response.stream.write("x");
+      }
+
+      this.logger.info("Work complete");
+      this.latch.countDown();
     }
   }
 
@@ -343,10 +393,6 @@ describe("LiveStreamTest", () => {
 
     static {
       this.tests(TestController);
-    }
-
-    waitForStreamClose(): Promise<boolean> {
-      return vi.waitUntil(() => this.response.stream.isClosed, { timeout: 10_000 });
     }
 
     async captureLogOutput(block: (output: StringIO) => Promise<void>): Promise<void> {
@@ -472,9 +518,87 @@ describe("LiveStreamTest", () => {
     // PERMANENT-SKIP: the action autoloads `::LoadMe` through a `Zeitwerk` loader while holding `ActiveSupport::Dependencies.interlock`; trails has no autoloader (packages/trailties/CLAUDE.md, "Trails has no autoloader (`Rails.autoloaders` / Zeitwerk)") and so no load interlock to deadlock against.
   });
 
+  it("async stream", async () => {
+    tc.controller.latch = new Concurrent.CountDownLatch();
+    const parts = ["hello", "world"];
+
+    await tc.get("blockingStream");
+
+    const t = new Thread(async () => {
+      const resp = tc.response;
+      await resp.awaitCommit();
+      for await (const part of resp.stream) {
+        assertEqual(parts.shift(), part);
+        const ol = tc.controller.latch;
+        tc.controller.latch = new Concurrent.CountDownLatch();
+        ol.countDown();
+      }
+    });
+
+    assert(await t.join(3), "timeout expired before the thread terminated");
+  });
+
   it("infinite test buffer", async () => {
     await tc.get("overfillDefaultBuffer");
     assertEqual("abcdefghijklmnopqrstuvwxyz", tc.response.stream.body);
+  });
+
+  // BLOCKED: live-buffer-write-does-not-wait-on-a-full-queue
+  it.skip("abort with full buffer", async () => {
+    const oldQueueSize = Buffer.queueSize;
+    Buffer.queueSize = 10;
+
+    tc.controller.latch = new Concurrent.CountDownLatch();
+    tc.controller.errorLatch = new Concurrent.CountDownLatch();
+
+    try {
+      await tc.captureLogOutput(async (output) => {
+        await tc.get("overfillBufferAndDie", { format: "plain" });
+
+        const t = new Thread(async () => {
+          const resp = tc.response;
+          await resp.awaitCommit();
+          const [, , body] = resp.toRack() as [number, unknown, RackBody];
+          for await (const _ of body) {
+            await tc.controller.latch.wait();
+            body.close();
+            break;
+          }
+        });
+
+        await t.join();
+        await tc.controller.errorLatch.wait();
+        output.rewind();
+        assertMatch("Error while streaming", output.read());
+      });
+    } finally {
+      Buffer.queueSize = oldQueueSize;
+    }
+  });
+
+  it("ignore client disconnect", async () => {
+    tc.controller.latch = new Concurrent.CountDownLatch();
+
+    await tc.captureLogOutput(async (output) => {
+      await tc.get("ignoreClientDisconnect");
+
+      const t = new Thread(async () => {
+        const resp = tc.response;
+        await resp.awaitCommit();
+        const [, , body] = resp.toRack() as [number, unknown, RackBody];
+        for await (const _ of body) {
+          body.close();
+          break;
+        }
+      });
+
+      await t.join();
+      await Timeout.timeout(3, null, null, async () => {
+        await tc.controller.latch.wait();
+      });
+      output.rewind();
+      assertMatch("Work complete", output.read());
+    });
   });
 
   it("thread locals get copied", async () => {
@@ -540,7 +664,7 @@ describe("LiveStreamTest", () => {
 
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInViewAfterCommit");
-      await tc.waitForStreamClose();
+      await tc.response.stream.awaitBody();
       assertMatch(/(window\.location = "\/500\.html"<\/script><\/html>)$/, tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
@@ -557,7 +681,7 @@ describe("LiveStreamTest", () => {
 
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInViewAfterCommit", { format: "json" });
-      await tc.waitForStreamClose();
+      await tc.response.stream.awaitBody();
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("Missing template test/doesntexist", output.read());
@@ -568,7 +692,7 @@ describe("LiveStreamTest", () => {
   it("exception callback when committed", async () => {
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionWithCallback", { format: "text/event-stream" });
-      await tc.waitForStreamClose();
+      await tc.response.stream.awaitBody();
 
       assertEqual('data: "500 Internal Server Error"\n\n', tc.response.body);
       output.rewind();
@@ -592,7 +716,7 @@ describe("LiveStreamTest", () => {
   it("exceptions raised handling exceptions and committed", async () => {
     await tc.captureLogOutput(async (output) => {
       await tc.get("exceptionInExceptionCallback", { format: "text/event-stream" });
-      await tc.waitForStreamClose();
+      await tc.response.stream.awaitBody();
       assertEqual("", tc.response.body);
       output.rewind();
       assertMatch("We need to go deeper", output.read());
