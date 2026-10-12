@@ -259,6 +259,15 @@ export const ASSERTION_RECEIPTS: Record<string, AssertionReceipt[]> = {
           "safe_buffer_test.rb:195 `assert_kind_of NilClass` — JS `null` is not an instance of any class, and nil is NilClass's only instance, so the check is `assert_nil`",
       },
     ],
+  "actioncontroller:controller/routing_test.rb › LegacyRouteSetTests › id encoding": [
+    {
+      kind: "assert_equal",
+      value: null,
+      as: null,
+      reason:
+        'controller/routing_test.rb:112 `assert_equal ::Encoding::UTF_8, hash["id"].encoding` — a JS string carries no encoding tag (CLAUDE.md, "A String has no encoding tag either")',
+    },
+  ],
   "actioncontroller:controller/parameter_encoding_test.rb › ParameterEncodingTest › properly transcodes parameters of the action specified by skip_parameter_encoding to ASCII_8BIT":
     [
       {

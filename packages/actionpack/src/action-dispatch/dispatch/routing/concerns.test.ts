@@ -98,6 +98,7 @@ describe("RoutingConcernsTest", () => {
     expect(urlHelpers().postReviewPath({ post_id: 1, id: 1 })).toBe("/posts/1/reviews/1");
   });
 
+  // BLOCKED: mapper-resources-hand-builds-canonical-routes
   it.skip("callable concerns accept options", async () => {
     await session.get("/posts/1/video/reviews/1");
     expect(String(session.response.status)).toBe("200");

@@ -1,28 +1,26 @@
+/* eslint-disable @typescript-eslint/no-unsafe-declaration-merging --
+   Ruby `include RoutingTestHelpers` / `include ActionDispatch::RoutingVerbs`; the class/interface
+   merge is how `include()` surfaces those members on the type side. */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 
-import { isPresent } from "@blazetrails/activesupport";
-import { bodyFromString, bodyToString } from "@blazetrails/rack";
-import type { Request } from "../../action-dispatch/http/request.js";
+import { ActiveSupportJSON, include, isPresent, type Included } from "@blazetrails/activesupport";
+import { bodyFromString } from "@blazetrails/rack";
+import { URI, type Module } from "@blazetrails/ruby-compat";
+import type { Base } from "../base.js";
+import { deprecator } from "../../action-dispatch/deprecator.js";
+import { Request } from "../../action-dispatch/http/request.js";
 import { RouteSet } from "../../action-dispatch/routing/route-set.js";
 import { RoutingError, UrlGenerationError } from "../metal/exceptions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { controllerConstants } from "../../action-dispatch/http/request.js";
 import type { DispatchableControllerClass } from "../../action-dispatch/routing/dispatcher.js";
+import { RoutingTestHelpers, RoutingVerbs } from "../../test-helpers/abstract-unit.js";
+import "../../test-helpers/lib/controller/fake-controllers.js";
 
 class StubController {}
 
 beforeAll(() => {
-  for (const name of [
-    "content",
-    "subpath_books",
-    "admin/accounts",
-    "admin/users",
-    "user",
-    "pages",
-    "not_a",
-  ]) {
-    controllerConstants.set(name, StubController as unknown as DispatchableControllerClass);
-  }
+  controllerConstants.set("not_a", StubController as unknown as DispatchableControllerClass);
 });
 
 function urlFor(rs: RouteSet, options: Record<string, unknown>): string {
@@ -30,71 +28,70 @@ function urlFor(rs: RouteSet, options: Record<string, unknown>): string {
   return rs.generateExtras(opts)[0];
 }
 
-async function rackGet(rs: RouteSet, urlStr: string): Promise<string> {
-  const url = new URL(urlStr);
-  const env = {
-    REQUEST_METHOD: "GET",
-    PATH_INFO: url.pathname,
-    HTTP_HOST: url.host,
-    "rack.url_scheme": "http",
-    "action_dispatch.request.path_parameters": {} as Record<string, unknown>,
-  };
-  const [status, , body] = await rs.call(env as any);
-  if (status === 404) return "Not Found";
-  return bodyToString(body);
+type NamedRoutes = Record<string, (...args: unknown[]) => string>;
+
+class UriReservedCharactersRoutingTest {
+  set!: RouteSet;
+  segment!: string;
+  escaped!: string;
+  controller: Base | null = null;
 }
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- `include RoutingTestHelpers` (`routing_test.rb:15`) is the only module mixed in.
+interface UriReservedCharactersRoutingTest extends Included<typeof RoutingTestHelpers> {}
+include(UriReservedCharactersRoutingTest, RoutingTestHelpers);
 
 describe("UriReservedCharactersRoutingTest", () => {
-  let rs: RouteSet;
-  let segment: string;
-  let escaped: string;
+  let tc: UriReservedCharactersRoutingTest;
 
   beforeEach(() => {
-    rs = new RouteSet();
-    rs.draw(function () {
-      this.get(":controller/:action/:variable/*additional", {});
+    tc = new UriReservedCharactersRoutingTest();
+    tc.set = new RouteSet();
+    tc.set.draw(function () {
+      deprecator().silence(() => {
+        this.get(":controller/:action/:variable/*additional");
+      });
     });
 
-    const safe = [":", "@", "&", "=", "+", "$", ",", ";"];
-    const unsafe = ["^", "?", "#", "[", "]"];
-    const hex = unsafe.map(
-      (char) => "%" + char.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0"),
-    );
+    const [safe, unsafe] = [
+      [":", "@", "&", "=", "+", "$", ",", ";"],
+      ["^", "?", "#", "[", "]"],
+    ];
+    const hex = unsafe.map((char) => "%" + char.charCodeAt(0).toString(16).toUpperCase());
 
-    segment = safe.join("") + unsafe.join("");
-    escaped = safe.join("") + hex.join("");
+    tc.segment = `${safe.join("")}${unsafe.join("")}`;
+    tc.escaped = `${safe.join("")}${hex.join("")}`;
   });
 
-  it.skip("route generation escapes unsafe path characters", () => {
+  it("route generation escapes unsafe path characters", () => {
     expect(
-      urlFor(rs, {
+      tc.urlFor(tc.set, {
         controller: "content",
-        action: `act${segment}ion`,
-        variable: `var${segment}iable`,
-        additional: [`add${segment}itional-1`, `add${segment}itional-2`],
+        action: `act${tc.segment}ion`,
+        variable: `var${tc.segment}iable`,
+        additional: [`add${tc.segment}itional-1`, `add${tc.segment}itional-2`],
       }),
     ).toBe(
-      `/content/act${escaped}ion/var${escaped}iable/add${escaped}itional-1/add${escaped}itional-2`,
+      `/content/act${tc.escaped}ion/var${tc.escaped}iable/add${tc.escaped}itional-1/add${tc.escaped}itional-2`,
     );
   });
 
   it("route recognition unescapes path components", () => {
     const options = {
       controller: "content",
-      action: `act${segment}ion`,
-      variable: `var${segment}iable`,
-      additional: `add${segment}itional-1/add${segment}itional-2`,
+      action: `act${tc.segment}ion`,
+      variable: `var${tc.segment}iable`,
+      additional: `add${tc.segment}itional-1/add${tc.segment}itional-2`,
     };
     expect(
-      rs.recognizePath(
-        `/content/act${escaped}ion/var${escaped}iable/add${escaped}itional-1/add${escaped}itional-2`,
+      tc.set.recognizePath(
+        `/content/act${tc.escaped}ion/var${tc.escaped}iable/add${tc.escaped}itional-1/add${tc.escaped}itional-2`,
       ),
-    ).toMatchObject(options);
+    ).toEqual(options);
   });
 
-  it.skip("route generation allows passing non string values to generated helper", () => {
+  it("route generation allows passing non string values to generated helper", () => {
     expect(
-      urlFor(rs, {
+      tc.urlFor(tc.set, {
         controller: "content",
         action: "action",
         variable: "variable",
@@ -104,38 +101,96 @@ describe("UriReservedCharactersRoutingTest", () => {
   });
 });
 
+class MockController {
+  static build(helpers: Module, additionalOptions: Record<string, unknown> = {}) {
+    const klass = class {
+      urlOptions(): Record<string, unknown> {
+        const options = helpers.superMethod(this, "urlOptions")!() as Record<string, unknown>;
+        options.protocol ||= "http";
+        options.host ||= "test.host";
+        return { ...options, ...additionalOptions };
+      }
+    };
+    include(klass, helpers);
+    return klass;
+  }
+}
+
+class LegacyRouteSetTests {
+  rs!: RouteSet;
+  controller: Base | null = null;
+  response: unknown;
+
+  get routes(): RouteSet {
+    return this.rs;
+  }
+
+  setupForNamedRoute(options: Record<string, unknown> = {}): NamedRoutes {
+    return new (MockController.build(this.rs.urlHelpers(), options))() as unknown as NamedRoutes;
+  }
+}
+interface LegacyRouteSetTests
+  extends Included<typeof RoutingTestHelpers>, Included<typeof RoutingVerbs> {}
+include(LegacyRouteSetTests, RoutingTestHelpers);
+include(LegacyRouteSetTests, RoutingVerbs);
+
 describe("LegacyRouteSetTests", () => {
+  let tc: LegacyRouteSetTests;
   let rs: RouteSet;
 
   beforeEach(() => {
-    rs = new RouteSet();
+    tc = new LegacyRouteSetTests();
+    tc.rs = tc.makeSet();
+    tc.response = null;
+    rs = tc.rs;
   });
 
   it("symbols with dashes", async () => {
     rs.draw(function () {
       this.get("/:artist/:song-omg", {
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
+          return [200, {}, bodyFromString(resp)];
         },
       });
     });
 
-    const hash = JSON.parse(await rackGet(rs, "http://example.org/journey/faithfully-omg"));
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/faithfully-omg")),
+    );
     expect(hash).toEqual({ artist: "journey", song: "faithfully" });
+  });
+
+  it("id encoding", async () => {
+    rs.draw(function () {
+      this.get("/journey/:id", {
+        to: (env: any) => {
+          const param = new Request(env).pathParameters;
+          const resp = ActiveSupportJSON.encode(param);
+          return [200, {}, bodyFromString(resp)];
+        },
+      });
+    });
+
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/%E5%A4%AA%E9%83%8E")),
+    );
+    expect(hash).toEqual({ id: "太郎" });
   });
 
   it("id with dash", async () => {
     rs.draw(function () {
       this.get("/journey/:id", {
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
+          return [200, {}, bodyFromString(resp)];
         },
       });
     });
 
-    const hash = JSON.parse(await rackGet(rs, "http://example.org/journey/faithfully-omg"));
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/faithfully-omg")),
+    );
     expect(hash).toEqual({ id: "faithfully-omg" });
   });
 
@@ -143,29 +198,33 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/:artist/:song-omg", {
         constraints: { song: /\d+/ },
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
+          return [200, {}, bodyFromString(resp)];
         },
       });
     });
 
-    const hash = JSON.parse(await rackGet(rs, "http://example.org/journey/123-omg"));
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/123-omg")),
+    );
     expect(hash).toEqual({ artist: "journey", song: "123" });
-    expect(await rackGet(rs, "http://example.org/journey/faithfully-omg")).toBe("Not Found");
+    expect(await tc.get(URI.parse("http://example.org/journey/faithfully-omg"))).toBe("Not Found");
   });
 
   it("pre dash", async () => {
     rs.draw(function () {
       this.get("/:artist/omg-:song", {
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
+          return [200, {}, bodyFromString(resp)];
         },
       });
     });
 
-    const hash = JSON.parse(await rackGet(rs, "http://example.org/journey/omg-faithfully"));
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/omg-faithfully")),
+    );
     expect(hash).toEqual({ artist: "journey", song: "faithfully" });
   });
 
@@ -173,228 +232,441 @@ describe("LegacyRouteSetTests", () => {
     rs.draw(function () {
       this.get("/:artist/omg-:song", {
         constraints: { song: /\d+/ },
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const resp = ActiveSupportJSON.encode(new Request(env).pathParameters);
+          return [200, {}, bodyFromString(resp)];
         },
       });
     });
 
-    const hash = JSON.parse(await rackGet(rs, "http://example.org/journey/omg-123"));
+    const hash = ActiveSupportJSON.decode(
+      await tc.get(URI.parse("http://example.org/journey/omg-123")),
+    );
     expect(hash).toEqual({ artist: "journey", song: "123" });
-    expect(await rackGet(rs, "http://example.org/journey/omg-faithfully")).toBe("Not Found");
+    expect(await tc.get(URI.parse("http://example.org/journey/omg-faithfully"))).toBe("Not Found");
   });
 
   it("star paths are greedy", async () => {
     rs.draw(function () {
       this.get("/*path", {
-        format: false,
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(params["path"])];
+        to: (env: any) => {
+          const x = env["action_dispatch.request.path_parameters"]["path"];
+          return [200, {}, bodyFromString(x)];
         },
+        format: false,
       });
     });
 
-    const url = new URL("http://example.org/foo/bar.html");
-    expect(await rackGet(rs, url.toString())).toBe(url.pathname.replace(/^\//, ""));
+    const u = URI.parse("http://example.org/foo/bar.html");
+    expect(await tc.get(u)).toBe(u.path!.replace(/^\//, ""));
   });
 
-  it.skip("star paths are greedy but not too much", async () => {
+  it("star paths are greedy but not too much", async () => {
     rs.draw(function () {
       this.get("/*path", {
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"];
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const x = ActiveSupportJSON.encode(env["action_dispatch.request.path_parameters"]);
+          return [200, {}, bodyFromString(x)];
         },
       });
     });
 
     const expected = { path: "foo/bar", format: "html" };
-    const result = JSON.parse(await rackGet(rs, "http://example.org/foo/bar.html"));
-    expect(result).toEqual(expected);
+    const u = URI.parse("http://example.org/foo/bar.html");
+    expect(ActiveSupportJSON.decode(await tc.get(u))).toEqual(expected);
   });
 
   it("optional star paths are greedy", async () => {
     rs.draw(function () {
       this.get("/(*filters)", {
-        format: false,
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"] as Record<string, string>;
-          return [200, {}, bodyFromString(params["filters"])];
+        to: (env: any) => {
+          const x = env["action_dispatch.request.path_parameters"]["filters"];
+          return [200, {}, bodyFromString(x)];
         },
+        format: false,
       });
     });
 
-    const url = new URL("http://example.org/ne_27.065938,-80.6092/sw_25.489856,-82.542794");
-    expect(await rackGet(rs, url.toString())).toBe(url.pathname.replace(/^\//, ""));
+    const u = URI.parse("http://example.org/ne_27.065938,-80.6092/sw_25.489856,-82.542794");
+    expect(await tc.get(u)).toBe(u.path!.replace(/^\//, ""));
   });
 
-  it.skip("optional star paths are greedy but not too much", async () => {
+  it("optional star paths are greedy but not too much", async () => {
     rs.draw(function () {
       this.get("/(*filters)", {
-        to: async (env: any) => {
-          const params = env["action_dispatch.request.path_parameters"];
-          return [200, {}, bodyFromString(JSON.stringify(params))];
+        to: (env: any) => {
+          const x = ActiveSupportJSON.encode(env["action_dispatch.request.path_parameters"]);
+          return [200, {}, bodyFromString(x)];
         },
       });
     });
 
-    const expected = {
-      filters: "ne_27.065938,-80.6092/sw_25.489856,-82",
-      format: "542794",
-    };
-    const result = JSON.parse(
-      await rackGet(rs, "http://example.org/ne_27.065938,-80.6092/sw_25.489856,-82.542794"),
-    );
-    expect(result).toEqual(expected);
+    const expected = { filters: "ne_27.065938,-80.6092/sw_25.489856,-82", format: "542794" };
+    const u = URI.parse("http://example.org/ne_27.065938,-80.6092/sw_25.489856,-82.542794");
+    expect(ActiveSupportJSON.decode(await tc.get(u))).toEqual(expected);
   });
 
   it("regexp precedence", async () => {
     rs.draw(function () {
       this.get("/whois/:domain", {
         constraints: { domain: /\w+\.[\w.]+/ },
-        to: async (_env: any) => [200, {}, bodyFromString("regexp")],
+        to: (_env: any) => [200, {}, bodyFromString("regexp")],
       });
-      this.get("/whois/:id", {
-        to: async (_env: any) => [200, {}, bodyFromString("id")],
+
+      this.get("/whois/:id", { to: (_env: any) => [200, {}, bodyFromString("id")] });
+    });
+
+    expect(await tc.get(URI.parse("http://example.org/whois/example.org"))).toBe("regexp");
+    expect(await tc.get(URI.parse("http://example.org/whois/123"))).toBe("id");
+  });
+
+  it("class and lambda constraints", async () => {
+    const subdomain = class {
+      matches(request: Request): boolean {
+        return isPresent(request.subdomain()) && request.subdomain() !== "clients";
+      }
+    };
+
+    rs.draw(function () {
+      this.get("/", {
+        constraints: new subdomain(),
+        to: (_env: any) => [200, {}, bodyFromString("default")],
+      });
+      this.get("/", {
+        constraints: { subdomain: "clients" },
+        to: (_env: any) => [200, {}, bodyFromString("clients")],
       });
     });
 
-    expect(await rackGet(rs, "http://example.org/whois/example.org")).toBe("regexp");
-    expect(await rackGet(rs, "http://example.org/whois/123")).toBe("id");
+    expect(await tc.get(URI.parse("http://www.example.org/"))).toBe("default");
+    expect(await tc.get(URI.parse("http://clients.example.org/"))).toBe("clients");
   });
 
-  it.skip("format symbol constraints", async () => {
+  it("format symbol constraints", async () => {
     rs.draw(function () {
       this.get("/api", {
         constraints: { format: "json" },
-        to: async (_env: any) => [200, {}, bodyFromString("json")],
+        to: (_env: any) => [200, {}, bodyFromString("json")],
       });
       this.get("/api", {
         constraints: { format: "xml" },
-        to: async (_env: any) => [200, {}, bodyFromString("xml")],
+        to: (_env: any) => [200, {}, bodyFromString("xml")],
       });
     });
 
-    expect(await rackGet(rs, "http://www.example.org/api.json")).toBe("json");
-    expect(await rackGet(rs, "http://clients.example.org/api.xml")).toBe("xml");
+    expect(await tc.get(URI.parse("http://www.example.org/api.json"))).toBe("json");
+    expect(await tc.get(URI.parse("http://clients.example.org/api.xml"))).toBe("xml");
+  });
+
+  it("lambda constraints", async () => {
+    rs.draw(function () {
+      this.get("/", {
+        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() !== "clients",
+        to: (_env: any) => [200, {}, bodyFromString("default")],
+      });
+
+      this.get("/", {
+        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() === "clients",
+        to: (_env: any) => [200, {}, bodyFromString("clients")],
+      });
+    });
+
+    expect(await tc.get(URI.parse("http://www.example.org/"))).toBe("default");
+    expect(await tc.get(URI.parse("http://clients.example.org/"))).toBe("clients");
+  });
+
+  it("scoped lambda", async () => {
+    let scopeCalled = false;
+    rs.draw(function () {
+      this.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
+        this.get("/", { to: (_env: any) => [200, {}, bodyFromString("default")] });
+      });
+    });
+
+    expect(await tc.get(URI.parse("http://www.example.org/foo/"))).toBe("default");
+    expect(scopeCalled, "scope constraint should be called").toBeTruthy();
+  });
+
+  it("scoped lambda with get lambda", async () => {
+    let innerCalled = false;
+
+    rs.draw(function () {
+      this.scope(
+        "/foo",
+        { constraints: (_req: Request) => expect.fail("should not be called") },
+        () => {
+          this.get("/", {
+            constraints: (_req: Request) => (innerCalled = true),
+            to: (_env: any) => [200, {}, bodyFromString("default")],
+          });
+        },
+      );
+    });
+
+    expect(await tc.get(URI.parse("http://www.example.org/foo/"))).toBe("default");
+    expect(innerCalled, "inner constraint should be called").toBeTruthy();
   });
 
   it("empty string match", async () => {
     rs.draw(function () {
       this.get("/:username", {
         constraints: { username: /[^/]+/ },
-        to: async (_env: any) => [200, {}, bodyFromString("foo")],
+        to: (_e: any) => [200, {}, bodyFromString("foo")],
       });
     });
-
-    expect(await rackGet(rs, "http://example.org/")).toBe("Not Found");
-    expect(await rackGet(rs, "http://example.org/hello")).toBe("foo");
+    expect(await tc.get(URI.parse("http://example.org/"))).toBe("Not Found");
+    expect(await tc.get(URI.parse("http://example.org/hello"))).toBe("foo");
   });
 
-  it.skip("non greedy glob regexp", async () => {
-    let capturedParams: Record<string, unknown> = {};
+  it("non greedy glob regexp", async () => {
+    let params: unknown = null;
     rs.draw(function () {
       this.get("/posts/:id(/*filters)", {
         constraints: { filters: /.+?/ },
-        to: async (env: any) => {
-          capturedParams = env["action_dispatch.request.path_parameters"];
+        to: (e: any) => {
+          params = e["action_dispatch.request.path_parameters"];
           return [200, {}, bodyFromString("foo")];
         },
       });
     });
-
-    expect(await rackGet(rs, "http://example.org/posts/1/foo.js")).toBe("foo");
-    expect(capturedParams).toMatchObject({ id: "1", filters: "foo", format: "js" });
+    expect(await tc.get(URI.parse("http://example.org/posts/1/foo.js"))).toBe("foo");
+    expect(params).toEqual({ id: "1", filters: "foo", format: "js" });
   });
 
   it("specific controller action failure", () => {
     rs.draw(function () {
-      this.mount(async (_env: any) => [200, {}, bodyFromString("")], { at: "/foo" });
+      this.mount(new Map<unknown, unknown>([[() => {}, "/foo"]]));
     });
 
-    expect(() => urlFor(rs, { controller: "omg", action: "lol" })).toThrow(UrlGenerationError);
+    expect(() => tc.urlFor(rs, { controller: "omg", action: "lol" })).toThrow(UrlGenerationError);
+  });
+
+  it("default setup", async () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get("/:controller(/:action(/:id))");
+      });
+    });
+    expect(rs.recognizePath("/content")).toEqual({ controller: "content", action: "index" });
+    expect(rs.recognizePath("/content/list")).toEqual({ controller: "content", action: "list" });
+    expect(rs.recognizePath("/content/show/10")).toEqual({
+      controller: "content",
+      action: "show",
+      id: "10",
+    });
+
+    expect(rs.recognizePath("/admin/user/show/10")).toEqual({
+      controller: "admin/user",
+      action: "show",
+      id: "10",
+    });
+
+    expect(tc.urlFor(rs, { controller: "admin/user", action: "show", id: 10 })).toBe(
+      "/admin/user/show/10",
+    );
+
+    await tc.get(URI.parse("http://test.host/admin/user/list/10"));
+
+    expect(tc.controller!.request.pathParameters).toEqual({
+      controller: "admin/user",
+      action: "list",
+      id: "10",
+    });
+
+    expect(tc.controller!.urlFor({ action: "show", onlyPath: true })).toBe("/admin/user/show");
+    expect(tc.controller!.urlFor({ onlyPath: true })).toBe("/admin/user/list/10");
+
+    expect(tc.controller!.urlFor({ controller: "stuff", onlyPath: true })).toBe("/admin/stuff");
+    expect(tc.controller!.urlFor({ controller: "/stuff", onlyPath: true })).toBe("/stuff");
+  });
+
+  it("route uri pattern", async () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get("/:controller(/:action(/:id))");
+      });
+    });
+
+    await tc.get(URI.parse("http://test.host/admin/user/list/10"));
+
+    expect(tc.controller!.request.routeUriPattern).toBe("/:controller(/:action(/:id))(.:format)");
+
+    expect(tc.controller!.request.getHeader("action_dispatch.route_uri_pattern")).toBe(
+      "/:controller(/:action(/:id))(.:format)",
+    );
   });
 
   it("route with colon first", () => {
     rs.draw(function () {
-      this.get("/:controller/:action/:id", { defaults: { action: "index" } } as any);
-      this.get(":url", { to: "content#translate" });
+      deprecator().silence(() => {
+        this.get("/:controller/:action/:id", { action: "index", id: null });
+      });
+
+      this.get(":url", { controller: "content", action: "translate" });
     });
 
-    expect(rs.recognizePath("/example")).toMatchObject({
+    expect(rs.recognizePath("/example")).toEqual({
       controller: "content",
       action: "translate",
       url: "example",
     });
   });
 
-  it.skip("route with regexp for action", () => {
+  it("route with regexp for action", () => {
     rs.draw(function () {
-      this.get("/:controller/:action", { action: /auth[-|_].+/ } as any);
+      deprecator().silence(() => {
+        this.get("/:controller/:action", { action: /auth[-|_].+/ });
+      });
     });
 
-    expect(rs.recognizePath("/content/auth_google")).toMatchObject({
+    expect(rs.recognizePath("/content/auth_google")).toEqual({
       action: "auth_google",
       controller: "content",
     });
-    expect(rs.recognizePath("/content/auth-twitter")).toMatchObject({
+    expect(rs.recognizePath("/content/auth-twitter")).toEqual({
       action: "auth-twitter",
       controller: "content",
     });
 
-    expect(urlFor(rs, { controller: "content", action: "auth_google" })).toBe(
+    expect(tc.urlFor(rs, { controller: "content", action: "auth_google" })).toBe(
       "/content/auth_google",
     );
-    expect(urlFor(rs, { controller: "content", action: "auth-twitter" })).toBe(
+    expect(tc.urlFor(rs, { controller: "content", action: "auth-twitter" })).toBe(
       "/content/auth-twitter",
     );
   });
 
-  it.skip("route with regexp and captures for controller", () => {
+  it("route with regexp for controller", () => {
     rs.draw(function () {
-      this.get("/:controller(/:action(/:id))", { controller: /admin\/(accounts|users)/ } as any);
+      deprecator().silence(() => {
+        this.get(":controller/:admintoken(/:action(/:id))", { controller: /admin\/.+/ });
+        this.get("/:controller(/:action(/:id))");
+      });
     });
 
-    expect(rs.recognizePath("/admin/accounts")).toMatchObject({
+    expect(rs.recognizePath("/admin/user/foo")).toEqual({
+      controller: "admin/user",
+      admintoken: "foo",
+      action: "index",
+    });
+    expect(rs.recognizePath("/content/foo")).toEqual({ controller: "content", action: "foo" });
+
+    expect(tc.urlFor(rs, { controller: "admin/user", admintoken: "foo", action: "index" })).toBe(
+      "/admin/user/foo",
+    );
+    expect(tc.urlFor(rs, { controller: "content", action: "foo" })).toBe("/content/foo");
+  });
+
+  it("route with regexp and captures for controller", () => {
+    rs.draw(function () {
+      deprecator().silence(() => {
+        this.get("/:controller(/:action(/:id))", { controller: /admin\/(accounts|users)/ });
+      });
+    });
+    expect(rs.recognizePath("/admin/accounts")).toEqual({
       controller: "admin/accounts",
       action: "index",
     });
-    expect(rs.recognizePath("/admin/users")).toMatchObject({
+    expect(rs.recognizePath("/admin/users")).toEqual({
       controller: "admin/users",
       action: "index",
     });
     expect(() => rs.recognizePath("/admin/products")).toThrow(RoutingError);
   });
 
-  it.skip("route with regexp and dot", () => {
+  it("route with regexp and dot", () => {
     rs.draw(function () {
-      this.get(":controller/:action/:file", {
-        controller: /admin|user/,
-        action: /upload|download/,
-        defaults: { file: undefined },
-        constraints: { file: /[^/]+(\.[^/]+)?/ },
-      } as any);
+      deprecator().silence(() => {
+        this.get(":controller/:action/:file", {
+          controller: /admin|user/,
+          action: /upload|download/,
+          defaults: { file: null },
+          constraints: { file: /[^/]+(\.[^/]+)?/ },
+        });
+      });
     });
-
-    expect(urlFor(rs, { controller: "user", action: "download", file: "file" })).toBe(
+    expect(tc.urlFor(rs, { controller: "user", action: "download", file: "file" })).toBe(
       "/user/download/file",
     );
-    expect(rs.recognizePath("/user/download/file")).toMatchObject({
+
+    expect(rs.recognizePath("/user/download/file")).toEqual({
       controller: "user",
       action: "download",
       file: "file",
     });
 
-    expect(urlFor(rs, { controller: "user", action: "download", file: "file.jpg" })).toBe(
+    expect(tc.urlFor(rs, { controller: "user", action: "download", file: "file.jpg" })).toBe(
       "/user/download/file.jpg",
     );
-    expect(rs.recognizePath("/user/download/file.jpg")).toMatchObject({
+
+    expect(rs.recognizePath("/user/download/file.jpg")).toEqual({
       controller: "user",
       action: "download",
       file: "file.jpg",
     });
+  });
+
+  it("basic named route", () => {
+    rs.draw(function () {
+      this.root({ to: "content#list", as: "home" });
+    });
+    expect(tc.setupForNamedRoute().homeUrl()).toBe("http://test.host/");
+  });
+
+  it("named route with option", () => {
+    rs.draw(function () {
+      this.get({ "page/:title": "content#show_page", as: "page" });
+    });
+
+    expect(tc.setupForNamedRoute().pageUrl({ title: "new stuff" })).toBe(
+      "http://test.host/page/new%20stuff",
+    );
+  });
+
+  it("named route with default", () => {
+    rs.draw(function () {
+      this.get({ "page/:title": "content#show_page", title: "AboutPage", as: "page" });
+    });
+
+    expect(tc.setupForNamedRoute().pageUrl({ title: "AboutRails" })).toBe(
+      "http://test.host/page/AboutRails",
+    );
+  });
+
+  it("named route with path prefix", () => {
+    rs.draw(function () {
+      this.scope("my", () => {
+        this.get({ page: "content#show_page", as: "page" });
+      });
+    });
+
+    expect(tc.setupForNamedRoute().pageUrl()).toBe("http://test.host/my/page");
+  });
+
+  it("named route with blank path prefix", () => {
+    rs.draw(function () {
+      this.scope("", () => {
+        this.get({ page: "content#show_page", as: "page" });
+      });
+    });
+
+    expect(tc.setupForNamedRoute().pageUrl()).toBe("http://test.host/page");
+  });
+
+  it("named route with nested controller", () => {
+    rs.draw(function () {
+      this.get({ "admin/user": "admin/user#index", as: "users" });
+    });
+
+    expect(tc.setupForNamedRoute().usersUrl()).toBe("http://test.host/admin/user");
+  });
+
+  it("optimised named route with host", () => {
+    rs.draw(function () {
+      this.get({ page: "content#show_page", as: "pages", host: "foo.com" });
+    });
+    const routes = tc.setupForNamedRoute();
+    expect(routes.pagesUrl()).toBe("http://foo.com/page");
   });
 
   it("paths escaped", () => {
@@ -499,20 +771,6 @@ describe("LegacyRouteSetTests", () => {
     expect(() => urlFor(rs, { controller: "post", action: "show" })).toThrow(UrlGenerationError);
   });
 
-  it.skip("basic named route", () => {});
-
-  it.skip("named route with option", () => {});
-
-  it.skip("named route with default", () => {});
-
-  it.skip("named route with path prefix", () => {});
-
-  it.skip("named route with blank path prefix", () => {});
-
-  it.skip("named route with nested controller", () => {});
-
-  it.skip("optimised named route with host", () => {});
-
   it.skip("named route without hash", () => {});
 
   it.skip("named route root", () => {});
@@ -527,85 +785,6 @@ describe("LegacyRouteSetTests", () => {
 
   it.skip("named route with regexps", () => {});
 
-  it("class and lambda constraints", async () => {
-    const subdomain = class {
-      matches(request: Request): boolean {
-        return isPresent(request.subdomain()) && request.subdomain() !== "clients";
-      }
-    };
-
-    rs.draw(function () {
-      this.get("/", {
-        constraints: new subdomain(),
-        to: async () => [200, {}, bodyFromString("default")],
-      });
-      this.get("/", {
-        constraints: { subdomain: "clients" },
-        to: async () => [200, {}, bodyFromString("clients")],
-      });
-    });
-
-    expect(await rackGet(rs, "http://www.example.org/")).toBe("default");
-    expect(await rackGet(rs, "http://clients.example.org/")).toBe("clients");
-  });
-
-  it("lambda constraints", async () => {
-    rs.draw(function () {
-      this.get("/", {
-        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() !== "clients",
-        to: async () => [200, {}, bodyFromString("default")],
-      });
-
-      this.get("/", {
-        constraints: (req: Request) => isPresent(req.subdomain()) && req.subdomain() === "clients",
-        to: async () => [200, {}, bodyFromString("clients")],
-      });
-    });
-
-    expect(await rackGet(rs, "http://www.example.org/")).toBe("default");
-    expect(await rackGet(rs, "http://clients.example.org/")).toBe("clients");
-  });
-
-  it("scoped lambda", async () => {
-    let scopeCalled = false;
-    rs.draw(function () {
-      this.scope("/foo", { constraints: (_req: Request) => (scopeCalled = true) }, () => {
-        this.get("/", { to: async () => [200, {}, bodyFromString("default")] });
-      });
-    });
-
-    expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
-    expect(scopeCalled).toBeTruthy();
-  });
-
-  it("scoped lambda with get lambda", async () => {
-    let innerCalled = false;
-
-    rs.draw(function () {
-      this.scope(
-        "/foo",
-        {
-          constraints: (_req: Request) => {
-            throw new Error("should not be called");
-          },
-        },
-        () => {
-          this.get("/", {
-            constraints: (_req: Request) => (innerCalled = true),
-            to: async () => [200, {}, bodyFromString("default")],
-          });
-        },
-      );
-    });
-
-    expect(await rackGet(rs, "http://www.example.org/foo/")).toBe("default");
-    expect(innerCalled).toBeTruthy();
-  });
-
-  it.skip("default setup", () => {});
-
-  it.skip("route uri pattern", () => {});
-
   it.skip("changing controller", () => {});
 
   it.skip("dynamic recall paths allowed", () => {});
@@ -615,8 +794,6 @@ describe("LegacyRouteSetTests", () => {
   it.skip("route with text default", () => {});
 
   it.skip("action expiry", () => {});
-
-  it.skip("id encoding", () => {});
 
   it.skip("set to nil forgets", () => {});
 });

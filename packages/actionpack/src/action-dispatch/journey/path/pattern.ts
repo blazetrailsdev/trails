@@ -4,16 +4,18 @@ import { Cat, Group } from "../nodes/node.js";
 import type { Dot, Literal, Node, Or, Slash, Star } from "../nodes/node.js";
 import { FormatBuilder, Format, Visitor } from "../visitors.js";
 
-type Matchers = Record<string, RegExp | RegExp[]>;
+type Requirement = RegExp | string;
+type Matchers = Record<string, Requirement | Requirement[]>;
 
 function escapeCharClass(s: string): string {
   return s.replace(/[\]\\^-]/g, "\\$&");
 }
 
-function regexUnion(re: RegExp | RegExp[]): string {
+function regexUnion(re: Requirement | Requirement[]): string {
   const arr = Array.isArray(re) ? re : [re];
   return arr
     .map((r) => {
+      if (typeof r === "string") return regexpEscape(r);
       let scoped = "";
       if (r.flags.includes("i")) scoped += "i";
       if (r.flags.includes("s")) scoped += "s";
@@ -23,14 +25,14 @@ function regexUnion(re: RegExp | RegExp[]): string {
 }
 
 function combinedFlagsFor(
-  values: ReadonlyArray<RegExp | RegExp[]>,
+  values: ReadonlyArray<Requirement | Requirement[]>,
   opts: { outer?: boolean } = {},
 ): string {
   const outer = opts.outer ?? true;
   const seen = new Set<string>();
   for (const v of values) {
     const arr = Array.isArray(v) ? v : [v];
-    for (const r of arr) for (const f of r.flags) seen.add(f);
+    for (const r of arr) if (typeof r !== "string") for (const f of r.flags) seen.add(f);
   }
   const out: string[] = [];
   for (const f of "d") if (seen.has(f)) out.push(f);
@@ -40,11 +42,8 @@ function combinedFlagsFor(
   return out.join("");
 }
 
-function combinedFlagsUsed(
-  matchers: Record<string, RegExp | RegExp[]>,
-  names: readonly string[],
-): string {
-  const values: Array<RegExp | RegExp[]> = [];
+function combinedFlagsUsed(matchers: Matchers, names: readonly string[]): string {
+  const values: Array<Requirement | Requirement[]> = [];
   for (const n of names) if (Object.hasOwn(matchers, n)) values.push(matchers[n]);
   return combinedFlagsFor(values);
 }
