@@ -173,12 +173,12 @@ export function renderer(this: RenderingClassHost): Renderer {
 
 /** @internal */
 export function setupRendererBang(this: RenderingClassHost): void {
-  this._renderer = Renderer.for(this);
+  this._renderer = Renderer.for(this as never);
 }
 
 export const ClassMethods: Module = new Module((mod) => {
   mod.defineMethod("render", function (this: RenderingClassHost, ...args: unknown[]) {
-    return this.renderer.render(...(args as [Record<string, unknown>?]));
+    return this.renderer.render(...args);
   });
 
   mod.moduleEval((m) => {

@@ -6,7 +6,7 @@ export interface NamedRoutesLike {
 
 export interface RouteSetLike {
   namedRoutes: NamedRoutesLike;
-  defaultEnv?: Record<string, unknown>;
+  defaultEnv?(): Record<string, unknown>;
 }
 
 export interface UrlForClassMethods {
