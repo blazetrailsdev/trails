@@ -39,8 +39,7 @@ describe("ChunkedTest", () => {
       headers: { "Transfer-Encoding": "gzip, chunked;foo=bar" },
     });
 
-    const parsedBody = t.response.parsedBody as Record<string, unknown>;
-    assertEqual(7, parsedBody["content_length"]);
-    assertEqual("foo=bar", parsedBody["raw_post"]);
+    assertEqual(7, (t.response.parsedBody as Record<string, unknown>)["content_length"]);
+    assertEqual("foo=bar", (t.response.parsedBody as Record<string, unknown>)["raw_post"]);
   });
 });
