@@ -8,6 +8,7 @@ import { SQLiteDatabaseTasks } from "./sqlite-database-tasks.js";
 
 const tasks = new SQLiteDatabaseTasks(
   new HashConfig("development", "primary", { adapter: "sqlite3", database: ":memory:" }),
+  "/rails/root",
 ) as unknown as { runCmd(cmd: string, args: string[], out: string): Promise<void> };
 const runCmd = (cmd: string, args: string[], out: string) => tasks.runCmd(cmd, args, out);
 

@@ -1,8 +1,9 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
 import { dumpSchemaAfterMigration, setDumpSchemaAfterMigration } from "../active-record.js";
 
@@ -12,6 +13,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     Base.configurations({});
     try {
       await Base.removeConnection();
@@ -24,7 +26,9 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
   async function setupConfigs(): Promise<void> {
     const dir = await mkdtemp(join(tmpdir(), "trails-migrate-all-meta-"));
     dirs.push(dir);
-    const env = DatabaseTasks.env.toString();
+    const env = DEFAULT_ENV();
+    vi.spyOn(DatabaseTasks, "env", "get").mockReturnValue(DEFAULT_ENV());
+    vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue("db");
     Base.configurations({
       [env]: {
         primary: {
@@ -53,7 +57,7 @@ describe("DatabaseTasksMigrateAllMetadataTest", () => {
 
   async function metadataTablesExist(): Promise<Array<boolean | null>> {
     const results: Array<boolean | null> = [];
-    for (const config of DatabaseTasks.configsFor({ envName: DatabaseTasks.env.toString() })) {
+    for (const config of DatabaseTasks.configsFor({ envName: DEFAULT_ENV() })) {
       await DatabaseTasks.withTemporaryConnection(config, async (adapter) => {
         results.push(await adapter.tableExists("ar_internal_metadata"));
       });

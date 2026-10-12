@@ -9,7 +9,7 @@ describe("SQLiteDatabaseTasks#purge", () => {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    const tasks = new SQLiteDatabaseTasks(configuration);
+    const tasks = new SQLiteDatabaseTasks(configuration, "/rails/root");
     let created = 0;
     Object.assign(tasks, {
       drop: async () => {

@@ -15,7 +15,7 @@ import { stripThenable } from "@blazetrails/activesupport";
 import { connectedToStack, currentRole, currentShard, currentPreventingWrites } from "./core.js";
 import { adapterType } from "./test-adapter.js";
 import { restoreWorkerConnection } from "./support/connection.js";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 import { permanentConnectionCheckout, setPermanentConnectionCheckout } from "./active-record.js";
 
 describe("ConnectionHandlingTest", () => {
@@ -490,7 +490,7 @@ describe("ConnectionHandlingTest", () => {
   it("autoConnect honors an in-memory DatabaseConfigurations registry", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    const env = process.env.NODE_ENV || DatabaseTasks.env.toString();
+    const env = process.env.NODE_ENV || DEFAULT_ENV();
 
     const priorConfigs = Base.configurations();
     class InMemoryModel extends Base {}
@@ -516,7 +516,7 @@ describe("ConnectionHandlingTest", () => {
   it("autoConnect reconnects via mutated configuration.database for UrlConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { UrlConfig } = await import("./database-configurations/url-config.js");
-    const env = process.env.NODE_ENV || DatabaseTasks.env.toString();
+    const env = process.env.NODE_ENV || DEFAULT_ENV();
 
     const priorConfigs = Base.configurations();
     class WorkerModel extends Base {}
@@ -543,7 +543,7 @@ describe("ConnectionHandlingTest", () => {
   it("establishConnection raises AdapterNotSpecified for an adapter-less HashConfig", async () => {
     const { DatabaseConfigurations } = await import("./database-configurations.js");
     const { HashConfig } = await import("./database-configurations/hash-config.js");
-    const env = DatabaseTasks.env.toString();
+    const env = DEFAULT_ENV();
 
     const { AdapterNotSpecified } = await import("./errors.js");
     const configurationHash = { url: "sqlite3:db/foo.sqlite3" };
@@ -789,7 +789,7 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
     try {
       __resetPrimaryAbstractClass();
       primaryAbstractClass(AppRecord);
-      const env = DatabaseTasks.env.toString();
+      const env = DEFAULT_ENV();
       priorConfigs = Base.configurations();
       Base.configurations({
         [env]: { primary: { adapter: "sqlite3", database: "db/primary.sqlite3" } },

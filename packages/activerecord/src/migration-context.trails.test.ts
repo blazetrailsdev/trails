@@ -10,7 +10,7 @@ import { Base } from "./base.js";
 import { SchemaMigration, NullSchemaMigration } from "./schema-migration.js";
 import { InternalMetadata, NullInternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
-import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { DEFAULT_ENV } from "./connection-handling.js";
 import {
   setTimestampedMigrations,
   setValidateMigrationTimestamps,
@@ -199,7 +199,7 @@ describe("MigrationContext connected surface", () => {
   });
 
   it("currentEnvironment answers the resolved default env", () => {
-    expect(context.currentEnvironment).toBe(DatabaseTasks.env);
+    expect(context.currentEnvironment).toBe(DEFAULT_ENV());
   });
 
   it("lastStoredEnvironment is null until a version has been recorded", async () => {

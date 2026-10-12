@@ -144,11 +144,14 @@ export class DatabaseTasks {
     return new ctor(config, ...args);
   }
 
-  static async create(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
+  static async create(
+    configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
+  ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration)!;
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
-      await rbFSend(this.databaseAdapterFor(dbConfig), "create");
+      await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "create");
       if (isVerbose()) puts.call(stdout, `Created database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof DatabaseAlreadyExists) {
@@ -184,11 +187,14 @@ export class DatabaseTasks {
     await this.migrationClass().establishConnection(`:${environment}`);
   }
 
-  static async drop(configuration: HashConfig | string | Record<string, unknown>): Promise<void> {
+  static async drop(
+    configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
+  ): Promise<void> {
     const dbConfig = this.resolveConfiguration(configuration)!;
     const { NoDatabaseError } = await import("../errors.js");
     try {
-      await rbFSend(this.databaseAdapterFor(dbConfig), "drop");
+      await rbFSend(this.databaseAdapterFor(dbConfig, ...args), "drop");
       if (isVerbose()) puts.call(stdout, `Dropped database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof NoDatabaseError) {
@@ -287,9 +293,10 @@ export class DatabaseTasks {
 
   static async charset(
     configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
   ): Promise<string | null> {
     const dbConfig = this.resolveConfiguration(configuration)!;
-    return rbFSend(this.databaseAdapterFor(dbConfig), "charset") as Promise<string | null>;
+    return rbFSend(this.databaseAdapterFor(dbConfig, ...args), "charset") as Promise<string | null>;
   }
 
   static async charsetCurrent(
@@ -302,9 +309,12 @@ export class DatabaseTasks {
 
   static async collation(
     configuration: HashConfig | string | Record<string, unknown>,
+    ...args: unknown[]
   ): Promise<string | null> {
     const dbConfig = this.resolveConfiguration(configuration)!;
-    return rbFSend(this.databaseAdapterFor(dbConfig), "collation") as Promise<string | null>;
+    return rbFSend(this.databaseAdapterFor(dbConfig, ...args), "collation") as Promise<
+      string | null
+    >;
   }
 
   static async collationCurrent(

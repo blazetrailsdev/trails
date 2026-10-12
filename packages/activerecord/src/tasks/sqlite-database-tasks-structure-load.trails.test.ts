@@ -38,7 +38,7 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
       adapter: "sqlite3",
       database,
     });
-    await new SQLiteDatabaseTasks(configuration).structureLoad(filename, null);
+    await new SQLiteDatabaseTasks(configuration, "/rails/root").structureLoad(filename, null);
 
     const result = getChildProcess().spawnSync("sqlite3", [database, "SELECT hex(a) FROM t;"]);
     expect(result.stdout.trim()).toBe("FF");
@@ -51,6 +51,7 @@ describe("SQLiteDatabaseTasks structure_load input redirect", () => {
     fs.writeFileSync(filename, "");
     const tasks = new SQLiteDatabaseTasks(
       new HashConfig("development", "primary", { adapter: "sqlite3", database }),
+      "/rails/root",
     );
     const spawnSync = vi.spyOn(await getChildProcessAsync(), "spawnSync");
 
