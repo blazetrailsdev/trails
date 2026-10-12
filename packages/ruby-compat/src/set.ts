@@ -7,6 +7,14 @@ import { rbDeclareIvar, rbModName, rbObjClass, rbObjRespondTo } from "./object.j
 
 const JsSet = globalThis.Set;
 
+interface EachEntry<E> {
+  eachEntry(block: (o: E) => void): unknown;
+}
+
+interface Each<E> {
+  each(block: (o: E) => void): unknown;
+}
+
 interface HashRelop {
   greaterThanOrEqual(other: unknown): boolean;
   lessThanOrEqual(other: unknown): boolean;
@@ -28,11 +36,19 @@ export class Set<T> extends JsSet<T> {
    * `Set#initialize` (`vendor/ruby/v3.3.11/lib/set.rb:243`).
    * @noRailsEquivalent PERMANENT
    */
-  constructor(enumerable: Iterable<T> | null = null) {
+  constructor(enumerable?: Iterable<T> | null, block?: undefined);
+  /** @noRailsEquivalent PERMANENT */
+  constructor(enumerable: Iterable<unknown>, block: (o: never) => T);
+  /** @noRailsEquivalent PERMANENT */
+  constructor(enumerable: Iterable<unknown> | null = null, block?: (o: never) => T) {
     super();
     if (enumerable == null) return;
 
-    this.merge(enumerable);
+    if (block) {
+      this.doWithEnum(enumerable, (o) => this.add(block(o as never)));
+    } else {
+      this.merge(enumerable as Iterable<T>);
+    }
   }
 
   /**
@@ -59,11 +75,18 @@ export class Set<T> extends JsSet<T> {
   }
 
   /**
-   * `Set#do_with_enum` (`vendor/ruby/v3.3.11/lib/set.rb:272`).
+   * `Set#do_with_enum` (`vendor/ruby/v3.3.11/lib/set.rb:272`). A JS iterable
+   * answers `each` through its iterator.
    * @noRailsEquivalent PERMANENT
    */
-  private doWithEnum(enumerable: Iterable<T>, block: (o: T) => void): void {
-    if (typeof (enumerable as Partial<Iterable<T>> | null)?.[Symbol.iterator] === "function") {
+  private doWithEnum<E>(enumerable: Iterable<E>, block: (o: E) => void): void {
+    if (typeof (enumerable as Partial<EachEntry<E>> | null)?.eachEntry === "function") {
+      (enumerable as unknown as EachEntry<E>).eachEntry(block);
+    } else if (typeof (enumerable as Partial<Each<E>> | null)?.each === "function") {
+      (enumerable as unknown as Each<E>).each(block);
+    } else if (
+      typeof (enumerable as Partial<Iterable<E>> | null)?.[Symbol.iterator] === "function"
+    ) {
       for (const o of enumerable) block(o);
     } else {
       throw new ArgumentError("value must be enumerable");

@@ -64,6 +64,19 @@ describe("Set", () => {
     expect(() => set.subtract(1 as never)).toThrow(new ArgumentError("value must be enumerable"));
   });
 
+  it("new applies its block to each member, and walks eachEntry before each", () => {
+    expect([...new Set([2], (x: number) => x * 2)]).toEqual([4]);
+
+    const calls: string[] = [];
+    const enumerable = {
+      eachEntry: (block: (o: number) => void) => (calls.push("eachEntry"), block(1)),
+      each: (block: (o: number) => void) => (calls.push("each"), block(2)),
+    };
+    expect([...new Set<number>().merge(enumerable as never)]).toEqual([1]);
+    expect([...new Set<number>().merge({ each: enumerable.each } as never)]).toEqual([2]);
+    expect(calls).toEqual(["eachEntry", "each"]);
+  });
+
   it("compare_by_identity makes an equal Array a second member", () => {
     const member = [1, 2];
     const set = new Set<unknown>().compareByIdentity().add(member);
