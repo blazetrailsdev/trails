@@ -1037,12 +1037,11 @@ export class RouteSet {
   }
 
   addPolymorphicMapping(
-    klass: string | { name: string },
+    klass: string,
     options: Record<string, unknown>,
     block: (this: PolymorphicHost, ...args: unknown[]) => object | string,
   ): void {
-    const key = typeof klass === "string" ? klass : klass.name;
-    this.polymorphicMappings.set(key, new CustomUrlHelper(key, options, block));
+    this.polymorphicMappings.set(klass, new CustomUrlHelper(klass, options, block));
   }
 
   addUrlHelper(

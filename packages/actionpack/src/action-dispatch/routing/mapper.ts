@@ -1791,7 +1791,7 @@ export class Mapper {
     const options = extractOptionsBang(args);
     args = args.flat(1);
 
-    for (const klass of args as Parameters<RouteSet["addPolymorphicMapping"]>[0][]) {
+    for (const klass of args as string[]) {
       this._set.addPolymorphicMapping(klass, options, block);
     }
   }
