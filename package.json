@@ -60,6 +60,8 @@
     "parity:api:blocks:tighten": "pnpm tsx scripts/api-compare/lint-block-params.ts --tighten",
     "parity:api:arity": "pnpm tsx scripts/api-compare/lint-arity-excludes.ts",
     "parity:api:inheritance": "pnpm tsx scripts/api-compare/lint-inheritance-excludes.ts",
+    "parity:api:inlined": "pnpm tsx scripts/api-compare/lint-inlined-from.ts",
+    "parity:api:inlined:fix": "pnpm tsx scripts/api-compare/lint-inlined-from.ts --fix",
     "parity:api:pins": "pnpm tsx scripts/api-compare/lint-body-pins.ts",
     "parity:api:pins:all": "API_COMPARE_FORCE=1 pnpm parity:api && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
     "parity:api:moves": "pnpm tsx scripts/api-compare/moves.ts",
