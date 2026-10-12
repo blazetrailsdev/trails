@@ -54,4 +54,8 @@ export class SchemaDumper extends AbstractSchemaDumper {
   protected extractExpressionForVirtualColumn(column: Column): string {
     return JSON.stringify(column.defaultFunction ?? null);
   }
+
+  protected override adapterType(): [name: string, path: string] {
+    return ["SQLite3Adapter", "sqlite3-adapter"];
+  }
 }
