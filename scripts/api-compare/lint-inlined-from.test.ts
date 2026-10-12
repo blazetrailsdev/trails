@@ -31,12 +31,17 @@ const ruby = {
       classes: {
         "ActiveRecord::Base": entity("base.rb", [], {
           includes: ["ActiveModel::API", "Core", "Inheritance", "Local", "Plain"],
+          extends: ["First::ClassMethods", "Last::ClassMethods"],
         }),
         "ActiveRecord::Relation": entity("relation.rb"),
       },
       modules: {
         "ActiveRecord::Core": entity("core.rb", [def("initialize", `${AR}/core.rb`, 471, 482)]),
         "ActiveRecord::Inheritance": entity("inheritance.rb", [], CONCERN),
+        "ActiveRecord::First::ClassMethods": entity("first.rb", [
+          def("new", `${AR}/first.rb`, 2, 4),
+        ]),
+        "ActiveRecord::Last::ClassMethods": entity("last.rb", [def("new", `${AR}/last.rb`, 2, 4)]),
         "ActiveRecord::Plain": entity("plain.rb"),
         "ActiveRecord::Plain::ClassMethods": entity("plain.rb", [
           def("new", `${AR}/plain.rb`, 2, 4),
@@ -73,6 +78,8 @@ const tag = (name: string, citation: string): InlinedFrom => {
   };
 };
 
+const FIRST = tag("ActiveRecord::First::ClassMethods#new", `${AR}/first.rb:2-4`);
+const LAST = tag("ActiveRecord::Last::ClassMethods#new", `${AR}/last.rb:2-4`);
 const NEW = tag("ActiveRecord::Inheritance::ClassMethods#new", `${AR}/inheritance.rb:56-78`);
 const CORE = tag("ActiveRecord::Core#initialize", `${AR}/core.rb:471-482`);
 const API = tag("ActiveModel::API#initialize", `${AM}/api.rb:80-84`);
@@ -90,7 +97,7 @@ function messages(
 
 describe("inlinedFromFindings", () => {
   it("passes a constructor tagged for each cross-file hook its Rails class reaches", () => {
-    expect(messages([NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([]);
+    expect(messages([LAST, FIRST, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([]);
   });
 
   it("flags a tag naming a module with no initialize", () => {
@@ -111,7 +118,7 @@ describe("inlinedFromFindings", () => {
 
   it("does not read a plain module's ClassMethods as extended, which only a Concern does", () => {
     const plain = tag("ActiveRecord::Plain::ClassMethods#new", `${AR}/plain.rb:2-4`);
-    expect(messages([plain, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([
+    expect(messages([plain, LAST, FIRST, NEW, CORE, API], { enrolled: ["activerecord"] })).toEqual([
       "ActiveRecord::Plain::ClassMethods#new names a module ActiveRecord::Base does not extend",
     ]);
   });
@@ -122,6 +129,17 @@ describe("inlinedFromFindings", () => {
     ]);
     expect(messages([NEW, API, CORE])).toEqual([
       "ActiveRecord::Core#initialize is out of chain order: Rails runs it before ActiveModel::API#initialize",
+    ]);
+  });
+
+  it("orders explicit extends last first, and leaves a pair across the two singleton sides unordered", () => {
+    expect(messages([FIRST, LAST])).toEqual([
+      "ActiveRecord::Last::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::First::ClassMethods#new",
+    ]);
+    expect(messages([NEW, LAST, FIRST, CORE])).toEqual([]);
+    expect(messages([LAST, NEW, FIRST, CORE])).toEqual([]);
+    expect(messages([CORE, NEW])).toEqual([
+      "ActiveRecord::Inheritance::ClassMethods#new is out of chain order: Rails runs it before ActiveRecord::Core#initialize",
     ]);
   });
 
@@ -165,7 +183,7 @@ describe("inlinedFromFindings", () => {
   });
 
   it("flags an enrolled package's untagged cross-file initialize and ClassMethods#new, and no same-file body", () => {
-    expect(messages([CORE], { enrolled: ["activerecord"] })).toEqual([
+    expect(messages([LAST, FIRST, CORE], { enrolled: ["activerecord"] })).toEqual([
       "ActiveRecord::Inheritance::ClassMethods#new is inlined untagged: ActiveRecord::Base reaches it from another Ruby file",
       "ActiveModel::API#initialize is inlined untagged: ActiveRecord::Base reaches it from another Ruby file",
     ]);
