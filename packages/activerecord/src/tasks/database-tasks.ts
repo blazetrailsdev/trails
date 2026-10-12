@@ -26,6 +26,7 @@ import {
   getCryptoAsync,
   stdout,
   stderr,
+  puts,
   abort,
   File,
   FileUtils,
@@ -148,14 +149,15 @@ export class DatabaseTasks {
     const { DatabaseAlreadyExists } = await import("../errors.js");
     try {
       await rbFSend(this.databaseAdapterFor(dbConfig), "create");
-      if (isVerbose()) stdout.write(`Created database '${dbConfig.database}'\n`);
+      if (isVerbose()) puts.call(stdout, `Created database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof DatabaseAlreadyExists) {
-        if (isVerbose()) stderr.write(`Database '${dbConfig.database}' already exists\n`);
+        if (isVerbose()) puts.call(stderr, `Database '${dbConfig.database}' already exists`);
       } else {
-        stderr.write(excToS(error) + "\n");
-        stderr.write(
-          `Couldn't create '${dbConfig.database}' database. Please check your configuration.\n`,
+        puts.call(stderr, excToS(error));
+        puts.call(
+          stderr,
+          `Couldn't create '${dbConfig.database}' database. Please check your configuration.`,
         );
         throw error;
       }
@@ -187,13 +189,13 @@ export class DatabaseTasks {
     const { NoDatabaseError } = await import("../errors.js");
     try {
       await rbFSend(this.databaseAdapterFor(dbConfig), "drop");
-      if (isVerbose()) stdout.write(`Dropped database '${dbConfig.database}'\n`);
+      if (isVerbose()) puts.call(stdout, `Dropped database '${dbConfig.database}'`);
     } catch (error) {
       if (error instanceof NoDatabaseError) {
-        stderr.write(`Database '${dbConfig.database}' does not exist\n`);
+        puts.call(stderr, `Database '${dbConfig.database}' does not exist`);
       } else {
-        stderr.write(excToS(error) + "\n");
-        stderr.write(`Couldn't drop database '${dbConfig.database}'\n`);
+        puts.call(stderr, excToS(error));
+        puts.call(stderr, `Couldn't drop database '${dbConfig.database}'`);
         throw error;
       }
     }
@@ -246,7 +248,7 @@ export class DatabaseTasks {
         },
       );
       if (isPresent(scope) && migrationsRan.length === 0) {
-        Migration.methodMissing("write", `No migrations ran. (using ${scope} scope)`);
+        rbFSend(Migration, "write", `No migrations ran. (using ${scope} scope)`);
       }
 
       this.migrationConnectionPool().schemaCache.clearBang();
@@ -399,8 +401,9 @@ export class DatabaseTasks {
       if (this.isLocalDatabase(dbConfig)) {
         await block(dbConfig);
       } else {
-        stderr.write(
-          `This task only modifies local databases. ${dbConfig.database} is on a remote host.\n`,
+        puts.call(
+          stderr,
+          `This task only modifies local databases. ${dbConfig.database} is on a remote host.`,
         );
       }
     }
@@ -592,14 +595,13 @@ export class DatabaseTasks {
       const left = Math.floor(pad / 2);
       return " ".repeat(left) + s + " ".repeat(pad - left);
     };
-    const puts = (s = "") => stdout.write(s + "\n");
-    puts(`\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n`);
-    puts(`${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
-    puts("-".repeat(50));
+    puts.call(stdout, `\ndatabase: ${this.migrationConnectionPool().dbConfig.database}\n\n`);
+    puts.call(stdout, `${center("Status", 8)}  ${"Migration ID".padEnd(14)}  Migration Name`);
+    puts.call(stdout, "-".repeat(50));
     for (const [status, version, name] of rows) {
-      puts(`${center(status, 8)}  ${version.padEnd(14)}  ${name}`);
+      puts.call(stdout, `${center(status, 8)}  ${version.padEnd(14)}  ${name}`);
     }
-    puts();
+    puts.call(stdout);
   }
 
   static async migrateAll(): Promise<void> {

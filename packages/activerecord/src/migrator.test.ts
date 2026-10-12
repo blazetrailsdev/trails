@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { assertRaises } from "@blazetrails/activesupport";
-import { stdout } from "@blazetrails/ruby-compat";
+import { puts, stdout } from "@blazetrails/ruby-compat";
 import {
   Migration,
   Migrator,
@@ -17,6 +17,7 @@ import { InternalMetadata } from "./internal-metadata.js";
 import { fixtures } from "./test-fixtures.js";
 import { anonymousMigration } from "./test-helpers/anonymous-migration.js";
 import { migrationProxy } from "./test-helpers/migration-proxy.js";
+import "./test-helpers/migration-helper.js";
 
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
@@ -88,10 +89,19 @@ describe("MigratorTest", () => {
     await schemaMigration.deleteAllVersions();
     internalMetadata = new InternalMetadata(adapter.pool);
     verboseWas = Migration.verbose;
+    Migration.messageCount = 0;
+    Migration.prototype["puts"] = function () {
+      Migration.messageCount += 1;
+      return null;
+    };
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await schemaMigration.deleteAllVersions().catch(() => null);
     Migration.verbose = verboseWas;
+    Migration.prototype["puts"] = function (...args: unknown[]) {
+      return puts.call(stdout, ...args);
+    };
   });
 
   it("migrator with duplicate names", async () => {
@@ -488,49 +498,26 @@ describe("MigratorTest", () => {
   });
 
   it("migrator verbosity", async () => {
-    const lines: string[] = [];
-    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      lines.push(chunk);
-      return true;
-    });
-    try {
-      const { migrations } = sensors(3);
+    const { migrations } = sensors(3);
 
-      Migration.verbose = true;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
-      await upMigrator.migrate();
-      expect(lines.length).not.toBe(0);
+    Migration.verbose = true;
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
+    expect(Migration.messageCount).not.toEqual(0);
 
-      lines.length = 0;
+    Migration.messageCount = 0;
 
-      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
-      await downMigrator.migrate();
-      expect(lines.length).not.toBe(0);
-    } finally {
-      spy.mockRestore();
-    }
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
+    expect(Migration.messageCount).not.toEqual(0);
   });
 
   it("migrator verbosity off", async () => {
-    const lines: string[] = [];
-    const spy = vi.spyOn(stdout, "write").mockImplementation((chunk) => {
-      lines.push(chunk);
-      return true;
-    });
-    try {
-      const { migrations } = sensors(3);
+    const { migrations } = sensors(3);
 
-      Migration.verbose = false;
-      const upMigrator = new Migrator("up", migrations, schemaMigration, internalMetadata, 1);
-      await upMigrator.migrate();
-      expect(lines.length).toBe(0);
-
-      const downMigrator = new Migrator("down", migrations, schemaMigration, internalMetadata, 0);
-      await downMigrator.migrate();
-      expect(lines.length).toBe(0);
-    } finally {
-      spy.mockRestore();
-    }
+    Migration.verbose = false;
+    await new Migrator("up", migrations, schemaMigration, internalMetadata, 1).migrate();
+    expect(Migration.messageCount).toEqual(0);
+    await new Migrator("down", migrations, schemaMigration, internalMetadata, 0).migrate();
+    expect(Migration.messageCount).toEqual(0);
   });
 
   it("target version zero should run only once", async () => {

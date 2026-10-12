@@ -22,6 +22,7 @@ import {
   format,
   max,
   stdout,
+  puts,
   excToS,
   rbFLoad,
   rbFPublicSend,
@@ -987,8 +988,13 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
 
   write(text = ""): void {
     if (Migration.verbose) {
-      stdout.write(`${text}\n`);
+      this.puts(text);
     }
+  }
+
+  /** @internal */
+  protected puts(...args: unknown[]): null {
+    return puts.call(stdout, ...args);
   }
 
   announce(message: string): void {

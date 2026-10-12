@@ -14,7 +14,6 @@ import {
   type NotificationEvent,
 } from "@blazetrails/activesupport";
 import { ACTIVE_RECORD_INSTRUMENTER } from "./future-result.js";
-import { setAsyncQueryExecutor } from "./active-record.js";
 
 function overSuper(
   props: object,
@@ -170,11 +169,9 @@ describe("DatabaseStatements#select", () => {
 
   afterEach(() => {
     execution.completeBang();
-    setAsyncQueryExecutor(null);
   });
 
   it("raises AsynchronousQueryInsideTransactionError inside a joinable transaction", () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const host = {
       asyncEnabled: () => true,
       preprocessQuery: (sql: string) => sql,
@@ -199,7 +196,6 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("forwards prepare and async through to the connection's rawExecQuery", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
@@ -224,7 +220,6 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("schedules a FutureResult through the pool when async is enabled", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = fakePool(result);
     const host = {
@@ -245,7 +240,6 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("hands back a pending FutureResult without waiting for the query", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     const pool = deferredPool(result);
     const host = {
@@ -268,7 +262,6 @@ describe("DatabaseStatements#select", () => {
   });
 
   it("runs the query to completion before returning when connections are not concurrent", async () => {
-    setAsyncQueryExecutor("global_thread_pool");
     const result = new Result(["id"], [[1]]);
     let release!: () => void;
     const gate = new Promise<void>((resolve) => (release = resolve));

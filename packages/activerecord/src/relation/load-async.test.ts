@@ -1,7 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { Thread } from "@blazetrails/ruby-compat";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
-import { Base } from "../index.js";
 import { asyncQueryExecutor, setAsyncQueryExecutor } from "../active-record.js";
 import { Rollback } from "../errors.js";
 import type { Relation } from "../relation.js";
@@ -23,24 +22,33 @@ describe("LoadAsyncTest", () => {
 
   it("scheduled?", async () => {
     const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
-    expect(inMemoryDb() && deferredPosts.isScheduled).toBeFalsy();
-    expect(inMemoryDb() || deferredPosts.isScheduled).toBeTruthy();
+    if (inMemoryDb()) {
+      expect(deferredPosts.isScheduled).toBeFalsy();
+    } else {
+      expect(deferredPosts.isScheduled).toBeTruthy();
+    }
     expect(deferredPosts.isLoaded).toBeTruthy();
     await deferredPosts;
     expect(deferredPosts.isScheduled).toBeFalsy();
   });
   it("null scheduled?", async () => {
     const deferredNullPosts = Post.none().loadAsync();
-    expect(inMemoryDb() && deferredNullPosts.isScheduled).toBeFalsy();
-    expect(inMemoryDb() || deferredNullPosts.isScheduled).toBeTruthy();
+    if (inMemoryDb()) {
+      expect(deferredNullPosts.isScheduled).toBeFalsy();
+    } else {
+      expect(deferredNullPosts.isScheduled).toBeTruthy();
+    }
     expect(deferredNullPosts.isLoaded).toBeTruthy();
     await deferredNullPosts;
     expect(deferredNullPosts.isScheduled).toBeFalsy();
   });
   it("reset", () => {
     const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
-    expect(inMemoryDb() && deferredPosts.isScheduled).toBeFalsy();
-    expect(inMemoryDb() || deferredPosts.isScheduled).toBeTruthy();
+    if (inMemoryDb()) {
+      expect(deferredPosts.isScheduled).toBeFalsy();
+    } else {
+      expect(deferredPosts.isScheduled).toBeTruthy();
+    }
     deferredPosts.reset();
     expect(deferredPosts.isScheduled).toBeFalsy();
   });
@@ -102,15 +110,12 @@ describe("LoadAsyncTest", () => {
 
     try {
       const deferredPosts = Post.where({ author_id: 1 }).loadAsync();
-      const records = await deferredPosts;
+      await waitForAsyncQuery();
 
-      expect(records.map((post) => post.id)).toEqual(expectedRecords.map((post) => post.id));
-      const connection = (await Base.connection) as unknown as {
-        supportsConcurrentConnections(): boolean;
-      };
-      expect(status.async).toBe(connection.supportsConcurrentConnections());
-      expect(status.thread_id).toBe(Thread.current().id);
-      if (connection.supportsConcurrentConnections()) {
+      expect(await deferredPosts).toEqual(expectedRecords);
+      expect(status.async).toEqual((await Post.leaseConnection()).supportsConcurrentConnections());
+      expect(status.thread_id).toEqual(Thread.current().id);
+      if ((await Post.leaseConnection()).supportsConcurrentConnections()) {
         expect(Object(status.lock_wait)).toBeInstanceOf(Number);
       } else {
         expect(status.lock_wait).toBeUndefined();

@@ -1,6 +1,6 @@
 import { describe, it, expect, afterAll } from "vitest";
 // prettier-ignore
-import { belongsToAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
+import { belongsToAssociationsByClass, joinLabelAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -172,6 +172,18 @@ describe("schemaCheck", () => {
     expect([...map.get("User")!]).toEqual([]);
     expect([...map.get("Admin::User")!]).toEqual(["account"]);
     expect([...map.get("Parrot")!]).toEqual(["killer"]);
+  });
+  it("reads a join label from the class's own and inherited associations only", () => {
+    const klass = (qualifiedName: string, parent: string, habtm: string[] = []) => ({ name: qualifiedName, qualifiedName, parent, tableName: null, associations: habtm.map((name) => ({ kind: "has_and_belongs_to_many", name, options: {}, hasScope: false })), validations: [], scopes: [], callbacks: [], attributes: [], attrs: [] }); // prettier-ignore
+    const map = joinLabelAssociationsByClass([
+      {
+        package: "activerecord",
+        file: "test/models/parrot.rb",
+        classes: [klass("Parrot", "ActiveRecord::Base", ["treasures"]), klass("DeadParrot", "Parrot", ["shared_computers"])], // prettier-ignore
+      },
+    ]);
+    expect([...map.get("Parrot")!]).toEqual(["treasures"]);
+    expect([...map.get("DeadParrot")!]).toEqual(["treasures", "sharedComputers"]);
   });
   it("allows a belongs_to association label only when the association is known", () => {
     const withFk: Schema = { users: { account_id: "integer" } };
@@ -490,11 +502,15 @@ describe("compareFile", () => {
     };
     const rails = { name: "Dusty DeadBird", parrot_sti_class: "DeadParrot", killer: "blackbeard" };
     const compare = (row: Record<string, unknown>) =>
-      compareFile("dead_parrots.yml", new Map([["dead_parrots", { deadbird: row }]]), empty, undefined, schema, new Map([["DeadParrot", new Set(["killer"])]]), tables); // prettier-ignore
+      compareFile("dead_parrots.yml", new Map([["dead_parrots", { deadbird: row }]]), empty, undefined, schema, new Map([["DeadParrot", new Set(["killer"])]]), tables, new Map([["DeadParrot", new Set(["treasures"])]])); // prettier-ignore
     const both = await compare({ ...rails, treasures: ["ruby", "sapphire"] });
-    expect([both.status, both.attrsSkipped, both.schemaPorted]).toEqual(["MATCH", 1, true]);
+    expect([both.status, both.attrsMatched, both.attrsSkipped]).toEqual(["MATCH", 4, 0]);
+    expect((await compare({ ...rails, treasures: "ruby, sapphire" })).status).toBe("MATCH");
+    expect((await compare({ ...rails, treasures: ["ruby"] })).status).toBe("DIFF");
+    expect((await compare({ ...rails, treasures: "sapphire, ruby" })).status).toBe("DIFF");
+    expect((await compare({ ...rails, treasures: "ruby, sapphire," })).status).toBe("MATCH");
     expect((await compare(rails)).notes).toEqual(["extra-in-ts: deadbird.treasures"]);
-    expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots")).toEqual({ treasures: ["ruby"] }); // prettier-ignore
+    expect(canonicalizeRailsRow({ treasures: ["ruby"] }, {}, new Set(["name"]), "parrots", new Set(), new Set(["treasures"]))).toEqual({ treasures: ["ruby"] }); // prettier-ignore
   });
   it("compares a key both rows spell the same way verbatim, column or not", async () => {
     const tables = new Map([["naked/yml/parrots", { table: "parrots", modelClass: "Parrot", declared: true }]]); // prettier-ignore
