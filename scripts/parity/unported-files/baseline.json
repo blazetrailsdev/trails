@@ -28,12 +28,6 @@
     "reason": "Trilogy adapter implementation; excluded along with adapters/trilogy. PERMANENT: CLAUDE.md \u00a7 \"Trilogy is out of scope\"."
   },
   {
-    "testFile": "adapter_test.rb",
-    "className": "AdapterThreadSafetyTest",
-    "tests": ["#active? is synchronized", "#verify! is synchronized"],
-    "reason": "AdapterThreadSafetyTest exercises Ruby Thread.new/Thread.pass concurrency on a single shared connection, asserting mutex-style serialization of #active?/#verify!/#disconnect! under the GVL. Node Worker threads use isolated heaps and structured-clone message passing, not the shared-memory Thread.new model this test relies on, so the GVL interleaving this test pins has no equivalent in our runtime target."
-  },
-  {
     "testFile": "adapters/sqlite3/sqlite3_adapter_test.rb",
     "tests": ["supports extensions", "respond to enable extension", "respond to disable extension"],
     "reason": "Rails' SQLite3::Database exposes load_extension / enable_load_extension via the sqlite3-ruby C bindings. better-sqlite3 does not expose the SQLITE_LOAD_EXTENSION entry points, so supports_extensions? / enable_extension / disable_extension cannot be implemented against the driver Trails uses."
@@ -48,38 +42,6 @@
     "reason": "GVL / Ruby Thread semantics — concurrent shard-swapping tests cannot translate to single-threaded Node.js."
   },
   {
-    "testFile": "connection_pool_test.rb",
-    "tests": [
-      "lock thread allow fiber reentrency",
-      "released connection moves between threads",
-      "inactive are returned from dead thread",
-      "remove connection for thread",
-      "concurrent connection establishment",
-      "non bang disconnect and clear reloadable connections throw exception if threads dont return their conns",
-      "disconnect and clear reloadable connections attempt to wait for threads to return their conns",
-      "bang versions of disconnect and clear reloadable connections if unable to acquire all connections proceed anyway",
-      "disconnect and clear reloadable connections are able to preempt other waiting threads",
-      "clear reloadable connections creates new connections for waiting threads if necessary",
-      "public connections access threadsafe",
-      "reap inactive",
-      "full pool blocking shares load interlock",
-      "checkout fairness",
-      "checkout fairness by group",
-      "pin connection synchronize the connection",
-      "pin connection nesting lock",
-      "pin connection nesting lock inverse"
-    ],
-    "reason": "GVL / Ruby Thread semantics — concurrent connection tests cannot translate to single-threaded Node.js."
-  },
-  {
-    "testFile": "connection_management_test.rb",
-    "tests": [
-      "connections are cleared even if inside a non-joinable transaction",
-      "cancel asynchronous queries if an exception is raised"
-    ],
-    "reason": "GVL / Ruby Thread semantics — first test pins across threads; second uses FutureResult (thread-based async queries)."
-  },
-  {
     "testFile": "query_cache_test.rb",
     "tests": [
       "query cache with forked processes",
@@ -90,11 +52,6 @@
       "threads use the same connection"
     ],
     "reason": "GVL / Ruby Thread + fork() semantics — per-thread / cross-process query-cache visibility cannot translate to single-threaded Node.js."
-  },
-  {
-    "testFile": "connection_adapters/connection_handlers_multi_db_test.rb",
-    "tests": ["multiple connections works in a threaded environment"],
-    "reason": "GVL / Ruby Thread semantics — concurrent multi-db connection access on shared objects has no single-threaded Node.js equivalent."
   },
   {
     "testFile": "relations_test.rb",

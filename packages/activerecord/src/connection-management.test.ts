@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { assertRespondTo } from "@blazetrails/activesupport";
+import { assertRaises, assertRespondTo } from "@blazetrails/activesupport";
+import { NotImplementedError, Thread } from "@blazetrails/ruby-compat";
 import { Executor } from "@blazetrails/activesupport";
 import { BodyProxy } from "@blazetrails/rack";
 import { Base } from "./index.js";
 import { QueryCache } from "./query-cache.js";
 import { AsynchronousQueriesTracker } from "./asynchronous-queries-tracker.js";
 import { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { FutureResult } from "./future-result.js";
+import { itIfSupports } from "./support/supports.js";
 
 type RackResponse = [number, Record<string, unknown>, unknown];
 
@@ -80,8 +83,19 @@ describe("ConnectionManagementTest", () => {
     expect(Base.connectionHandler.hasActiveConnections("all")).toBeFalsy();
   });
 
-  it.skip("connections are cleared even if inside a non-joinable transaction", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — Thread
+  it("connections are cleared even if inside a non-joinable transaction", async () => {
+    await Base.connectionPool().pinConnectionBang(true);
+    try {
+      await new Thread(async () => {
+        expect(await Base.leaseConnection()).toBeTruthy();
+        expect(Base.connectionHandler.hasActiveConnections("all")).toBeTruthy();
+        const [, , body] = management(env);
+        (body as BodyProxy).close();
+        expect(Base.connectionHandler.hasActiveConnections("all")).toBeFalsy();
+      }).join();
+    } finally {
+      await Base.connectionPool().unpinConnectionBang();
+    }
   });
 
   it("active connections are not cleared on body close during transaction", async () => {
@@ -116,9 +130,29 @@ describe("ConnectionManagementTest", () => {
     });
   });
 
-  it.skip("cancel asynchronous queries if an exception is raised", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — FutureResult
-  });
+  itIfSupports(
+    "concurrent_connections",
+    "cancel asynchronous queries if an exception is raised",
+    async () => {
+      const connection = await Base.leaseConnection();
+      class Explosive extends App {
+        futureResult!: FutureResult;
+
+        override call(): RackResponse {
+          this.futureResult = connection.selectAll("SELECT * FROM does_not_exists", null, [], {
+            async: true,
+          }) as unknown as FutureResult;
+          throw new NotImplementedError();
+        }
+      }
+      const app = new Explosive();
+
+      const explosive = middleware(app);
+      await assertRaises([NotImplementedError], {}, () => explosive(env));
+
+      await assertRaises([FutureResult.Canceled], {}, () => app.futureResult.toArray());
+    },
+  );
 
   it("doesn't clear active connections when running in a test case", () => {
     executor().wrap(() => {

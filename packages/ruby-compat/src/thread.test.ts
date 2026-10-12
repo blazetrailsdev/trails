@@ -67,6 +67,27 @@ describe("Thread", () => {
     expect(thread.exit()).toBe(thread);
   });
 
+  it("terminate ends a stopped thread, and join then returns it", async () => {
+    let resumed = false;
+    const thread = new Thread(async () => {
+      await Thread.stop();
+      resumed = true;
+    });
+    expect(await thread.join(0.01)).toBeNull();
+    expect(thread.isAlive()).toBe(true);
+    expect(thread.terminate()).toBe(thread);
+    expect(await thread.join()).toBe(thread);
+    expect(thread.isAlive()).toBe(false);
+    expect(resumed).toBe(false);
+  });
+
+  it("join with a limit returns the thread once it finishes", async () => {
+    const thread = new Thread(async () => {
+      await Thread.pass();
+    });
+    expect(await thread.join(1)).toBe(thread);
+  });
+
   it("to_s names the runtime class and the thread name", () => {
     class Worker extends Thread {}
     const thread = new Worker(() => null);

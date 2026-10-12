@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
+import { Concurrent, Tempfile, Thread, getFs, getPath, getOsAsync } from "@blazetrails/ruby-compat";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { ConnectionNotDefined } from "../errors.js";
 import { ConnectionHandler } from "./abstract/connection-handler.js";
@@ -95,7 +95,82 @@ describe("ConnectionHandlersMultiDbTest", () => {
     }
   }
 
-  it.skip("multiple connections works in a threaded environment", () => {});
+  it("multiple connections works in a threaded environment", async () => {
+    class SecondaryBase extends Base {
+      static {
+        this.abstractClass = true;
+        this.connectionClass = true;
+      }
+    }
+    class MultiConnectionTestModel extends SecondaryBase {
+      static {
+        this.tableName = "multi_connection_test_models";
+      }
+    }
+    const tfWriting = Tempfile.open("test_writing");
+    const tfReading = Tempfile.open("test_reading");
+
+    try {
+      await SecondaryBase.connectsTo({
+        database: {
+          writing: { database: tfWriting.path(), adapter: "sqlite3" },
+          secondary: { database: tfReading.path(), adapter: "sqlite3" },
+        },
+      });
+
+      await (
+        await MultiConnectionTestModel.leaseConnection()
+      ).execute("CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))");
+      await (
+        await MultiConnectionTestModel.leaseConnection()
+      ).execute("INSERT INTO multi_connection_test_models VALUES ('writing')");
+
+      await Base.connectedTo({ role: "secondary" }, async () => {
+        await (
+          await MultiConnectionTestModel.leaseConnection()
+        ).execute("CREATE TABLE `multi_connection_test_models` (connection_role VARCHAR (255))");
+        await (
+          await MultiConnectionTestModel.leaseConnection()
+        ).execute("INSERT INTO multi_connection_test_models VALUES ('reading')");
+      });
+
+      const readLatch = new Concurrent.CountDownLatch();
+      const writeLatch = new Concurrent.CountDownLatch();
+
+      await MultiConnectionTestModel.leaseConnection();
+
+      const thread = new Thread(async () => {
+        await MultiConnectionTestModel.leaseConnection();
+
+        await writeLatch.wait();
+        expect(
+          await (
+            await MultiConnectionTestModel.leaseConnection()
+          ).selectValue("SELECT connection_role from multi_connection_test_models"),
+        ).toBe("writing");
+        readLatch.countDown();
+      });
+
+      await Base.connectedTo({ role: "secondary" }, async () => {
+        writeLatch.countDown();
+        expect(
+          await (
+            await MultiConnectionTestModel.leaseConnection()
+          ).selectValue("SELECT connection_role from multi_connection_test_models"),
+        ).toBe("reading");
+        await readLatch.wait();
+      });
+
+      await thread.join();
+    } finally {
+      tfReading.close();
+      tfReading.unlink();
+      tfWriting.close();
+      tfWriting.unlink();
+      await SecondaryBase.removeConnection();
+      await Base.connectionHandler.removeConnectionPool("SecondaryBase", { role: "secondary" });
+    }
+  });
 
   it("loading relations with multi db connections", async () => {
     class SecondaryBase extends Base {

@@ -351,6 +351,8 @@ export class SQLite3Adapter extends AbstractAdapter implements DatabaseAdapter {
     return this.isActive() ?? false;
   }
 
+  declare resetBang: AbstractAdapter["reconnectBang"];
+
   override async disconnectBang(): Promise<void> {
     await super.disconnectBang();
 
@@ -1266,6 +1268,7 @@ function isInvalidAlterTableType(type: string, options: Record<string, unknown>)
   );
 }
 
+SQLite3Adapter.prototype.resetBang = SQLite3Adapter.prototype.reconnectBang;
 SQLite3Adapter.prototype.beginDbTransaction = sqliteBeginDbTransaction;
 SQLite3Adapter.prototype.beginDeferredTransaction = sqliteBeginDeferredTransaction;
 SQLite3Adapter.prototype.beginIsolatedDbTransaction = sqliteBeginIsolatedDbTransaction;
