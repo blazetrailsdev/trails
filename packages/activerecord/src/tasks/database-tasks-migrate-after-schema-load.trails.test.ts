@@ -1,9 +1,10 @@
 import { StringIO } from "@blazetrails/ruby-compat";
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtemp, rm, writeFile } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks } from "./database-tasks.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { Base } from "../base.js";
 import { schemaFormat, setSchemaFormat } from "../active-record.js";
 
@@ -13,6 +14,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   const dirs: string[] = [];
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     Base.configurations({});
     try {
       await Base.removeConnection();
@@ -23,8 +25,10 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
   });
 
   async function connectTo(database: string): Promise<void> {
+    vi.spyOn(DatabaseTasks, "env", "get").mockReturnValue(DEFAULT_ENV());
+    vi.spyOn(DatabaseTasks, "dbDir", "get").mockReturnValue("db");
     Base.configurations({
-      [DatabaseTasks.env.toString()]: {
+      [DEFAULT_ENV()]: {
         primary: {
           adapter: "sqlite3",
           database,
@@ -66,7 +70,7 @@ describe("DatabaseTasksMigrateAfterSchemaLoadTest", () => {
 
     await Base.removeConnection();
     await connectTo(join(dir, "fresh.sqlite3"));
-    const [fresh] = DatabaseTasks.configsFor({ envName: DatabaseTasks.env.toString() });
+    const [fresh] = DatabaseTasks.configsFor({ envName: DEFAULT_ENV() });
     await DatabaseTasks.loadSchema(fresh, "js", schemaFile);
 
     const pending =

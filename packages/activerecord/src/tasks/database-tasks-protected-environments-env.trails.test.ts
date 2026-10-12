@@ -4,6 +4,7 @@ import { mkdtemp, rm } from "fs/promises";
 import { tmpdir } from "os";
 import { join } from "path";
 import { DatabaseTasks, checkCurrentProtectedEnvironmentBang } from "./database-tasks.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { Base } from "../base.js";
 import {
@@ -65,7 +66,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "compares the stored environment against the global default environment",
     async () => {
-      await stampedConfig(DatabaseTasks.env.toString());
+      await stampedConfig(DEFAULT_ENV());
       await DatabaseTasks.checkProtectedEnvironmentsBang(env);
     },
   );
@@ -73,7 +74,7 @@ describe("DatabaseTasksCheckProtectedEnvironmentsCurrentEnvironmentTest", () => 
   it.skipIf(adapterType !== "sqlite" || inMemoryDb())(
     "reports the global default environment as current on a mismatch",
     async () => {
-      const current = DatabaseTasks.env.toString();
+      const current = DEFAULT_ENV();
       expect(current).not.toBe(env);
       await stampedConfig("otherenv");
       const error = await DatabaseTasks.checkProtectedEnvironmentsBang(env).catch(
@@ -185,7 +186,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   });
 
   it.skipIf(skipUnlessFileSqlite)("passes when environments match", async () => {
-    const config = await seededConfig({ storedEnv: DatabaseTasks.env.toString() });
+    const config = await seededConfig({ storedEnv: DEFAULT_ENV() });
     await expect(checkCurrentProtectedEnvironmentBang(config)).resolves.toBeUndefined();
   });
 
@@ -210,7 +211,7 @@ describe("DatabaseTasksCheckCurrentProtectedEnvironmentTest", () => {
   );
 
   it.skipIf(skipUnlessFileSqlite)("passes for an unprotected stored environment", async () => {
-    const current = DatabaseTasks.env.toString();
+    const current = DEFAULT_ENV();
     const config = await seededConfig({ storedEnv: current });
     const protectedEnvironments = Base.protectedEnvironments;
     Base.protectedEnvironments = ["production"];
@@ -304,11 +305,10 @@ describe("PendingMigrationError message", () => {
 
 describe("DatabaseTasks.env", () => {
   const trails = TopLevel.Trails;
-  const env = DatabaseTasks.env;
 
   afterEach(() => {
     TopLevel.Trails = trails;
-    DatabaseTasks.env = env;
+    DatabaseTasks.env = null;
   });
 
   it("memoizes Trails.env itself and finds its configs through it", () => {

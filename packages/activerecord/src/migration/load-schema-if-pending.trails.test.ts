@@ -5,6 +5,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { currentAdapter } from "../support/adapter-helper.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
+import { DEFAULT_ENV } from "../connection-handling.js";
 
 describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendingBang", () => {
   let originalConfigurations: DatabaseConfigurations;
@@ -16,7 +17,7 @@ describe.skipIf(!currentAdapter("SQLite3Adapter"))("Migration.loadSchemaIfPendin
     upToDate = true;
     originalConfigurations = Base.configurations();
     Base.configurations({
-      [DatabaseTasks.env.toString()]: {
+      [DEFAULT_ENV()]: {
         primary: { adapter: "sqlite3", database: ":memory:" },
       },
     });

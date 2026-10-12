@@ -1,5 +1,5 @@
 import { rbInspect } from "@blazetrails/ruby-compat";
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from "vitest";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { ValueType, MissingAttributeError } from "@blazetrails/activemodel";
 import { Base, SerializationTypeMismatch, registerModel } from "./index.js";
@@ -8,7 +8,12 @@ import { fixtures } from "./test-fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
-import { setUseYamlUnsafeLoad } from "./active-record.js";
+import {
+  setUseYamlUnsafeLoad,
+  setYamlColumnPermittedClasses,
+  useYamlUnsafeLoad,
+  yamlColumnPermittedClasses,
+} from "./active-record.js";
 
 class HashObject {
   constructor() {
@@ -39,10 +44,26 @@ class MyObject {
   }
 }
 
+class ImportantTopic extends Topic {
+  static {
+    this.serialize("important", { type: HashObject });
+  }
+}
+registerModel(ImportantTopic);
+
 describe("SerializedAttributeTest", () => {
   const { topics, posts } = fixtures(["topics", "posts"]);
 
-  beforeEach(() => setUseYamlUnsafeLoad(true));
+  let yamlColumnPermittedClassesDefault: unknown[];
+
+  beforeEach(() => {
+    setUseYamlUnsafeLoad(true);
+    yamlColumnPermittedClassesDefault = yamlColumnPermittedClasses();
+  });
+  afterEach(() => {
+    Topic.serialize("content");
+    setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
+  });
   afterAll(() => setUseYamlUnsafeLoad(false));
 
   it("serialize does not eagerly load columns", async () => {
@@ -53,115 +74,83 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized attribute", async () => {
-    class MyObjectTopic extends Topic {
-      static {
-        this.serialize("content", { coder: MyObject });
-      }
-    }
-    registerModel(MyObjectTopic);
+    Topic.serialize("content", { coder: MyObject });
     const myobj = new MyObject("value1", "value2");
-    const topic = await MyObjectTopic.create({ content: myobj as any });
+    const topic = await Topic.create({ content: myobj as any });
     expect((topic as any).content).toEqual(myobj);
-    const reloaded = await MyObjectTopic.find(topic.id as number);
+    const reloaded = await Topic.find(topic.id as number);
     expect((reloaded as any).content).toEqual(myobj);
   });
 
   it("serialized attribute on alias attribute", async () => {
-    class AliasTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.aliasAttribute("object", "content");
         this.serialize("object", { coder: MyObject });
       }
-    }
-    registerModel(AliasTopic);
+    };
     const myobj = new MyObject("value1", "value2");
-    const topic = (await AliasTopic.create({ object: myobj } as any)) as unknown as AliasTopic;
+    const topic = await klass.create({ object: myobj } as any);
     expect((topic as any).object).toEqual(myobj);
-    const reloaded = await AliasTopic.find((topic as any).id as number);
+    const reloaded = await klass.find((topic as any).id as number);
     expect((reloaded as any).object).toEqual(myobj);
   });
 
   it("serialized attribute with default", () => {
-    class DefaultTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.serialize("content", { type: HashObject, default: { key: "value" } });
       }
-    }
-    registerModel(DefaultTopic);
-    const t = new DefaultTopic();
+    };
+    const t = new klass();
     expect((t as any).content).toEqual({ key: "value" });
   });
 
   it("serialized attribute on custom attribute with default", () => {
-    class CustomDefaultTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
         this.serialize("content", { type: HashObject });
       }
-    }
-    registerModel(CustomDefaultTopic);
-    const t = new CustomDefaultTopic();
+    };
+    const t = new klass();
     expect((t as any).content).toEqual({ key: "value" });
   });
 
   it("serialized attribute in base class", async () => {
-    class HashContentTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashContentTopic);
-    class HashImportantTopic extends HashContentTopic {}
-    registerModel(HashImportantTopic);
+    Topic.serialize("content", { type: HashObject });
     const hash = { content1: "value1", content2: "value2" };
-    const topic = await HashImportantTopic.create({ content: hash as any });
+    const topic = await ImportantTopic.create({ content: hash as any });
     expect((topic as any).content).toEqual(hash);
-    const reloaded = await HashImportantTopic.find(topic.id as number);
+    const reloaded = await ImportantTopic.find(topic.id as number);
     expect((reloaded as any).content).toEqual(hash);
   });
 
   it("serialized attributes from database on subclass", async () => {
-    class HashBaseTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashBaseTopic);
-    class SubTopic extends HashBaseTopic {}
-    registerModel(SubTopic);
-    const t = new SubTopic({ content: { foo: "bar" } } as any);
+    Topic.serialize("content", { type: HashObject });
+    const t = new ImportantTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
-    const last = await SubTopic.last();
+    const last = await ImportantTopic.last();
     expect((last as any).content).toEqual({ foo: "bar" });
   });
 
   it("serialized attribute calling dup method", () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    const orig = new JsonTopic({ content: { foo: "bar" } } as any);
+    Topic.serialize("content", { coder: JSON });
+    const orig = new Topic({ content: { foo: "bar" } } as any);
     const clone = orig.dup();
     expect((orig as any).content).toEqual((clone as any).content);
   });
 
   it("serialized json attribute returns unserialized value", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
+    Topic.serialize("content", { coder: JSON });
     const myPost = posts("welcome");
-    const t = new JsonTopic({ content: myPost } as any);
+    const t = new Topic({ content: myPost } as any);
     await t.save();
-    const reloaded = await JsonTopic.find(t.id as number);
+    const reloaded = await Topic.find(t.id as number);
     expect((reloaded as any).content).toBeInstanceOf(Object);
     expect((reloaded as any).content.id).toEqual(myPost.id);
     expect((reloaded as any).content.title).toEqual(myPost.title);
@@ -169,74 +158,44 @@ describe("SerializedAttributeTest", () => {
 
   // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies raw "null" string decoding via raw SQL update
   it("json read legacy null", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    const t = (await JsonTopic.create({ title: "test" } as any)) as unknown as InstanceType<
-      typeof JsonTopic
-    >;
+    Topic.serialize("content", { coder: JSON });
+    const t = await Topic.create({ title: "test" } as any);
     await ((await Base.leaseConnection()) as any).execute(
       `UPDATE topics SET content = 'null' WHERE id = ${(t as any).id}`,
     );
-    const reloaded = await JsonTopic.find((t as any).id as number);
+    const reloaded = await Topic.find((t as any).id as number);
     expect((reloaded as any).content).toBeNull();
   });
 
   // eslint-disable-next-line blazetrails/test-fixture-parity -- fixture data unused; test verifies SQL NULL decoding via raw SQL update
   it("json read db null", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    const t = await JsonTopic.create({ title: "test", content: "placeholder" as any });
+    Topic.serialize("content", { coder: JSON });
+    const t = await Topic.create({ title: "test", content: "placeholder" as any });
     await ((await Base.leaseConnection()) as any).execute(
       `UPDATE topics SET content = NULL WHERE id = ${(t as any).id}`,
     );
-    const reloaded = await JsonTopic.find((t as any).id as number);
+    const reloaded = await Topic.find((t as any).id as number);
     expect((reloaded as any).content).toBeNull();
   });
 
   it("serialized attribute declared in subclass", async () => {
-    class LocalImportantTopic extends Topic {
-      static {
-        this.serialize("important", { type: HashObject });
-      }
-    }
-    registerModel(LocalImportantTopic);
     const hash = { important1: "value1", important2: "value2" };
-    const topic = await LocalImportantTopic.create({ important: hash as any });
+    const topic = await ImportantTopic.create({ important: hash as any });
     expect((topic as any).important).toEqual(hash);
-    const reloaded = await LocalImportantTopic.find(topic.id as number);
+    const reloaded = await ImportantTopic.find(topic.id as number);
     expect((reloaded as any).important).toEqual(hash);
     expect((reloaded as any).readAttribute("important")).toEqual(hash);
   });
 
   it("serialized time attribute", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
     const myobj = new Date("2008-01-01T01:00:00Z").toISOString();
-    const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
+    const topic = await (await Topic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
   });
 
   it("serialized string attribute", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
     const myobj = "Yes";
-    const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
+    const topic = await (await Topic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
   });
 
@@ -254,25 +213,14 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("nil not serialized without class constraint", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    expect(await new JsonTopic({ content: null } as any).save()).toBeTruthy();
-    expect(await JsonTopic.where({ content: null }).count()).toEqual(1);
+    expect(await new Topic({ content: null } as any).save()).toBeTruthy();
+    expect(await Topic.where({ content: null }).count()).toEqual(1);
   });
 
   it("nil not serialized with class constraint", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    expect(await new HashTopic({ content: null } as any).save()).toBeTruthy();
-    expect(await HashTopic.where({ content: null }).count()).toEqual(1);
+    Topic.serialize("content", { type: HashObject });
+    expect(await new Topic({ content: null } as any).save()).toBeTruthy();
+    expect(await Topic.where({ content: null }).count()).toEqual(1);
   });
 
   it.skip("serialized attribute should raise exception on assignment with wrong type", () => {
@@ -280,80 +228,49 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    class FlexTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(FlexTopic);
-    const topic = new FlexTopic({ content: { zomg: true } } as any);
+    const topic = new Topic({ content: { zomg: true } } as any);
     expect(await topic.save()).toBeTruthy();
-    FlexTopic.serialize("content", { type: Array });
-    const found = await FlexTopic.find(topic.id as number);
+    Topic.serialize("content", { type: Array });
+    const found = await Topic.find(topic.id as number);
     expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
   });
 
   it("serialized attribute with class constraint", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
+    Topic.serialize("content", { type: HashObject });
     const settings = { color: "blue" };
-    const topic = new HashTopic({ content: settings } as any);
+    const topic = new Topic({ content: settings } as any);
     expect(await topic.save()).toBeTruthy();
-    const found = await HashTopic.find(topic.id as number);
+    const found = await Topic.find(topic.id as number);
     expect((found as any).content).toEqual(settings);
   });
 
   it("where by serialized attribute with array", async () => {
-    class ArrayTopic extends Topic {
-      static {
-        this.serialize("content", { type: Array });
-      }
-    }
-    registerModel(ArrayTopic);
+    Topic.serialize("content", { type: Array });
     const settings = [{ color: "green" }];
-    const topic = await ArrayTopic.create({ content: settings as any });
-    const found = await ArrayTopic.where({ content: settings }).take();
+    const topic = await Topic.create({ content: settings as any });
+    const found = await Topic.where({ content: settings }).take();
     expect((found as any)?.id).toBe(topic.id);
   });
 
   it("where by serialized attribute with hash", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
+    Topic.serialize("content", { type: HashObject });
     const settings = { color: "green" };
-    const topic = await HashTopic.create({ content: settings as any });
-    const found = await HashTopic.where({ content: settings }).take();
+    const topic = await Topic.create({ content: settings as any });
+    const found = await Topic.where({ content: settings }).take();
     expect((found as any)?.id).toBe(topic.id);
   });
 
   it("where by serialized attribute with hash in array", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
+    Topic.serialize("content", { type: HashObject });
     const settings = { color: "green" };
-    const topic = await HashTopic.create({ content: settings as any });
-    const found = await HashTopic.where({ content: [settings, { herring: "red" }] }).take();
+    const topic = await Topic.create({ content: settings as any });
+    const found = await Topic.where({ content: [settings, { herring: "red" }] }).take();
     expect((found as any)?.id).toBe(topic.id);
   });
 
   it("serialized default class", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    const topic = new HashTopic();
+    Topic.serialize("content", { type: HashObject });
+    const topic = new Topic();
     expect((topic as any).content.constructor).toEqual(Object);
     expect((topic as any).readAttribute("content").constructor).toEqual(Object);
     (topic as any).content["beer"] = "MadridRb";
@@ -369,26 +286,14 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized boolean value true", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    let topic: any = new JsonTopic({ content: true } as any);
+    let topic: any = new Topic({ content: true } as any);
     expect(await topic.save()).toBeTruthy();
     topic = await topic.reload();
     expect(topic.content).toBe(true);
   });
 
   it("serialized boolean value false", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    let topic: any = new JsonTopic({ content: false } as any);
+    let topic: any = new Topic({ content: false } as any);
     expect(await topic.save()).toBeTruthy();
     topic = await topic.reload();
     expect(topic.content).toBe(false);
@@ -405,15 +310,10 @@ describe("SerializedAttributeTest", () => {
         return { foo: value as string };
       },
     };
-    class CoderTopic extends Topic {
-      static {
-        this.serialize("content", { coder: someClass });
-      }
-    }
-    registerModel(CoderTopic);
-    const topic = new CoderTopic({ content: { foo: "my value" } } as any);
+    Topic.serialize("content", { coder: someClass });
+    const topic = new Topic({ content: { foo: "my value" } } as any);
     await topic.save();
-    const reloaded = await CoderTopic.find(topic.id as number);
+    const reloaded = await Topic.find(topic.id as number);
     expect((reloaded as any).content).toBeInstanceOf(Object);
     expect((reloaded as any).content).toEqual({ foo: "my value" });
   });
@@ -437,15 +337,10 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("unexpected serialized type", async () => {
-    class FlexTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(FlexTopic);
-    const topic = await FlexTopic.create({ content: { zomg: true } as any });
-    FlexTopic.serialize("content", { type: Array });
-    const reloaded = await FlexTopic.find(topic.id as number);
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: { zomg: true } as any });
+    Topic.serialize("content", { type: Array });
+    const reloaded = await Topic.find(topic.id as number);
     let error: any;
     expect(() => {
       try {
@@ -460,43 +355,26 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("serialized column should unserialize after update column", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    const t = await JsonTopic.create({ content: "first" as any });
+    const t = await Topic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
     await t.updateColumn("content", ["second"]);
     expect((t as any).content).toEqual(["second"]);
-    const reloaded = await JsonTopic.find(t.id as number);
+    const reloaded = await Topic.find(t.id as number);
     expect((reloaded as any).content).toEqual(["second"]);
   });
 
   it("serialized column should unserialize after update attribute", async () => {
-    class JsonTopic extends Topic {
-      static {
-        this.serialize("content", { coder: JSON });
-      }
-    }
-    registerModel(JsonTopic);
-    const t = await JsonTopic.create({ content: "first" as any });
+    const t = await Topic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
     await t.updateAttribute("content", "second");
     expect((t as any).content).toBe("second");
-    const reloaded = await JsonTopic.find(t.id as number);
+    const reloaded = await Topic.find(t.id as number);
     expect((reloaded as any).content).toBe("second");
   });
 
   it("nil is not changed when serialized with a class", () => {
-    class ArrayTopic extends Topic {
-      static {
-        this.serialize("content", { type: Array });
-      }
-    }
-    registerModel(ArrayTopic);
-    const topic = new ArrayTopic({ content: null } as any);
+    Topic.serialize("content", { type: Array });
+    const topic = new Topic({ content: null } as any);
     expect(topic.attributeChanged("content")).toBeFalsy();
   });
 
@@ -505,17 +383,12 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("newly emptied serialized hash is changed", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    const topic = await HashTopic.create({ content: { things: "stuff" } as any });
-    const reloaded = await HashTopic.find(topic.id as number);
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: { things: "stuff" } as any });
+    const reloaded = await Topic.find(topic.id as number);
     delete (reloaded as any).content["things"];
     await reloaded.save();
-    const found = await HashTopic.find(topic.id as number);
+    const found = await Topic.find(topic.id as number);
     expect((found as any).content).toEqual({});
   });
 
@@ -528,15 +401,10 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("values cast from nil are persisted as nil", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    const topic = await HashTopic.create({ content: {} as any });
-    const topic2 = await HashTopic.create({ content: null as any });
-    const found = await HashTopic.where({ content: null });
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: {} as any });
+    const topic2 = await Topic.create({ content: null as any });
+    const found = await Topic.where({ content: null });
     expect(found.sort((a: any, b: any) => a.id - b.id).map((t: any) => t.id)).toEqual([
       topic.id,
       topic2.id,
@@ -562,15 +430,10 @@ describe("SerializedAttributeTest", () => {
   });
 
   it("nil is always persisted as null", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    const topic = await HashTopic.create({ content: { foo: "bar" } as any });
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
-    const found = await HashTopic.where({ content: null });
+    const found = await Topic.where({ content: null });
     expect(found.map((t: any) => t.id)).toEqual([topic.id]);
   });
 
@@ -610,14 +473,13 @@ describe("SerializedAttributeTest", () => {
         return this.serialize(newValue) !== rawOldValue;
       }
     }
-    class CoderTopic extends Topic {
+    const model = class extends Topic {
       static {
         this.attribute("content", new MutableStringType());
         this.serialize("content", { coder });
       }
-    }
-    registerModel(CoderTopic);
-    const topic = await CoderTopic.create({ content: "bar" as any });
+    };
+    const topic = await model.create({ content: "bar" as any });
     void (topic as any).content;
     expect(topic.isChanged).toBeFalsy();
   });
@@ -630,101 +492,90 @@ describe("SerializedAttributeTest", () => {
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   fixtures(["topics"]);
 
+  let useYamlUnsafeLoadWas: boolean;
+  let yamlColumnPermittedClassesDefault: unknown[];
+
+  beforeEach(() => {
+    useYamlUnsafeLoadWas = useYamlUnsafeLoad();
+    yamlColumnPermittedClassesDefault = yamlColumnPermittedClasses();
+    setUseYamlUnsafeLoad(false);
+  });
+  afterEach(() => {
+    Topic.serialize("content");
+    setYamlColumnPermittedClasses(yamlColumnPermittedClassesDefault);
+    setUseYamlUnsafeLoad(useYamlUnsafeLoadWas);
+  });
+
   it("serialized attribute", async () => {
-    class ArrayTopic extends Topic {
-      static {
-        this.serialize("content", { type: Array });
-      }
-    }
-    registerModel(ArrayTopic);
+    Topic.serialize("content", { type: Array });
     const myobj = ["value1"];
-    const topic = await ArrayTopic.create({ content: myobj as any });
+    const topic = await Topic.create({ content: myobj as any });
     expect((topic as any).content).toEqual(myobj);
-    const reloaded = await ArrayTopic.find(topic.id as number);
+    const reloaded = await Topic.find(topic.id as number);
     expect((reloaded as any).content).toEqual(myobj);
   });
 
   it("serialized attribute on custom attribute with default", () => {
-    class DefaultTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
         this.serialize("content", { type: HashObject });
       }
-    }
-    registerModel(DefaultTopic);
-    const t = new DefaultTopic();
+    };
+    const t = new klass();
     expect((t as any).content).toEqual({ key: "value" });
   });
 
   it("nil is always persisted as null", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
-    const topic = await HashTopic.create({ content: { foo: "bar" } as any });
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: { foo: "bar" } as any });
     await topic.updateAttribute("content", null);
-    const found = await HashTopic.where({ content: null });
+    const found = await Topic.where({ content: null });
     expect(found.map((t: any) => t.id)).toEqual([topic.id]);
   });
 
   it("serialized attribute with default", () => {
-    class DefaultTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.attribute("content", "text", { default: { key: "value" } });
         this.serialize("content", { type: HashObject });
       }
-    }
-    registerModel(DefaultTopic);
-    const t = new DefaultTopic();
+    };
+    const t = new klass();
     expect((t as any).content).toEqual({ key: "value" });
   });
 
   it("serialized attributes from database on subclass", async () => {
-    class HashBaseTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashBaseTopic);
-    class SubTopic extends HashBaseTopic {}
-    registerModel(SubTopic);
-    const t = new SubTopic({ content: { foo: "bar" } } as any);
+    Topic.serialize("content", { type: HashObject });
+    const t = new ImportantTopic({ content: { foo: "bar" } } as any);
     expect((t as any).content).toEqual({ foo: "bar" });
     await t.save();
-    const last = await SubTopic.last();
+    const last = await ImportantTopic.last();
     expect((last as any).content).toEqual({ foo: "bar" });
   });
 
   it("serialized attribute on alias attribute", async () => {
-    class AliasTopic extends Topic {
+    const klass = class extends Base {
       static {
-        this._tableName = "topics";
+        this.tableName = Topic.tableName;
         this.aliasAttribute("object", "content");
         this.serialize("object", { type: HashObject });
       }
-    }
-    registerModel(AliasTopic);
+    };
     const myobj = { somevalue: "thevalue" };
-    const topic = (await AliasTopic.create({ object: myobj } as any)) as unknown as AliasTopic;
+    const topic = await klass.create({ object: myobj } as any);
     expect((topic as any).object).toEqual(myobj);
-    const reloaded = await AliasTopic.find((topic as any).id as number);
+    const reloaded = await klass.find((topic as any).id as number);
     expect((reloaded as any).object).toEqual(myobj);
   });
 
   it("unexpected serialized type", async () => {
-    class FlexTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(FlexTopic);
-    const topic = await FlexTopic.create({ content: { zomg: true } as any });
-    FlexTopic.serialize("content", { type: Array });
-    const reloaded = await FlexTopic.find(topic.id as number);
+    Topic.serialize("content", { type: HashObject });
+    const topic = await Topic.create({ content: { zomg: true } as any });
+    Topic.serialize("content", { type: Array });
+    const reloaded = await Topic.find(topic.id as number);
     let error: any;
     expect(() => {
       try {
@@ -739,31 +590,20 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
   });
 
   it("serialize attribute via select method when time zone available", async () => {
-    class HashTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(HashTopic);
+    Topic.serialize("content", { type: HashObject });
     const myobj = { somevalue: "thevalue" };
-    const topic = await HashTopic.create({ content: myobj as any });
-    const found = await HashTopic.select("id", "content").find(topic.id as number);
+    const topic = await Topic.create({ content: myobj as any });
+    const found = await Topic.select("id", "content").find(topic.id as number);
     expect((found as any).content).toEqual(myobj);
-    const partial = await HashTopic.select("id").find(topic.id as number);
+    const partial = await Topic.select("id").find(topic.id as number);
     expect(() => (partial as any).content).toThrow(MissingAttributeError);
   });
 
   it("should raise exception on serialized attribute with type mismatch", async () => {
-    class FlexTopic extends Topic {
-      static {
-        this.serialize("content", { type: HashObject });
-      }
-    }
-    registerModel(FlexTopic);
-    const topic = new FlexTopic({ content: { somevalue: "thevalue" } } as any);
+    const topic = new Topic({ content: { somevalue: "thevalue" } } as any);
     expect(await topic.save()).toBeTruthy();
-    FlexTopic.serialize("content", { type: Array });
-    const found = await FlexTopic.find(topic.id as number);
+    Topic.serialize("content", { type: Array });
+    const found = await Topic.find(topic.id as number);
     expect(() => (found as any).content).toThrow(SerializationTypeMismatch);
   });
 

@@ -1,8 +1,9 @@
 import { connect } from "./support/connection.js";
 import { getEnv } from "@blazetrails/activesupport";
-import { RuntimeError } from "@blazetrails/ruby-compat";
+import { RuntimeError, getOs } from "@blazetrails/ruby-compat";
 import { Base } from "./base.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
+import { SQLiteDatabaseTasks } from "./tasks/sqlite-database-tasks.js";
 
 const { adapter, envConfig } = await connect();
 
@@ -28,7 +29,9 @@ if (await canonicalSchemaUpToDate(await Base.leaseConnection())) {
   await stampCanonicalSchema(conn, undefined, intact ? laid : undefined);
   await recordBootOutcome("fastPath", await canonicalSchemaUpToDate(conn));
 } else {
-  if (ownsDatabase) {
+  if (adapter === "sqlite" && ownsDatabase) {
+    await new SQLiteDatabaseTasks(envConfig, getOs().cwd()).purge();
+  } else if (ownsDatabase) {
     await DatabaseTasks.purge(envConfig);
   } else {
     await dropAllTables(await Base.leaseConnection());

@@ -14,7 +14,7 @@ describe("SQLiteDatabaseTasks#establish_connection", () => {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    const tasks = new SQLiteDatabaseTasks(configuration);
+    const tasks = new SQLiteDatabaseTasks(configuration, "/rails/root");
     vi.spyOn(Base, "establishConnection").mockImplementation(async () => {
       calls.push("establishConnection");
       return undefined as never;

@@ -95,7 +95,7 @@ describe("SQLiteDatabaseTasks", () => {
       await (seedAdapter as unknown as { disconnectBang(): Promise<void> }).disconnectBang();
 
       await DatabaseTasks.withTemporaryConnection(sourceConfig, async () => {
-        await new SQLiteDatabaseTasks(sourceConfig).structureDump(dumpPath, null);
+        await new SQLiteDatabaseTasks(sourceConfig, "/rails/root").structureDump(dumpPath, null);
       });
 
       const dumped = fs.readFileSync(dumpPath, "utf8");
@@ -109,7 +109,7 @@ describe("SQLiteDatabaseTasks", () => {
       });
       fs.writeFileSync(loadDbPath, "");
       await DatabaseTasks.withTemporaryConnection(targetConfig, async () => {
-        await new SQLiteDatabaseTasks(targetConfig).structureLoad(dumpPath, null);
+        await new SQLiteDatabaseTasks(targetConfig, "/rails/root").structureLoad(dumpPath, null);
       });
 
       const loadedAdapter = new BetterSQLite3Adapter({ database: loadDbPath });
@@ -157,7 +157,7 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
       adapter: "sqlite3",
       database: ":memory:",
     });
-    const connection = await new SQLiteDatabaseTasks(config).create();
+    const connection = await new SQLiteDatabaseTasks(config, "/rails/root").create();
     const { connectionHandler } = Base;
     const pool = connectionHandler.retrieveConnectionPool("ActiveRecord::Base")!;
     expect(await pool.withConnection((conn) => conn)).toBe(connection);
@@ -175,7 +175,9 @@ describe("SQLiteDatabaseTasks in-memory URI variants", () => {
         adapter: "sqlite3",
         database,
       });
-      await expect(new SQLiteDatabaseTasks(config).drop()).rejects.toThrow(NoDatabaseError);
+      await expect(new SQLiteDatabaseTasks(config, "/rails/root").drop()).rejects.toThrow(
+        NoDatabaseError,
+      );
     }
   });
 });
@@ -219,7 +221,7 @@ describe("SQLiteDatabaseTasks in-memory structure dump", () => {
   };
 
   it("leaves the live in-memory connection untouched, as Rails' child process does", async () => {
-    await new SQLiteDatabaseTasks(configuration).structureLoad(
+    await new SQLiteDatabaseTasks(configuration, "/rails/root").structureLoad(
       sqlFile("CREATE TABLE widgets (id INTEGER PRIMARY KEY);\n"),
       null,
     );
