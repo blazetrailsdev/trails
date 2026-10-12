@@ -124,6 +124,34 @@ describe("FixtureSet", () => {
       });
     });
 
+    it("render context lookup scope", () => {
+      const defined = (constant: string) => `<%= typeof ${constant} === "undefined" ? null : "constant" %>`; // prettier-ignore
+      const yaml = `one:
+  ActiveRecord: ${defined("ActiveRecord")}
+  ActiveRecord_FixtureSet: ${defined("ActiveRecord.FixtureSet")}
+  FixtureSet: ${defined("FixtureSet")}
+  ActiveRecord_FixtureSet_File: ${defined("ActiveRecord.FixtureSet.File")}
+  File: <%= File.name %>
+`;
+
+      const golden = [
+        [
+          "one",
+          {
+            ActiveRecord: "constant",
+            ActiveRecord_FixtureSet: "constant",
+            FixtureSet: null,
+            ActiveRecord_FixtureSet_File: "constant",
+            File: "File",
+          },
+        ],
+      ];
+
+      tmpYaml(["curious", "yml"], yaml, (t) => {
+        expect(File.open(t.path()!, (fh) => [...fh])).toEqual(golden);
+      });
+    });
+
     it("removes fixture config row", () => {
       File.open(RubyFile.join(FIXTURES_ROOT, "other_posts.yml"), (fh) => {
         expect([...fh].map(([name]) => name)).toEqual(["second_welcome"]);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Builder, LazyAttributeSet, LazyAttributeHash } from "./builder.js";
 import { Attribute } from "../attribute.js";
-import { hasKey, hashAref, keys } from "@blazetrails/ruby-compat";
+import { Hash, hasKey, hashAref, keys } from "@blazetrails/ruby-compat";
 import { registry } from "../type.js";
 
 const typeRegistry = registry();
@@ -294,9 +294,7 @@ describe("names Object.prototype answers", () => {
   });
 
   it("LazyAttributeSet reads the default of a types hash that carries one", () => {
-    const types = new Proxy({} as Record<string, typeof strType>, {
-      get: (target, prop) => (Object.hasOwn(target, prop) ? target[prop as string] : strType),
-    });
+    const types = new Hash<string, typeof strType>(strType);
     for (const name of [...names, "aliased"]) {
       const lazy = new LazyAttributeSet({ [name]: "x" }, types, {}, {});
       expect(lazy.getAttribute(name).type).toBe(strType);

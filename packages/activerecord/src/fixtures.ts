@@ -19,6 +19,7 @@ import {
   RuntimeError,
   StandardError,
   Zlib,
+  rbModConstSet,
   rbObjRespondTo,
   slice,
   update,
@@ -441,5 +442,7 @@ export class Fixture {
 }
 
 ActiveRecord.Fixture = Fixture;
+rbModConstSet(ActiveRecord, "FixtureSet", FixtureSet);
+rbModConstSet(FixtureSet, "File", File);
 
 runLoadHooks("active_record_fixture_set", FixtureSet);

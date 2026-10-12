@@ -25,6 +25,15 @@ describe("assertionValueMismatch", () => {
     ).toEqual([{ kind: "equal", rails: ["s:short"], trails: ["s:long"] }]);
   });
 
+  it("folds a Ruby instance variable onto this.ivar", () => {
+    const mismatch = (rails: string, trails: string) =>
+      assertionValueMismatch(["assert_equal"], [`s:${rails}`], ["toEqual"], [`s:${trails}`], false);
+    expect(mismatch("`@object.num` didn't change", "`this.object.num` didn't change")).toBeNull();
+    expect(mismatch("`@object.num` didn't change", "`object.num` didn't change")).not.toBeNull();
+    expect(mismatch("a@b.com", "athis.b.com")).not.toBeNull();
+    expect(mismatch("@@ -1 @@", "@this. -1 @this.")).not.toBeNull();
+  });
+
   it("folds a TOKEN_RENAMES file extension onto its trails spelling", () => {
     expect(
       assertionValueMismatch(["assert_equal"], ["s:schema.rb"], ["toBe"], ["s:schema.ts"], false),

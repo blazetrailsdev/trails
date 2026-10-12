@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Enumerator, toEnum } from "./enumerator.js";
+import { block } from "./hash.js";
+import { StopIteration } from "./stop-iteration.js";
 
 describe("Enumerator", () => {
   const source = {
@@ -42,5 +44,24 @@ describe("Enumerator", () => {
         throw new Error("boom");
       }),
     ).toThrow("boom");
+  });
+
+  it("next resumes a generator block one element at a time, then raises StopIteration", async () => {
+    const ran: string[] = [];
+    const enumerator = new Enumerator<number>(
+      block(async (yielder: { yield(value: number): unknown }) => {
+        ran.push("first");
+        await yielder.yield(1);
+        ran.push("second");
+        await yielder.yield(2);
+      }),
+    );
+
+    expect(await enumerator.next()).toBe(1);
+    expect(ran).toEqual(["first"]);
+    expect(await enumerator.next()).toBe(2);
+    await expect(enumerator.next()).rejects.toThrow(new StopIteration("iteration reached an end"));
+    await expect(enumerator.next()).rejects.toThrow(StopIteration);
+    expect(ran).toEqual(["first", "second"]);
   });
 });

@@ -2,7 +2,7 @@ import { assertValidKeys, isPlainObject } from "@blazetrails/activesupport";
 import { Enumerable, include, rtest, RuntimeError } from "@blazetrails/ruby-compat";
 import { ConfigurationFile } from "@blazetrails/activesupport/configuration-file";
 
-import { FormatError } from "../fixtures.js";
+import { ActiveRecord } from "../namespaces.js";
 import { RenderContext } from "./render-context.js";
 
 const fixtureModules = new Map<string, Record<string, unknown>>();
@@ -80,14 +80,14 @@ export class File {
         return rtest(data) ? toA(this.validate(data)) : [];
       } catch (error: unknown) {
         if (!(error instanceof RuntimeError)) throw error;
-        throw new FormatError(error.message);
+        throw new ActiveRecord.Fixture.FormatError(error.message);
       }
     })());
   }
 
   private validateConfigRow(data: unknown): Record<string, unknown> {
     if (!isPlainObject(data)) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `Invalid \`_fixture\` section: \`_fixture\` must be a hash: ${this.file}`,
       );
     }
@@ -95,7 +95,7 @@ export class File {
     try {
       assertValidKeys(data, ["model_class", "ignore"]);
     } catch (error: unknown) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `Invalid \`_fixture\` section: ${(error as Error).message}: ${this.file}`,
       );
     }
@@ -105,12 +105,12 @@ export class File {
 
   private validate(data: unknown): Record<string, unknown> | Map<unknown, unknown> {
     if (!isPlainObject(data) && !(data instanceof Map)) {
-      throw new FormatError(`fixture is not a hash: ${this.file}`);
+      throw new ActiveRecord.Fixture.FormatError(`fixture is not a hash: ${this.file}`);
     }
 
     const invalid = toA(data).filter(([, row]) => !isPlainObject(row));
     if (invalid.length > 0) {
-      throw new FormatError(
+      throw new ActiveRecord.Fixture.FormatError(
         `fixture key is not a hash: ${this.file}, keys: ` +
           `[${invalid.map(([key]) => JSON.stringify(key)).join(", ")}]`,
       );

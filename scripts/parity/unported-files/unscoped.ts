@@ -169,17 +169,6 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
       "ruby-compat-pathname-join-and-file-join-to-path.",
   },
   {
-    testFile: "fixture_set/file_test.rb",
-    tests: ["render context lookup scope"],
-    reason:
-      "Asserts Ruby constant-lookup scope inside the rendering context — " +
-      "`defined? ActiveRecord`, `defined? ActiveRecord::FixtureSet::File`, `File.name` " +
-      "(file_test.rb:97-116). Constants are resolved lexically against the enclosing " +
-      "Ruby module nesting; an ESM module has no nesting to resolve against and no " +
-      "`defined?`, so there is nothing to assert. The other 13 cases are ported in " +
-      "fixture-set/file.test.ts.",
-  },
-  {
     pattern: "destroy_association_async_job.rb", // no test counterpart
     reason:
       "ActiveJob subclass that backs `dependent: :destroy_async`. Trails has not " +
@@ -278,30 +267,12 @@ export const UNSCOPED_UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "connection_pool_test.rb",
-    tests: ["lock thread allow fiber reentrency"],
-    reason:
-      "connection_pool_test.rb:1026-1037 opens a nested transaction inside an `Enumerator.new` " +
-      "block and reads it with external `enumerator.next`, which MRI runs on a second Fiber " +
-      "under the same thread. ruby-compat's Enumerator has no external `next`. Tracked by " +
-      "story activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
-  },
-  {
-    testFile: "connection_pool_test.rb",
-    tests: ["concurrent connection establishment"],
-    reason:
-      "connection_pool_test.rb:631-666 parks every thread inside an overridden `new_connection` " +
-      "on a latch. trails' `ConnectionPool#newConnection` is synchronous, so its body cannot " +
-      "await the latch. Tracked by story " +
-      "activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
-  },
-  {
-    testFile: "connection_pool_test.rb",
     tests: ["full pool blocking shares load interlock"],
     reason:
       "connection_pool_test.rb:151-188 takes `ActiveSupport::Dependencies.interlock.running` and " +
       "`.loading`; `ActiveSupport::Dependencies::Interlock` (dependencies/interlock.rb) is not " +
       "ported. Tracked by story " +
-      "activerecord-port-pool-tests-blocked-on-enumerator-interlock-and-sync-new-connection.",
+      "pool-test-full-pool-blocking-shares-load-interlock-needs-owner-ruling.",
   },
   // --- Permanently not-portable: GVL / Ruby Thread + fork in mixed files ---
   {
