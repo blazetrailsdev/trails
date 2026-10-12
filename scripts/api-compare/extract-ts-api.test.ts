@@ -3583,8 +3583,6 @@ describe("extractFromProgram — include() detection", () => {
   });
 
   it("reads the superclass through a parenthesized `as` cast", () => {
-    // `type/date.ts` widens its parent's constructor type for an included
-    // `initialize`; the cast is compile-time only, so the parent is the operand.
     const info = extractFromFiles("/p", {
       "base.ts": `export class Base {}`,
       "derived.ts": `
