@@ -5,6 +5,7 @@ export interface ClassOptionConfig {
   aliases?: string | string[];
   desc?: string;
   type?: "boolean" | "string" | "numeric";
+  enum?: string[];
   default?: unknown;
 }
 

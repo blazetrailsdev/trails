@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdapterNotSpecified, HashConfig } from "@blazetrails/activerecord";
 import { assertRaises } from "@blazetrails/activesupport";
 import { SystemExit, stderr } from "@blazetrails/ruby-compat";
-import { DBConsole } from "./dbconsole.js";
+import { DBConsole, DbconsoleCommand } from "./dbconsole.js";
 
 const database = vi.hoisted(() => ({ results: {} as Record<string, unknown> }));
 
@@ -70,6 +70,14 @@ describe("Rails::DBConsoleTest", () => {
     await appDbConfig(null, async () => {
       await expect(new DBConsole().dbConfig()).rejects.toThrow(AdapterNotSpecified);
     });
+  });
+
+  it("rails env is development when environment option is dev", () => {
+    vi.spyOn(
+      DbconsoleCommand.prototype as unknown as { availableEnvironments(): string[] },
+      "availableEnvironments",
+    ).mockReturnValue(["development", "test"]);
+    expect(new DbconsoleCommand({ environment: "dev" }).options.environment).toMatch("development");
   });
 
   it("unknown command line client", async () => {

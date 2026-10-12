@@ -432,10 +432,6 @@ answer, and ask it in line:
 - `InsertAll#primary_keys` (`insert_all.rb:61-63`) reads
   `@model.schema_cache.primary_keys(model.table_name)`, and
   `InsertAll#initialize` reads it and `supports_insert_returning?` (`:39`).
-- `DatabaseStatements#sql_for_insert`
-  (`abstract/database_statements.rb:702-717`) reads `supports_insert_returning?`,
-  which SQLite and MySQL answer off `database_version`, and with no `pk` given
-  it reads `primary_key(table_ref)`.
 
 - `PostgreSQL::Quoting#lookup_cast_type_from_column`
   (`postgresql/quoting.rb:189-192`) runs `verify! if type_map.nil?`, which
@@ -462,9 +458,6 @@ and the synchronous body peeks at the warmed value.**
   client library.
 - `InsertAll` awaits its facts before construction, and `primaryKeys` returns
   the warmed list.
-- `execInsert` awaits `databaseVersion` and, with no `pk` given, the schema
-  cache's primary keys for the statement's table. `supportsInsertReturning` and
-  `sqlForInsert` are synchronous and read both.
 
 - `lookupCastTypeFromColumn` keeps Rails' line and cannot await it. On a cold
   type map it starts `verifyBang` and the lookup raises `TypeError` off the
@@ -496,9 +489,7 @@ This is a genuine language shortcoming, ratified repo-wide here. The omitted
 `@missingRailsCall … — PERMANENT`, `warmMaxIdentifierLength` carries
 `@noRailsEquivalent PERMANENT`, and MySQL's escape-state arm carries
 `@inventedArm if — PERMANENT`, `buildFixtureSql`'s warm step carries
-`@inventedArm if` / `verifyBang — PERMANENT`, `execInsert`'s warm step carries
-`@inventedArm if` / `primaryKeys — PERMANENT` and `sqlForInsert` a
-`@missingRailsCall primary_key — PERMANENT`, and `mismatchedForeignKey`'s
+`@inventedArm if` / `verifyBang — PERMANENT`, and `mismatchedForeignKey`'s
 promise arm carries `@inventedArm then — PERMANENT`, all against this section.
 A new instance is not a new decision to argue.
 

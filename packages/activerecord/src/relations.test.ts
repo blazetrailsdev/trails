@@ -196,10 +196,8 @@ describe("RelationTest", () => {
   });
 
   it("to yaml", async () => {
-    const birds = await Bird.all().load();
-    expect(() => YAML.dump(birds)).not.toThrow();
-    const records = await Bird.all();
-    expect(() => YAML.dump(records)).not.toThrow();
+    await expect(Bird.all().toYaml()).resolves.not.toThrow();
+    await expect((async () => YAML.toYaml(await Bird.all()))()).resolves.not.toThrow();
   });
 
   it("to xml", async () => {

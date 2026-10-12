@@ -32,6 +32,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: true }))).toBe(true);
@@ -41,6 +42,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => false;
     expect(await adapter.returnValueAfterInsert(makeColumn({ autoIncrement: false }))).toBe(false);
@@ -50,6 +52,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn({ defaultFunction: "uuid()" }))).toBe(
@@ -61,6 +64,7 @@ describe("AbstractMysqlAdapter#returnValueAfterInsert", () => {
     const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
     const adapter = Object.assign(Object.create(AbstractMysqlAdapter.prototype), {
       _escapeState: { noBackslashEscapes: false },
+      pool: { serverVersion: () => null },
     });
     adapter.supportsInsertReturning = () => true;
     expect(await adapter.returnValueAfterInsert(makeColumn())).toBe(false);

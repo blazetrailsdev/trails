@@ -5,11 +5,20 @@ import {
   Base as ActiveRecordBase,
   ConnectionAdapters,
 } from "@blazetrails/activerecord";
-import { LoadError, NotImplementedError, abort, rbInspect } from "@blazetrails/ruby-compat";
-import { Command } from "commander";
+import { isPresent } from "@blazetrails/activesupport";
+import {
+  LoadError,
+  NotImplementedError,
+  abort,
+  include,
+  rbInspect,
+  type Included,
+} from "@blazetrails/ruby-compat";
+import { Command, Option } from "commander";
 import { environment } from "../command.js";
 import { bootApplicationBang, requireApplicationBang } from "../command/actions.js";
 import { Base } from "../command/base.js";
+import { EnvironmentArgument } from "../command/environment-argument.js";
 import { databaseConfiguration } from "../database.js";
 
 interface DBConsoleOptions {
@@ -116,14 +125,29 @@ export class DBConsole {
   }
 }
 
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
+export interface DbconsoleCommand extends Included<typeof EnvironmentArgument> {
+  /** @internal */
+  _environment?: string;
+  /** @internal */
+  _environmentSpecified?: boolean;
+  /** @internal */
+  _availableEnvironments?: string[];
+}
+
+/* eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging */
 export class DbconsoleCommand extends Base {
+  declare options: DBConsoleOptions;
+
   static {
+    include(this, EnvironmentArgument);
     this.classOption("includePassword", {
       aliases: "-p",
       type: "boolean",
       desc: "Automatically provide the password from database.yml",
     });
     this.classOption("mode", {
+      enum: ["html", "list", "line", "column"],
       type: "string",
       desc: "Automatically put the sqlite3 database in the specified mode",
     });
@@ -135,7 +159,23 @@ export class DbconsoleCommand extends Base {
     });
   }
 
+  constructor(options: DBConsoleOptions = {}) {
+    super(options);
+
+    this._environmentSpecified = isPresent(this.options.environment);
+
+    if (!this._environmentSpecified) {
+      this.options = { ...this.options, environment: environment() };
+    } else if (!this.availableEnvironments().includes(this.options.environment!)) {
+      this.options = {
+        ...this.options,
+        environment: this.expandEnvironmentName(this.options.environment!),
+      };
+    }
+  }
+
   async perform(): Promise<void> {
+    await this.requireApplicationBang();
     await bootApplicationBang();
     await DBConsole.start(this.options);
   }
@@ -148,7 +188,8 @@ export function dbconsoleCommand(): Command {
   for (const [name, option] of Object.entries(klass.classOptions())) {
     const flag = `--${name.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
     const long = option.type === "boolean" ? flag : `${flag} <${name}>`;
-    cmd.option([...[option.aliases ?? []].flat(), long].join(", "), option.desc);
+    const opt = new Option([...[option.aliases ?? []].flat(), long].join(", "), option.desc);
+    cmd.addOption(option.enum ? opt.choices(option.enum) : opt);
   }
   cmd.action(async (options: DBConsoleOptions, command: Command) => {
     await klass.perform(klass.commandName(), command.args, { options });

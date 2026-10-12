@@ -129,6 +129,15 @@ export namespace Psych {
   }
 
   /**
+   * `Object#to_yaml` (`vendor/ruby/v3.3.11/ext/psych/lib/psych/core_ext.rb:12-14`).
+   *
+   * @noRailsEquivalent PERMANENT
+   */
+  export function toYaml(o: unknown): string {
+    return dump(o);
+  }
+
+  /**
    * `Psych.unsafe_load` (`vendor/ruby/v3.3.11/ext/psych/lib/psych.rb:271`).
    *
    * @noRailsEquivalent PERMANENT

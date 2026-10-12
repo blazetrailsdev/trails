@@ -893,8 +893,8 @@ export const DatabaseStatements = new Module((mod) => {
   },
 
   /**
-   * @inventedArm if — PERMANENT
-   * @inventedArm primaryKeys — PERMANENT
+   * @inventedArm if — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
+   * @inventedArm primaryKeys — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
    */
   async execInsert(
     this: DatabaseStatementsDefaultsHost,
@@ -1266,7 +1266,7 @@ export function select(
 
 /**
  * @internal
- * @missingRailsCall primary_key — PERMANENT
+ * @missingRailsCall primary_key — CONVERGEABLE sql-for-insert-peeks-schema-cache-primary-keys
  */
 export function sqlForInsert(
   this: DatabaseStatementsHost,

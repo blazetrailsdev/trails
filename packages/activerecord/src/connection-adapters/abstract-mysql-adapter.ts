@@ -306,6 +306,7 @@ export abstract class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   async returnValueAfterInsert(column: Column): Promise<boolean> {
+    await this.databaseVersion;
     return this.supportsInsertReturning()
       ? column.isAutoPopulated()
       : column.isAutoIncrementedByDb();
