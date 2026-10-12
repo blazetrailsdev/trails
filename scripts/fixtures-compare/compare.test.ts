@@ -1,6 +1,7 @@
 import { describe, it, expect, afterAll } from "vitest";
+import { existsSync } from "node:fs";
 // prettier-ignore
-import { belongsToAssociationsByClass, joinLabelAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries } from "./compare.js";
+import { belongsToAssociationsByClass, joinLabelAssociationsByClass, stripErb, isRefLike, compareValue, compareFile, schemaCheck, canonicalizeRailsRow, ERB_SKIP_SENTINEL, tsModelPath, compareModelClass, modelDeclarationDrift, buildIdIndexForTest, loadRailsYamlForTest, withoutIgnoredFixtures, COMPOSITE_FK_LABEL_ATTRS, fixtureSetName, fixtureTable, rowsByTable, staleFixtureEntries, classesByName, loadRubyModelsManifest, MODELS_RUBY_DIRS } from "./compare.js";
 import type { RubyClass } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/support/schema-types.js";
 
@@ -570,7 +571,7 @@ describe("fixtureTable", () => {
     klass("Aircraft", { pluralizeTableNames: false }),
     klass("Admin::Account", { tableNamePrefix: "admin_" }),
     klass("Post"),
-    klass("CategoryPost", { tableName: "categories_posts" }),
+    klass("Post::CategoryPost", { tableName: "categories_posts" }),
     klass("EncryptedBookThatIgnoresCase", { tableName: "encrypted_books" }),
     klass("Account"),
   ]);
@@ -602,6 +603,17 @@ describe("fixtureTable", () => {
   it("gives an STI descendant its base class's table, past an intermediate table_name", () => {
     const sti = new Map([...classes, klass("Renamed", { parent: "Parrot", tableName: "renamed" }), klass("Leaf", { parent: "Renamed" })]); // prettier-ignore
     expect(fixtureTable("leafs", undefined, sti, rails).table).toBe("parrots");
+  });
+  describe.skipIf(!existsSync(MODELS_RUBY_DIRS.activerecord))("against the vendored models", () => {
+    it("qualifies a class nested in a class body, and prefixes its table (model_schema.rb:608-613)", () => {
+      const real = classesByName(loadRubyModelsManifest().filter((e) => e.package === "activerecord")); // prettier-ignore
+      const rails = new Set(["product_types", "categories_posts"]);
+      expect(fixtureTable("shop/product/types", undefined, real, rails)).toEqual({ table: "product_types", modelClass: "Shop::Product::Type", declared: true }); // prettier-ignore
+      expect(fixtureTable("categories_posts", "Post::CategoryPost", real, rails).modelClass).toBe("Post::CategoryPost"); // prettier-ignore
+      expect(real.has("MyApplication::Business::Client::Contact")).toBe(true);
+      for (const sibling of ["BookDestroyAsyncWithScopedTags", "DeadParrot", "Contact"])
+        expect(real.get(sibling)?.qualifiedName).toBe(sibling);
+    });
   });
   it("falls back to default_fixture_table_name when no class resolves", () => {
     expect(table("namespaced/accounts")).toEqual({ table: "namespaced_accounts", modelClass: null, declared: false }); // prettier-ignore

@@ -723,9 +723,7 @@ function computeTableName(classes: ReadonlyMap<string, RubyClass>, klass: RubyCl
  * class's table name, or `default_fixture_table_name` (`fixtures.rb:550-554`)
  * with no class, whose `config.table_name_prefix` / `table_name_suffix` are
  * `""` in Rails' test suite. A passed class the manifest lacks is one the test
- * file defines, with no `table_name` of its own. The manifest qualifies a class
- * by its enclosing modules only, so a file's `model_class` nested in a class
- * body (`Post::CategoryPost`) is found under its last segment.
+ * file defines, with no `table_name` of its own.
  */
 export function fixtureTable(
   name: string,
@@ -740,9 +738,7 @@ export function fixtureTable(
   const passed = FIXTURE_CLASS_NAMES[name];
   const klass = passed
     ? classes.get(passed)
-    : ((fileModelClass
-        ? (classes.get(fileModelClass) ?? classes.get(fileModelClass.split("::").pop()!))
-        : undefined) ?? classes.get(defaultName));
+    : ((fileModelClass ? classes.get(fileModelClass) : undefined) ?? classes.get(defaultName));
   const table = klass
     ? tableName(classes, klass)!
     : passed
@@ -1219,7 +1215,7 @@ const MODELS_TS_DIRS: Record<string, string> = {
   activemodel: path.join(ROOT, "packages/activemodel/src/test-helpers/models"),
 };
 const RUBY_EXTRACTOR = path.join(HERE, "extract-ruby-models.rb");
-const MODELS_RUBY_DIRS: Record<string, string> = {
+export const MODELS_RUBY_DIRS: Record<string, string> = {
   activerecord: resolveSourcePath("rails", "activerecord/test/models"),
   activemodel: resolveSourcePath("rails", "activemodel/test/models"),
 };
@@ -1286,7 +1282,7 @@ interface ModelResult {
   notes: string[];
 }
 
-function loadRubyModelsManifest(): RubyFileEntry[] {
+export function loadRubyModelsManifest(): RubyFileEntry[] {
   const out = execFileSync("ruby", [RUBY_EXTRACTOR], {
     encoding: "utf8",
     env: { ...process.env, MODELS_PATHS_JSON: JSON.stringify(MODELS_RUBY_DIRS) },
