@@ -9,6 +9,7 @@ import {
   NoMethodError,
   PROTOCOL_PROBES,
   rbEqual,
+  rbHash,
   stringToSym,
   symbolToS,
 } from "@blazetrails/ruby-compat";
@@ -187,15 +188,21 @@ export class MimeType {
   readonly symbol: string | null;
   /** @internal */
   readonly synonyms: string[];
+  private readonly _hash: number;
 
   private static callbacks: Array<(type: MimeType) => void> = [];
 
   static readonly SET: Mimes = new Mimes();
 
+  hash(): number {
+    return this._hash;
+  }
+
   constructor(string: string, symbol: string | null = null, synonyms: string[] = []) {
     this.string = string;
     this.symbol = symbol;
     this.synonyms = synonyms;
+    this._hash = rbHash([this.string, this.synonyms, this.symbol]);
     return new Proxy<MimeType>(this, METHOD_MISSING_HANDLER);
   }
 

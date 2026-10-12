@@ -339,6 +339,7 @@ export { beginningOfHour as atBeginningOfHour };
 export { endOfHour as atEndOfHour };
 export { beginningOfMinute as atBeginningOfMinute };
 export { endOfMinute as atEndOfMinute };
+export { eqlWithCoercion as eql };
 
 export function prevDay(this: RubyTime, days = 1): RubyTime {
   return advance.call(this, { days: -days });

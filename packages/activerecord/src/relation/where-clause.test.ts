@@ -1,4 +1,5 @@
 import { assertEmpty, assertNotEmpty, rbEqual } from "@blazetrails/activesupport";
+import { Hash } from "@blazetrails/ruby-compat";
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, sql } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";
@@ -250,20 +251,18 @@ describe("ActiveRecord::Relation", () => {
     });
 
     it("supports hash equality", () => {
-      const h = new Map<WhereClause, number>();
-      const bump = (k: WhereClause) => {
-        const key = [...h.keys()].find((e) => e.equals(k)) ?? k;
-        h.set(key, (h.get(key) ?? 0) + 1);
-      };
-      bump(new WhereClause(["a"]));
-      bump(new WhereClause(["a"]));
-      bump(new WhereClause(["b"]));
+      const h = new Hash<WhereClause, number>(0);
+      let k = new WhereClause(["a"]);
+      h.set(k, h.get(k)! + 1);
+      k = new WhereClause(["a"]);
+      h.set(k, h.get(k)! + 1);
+      k = new WhereClause(["b"]);
+      h.set(k, h.get(k)! + 1);
 
-      const expected = [
-        [new WhereClause(["a"]), 2],
-        [new WhereClause(["b"]), 1],
-      ];
-      expect(rbEqual([...h.entries()], expected)).toEqual(true);
+      const expected = new Hash<WhereClause, number>();
+      expected.set(new WhereClause(["a"]), 2);
+      expected.set(new WhereClause(["b"]), 1);
+      expect(rbEqual(expected, h)).toEqual(true);
     });
   });
 });

@@ -84,6 +84,10 @@ describe("Scalar", () => {
 });
 
 describe("DurationTest", () => {
+  it("hash", () => {
+    expect(minutes(1).hash()).toBe(seconds(60).hash());
+  });
+
   it("equals", () => {
     expect(days(1).equals(days(1))).toBe(true);
     expect(days(1).equals(days(1).toI())).toBe(true);

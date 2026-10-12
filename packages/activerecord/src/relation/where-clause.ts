@@ -1,5 +1,12 @@
 import { extractBang, rbEqual } from "@blazetrails/activesupport";
-import { Hash, first, isEmpty, isModuleIncluded, rbObjRespondTo } from "@blazetrails/ruby-compat";
+import {
+  Hash,
+  first,
+  isEmpty,
+  isModuleIncluded,
+  rbHash,
+  rbObjRespondTo,
+} from "@blazetrails/ruby-compat";
 
 import * as Arel from "@blazetrails/arel";
 import { Nodes, Predications, fetchAttribute, sql } from "@blazetrails/arel";
@@ -97,6 +104,12 @@ export class WhereClause {
 
   equals(other: unknown): boolean {
     return other instanceof WhereClause && rbEqual(this.predicates, other.predicates);
+  }
+
+  declare eql: WhereClause["equals"];
+
+  hash(): number {
+    return rbHash([this.constructor, this.predicates]);
   }
 
   isContradiction(): boolean {
@@ -199,6 +212,8 @@ export class WhereClause {
     return hash;
   }
 }
+
+WhereClause.prototype.eql = WhereClause.prototype.equals;
 
 /** @internal */
 function invertPredicate(

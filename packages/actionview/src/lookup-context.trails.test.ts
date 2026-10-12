@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect } from "vitest";
-import { LookupContext } from "./lookup-context.js";
+import { DetailsKey, LookupContext } from "./lookup-context.js";
 import { TemplateHandlers } from "./template/handlers.js";
 
 describe("LookupContext", () => {
@@ -63,5 +63,13 @@ describe("LookupContext", () => {
     expect(ctx.handlers).toEqual([":builder"]);
     expect(ctx.formats).toEqual([":json"]);
     expect(ctx.locale).toBe(":da");
+  });
+});
+
+describe("LookupContext::DetailsKey#eql?", () => {
+  it("is equal?, so two keys are eql only when they are the same object", () => {
+    const key = new DetailsKey();
+    expect(key.eql(key)).toBe(true);
+    expect(key.eql(new DetailsKey())).toBe(false);
   });
 });

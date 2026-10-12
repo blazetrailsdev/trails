@@ -80,3 +80,13 @@ describe("Mime::Type.register fills LOOKUP and EXTENSION_LOOKUP separately (mime
     MimeType.unregister(":foobar");
   });
 });
+
+describe("Mime::Type#hash", () => {
+  it("is the hash of string, synonyms and symbol, taken at initialize", () => {
+    const one = new MimeType("text/x-hash", ":x_hash", ["application/x-hash"]);
+    const two = new MimeType("text/x-hash", ":x_hash", ["application/x-hash"]);
+    expect(one.eql(two)).toBe(true);
+    expect(one.hash()).toBe(two.hash());
+    expect(one.hash()).not.toBe(new MimeType("text/x-hash", ":other").hash());
+  });
+});
