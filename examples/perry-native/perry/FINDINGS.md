@@ -135,7 +135,7 @@ Hiding an import does not defer its cost, it deletes the capability. **No
 import-graph change in trails can reduce Perry's module count**, so do not make
 a correctly-lazy dependency less lazy to suit it.
 
-## Wall 3: module initialization order — a Perry bug
+## Wall 3: module initialization order — a Perry bug, and not workaroundable
 
 `04d-ruby-compat-barrel` compiles **and links** (139 modules, 40MB) and then
 dies immediately:
@@ -146,18 +146,50 @@ dies immediately:
 That line is `Object.setPrototypeOf(rbCClass, Module)`. `rbCClass` is imported
 from `./object.js`, where it is `export const rbCClass = rbDefineClass("Class")`
 (`object.ts:236`). It is `undefined` when `include.ts`'s top-level body runs,
-which means `object.js` had not been evaluated yet.
+so `object.js` had not been evaluated yet. The same code reached directly
+(`04c`) works; reached through the barrel (`04d`) it crashes.
 
-**`object.ts` does not import `include.ts`.** There is no cycle — the edge is
-one-directional and acyclic, so ESM guarantees `object.js` is fully evaluated
-before `include.js`'s body executes. Perry ran them in the wrong order. It is
-also entry-point dependent: the same code reached directly (`04c`) works, and
-reached through the barrel (`04d`) crashes.
+### Why it is still Perry's bug, although ruby-compat has cycles
 
-This is a clean, minimal, reproducible Perry defect with no trails fault to
-excuse it, and it is the single most useful thing to report upstream. It also
-means Wall 1 is not the last obstacle: even with unlimited memory, a barrel
-import of a trails package currently produces a binary that crashes on startup.
+Perry documents the right intent — `init_order.rs` topologically sorts by
+import dependency so "a module that imports from another module runs after
+that other module's initializer", and "cycles are broken at the back-edge".
+
+`ruby-compat/src` does contain circular value imports: 6 circular groups,
+including one of 28 modules (`array`, `hash`, `comparable`, `complex`,
+`enumerator`, …) and a 2-module `include ↔ variable` pair. An earlier revision
+of this document claimed the graph was acyclic. **That was wrong**, and the
+cycle-breaking is the likely mechanism.
+
+But it does not excuse the result, because **`include.ts` and `object.ts` are
+in different circular groups** — `include` sits in `{include, variable}`,
+`object` in the 28-module group. Condense each group to a node and the
+remaining graph is a DAG in which `include`'s group depends on `object`'s. A
+valid initialization order therefore exists and is unambiguous for this pair;
+Perry did not find it. Breaking a cycle perturbed the order of a module
+_outside_ that cycle.
+
+### A workaround was tried and does not work
+
+The obvious nudge — making the barrel force the dependency first, by putting
+
+    import "./object.js";
+
+as the very first statement of `ruby-compat/src/index.ts` — was implemented,
+`dist` rebuilt, and `04d` recompiled. **It changes nothing**: still 139
+modules, still the same crash at the same line. Perry honours neither the
+dependency edge nor an explicit first-statement side-effect import for this
+module, which makes the defect sharper and the prospects for a trails-side
+workaround correspondingly worse. The experiment was reverted.
+
+The only thing that avoids Wall 3 is not importing through the barrel, which
+is what `04c` does. That is available to a diagnostic rung and not to real
+application code, which imports `@blazetrails/*` by package name — and it
+would buy nothing anyway while Walls 1 and 2 stand.
+
+So: report it upstream. `04d-ruby-compat-barrel` is a 139-module reproducer,
+and the one-line barrel experiment above is worth including, since "an
+explicit side-effect import does not fix it" narrows the cause considerably.
 
 ## The SQLite result is weaker than it looks
 
