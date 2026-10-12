@@ -24,6 +24,15 @@ describe("Psych with Date, DateTime and Time unseated", () => {
     expect(load).toThrow("undefined class/module DateTime");
   });
 
+  it("emits a coder's represent_seq as a sequence", () => {
+    class Seq {
+      encodeWith(coder: PsychModule.Coder): void {
+        coder.representSeq(null, [1, "a"]);
+      }
+    }
+    expect(Psych.dump(new Seq())).toBe("---\n- 1\n- a\n");
+  });
+
   it("round-trips plain data", () => {
     const yaml = Psych.dump({ a: [1, "x", null] });
     expect(Psych.unsafeLoad(yaml)).toEqual({ a: [1, "x", null] });

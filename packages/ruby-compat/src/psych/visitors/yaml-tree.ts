@@ -15,7 +15,7 @@ import { registeredConstant } from "../../variable.js";
 import type { Document, Node, Scalar, YAMLMap } from "yaml";
 import { Psych } from "../../psych.js";
 import { yaml } from "../../psych-adapter.js";
-import { Coder, coderTag } from "../coder.js";
+import { Coder, coderSeq, coderTag, coderType } from "../coder.js";
 import { ClassLoader } from "../class-loader.js";
 import { ScalarScanner } from "../scalar-scanner.js";
 
@@ -260,6 +260,12 @@ export class YAMLTree {
   }
 
   private emitCoder(c: Coder, o: object): Node {
+    if (c[coderType] === ":seq") {
+      const seq = new yaml.YAMLSeq();
+      if (c[coderTag] !== null) seq.tag = c[coderTag];
+      for (const thing of c[coderSeq]) seq.items.push(this.accept(thing));
+      return seq;
+    }
     const map = new yaml.YAMLMap();
     if (c[coderTag] !== null) map.tag = c[coderTag];
     this.register(o, map);
