@@ -13,7 +13,6 @@ import {
   stringSplit,
   type Generic,
   type Included,
-  type StringIO,
 } from "@blazetrails/ruby-compat";
 import { TestResponse } from "./test-response.js";
 import { RouteSet } from "../routing/route-set.js";
@@ -33,7 +32,7 @@ import { DEFAULT_PORTS, type RackApp, type RackMiddleware } from "@blazetrails/r
 import { TestCase } from "@blazetrails/activesupport/test-case";
 
 export interface IntegrationRequestOptions {
-  params?: Record<string, unknown> | string | StringIO;
+  params?: Record<string, unknown> | string;
   headers?: Record<string, string>;
   xhr?: boolean;
   env?: Record<string, unknown>;
