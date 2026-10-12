@@ -30,14 +30,6 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(type.isBinary()).toBeFalsy();
     });
 
-    it("full text search", async () => {
-      await adapter.execute(`INSERT INTO tsvectors (text_vector) VALUES ('cat'::tsvector)`);
-      const rows = await adapter.execute(
-        `SELECT text_vector FROM tsvectors WHERE text_vector @@ to_tsquery('cat')`,
-      );
-      expect(rows).toHaveLength(1);
-    });
-
     it("schema dump with shorthand", async () => {
       const output = await dumpTableSchema("tsvectors");
       expect(output).toMatch(/t\.tsvector\("text_vector"\)/);

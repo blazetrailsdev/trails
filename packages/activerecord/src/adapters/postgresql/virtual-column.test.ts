@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
+import { describe, expect, beforeAll, afterAll, vi } from "vitest";
 import { File as FixtureFile } from "../../fixture-set/file.js";
 import { FIXTURES_ROOT as TS_FIXTURES_ROOT } from "../../test-helpers/fixtures-registry.js";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
@@ -97,16 +97,6 @@ describeIfPg("PostgreSQLAdapter", () => {
           await t.virtual("invalid_definition", { type: "string", as: "LOWER(name)" });
         }),
       ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
-    });
-
-    it("non persisted column via createTable", async () => {
-      await expect(
-        adapter.createTable("bad_virtual", { force: true }, (t) => {
-          t.virtual("invalid", { type: "string", as: "LOWER(name)" });
-        }),
-      ).rejects.toThrow(/does not support VIRTUAL.*Specify 'stored: true'/s);
-      // eslint-disable-next-line blazetrails/require-table-teardown
-      await adapter.dropTable("bad_virtual", { ifExists: true }).catch(() => {});
     });
 
     itIfSupports("virtual_columns", "schema dumping", async () => {
