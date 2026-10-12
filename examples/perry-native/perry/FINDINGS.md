@@ -5,11 +5,30 @@ x86_64 Linux box, against `examples/perry-native` — a stock `trails new`
 scaffold plus one `trails g scaffold Trail name:string length:integer`.
 Reproduce with `perry/run-ladder.sh`; setup is in [README.md](README.md).
 
-**Real trails framework code does compile and run as a native binary.** A
-54-module slice of `@blazetrails/ruby-compat` produces a working 21MB
-executable with correct output. The whole application does not, and is blocked
-by three distinct walls, all of them Perry's. One of them is a plain Perry bug
-worth reporting upstream.
+Measured against **Perry 0.5.1520** (the published npm build) and re-verified
+against **`main` @ `d74498b2` (0.5.1659)** built from source, clang 23.1.3 /
+LLVM 22.1.8, on a 60GB x86_64 Linux box.
+
+**Short answer: not yet — but the two walls that looked structural are not.**
+
+Real trails framework code compiles and runs natively: a 54-module slice of
+`@blazetrails/ruby-compat` gives a working 21MB executable with correct
+output. With a from-source Perry, a 362-module activesupport subgraph —
+WebAssembly and all — compiles and **links** into a 69MB executable. It then
+hangs in module initialization, which is where this stops today.
+
+Status of each wall after re-verification:
+
+| Wall                               | Status                                                                                                          |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 1 — codegen memory                 | **Softer than first recorded.** 362 modules fit in a 20GB cap.                                                  |
+| 2 — WebAssembly cannot link        | **Gone** from source. An npm-distribution gap, not a capability limit.                                          |
+| 3a — `importedClass.prototype`     | **Fixed upstream**, unreleased.                                                                                 |
+| 3b — shape-mint abort              | Live. Triggered by compiling TypeScript _source_; avoidable by compiling the `dist` JS published packages ship. |
+| 3c — init-time hang at 362 modules | Live, new, and the current frontier.                                                                            |
+
+The rung table below was measured on the npm build, so its `MEM` and `RUNTIME`
+rows are that build's behaviour; each wall's own section says what changed.
 
 ## The ladder
 
