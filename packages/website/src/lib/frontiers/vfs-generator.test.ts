@@ -119,6 +119,20 @@ describe("the VFS FsAdapter's async verbs", () => {
     expect(() => fs.readdirSync("/tmp")).toThrow(/ENOENT/);
   });
 
+  test("rm removes a tree, and force ignores a path that does not exist", async () => {
+    const fs = vfsFs(tree());
+
+    await fs.mkdir!("/app/views/posts/partials", { recursive: true });
+    await expect(fs.rm!("/app/views/posts")).rejects.toThrow(/ERR_FS_EISDIR/);
+    await fs.rm!("/app/views/posts", { recursive: true, force: true });
+    expect(fs.existsSync("/app/views/posts")).toBe(false);
+    expect(fs.existsSync("/app/views/posts/index.html.tse")).toBe(false);
+    expect(fs.statSync("/app/views").isDirectory()).toBe(true);
+
+    await expect(fs.rm!("/nope")).rejects.toThrow(/ENOENT/);
+    await expect(fs.rm!("/nope", { force: true })).resolves.toBeUndefined();
+  });
+
   test("the sync and the async readdir, stat and exists agree", async () => {
     const fs = vfsFs(tree());
 
