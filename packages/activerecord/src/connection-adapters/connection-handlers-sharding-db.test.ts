@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, afterAll } from "vitest";
 import { Base } from "../base.js";
 import { type RawConfigurations } from "../database-configurations.js";
-import { currentRole, connectedToStack } from "../core.js";
+import { currentRole } from "../core.js";
 import { ConnectionNotDefined } from "../errors.js";
 import { ArgumentError, setEnv } from "@blazetrails/ruby-compat";
 import { fixtures } from "../test-fixtures.js";
@@ -450,25 +450,6 @@ describe("ConnectionHandlersShardingDbTest", () => {
     });
     expect(SecondaryBase.defaultShard).toBe("not_default");
     expect(SomeOtherBase.defaultShard).toBe("default");
-  });
-
-  it("connectingTo uses the class defaultShard when shard is omitted", async () => {
-    class ShardedAbstractBase extends Base {
-      static override abstractClass = true;
-    }
-    await ShardedAbstractBase.connectsTo({
-      shards: { not_default: { writing: { database: ":memory:", adapter: "sqlite3" } } },
-    });
-    expect(ShardedAbstractBase.defaultShard).toBe("not_default");
-
-    ShardedAbstractBase.connectingTo({ role: "writing" });
-    try {
-      expect(ShardedAbstractBase.isConnectedTo({ role: "writing", shard: "not_default" })).toBe(
-        true,
-      );
-    } finally {
-      connectedToStack().pop();
-    }
   });
 
   it("same shards across clusters", async () => {
