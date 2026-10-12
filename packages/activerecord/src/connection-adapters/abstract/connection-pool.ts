@@ -6,7 +6,6 @@ import {
   isMonOwned,
   KERNEL_METHODS,
   Mutex,
-  NotImplementedError,
   PROTOCOL_PROBES,
   rbDefineInspectCustom,
   rbObjDup,
@@ -718,12 +717,7 @@ export class ConnectionPool implements ReapablePool {
       this._nowConnecting += 1;
       try {
         const conn = this.checkoutNewConnection();
-        if (conn instanceof Promise) {
-          // @nie disposition=TODO
-          throw new NotImplementedError(
-            "newConnection answered a promise on the synchronous checkout path",
-          );
-        }
+        if (conn instanceof Promise) throw new ConnectionNotEstablished("async newConnection");
         conn.pool = this;
         this._connections!.push(conn);
         conn.lease();
