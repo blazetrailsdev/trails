@@ -11,12 +11,14 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLActiveSchemaTest", () => {
     let execute: typeof PostgreSQLAdapter.prototype.execute;
+    let executeWasOwn: boolean;
     fixtures(["people"]);
 
     beforeEach(async () => {
       adapter = (await Base.leaseConnection()) as PostgreSQLAdapter;
       await adapter.materializeTransactions();
 
+      executeWasOwn = Object.hasOwn(PostgreSQLAdapter.prototype, "execute");
       execute = PostgreSQLAdapter.prototype.execute;
       PostgreSQLAdapter.prototype.execute = async function (sql: string, _name = null) {
         return sql;
@@ -24,7 +26,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     afterEach(() => {
-      PostgreSQLAdapter.prototype.execute = execute;
+      delete (PostgreSQLAdapter.prototype as Partial<PostgreSQLAdapter>).execute;
+      if (executeWasOwn) PostgreSQLAdapter.prototype.execute = execute;
     });
 
     it("create database with encoding", async () => {

@@ -753,8 +753,8 @@ export class Migration<A extends DatabaseAdapter = DatabaseAdapter> {
     await this.methodMissing("addTimestamps", ...args);
   }
 
-  async removeTimestamps(tableName: string): Promise<void> {
-    await this.methodMissing("removeTimestamps", tableName);
+  async removeTimestamps(...args: [tableName: string, options?: ColumnOptions]): Promise<void> {
+    await this.methodMissing("removeTimestamps", ...args);
   }
 
   async createJoinTable(
