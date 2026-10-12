@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Decryption } from "./errors.js";
+import { rbInspect } from "@blazetrails/ruby-compat";
 import type { EncryptorLike } from "./encryptor.js";
 import type { SchemeOptions } from "./scheme.js";
 import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
@@ -32,15 +33,16 @@ class TestEncryptor implements EncryptorLike {
     for (const [clear, cipher] of Object.entries(this.map)) {
       if (cipher === encryptedText) return clear;
     }
-    throw new Decryption(`Couldn't find a match for ${encryptedText}`);
+    throw new Decryption(`Couldn't find a match for ${encryptedText} (${rbInspect(this.map)})`);
   }
 
   isEncrypted(text: string): boolean {
     try {
       this.decrypt(text);
       return true;
-    } catch {
-      return false;
+    } catch (error) {
+      if (error instanceof Decryption) return false;
+      throw error;
     }
   }
 

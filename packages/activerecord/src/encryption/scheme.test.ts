@@ -45,11 +45,13 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
     const originalSalt = Encryption.config.keyDerivationSalt;
     try {
       Encryption.config.keyDerivationSalt = "salt-one";
+      Encryption.resetDefaultContext();
       const schemeA = new Scheme({ key: "mykey" });
       expect(schemeA.keyProvider).toBeInstanceOf(DerivedSecretKeyProvider);
       const secretA = (schemeA.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
 
       Encryption.config.keyDerivationSalt = "salt-two";
+      Encryption.resetDefaultContext();
       const schemeB = new Scheme({ key: "mykey" });
       const secretB = (schemeB.keyProvider as DerivedSecretKeyProvider).encryptionKey().secret;
 
@@ -58,6 +60,7 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
       expect(secretA).not.toBe(secretB);
     } finally {
       Encryption.config.keyDerivationSalt = originalSalt;
+      Encryption.resetDefaultContext();
     }
   });
 

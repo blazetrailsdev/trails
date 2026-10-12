@@ -46,7 +46,10 @@ describe("ActiveRecord::Encryption::KeyGeneratorTest (trails)", () => {
       const gen = new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 });
       const withTestSalt = gen.deriveKeyFrom("password");
       Encryption.config.keyDerivationSalt = "other-salt";
-      expect(gen.deriveKeyFrom("password")).not.toBe(withTestSalt);
+      expect(gen.deriveKeyFrom("password")).toBe(withTestSalt);
+      expect(
+        new KeyGenerator({ hashDigestClass: OpenSSL.Digest.SHA256 }).deriveKeyFrom("password"),
+      ).not.toBe(withTestSalt);
     });
   });
 });
