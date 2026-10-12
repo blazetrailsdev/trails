@@ -99,7 +99,7 @@ function strRange(str: string, args: ArefArgs): [number, number] {
   return [start, second === undefined ? 1 : second];
 }
 
-export class SafeBuffer extends stringSuperclass("eql", "hash") {
+export class SafeBuffer extends stringSuperclass("eql", "hash", "isBlank", "asJson") {
   static readonly UNSAFE_STRING_METHODS = [
     "capitalize",
     "chomp",

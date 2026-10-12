@@ -26,11 +26,7 @@ export class MissingRenderer extends Error {
   }
 }
 
-export type RendererProc = (
-  this: RenderersHost,
-  value: unknown,
-  options: Record<string, unknown>,
-) => unknown;
+export type RendererProc = (this: any, value: unknown, options: Record<string, unknown>) => unknown;
 
 export interface RenderersHost {
   contentType: string | null;

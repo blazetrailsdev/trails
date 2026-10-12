@@ -50,22 +50,22 @@ export interface RenderingHost {
   _normalizeOptions(options: RenderOptions): RenderOptions;
 }
 
-export function render<T extends RenderingHost>(this: T, ...args: unknown[]): void | Promise<void> {
+export function render<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {
   const options = this._normalizeRender(...args);
   const renderedBody = this.renderToBody(options);
-  const set = (renderedBody: unknown): void => {
+  const set = (renderedBody: unknown): unknown => {
     if (options.html != null && options.html !== false) {
       this._setHtmlContentType();
     } else {
       this._setRenderedContentType(this.renderedFormat());
     }
     this._setVaryHeader();
-    this.responseBody = renderedBody;
+    return (this.responseBody = renderedBody);
   };
   if (typeof (renderedBody as PromiseLike<unknown> | null)?.then === "function") {
     return Promise.resolve(renderedBody).then(set);
   }
-  set(renderedBody);
+  return set(renderedBody);
 }
 
 export function renderToString<T extends RenderingHost>(this: T, ...args: unknown[]): unknown {

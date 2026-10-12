@@ -116,9 +116,9 @@ export function _processOptions(
   return Rendering.superMethod(this, "_processOptions")!(options);
 }
 
-export function render(this: AbstractRenderHost, ...args: unknown[]): void | Promise<void> {
+export function render(this: AbstractRenderHost, ...args: unknown[]): unknown {
   if (this.responseBody != null) throw new DoubleRenderError();
-  return Rendering.superMethod(this, "render")!(...args) as void | Promise<void>;
+  return Rendering.superMethod(this, "render")!(...args);
 }
 
 export function renderToString(this: AbstractRenderHost, ...args: unknown[]): unknown {
