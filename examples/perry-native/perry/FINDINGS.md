@@ -169,27 +169,43 @@ answers "up to date (v0.5.1520)" (published 2026-09-11).
 That fix is real and it moves us: the 58-module `include.js` rung, which
 crashed under the npm build, now compiles **and runs correctly** from source.
 
-### Bug 3b — `static ShapeId refused by the shape mint` (live, unreported)
+### Bug 3b — `static ShapeId refused by the shape mint` (live, narrowed)
 
-With 3a fixed, the 137-module barrel rung gets further and then aborts at
-startup with an explicit internal-invariant failure:
+With 3a fixed, the 137-module barrel rung gets further and aborts at startup
+on Perry's own invariant check:
 
-    Perry internal error: the static ShapeId 0x80000505 (proto 0x400000000000000c)
+    Perry internal error: the static ShapeId 0x80000631 (proto 0x400000000000000c)
     was refused by the shape mint (it is outside the static band or already names
     other facts in this agent); a static id must name one shape
 
-Deterministic across runs. Current state on `main` (0.5.1659), by graph size:
+Narrowed to a single construct — the write-up is
+[upstream/SHAPE-MINT.md](upstream/SHAPE-MINT.md):
 
-| Rung                           | Modules | Result on `main`                                  |
-| ------------------------------ | ------- | ------------------------------------------------- |
-| `04c-ruby-compat`              | 54      | compiles, runs correctly                          |
-| `inc-only` (deep `include.js`) | 58      | **now** compiles and runs correctly (3a fixed it) |
-| `04d-ruby-compat-barrel`       | 137     | compiles and links, aborts on the shape mint      |
+| `ruby-compat/src/include.ts:175`                                 | Result         |
+| ---------------------------------------------------------------- | -------------- |
+| `export class Module<I extends object = Record<never, never>> {` | **aborts**     |
+| `export class Module {`                                          | runs correctly |
 
-So Wall 3 is two bugs deep: fixing the first revealed the second. 3b is a
-genuine candidate to report — it is Perry's own invariant check firing, not a
-misuse — but it has not been minimized, so it is not filed. Reproduce with
-`04d-ruby-compat-barrel` against a from-source `main`.
+The trigger is compiling the package's **TypeScript source**. The `tsc` output
+of the same class, which ruby-compat ships in `dist/`, never aborts — and
+Perry prefers `src/` over `dist/` on its own, which is what selects the
+failing path. Importing `dist/index.js` by relative path compiles and runs at
+the same 137 modules.
+
+It does **not** reduce to a small synthetic program: a bare
+`export class Box<I extends object = Record<never, never>> {}` is fine, as are
+variants with a constructor parameter, a getter, no default type argument, or
+a plain `<T>`. That is consistent with the error rather than a dead end —
+these static ids are compiler-assigned _by content_, so a collision needs a
+populated shape space that a two-module program has not got.
+
+Current state on `main` (0.5.1659) by graph size:
+
+| Rung                           | Modules | Result                               |
+| ------------------------------ | ------- | ------------------------------------ |
+| `04c-ruby-compat`              | 54      | compiles, runs correctly             |
+| `inc-only` (deep `include.js`) | 58      | **now** runs correctly (3a fixed it) |
+| `04d-ruby-compat-barrel`       | 137     | aborts on the shape mint             |
 
 ### Reproducing any of this needs a from-source Perry
 
