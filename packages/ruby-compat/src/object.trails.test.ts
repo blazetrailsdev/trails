@@ -66,6 +66,7 @@ import { NameError } from "./name-error.js";
 import { FrozenError } from "./frozen-error.js";
 import { NoMethodError } from "./no-method-error.js";
 import { rbModConstSet } from "./include.js";
+import { stringSuperclass } from "./string/method-table.js";
 
 describe("Object#inspect", () => {
   it("renders nested arrays, hashes, nil, strings and numbers as MRI does", () => {
@@ -137,6 +138,26 @@ describe("Object#inspect", () => {
 });
 
 describe("Object#to_s", () => {
+  it("accepts a to_s answer that is a String and never calls to_str on it", () => {
+    class Str extends stringSuperclass("eql") {
+      toS(): this {
+        return this;
+      }
+    }
+    expect(toS(new Str("seat"))).toBe("seat");
+    class Convertible {
+      toStr(): string {
+        return "converted";
+      }
+    }
+    class Wrapper {
+      toS(): Convertible {
+        return new Convertible();
+      }
+    }
+    expect(toS(new Wrapper())).toMatch(/^#<Wrapper/);
+  });
+
   it("is inspect for Array and Hash and the value's own to_s otherwise", () => {
     expect(toS(3)).toBe("3");
     expect(toS(null)).toBe("");

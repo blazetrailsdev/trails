@@ -1,6 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
 import type { RackEnv } from "@blazetrails/rack";
-import { dup, merge, rbEqual } from "@blazetrails/ruby-compat";
+import { dup, hashAref, hashAset, merge, mergeBang, rbEqual } from "@blazetrails/ruby-compat";
 
 import { Request } from "../action-dispatch/http/request.js";
 import type { Response } from "../action-dispatch/http/response.js";
@@ -41,9 +41,9 @@ export class Renderer {
           break;
       }
 
-      key = Renderer.RACK_KEY_TRANSLATION[key] ?? key;
+      key = (hashAref(Renderer.RACK_KEY_TRANSLATION, key) as string | null) ?? key;
 
-      newEnv[key] = value;
+      hashAset(newEnv, key, value);
     }
 
     if (newEnv["HTTP_HOST"] != null && newEnv["HTTP_HOST"] !== false) {
@@ -87,7 +87,7 @@ export class Renderer {
       this._env = Renderer.DEFAULT_ENV;
     } else {
       this._env = this.normalizeEnv(this._defaults);
-      if (!isBlank(env)) Object.assign(this._env, this.normalizeEnv(env!));
+      if (!isBlank(env)) mergeBang(this._env, this.normalizeEnv(env!));
     }
   }
 

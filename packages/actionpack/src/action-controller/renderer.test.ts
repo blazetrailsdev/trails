@@ -38,5 +38,14 @@ describe("Renderer", () => {
         Renderer.normalizeEnv({ httpHost: "example.com", https: false })["rack.url_scheme"],
       ).toBe("http");
     });
+
+    it("keeps a key naming an Object.prototype member or __proto__ literally", () => {
+      const env = Renderer.normalizeEnv(JSON.parse('{"toString":"a","__proto__":"b"}'));
+      expect(Object.entries(env)).toEqual([
+        ["toString", "a"],
+        ["__proto__", "b"],
+      ]);
+      expect(Object.getPrototypeOf(env)).toBe(Object.prototype);
+    });
   });
 });
